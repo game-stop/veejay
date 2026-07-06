@@ -1,22 +1,20 @@
 #define _POSIX_C_SOURCE 200810L
 
-/* Eidolon - VIMS lifeform
+/* eidolon_life.c - evolving Auto-VJ performer for VeeJay/VIMS
  *
- *       (C) 2026 Niels Elburg <nwelburg@gmail.com> 
+ * This is intentionally a little autonomous organism: it creates samples,
+ * builds FX chains up to nineteen entries, enables beat control on every entry,
+ * and drives parameters forever with a Conway-ish fuzzy state machine.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * Build inside the VeeJay source tree similarly to sayVIMS.
+ * Suggested quick build from a configured tree:
+ *   gcc -DHAVE_CONFIG_H -I. -I./veejay-current/veejay-server \
+ *       -o eidolon eidolon_life.c -lveejaycore -lm
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * The program uses the same client layer as sayVIMS and speaks VIMS only.
+ * State is written atomically so the organism can continue after a stop.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ * GPL-2.0-or-later, matching VeeJay tooling.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -59,20 +57,57 @@
 #define AVJ_POP             18
 #define AVJ_NAME_LEN        48
 #define AVJ_LINE            2048
-#define AVJ_DEFAULT_STATE   "autovj.life"
-#define AVJ_VERSION         14
+#define AVJ_DEFAULT_STATE   "eidolon.life"
+#define AVJ_VERSION         22
 #define AVJ_STATUS_FEATURES  48
-#define AVJ_STATUS_TOKEN_CAP 128
+#define AVJ_STATUS_TOKEN_CAP 160
 #define AVJ_IMMUNE_CAP       96
 #define AVJ_PAIR_IMMUNE_CAP 192
+#define AVJ_GESTURE_CAP      64
+#define AVJ_GESTURE_MEMORY_CAP 128
 
 #define AVJ_STATUS_TOKEN_REAL_FPS             0
+#define AVJ_STATUS_TOKEN_FRAME                1
 #define AVJ_STATUS_TOKEN_PLAYBACK_MODE        2
 #define AVJ_STATUS_TOKEN_CURRENT_ID           3
 #define AVJ_STATUS_TOKEN_CHAIN_ON             4
+#define AVJ_STATUS_TOKEN_FIRST_FRAME          5
+#define AVJ_STATUS_TOKEN_LAST_FRAME           6
+#define AVJ_STATUS_TOKEN_SPEED                7
+#define AVJ_STATUS_TOKEN_LOOPTYPE             8
+#define AVJ_STATUS_TOKEN_SAMPLE_COUNT        12
+#define AVJ_STATUS_TOKEN_MARKER_START        13
+#define AVJ_STATUS_TOKEN_MARKER_END          14
+#define AVJ_STATUS_TOKEN_SELECTED_ENTRY      15
+#define AVJ_STATUS_TOKEN_TOTAL_SLOTS         16
 #define AVJ_STATUS_TOKEN_TARGET_FPS          18
+#define AVJ_STATUS_TOKEN_CYCLE_LO            19
+#define AVJ_STATUS_TOKEN_CYCLE_HI            20
+#define AVJ_STATUS_TOKEN_FRAMEDUP            24
+#define AVJ_STATUS_TOKEN_MACRO               25
+#define AVJ_STATUS_TOKEN_LOOP_STAT           30
+#define AVJ_STATUS_TOKEN_LOOP_STOP           31
+#define AVJ_STATUS_TOKEN_FEEDBACK            35
+#define AVJ_STATUS_TOKEN_TAG_COUNT           36
 #define AVJ_STATUS_TOKEN_GLOBAL_CHAIN_ON     37
+#define AVJ_STATUS_TOKEN_VIMS_MIRROR         38
+
 #define AVJ_STATUS_TOKEN_SELECTED_FX         83
+#define AVJ_STATUS_TOKEN_SELECTED_IS_VIDEO   84
+#define AVJ_STATUS_TOKEN_SELECTED_PARAMS     85
+#define AVJ_STATUS_TOKEN_SELECTED_SOURCE     90
+#define AVJ_STATUS_TOKEN_SELECTED_CHANNEL    91
+#define AVJ_STATUS_TOKEN_SELECTED_ENABLED    92
+#define AVJ_STATUS_TOKEN_SELECTED_BEAT       93
+
+#define AVJ_STATUS_TOKEN_STREAM_BUF_ENABLED 134
+#define AVJ_STATUS_TOKEN_STREAM_BUF_CAPACITY 135
+#define AVJ_STATUS_TOKEN_STREAM_BUF_FILLED   136
+#define AVJ_STATUS_TOKEN_STREAM_BUF_POSITION 137
+#define AVJ_STATUS_TOKEN_STREAM_BUF_SPEED    138
+#define AVJ_STATUS_TOKEN_STREAM_BUF_DIRECTION 139
+#define AVJ_STATUS_TOKEN_STREAM_BUF_MODE     140
+#define AVJ_STATUS_TOKEN_STREAM_BUF_STATE    141
 
 #define AVJ_RT_CLEAR_OFF       0
 #define AVJ_RT_CLEAR_STRICT    1
@@ -192,6 +227,25 @@ static const avj_chain_profile_t avj_chain_profiles[] = {
 #define AVJ_TRICK_SCRATCH   3
 #define AVJ_TRICK_FREEZE    4
 #define AVJ_TRICK_JUMP      5
+
+
+typedef enum {
+    AVJ_GESTURE_NONE = 0,
+    AVJ_GESTURE_FREEZE,
+    AVJ_GESTURE_SLOW,
+    AVJ_GESTURE_REVERSE,
+    AVJ_GESTURE_SCRATCH,
+    AVJ_GESTURE_STUTTER,
+    AVJ_GESTURE_JUMP,
+    AVJ_GESTURE_LOOP_MARK,
+    AVJ_GESTURE_STOP_START
+} avj_user_gesture_t;
+
+typedef enum {
+    AVJ_GESTURE_ORIGIN_UNKNOWN = 0,
+    AVJ_GESTURE_ORIGIN_USER,
+    AVJ_GESTURE_ORIGIN_SELF
+} avj_gesture_origin_t;
 
 static void avj_ui_printf(const char *fmt, ...);
 static void avj_ui_vprintf(const char *fmt, va_list ap);
@@ -2274,6 +2328,76 @@ typedef struct {
     unsigned long tick;
 } avj_pair_immune_t;
 
+
+typedef struct {
+    int seen;
+    double real_fps;
+    int frame;
+    int playback_mode;
+    int current_id;
+    int local_chain_on;
+    int first_frame;
+    int last_frame;
+    int speed;
+    int looptype;
+    int sample_count;
+    int marker_start;
+    int marker_end;
+    int selected_entry;
+    int total_slots;
+    double target_fps;
+    int cycle_lo;
+    int cycle_hi;
+    int framedup;
+    int macro;
+    int loop_stat;
+    int loop_stop;
+    int feedback;
+    int tag_count;
+    int global_chain_on;
+    int vims_mirror;
+    int selected_fx;
+    int selected_is_video;
+    int selected_params;
+    int selected_source;
+    int selected_channel;
+    int selected_enabled;
+    int selected_beat;
+    int stream_buf_enabled;
+    int stream_buf_capacity;
+    int stream_buf_filled;
+    int stream_buf_position;
+    int stream_buf_speed;
+    int stream_buf_direction;
+    int stream_buf_mode;
+    int stream_buf_state;
+} avj_status_view_t;
+
+typedef struct {
+    unsigned long tick;
+    int gesture;
+    int origin;
+    int mode;
+    int id;
+    int frame;
+    int speed;
+    int dup;
+    int looptype;
+    int marker_start;
+    int marker_end;
+    uint32_t chain_sig;
+    double fps_ratio;
+} avj_gesture_event_t;
+
+typedef struct {
+    uint32_t chain_sig;
+    int gesture;
+    int mode;
+    double reward;
+    double heat;
+    unsigned long tick;
+} avj_gesture_memory_t;
+
 typedef struct {
     int sample_new;
     int sample_select;
@@ -2353,6 +2477,8 @@ typedef struct {
     int explore_interval_ticks;
     int explore_left;
     int explore_chain_len;
+    int explore_deferred;
+    unsigned long explore_deferred_tick;
     unsigned long last_explore_tick;
     int make_samples;
     int sample_frames;
@@ -2374,9 +2500,15 @@ typedef struct {
     int nn_ready;
     int status_seen;
     unsigned long last_status_tick;
+    unsigned long status_seq;
+    int status_warmup;
+    double last_status_time_s;
+    double status_fps_ema;
     int status_token_count;
     double status_raw[AVJ_STATUS_TOKEN_CAP];
     double status_x[AVJ_STATUS_FEATURES];
+    avj_status_view_t sv;
+    avj_status_view_t prev_sv;
 
     int rt_auto;
     int rt_user_locked;
@@ -2396,6 +2528,29 @@ typedef struct {
     unsigned long last_chain_control_tick;
     unsigned long last_user_override_tick;
     int chain_disabled_by_eidolon;
+
+    avj_gesture_event_t gesture_ring[AVJ_GESTURE_CAP];
+    avj_gesture_memory_t gesture_memory[AVJ_GESTURE_MEMORY_CAP];
+    int gesture_head;
+    int gesture_count;
+    int gesture_memory_pos;
+    int gesture_learn;
+    int gesture_auto;
+    int apprentice_mode;
+    int apprentice_guard_ticks;
+    int apprentice_param_div;
+    int apprentice_stable_ticks;
+    int apprentice_release_ticks;
+    int last_user_gesture;
+    int last_any_gesture;
+    unsigned long last_any_gesture_tick;
+    int gesture_flip_count;
+    int gesture_still_ticks;
+    unsigned long last_gesture_tick;
+    unsigned long last_gesture_learn_tick;
+    unsigned long user_performing_until;
+    unsigned long self_transport_until;
+
     double nn_w1[AVJ_NN_HIDDEN][AVJ_STATUS_FEATURES];
     double nn_b1[AVJ_NN_HIDDEN];
     double nn_w2[AVJ_FX_DB_COUNT][AVJ_NN_HIDDEN];
@@ -2414,6 +2569,8 @@ typedef struct {
     int fx_lifetime_ticks;
     int fx_replace_min_ticks;
     int param_commit_ticks;
+    int param_entry_hold_ticks;
+    int param_target_ticks;
     unsigned long last_fx_mutation_tick;
     unsigned long last_entry_preset_tick[AVJ_MAX_CHAIN];
     unsigned long last_param_any_preset_tick;
@@ -2470,6 +2627,23 @@ static void avj_update_beat_event(avj_t *a, int force);
 static void avj_reassert_chain_enabled(avj_t *a, int force);
 static int avj_replace_chain_entry(avj_t *a, avj_org_t *o, int entry, int send_now);
 static void avj_trick_release(avj_t *a);
+static void avj_learn_active(avj_t *a, double reward);
+static void avj_gesture_status(avj_t *a);
+static void avj_shell_gesture(avj_t *a, char *arg);
+static void avj_apprentice_extend_user_window(avj_t *a, int gesture);
+static int avj_apprentice_guard_active(avj_t *a);
+static int avj_autonomy_allowed(avj_t *a);
+static void avj_apprentice_tick_status(avj_t *a);
+static void avj_shell_apprentice(avj_t *a, char *arg);
+static void avj_shell_pace(avj_t *a, char *arg);
+static const char *avj_apprentice_state_name(avj_t *a);
+static const char *avj_gesture_name(int gesture);
+static void avj_self_transport_note(avj_t *a, int gesture);
+static void avj_self_transport_note_ticks(avj_t *a, int gesture, int ticks);
+static int avj_status_token(const avj_t *a, int index, double *raw);
+static double avj_status_fps_value(double raw);
+static void avj_status_rate_sample(avj_t *a);
+static double avj_runtime_fps_ratio(double real_fps, double target_fps);
 static int avj_effect_allowed(avj_t *a, int dbi);
 static double avj_brain_fx_multiplier(avj_t *a, int dbi);
 static void avj_immune_remember_active(avj_t *a, double heat, const char *why);
@@ -2630,6 +2804,15 @@ static double avj_clampd(double v, double lo, double hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
+
+/*
+ * Plain terminal interface.
+ *
+ * Eidolon intentionally uses the user's normal terminal now: stdin for
+ * commands, stderr for responses/logs, and the terminal emulator's own
+ * scrollback. There is no alternate-screen UI, pane model, raw keyboard mode,
+ * mouse tracking, or redraw layer.
+ */
 static void avj_ui_vprintf(const char *fmt, va_list ap)
 {
     vfprintf(stderr, fmt, ap);
@@ -2684,6 +2867,48 @@ static double avj_ticks_to_seconds(avj_t *a, int ticks)
 {
     if (ticks < 1) ticks = 1;
     return ((double)ticks * (double)a->tick_ms) / 1000.0;
+}
+
+static double avj_status_rate(avj_t *a)
+{
+    double fps = 0.0;
+    if (a) {
+        if (a->sv.target_fps > 0.0) fps = a->sv.target_fps;
+        else if (a->sv.real_fps > 0.0) fps = a->sv.real_fps;
+        else if (a->status_fps_ema > 0.0) fps = a->status_fps_ema;
+    }
+    if (fps < 1.0 || fps > 240.0) fps = 25.0;
+    return fps;
+}
+
+static int avj_seconds_to_status_ticks(avj_t *a, double seconds)
+{
+    int ticks;
+    if (!isfinite(seconds)) seconds = 1.25;
+    seconds = avj_clampd(seconds, 0.10, 60.0);
+    ticks = (int)ceil(seconds * avj_status_rate(a));
+    return avj_clampi(ticks, 1, 1000000);
+}
+
+static double avj_status_ticks_to_seconds(avj_t *a, int ticks)
+{
+    if (ticks < 1) ticks = 1;
+    return (double)ticks / avj_status_rate(a);
+}
+
+static int avj_seconds_to_pace_ticks(avj_t *a, double seconds)
+{
+    int ticks;
+    if (!isfinite(seconds)) seconds = 1.0;
+    seconds = avj_clampd(seconds, 0.10, 3600.0);
+    ticks = (int)ceil(seconds * avj_status_rate(a));
+    return avj_clampi(ticks, 1, 1000000);
+}
+
+static double avj_pace_ticks_to_seconds(avj_t *a, int ticks)
+{
+    if (ticks < 1) ticks = 1;
+    return (double)ticks / avj_status_rate(a);
 }
 
 static int avj_contains_ci(const char *hay, const char *needle)
@@ -2981,6 +3206,667 @@ static double avj_fx_survival_multiplier(avj_t *a, const avj_org_t *o, int dbi, 
     return avj_clampd(exp(-(cost * 0.30 + heat * 0.42)), 0.03, 1.0);
 }
 
+
+static int avj_status_get_i(const avj_t *a, int token, int fallback)
+{
+    double raw;
+    if (!avj_status_token(a, token, &raw)) return fallback;
+    if (!isfinite(raw)) return fallback;
+    return (int)floor(raw + (raw >= 0.0 ? 0.5 : -0.5));
+}
+
+static double avj_status_get_d(const avj_t *a, int token, double fallback)
+{
+    double raw;
+    if (!avj_status_token(a, token, &raw)) return fallback;
+    return isfinite(raw) ? raw : fallback;
+}
+
+static void avj_status_view_fill(avj_t *a)
+{
+    avj_status_view_t v;
+    memset(&v, 0, sizeof(v));
+    v.seen = a && a->status_seen;
+    if (!v.seen) {
+        a->prev_sv = a->sv;
+        memset(&a->sv, 0, sizeof(a->sv));
+        return;
+    }
+
+    v.real_fps = avj_status_fps_value(avj_status_get_d(a, AVJ_STATUS_TOKEN_REAL_FPS, 0.0));
+    v.frame = avj_status_get_i(a, AVJ_STATUS_TOKEN_FRAME, 0);
+    v.playback_mode = avj_status_get_i(a, AVJ_STATUS_TOKEN_PLAYBACK_MODE, 0);
+    v.current_id = avj_status_get_i(a, AVJ_STATUS_TOKEN_CURRENT_ID, 0);
+    v.local_chain_on = avj_status_get_i(a, AVJ_STATUS_TOKEN_CHAIN_ON, 0);
+    v.first_frame = avj_status_get_i(a, AVJ_STATUS_TOKEN_FIRST_FRAME, 0);
+    v.last_frame = avj_status_get_i(a, AVJ_STATUS_TOKEN_LAST_FRAME, 0);
+    v.speed = avj_status_get_i(a, AVJ_STATUS_TOKEN_SPEED, 0);
+    v.looptype = avj_status_get_i(a, AVJ_STATUS_TOKEN_LOOPTYPE, 0);
+    v.sample_count = avj_status_get_i(a, AVJ_STATUS_TOKEN_SAMPLE_COUNT, 0);
+    v.marker_start = avj_status_get_i(a, AVJ_STATUS_TOKEN_MARKER_START, 0);
+    v.marker_end = avj_status_get_i(a, AVJ_STATUS_TOKEN_MARKER_END, 0);
+    v.selected_entry = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_ENTRY, 0);
+    v.total_slots = avj_status_get_i(a, AVJ_STATUS_TOKEN_TOTAL_SLOTS, 0);
+    v.target_fps = avj_status_fps_value(avj_status_get_d(a, AVJ_STATUS_TOKEN_TARGET_FPS, 0.0));
+    v.cycle_lo = avj_status_get_i(a, AVJ_STATUS_TOKEN_CYCLE_LO, 0);
+    v.cycle_hi = avj_status_get_i(a, AVJ_STATUS_TOKEN_CYCLE_HI, 0);
+    v.framedup = avj_status_get_i(a, AVJ_STATUS_TOKEN_FRAMEDUP, 0);
+    v.macro = avj_status_get_i(a, AVJ_STATUS_TOKEN_MACRO, 0);
+    v.loop_stat = avj_status_get_i(a, AVJ_STATUS_TOKEN_LOOP_STAT, 0);
+    v.loop_stop = avj_status_get_i(a, AVJ_STATUS_TOKEN_LOOP_STOP, 0);
+    v.feedback = avj_status_get_i(a, AVJ_STATUS_TOKEN_FEEDBACK, 0);
+    v.tag_count = avj_status_get_i(a, AVJ_STATUS_TOKEN_TAG_COUNT, 0);
+    v.global_chain_on = avj_status_get_i(a, AVJ_STATUS_TOKEN_GLOBAL_CHAIN_ON, 0);
+    v.vims_mirror = avj_status_get_i(a, AVJ_STATUS_TOKEN_VIMS_MIRROR, 0);
+
+    v.selected_fx = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_FX, 0);
+    v.selected_is_video = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_IS_VIDEO, 0);
+    v.selected_params = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_PARAMS, 0);
+    v.selected_source = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_SOURCE, 0);
+    v.selected_channel = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_CHANNEL, 0);
+    v.selected_enabled = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_ENABLED, 0);
+    v.selected_beat = avj_status_get_i(a, AVJ_STATUS_TOKEN_SELECTED_BEAT, 0);
+
+    v.stream_buf_enabled = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_ENABLED, 0);
+    v.stream_buf_capacity = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_CAPACITY, 0);
+    v.stream_buf_filled = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_FILLED, 0);
+    v.stream_buf_position = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_POSITION, 0);
+    v.stream_buf_speed = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_SPEED, 0);
+    v.stream_buf_direction = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_DIRECTION, 0);
+    v.stream_buf_mode = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_MODE, 0);
+    v.stream_buf_state = avj_status_get_i(a, AVJ_STATUS_TOKEN_STREAM_BUF_STATE, 0);
+
+    a->prev_sv = a->sv;
+    a->sv = v;
+}
+
+static const char *avj_gesture_name(int gesture)
+{
+    switch (gesture) {
+    case AVJ_GESTURE_FREEZE: return "freeze";
+    case AVJ_GESTURE_SLOW: return "slow";
+    case AVJ_GESTURE_REVERSE: return "reverse";
+    case AVJ_GESTURE_SCRATCH: return "scratch";
+    case AVJ_GESTURE_STUTTER: return "stutter";
+    case AVJ_GESTURE_JUMP: return "jump";
+    case AVJ_GESTURE_LOOP_MARK: return "loopmark";
+    case AVJ_GESTURE_STOP_START: return "stopstart";
+    default: return "none";
+    }
+}
+
+static const char *avj_gesture_origin_name(int origin)
+{
+    return origin == AVJ_GESTURE_ORIGIN_SELF ? "self" :
+           origin == AVJ_GESTURE_ORIGIN_USER ? "user" : "unknown";
+}
+
+static int avj_sign_i(int v)
+{
+    return (v > 0) - (v < 0);
+}
+
+static int avj_status_transport_speed(const avj_status_view_t *v)
+{
+    if (!v) return 0;
+    if (v->stream_buf_enabled)
+        return v->stream_buf_speed;
+    return v->speed;
+}
+
+static int avj_status_transport_frame(const avj_status_view_t *v)
+{
+    if (!v) return 0;
+    if (v->stream_buf_enabled)
+        return v->stream_buf_position;
+    return v->frame;
+}
+
+static double avj_current_fps_ratio(avj_t *a)
+{
+    double real_fps, target_fps;
+    if (!a) return -1.0;
+    real_fps = a->sv.real_fps;
+    target_fps = a->sv.target_fps;
+    if (real_fps <= 0.0 && a->status_fps_ema > 0.0) real_fps = a->status_fps_ema;
+    return avj_runtime_fps_ratio(real_fps, target_fps);
+}
+
+static int avj_self_transport_mask_ticks(avj_t *a, int gesture)
+{
+    switch (gesture) {
+    case AVJ_GESTURE_FREEZE:
+        return avj_seconds_to_ticks(a, 2.50);
+    case AVJ_GESTURE_LOOP_MARK:
+        return avj_seconds_to_ticks(a, 2.00);
+    case AVJ_GESTURE_STUTTER:
+        return avj_seconds_to_ticks(a, 1.75);
+    case AVJ_GESTURE_SCRATCH:
+        return avj_seconds_to_ticks(a, 2.25);
+    case AVJ_GESTURE_JUMP:
+        return avj_seconds_to_ticks(a, 1.25);
+    case AVJ_GESTURE_STOP_START:
+        return avj_seconds_to_ticks(a, 1.50);
+    default:
+        return avj_seconds_to_ticks(a, 1.50);
+    }
+}
+
+static void avj_self_transport_note_ticks(avj_t *a, int gesture, int ticks)
+{
+    unsigned long until;
+    if (!a) return;
+    if (ticks < 1) ticks = 1;
+    until = a->tick + (unsigned long)ticks;
+    if (a->self_transport_until < until)
+        a->self_transport_until = until;
+    if (gesture != AVJ_GESTURE_NONE)
+        a->last_any_gesture = gesture;
+}
+
+static void avj_self_transport_note(avj_t *a, int gesture)
+{
+    if (!a) return;
+    avj_self_transport_note_ticks(a, gesture, avj_self_transport_mask_ticks(a, gesture));
+}
+
+static void avj_gesture_memory_add(avj_t *a, int gesture, double reward, double heat)
+{
+    avj_org_t *o;
+    uint32_t sig;
+    int i, slot;
+    if (!a || gesture == AVJ_GESTURE_NONE) return;
+    o = &a->pop[a->active];
+    sig = avj_chain_signature(o);
+    if (!sig) return;
+
+    for (i = 0; i < AVJ_GESTURE_MEMORY_CAP; i++) {
+        if (a->gesture_memory[i].chain_sig == sig &&
+            a->gesture_memory[i].gesture == gesture &&
+            a->gesture_memory[i].mode == a->sv.playback_mode) {
+            a->gesture_memory[i].reward = avj_clampd(a->gesture_memory[i].reward + reward, -24.0, 24.0);
+            a->gesture_memory[i].heat = avj_clampd(a->gesture_memory[i].heat + heat, 0.0, 24.0);
+            a->gesture_memory[i].tick = a->tick;
+            return;
+        }
+    }
+
+    slot = a->gesture_memory_pos++ % AVJ_GESTURE_MEMORY_CAP;
+    a->gesture_memory[slot].chain_sig = sig;
+    a->gesture_memory[slot].gesture = gesture;
+    a->gesture_memory[slot].mode = a->sv.playback_mode;
+    a->gesture_memory[slot].reward = avj_clampd(reward, -24.0, 24.0);
+    a->gesture_memory[slot].heat = avj_clampd(heat, 0.0, 24.0);
+    a->gesture_memory[slot].tick = a->tick;
+}
+
+static void avj_gesture_negative_feedback(avj_t *a, double heat)
+{
+    if (!a || !a->gesture_learn || heat <= 0.0) return;
+    if (a->last_user_gesture == AVJ_GESTURE_NONE) return;
+    if ((unsigned long)(a->tick - a->last_gesture_tick) > (unsigned long)avj_seconds_to_ticks(a, 12.0)) return;
+    avj_gesture_memory_add(a, a->last_user_gesture, -0.25 * heat, heat);
+    avj_log(a, "gesture %s learned negative coupling heat %.2f\n", avj_gesture_name(a->last_user_gesture), heat);
+}
+
+static void avj_gesture_record(avj_t *a, int gesture, int origin)
+{
+    avj_gesture_event_t *ev;
+    avj_org_t *o;
+    double ratio;
+    int slot;
+    if (!a || gesture == AVJ_GESTURE_NONE) return;
+
+    o = &a->pop[a->active];
+    ratio = avj_current_fps_ratio(a);
+    slot = a->gesture_head++ % AVJ_GESTURE_CAP;
+    if (a->gesture_count < AVJ_GESTURE_CAP) a->gesture_count++;
+    ev = &a->gesture_ring[slot];
+    memset(ev, 0, sizeof(*ev));
+    ev->tick = a->tick;
+    ev->gesture = gesture;
+    ev->origin = origin;
+    ev->mode = a->sv.playback_mode;
+    ev->id = a->sv.current_id;
+    ev->frame = avj_status_transport_frame(&a->sv);
+    ev->speed = avj_status_transport_speed(&a->sv);
+    ev->dup = a->sv.framedup;
+    ev->looptype = a->sv.looptype;
+    ev->marker_start = a->sv.marker_start;
+    ev->marker_end = a->sv.marker_end;
+    ev->chain_sig = avj_chain_signature(o);
+    ev->fps_ratio = ratio;
+
+    a->last_any_gesture = gesture;
+    a->last_any_gesture_tick = a->tick;
+    if (origin == AVJ_GESTURE_ORIGIN_USER) {
+        a->last_user_gesture = gesture;
+        a->last_gesture_tick = a->tick;
+        avj_apprentice_extend_user_window(a, gesture);
+        if (a->trick_mode == AVJ_TRICK_NONE)
+            a->trick_release = 0;
+
+        if (a->gesture_learn && a->built && ev->chain_sig &&
+            (unsigned long)(a->tick - a->last_gesture_learn_tick) >= 4 &&
+            (ratio < 0.0 || ratio >= a->rt_low)) {
+            double reward = (gesture == AVJ_GESTURE_FREEZE) ? 0.35 : 0.12;
+            if (gesture == AVJ_GESTURE_LOOP_MARK || gesture == AVJ_GESTURE_SCRATCH)
+                reward += 0.08;
+            avj_gesture_memory_add(a, gesture, reward, 0.0);
+            avj_learn_active(a, reward);
+            a->last_gesture_learn_tick = a->tick;
+        }
+    }
+
+    avj_log(a, "gesture %s/%s frame=%d speed=%d dup=%d fps=%.3f\n",
+            avj_gesture_origin_name(origin), avj_gesture_name(gesture),
+            ev->frame, ev->speed, ev->dup, ratio);
+}
+
+static int avj_classify_status_gesture(avj_t *a)
+{
+    avj_status_view_t *v, *p;
+    int frame, prev_frame, delta, speed, prev_speed, sign, prev_sign;
+    int marker_edge, loop_edge, dup_edge, speed_edge, direction_edge;
+    int stopped_edge, resumed_edge, abs_delta, expected, speed_abs, prev_speed_abs;
+
+    if (!a || !a->sv.seen || !a->prev_sv.seen) return AVJ_GESTURE_NONE;
+
+    v = &a->sv;
+    p = &a->prev_sv;
+    frame = avj_status_transport_frame(v);
+    prev_frame = avj_status_transport_frame(p);
+    speed = avj_status_transport_speed(v);
+    prev_speed = avj_status_transport_speed(p);
+    sign = avj_sign_i(speed);
+    prev_sign = avj_sign_i(prev_speed);
+    delta = frame - prev_frame;
+    abs_delta = delta < 0 ? -delta : delta;
+    speed_abs = abs(speed);
+    prev_speed_abs = abs(prev_speed);
+    expected = avj_clampi(prev_speed_abs > 0 ? prev_speed_abs : speed_abs, 1, 64);
+
+    speed_edge = speed != prev_speed;
+    direction_edge = speed_edge && sign && prev_sign && sign != prev_sign;
+    marker_edge = (v->marker_start != p->marker_start) || (v->marker_end != p->marker_end);
+    loop_edge = v->looptype != p->looptype;
+    dup_edge = v->framedup != p->framedup;
+    stopped_edge = speed_edge && prev_speed != 0 && speed == 0;
+    resumed_edge = speed_edge && prev_speed == 0 && speed != 0;
+
+    if (!speed_edge && !marker_edge && !loop_edge && !dup_edge) {
+        if (abs_delta == 0 && speed == 0)
+            a->gesture_still_ticks++;
+        else
+            a->gesture_still_ticks = 0;
+    }
+    else {
+        a->gesture_still_ticks = 0;
+    }
+
+    if ((unsigned long)(a->tick - a->last_any_gesture_tick) > 12)
+        a->gesture_flip_count = 0;
+
+    if (stopped_edge || (a->gesture_still_ticks == 3 && speed == 0))
+        return AVJ_GESTURE_FREEZE;
+
+    if (direction_edge) {
+        a->gesture_flip_count++;
+        if (a->gesture_flip_count >= 2)
+            return AVJ_GESTURE_SCRATCH;
+        return sign < 0 ? AVJ_GESTURE_REVERSE : AVJ_GESTURE_STOP_START;
+    }
+
+    if (resumed_edge && a->last_any_gesture == AVJ_GESTURE_FREEZE &&
+        (unsigned long)(a->tick - a->last_any_gesture_tick) <= 8)
+        return AVJ_GESTURE_STOP_START;
+
+    if (marker_edge || loop_edge)
+        return AVJ_GESTURE_LOOP_MARK;
+
+    if (dup_edge && v->framedup > p->framedup && v->framedup > 1)
+        return AVJ_GESTURE_STUTTER;
+
+    if (speed_edge && speed != 0 && prev_speed != 0 && speed_abs < prev_speed_abs)
+        return AVJ_GESTURE_SLOW;
+
+    if (speed_edge && sign < 0 && prev_sign >= 0)
+        return AVJ_GESTURE_REVERSE;
+
+    if (!marker_edge && !loop_edge && abs_delta > expected * 6 + 12)
+        return AVJ_GESTURE_JUMP;
+
+    return AVJ_GESTURE_NONE;
+}
+
+static void avj_gesture_from_status(avj_t *a)
+{
+    int gesture, origin;
+    if (!a || !a->status_seen || a->paused || a->status_warmup > 0) return;
+
+    gesture = avj_classify_status_gesture(a);
+    if (gesture == AVJ_GESTURE_NONE) return;
+
+    if (a->last_any_gesture_tick == a->tick)
+        return;
+
+    origin = (a->tick <= a->self_transport_until) ? AVJ_GESTURE_ORIGIN_SELF : AVJ_GESTURE_ORIGIN_USER;
+    if (origin == AVJ_GESTURE_ORIGIN_USER) {
+        if (gesture == a->last_any_gesture &&
+            (unsigned long)(a->tick - a->last_any_gesture_tick) < 3)
+            return;
+    }
+    avj_gesture_record(a, gesture, origin);
+}
+
+static double avj_gesture_fx_multiplier(avj_t *a, int dbi)
+{
+    unsigned int c;
+    int g;
+    if (!a || dbi < 0 || dbi >= avj_fx_db_count) return 1.0;
+    if (a->last_user_gesture == AVJ_GESTURE_NONE) return 1.0;
+    if (a->tick > a->user_performing_until) return 1.0;
+
+    g = a->last_user_gesture;
+    c = avj_fx_db[dbi].categories;
+    switch (g) {
+    case AVJ_GESTURE_FREEZE:
+        return (c & (AVJ_CAT_DETAIL | AVJ_CAT_GLOW | AVJ_CAT_COLOR | AVJ_CAT_FOUNDATION)) ? 1.18 : 0.96;
+    case AVJ_GESTURE_SCRATCH:
+    case AVJ_GESTURE_REVERSE:
+    case AVJ_GESTURE_JUMP:
+        return (c & (AVJ_CAT_TEMPORAL | AVJ_CAT_MOTION | AVJ_CAT_TEXTURE | AVJ_CAT_DETAIL)) ? 1.18 : 0.94;
+    case AVJ_GESTURE_STUTTER:
+    case AVJ_GESTURE_LOOP_MARK:
+    case AVJ_GESTURE_SLOW:
+        return (c & (AVJ_CAT_TEMPORAL | AVJ_CAT_RHYTHMIC | AVJ_CAT_DETAIL | AVJ_CAT_GLOW)) ? 1.15 : 0.96;
+    default:
+        break;
+    }
+    return 1.0;
+}
+
+
+static int avj_apprentice_guard_active(avj_t *a)
+{
+    return a && a->apprentice_mode && a->tick <= a->user_performing_until;
+}
+
+static int avj_autonomy_allowed(avj_t *a)
+{
+    return !avj_apprentice_guard_active(a);
+}
+
+static int avj_frame_inside_marker_span(const avj_status_view_t *s, int frame)
+{
+    if (!s) return 0;
+    if (s->marker_end <= s->marker_start) return 0;
+    return frame >= s->marker_start && frame <= s->marker_end;
+}
+
+static int avj_transport_frame_is_stable(const avj_status_view_t *s, const avj_status_view_t *p)
+{
+    int speed, frame, prev_frame, delta, abs_delta, span, budget;
+
+    if (!s || !p) return 0;
+
+    speed = avj_status_transport_speed(s);
+    frame = avj_status_transport_frame(s);
+    prev_frame = avj_status_transport_frame(p);
+    delta = frame - prev_frame;
+    abs_delta = delta < 0 ? -delta : delta;
+
+    if (speed == 0)
+        return abs_delta <= 1;
+
+    if (s->marker_end > s->marker_start &&
+        avj_frame_inside_marker_span(s, frame) &&
+        avj_frame_inside_marker_span(s, prev_frame))
+        return 1;
+
+    if (s->stream_buf_enabled && s->stream_buf_filled > 1 &&
+        frame >= 0 && prev_frame >= 0 &&
+        frame < s->stream_buf_filled && prev_frame < s->stream_buf_filled)
+        return 1;
+
+    span = s->last_frame - s->first_frame;
+    if (span > 1 && frame >= s->first_frame && frame <= s->last_frame &&
+        prev_frame >= s->first_frame && prev_frame <= s->last_frame &&
+        abs_delta > span - (abs(speed) + 2))
+        return 1;
+
+    budget = avj_clampi(abs(speed), 1, 64);
+    budget = budget * 3 + 8;
+    if (abs_delta > budget)
+        return 0;
+
+    if (speed > 0 && delta < 0)
+        return 0;
+    if (speed < 0 && delta > 0)
+        return 0;
+
+    return 1;
+}
+
+static int avj_transport_is_stable_groove(avj_t *a)
+{
+    const avj_status_view_t *s, *p;
+
+    if (!a || !a->sv.seen || !a->prev_sv.seen || a->status_warmup > 0) return 0;
+    s = &a->sv;
+    p = &a->prev_sv;
+
+    if (avj_status_transport_speed(s) != avj_status_transport_speed(p)) return 0;
+    if (s->framedup != p->framedup) return 0;
+    if (s->marker_start != p->marker_start || s->marker_end != p->marker_end) return 0;
+    if (s->looptype != p->looptype) return 0;
+
+    if (s->stream_buf_enabled || p->stream_buf_enabled) {
+        if (s->stream_buf_enabled != p->stream_buf_enabled) return 0;
+        if (s->stream_buf_direction != p->stream_buf_direction) return 0;
+        if (s->stream_buf_mode != p->stream_buf_mode) return 0;
+        if (s->stream_buf_state != p->stream_buf_state) return 0;
+    }
+
+    return avj_transport_frame_is_stable(s, p);
+}
+
+static void avj_apprentice_tick_status(avj_t *a)
+{
+    if (!a || !avj_apprentice_guard_active(a)) {
+        if (a) a->apprentice_stable_ticks = 0;
+        return;
+    }
+
+    if (avj_transport_is_stable_groove(a))
+        a->apprentice_stable_ticks++;
+    else
+        a->apprentice_stable_ticks = 0;
+
+    if (a->apprentice_release_ticks < 1)
+        a->apprentice_release_ticks = avj_seconds_to_status_ticks(a, 1.25);
+
+    if (a->apprentice_stable_ticks >= a->apprentice_release_ticks) {
+        a->user_performing_until = 0;
+        a->apprentice_stable_ticks = 0;
+        avj_log(a, "apprentice released: stable groove\n");
+    }
+}
+
+static void avj_apprentice_extend_user_window(avj_t *a, int gesture)
+{
+    int ticks;
+    if (!a || !a->apprentice_mode) return;
+
+    ticks = a->apprentice_guard_ticks;
+    if (ticks < 1) ticks = avj_seconds_to_ticks(a, 10.0);
+
+    switch (gesture) {
+    case AVJ_GESTURE_FREEZE:
+    case AVJ_GESTURE_LOOP_MARK:
+        ticks = avj_clampi(ticks + avj_seconds_to_ticks(a, 4.0), 1, avj_seconds_to_ticks(a, 60.0));
+        break;
+    case AVJ_GESTURE_SCRATCH:
+    case AVJ_GESTURE_STUTTER:
+    case AVJ_GESTURE_REVERSE:
+        ticks = avj_clampi(ticks + avj_seconds_to_ticks(a, 2.0), 1, avj_seconds_to_ticks(a, 60.0));
+        break;
+    default:
+        break;
+    }
+
+    if (a->user_performing_until < a->tick + (unsigned long)ticks)
+        a->user_performing_until = a->tick + (unsigned long)ticks;
+}
+
+static const char *avj_apprentice_state_name(avj_t *a)
+{
+    if (!a || !a->apprentice_mode) return "off";
+    if (avj_apprentice_guard_active(a)) return "listening";
+    return "curious";
+}
+
+static void avj_gesture_status(avj_t *a)
+{
+    int idx = (a->gesture_head - 1 + AVJ_GESTURE_CAP) % AVJ_GESTURE_CAP;
+    avj_gesture_event_t *ev = a->gesture_count > 0 ? &a->gesture_ring[idx] : NULL;
+    avj_ui_printf("gesture learn %s auto %s apprentice=%s guard=%.1fs stable=%.2fs/%.2fs calm=%d performing=%s self_until=%lu user_until=%lu\n",
+            a->gesture_learn ? "on" : "off",
+            a->gesture_auto ? "on" : "off",
+            avj_apprentice_state_name(a),
+            avj_ticks_to_seconds(a, a->apprentice_guard_ticks),
+            avj_status_ticks_to_seconds(a, a->apprentice_stable_ticks),
+            avj_status_ticks_to_seconds(a, a->apprentice_release_ticks),
+            a->apprentice_param_div,
+            avj_apprentice_guard_active(a) ? "yes" : "no",
+            a->self_transport_until,
+            a->user_performing_until);
+    if (ev) {
+        avj_ui_printf("last %s/%s tick=%lu frame=%d speed=%d dup=%d fps=%.3f chain=%08x\n",
+                avj_gesture_origin_name(ev->origin), avj_gesture_name(ev->gesture), ev->tick,
+                ev->frame, ev->speed, ev->dup, ev->fps_ratio, ev->chain_sig);
+    }
+}
+
+static void avj_gesture_last(avj_t *a)
+{
+    int n, printed = 0;
+    if (!a || a->gesture_count <= 0) {
+        avj_ui_printf("gesture last: none\n");
+        return;
+    }
+    for (n = 0; n < a->gesture_count && n < 8; n++) {
+        int idx = (a->gesture_head - 1 - n + AVJ_GESTURE_CAP) % AVJ_GESTURE_CAP;
+        avj_gesture_event_t *ev = &a->gesture_ring[idx];
+        avj_ui_printf("%02d %s/%s tick=%lu frame=%d speed=%d dup=%d loop=%d mark=%d:%d fps=%.3f chain=%08x\n",
+                n,
+                avj_gesture_origin_name(ev->origin), avj_gesture_name(ev->gesture), ev->tick,
+                ev->frame, ev->speed, ev->dup, ev->looptype, ev->marker_start, ev->marker_end,
+                ev->fps_ratio, ev->chain_sig);
+        printed++;
+    }
+    if (!printed) avj_ui_printf("gesture last: none\n");
+}
+
+static void avj_gesture_clear(avj_t *a)
+{
+    if (!a) return;
+    memset(a->gesture_ring, 0, sizeof(a->gesture_ring));
+    memset(a->gesture_memory, 0, sizeof(a->gesture_memory));
+    a->gesture_head = 0;
+    a->gesture_count = 0;
+    a->gesture_memory_pos = 0;
+    a->last_user_gesture = AVJ_GESTURE_NONE;
+    a->last_any_gesture = AVJ_GESTURE_NONE;
+    a->last_any_gesture_tick = 0;
+    a->user_performing_until = 0;
+    a->self_transport_until = 0;
+    avj_ui_printf("gesture memory cleared\n");
+}
+
+static void avj_shell_gesture(avj_t *a, char *arg)
+{
+    char *cmd = arg;
+    char *rest;
+    while (*cmd && isspace((unsigned char)*cmd)) cmd++;
+    rest = cmd;
+    while (*rest && !isspace((unsigned char)*rest)) rest++;
+    if (*rest) *rest++ = '\0';
+    while (*rest && isspace((unsigned char)*rest)) rest++;
+
+    if (!*cmd || !strcasecmp(cmd, "status")) avj_gesture_status(a);
+    else if (!strcasecmp(cmd, "learn")) {
+        if (!strcasecmp(rest, "off") || !strcasecmp(rest, "0")) a->gesture_learn = 0;
+        else if (!strcasecmp(rest, "on") || !strcasecmp(rest, "1") || !*rest) a->gesture_learn = 1;
+        avj_ui_printf("gesture learn %s\n", a->gesture_learn ? "on" : "off");
+    } else if (!strcasecmp(cmd, "auto")) {
+        if (!strcasecmp(rest, "on") || !strcasecmp(rest, "1")) a->gesture_auto = 1;
+        else a->gesture_auto = 0;
+        avj_ui_printf("gesture auto %s (reserved; Eidolon listens but does not imitate yet)\n",
+                a->gesture_auto ? "on" : "off");
+    } else if (!strcasecmp(cmd, "last")) avj_gesture_last(a);
+    else if (!strcasecmp(cmd, "clear")) avj_gesture_clear(a);
+    else avj_ui_printf("gesture expects status|learn on|off|auto on|off|last|clear\n");
+}
+
+
+static void avj_apprentice_status(avj_t *a)
+{
+    avj_ui_printf("apprentice %s guard=%.1fs stable=%.2fs/%.2fs calm=%d explore=%s%s last=%s until=%lu\n",
+            avj_apprentice_state_name(a),
+            avj_ticks_to_seconds(a, a->apprentice_guard_ticks),
+            avj_status_ticks_to_seconds(a, a->apprentice_stable_ticks),
+            avj_status_ticks_to_seconds(a, a->apprentice_release_ticks),
+            a->apprentice_param_div,
+            a->explore_enabled ? "kept" : "off",
+            a->explore_deferred ? ":deferred" : "",
+            avj_gesture_name(a->last_user_gesture),
+            a->user_performing_until);
+}
+
+static void avj_shell_apprentice(avj_t *a, char *arg)
+{
+    char *cmd = arg;
+    char *rest;
+    while (*cmd && isspace((unsigned char)*cmd)) cmd++;
+    rest = cmd;
+    while (*rest && !isspace((unsigned char)*rest)) rest++;
+    if (*rest) *rest++ = '\0';
+    while (*rest && isspace((unsigned char)*rest)) rest++;
+
+    if (!*cmd || !strcasecmp(cmd, "status")) {
+        avj_apprentice_status(a);
+    } else if (!strcasecmp(cmd, "on")) {
+        a->apprentice_mode = 1;
+        avj_ui_printf("apprentice on\n");
+    } else if (!strcasecmp(cmd, "off")) {
+        a->apprentice_mode = 0;
+        a->user_performing_until = 0;
+        a->apprentice_stable_ticks = 0;
+        avj_ui_printf("apprentice off\n");
+    } else if (!strcasecmp(cmd, "guard")) {
+        double sec = *rest ? strtod(rest, NULL) : avj_ticks_to_seconds(a, a->apprentice_guard_ticks);
+        sec = avj_clampd(sec, 1.0, 60.0);
+        a->apprentice_guard_ticks = avj_seconds_to_ticks(a, sec);
+        avj_ui_printf("apprentice guard %.1fs\n", avj_ticks_to_seconds(a, a->apprentice_guard_ticks));
+    } else if (!strcasecmp(cmd, "calm")) {
+        int n = *rest ? atoi(rest) : a->apprentice_param_div;
+        a->apprentice_param_div = avj_clampi(n, 1, 16);
+        avj_ui_printf("apprentice calm %d\n", a->apprentice_param_div);
+    } else if (!strcasecmp(cmd, "stable")) {
+        double sec = *rest ? strtod(rest, NULL) : avj_status_ticks_to_seconds(a, a->apprentice_release_ticks);
+        sec = avj_clampd(sec, 0.10, 10.0);
+        a->apprentice_release_ticks = avj_seconds_to_status_ticks(a, sec);
+        avj_ui_printf("apprentice stable %.2fs\n", avj_status_ticks_to_seconds(a, a->apprentice_release_ticks));
+    } else if (!strcasecmp(cmd, "release") || !strcasecmp(cmd, "clear") || !strcasecmp(cmd, "curious")) {
+        a->user_performing_until = 0;
+        a->apprentice_stable_ticks = 0;
+        avj_ui_printf("apprentice released\n");
+    } else {
+        avj_ui_printf("apprentice expects status|on|off|guard SEC|stable SEC|calm N|release|curious\n");
+    }
+}
+
 static void avj_pair_immune_add(avj_t *a, int fx_a, int fx_b, double heat)
 {
     uint32_t sig;
@@ -3071,7 +3957,9 @@ static double avj_slot_fx_weight(avj_t *a, const avj_org_t *o, int dbi, int slot
     c = fx->categories ? fx->categories : AVJ_CAT_ANY;
     profile = &avj_chain_profiles[avj_profile_for_slot(slot, chain_len)];
     pos = chain_len > 1 ? ((double)slot + 0.5) / (double)chain_len : 1.0;
-    w = a->fx_weight[dbi] * avj_brain_fx_multiplier(a, dbi) * avj_fx_survival_multiplier(a, o, dbi, slot);
+    w = a->fx_weight[dbi] * avj_brain_fx_multiplier(a, dbi) *
+        avj_fx_survival_multiplier(a, o, dbi, slot) *
+        avj_gesture_fx_multiplier(a, dbi);
     if (w < 0.02) w = 0.02;
 
     if (c & profile->prefer) w *= 3.0;
@@ -3730,6 +4618,8 @@ static int avj_connect(avj_t *a)
         return 0;
     }
     a->offline = 0;
+    a->status_warmup = 3;
+    a->apprentice_stable_ticks = 0;
     if (a->verbose) avj_ui_printf( "eidolon: connected to %s:%d\n", host, a->port);
     return 1;
 }
@@ -3865,6 +4755,38 @@ static vj_client *avj_remote_connect(const char *host, const char *group, int po
     return client;
 }
 
+
+static double avj_monotonic_s(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec + (double)ts.tv_nsec / 1000000000.0;
+}
+
+static double avj_status_fps_value(double raw)
+{
+    if (!isfinite(raw) || raw <= 0.0) return -1.0;
+    if (raw > 240.0 && raw <= 24000.0) raw /= 100.0;
+    if (raw < 0.1 || raw > 240.0) return -1.0;
+    return raw;
+}
+
+static void avj_status_rate_sample(avj_t *a)
+{
+    double now, dt, fps;
+    if (!a) return;
+    now = avj_monotonic_s();
+    if (a->last_status_time_s > 0.0) {
+        dt = now - a->last_status_time_s;
+        if (dt >= 0.004 && dt <= 1.000) {
+            fps = 1.0 / dt;
+            if (fps >= 1.0 && fps <= 240.0)
+                a->status_fps_ema = (a->status_fps_ema > 0.0) ?
+                    (a->status_fps_ema * 0.85 + fps * 0.15) : fps;
+        }
+    }
+    a->last_status_time_s = now;
+}
 
 static double avj_status_norm(double v)
 {
@@ -4148,7 +5070,8 @@ static int avj_sync_effect_list_vims(avj_t *a, int verbose)
 
 static double avj_runtime_fps_ratio(double real_fps, double target_fps)
 {
-    if (!isfinite(real_fps) || !isfinite(target_fps)) return -1.0;
+    real_fps = avj_status_fps_value(real_fps);
+    target_fps = avj_status_fps_value(target_fps);
     if (real_fps <= 0.0 || target_fps <= 0.0) return -1.0;
     return avj_clampd(real_fps / target_fps, 0.0, 2.0);
 }
@@ -4198,12 +5121,16 @@ static void avj_parse_status_tokens(avj_t *a, const char *body)
     }
     if (n == 0) return;
     a->status_token_count = n;
+    avj_status_rate_sample(a);
     a->rt_render_seen = 0;
     {
         const int real_fps_token = avj_rt_real_fps_token(a);
         if (n > real_fps_token && n > AVJ_STATUS_TOKEN_TARGET_FPS) {
-            double ratio = avj_runtime_fps_ratio(a->status_raw[real_fps_token],
-                                                 a->status_raw[AVJ_STATUS_TOKEN_TARGET_FPS]);
+            double real_fps = avj_status_fps_value(a->status_raw[real_fps_token]);
+            double target_fps = avj_status_fps_value(a->status_raw[AVJ_STATUS_TOKEN_TARGET_FPS]);
+            double ratio;
+            if (real_fps <= 0.0 && a->status_fps_ema > 0.0) real_fps = a->status_fps_ema;
+            ratio = avj_runtime_fps_ratio(real_fps, target_fps);
             if (ratio >= 0.0) {
                 a->rt_render_load = ratio;
                 a->rt_render_seen = 1;
@@ -4214,6 +5141,15 @@ static void avj_parse_status_tokens(avj_t *a, const char *body)
     }
     a->status_seen = 1;
     a->last_status_tick = a->tick;
+    a->status_seq++;
+    avj_status_view_fill(a);
+    if (a->status_warmup > 0) {
+        a->status_warmup--;
+        a->apprentice_stable_ticks = 0;
+        return;
+    }
+    avj_gesture_from_status(a);
+    avj_apprentice_tick_status(a);
 }
 
 static void avj_poll_status(avj_t *a)
@@ -4413,6 +5349,7 @@ static void avj_brain_sanitize(avj_t *a)
     a->corpus_len = avj_clampi(a->corpus_len, 0, AVJ_CORPUS);
     a->corpus_pos = avj_clampi(a->corpus_pos, 0, AVJ_CORPUS - 1);
     a->status_seen = a->status_seen ? 1 : 0;
+    if (a->status_warmup < 0) a->status_warmup = 0;
     for (h = 0; h < AVJ_NN_HIDDEN; h++) {
         if (!isfinite(a->nn_b1[h])) a->nn_b1[h] = 0.0;
         a->nn_b1[h] = avj_clampd(a->nn_b1[h], -4.0, 4.0);
@@ -4537,7 +5474,7 @@ static void avj_print_banner(avj_t *a)
         "        metabolism online  |  immune memory awake\n"
         "        mind: %s  |  link: %s:%d  |  SIGUSR1 saves\n"
         "%s"
-        "        type intro for first contact, help for commands\n",
+        "        type intro for deck guide, pace status for timing, help for commands\n",
         b, c, d,
         a && a->state_path[0] ? a->state_path : AVJ_DEFAULT_STATE,
         a && a->host ? a->host : "localhost",
@@ -4555,14 +5492,26 @@ static void avj_print_intro(avj_t *a)
     const char *r = avj_col(a, AVJ_COL_RESET);
 
     avj_ui_printf(
-        "%sfirst contact%s\n"
-        "  %smutate%s      build a new organism now; the screen should change immediately\n"
-        "  %schain%s       inspect the current FX body\n"
-        "  %slike%s/%slove%s   reward a good visual; %shate%s mutates away\n"
-        "  %srt status%s   inspect realtime metabolism from VeeJay FPS tokens\n"
-        "  %sman eidolon%s read the field manual when curiosity takes over\n"
+        "%sfirst contact // artist at the deck%s\n"
+        "  %sstatus%s             read health, FPS, chain bounds, apprentice state\n"
+        "  %space status%s        inspect timing: chain, entry, params, explore\n"
+        "  %space live|calm|hot%s choose how fast the apprentice moves\n"
+        "  %sapprentice status%s  see whether Eidolon is curious or listening\n"
+        "  %sgesture last%s       what Eidolon heard from your trickplay\n"
+        "  %sexplore on%s         let curiosity propose chains; it defers while you perform\n"
+        "  %smutate%s             ask for an immediate new organism\n"
+        "  %schain%s              inspect the current FX body\n"
+        "  %slike%s/%slove%s          reward a good visual; %shate%s mutates away\n"
+        "  %srt status%s          inspect realtime metabolism from VeeJay FPS tokens\n"
+        "  %sman eidolon%s        read the field manual when curiosity takes over\n"
         "%s\n",
         h, r,
+        cmd, r,
+        cmd, r,
+        cmd, r,
+        cmd, r,
+        cmd, r,
+        cmd, r,
         cmd, r,
         cmd, r,
         cmd, r, cmd, r, warn, r,
@@ -4746,12 +5695,19 @@ static int avj_sanitize_mind(avj_t *a)
     a->autosave_ticks = avj_clampi(a->autosave_ticks, 8, 1000000);
     a->send_budget = avj_clampi(a->send_budget, 1, 512);
     a->safe_params = 1;
-    a->param_commit_ticks = avj_clampi(a->param_commit_ticks, avj_seconds_to_ticks(a, 2.0), avj_seconds_to_ticks(a, 120.0));
-    a->fx_replace_min_ticks = avj_clampi(a->fx_replace_min_ticks, avj_seconds_to_ticks(a, 1.0), avj_seconds_to_ticks(a, 120.0));
-    a->fx_lifetime_ticks = avj_clampi(a->fx_lifetime_ticks, avj_seconds_to_ticks(a, 8.0), avj_seconds_to_ticks(a, 120.0));
+    a->param_commit_ticks = avj_clampi(a->param_commit_ticks, 1, 1000000);
+    a->param_entry_hold_ticks = avj_clampi(a->param_entry_hold_ticks > 0 ? a->param_entry_hold_ticks : a->param_commit_ticks, 1, 1000000);
+    a->param_target_ticks = (a->param_target_ticks <= 1) ? avj_seconds_to_pace_ticks(a, 8.0) : avj_clampi(a->param_target_ticks, 1, 1000000);
+    a->fx_replace_min_ticks = avj_clampi(a->fx_replace_min_ticks, 1, 1000000);
+    a->fx_lifetime_ticks = avj_clampi(a->fx_lifetime_ticks, 1, 1000000);
     a->explore_enabled = a->explore_enabled ? 1 : 0;
+    a->explore_deferred = a->explore_deferred ? 1 : 0;
     if (a->explore_left == 0) a->explore_enabled = 0;
     if (a->explore_left < -1) a->explore_left = -1;
+    a->apprentice_mode = a->apprentice_mode ? 1 : 0;
+    a->apprentice_guard_ticks = avj_clampi(a->apprentice_guard_ticks, 1, avj_seconds_to_ticks(a, 60.0));
+    a->apprentice_param_div = avj_clampi(a->apprentice_param_div, 1, 16);
+    a->apprentice_release_ticks = avj_clampi(a->apprentice_release_ticks, 1, avj_seconds_to_status_ticks(a, 10.0));
     a->trick_enabled = a->trick_enabled ? 1 : 0;
     a->sample_frames = avj_clampi(a->sample_frames, 0, 2000000000);
     a->sample_min_len = avj_clampi(a->sample_min_len, 2, 10000000);
@@ -4886,6 +5842,7 @@ static void avj_update_beat_event(avj_t *a, int force)
     double aggression;
     int wild;
     if (!a->beat_enabled) return;
+    if (!force && avj_apprentice_guard_active(a)) return;
     if (!force && (unsigned long)(a->tick - a->last_beat_update_tick) < 32UL) return;
 
     o = &a->pop[a->active];
@@ -5313,19 +6270,24 @@ static void avj_evolve_cells(avj_t *a)
     avj_org_t *o = &a->pop[a->active];
     unsigned char next_alive[AVJ_MAX_CHAIN][AVJ_MAX_PARAMS];
     int e, p;
+    const int retarget = (a->param_target_ticks <= 1) || ((unsigned long)a->tick % (unsigned long)a->param_target_ticks) == 0;
     memset(next_alive, 0, sizeof(next_alive));
     for (e = 0; e < o->chain_len; e++) {
         const avj_fx_info_t *fx = avj_fx_by_id(o->gene[e].fx_id, &o->gene[e].fx_db_index);
         if (!fx) continue;
         for (p = 0; p < fx->param_count && p < AVJ_MAX_PARAMS; p++) {
-            int n = 0;
-            double avg = 0.5;
             avj_cell_t *c = &o->gene[e].param[p];
-            avj_neighbor_stats(o, e, p, &n, &avg);
-            next_alive[e][p] = (c->alive ? (n == 2 || n == 3 || (a->chaos > 0.75 && n == 4)) : (n == 3 || (a->chaos > 0.85 && n == 2)));
-            if (avj_frand(a) < a->mutation * (0.010 + a->chaos * 0.050)) next_alive[e][p] ^= 1;
-            if (!next_alive[e][p] && avj_frand(a) < a->curiosity * 0.002) next_alive[e][p] = 1;
-            c->target = avj_clampd(c->target * 0.88 + avg * 0.12 + (avj_frand(a) - 0.5) * a->chaos * 0.12, 0.0, 1.0);
+            if (retarget) {
+                int n = 0;
+                double avg = 0.5;
+                avj_neighbor_stats(o, e, p, &n, &avg);
+                next_alive[e][p] = (c->alive ? (n == 2 || n == 3 || (a->chaos > 0.75 && n == 4)) : (n == 3 || (a->chaos > 0.85 && n == 2)));
+                if (avj_frand(a) < a->mutation * (0.010 + a->chaos * 0.050)) next_alive[e][p] ^= 1;
+                if (!next_alive[e][p] && avj_frand(a) < a->curiosity * 0.002) next_alive[e][p] = 1;
+                c->target = avj_clampd(c->target * 0.88 + avg * 0.12 + (avj_frand(a) - 0.5) * a->chaos * 0.12, 0.0, 1.0);
+            } else {
+                next_alive[e][p] = c->alive;
+            }
         }
     }
     for (e = 0; e < o->chain_len; e++) {
@@ -5379,7 +6341,7 @@ static void avj_drive_params(avj_t *a)
             if (v != c->last_sent || c->dirty) changed = 1;
         }
         if (!changed) continue;
-        if ((unsigned long)(a->tick - a->last_entry_preset_tick[e]) < (unsigned long)a->param_commit_ticks) continue;
+        if ((unsigned long)(a->tick - a->last_entry_preset_tick[e]) < (unsigned long)a->param_entry_hold_ticks) continue;
         if (avj_send_entry_preset(a, o, e, 0, 0)) {
             a->last_param_any_preset_tick = a->tick;
             a->param_cursor = (e + 1) % o->chain_len;
@@ -5400,8 +6362,21 @@ static const char *avj_trick_name(int mode)
     }
 }
 
+static int avj_gesture_from_trick_mode(int mode)
+{
+    switch (mode) {
+    case AVJ_TRICK_SHORTLOOP: return AVJ_GESTURE_LOOP_MARK;
+    case AVJ_TRICK_STUTTER: return AVJ_GESTURE_STUTTER;
+    case AVJ_TRICK_SCRATCH: return AVJ_GESTURE_SCRATCH;
+    case AVJ_TRICK_FREEZE: return AVJ_GESTURE_FREEZE;
+    case AVJ_TRICK_JUMP: return AVJ_GESTURE_JUMP;
+    default: return AVJ_GESTURE_NONE;
+    }
+}
+
 static void avj_trick_release(avj_t *a)
 {
+    avj_self_transport_note_ticks(a, AVJ_GESTURE_STOP_START, avj_seconds_to_ticks(a, 0.75));
     avj_send(a, a->ev.sample_hold_frame, "%d %d %d", 0, 0, 0);
     avj_send(a, a->ev.sample_clear_marker, "%d", a->current_sample);
     avj_send(a, a->ev.sample_loop, "%d %d", a->current_sample, 1);
@@ -5425,6 +6400,7 @@ static void avj_trick_start(avj_t *a, int mode)
 
     max_anchor = a->sample_frames > 32 ? a->sample_frames - 16 : 25000;
     a->trick_mode = mode;
+    avj_self_transport_note(a, avj_gesture_from_trick_mode(mode));
     a->trick_age = 0;
     a->trick_ticks = avj_irand(a, 18, 80 + (int)(a->chaos * 90.0));
     a->trick_anchor = avj_irand(a, 8, max_anchor);
@@ -5453,12 +6429,14 @@ static void avj_trick_tick(avj_t *a)
     int mode, start, end, len, span, speed;
     if (!a->trick_enabled) return;
     if (a->trick_mode == AVJ_TRICK_NONE) {
+        if (a->tick <= a->user_performing_until) return;
         if ((a->tick & 15UL) == 0 && avj_frand(a) < 0.010 + a->chaos * 0.030)
             avj_trick_start(a, avj_irand(a, AVJ_TRICK_SHORTLOOP, AVJ_TRICK_JUMP));
         return;
     }
 
     mode = a->trick_mode;
+    avj_self_transport_note(a, avj_gesture_from_trick_mode(mode));
     a->trick_age++;
     if (a->trick_age >= a->trick_ticks) { avj_trick_release(a); return; }
 
@@ -5504,7 +6482,7 @@ static void avj_age_chain_fx(avj_t *a, int force)
     }
 
     if (!force && (unsigned long)(a->tick - a->last_fx_mutation_tick) < (unsigned long)a->fx_replace_min_ticks) return;
-    lifetime = avj_clampi((int)((double)a->fx_lifetime_ticks * (1.15 - a->chaos * 0.35 + a->patience * 0.20)), avj_seconds_to_ticks(a, 8.0), avj_seconds_to_ticks(a, 120.0));
+    lifetime = avj_clampi((int)((double)a->fx_lifetime_ticks * (1.15 - a->chaos * 0.35 + a->patience * 0.20)), avj_seconds_to_pace_ticks(a, 0.25), avj_seconds_to_pace_ticks(a, 3600.0));
     if (!force && oldest < (unsigned long)lifetime) return;
     if (victim < 0) return;
 
@@ -5520,6 +6498,7 @@ static void avj_learn_active(avj_t *a, double reward)
     int e;
     double norm;
     if (reward <= -3.0) avj_immune_remember_active(a, -reward, "negative feedback");
+    if (reward < 0.0) avj_gesture_negative_feedback(a, -reward);
     avj_brain_feedback(a, reward);
     o->score += reward;
     norm = o->chain_len > 1 ? sqrt((double)o->chain_len) : 1.0;
@@ -5573,15 +6552,17 @@ static void avj_random_rebuild(avj_t *a, int desired_len, int make_sample)
 static void avj_start_explore(avj_t *a, double seconds, int desired_len, int count)
 {
     seconds = avj_clampd(seconds, 0.25, 120.0);
-    a->explore_interval_ticks = avj_seconds_to_ticks(a, seconds);
+    a->explore_interval_ticks = avj_seconds_to_pace_ticks(a, seconds);
     a->explore_chain_len = desired_len > 0 ? avj_clampi(desired_len, a->min_chain, a->max_chain) : 0;
     a->explore_left = count == 0 ? -1 : count;
     if (a->explore_left < -1) a->explore_left = -1;
     a->explore_enabled = 1;
+    a->explore_deferred = 0;
+    a->explore_deferred_tick = 0;
     a->last_explore_tick = a->tick;
     avj_random_rebuild(a, a->explore_chain_len, 0);
     avj_log(a, "explore on: %.2fs interval, len %d, count %d\n",
-            avj_ticks_to_seconds(a, a->explore_interval_ticks),
+            avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
             a->explore_chain_len,
             a->explore_left);
 }
@@ -5590,13 +6571,19 @@ static void avj_stop_explore(avj_t *a)
 {
     a->explore_enabled = 0;
     a->explore_left = -1;
+    a->explore_deferred = 0;
     avj_log(a, "explore off\n");
 }
 
-static void avj_explore_tick(avj_t *a)
+static int avj_explore_due(avj_t *a)
 {
-    if (!a->explore_enabled) return;
-    if ((unsigned long)(a->tick - a->last_explore_tick) < (unsigned long)a->explore_interval_ticks) return;
+    return a && a->explore_enabled &&
+           (unsigned long)(a->tick - a->last_explore_tick) >= (unsigned long)a->explore_interval_ticks;
+}
+
+static void avj_explore_step(avj_t *a)
+{
+    if (!a || !a->explore_enabled) return;
     a->last_explore_tick = a->tick;
     avj_random_rebuild(a, a->explore_chain_len, avj_frand(a) < 0.12 + a->chaos * 0.18);
     if (a->explore_left > 0) {
@@ -5608,6 +6595,25 @@ static void avj_explore_tick(avj_t *a)
     }
 }
 
+static void avj_explore_mark_deferred(avj_t *a)
+{
+    if (!a || !a->explore_enabled || !avj_explore_due(a)) return;
+    a->explore_deferred = 1;
+    a->explore_deferred_tick = a->tick;
+}
+
+static void avj_explore_tick(avj_t *a)
+{
+    if (!a->explore_enabled) return;
+    if (a->explore_deferred) {
+        a->explore_deferred = 0;
+        avj_explore_step(a);
+        return;
+    }
+    if (!avj_explore_due(a)) return;
+    avj_explore_step(a);
+}
+
 static void avj_rt_lock_user_bounds(avj_t *a)
 {
     if (a) a->rt_user_locked = 1;
@@ -5615,8 +6621,13 @@ static void avj_rt_lock_user_bounds(avj_t *a)
 
 static double avj_rt_status_value(avj_t *a, int token, double fallback)
 {
-    double raw;
-    if (avj_status_token(a, token, &raw)) return raw;
+    double raw, fps;
+    if (avj_status_token(a, token, &raw)) {
+        fps = avj_status_fps_value(raw);
+        if (fps > 0.0) return fps;
+    }
+    if (token == avj_rt_real_fps_token(a) && a && a->status_fps_ema > 0.0)
+        return a->status_fps_ema;
     return fallback;
 }
 
@@ -5662,12 +6673,12 @@ static void avj_rt_print(avj_t *a)
             clear_mode,
             a->rt_target * 100.0, a->rt_low * 100.0, a->rt_high * 100.0);
     if (a->rt_render_seen)
-        avj_ui_printf(" fps_ratio=%s%.1f%%%s real=%.1f target=%.1f frame=%.1fms budget=%.1fms raw_tokens=%d\n",
+        avj_ui_printf(" fps_ratio=%s%.1f%%%s real=%.1f target=%.1f frame=%.1fms budget=%.1fms status_rate=%.1f raw_tokens=%d\n",
                 avj_col_rt_ratio(a, a->rt_render_load), a->rt_render_load * 100.0, avj_col(a, AVJ_COL_RESET),
-                real_fps, target_fps, real_ms, budget_ms,
+                real_fps, target_fps, real_ms, budget_ms, avj_status_rate(a),
                 a->status_token_count);
     else
-        avj_ui_printf(" fps_ratio=unknown raw_tokens=%d\n", a->status_token_count);
+        avj_ui_printf(" fps_ratio=unknown status_rate=%.1f raw_tokens=%d\n", avj_status_rate(a), a->status_token_count);
 }
 
 static void avj_rt_apply_chain_len(avj_t *a, int len, const char *why)
@@ -5854,7 +6865,21 @@ static int avj_save_state(avj_t *a, const char *path)
     FILE *f;
     int i, e, p;
     const char *out = path && path[0] ? path : a->state_path;
-    snprintf(tmp, sizeof(tmp), "%s.tmp", out);
+    {
+        const char *slash = strrchr(out, '/');
+        if (slash) {
+            size_t dir_len = (size_t)(slash - out) + 1u;
+            const char *base = "eidolon.tmp";
+            if (dir_len + strlen(base) < sizeof(tmp)) {
+                memcpy(tmp, out, dir_len);
+                strcpy(tmp + dir_len, base);
+            } else {
+                snprintf(tmp, sizeof(tmp), "%s.tmp", out);
+            }
+        } else {
+            snprintf(tmp, sizeof(tmp), "eidolon.tmp");
+        }
+    }
     f = fopen(tmp, "w");
     if (!f) return 0;
     fprintf(f, "AUTOVJ_LIFE %d\n", AVJ_VERSION);
@@ -5867,10 +6892,13 @@ static int avj_save_state(avj_t *a, const char *path)
             a->rt_auto, a->rt_user_locked, a->rt_render_token,
             a->rt_chain_len_token, a->rt_chain_on_token, a->rt_clear_learn,
             a->rt_target, a->rt_low, a->rt_high);
+    fprintf(f, "gesture %d %d %d %d %d %d\n", a->gesture_learn, a->gesture_auto,
+            a->apprentice_mode, a->apprentice_guard_ticks, a->apprentice_param_div,
+            a->apprentice_release_ticks);
     fprintf(f, "mix %d %d\n", a->mix_source_type, a->mix_channel);
     fprintf(f, "explore %d %d %d %d\n", a->explore_enabled, a->explore_interval_ticks, a->explore_chain_len, a->explore_left);
     fprintf(f, "life %d %d\n", a->fx_lifetime_ticks, a->trick_enabled);
-    fprintf(f, "pace %d %d %d\n", a->fx_replace_min_ticks, a->fx_lifetime_ticks, a->param_commit_ticks);
+    fprintf(f, "pace %d %d %d %d %d\n", a->fx_replace_min_ticks, a->fx_lifetime_ticks, a->param_commit_ticks, a->param_entry_hold_ticks, a->param_target_ticks);
     fprintf(f, "pscan %lu %d\n", a->last_param_any_preset_tick, a->param_cursor);
     fprintf(f, "samples %d %d %d %d\n", a->make_samples, a->sample_frames, a->sample_min_len, a->sample_max_len);
     fprintf(f, "beat %d %d %d %d %d %d %d %d %d %d %d %d\n",
@@ -5912,6 +6940,14 @@ static int avj_save_state(avj_t *a, const char *path)
     for (i = 0; i < AVJ_PAIR_IMMUNE_CAP; i++) {
         if (a->pair_immune[i].sig && a->pair_immune[i].heat > 0.0001)
             fprintf(f, "pairimmune %u %.8f %lu\n", a->pair_immune[i].sig, a->pair_immune[i].heat, a->pair_immune[i].tick);
+    }
+    for (i = 0; i < AVJ_GESTURE_MEMORY_CAP; i++) {
+        if (a->gesture_memory[i].chain_sig &&
+            (fabs(a->gesture_memory[i].reward) > 0.0001 || a->gesture_memory[i].heat > 0.0001))
+            fprintf(f, "gm %u %d %d %.8f %.8f %lu\n",
+                    a->gesture_memory[i].chain_sig, a->gesture_memory[i].gesture,
+                    a->gesture_memory[i].mode, a->gesture_memory[i].reward,
+                    a->gesture_memory[i].heat, a->gesture_memory[i].tick);
     }
     fprintf(f, "active %d\n", a->active);
     for (i = 0; i < AVJ_POP; i++) {
@@ -5984,13 +7020,33 @@ static int avj_load_state(avj_t *a, const char *path)
                    &a->rt_chain_len_token, &a->rt_chain_on_token, &a->rt_clear_learn,
                    &a->rt_target, &a->rt_low, &a->rt_high);
         }
+        else if (!strcmp(key, "gesture")) {
+            int n = sscanf(line, "%*s %d %d %d %d %d %d",
+                   &a->gesture_learn, &a->gesture_auto, &a->apprentice_mode,
+                   &a->apprentice_guard_ticks, &a->apprentice_param_div,
+                   &a->apprentice_release_ticks);
+            if (n < 3) a->apprentice_mode = 1;
+            if (n < 4) a->apprentice_guard_ticks = avj_seconds_to_ticks(a, 10.0);
+            if (n < 5) a->apprentice_param_div = 4;
+            if (n < 6) a->apprentice_release_ticks = avj_seconds_to_status_ticks(a, 1.25);
+        }
         else if (!strcmp(key, "mix")) sscanf(line, "%*s %d %d", &a->mix_source_type, &a->mix_channel);
         else if (!strcmp(key, "minchain")) sscanf(line, "%*s %d", &a->min_chain);
         else if (!strcmp(key, "maxchain")) sscanf(line, "%*s %d", &a->max_chain);
-        else if (!strcmp(key, "explore")) sscanf(line, "%*s %d %d %d %d", &a->explore_enabled, &a->explore_interval_ticks, &a->explore_chain_len, &a->explore_left);
+        else if (!strcmp(key, "explore")) {
+            sscanf(line, "%*s %d %d %d %d", &a->explore_enabled, &a->explore_interval_ticks, &a->explore_chain_len, &a->explore_left);
+            a->explore_deferred = 0;
+        }
         else if (!strcmp(key, "samples")) sscanf(line, "%*s %d %d %d %d", &a->make_samples, &a->sample_frames, &a->sample_min_len, &a->sample_max_len);
         else if (!strcmp(key, "life")) sscanf(line, "%*s %d %d", &a->fx_lifetime_ticks, &a->trick_enabled);
-        else if (!strcmp(key, "pace")) sscanf(line, "%*s %d %d %d", &a->fx_replace_min_ticks, &a->fx_lifetime_ticks, &a->param_commit_ticks);
+        else if (!strcmp(key, "pace")) {
+            int n = sscanf(line, "%*s %d %d %d %d %d",
+                           &a->fx_replace_min_ticks, &a->fx_lifetime_ticks,
+                           &a->param_commit_ticks, &a->param_entry_hold_ticks,
+                           &a->param_target_ticks);
+            if (n < 4) a->param_entry_hold_ticks = a->param_commit_ticks;
+            if (n < 5) a->param_target_ticks = avj_seconds_to_pace_ticks(a, 8.0);
+        }
         else if (!strcmp(key, "pscan")) sscanf(line, "%*s %lu %d", &a->last_param_any_preset_tick, &a->param_cursor);
         else if (!strcmp(key, "beat")) sscanf(line, "%*s %d %d %d %d %d %d %d %d %d %d %d %d",
             &a->beat_enabled, &a->beat_action, &a->beat_mode, &a->beat_amount,
@@ -6072,6 +7128,20 @@ static int avj_load_state(avj_t *a, const char *path)
                 a->pair_immune[slot].heat = avj_clampd(heat, 0.0, 24.0);
                 a->pair_immune[slot].tick = tick;
             }
+        } else if (!strcmp(key, "gm")) {
+            unsigned int sig;
+            int gesture, mode;
+            double reward, heat;
+            unsigned long tick;
+            if (sscanf(line, "%*s %u %d %d %lf %lf %lu", &sig, &gesture, &mode, &reward, &heat, &tick) == 6) {
+                int slot = a->gesture_memory_pos++ % AVJ_GESTURE_MEMORY_CAP;
+                a->gesture_memory[slot].chain_sig = sig;
+                a->gesture_memory[slot].gesture = avj_clampi(gesture, AVJ_GESTURE_NONE, AVJ_GESTURE_STOP_START);
+                a->gesture_memory[slot].mode = mode;
+                a->gesture_memory[slot].reward = avj_clampd(reward, -24.0, 24.0);
+                a->gesture_memory[slot].heat = avj_clampd(heat, 0.0, 24.0);
+                a->gesture_memory[slot].tick = tick;
+            }
         } else if (!strcmp(key, "active")) {
             sscanf(line, "%*s %d", &a->active);
             a->active = avj_clampi(a->active, 0, AVJ_POP - 1);
@@ -6126,10 +7196,16 @@ static int avj_load_state(avj_t *a, const char *path)
     a->tick_ms = avj_clampi(a->tick_ms, 250, 5000);
     a->scene_ticks = avj_clampi(a->scene_ticks, 8, 1000000);
     a->send_budget = avj_clampi(a->send_budget, 1, 512);
-    a->param_commit_ticks = avj_clampi(a->param_commit_ticks, avj_seconds_to_ticks(a, 2.0), avj_seconds_to_ticks(a, 120.0));
-    a->fx_replace_min_ticks = avj_clampi(a->fx_replace_min_ticks, avj_seconds_to_ticks(a, 1.0), avj_seconds_to_ticks(a, 120.0));
-    a->fx_lifetime_ticks = avj_clampi(a->fx_lifetime_ticks, avj_seconds_to_ticks(a, 8.0), avj_seconds_to_ticks(a, 120.0));
+    a->param_commit_ticks = avj_clampi(a->param_commit_ticks, 1, 1000000);
+    a->param_entry_hold_ticks = avj_clampi(a->param_entry_hold_ticks > 0 ? a->param_entry_hold_ticks : a->param_commit_ticks, 1, 1000000);
+    a->param_target_ticks = (a->param_target_ticks <= 1) ? avj_seconds_to_pace_ticks(a, 8.0) : avj_clampi(a->param_target_ticks, 1, 1000000);
+    a->fx_replace_min_ticks = avj_clampi(a->fx_replace_min_ticks, 1, 1000000);
+    a->fx_lifetime_ticks = avj_clampi(a->fx_lifetime_ticks, 1, 1000000);
     a->trick_enabled = a->trick_enabled ? 1 : 0;
+    a->gesture_learn = a->gesture_learn ? 1 : 0;
+    a->gesture_auto = a->gesture_auto ? 1 : 0;
+    a->last_user_gesture = avj_clampi(a->last_user_gesture, AVJ_GESTURE_NONE, AVJ_GESTURE_STOP_START);
+    a->last_any_gesture = avj_clampi(a->last_any_gesture, AVJ_GESTURE_NONE, AVJ_GESTURE_STOP_START);
     a->rt_auto = a->rt_auto ? 1 : 0;
     a->rt_user_locked = a->rt_user_locked ? 1 : 0;
     a->rt_clear_learn = avj_clampi(a->rt_clear_learn, AVJ_RT_CLEAR_OFF, AVJ_RT_CLEAR_SELECTED);
@@ -6218,6 +7294,10 @@ static void avj_help(avj_t *a)
     avj_ui_printf("    %sstatus%s                       one-line organism summary\n", cmd, r);
     avj_ui_printf("    %schain%s                        current FX chain entries\n", cmd, r);
     avj_ui_printf("    %sroles%s                        chain grammar/category table\n", cmd, r);
+    avj_ui_printf("    %sgesture status|last|learn on|off|auto on|off|clear%s\n", cmd, r);
+    avj_ui_printf("                                 learn from user trickplay body language\n");
+    avj_ui_printf("    %sapprentice status|on|off|guard SEC|stable SEC|calm N|release%s\n", cmd, r);
+    avj_ui_printf("                                 defer curiosity while the artist has hands on the deck\n");
     avj_ui_printf("    %sbrain on|off|status|replay|clear%s\n", cmd, r);
     avj_ui_printf("                                 neural status-token preference learner\n\n");
 
@@ -6255,8 +7335,14 @@ static void avj_help(avj_t *a)
     avj_ui_printf("    %sexplore off|[SEC [LEN [N]]]%s rebuild random FX chains; SEC may be 0.25\n", cmd, r);
     avj_ui_printf("    %scombos [SEC [LEN [N]]]%s      try N random chains, default: 8 combos, 8s apart\n", cmd, r);
     avj_ui_printf("    %stry19 [SEC [N]]%s             try 19 full chains, e.g. try19 0.25\n", cmd, r);
-    avj_ui_printf("    %sfxpace MIN MAX%s              FX-entry lifetime seconds\n", cmd, r);
-    avj_ui_printf("    %sparampace S%s                 param-preset lifetime seconds\n\n", cmd, r);
+    avj_ui_printf("    %sfxpace MIN MAX%s              FX-entry lifetime seconds (fxspace also accepted)\n", cmd, r);
+    avj_ui_printf("    %space status%s                 show performer timing controls\n", cmd, r);
+    avj_ui_printf("    %space chain S%s                whole-chain mutation interval\n", cmd, r);
+    avj_ui_printf("    %space entry MIN LIFE%s         single-entry replacement min/life\n", cmd, r);
+    avj_ui_printf("    %space param S%s                minimum interval between param sends\n", cmd, r);
+    avj_ui_printf("    %space hold S%s                 minimum interval before same entry gets params again\n", cmd, r);
+    avj_ui_printf("    %space target S%s               parameter retarget/alive lifetime\n", cmd, r);
+    avj_ui_printf("    %sparampace S%s                 alias for pace param S\n\n", cmd, r);
 
     avj_ui_printf("  %sSources / routing%s\n", sec, r);
     avj_ui_printf("    %sfxsync%s                       refresh live FX list over VIMS 401\n", cmd, r);
@@ -6344,7 +7430,7 @@ static void avj_shell_explore(avj_t *a, char *arg, int force_full)
     if (count < 0) count = -1;
     avj_start_explore(a, seconds, desired_len, count);
     avj_ui_printf( "explore on: every %.2fs, chain len %d, %s\n",
-            avj_ticks_to_seconds(a, a->explore_interval_ticks),
+            avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
             a->explore_chain_len > 0 ? a->explore_chain_len : 0,
             a->explore_left < 0 ? "forever" : "counted");
 }
@@ -6378,7 +7464,7 @@ static void avj_shell_combos(avj_t *a, char *arg)
     if (count == 0) count = 8;
     avj_start_explore(a, seconds, desired_len, count < 0 ? -1 : count);
     avj_ui_printf( "combos: every %.2fs, %d FX, %s\n",
-            avj_ticks_to_seconds(a, a->explore_interval_ticks),
+            avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
             desired_len,
             a->explore_left < 0 ? "forever" : "8-ish tasting run");
 }
@@ -6398,17 +7484,17 @@ static void avj_shell_line(avj_t *a, char *line)
     else if (!strcasecmp(cmd, "banner") || !strcasecmp(cmd, "boot")) avj_print_banner(a);
     else if (!strcasecmp(cmd, "intro") || !strcasecmp(cmd, "first") || !strcasecmp(cmd, "start")) avj_print_intro(a);
     else if (!strcasecmp(cmd, "pause")) { a->paused = 1; avj_ui_printf( "%spaused%s\n", avj_col(a, AVJ_COL_YELLOW), avj_col(a, AVJ_COL_RESET)); }
-    else if (!strcasecmp(cmd, "go") || !strcasecmp(cmd, "run")) { a->paused = 0; avj_ui_printf( "%slive%s\n", avj_col(a, AVJ_COL_GREEN), avj_col(a, AVJ_COL_RESET)); }
+    else if (!strcasecmp(cmd, "go") || !strcasecmp(cmd, "run")) { a->paused = 0; a->status_warmup = 3; a->apprentice_stable_ticks = 0; avj_ui_printf( "%slive%s\n", avj_col(a, AVJ_COL_GREEN), avj_col(a, AVJ_COL_RESET)); }
     else if (!strcasecmp(cmd, "status")) {
-        avj_ui_printf( "%stick%s %lu chaos %.3f mutation %.3f curiosity %.3f scene %lu/%d chain%s[%d..%d]%s fxpace=%.1f/%.1fs parampace=%.2fs explore=%s%s%s %.2fs len=%d left=%d beat(mode=%d amount=%d action=%d) brain=%s%s%s corpus=%d status=%s%s%s tokens=%d rt=%s%s/%s%s fps=%s%s%s fxdb=%s:%d mix=%s:%d\n",
+        avj_ui_printf( "%stick%s %lu chaos %.3f mutation %.3f curiosity %.3f scene %lu/%d chain%s[%d..%d]%s fxpace=%.1f/%.1fs parampace=%.2fs explore=%s%s%s %.2fs len=%d left=%d beat(mode=%d amount=%d action=%d) brain=%s%s%s corpus=%d status=%s%s%s tokens=%d rt=%s%s/%s%s fps=%s%s%s gesture=%s%s/%s%s apprentice=%s%s%s fxdb=%s:%d mix=%s:%d\n",
                 avj_col(a, AVJ_COL_DIM), avj_col(a, AVJ_COL_RESET),
                 a->tick, a->chaos, a->mutation, a->curiosity,
                 a->tick - a->last_scene_tick, a->scene_ticks,
                 avj_col(a, AVJ_COL_YELLOW), a->min_chain, a->max_chain, avj_col(a, AVJ_COL_RESET),
-                avj_ticks_to_seconds(a, a->fx_replace_min_ticks), avj_ticks_to_seconds(a, a->fx_lifetime_ticks),
-                avj_ticks_to_seconds(a, a->param_commit_ticks),
+                avj_pace_ticks_to_seconds(a, a->fx_replace_min_ticks), avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks),
+                avj_pace_ticks_to_seconds(a, a->param_commit_ticks),
                 avj_col_state(a, a->explore_enabled, 0), a->explore_enabled ? "on" : "off", avj_col(a, AVJ_COL_RESET),
-                avj_ticks_to_seconds(a, a->explore_interval_ticks),
+                avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
                 a->explore_chain_len, a->explore_left,
                 a->beat_mode, a->beat_amount, a->beat_action,
                 avj_col_state(a, a->nn_enabled, 0), a->nn_enabled ? "on" : "off", avj_col(a, AVJ_COL_RESET),
@@ -6416,10 +7502,16 @@ static void avj_shell_line(avj_t *a, char *line)
                 avj_col_state(a, a->status_seen, 1), a->status_seen ? "seen" : "fallback", avj_col(a, AVJ_COL_RESET), a->status_token_count,
                 avj_col_state(a, a->rt_auto, 0), a->rt_auto ? "auto" : "off", a->rt_user_locked ? "manual" : "adaptive", avj_col(a, AVJ_COL_RESET),
                 avj_col_state(a, a->rt_render_seen, 1), a->rt_render_seen ? "seen" : "unknown", avj_col(a, AVJ_COL_RESET),
+                avj_col_state(a, a->gesture_learn, 0), a->gesture_learn ? "learn" : "off",
+                avj_gesture_name(a->last_user_gesture), avj_col(a, AVJ_COL_RESET),
+                avj_col_state(a, avj_apprentice_guard_active(a), 0), avj_apprentice_state_name(a), avj_col(a, AVJ_COL_RESET),
                 avj_capabilities_live ? "live" : "bundled", avj_fx_db_count,
                 a->mix_source_type ? "stream" : "sample", a->mix_channel);
     } else if (!strcasecmp(cmd, "chain") && (!arg || !*arg)) avj_print_chain(a);
     else if (!strcasecmp(cmd, "roles")) avj_print_role_tables();
+    else if (!strcasecmp(cmd, "gesture")) avj_shell_gesture(a, arg);
+    else if (!strcasecmp(cmd, "apprentice") || !strcasecmp(cmd, "deck") || !strcasecmp(cmd, "performer")) avj_shell_apprentice(a, arg);
+    else if (!strcasecmp(cmd, "pace")) avj_shell_pace(a, arg);
     else if (!strcasecmp(cmd, "fxsync") || !strcasecmp(cmd, "effects")) {
         if (avj_sync_effect_list_vims(a, 1)) {
             avj_sanitize_mind(a);
@@ -6589,12 +7681,12 @@ static void avj_shell_line(avj_t *a, char *line)
     else if (!strcasecmp(cmd, "rt") || !strcasecmp(cmd, "realtime")) avj_shell_rt(a, arg);
     else if (!strcasecmp(cmd, "budget")) { a->send_budget = avj_clampi(atoi(arg), 1, 512); avj_ui_printf( "budget %d preset sends/tick\n", a->send_budget); }
     else if (!strcasecmp(cmd, "life")) {
-        double sec = *arg ? strtod(arg, NULL) : avj_ticks_to_seconds(a, a->fx_lifetime_ticks);
-        sec = avj_clampd(sec, 8.0, 120.0);
-        a->fx_lifetime_ticks = avj_seconds_to_ticks(a, sec);
-        avj_ui_printf( "life %.1fs (%d ticks)\n", avj_ticks_to_seconds(a, a->fx_lifetime_ticks), a->fx_lifetime_ticks);
+        double sec = *arg ? strtod(arg, NULL) : avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks);
+        sec = avj_clampd(sec, 0.25, 3600.0);
+        a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, sec);
+        avj_ui_printf( "life %.1fs (%d status ticks)\n", avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks), a->fx_lifetime_ticks);
     }
-    else if (!strcasecmp(cmd, "fxpace")) {
+    else if (!strcasecmp(cmd, "fxpace") || !strcasecmp(cmd, "fxspace")) {
         char *minp = arg, *maxp;
         double minsec, maxsec;
         while (*minp && isspace((unsigned char)*minp)) minp++;
@@ -6602,20 +7694,20 @@ static void avj_shell_line(avj_t *a, char *line)
         while (*maxp && !isspace((unsigned char)*maxp)) maxp++;
         if (*maxp) *maxp++ = '\0';
         while (*maxp && isspace((unsigned char)*maxp)) maxp++;
-        minsec = *minp ? strtod(minp, NULL) : avj_ticks_to_seconds(a, a->fx_replace_min_ticks);
-        maxsec = *maxp ? strtod(maxp, NULL) : avj_ticks_to_seconds(a, a->fx_lifetime_ticks);
-        minsec = avj_clampd(minsec, 1.0, 120.0);
-        maxsec = avj_clampd(maxsec, 8.0, 120.0);
+        minsec = *minp ? strtod(minp, NULL) : avj_pace_ticks_to_seconds(a, a->fx_replace_min_ticks);
+        maxsec = *maxp ? strtod(maxp, NULL) : avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks);
+        minsec = avj_clampd(minsec, 0.25, 3600.0);
+        maxsec = avj_clampd(maxsec, 0.25, 3600.0);
         if (maxsec < minsec) maxsec = minsec;
-        a->fx_replace_min_ticks = avj_seconds_to_ticks(a, minsec);
-        a->fx_lifetime_ticks = avj_seconds_to_ticks(a, maxsec);
-        avj_ui_printf( "fxpace min %.1fs life %.1fs\n", avj_ticks_to_seconds(a, a->fx_replace_min_ticks), avj_ticks_to_seconds(a, a->fx_lifetime_ticks));
+        a->fx_replace_min_ticks = avj_seconds_to_pace_ticks(a, minsec);
+        a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, maxsec);
+        avj_ui_printf( "fxpace min %.1fs life %.1fs\n", avj_pace_ticks_to_seconds(a, a->fx_replace_min_ticks), avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks));
     }
     else if (!strcasecmp(cmd, "parampace")) {
-        double sec = *arg ? strtod(arg, NULL) : avj_ticks_to_seconds(a, a->param_commit_ticks);
-        sec = avj_clampd(sec, 2.0, 120.0);
-        a->param_commit_ticks = avj_seconds_to_ticks(a, sec);
-        avj_ui_printf( "parampace %.2fs (%d ticks, one entry per interval)\n", avj_ticks_to_seconds(a, a->param_commit_ticks), a->param_commit_ticks);
+        double sec = *arg ? strtod(arg, NULL) : avj_pace_ticks_to_seconds(a, a->param_commit_ticks);
+        sec = avj_clampd(sec, 0.10, 3600.0);
+        a->param_commit_ticks = avj_seconds_to_pace_ticks(a, sec);
+        avj_ui_printf( "parampace %.2fs (%d status ticks, one send interval)\n", avj_pace_ticks_to_seconds(a, a->param_commit_ticks), a->param_commit_ticks);
     }
     else if (!strcasecmp(cmd, "trick")) {
         if (!strcasecmp(arg, "off")) { a->trick_enabled = 0; avj_trick_release(a); avj_ui_printf( "tricks off\n"); }
@@ -6711,9 +7803,120 @@ static int avj_read_shell(avj_t *a, int timeout_ms)
     return 0;
 }
 
+static void avj_pace_print(avj_t *a)
+{
+    avj_ui_printf("pace chain=%.1fs entry=min %.1fs life %.1fs param=send %.2fs hold %.2fs target %.2fs explore=%.2fs rate=%.1fHz ticks(scene=%d entry=%d/%d param=%d/%d/%d)\n",
+            avj_pace_ticks_to_seconds(a, a->scene_ticks),
+            avj_pace_ticks_to_seconds(a, a->fx_replace_min_ticks),
+            avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks),
+            avj_pace_ticks_to_seconds(a, a->param_commit_ticks),
+            avj_pace_ticks_to_seconds(a, a->param_entry_hold_ticks),
+            avj_pace_ticks_to_seconds(a, a->param_target_ticks),
+            avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
+            avj_status_rate(a),
+            a->scene_ticks, a->fx_replace_min_ticks, a->fx_lifetime_ticks,
+            a->param_commit_ticks, a->param_entry_hold_ticks, a->param_target_ticks);
+}
+
+static char *avj_next_word(char **sp)
+{
+    char *s, *w;
+    if (!sp || !*sp) return NULL;
+    s = *sp;
+    while (*s && isspace((unsigned char)*s)) s++;
+    if (!*s) { *sp = s; return NULL; }
+    w = s;
+    while (*s && !isspace((unsigned char)*s)) s++;
+    if (*s) *s++ = '\0';
+    *sp = s;
+    return w;
+}
+
+static void avj_shell_pace(avj_t *a, char *arg)
+{
+    char *sub, *v1, *v2;
+    double s1, s2;
+    if (!arg) { avj_pace_print(a); return; }
+    sub = avj_next_word(&arg);
+    if (!sub || !*sub || !strcasecmp(sub, "status") || !strcasecmp(sub, "show")) {
+        avj_pace_print(a);
+        return;
+    }
+    if (!strcasecmp(sub, "chain") || !strcasecmp(sub, "scene")) {
+        v1 = avj_next_word(&arg);
+        s1 = v1 ? strtod(v1, NULL) : avj_pace_ticks_to_seconds(a, a->scene_ticks);
+        s1 = avj_clampd(s1, 0.25, 3600.0);
+        a->scene_ticks = avj_seconds_to_pace_ticks(a, s1);
+        a->last_scene_tick = a->tick;
+        avj_ui_printf("pace chain %.1fs (%d status ticks)\n", avj_pace_ticks_to_seconds(a, a->scene_ticks), a->scene_ticks);
+    } else if (!strcasecmp(sub, "entry") || !strcasecmp(sub, "fx")) {
+        v1 = avj_next_word(&arg);
+        v2 = avj_next_word(&arg);
+        s1 = v1 ? strtod(v1, NULL) : avj_pace_ticks_to_seconds(a, a->fx_replace_min_ticks);
+        s2 = v2 ? strtod(v2, NULL) : avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks);
+        s1 = avj_clampd(s1, 0.25, 3600.0);
+        s2 = avj_clampd(s2, 0.25, 3600.0);
+        if (s2 < s1) s2 = s1;
+        a->fx_replace_min_ticks = avj_seconds_to_pace_ticks(a, s1);
+        a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, s2);
+        avj_ui_printf("pace entry min %.1fs life %.1fs\n", avj_pace_ticks_to_seconds(a, a->fx_replace_min_ticks), avj_pace_ticks_to_seconds(a, a->fx_lifetime_ticks));
+    } else if (!strcasecmp(sub, "param") || !strcasecmp(sub, "send")) {
+        v1 = avj_next_word(&arg);
+        s1 = v1 ? strtod(v1, NULL) : avj_pace_ticks_to_seconds(a, a->param_commit_ticks);
+        s1 = avj_clampd(s1, 0.10, 3600.0);
+        a->param_commit_ticks = avj_seconds_to_pace_ticks(a, s1);
+        avj_ui_printf("pace param send %.2fs (%d status ticks)\n", avj_pace_ticks_to_seconds(a, a->param_commit_ticks), a->param_commit_ticks);
+    } else if (!strcasecmp(sub, "hold") || !strcasecmp(sub, "entryhold")) {
+        v1 = avj_next_word(&arg);
+        s1 = v1 ? strtod(v1, NULL) : avj_pace_ticks_to_seconds(a, a->param_entry_hold_ticks);
+        s1 = avj_clampd(s1, 0.10, 3600.0);
+        a->param_entry_hold_ticks = avj_seconds_to_pace_ticks(a, s1);
+        avj_ui_printf("pace hold %.2fs (%d status ticks before same entry repeats)\n", avj_pace_ticks_to_seconds(a, a->param_entry_hold_ticks), a->param_entry_hold_ticks);
+    } else if (!strcasecmp(sub, "target") || !strcasecmp(sub, "life") || !strcasecmp(sub, "paramlife")) {
+        v1 = avj_next_word(&arg);
+        s1 = v1 ? strtod(v1, NULL) : avj_pace_ticks_to_seconds(a, a->param_target_ticks);
+        s1 = avj_clampd(s1, 0.25, 3600.0);
+        a->param_target_ticks = avj_seconds_to_pace_ticks(a, s1);
+        avj_ui_printf("pace target %.2fs (%d status ticks before param targets retune)\n", avj_pace_ticks_to_seconds(a, a->param_target_ticks), a->param_target_ticks);
+    } else if (!strcasecmp(sub, "explore")) {
+        v1 = avj_next_word(&arg);
+        s1 = v1 ? strtod(v1, NULL) : avj_pace_ticks_to_seconds(a, a->explore_interval_ticks);
+        s1 = avj_clampd(s1, 0.25, 3600.0);
+        a->explore_interval_ticks = avj_seconds_to_pace_ticks(a, s1);
+        avj_ui_printf("pace explore %.2fs (%d status ticks)\n", avj_pace_ticks_to_seconds(a, a->explore_interval_ticks), a->explore_interval_ticks);
+    } else if (!strcasecmp(sub, "calm")) {
+        a->scene_ticks = avj_seconds_to_pace_ticks(a, 180.0);
+        a->fx_replace_min_ticks = avj_seconds_to_pace_ticks(a, 45.0);
+        a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, 180.0);
+        a->param_commit_ticks = avj_seconds_to_pace_ticks(a, 6.0);
+        a->param_entry_hold_ticks = avj_seconds_to_pace_ticks(a, 12.0);
+        a->param_target_ticks = avj_seconds_to_pace_ticks(a, 16.0);
+        avj_pace_print(a);
+    } else if (!strcasecmp(sub, "live")) {
+        a->scene_ticks = avj_seconds_to_pace_ticks(a, 90.0);
+        a->fx_replace_min_ticks = avj_seconds_to_pace_ticks(a, 16.0);
+        a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, 90.0);
+        a->param_commit_ticks = avj_seconds_to_pace_ticks(a, 4.0);
+        a->param_entry_hold_ticks = avj_seconds_to_pace_ticks(a, 4.0);
+        a->param_target_ticks = avj_seconds_to_pace_ticks(a, 8.0);
+        avj_pace_print(a);
+    } else if (!strcasecmp(sub, "hot")) {
+        a->scene_ticks = avj_seconds_to_pace_ticks(a, 30.0);
+        a->fx_replace_min_ticks = avj_seconds_to_pace_ticks(a, 6.0);
+        a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, 30.0);
+        a->param_commit_ticks = avj_seconds_to_pace_ticks(a, 1.0);
+        a->param_entry_hold_ticks = avj_seconds_to_pace_ticks(a, 2.0);
+        a->param_target_ticks = avj_seconds_to_pace_ticks(a, 3.0);
+        avj_pace_print(a);
+    } else {
+        avj_ui_printf("pace expects status|chain S|entry MIN LIFE|param S|hold S|target S|explore S|calm|live|hot\n");
+    }
+}
+
 static void avj_tick(avj_t *a)
 {
     avj_org_t *o;
+    int apprentice_hands;
     if (!a->built) {
         if (a->make_samples) avj_create_sample(a);
         avj_build_chain(a);
@@ -6721,18 +7924,24 @@ static void avj_tick(avj_t *a)
     o = &a->pop[a->active];
     a->tick++;
     avj_poll_status(a);
+    apprentice_hands = avj_apprentice_guard_active(a);
     o->age++;
     o->score += 0.002 + o->novelty * 0.0005;
     a->pressure = avj_clampd(a->pressure * 0.998 + avj_frand(a) * 0.004, 0.0, 1.0);
-    if (a->explore_enabled) avj_explore_tick(a);
-    else if ((int)(a->tick - a->last_scene_tick) >= a->scene_ticks) avj_next_scene(a, 0);
+    if (avj_autonomy_allowed(a)) {
+        if (a->explore_enabled) avj_explore_tick(a);
+        else if ((int)(a->tick - a->last_scene_tick) >= a->scene_ticks) avj_next_scene(a, 0);
+    } else {
+        avj_explore_mark_deferred(a);
+    }
     avj_update_beat_event(a, 0);
     avj_realtime_tick(a);
     avj_reassert_chain_enabled(a, 0);
     avj_evolve_cells(a);
-    avj_drive_params(a);
-    avj_trick_tick(a);
-    avj_age_chain_fx(a, 0);
+    if (!apprentice_hands || a->apprentice_param_div <= 1 || (a->tick % (unsigned long)a->apprentice_param_div) == 0)
+        avj_drive_params(a);
+    if (avj_autonomy_allowed(a)) avj_trick_tick(a);
+    if (avj_autonomy_allowed(a)) avj_age_chain_fx(a, 0);
     if (a->autosave_ticks > 0 && (int)(a->tick - a->last_save_tick) >= a->autosave_ticks) avj_save_state(a, a->state_path);
     if (avj_save_requested) {
         avj_save_state(a, a->state_path);
@@ -6752,15 +7961,17 @@ static void avj_defaults(avj_t *a)
     snprintf(a->state_path, sizeof(a->state_path), "%s", AVJ_DEFAULT_STATE);
     a->rng = (unsigned int)time(NULL) ^ (unsigned int)getpid() ^ 0xa8715f3du;
     a->tick_ms = 250;
-    a->scene_ticks = 375;
+    a->scene_ticks = avj_seconds_to_pace_ticks(a, 90.0);
     a->autosave_ticks = 96;
     a->send_budget = 1;
     a->min_chain = AVJ_DEFAULT_MIN_CHAIN;
     a->max_chain = 6;
     a->explore_enabled = 0;
-    a->explore_interval_ticks = avj_seconds_to_ticks(a, 8.0);
+    a->explore_interval_ticks = avj_seconds_to_pace_ticks(a, 8.0);
     a->explore_left = -1;
     a->explore_chain_len = 0;
+    a->explore_deferred = 0;
+    a->explore_deferred_tick = 0;
     a->make_samples = 1;
     a->sample_frames = 25000;
     a->sample_min_len = 75;
@@ -6779,12 +7990,25 @@ static void avj_defaults(avj_t *a)
     a->rt_low = 0.98;
     a->rt_high = 1.00;
     a->rt_render_load = 0.0;
+    a->status_warmup = 3;
+    a->gesture_learn = 1;
+    a->gesture_auto = 0;
+    a->apprentice_mode = 1;
+    a->apprentice_guard_ticks = avj_seconds_to_ticks(a, 10.0);
+    a->apprentice_param_div = 4;
+    a->apprentice_stable_ticks = 0;
+    a->apprentice_release_ticks = avj_seconds_to_status_ticks(a, 1.25);
+    a->last_user_gesture = AVJ_GESTURE_NONE;
+    a->last_any_gesture = AVJ_GESTURE_NONE;
+    a->last_any_gesture_tick = 0;
     avj_wire_clear_all(a);
     a->trick_enabled = 1;
     a->trick_mode = AVJ_TRICK_NONE;
-    a->fx_lifetime_ticks = avj_seconds_to_ticks(a, 90.0);
-    a->fx_replace_min_ticks = avj_seconds_to_ticks(a, 16.0);
-    a->param_commit_ticks = avj_seconds_to_ticks(a, 4.0);
+    a->fx_lifetime_ticks = avj_seconds_to_pace_ticks(a, 90.0);
+    a->fx_replace_min_ticks = avj_seconds_to_pace_ticks(a, 16.0);
+    a->param_commit_ticks = avj_seconds_to_pace_ticks(a, 4.0);
+    a->param_entry_hold_ticks = avj_seconds_to_pace_ticks(a, 4.0);
+    a->param_target_ticks = avj_seconds_to_pace_ticks(a, 8.0);
     a->beat_enabled = 1;
     a->beat_action = 3;
     a->beat_mode = 4;
@@ -6821,7 +8045,7 @@ static void avj_usage(const char *p)
         "  -h HOST          VeeJay host (default localhost)\n"
         "  -p PORT          VeeJay port (default 3490)\n"
         "  -g GROUP         multicast group / group name\n"
-        "  -s FILE          mind state file (default autovj.life)\n"
+        "  -s FILE          mind state file (default eidolon.life)\n"
         "  -l               load state file at startup (default)\n"
         "  -R               fresh start, ignore previous mind state\n"
         "  -n               do not create samples; use current sample/stream\n"

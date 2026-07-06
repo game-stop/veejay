@@ -1,6 +1,6 @@
 .TH EIDOLON 1 "July 2026" "VeeJay" "User Commands"
 .SH NAME
-Eidolon \- autonomous Auto-VJ organism for VeeJay/VIMS
+Eidolon \- apprentice Auto-VJ organism for VeeJay/VIMS
 .SH SYNOPSIS
 .SY eidolon
 .OP \-h host
@@ -25,9 +25,15 @@ Eidolon \- autonomous Auto-VJ organism for VeeJay/VIMS
 .SH DESCRIPTION
 .B eidolon
 connects to a running VeeJay instance and controls an FX chain through VIMS.
-It behaves like a small autonomous performer: it creates or reuses samples,
-builds FX chains, mutates parameters, enables beat control, and learns from
-status tokens and explicit user feedback.
+It behaves like an apprentice at the deck: it proposes FX chains, mutates
+parameters, listens to the performer, and backs off while the artist is using
+transport or trickplay.
+.PP
+Eidolon has three related control layers.  The realtime governor keeps the
+organism inside the local machine's frame budget.  The apprentice layer watches
+VeeJay status tokens and treats user trickplay as body language.  The pace layer
+controls how quickly chains, single FX entries, and parameters change during a
+set.
 .PP
 The default interface is a plain terminal command shell.  Eidolon is quiet by
 default: it prints one response per command and does not flood the terminal
@@ -38,8 +44,9 @@ or the
 option when automatic debug logs are wanted.
 .PP
 Eidolon persists its fuzzy mind to a state file.  The state contains chain
-bounds, population state, learned FX weights, realtime cost pressure, immune
-memory, and other behaviour settings.
+bounds, population state, learned FX weights, realtime cost pressure, gesture
+memory, immune memory, apprentice settings, pace settings, and other behaviour
+settings.
 .SH OPTIONS
 .TP
 .BI \-h " host"
@@ -61,7 +68,7 @@ Set multicast group or group name.
 Use
 .I file
 as mind state file.  The default is
-.BR autovj.life .
+.BR eidolon.life .
 .TP
 .B \-l
 Load the state file at startup.  This is the default behaviour.
@@ -127,20 +134,36 @@ Accepted for compatibility and ignored.  Eidolon is terminal-only.
 .B \-v
 Enable verbose automatic logs and VIMS output.
 .SH INTERACTIVE SHELL
-After startup, Eidolon prints:
+After startup, Eidolon prints a small boot glyph and then shows a prompt like:
 .PP
 .EX
-eidolon: ready. Type help. SIGUSR1 saves.
-eidolon[0/live]>
+eidolon://0/live>
 .EE
 .PP
+The first value is the currently controlled sample or stream id.  The second
+value is the organism state, usually
+.B live
+or
+.BR paused .
+.PP
 Type
+.B intro
+for the deck guide, or
 .B help
-to show the command list.  Commands are grouped by purpose.
+to show the full command list.  Commands are grouped by purpose.
 .SH SHELL COMMANDS
 .TP
 .B help
 Show command help.
+.TP
+.B intro
+Show a short first-contact deck guide with the most useful commands.
+.TP
+.B banner
+Print the Eidolon startup glyph again.
+.TP
+.BI colors " on|off|status"
+Enable, disable, or inspect semantic terminal colors.
 .TP
 .B terminal
 Confirm plain command-shell mode.  Eidolon no longer has a split terminal UI.
@@ -162,6 +185,22 @@ available.
 .TP
 .B roles
 Print the chain grammar and category table.
+.TP
+.B gesture status
+Show gesture learning state, apprentice guard state, and the last learned
+performer gesture.
+.TP
+.B gesture last
+Show the recent gesture ring: scratch, reverse, stutter, loop-marker changes,
+jumps, slowdowns, and related deck actions inferred from VeeJay status tokens.
+.TP
+.B apprentice status
+Show whether Eidolon is
+.B curious
+or
+.B listening ,
+the guard window, stable-groove release timer, calm divisor, and deferred
+exploration state.
 .TP
 .BI brain " on|off|status|replay|clear"
 Control or inspect the neural status-token preference learner.
@@ -244,6 +283,101 @@ Force all 19 FX entries and rebuild immediately.
 .TP
 .B chain on
 Reassert the current sample chain and entries.
+.SH PACE COMMANDS
+The
+.B pace
+commands control how quickly Eidolon changes things during a set.  These
+settings are performer-facing: they are about deck feel, not low-level VIMS
+syntax.
+.TP
+.B pace status
+Show chain, entry, parameter, hold, target, and explore timing in seconds and
+status ticks.
+.TP
+.BI pace " chain seconds"
+Set how often Eidolon may mutate or rebuild the whole organism.
+.TP
+.BI pace " entry min life"
+Set the minimum delay before a single FX entry may be replaced, and the normal
+single-entry lifetime.
+.TP
+.BI pace " param seconds"
+Set the minimum interval between parameter sends.
+.TP
+.BI pace " hold seconds"
+Set how long Eidolon should wait before sending parameters to the same FX entry
+again.
+.TP
+.BI pace " target seconds"
+Set how long parameter targets remain alive before Eidolon retunes them.
+.TP
+.BI pace " explore seconds"
+Set the exploration interval used by
+.BR explore .
+.TP
+.B pace calm
+Use a slower, safer deck pace.
+.TP
+.B pace live
+Use the default live pace.
+.TP
+.B pace hot
+Use a fast, aggressive deck pace.
+.TP
+.BI fxpace " min max"
+Compatibility alias for entry pacing.  The typo
+.B fxspace
+is also accepted.
+.TP
+.BI parampace " seconds"
+Compatibility alias for
+.BR "pace param" .
+.TP
+.BI life " seconds"
+Compatibility alias for parameter target lifetime.
+.SH APPRENTICE AND GESTURE COMMANDS
+Eidolon learns from the performer by reading the VeeJay status packet.  It does
+not need to guess from OSD text.  Trickplay and transport changes become
+performer gestures.  While the performer is actively touching transport,
+Eidolon enters a listening guard: exploration and autonomous tricks are deferred,
+parameter churn calms down, and realtime survival still remains active.
+.TP
+.BI apprentice " on|off"
+Enable or disable apprentice behaviour.
+.TP
+.B apprentice status
+Show the current apprentice state.
+.TP
+.BI apprentice " guard seconds"
+Set the maximum listening guard after fresh user trickplay.
+.TP
+.BI apprentice " stable seconds"
+Set how long a stable groove must be observed before Eidolon releases the guard
+early.  Stability does not require normal playback; a steady loop or steady
+reverse state can also release.
+.TP
+.BI apprentice " calm n"
+Set how strongly parameter churn is slowed while listening.  Larger values are
+calmer.
+.TP
+.B apprentice release
+Manually leave listening mode now.
+.TP
+.B gesture status
+Show gesture learning state.
+.TP
+.B gesture last
+Show the most recent learned performer gestures.
+.TP
+.BI gesture " learn on|off"
+Enable or disable gesture learning.
+.TP
+.BI gesture " auto on|off"
+Reserved for future autonomous imitation.  Current builds listen and learn but
+do not imitate the performer's trickplay automatically.
+.TP
+.B gesture clear
+Clear gesture memory.
 .SH REALTIME GOVERNOR COMMANDS
 Eidolon reads the VeeJay status packet and uses measured FPS as its survival
 sensor.  Token
@@ -331,11 +465,16 @@ random chains.  Defaults to eight combinations, eight seconds apart.
 Try full 19-entry chains, for example
 .BR "try19 0.25" .
 .TP
+.BI pace " explore seconds"
+Set the explore interval through the pace model.
+.TP
 .BI fxpace " min max"
-Set FX-entry lifetime in seconds.
+Compatibility alias for entry pacing.  Prefer
+.BR "pace entry" .
 .TP
 .BI parampace " seconds"
-Set parameter-preset lifetime in seconds.
+Compatibility alias for parameter send pacing.  Prefer
+.BR "pace param" .
 .SH SOURCES AND ROUTING COMMANDS
 .TP
 .B fxsync
@@ -398,6 +537,11 @@ create negative feedback and immune memory.
 When clear-learning is enabled, externally disabling or clearing the chain can
 also be treated as rejection.
 .PP
+Gesture learning treats the performer's trickplay as body language.  A freeze,
+scratch, reverse, stutter, loop-marker change, jump, or slowdown can reward or
+punish the current chain depending on whether the performer keeps using it,
+returns to a stable groove, or rejects it soon after.
+.PP
 The realtime governor treats low
 .B real_fps
 as metabolic pressure.  Expensive active FX accumulate cost pressure and become
@@ -410,10 +554,10 @@ broken organism.  When realtime headroom returns, Eidolon may grow back to one
 or more FX.
 .SH FILES
 .TP
-.B autovj.life
+.B eidolon.life
 Default mind state file.
 .TP
-.BI file .tmp
+.B eidolon.tmp
 Temporary state file used while saving.
 .SH SIGNALS
 .TP
@@ -457,6 +601,23 @@ rt status
 rt fps
 .EE
 .PP
+Set a calmer apprentice pace for a live set:
+.PP
+.EX
+pace calm
+apprentice guard 8
+apprentice stable 1.0
+gesture learn on
+.EE
+.PP
+Inspect what Eidolon heard from the deck:
+.PP
+.EX
+gesture last
+apprentice status
+pace status
+.EE
+.PP
 Teach Eidolon during a performance:
 .PP
 .EX
@@ -474,5 +635,6 @@ Normal exit.
 Startup, option, connection, or state handling error.
 .SH NOTES
 Eidolon speaks VIMS and assumes a compatible running VeeJay instance.  It is an
-experimental autonomous performer; use smaller chain ranges for live-critical
-sets until the local machine's realtime behaviour is known.
+experimental apprentice performer; use smaller chain ranges and calmer pace
+settings for live-critical sets until the local machine's realtime behaviour is
+known.
