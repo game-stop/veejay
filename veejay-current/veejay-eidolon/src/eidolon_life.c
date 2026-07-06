@@ -1,7 +1,23 @@
 #define _POSIX_C_SOURCE 200810L
-
-/* eidolon_life.c - evolving Auto-VJ performer for VeeJay/VIMS
+/* Eidolon Life - evolving Auto-VJ performer for VeeJay/VIMS
+ *       (C) 2026 Niels Elburg <nwelburg@gmail.com> 
  *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
+
+/*
  * This is intentionally a little autonomous organism: it creates samples,
  * builds FX chains up to nineteen entries, enables beat control on every entry,
  * and drives parameters forever with a Conway-ish fuzzy state machine.
@@ -14,7 +30,6 @@
  * The program uses the same client layer as sayVIMS and speaks VIMS only.
  * State is written atomically so the organism can continue after a stop.
  *
- * GPL-2.0-or-later, matching VeeJay tooling.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -58,7 +73,7 @@
 #define AVJ_NAME_LEN        48
 #define AVJ_LINE            2048
 #define AVJ_DEFAULT_STATE   "eidolon.life"
-#define AVJ_VERSION         22
+#define AVJ_VERSION         24
 #define AVJ_STATUS_FEATURES  48
 #define AVJ_STATUS_TOKEN_CAP 160
 #define AVJ_IMMUNE_CAP       96
@@ -228,6 +243,13 @@ static const avj_chain_profile_t avj_chain_profiles[] = {
 #define AVJ_TRICK_FREEZE    4
 #define AVJ_TRICK_JUMP      5
 
+#define AVJ_PICK_NORMAL      0
+#define AVJ_PICK_EXPLORE     1
+#define AVJ_PICK_COVERAGE    2
+
+#define AVJ_COVERAGE_OFF     0
+#define AVJ_COVERAGE_SOFT    1
+#define AVJ_COVERAGE_STRONG  2
 
 typedef enum {
     AVJ_GESTURE_NONE = 0,
@@ -2603,6 +2625,11 @@ typedef struct {
     double fx_cost[AVJ_FX_DB_COUNT];
     double fx_immune[AVJ_FX_DB_COUNT];
     unsigned char fx_banned[AVJ_FX_DB_COUNT];
+    unsigned int fx_seen[AVJ_FX_DB_COUNT];
+    unsigned long fx_last_seen[AVJ_FX_DB_COUNT];
+    int coverage_bias;
+    int explore_coverage;
+    int pick_mode;
     avj_immune_t immune[AVJ_IMMUNE_CAP];
     avj_pair_immune_t pair_immune[AVJ_PAIR_IMMUNE_CAP];
     int immune_pos;
@@ -2636,6 +2663,7 @@ static int avj_autonomy_allowed(avj_t *a);
 static void avj_apprentice_tick_status(avj_t *a);
 static void avj_shell_apprentice(avj_t *a, char *arg);
 static void avj_shell_pace(avj_t *a, char *arg);
+static void avj_shell_coverage(avj_t *a, char *arg);
 static const char *avj_apprentice_state_name(avj_t *a);
 static const char *avj_gesture_name(int gesture);
 static void avj_self_transport_note(avj_t *a, int gesture);
@@ -3944,6 +3972,68 @@ static void avj_metabolism_feedback(avj_t *a, double pressure, int recovering)
     }
 }
 
+
+static const char *avj_coverage_bias_name(int bias)
+{
+    switch (bias) {
+        case AVJ_COVERAGE_OFF: return "off";
+        case AVJ_COVERAGE_STRONG: return "strong";
+        case AVJ_COVERAGE_SOFT:
+        default: return "soft";
+    }
+}
+
+static double avj_fx_discovery_multiplier(avj_t *a, int dbi)
+{
+    double m = 1.0;
+    unsigned int seen;
+    unsigned long age;
+    int mode;
+
+    if (!a || dbi < 0 || dbi >= avj_fx_db_count)
+        return 1.0;
+
+    mode = a->pick_mode;
+    if (mode == AVJ_PICK_NORMAL)
+        return 1.0;
+
+    if (a->coverage_bias == AVJ_COVERAGE_OFF && mode != AVJ_PICK_COVERAGE)
+        return 1.0;
+
+    seen = a->fx_seen[dbi];
+    age = a->fx_last_seen[dbi] ? (unsigned long)(a->tick - a->fx_last_seen[dbi]) : 1000000UL;
+
+    if (mode == AVJ_PICK_COVERAGE) {
+        if (seen == 0) return 18.0;
+        if (seen == 1) return 7.0;
+        if (seen < 4) return 3.5;
+        if (age > 2500UL) return 2.0;
+        return 0.75;
+    }
+
+    if (seen == 0) m = 6.0;
+    else if (seen < 3) m = 2.5;
+    else if (age > 2500UL) m = 1.5;
+    else m = 1.0;
+
+    if (a->coverage_bias == AVJ_COVERAGE_STRONG) {
+        if (seen == 0) m *= 1.8;
+        else if (seen < 3) m *= 1.5;
+        else if (age <= 160UL) m *= 0.75;
+    }
+
+    return m;
+}
+
+static void avj_coverage_note_fx(avj_t *a, int dbi)
+{
+    if (!a || dbi < 0 || dbi >= avj_fx_db_count)
+        return;
+    if (a->fx_seen[dbi] < 0xffffffffu)
+        a->fx_seen[dbi]++;
+    a->fx_last_seen[dbi] = a->tick;
+}
+
 static double avj_slot_fx_weight(avj_t *a, const avj_org_t *o, int dbi, int slot, int chain_len, int old_dbi)
 {
     const avj_fx_info_t *fx;
@@ -3993,6 +4083,12 @@ static double avj_slot_fx_weight(avj_t *a, const avj_org_t *o, int dbi, int slot
     }
 
     if (dbi == old_dbi) w *= 0.04;
+
+    if (a && a->pick_mode != AVJ_PICK_NORMAL) {
+        double floor = (a->pick_mode == AVJ_PICK_COVERAGE) ? 0.05 : 0.01;
+        w *= avj_fx_discovery_multiplier(a, dbi);
+        if (w > 0.0 && w < floor) w = floor;
+    }
     return w;
 }
 
@@ -4511,7 +4607,11 @@ static void avj_apply_runtime_fx_db(avj_t *a,
     int old_ids[AVJ_FX_DB_CAP];
     double old_weight[AVJ_FX_DB_CAP];
     unsigned char old_banned[AVJ_FX_DB_CAP];
+    double old_cost[AVJ_FX_DB_CAP];
+    double old_immune[AVJ_FX_DB_CAP];
     double old_bias[AVJ_FX_DB_CAP];
+    unsigned int old_seen[AVJ_FX_DB_CAP];
+    unsigned long old_last_seen[AVJ_FX_DB_CAP];
     int i, j;
     if (!fx_in || !fx_names || !param_in || !param_names) return;
     fx_count = avj_clampi(fx_count, 0, AVJ_FX_DB_CAP);
@@ -4520,7 +4620,11 @@ static void avj_apply_runtime_fx_db(avj_t *a,
         old_ids[i] = avj_fx_db[i].id;
         old_weight[i] = a ? a->fx_weight[i] : 1.0;
         old_banned[i] = a ? a->fx_banned[i] : 0;
+        old_cost[i] = a ? a->fx_cost[i] : 0.0;
+        old_immune[i] = a ? a->fx_immune[i] : 0.0;
         old_bias[i] = a ? a->nn_b2[i] : 0.0;
+        old_seen[i] = a ? a->fx_seen[i] : 0;
+        old_last_seen[i] = a ? a->fx_last_seen[i] : 0;
     }
     memset(avj_fx_db, 0, sizeof(avj_fx_db));
     memset(avj_param_db, 0, sizeof(avj_param_db));
@@ -4544,6 +4648,10 @@ static void avj_apply_runtime_fx_db(avj_t *a,
         for (i = 0; i < AVJ_FX_DB_CAP; i++) {
             a->fx_weight[i] = 1.0;
             a->fx_banned[i] = 0;
+            a->fx_cost[i] = 0.0;
+            a->fx_immune[i] = 0.0;
+            a->fx_seen[i] = 0;
+            a->fx_last_seen[i] = 0;
             a->nn_b2[i] = 0.0;
         }
         for (i = 0; i < avj_fx_db_count; i++) {
@@ -4551,6 +4659,10 @@ static void avj_apply_runtime_fx_db(avj_t *a,
                 if (old_ids[j] == avj_fx_db[i].id) {
                     a->fx_weight[i] = old_weight[j];
                     a->fx_banned[i] = old_banned[j];
+                    a->fx_cost[i] = old_cost[j];
+                    a->fx_immune[i] = old_immune[j];
+                    a->fx_seen[i] = old_seen[j];
+                    a->fx_last_seen[i] = old_last_seen[j];
                     a->nn_b2[i] = old_bias[j];
                     break;
                 }
@@ -5529,6 +5641,11 @@ static int avj_choose_fx(avj_t *a)
         if (avj_effect_allowed(a, i)) {
             double w = a->fx_weight[i] * avj_brain_fx_multiplier(a, i);
             if (w < 0.02) w = 0.02;
+            if (a->pick_mode != AVJ_PICK_NORMAL) {
+                double floor = (a->pick_mode == AVJ_PICK_COVERAGE) ? 0.05 : 0.01;
+                w *= avj_fx_discovery_multiplier(a, i);
+                if (w > 0.0 && w < floor) w = floor;
+            }
             total += w;
         }
     }
@@ -5538,6 +5655,11 @@ static int avj_choose_fx(avj_t *a)
         if (avj_effect_allowed(a, i)) {
             double w = a->fx_weight[i] * avj_brain_fx_multiplier(a, i);
             if (w < 0.02) w = 0.02;
+            if (a->pick_mode != AVJ_PICK_NORMAL) {
+                double floor = (a->pick_mode == AVJ_PICK_COVERAGE) ? 0.05 : 0.01;
+                w *= avj_fx_discovery_multiplier(a, i);
+                if (w > 0.0 && w < floor) w = floor;
+            }
             r -= w;
             if (r <= 0.0) return i;
         }
@@ -5742,6 +5864,13 @@ static int avj_sanitize_mind(avj_t *a)
         a->fx_immune[i] = avj_clampd(a->fx_immune[i], 0.0, 32.0);
         a->fx_banned[i] = a->fx_banned[i] ? 1 : 0;
     }
+    for (i = avj_fx_db_count; i < AVJ_FX_DB_COUNT; i++) {
+        a->fx_seen[i] = 0;
+        a->fx_last_seen[i] = 0;
+    }
+    a->coverage_bias = avj_clampi(a->coverage_bias, AVJ_COVERAGE_OFF, AVJ_COVERAGE_STRONG);
+    a->explore_coverage = a->explore_coverage ? 1 : 0;
+    a->pick_mode = AVJ_PICK_NORMAL;
     a->immune_pos = avj_clampi(a->immune_pos, 0, 1000000000);
     a->pair_immune_pos = avj_clampi(a->pair_immune_pos, 0, 1000000000);
     for (i = 0; i < AVJ_IMMUNE_CAP; i++) {
@@ -5980,6 +6109,7 @@ static int avj_send_entry_preset(avj_t *a, avj_org_t *o, int i, int reset_first,
     if (!ok)
         ok = avj_send(a, a->ev.chain_set_effect, "%d %d %d %d", a->current_sample, i, fx->id, 1);
     if (!ok) return 0;
+    avj_coverage_note_fx(a, o->gene[i].fx_db_index);
     a->last_chain_control_tick = a->tick;
 
     avj_log(a, "%s entry %d -> FX %d %s preset[%s]\n", reset_first ? "materialize" : "preset", i, fx->id, fx->name, values);
@@ -6536,6 +6666,9 @@ static void avj_next_scene(avj_t *a, int hard)
 static void avj_random_rebuild(avj_t *a, int desired_len, int make_sample)
 {
     avj_org_t *o = &a->pop[a->active];
+    int old_pick = a->pick_mode;
+    if (a->pick_mode == AVJ_PICK_NORMAL && a->explore_enabled)
+        a->pick_mode = a->explore_coverage ? AVJ_PICK_COVERAGE : AVJ_PICK_EXPLORE;
     avj_random_org(a, o);
     if (desired_len > 0)
         avj_set_org_chain_len(a, o, desired_len);
@@ -6546,6 +6679,7 @@ static void avj_random_rebuild(avj_t *a, int desired_len, int make_sample)
     o->aggression = avj_clampd(a->chaos + (avj_frand(a) - 0.5) * 0.40, 0.0, 1.0);
     if (a->trick_mode != AVJ_TRICK_NONE) avj_trick_release(a);
     if (make_sample && a->make_samples) avj_create_sample(a);
+    a->pick_mode = old_pick;
     avj_build_chain(a);
 }
 
@@ -6561,7 +6695,8 @@ static void avj_start_explore(avj_t *a, double seconds, int desired_len, int cou
     a->explore_deferred_tick = 0;
     a->last_explore_tick = a->tick;
     avj_random_rebuild(a, a->explore_chain_len, 0);
-    avj_log(a, "explore on: %.2fs interval, len %d, count %d\n",
+    avj_log(a, "explore on%s: %.2fs interval, len %d, count %d\n",
+            a->explore_coverage ? " unseen" : "",
             avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
             a->explore_chain_len,
             a->explore_left);
@@ -6572,6 +6707,7 @@ static void avj_stop_explore(avj_t *a)
     a->explore_enabled = 0;
     a->explore_left = -1;
     a->explore_deferred = 0;
+    a->explore_coverage = 0;
     avj_log(a, "explore off\n");
 }
 
@@ -6899,6 +7035,7 @@ static int avj_save_state(avj_t *a, const char *path)
     fprintf(f, "explore %d %d %d %d\n", a->explore_enabled, a->explore_interval_ticks, a->explore_chain_len, a->explore_left);
     fprintf(f, "life %d %d\n", a->fx_lifetime_ticks, a->trick_enabled);
     fprintf(f, "pace %d %d %d %d %d\n", a->fx_replace_min_ticks, a->fx_lifetime_ticks, a->param_commit_ticks, a->param_entry_hold_ticks, a->param_target_ticks);
+    fprintf(f, "coverage %d %d\n", a->coverage_bias, a->explore_coverage);
     fprintf(f, "pscan %lu %d\n", a->last_param_any_preset_tick, a->param_cursor);
     fprintf(f, "samples %d %d %d %d\n", a->make_samples, a->sample_frames, a->sample_min_len, a->sample_max_len);
     fprintf(f, "beat %d %d %d %d %d %d %d %d %d %d %d %d\n",
@@ -6932,6 +7069,8 @@ static int avj_save_state(avj_t *a, const char *path)
     for (i = 0; i < avj_fx_db_count; i++) {
         if (a->fx_weight[i] != 1.0 || a->fx_banned[i] || a->fx_cost[i] > 0.0001 || a->fx_immune[i] > 0.0001)
             fprintf(f, "fx %d %.8f %d %.8f %.8f\n", avj_fx_db[i].id, a->fx_weight[i], a->fx_banned[i] ? 1 : 0, a->fx_cost[i], a->fx_immune[i]);
+        if (a->fx_seen[i] > 0)
+            fprintf(f, "fxseen %d %u %lu\n", avj_fx_db[i].id, a->fx_seen[i], a->fx_last_seen[i]);
     }
     for (i = 0; i < AVJ_IMMUNE_CAP; i++) {
         if (a->immune[i].sig && a->immune[i].heat > 0.0001)
@@ -7047,6 +7186,11 @@ static int avj_load_state(avj_t *a, const char *path)
             if (n < 4) a->param_entry_hold_ticks = a->param_commit_ticks;
             if (n < 5) a->param_target_ticks = avj_seconds_to_pace_ticks(a, 8.0);
         }
+        else if (!strcmp(key, "coverage")) {
+            int n = sscanf(line, "%*s %d %d", &a->coverage_bias, &a->explore_coverage);
+            if (n < 1) a->coverage_bias = AVJ_COVERAGE_SOFT;
+            if (n < 2) a->explore_coverage = 0;
+        }
         else if (!strcmp(key, "pscan")) sscanf(line, "%*s %lu %d", &a->last_param_any_preset_tick, &a->param_cursor);
         else if (!strcmp(key, "beat")) sscanf(line, "%*s %d %d %d %d %d %d %d %d %d %d %d %d",
             &a->beat_enabled, &a->beat_action, &a->beat_mode, &a->beat_amount,
@@ -7105,6 +7249,14 @@ static int avj_load_state(avj_t *a, const char *path)
                 a->fx_banned[dbi] = banned ? 1 : 0;
                 if (n >= 4) a->fx_cost[dbi] = avj_clampd(cost, 0.0, 32.0);
                 if (n >= 5) a->fx_immune[dbi] = avj_clampd(immune, 0.0, 32.0);
+            }
+        } else if (!strcmp(key, "fxseen")) {
+            int fxid, dbi;
+            unsigned int seen;
+            unsigned long last;
+            if (sscanf(line, "%*s %d %u %lu", &fxid, &seen, &last) == 3 && avj_fx_by_id(fxid, &dbi)) {
+                a->fx_seen[dbi] = seen;
+                a->fx_last_seen[dbi] = last;
             }
         } else if (!strcmp(key, "immune")) {
             unsigned int sig;
@@ -7294,6 +7446,8 @@ static void avj_help(avj_t *a)
     avj_ui_printf("    %sstatus%s                       one-line organism summary\n", cmd, r);
     avj_ui_printf("    %schain%s                        current FX chain entries\n", cmd, r);
     avj_ui_printf("    %sroles%s                        chain grammar/category table\n", cmd, r);
+    avj_ui_printf("    %scoverage status|unseen|rare|bias off|soft|strong|reset%s\n", cmd, r);
+    avj_ui_printf("                                 exposure/fairness memory for explore\n");
     avj_ui_printf("    %sgesture status|last|learn on|off|auto on|off|clear%s\n", cmd, r);
     avj_ui_printf("                                 learn from user trickplay body language\n");
     avj_ui_printf("    %sapprentice status|on|off|guard SEC|stable SEC|calm N|release%s\n", cmd, r);
@@ -7333,6 +7487,7 @@ static void avj_help(avj_t *a)
 
     avj_ui_printf("  %sExploration%s\n", sec, r);
     avj_ui_printf("    %sexplore off|[SEC [LEN [N]]]%s rebuild random FX chains; SEC may be 0.25\n", cmd, r);
+    avj_ui_printf("    %sexplore unseen [SEC [LEN [N]]]%s stronger discovery pressure for rare/unseen FX\n", cmd, r);
     avj_ui_printf("    %scombos [SEC [LEN [N]]]%s      try N random chains, default: 8 combos, 8s apart\n", cmd, r);
     avj_ui_printf("    %stry19 [SEC [N]]%s             try 19 full chains, e.g. try19 0.25\n", cmd, r);
     avj_ui_printf("    %sfxpace MIN MAX%s              FX-entry lifetime seconds (fxspace also accepted)\n", cmd, r);
@@ -7385,6 +7540,7 @@ static void avj_shell_explore(avj_t *a, char *arg, int force_full)
     double seconds = 8.0;
     int desired_len = force_full ? AVJ_MAX_CHAIN : (a->explore_chain_len > 0 ? a->explore_chain_len : a->max_chain);
     int count = force_full ? 8 : -1;
+    int requested_coverage = 0;
 
     while (arg && *arg && nt < 4) {
         while (*arg && isspace((unsigned char)*arg)) arg++;
@@ -7398,6 +7554,14 @@ static void avj_shell_explore(avj_t *a, char *arg, int force_full)
         avj_stop_explore(a);
         avj_ui_printf( "explore off\n");
         return;
+    }
+
+    if (nt > 0 && (!strcasecmp(tok[0], "unseen") || !strcasecmp(tok[0], "coverage") || !strcasecmp(tok[0], "more"))) {
+        int k;
+        requested_coverage = 1;
+        for (k = 0; k + 1 < nt; k++) tok[k] = tok[k + 1];
+        tok[k] = NULL;
+        nt--;
     }
 
     if (force_full) {
@@ -7428,8 +7592,10 @@ static void avj_shell_explore(avj_t *a, char *arg, int force_full)
 
     if (!isfinite(seconds) || seconds <= 0.0) seconds = 2.0;
     if (count < 0) count = -1;
+    a->explore_coverage = requested_coverage;
     avj_start_explore(a, seconds, desired_len, count);
-    avj_ui_printf( "explore on: every %.2fs, chain len %d, %s\n",
+    avj_ui_printf( "explore on%s: every %.2fs, chain len %d, %s\n",
+            a->explore_coverage ? " unseen" : "",
             avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
             a->explore_chain_len > 0 ? a->explore_chain_len : 0,
             a->explore_left < 0 ? "forever" : "counted");
@@ -7462,6 +7628,7 @@ static void avj_shell_combos(avj_t *a, char *arg)
     if (desired_len < a->min_chain) a->min_chain = desired_len;
     avj_apply_chain_bounds_to_population(a);
     if (count == 0) count = 8;
+    a->explore_coverage = 1;
     avj_start_explore(a, seconds, desired_len, count < 0 ? -1 : count);
     avj_ui_printf( "combos: every %.2fs, %d FX, %s\n",
             avj_pace_ticks_to_seconds(a, a->explore_interval_ticks),
@@ -7512,6 +7679,7 @@ static void avj_shell_line(avj_t *a, char *line)
     else if (!strcasecmp(cmd, "gesture")) avj_shell_gesture(a, arg);
     else if (!strcasecmp(cmd, "apprentice") || !strcasecmp(cmd, "deck") || !strcasecmp(cmd, "performer")) avj_shell_apprentice(a, arg);
     else if (!strcasecmp(cmd, "pace")) avj_shell_pace(a, arg);
+    else if (!strcasecmp(cmd, "coverage")) avj_shell_coverage(a, arg);
     else if (!strcasecmp(cmd, "fxsync") || !strcasecmp(cmd, "effects")) {
         if (avj_sync_effect_list_vims(a, 1)) {
             avj_sanitize_mind(a);
@@ -7832,6 +8000,80 @@ static char *avj_next_word(char **sp)
     return w;
 }
 
+
+static void avj_shell_coverage(avj_t *a, char *arg)
+{
+    char *sub = arg;
+    char *rest = NULL;
+    int i, allowed = 0, unseen = 0, rare = 0, seen = 0;
+
+    while (sub && *sub && isspace((unsigned char)*sub)) sub++;
+    if (!sub || !*sub) sub = "status";
+    rest = sub;
+    while (*rest && !isspace((unsigned char)*rest)) rest++;
+    if (*rest) *rest++ = '\0';
+    while (rest && *rest && isspace((unsigned char)*rest)) rest++;
+
+    if (!strcasecmp(sub, "bias")) {
+        if (!rest || !*rest) {
+            avj_ui_printf("coverage bias %s\n", avj_coverage_bias_name(a->coverage_bias));
+            return;
+        }
+        if (!strcasecmp(rest, "off") || !strcmp(rest, "0"))
+            a->coverage_bias = AVJ_COVERAGE_OFF;
+        else if (!strcasecmp(rest, "strong") || !strcasecmp(rest, "hard") || !strcmp(rest, "2"))
+            a->coverage_bias = AVJ_COVERAGE_STRONG;
+        else
+            a->coverage_bias = AVJ_COVERAGE_SOFT;
+        avj_ui_printf("coverage bias %s\n", avj_coverage_bias_name(a->coverage_bias));
+        return;
+    }
+
+    if (!strcasecmp(sub, "reset") || !strcasecmp(sub, "clear")) {
+        for (i = 0; i < AVJ_FX_DB_COUNT; i++) {
+            a->fx_seen[i] = 0;
+            a->fx_last_seen[i] = 0;
+        }
+        avj_ui_printf("coverage reset\n");
+        return;
+    }
+
+    for (i = 0; i < avj_fx_db_count; i++) {
+        if (!avj_effect_allowed(a, i))
+            continue;
+        allowed++;
+        if (a->fx_seen[i] == 0) unseen++;
+        else {
+            seen++;
+            if (a->fx_seen[i] < 3) rare++;
+        }
+    }
+
+    if (!strcasecmp(sub, "unseen") || !strcasecmp(sub, "rare")) {
+        int limit = (rest && *rest) ? avj_clampi(atoi(rest), 1, 64) : 16;
+        int n = 0;
+        for (i = 0; i < avj_fx_db_count && n < limit; i++) {
+            if (!avj_effect_allowed(a, i))
+                continue;
+            if ((!strcasecmp(sub, "unseen") && a->fx_seen[i] == 0) ||
+                (!strcasecmp(sub, "rare") && a->fx_seen[i] > 0 && a->fx_seen[i] < 3)) {
+                avj_ui_printf("%03d FX %d %s seen=%u last=%lu\n",
+                              n, avj_fx_db[i].id, avj_fx_db[i].name,
+                              a->fx_seen[i], a->fx_last_seen[i]);
+                n++;
+            }
+        }
+        if (n == 0)
+            avj_ui_printf("coverage %s: none\n", sub);
+        return;
+    }
+
+    avj_ui_printf("coverage bias=%s explore=%s allowed=%d seen=%d unseen=%d rare=%d pick=%d\n",
+                  avj_coverage_bias_name(a->coverage_bias),
+                  a->explore_coverage ? "unseen" : "weighted",
+                  allowed, seen, unseen, rare, a->pick_mode);
+}
+
 static void avj_shell_pace(avj_t *a, char *arg)
 {
     char *sub, *v1, *v2;
@@ -7998,6 +8240,9 @@ static void avj_defaults(avj_t *a)
     a->apprentice_param_div = 4;
     a->apprentice_stable_ticks = 0;
     a->apprentice_release_ticks = avj_seconds_to_status_ticks(a, 1.25);
+    a->coverage_bias = AVJ_COVERAGE_SOFT;
+    a->explore_coverage = 0;
+    a->pick_mode = AVJ_PICK_NORMAL;
     a->last_user_gesture = AVJ_GESTURE_NONE;
     a->last_any_gesture = AVJ_GESTURE_NONE;
     a->last_any_gesture_tick = 0;
