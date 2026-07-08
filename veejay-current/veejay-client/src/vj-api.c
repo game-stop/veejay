@@ -3162,7 +3162,7 @@ static void ui_size_probe_widget(const char *name, GtkWidget *widget)
     gtk_widget_get_allocation(widget, &alloc);
     gtk_widget_get_size_request(widget, &req_w, &req_h);
 
-    veejay_msg(VEEJAY_MSG_INFO,
+    veejay_msg(VEEJAY_MSG_DEBUG,
                "UI size probe %-22s request=%dx%d min=%dx%d natural=%dx%d alloc=%dx%d visible=%d mapped=%d",
                name,
                req_w,
@@ -3208,7 +3208,7 @@ static void ui_size_probe(const char *stage)
         NULL
     };
 
-    veejay_msg(VEEJAY_MSG_INFO, "UI size probe: %s", stage ? stage : "unknown");
+    veejay_msg(VEEJAY_MSG_DEBUG, "UI size probe: %s", stage ? stage : "unknown");
 
     for(int i = 0; names[i]; i++)
         ui_size_probe_named(names[i]);
@@ -3793,9 +3793,6 @@ static void ui_compact_fx_panel(void)
 
         gtk_widget_set_size_request(w, -1, 76);
         gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(w), 76);
-#if GTK_CHECK_VERSION(3,22,0)
-        gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(w), FALSE);
-#endif
         gtk_widget_set_vexpand(w, TRUE);
         gtk_widget_set_valign(w, GTK_ALIGN_FILL);
 
@@ -7230,10 +7227,17 @@ static void update_record_tab(int pm)
 
 static void set_widget_sensitive_cached(int widget_id, int sensitive)
 {
-    GtkWidget *w = widget_cache[widget_id];
+    GtkWidget *w = NULL;
     gboolean wanted = sensitive ? TRUE : FALSE;
 
-    if(w && gtk_widget_get_sensitive(w) != wanted)
+    if(widget_id < 0 || widget_id >= MAX_WIDGET_CACHE)
+        return;
+
+    w = widget_cache[widget_id];
+    if(!w || !GTK_IS_WIDGET(w))
+        return;
+
+    if(gtk_widget_get_sensitive(w) != wanted)
         gtk_widget_set_sensitive(w, wanted);
 }
 
@@ -11142,85 +11146,62 @@ static void update_status_accessibility(int old_pm, int new_pm, int force)
     if(old_pm == new_pm && !force)
         return;
 
-    if( new_pm == MODE_STREAM )
+    if(new_pm == MODE_STREAM)
     {
-        for(i=0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i ++ ) {
-            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] ), FALSE);
-            }
-        }
+        for(i = 0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(sample_widget_map[i].widget_id, FALSE);
 
-        for(i=0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i ++ ) {
-            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] ), FALSE);
-            }
-        }
+        for(i = 0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(plain_widget_map[i].widget_id, FALSE);
 
-        for(i=0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i ++ ) {
-            if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] ), TRUE);
-            }
-        }
+        for(i = 0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(stream_widget_map[i].widget_id, TRUE);
     }
 
-    if( new_pm == MODE_SAMPLE )
+    if(new_pm == MODE_SAMPLE)
     {
-        for(i=0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i ++ ) {
-            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] ), FALSE);
-            }
-        }
+        for(i = 0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(stream_widget_map[i].widget_id, FALSE);
 
-        for(i=0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i ++ ) {
-            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] ), FALSE);
-            }
-        }
+        for(i = 0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(plain_widget_map[i].widget_id, FALSE);
 
-        for(i=0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i ++ ) {
-            if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] ), TRUE);
-            }
-        }
-
+        for(i = 0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(sample_widget_map[i].widget_id, TRUE);
     }
 
-    if( new_pm == MODE_PLAIN)
+    if(new_pm == MODE_PLAIN)
     {
-        for(i=0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i ++ ) {
-            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ stream_widget_map[i].widget_id ] ), FALSE);
-            }
-        }
+        for(i = 0; stream_widget_map[i].stream_widget_id != STREAM_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(stream_widget_map[i].widget_id, FALSE);
 
-        for(i=0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i ++ ) {
-            if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ sample_widget_map[i].widget_id ] ), FALSE);
-            }
-        }
+        for(i = 0; sample_widget_map[i].sample_widget_id != SAMPLE_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(sample_widget_map[i].widget_id, FALSE);
 
-        for(i=0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i ++ ) {
-            if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] )) ) {
-                gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[ plain_widget_map[i].widget_id ] ), TRUE);
-            }
-        }
-
+        for(i = 0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i++)
+            set_widget_sensitive_cached(plain_widget_map[i].widget_id, TRUE);
     }
 
-    GtkWidget *n = widget_cache[ WIDGET_PANELS ];
+    GtkWidget *n = widget_cache[WIDGET_PANELS];
     int page_needed = 0;
-    switch( new_pm )
+    switch(new_pm)
     {
         case MODE_SAMPLE:
-            page_needed =0 ; break;
+            page_needed = 0;
+            break;
         case MODE_STREAM:
-            page_needed = 1; break;
+            page_needed = 1;
+            break;
         case MODE_PLAIN:
-            page_needed = 2; break;
+            page_needed = 2;
+            break;
         default:
             break;
     }
-    gtk_notebook_set_current_page( GTK_NOTEBOOK(n), page_needed );
+
+    if(n && GTK_IS_NOTEBOOK(n))
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(n), page_needed);
+
     samplebank_update_offline_recorder_gadget();
 }
 
@@ -12570,12 +12551,20 @@ static void audio_sync_set_widgets_sensitive(const int *ids, int sensitive)
         audio_sync_set_widget_sensitive(ids[i], sensitive);
 }
 
+static void audio_sync_apply_widget_visibility(GtkWidget *w, int visible)
+{
+    if(!w)
+        return;
+
+    gtk_widget_set_no_show_all(w, visible ? FALSE : TRUE);
+    gtk_widget_set_visible(w, visible ? TRUE : FALSE);
+}
+
 static void audio_sync_set_widget_visible(int widget_id, int visible)
 {
     GtkWidget *w = widget_cache[widget_id];
 
-    if(w)
-        gtk_widget_set_visible(w, visible ? TRUE : FALSE);
+    audio_sync_apply_widget_visibility(w, visible);
 }
 
 static GtkWidget *vj_api_audio_sync_named_widget(const char *name)
@@ -12590,8 +12579,7 @@ static void audio_sync_set_named_widget_visible(const char *name, int visible)
 {
     GtkWidget *w = vj_api_audio_sync_named_widget(name);
 
-    if(w)
-        gtk_widget_set_visible(w, visible ? TRUE : FALSE);
+    audio_sync_apply_widget_visibility(w, visible);
 }
 
 static void audio_sync_set_named_widget_sensitive(const char *name, int sensitive)
@@ -12846,6 +12834,8 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
                                            record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
 
     (void) target_mode;
+    (void) control_only;
+    (void) monitor;
 
     audio_sync_set_widget_sensitive(WIDGET_AUDIO_INPUT_SELECTOR_COMBO, 1);
 
@@ -13694,16 +13684,12 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     if( info->status_tokens[FEEDBACK] != history[FEEDBACK] ) {
         if(info->status_tokens[FEEDBACK] == 1) {
-            for ( i = 0; fb_widget_map[i].fb_widget_id != FB_WIDGET_NONE; i ++ ) {
-               if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id])))
-                   gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id]), FALSE);
-            }
+            for ( i = 0; fb_widget_map[i].fb_widget_id != FB_WIDGET_NONE; i ++ )
+                set_widget_sensitive_cached(fb_widget_map[i].widget_id, FALSE);
         }
         else {
-            for ( i = 0; fb_widget_map[i].fb_widget_id != FB_WIDGET_NONE; i ++ ) {
-               if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id])))
-                   gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[fb_widget_map[i].widget_id]), TRUE);
-            }
+            for ( i = 0; fb_widget_map[i].fb_widget_id != FB_WIDGET_NONE; i ++ )
+                set_widget_sensitive_cached(fb_widget_map[i].widget_id, TRUE);
         }
 
         if(info->status_tokens[FEEDBACK] !=
@@ -14882,8 +14868,11 @@ void vj_gui_set_title(char *remote, int port) {
     gtk_window_set_title(GTK_WINDOW(mw), title);
 }
 
+static void detachable_windows_close_all(void);
+
 void vj_gui_free(void)
 {
+    detachable_windows_close_all();
     preview_clear_live_pixbuf();
 
     if(info)
@@ -15385,6 +15374,10 @@ static void ui_update_screen_profile(gboolean log_result)
         screen_w = gdk_screen_get_width(screen);
         screen_h = gdk_screen_get_height(screen);
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
         GdkWindow *root_window = gdk_screen_get_root_window(screen);
         if(root_window)
             scale_factor = gdk_window_get_scale_factor(root_window);
@@ -15407,6 +15400,9 @@ static void ui_update_screen_profile(gboolean log_result)
                 monitor_scale = gdk_monitor_get_scale_factor(monitor);
             }
         }
+#endif
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
 #endif
     }
 
@@ -15499,7 +15495,7 @@ static void ui_window_log_startup_size(GtkWidget *mainw, const char *stage)
     ui_window_preferred_minimum(mainw, &min_w, &min_h);
     gtk_window_get_size(GTK_WINDOW(mainw), &w, &h);
 
-    veejay_msg(VEEJAY_MSG_INFO,
+    veejay_msg(VEEJAY_MSG_DEBUG,
                "Final UI Window size: %dx%d (default target %dx%d%s, minimum %dx%d)",
                w,
                h,
@@ -15730,6 +15726,1552 @@ static void init_sample_bank(sample_bank_t *bank, int bank_num)
     add_bank(bank_num);
 }
 
+
+
+
+#define VJ_DETACH_DATA_READY "gveejay-detach-ready"
+#define VJ_DETACH_DATA_ORIGIN "gveejay-detach-origin"
+#define VJ_DETACH_DATA_ORIGIN_POS "gveejay-detach-origin-pos"
+#define VJ_DETACH_DATA_ORIGIN_TITLE "gveejay-detach-origin-title"
+#define VJ_DETACH_DATA_IS_PLACEHOLDER "gveejay-detach-is-placeholder"
+#define VJ_DETACH_DATA_PLACEHOLDER "gveejay-detach-placeholder"
+#define VJ_DETACH_DATA_PLACEHOLDER_PAGE "gveejay-detach-placeholder-page"
+#define VJ_DETACH_DATA_WINDOW "gveejay-detach-window"
+#define VJ_DETACH_DATA_TAB_READY "gveejay-detach-tab-ready"
+#define VJ_DETACH_DATA_TAB_PAGE "gveejay-detach-tab-page"
+#define VJ_DETACH_DATA_DETACHED "gveejay-detach-record"
+#define VJ_DETACH_DATA_DETACHED_NOTEBOOK "gveejay-detach-detached-notebook"
+#define VJ_DETACH_DATA_RESTORE_ONCE "gveejay-detach-restore-once"
+
+typedef struct
+{
+    GtkWidget *window;
+    GtkWidget *box;
+    GtkWidget *notebook;
+    GList     *pages;
+    gint       id;
+} detached_notebook_t;
+
+typedef struct
+{
+    GtkWidget *page;
+    detached_notebook_t *detached;
+} detachable_target_action_t;
+
+static GList *detached_notebooks_ = NULL;
+static gboolean detachable_reordering_ = FALSE;
+static gboolean detachable_in_explicit_detach_ = FALSE;
+static gint detachable_next_window_id_ = 1;
+
+static void detachable_notebook_setup(GtkNotebook *notebook, detached_notebook_t *detached);
+static gboolean detachable_window_delete(GtkWidget *window, GdkEvent *event, gpointer user_data);
+static gboolean detachable_tab_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
+static gboolean detachable_window_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data);
+static void detachable_notebook_update_visibility(GtkNotebook *notebook);
+static void init_window_configuration_menu(void);
+static void detachable_restore_window_configuration(GtkMenuItem *item, gpointer user_data);
+static void detachable_restore_default_window_configuration(GtkMenuItem *item, gpointer user_data);
+
+static void detachable_preserve_hidden_descendants(GtkWidget *widget)
+{
+    if(!widget || !GTK_IS_WIDGET(widget))
+        return;
+
+    if(!gtk_widget_get_visible(widget))
+        gtk_widget_set_no_show_all(widget, TRUE);
+
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        for(GList *node = children; node; node = node->next)
+            if(node->data && GTK_IS_WIDGET(node->data))
+                detachable_preserve_hidden_descendants(GTK_WIDGET(node->data));
+        g_list_free(children);
+    }
+}
+
+static void detachable_refresh_mode_visibility(void)
+{
+    if(!info)
+        return;
+
+    audio_sync_update_mode_sensitivity(info->status_tokens[AUDIO_SYNC_MODE],
+                                       info->status_tokens[AUDIO_SYNC_SOURCE],
+                                       info->status_tokens[AUDIO_SYNC_TARGET_MODE],
+                                       info->status_tokens[RECORD_AUDIO_SOURCE]);
+}
+
+static GtkWidget *detachable_main_window(void)
+{
+    if(!info || !info->main_window)
+        return NULL;
+
+    return glade_xml_get_widget_(info->main_window, "gveejay_window");
+}
+
+static gboolean detachable_page_is_placeholder(GtkWidget *page)
+{
+    return page && GTK_IS_WIDGET(page) &&
+           g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER) != NULL;
+}
+
+static gint detachable_notebook_real_page_count(GtkNotebook *notebook)
+{
+    gint count = 0;
+
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+        return 0;
+
+    gint n_pages = gtk_notebook_get_n_pages(notebook);
+    for(gint i = 0; i < n_pages; i++) {
+        GtkWidget *page = gtk_notebook_get_nth_page(notebook, i);
+        if(page && GTK_IS_WIDGET(page) && !detachable_page_is_placeholder(page))
+            count++;
+    }
+
+    return count;
+}
+
+static gint detachable_notebook_first_real_page(GtkNotebook *notebook)
+{
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+        return -1;
+
+    gint n_pages = gtk_notebook_get_n_pages(notebook);
+    for(gint i = 0; i < n_pages; i++) {
+        GtkWidget *page = gtk_notebook_get_nth_page(notebook, i);
+        if(page && GTK_IS_WIDGET(page) && !detachable_page_is_placeholder(page))
+            return i;
+    }
+
+    return -1;
+}
+
+static void detachable_notebook_select_real_page(GtkNotebook *notebook)
+{
+    gint page_num = detachable_notebook_first_real_page(notebook);
+
+    if(page_num >= 0)
+        gtk_notebook_set_current_page(notebook, page_num);
+}
+
+static gboolean detachable_notebook_current_page_is_placeholder(GtkNotebook *notebook)
+{
+    gint page_num;
+    GtkWidget *page;
+
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+        return FALSE;
+
+    page_num = gtk_notebook_get_current_page(notebook);
+    if(page_num < 0)
+        return FALSE;
+
+    page = gtk_notebook_get_nth_page(notebook, page_num);
+    return detachable_page_is_placeholder(page);
+}
+
+static void detachable_notebook_update_visibility(GtkNotebook *notebook)
+{
+    GtkWidget *widget;
+
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+        return;
+
+    if(g_object_get_data(G_OBJECT(notebook), VJ_DETACH_DATA_DETACHED_NOTEBOOK))
+        return;
+
+    widget = GTK_WIDGET(notebook);
+
+    if(detachable_notebook_real_page_count(notebook) <= 0) {
+        gtk_widget_hide(widget);
+        return;
+    }
+
+    if(!gtk_widget_get_visible(widget))
+        gtk_widget_show(widget);
+}
+
+static gchar *detachable_label_text(GtkWidget *widget)
+{
+    if(!widget || !GTK_IS_WIDGET(widget))
+        return NULL;
+
+    if(GTK_IS_LABEL(widget)) {
+        const gchar *text = gtk_label_get_text(GTK_LABEL(widget));
+        if(text && *text)
+            return g_strdup(text);
+    }
+
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        for(GList *node = children; node; node = node->next) {
+            gchar *text = node->data && GTK_IS_WIDGET(node->data) ?
+                detachable_label_text(GTK_WIDGET(node->data)) : NULL;
+            if(text && *text) {
+                g_list_free(children);
+                return text;
+            }
+            g_free(text);
+        }
+        g_list_free(children);
+    }
+
+    return NULL;
+}
+
+static gchar *detachable_widget_name(GtkWidget *widget)
+{
+    if(widget && GTK_IS_WIDGET(widget) && GTK_IS_BUILDABLE(widget)) {
+        const gchar *name = gtk_buildable_get_name(GTK_BUILDABLE(widget));
+        if(name && *name)
+            return g_strdup(name);
+    }
+
+    return NULL;
+}
+
+static gchar *detachable_page_title(GtkNotebook *notebook, GtkWidget *page)
+{
+    gchar *title = NULL;
+    GtkWidget *tab = NULL;
+
+    if(notebook && page && GTK_IS_NOTEBOOK(notebook) && GTK_IS_WIDGET(page) &&
+       gtk_notebook_page_num(notebook, page) >= 0)
+        tab = gtk_notebook_get_tab_label(notebook, page);
+
+    title = detachable_label_text(tab);
+    if(title) {
+        g_strstrip(title);
+        if(*title)
+            return title;
+        g_free(title);
+    }
+
+    if(page && GTK_IS_WIDGET(page))
+        title = g_strdup((const gchar *) g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN_TITLE));
+    if(title) {
+        g_strstrip(title);
+        if(*title)
+            return title;
+        g_free(title);
+    }
+
+    title = detachable_widget_name(page);
+    if(title)
+        return title;
+
+    return g_strdup("Panel");
+}
+
+static GtkWidget *detachable_make_tab_label(GtkWidget *page, const gchar *title)
+{
+    GtkWidget *event_box = gtk_event_box_new();
+    GtkWidget *label = gtk_label_new(title && *title ? title : "Panel");
+
+    gtk_event_box_set_visible_window(GTK_EVENT_BOX(event_box), FALSE);
+    gtk_widget_add_events(event_box, GDK_BUTTON_PRESS_MASK);
+    gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+    gtk_label_set_single_line_mode(GTK_LABEL(label), TRUE);
+    gtk_container_add(GTK_CONTAINER(event_box), label);
+    gtk_widget_set_tooltip_text(event_box, "Right click to detach or reattach this panel");
+    g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_TAB_READY, GINT_TO_POINTER(1));
+    g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_TAB_PAGE, page);
+    g_signal_connect(event_box, "button-press-event", G_CALLBACK(detachable_tab_button_press), page);
+
+    return event_box;
+}
+
+static void detachable_install_tab(GtkNotebook *notebook, GtkWidget *page)
+{
+    GtkWidget *tab = NULL;
+    gchar *title = NULL;
+
+    if(!notebook || !page || !GTK_IS_NOTEBOOK(notebook) || !GTK_IS_WIDGET(page))
+        return;
+
+    if(gtk_notebook_page_num(notebook, page) < 0)
+        return;
+
+    tab = gtk_notebook_get_tab_label(notebook, page);
+    if(tab && GTK_IS_WIDGET(tab) && g_object_get_data(G_OBJECT(tab), VJ_DETACH_DATA_TAB_READY)) {
+        g_object_set_data(G_OBJECT(tab), VJ_DETACH_DATA_TAB_PAGE, page);
+        return;
+    }
+
+    title = detachable_page_title(notebook, page);
+    tab = detachable_make_tab_label(page, title);
+    gtk_notebook_set_tab_label(notebook, page, tab);
+    gtk_widget_show_all(tab);
+    g_free(title);
+}
+
+static gint detachable_window_page_count(detached_notebook_t *detached)
+{
+    if(!detached)
+        return 0;
+
+    return g_list_length(detached->pages);
+}
+
+static GtkWidget *detachable_window_nth_page(detached_notebook_t *detached, gint index)
+{
+    if(!detached || !detached->notebook || !GTK_IS_NOTEBOOK(detached->notebook))
+        return NULL;
+
+    return gtk_notebook_get_nth_page(GTK_NOTEBOOK(detached->notebook), index);
+}
+
+static GtkWidget *detachable_window_current_page(detached_notebook_t *detached)
+{
+    gint page_num;
+
+    if(!detached || !detached->notebook || !GTK_IS_NOTEBOOK(detached->notebook))
+        return NULL;
+
+    page_num = gtk_notebook_get_current_page(GTK_NOTEBOOK(detached->notebook));
+    if(page_num < 0)
+        page_num = 0;
+
+    return detachable_window_nth_page(detached, page_num);
+}
+
+static void detachable_window_update_title(detached_notebook_t *detached)
+{
+    gchar *page_title = NULL;
+    gchar *title = NULL;
+    gint count = detachable_window_page_count(detached);
+
+    if(!detached || !detached->window || !GTK_IS_WINDOW(detached->window))
+        return;
+
+    if(count == 1) {
+        page_title = detachable_page_title(NULL, detached->pages ? GTK_WIDGET(detached->pages->data) : NULL);
+        title = g_strdup_printf("Reloaded - %s", page_title && *page_title ? page_title : "Detached panel");
+    }
+    else {
+        title = g_strdup_printf("Reloaded - Detached panels (%d)", count);
+    }
+
+    gtk_window_set_title(GTK_WINDOW(detached->window), title);
+    g_free(title);
+    g_free(page_title);
+}
+
+static void detachable_window_update_notebook(detached_notebook_t *detached)
+{
+    gint count = detachable_window_page_count(detached);
+
+    if(!detached || !detached->notebook || !GTK_IS_NOTEBOOK(detached->notebook))
+        return;
+
+    gtk_notebook_set_show_tabs(GTK_NOTEBOOK(detached->notebook), count > 1);
+    gtk_notebook_set_show_border(GTK_NOTEBOOK(detached->notebook), count > 1);
+    detachable_window_update_title(detached);
+}
+
+static void detachable_present_page_window(GtkWidget *page)
+{
+    GtkWidget *window = NULL;
+
+    if(!page || !GTK_IS_WIDGET(page))
+        return;
+
+    window = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW));
+    if(window && GTK_IS_WINDOW(window)) {
+        gtk_window_deiconify(GTK_WINDOW(window));
+        gtk_window_present(GTK_WINDOW(window));
+    }
+}
+
+static gboolean detachable_placeholder_press(GtkWidget *widget,
+                                             GdkEventButton *event,
+                                             gpointer user_data)
+{
+    GtkWidget *page = user_data && GTK_IS_WIDGET(user_data) ? GTK_WIDGET(user_data) : NULL;
+
+    if(event && event->button == 3)
+        return detachable_tab_button_press(widget, event, page);
+
+    detachable_present_page_window(page);
+    return TRUE;
+}
+
+static GtkWidget *detachable_make_placeholder(GtkWidget *page, const gchar *title)
+{
+    GtkWidget *event_box = gtk_event_box_new();
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    GtkWidget *label = gtk_label_new(NULL);
+    gchar *markup = g_markup_printf_escaped("<b>%s</b>\nDetached panel\nLeft click: show window\nRight click: attach menu",
+                                            title && *title ? title : "Panel");
+
+    gtk_event_box_set_visible_window(GTK_EVENT_BOX(event_box), FALSE);
+    gtk_widget_add_events(event_box, GDK_BUTTON_PRESS_MASK);
+    gtk_label_set_markup(GTK_LABEL(label), markup);
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
+    gtk_container_add(GTK_CONTAINER(box), label);
+    gtk_container_add(GTK_CONTAINER(event_box), box);
+    gtk_widget_set_hexpand(event_box, TRUE);
+    gtk_widget_set_vexpand(event_box, TRUE);
+    gtk_widget_set_halign(event_box, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(event_box, GTK_ALIGN_FILL);
+    gtk_widget_set_tooltip_text(event_box, "This page is detached. Left click to show it, right click to reattach it.");
+    g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_IS_PLACEHOLDER, GINT_TO_POINTER(1));
+    g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_PLACEHOLDER_PAGE, page);
+    g_signal_connect(event_box, "button-press-event", G_CALLBACK(detachable_placeholder_press), page);
+
+    g_free(markup);
+
+    return event_box;
+}
+
+static void detachable_remove_placeholder_for_page(GtkNotebook *origin,
+                                                   GtkWidget *page)
+{
+    GtkWidget *placeholder = NULL;
+    gint pos = -1;
+
+    if(!origin || !page || !GTK_IS_NOTEBOOK(origin) || !GTK_IS_WIDGET(page))
+        return;
+
+    placeholder = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER));
+    if(!placeholder || !GTK_IS_WIDGET(placeholder))
+        return;
+
+    if(gtk_widget_get_parent(placeholder) != GTK_WIDGET(origin)) {
+        g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER, NULL);
+        return;
+    }
+
+    pos = gtk_notebook_page_num(origin, placeholder);
+    if(pos >= 0) {
+        detachable_reordering_ = TRUE;
+        gtk_notebook_remove_page(origin, pos);
+        detachable_reordering_ = FALSE;
+    }
+
+    g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER, NULL);
+    detachable_notebook_update_visibility(origin);
+}
+
+static void detachable_create_placeholder_for_page(GtkNotebook *origin,
+                                                   GtkWidget *page,
+                                                   guint page_num)
+{
+    GtkWidget *placeholder = NULL;
+    GtkWidget *tab = NULL;
+    gchar *title = NULL;
+    gchar *tab_title = NULL;
+    gint n_pages = 0;
+    gint pos = (gint) page_num;
+
+    if(!origin || !page || !GTK_IS_NOTEBOOK(origin) || !GTK_IS_WIDGET(page))
+        return;
+
+    if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER))
+        return;
+
+    if(detachable_notebook_real_page_count(origin) <= 0) {
+        g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER, NULL);
+        detachable_notebook_update_visibility(origin);
+        return;
+    }
+
+    title = detachable_page_title(origin, page);
+    tab_title = g_strdup_printf("%s ↗", title && *title ? title : "Panel");
+    placeholder = detachable_make_placeholder(page, title);
+    tab = detachable_make_tab_label(page, tab_title);
+    g_object_set_data(G_OBJECT(tab), VJ_DETACH_DATA_TAB_PAGE, page);
+
+    n_pages = gtk_notebook_get_n_pages(origin);
+    if(pos < 0)
+        pos = 0;
+    if(pos > n_pages)
+        pos = n_pages;
+
+    detachable_reordering_ = TRUE;
+    gtk_notebook_insert_page(origin, placeholder, tab, pos);
+    gtk_notebook_set_tab_detachable(origin, placeholder, FALSE);
+    gtk_notebook_set_tab_reorderable(origin, placeholder, FALSE);
+    gtk_widget_show_all(placeholder);
+    gtk_widget_show_all(tab);
+    detachable_reordering_ = FALSE;
+
+    g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER, placeholder);
+    if(detachable_notebook_current_page_is_placeholder(origin))
+        detachable_notebook_select_real_page(origin);
+    detachable_notebook_update_visibility(origin);
+
+    g_free(tab_title);
+    g_free(title);
+}
+
+static void detachable_notebook_prepare_page(GtkNotebook *notebook,
+                                             GtkWidget *page,
+                                             gint page_num)
+{
+    if(!notebook || !page || !GTK_IS_NOTEBOOK(notebook) || !GTK_IS_WIDGET(page))
+        return;
+
+    if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
+        return;
+
+    if(!g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN)) {
+        gchar *title = detachable_page_title(notebook, page);
+        g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN, notebook);
+        g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN_POS, GINT_TO_POINTER(page_num));
+        g_object_set_data_full(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN_TITLE, title, g_free);
+    }
+
+    gtk_notebook_set_tab_reorderable(notebook, page, FALSE);
+    gtk_notebook_set_tab_detachable(notebook, page, FALSE);
+    detachable_install_tab(notebook, page);
+
+    if(GTK_IS_NOTEBOOK(page))
+        detachable_notebook_setup(GTK_NOTEBOOK(page), NULL);
+}
+
+static void detachable_notebook_page_added(GtkNotebook *notebook,
+                                           GtkWidget *page,
+                                           guint page_num,
+                                           gpointer user_data)
+{
+    GtkNotebook *origin = NULL;
+    gpointer origin_data = NULL;
+    (void) user_data;
+
+    if(!page || !GTK_IS_WIDGET(page) ||
+       g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
+        return;
+
+    detachable_notebook_prepare_page(notebook, page, (gint) page_num);
+
+    origin_data = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN);
+    origin = origin_data && GTK_IS_NOTEBOOK(origin_data) ? GTK_NOTEBOOK(origin_data) : NULL;
+    if(origin == notebook) {
+        gint pos = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN_POS));
+        detachable_remove_placeholder_for_page(origin, page);
+        if(pos >= 0 && pos < gtk_notebook_get_n_pages(origin) && !detachable_reordering_) {
+            detachable_reordering_ = TRUE;
+            gtk_notebook_reorder_child(origin, page, pos);
+            detachable_reordering_ = FALSE;
+        }
+        g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW, NULL);
+        g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED, NULL);
+    }
+
+    detachable_notebook_update_visibility(notebook);
+}
+
+static void detachable_notebook_page_removed(GtkNotebook *notebook,
+                                             GtkWidget *page,
+                                             guint page_num,
+                                             gpointer user_data)
+{
+    GtkNotebook *origin = NULL;
+    gpointer origin_data = NULL;
+    (void) user_data;
+
+    if(!page || !GTK_IS_WIDGET(page) ||
+       g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
+        return;
+
+    origin_data = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN);
+    origin = origin_data && GTK_IS_NOTEBOOK(origin_data) ? GTK_NOTEBOOK(origin_data) : NULL;
+    if(origin == notebook && !detachable_reordering_ && !detachable_in_explicit_detach_)
+        detachable_create_placeholder_for_page(origin, page, page_num);
+
+    detachable_notebook_update_visibility(notebook);
+}
+
+static void detachable_notebook_switch_page(GtkNotebook *notebook,
+                                            GtkWidget *page,
+                                            guint page_num,
+                                            gpointer user_data)
+{
+    (void) notebook;
+    (void) page_num;
+    (void) user_data;
+
+    if(page && GTK_IS_WIDGET(page) &&
+       g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER)) {
+        GtkWidget *detached_page = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER_PAGE));
+        detachable_present_page_window(detached_page);
+    }
+}
+
+static void detachable_notebook_setup(GtkNotebook *notebook, detached_notebook_t *detached)
+{
+    (void) detached;
+
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+        return;
+
+    if(g_object_get_data(G_OBJECT(notebook), VJ_DETACH_DATA_DETACHED_NOTEBOOK))
+        return;
+
+    gtk_notebook_set_scrollable(notebook, TRUE);
+    gtk_notebook_set_show_tabs(notebook, TRUE);
+    gtk_notebook_set_show_border(notebook, TRUE);
+
+    if(!g_object_get_data(G_OBJECT(notebook), VJ_DETACH_DATA_READY)) {
+        g_signal_connect(notebook, "page-added", G_CALLBACK(detachable_notebook_page_added), NULL);
+        g_signal_connect(notebook, "page-removed", G_CALLBACK(detachable_notebook_page_removed), NULL);
+        g_signal_connect(notebook, "switch-page", G_CALLBACK(detachable_notebook_switch_page), NULL);
+        g_object_set_data(G_OBJECT(notebook), VJ_DETACH_DATA_READY, GINT_TO_POINTER(1));
+    }
+
+    gint n_pages = gtk_notebook_get_n_pages(notebook);
+    for(gint i = 0; i < n_pages; i++) {
+        GtkWidget *page = gtk_notebook_get_nth_page(notebook, i);
+        detachable_notebook_prepare_page(notebook, page, i);
+    }
+
+    detachable_notebook_update_visibility(notebook);
+}
+
+static detached_notebook_t *detachable_create_window(GtkNotebook *source, GtkWidget *page)
+{
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    GtkWidget *notebook = gtk_notebook_new();
+    GtkWidget *mainw = detachable_main_window();
+    detached_notebook_t *detached = g_new0(detached_notebook_t, 1);
+    gchar *title = detachable_page_title(source, page);
+
+    detached->window = window;
+    detached->box = box;
+    detached->notebook = notebook;
+    detached->id = detachable_next_window_id_++;
+
+    gtk_container_add(GTK_CONTAINER(window), box);
+    gtk_box_pack_start(GTK_BOX(box), notebook, TRUE, TRUE, 0);
+    gtk_notebook_set_scrollable(GTK_NOTEBOOK(notebook), TRUE);
+    gtk_notebook_set_show_tabs(GTK_NOTEBOOK(notebook), FALSE);
+    gtk_notebook_set_show_border(GTK_NOTEBOOK(notebook), FALSE);
+    g_object_set_data(G_OBJECT(notebook), VJ_DETACH_DATA_DETACHED_NOTEBOOK, GINT_TO_POINTER(1));
+
+    gtk_window_set_default_size(GTK_WINDOW(window), 760, 520);
+    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_NORMAL);
+    gtk_window_set_destroy_with_parent(GTK_WINDOW(window), FALSE);
+    gtk_window_set_title(GTK_WINDOW(window), title && *title ? title : "Reloaded - Detached panel");
+    gtk_widget_add_events(window, GDK_BUTTON_PRESS_MASK);
+
+    if(mainw && GTK_IS_WINDOW(mainw))
+        gtk_window_set_position(GTK_WINDOW(window), GTK_WIN_POS_CENTER_ON_PARENT);
+
+    g_object_set_data(G_OBJECT(window), VJ_DETACH_DATA_DETACHED, detached);
+    g_signal_connect(window, "delete-event", G_CALLBACK(detachable_window_delete), detached);
+    g_signal_connect(window, "button-press-event", G_CALLBACK(detachable_window_button_press), detached);
+
+    detached_notebooks_ = g_list_append(detached_notebooks_, detached);
+    g_free(title);
+
+    return detached;
+}
+
+static void detachable_detach_page_to_window(GtkNotebook *from,
+                                             GtkWidget *page,
+                                             detached_notebook_t *detached)
+{
+    GtkWidget *tab = NULL;
+    gchar *title = NULL;
+    gint page_num = -1;
+    gint detached_pos = -1;
+
+    if(!from || !page || !detached || !detached->notebook ||
+       !GTK_IS_NOTEBOOK(from) || !GTK_IS_WIDGET(page) || !GTK_IS_NOTEBOOK(detached->notebook))
+        return;
+
+    page_num = gtk_notebook_page_num(from, page);
+    if(page_num < 0)
+        return;
+
+    title = detachable_page_title(from, page);
+    tab = detachable_make_tab_label(page, title);
+
+    detachable_preserve_hidden_descendants(page);
+    g_object_ref(page);
+
+    detachable_in_explicit_detach_ = TRUE;
+    gtk_notebook_remove_page(from, page_num);
+    detachable_in_explicit_detach_ = FALSE;
+
+    g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW, detached->window);
+    g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED, detached);
+
+    detached_pos = gtk_notebook_append_page(GTK_NOTEBOOK(detached->notebook), page, tab);
+    gtk_notebook_set_tab_reorderable(GTK_NOTEBOOK(detached->notebook), page, TRUE);
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(detached->notebook), detached_pos);
+    gtk_widget_show_all(tab);
+    gtk_widget_show(page);
+
+    detached->pages = g_list_append(detached->pages, page);
+
+    detachable_create_placeholder_for_page(from, page, (guint) page_num);
+    detachable_notebook_update_visibility(from);
+    detachable_window_update_notebook(detached);
+
+    gtk_widget_show(detached->notebook);
+    gtk_widget_show(detached->box);
+    gtk_widget_show(detached->window);
+
+    detachable_refresh_mode_visibility();
+
+    vj_msg(VEEJAY_MSG_INFO, "Detached panel '%s'", title && *title ? title : "Panel");
+
+    g_object_unref(page);
+    g_free(title);
+}
+
+static void detachable_reattach_page(GtkNotebook *from, GtkWidget *page)
+{
+    GtkNotebook *origin = NULL;
+    GtkWidget *parent = NULL;
+    GtkWidget *tab = NULL;
+    GtkWidget *menu = NULL;
+    detached_notebook_t *detached = NULL;
+    gchar *title = NULL;
+    gint pos = 0;
+    gint n_pages = 0;
+    gpointer origin_data = NULL;
+
+    (void) from;
+
+    if(!page || !GTK_IS_WIDGET(page))
+        return;
+
+    origin_data = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN);
+    origin = origin_data && GTK_IS_NOTEBOOK(origin_data) ? GTK_NOTEBOOK(origin_data) : NULL;
+    if(!origin)
+        return;
+
+    parent = gtk_widget_get_parent(page);
+    if(parent == GTK_WIDGET(origin))
+        return;
+
+    detached = (detached_notebook_t *) g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED);
+    pos = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN_POS));
+    detachable_remove_placeholder_for_page(origin, page);
+
+    n_pages = gtk_notebook_get_n_pages(origin);
+    if(pos < 0)
+        pos = 0;
+    if(pos > n_pages)
+        pos = n_pages;
+
+    if(!gtk_widget_get_visible(GTK_WIDGET(origin)))
+        gtk_widget_show(GTK_WIDGET(origin));
+
+    title = detachable_page_title(NULL, page);
+    tab = detachable_make_tab_label(page, title);
+    menu = gtk_label_new(title && *title ? title : "Panel");
+
+    detachable_preserve_hidden_descendants(page);
+    g_object_ref(page);
+
+    if(parent && GTK_IS_CONTAINER(parent))
+        gtk_container_remove(GTK_CONTAINER(parent), page);
+
+    if(detached)
+        detached->pages = g_list_remove(detached->pages, page);
+
+    gtk_notebook_insert_page_menu(origin, page, tab, menu, pos);
+    detachable_notebook_prepare_page(origin, page, pos);
+    gtk_notebook_set_current_page(origin, pos);
+    g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW, NULL);
+    g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED, NULL);
+    gtk_widget_show(page);
+    gtk_widget_show_all(tab);
+    gtk_widget_show(menu);
+
+    detachable_notebook_update_visibility(origin);
+    if(detached)
+        detachable_window_update_notebook(detached);
+    detachable_refresh_mode_visibility();
+    vj_msg(VEEJAY_MSG_INFO, "Reattached panel '%s'", title && *title ? title : "Panel");
+
+    g_object_unref(page);
+    g_free(title);
+}
+
+static void detachable_reattach_all(detached_notebook_t *detached)
+{
+    GList *copy;
+
+    if(!detached)
+        return;
+
+    copy = g_list_copy(detached->pages);
+    for(GList *node = copy; node; node = node->next)
+        if(node->data && GTK_IS_WIDGET(node->data))
+            detachable_reattach_page(NULL, GTK_WIDGET(node->data));
+    g_list_free(copy);
+}
+
+static gboolean detachable_window_delete(GtkWidget *window,
+                                         GdkEvent *event,
+                                         gpointer user_data)
+{
+    detached_notebook_t *detached = (detached_notebook_t *) user_data;
+    (void) event;
+
+    detachable_reattach_all(detached);
+    detached_notebooks_ = g_list_remove(detached_notebooks_, detached);
+
+    if(window && GTK_IS_WIDGET(window))
+        gtk_widget_destroy(window);
+
+    if(detached) {
+        g_list_free(detached->pages);
+        g_free(detached);
+    }
+    return TRUE;
+}
+
+static void detachable_destroy_empty_window(detached_notebook_t *detached)
+{
+    if(!detached)
+        return;
+
+    if(detachable_window_page_count(detached) > 0)
+        return;
+
+    detached_notebooks_ = g_list_remove(detached_notebooks_, detached);
+    if(detached->window && GTK_IS_WIDGET(detached->window))
+        gtk_widget_destroy(detached->window);
+    g_list_free(detached->pages);
+    g_free(detached);
+}
+
+static void detachable_detach_page(GtkNotebook *from, GtkWidget *page)
+{
+    detached_notebook_t *detached = NULL;
+
+    if(!from || !page || !GTK_IS_NOTEBOOK(from) || !GTK_IS_WIDGET(page))
+        return;
+
+    if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER)) {
+        GtkWidget *real_page = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER_PAGE));
+        detachable_present_page_window(real_page);
+        return;
+    }
+
+    if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW)) {
+        detachable_present_page_window(page);
+        return;
+    }
+
+    if(gtk_notebook_page_num(from, page) < 0)
+        return;
+
+    detached = detachable_create_window(from, page);
+    detachable_detach_page_to_window(from, page, detached);
+    gtk_window_present(GTK_WINDOW(detached->window));
+}
+
+static void detachable_menu_detach(GtkMenuItem *item, gpointer user_data)
+{
+    GtkWidget *page = user_data && GTK_IS_WIDGET(user_data) ? GTK_WIDGET(user_data) : NULL;
+    GtkWidget *parent = page ? gtk_widget_get_parent(page) : NULL;
+    (void) item;
+
+    if(parent && GTK_IS_NOTEBOOK(parent))
+        detachable_detach_page(GTK_NOTEBOOK(parent), page);
+}
+
+static void detachable_target_action_free(gpointer user_data, GClosure *closure)
+{
+    detachable_target_action_t *action = (detachable_target_action_t *) user_data;
+    (void) closure;
+
+    if(!action)
+        return;
+
+    if(action->page && GTK_IS_WIDGET(action->page))
+        g_object_unref(action->page);
+    g_free(action);
+}
+
+static void detachable_menu_detach_to_window(GtkMenuItem *item, gpointer user_data)
+{
+    detachable_target_action_t *action = (detachable_target_action_t *) user_data;
+    GtkWidget *page = action ? action->page : NULL;
+    GtkWidget *parent = page && GTK_IS_WIDGET(page) ? gtk_widget_get_parent(page) : NULL;
+    (void) item;
+
+    if(page && parent && GTK_IS_NOTEBOOK(parent) && action->detached) {
+        detachable_detach_page_to_window(GTK_NOTEBOOK(parent), page, action->detached);
+        gtk_window_present(GTK_WINDOW(action->detached->window));
+    }
+}
+
+static void detachable_menu_reattach(GtkMenuItem *item, gpointer user_data)
+{
+    GtkWidget *page = user_data && GTK_IS_WIDGET(user_data) ? GTK_WIDGET(user_data) : NULL;
+    detached_notebook_t *detached = NULL;
+    (void) item;
+
+    if(!page)
+        return;
+
+    detached = (detached_notebook_t *) g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED);
+    detachable_reattach_page(NULL, page);
+    detachable_destroy_empty_window(detached);
+}
+
+static void detachable_menu_show(GtkMenuItem *item, gpointer user_data)
+{
+    GtkWidget *page = user_data && GTK_IS_WIDGET(user_data) ? GTK_WIDGET(user_data) : NULL;
+    (void) item;
+    detachable_present_page_window(page);
+}
+
+static void detachable_append_existing_window_menu(GtkWidget *menu, GtkWidget *page)
+{
+    GtkWidget *submenu = NULL;
+    GtkWidget *root = NULL;
+    gint added = 0;
+
+    if(!menu || !GTK_IS_MENU_SHELL(menu) || !page || !GTK_IS_WIDGET(page))
+        return;
+
+    for(GList *node = detached_notebooks_; node; node = node->next) {
+        detached_notebook_t *detached = (detached_notebook_t *) node->data;
+        detachable_target_action_t *action = NULL;
+        GtkWidget *item = NULL;
+        const gchar *window_title = NULL;
+        gchar *label = NULL;
+
+        if(!detached || !detached->window || !GTK_IS_WINDOW(detached->window))
+            continue;
+        if(g_list_find(detached->pages, page))
+            continue;
+
+        if(!submenu)
+            submenu = gtk_menu_new();
+
+        window_title = gtk_window_get_title(GTK_WINDOW(detached->window));
+        label = g_strdup_printf("%s  [%d page%s]",
+                                window_title && *window_title ? window_title : "Detached window",
+                                detachable_window_page_count(detached),
+                                detachable_window_page_count(detached) == 1 ? "" : "s");
+        item = gtk_menu_item_new_with_label(label);
+        action = g_new0(detachable_target_action_t, 1);
+        action->page = page;
+        action->detached = detached;
+        g_object_ref(page);
+        g_signal_connect_data(item,
+                              "activate",
+                              G_CALLBACK(detachable_menu_detach_to_window),
+                              action,
+                              detachable_target_action_free,
+                              0);
+        gtk_menu_shell_append(GTK_MENU_SHELL(submenu), item);
+        g_free(label);
+        added++;
+    }
+
+    if(added <= 0) {
+        if(submenu)
+            gtk_widget_destroy(submenu);
+        return;
+    }
+
+    root = gtk_menu_item_new_with_label("Detach page to existing window");
+    gtk_menu_item_set_submenu(GTK_MENU_ITEM(root), submenu);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), root);
+}
+
+static void detachable_popup_for_page(GtkWidget *page, GdkEventButton *event)
+{
+    GtkWidget *menu = NULL;
+    GtkWidget *item = NULL;
+    GtkWidget *parent = NULL;
+    GtkNotebook *origin = NULL;
+    gpointer origin_data = NULL;
+    gboolean is_placeholder = FALSE;
+
+    if(!page || !GTK_IS_WIDGET(page))
+        return;
+
+    is_placeholder = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER) != NULL;
+    if(is_placeholder) {
+        GtkWidget *real_page = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER_PAGE));
+        if(real_page && GTK_IS_WIDGET(real_page))
+            page = real_page;
+    }
+
+    parent = gtk_widget_get_parent(page);
+    origin_data = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN);
+    origin = origin_data && GTK_IS_NOTEBOOK(origin_data) ? GTK_NOTEBOOK(origin_data) : NULL;
+    menu = gtk_menu_new();
+
+    if(is_placeholder || g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW)) {
+        item = gtk_menu_item_new_with_label("Show detached window");
+        g_signal_connect(item, "activate", G_CALLBACK(detachable_menu_show), page);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+
+        item = gtk_menu_item_new_with_label("Reattach page");
+        g_signal_connect(item, "activate", G_CALLBACK(detachable_menu_reattach), page);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+    }
+    else if(parent && GTK_IS_NOTEBOOK(parent) && (!origin || origin == GTK_NOTEBOOK(parent))) {
+        item = gtk_menu_item_new_with_label("Detach page to new window");
+        g_signal_connect(item, "activate", G_CALLBACK(detachable_menu_detach), page);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+        detachable_append_existing_window_menu(menu, page);
+    }
+    else if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED)) {
+        item = gtk_menu_item_new_with_label("Reattach page");
+        g_signal_connect(item, "activate", G_CALLBACK(detachable_menu_reattach), page);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+    }
+
+    GList *items = gtk_container_get_children(GTK_CONTAINER(menu));
+    if(!items) {
+        gtk_widget_destroy(menu);
+        return;
+    }
+    g_list_free(items);
+
+    g_object_ref(page);
+    g_object_set_data_full(G_OBJECT(menu), VJ_DETACH_DATA_TAB_PAGE, page, g_object_unref);
+    g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
+    gtk_widget_show_all(menu);
+    gtk_menu_popup(GTK_MENU(menu), NULL, NULL, NULL, NULL,
+                   event ? event->button : 0,
+                   event ? event->time : gtk_get_current_event_time());
+}
+
+static gboolean detachable_tab_button_press(GtkWidget *widget,
+                                            GdkEventButton *event,
+                                            gpointer user_data)
+{
+    GtkWidget *page = user_data && GTK_IS_WIDGET(user_data) ? GTK_WIDGET(user_data) : NULL;
+
+    if(!event || event->button != 3)
+        return FALSE;
+
+    if(widget && GTK_IS_WIDGET(widget) && g_object_get_data(G_OBJECT(widget), VJ_DETACH_DATA_TAB_PAGE))
+        page = GTK_WIDGET(g_object_get_data(G_OBJECT(widget), VJ_DETACH_DATA_TAB_PAGE));
+
+    detachable_popup_for_page(page, event);
+    return TRUE;
+}
+
+static gboolean detachable_window_button_press(GtkWidget *widget,
+                                               GdkEventButton *event,
+                                               gpointer user_data)
+{
+    detached_notebook_t *detached = (detached_notebook_t *) user_data;
+    GtkWidget *page = NULL;
+    (void) widget;
+
+    if(!event || event->button != 3 || !detached)
+        return FALSE;
+
+    page = detachable_window_current_page(detached);
+    if(!page || !GTK_IS_WIDGET(page))
+        return FALSE;
+
+    detachable_popup_for_page(page, event);
+    return TRUE;
+}
+
+
+static gchar *detachable_window_config_path(void)
+{
+    const gchar *home = g_get_home_dir();
+    gchar *dir = home ? g_build_filename(home, ".veejay", NULL) : NULL;
+    gchar *path = NULL;
+
+    if(dir)
+        g_mkdir_with_parents(dir, 0700);
+
+    path = g_build_filename(dir ? dir : g_get_user_config_dir(),
+                            "reloaded-layout.ini",
+                            NULL);
+    g_free(dir);
+
+    return path;
+}
+
+static const gchar *detachable_buildable_name(GtkWidget *widget)
+{
+    if(widget && GTK_IS_WIDGET(widget) && GTK_IS_BUILDABLE(widget)) {
+        const gchar *name = gtk_buildable_get_name(GTK_BUILDABLE(widget));
+        if(name && *name)
+            return name;
+    }
+
+    return "";
+}
+
+static void detachable_key_file_set_window(GKeyFile *kf, const gchar *group, GtkWidget *window)
+{
+    gint x = 0;
+    gint y = 0;
+    gint w = 0;
+    gint h = 0;
+
+    if(!kf || !group || !window || !GTK_IS_WINDOW(window))
+        return;
+
+    gtk_window_get_position(GTK_WINDOW(window), &x, &y);
+    gtk_window_get_size(GTK_WINDOW(window), &w, &h);
+
+    g_key_file_set_integer(kf, group, "x", x);
+    g_key_file_set_integer(kf, group, "y", y);
+    g_key_file_set_integer(kf, group, "width", w);
+    g_key_file_set_integer(kf, group, "height", h);
+}
+
+static void detachable_save_page_group(GKeyFile *kf, const gchar *group, GtkWidget *page)
+{
+    gpointer origin_data = NULL;
+    GtkNotebook *origin = NULL;
+    gchar *title = detachable_page_title(NULL, page);
+
+    if(!kf || !group)
+        return;
+
+    origin_data = page && GTK_IS_WIDGET(page) ? g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN) : NULL;
+    origin = origin_data && GTK_IS_NOTEBOOK(origin_data) ? GTK_NOTEBOOK(origin_data) : NULL;
+
+    g_key_file_set_string(kf, group, "title", title && *title ? title : "Panel");
+    g_key_file_set_string(kf, group, "page", detachable_buildable_name(page));
+    g_key_file_set_string(kf, group, "origin", origin ? detachable_buildable_name(GTK_WIDGET(origin)) : "");
+    g_key_file_set_integer(kf, group, "origin-position",
+                           page && GTK_IS_WIDGET(page) ?
+                           GPOINTER_TO_INT(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN_POS)) : 0);
+    g_free(title);
+}
+
+static void detachable_save_window_configuration(GtkMenuItem *item, gpointer user_data)
+{
+    GKeyFile *kf = g_key_file_new();
+    gchar *path = detachable_window_config_path();
+    gchar *data = NULL;
+    gsize len = 0;
+    GError *error = NULL;
+    GtkWidget *mainw = detachable_main_window();
+    gint count = 0;
+    gint idx = 0;
+    (void) item;
+    (void) user_data;
+
+    g_key_file_set_string(kf, "layout", "format", "gveejay-detached-windows-v2");
+
+    if(mainw && GTK_IS_WINDOW(mainw))
+        detachable_key_file_set_window(kf, "main-window", mainw);
+
+    count = g_list_length(detached_notebooks_);
+    g_key_file_set_integer(kf, "layout", "detached-count", count);
+
+    for(GList *node = detached_notebooks_; node; node = node->next) {
+        detached_notebook_t *detached = (detached_notebook_t *) node->data;
+        gchar *group = g_strdup_printf("detached-%d", idx);
+        gint page_count = detachable_window_page_count(detached);
+
+        if(detached && detached->window && GTK_IS_WINDOW(detached->window))
+            detachable_key_file_set_window(kf, group, detached->window);
+
+        g_key_file_set_integer(kf, group, "page-count", page_count);
+
+        for(gint p = 0; p < page_count; p++) {
+            GtkWidget *page = detachable_window_nth_page(detached, p);
+            gchar *page_group = g_strdup_printf("detached-%d-page-%d", idx, p);
+            detachable_save_page_group(kf, page_group, page);
+            g_free(page_group);
+        }
+
+        g_free(group);
+        idx++;
+    }
+
+    data = g_key_file_to_data(kf, &len, &error);
+    if(data && path && g_file_set_contents(path, data, len, &error))
+        vj_msg(VEEJAY_MSG_INFO, "Saved window configuration to %s", path);
+    else
+        vj_msg(VEEJAY_MSG_WARNING, "Unable to save window configuration%s%s",
+               error && error->message ? ": " : "",
+               error && error->message ? error->message : "");
+
+    if(error)
+        g_error_free(error);
+    g_free(data);
+    g_free(path);
+    g_key_file_free(kf);
+}
+
+static gboolean detachable_key_file_get_integer(GKeyFile *kf, const gchar *group, const gchar *key, gint *value)
+{
+    GError *error = NULL;
+    gint v;
+
+    if(!kf || !group || !key || !value || !g_key_file_has_key(kf, group, key, NULL))
+        return FALSE;
+
+    v = g_key_file_get_integer(kf, group, key, &error);
+    if(error) {
+        g_error_free(error);
+        return FALSE;
+    }
+
+    *value = v;
+    return TRUE;
+}
+
+static void detachable_apply_window_geometry(GKeyFile *kf, const gchar *group, GtkWidget *window)
+{
+    gint x = -1;
+    gint y = -1;
+    gint w = -1;
+    gint h = -1;
+
+    if(!kf || !group || !window || !GTK_IS_WINDOW(window) || !g_key_file_has_group(kf, group))
+        return;
+
+    detachable_key_file_get_integer(kf, group, "x", &x);
+    detachable_key_file_get_integer(kf, group, "y", &y);
+    detachable_key_file_get_integer(kf, group, "width", &w);
+    detachable_key_file_get_integer(kf, group, "height", &h);
+
+    if(w > 0 && h > 0) {
+        gtk_window_set_default_size(GTK_WINDOW(window), w, h);
+        gtk_window_resize(GTK_WINDOW(window), w, h);
+    }
+    if(x >= 0 && y >= 0)
+        gtk_window_move(GTK_WINDOW(window), x, y);
+}
+
+static GtkWidget *detachable_find_widget_by_name(const gchar *name)
+{
+    if(!info || !info->main_window || !name || !*name)
+        return NULL;
+
+    return glade_xml_get_widget_(info->main_window, name);
+}
+
+static GtkWidget *detachable_find_page_from_config(GKeyFile *kf, const gchar *group)
+{
+    gchar *page_name = NULL;
+    gchar *origin_name = NULL;
+    GtkWidget *page = NULL;
+    GtkWidget *origin_widget = NULL;
+    gint pos = -1;
+    GError *error = NULL;
+
+    if(!kf || !group || !g_key_file_has_group(kf, group))
+        return NULL;
+
+    page_name = g_key_file_get_string(kf, group, "page", &error);
+    if(error) {
+        g_error_free(error);
+        error = NULL;
+    }
+
+    if(page_name && *page_name)
+        page = detachable_find_widget_by_name(page_name);
+
+    origin_name = g_key_file_get_string(kf, group, "origin", &error);
+    if(error) {
+        g_error_free(error);
+        error = NULL;
+    }
+
+    detachable_key_file_get_integer(kf, group, "origin-position", &pos);
+    if(!page && origin_name && *origin_name && pos >= 0) {
+        origin_widget = detachable_find_widget_by_name(origin_name);
+        if(origin_widget && GTK_IS_NOTEBOOK(origin_widget))
+            page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(origin_widget), pos);
+    }
+
+    if(page && GTK_IS_WIDGET(page)) {
+        GtkWidget *parent = gtk_widget_get_parent(page);
+        if(parent && GTK_IS_NOTEBOOK(parent)) {
+            g_free(page_name);
+            g_free(origin_name);
+            return page;
+        }
+    }
+
+    g_free(page_name);
+    g_free(origin_name);
+    return NULL;
+}
+
+static gboolean detachable_restore_page_group(GKeyFile *kf,
+                                              const gchar *group,
+                                              detached_notebook_t **detached)
+{
+    GtkWidget *page = detachable_find_page_from_config(kf, group);
+    GtkWidget *parent = page ? gtk_widget_get_parent(page) : NULL;
+
+    if(!page || !parent || !GTK_IS_NOTEBOOK(parent))
+        return FALSE;
+
+    if(!*detached)
+        *detached = detachable_create_window(GTK_NOTEBOOK(parent), page);
+
+    detachable_detach_page_to_window(GTK_NOTEBOOK(parent), page, *detached);
+    return TRUE;
+}
+
+static void detachable_restore_window_configuration(GtkMenuItem *item, gpointer user_data)
+{
+    GKeyFile *kf = g_key_file_new();
+    gchar *path = detachable_window_config_path();
+    GError *error = NULL;
+    gint count = 0;
+    gint restored_windows = 0;
+    GtkWidget *mainw = detachable_main_window();
+    (void) item;
+    (void) user_data;
+
+    if(!path || !g_key_file_load_from_file(kf, path, G_KEY_FILE_NONE, &error)) {
+        vj_msg(VEEJAY_MSG_DEBUG, "No saved window configuration found at %s", path ? path : "(null)");
+        if(error)
+            g_error_free(error);
+        g_free(path);
+        g_key_file_free(kf);
+        return;
+    }
+
+    detachable_windows_close_all();
+
+    if(mainw && GTK_IS_WINDOW(mainw))
+        detachable_apply_window_geometry(kf, "main-window", mainw);
+
+    detachable_key_file_get_integer(kf, "layout", "detached-count", &count);
+    for(gint i = 0; i < count; i++) {
+        gchar *group = g_strdup_printf("detached-%d", i);
+        detached_notebook_t *detached = NULL;
+        gint page_count = 0;
+        gboolean restored_any = FALSE;
+
+        if(!g_key_file_has_group(kf, group)) {
+            g_free(group);
+            continue;
+        }
+
+        if(!detachable_key_file_get_integer(kf, group, "page-count", &page_count))
+            page_count = 1;
+
+        for(gint p = 0; p < page_count; p++) {
+            gchar *page_group = page_count == 1 && g_key_file_has_key(kf, group, "page", NULL) ?
+                g_strdup(group) : g_strdup_printf("detached-%d-page-%d", i, p);
+            if(detachable_restore_page_group(kf, page_group, &detached))
+                restored_any = TRUE;
+            g_free(page_group);
+        }
+
+        if(restored_any && detached && detached->window && GTK_IS_WINDOW(detached->window)) {
+            detachable_apply_window_geometry(kf, group, detached->window);
+            gtk_widget_show(detached->notebook);
+            gtk_widget_show(detached->box);
+            gtk_widget_show(detached->window);
+            detachable_window_update_notebook(detached);
+            restored_windows++;
+        }
+        else if(detached) {
+            detachable_destroy_empty_window(detached);
+        }
+
+        g_free(group);
+    }
+
+    detachable_refresh_mode_visibility();
+    vj_msg(VEEJAY_MSG_INFO, "Restored %d detached panel window%s from %s",
+           restored_windows,
+           restored_windows == 1 ? "" : "s",
+           path);
+
+    g_free(path);
+    g_key_file_free(kf);
+}
+
+
+static void detachable_restore_default_window_configuration(GtkMenuItem *item, gpointer user_data)
+{
+    gchar *path = detachable_window_config_path();
+    GtkWidget *mainw = detachable_main_window();
+    (void) item;
+    (void) user_data;
+
+    detachable_windows_close_all();
+    detachable_refresh_mode_visibility();
+
+    if(mainw && GTK_IS_WINDOW(mainw)) {
+        gtk_window_unmaximize(GTK_WINDOW(mainw));
+        gtk_widget_queue_resize(mainw);
+        ui_window_set_startup_size(mainw);
+    }
+
+    if(path && *path && g_file_test(path, G_FILE_TEST_EXISTS)) {
+        if(unlink(path) == 0)
+            vj_msg(VEEJAY_MSG_INFO, "Removed saved window configuration %s", path);
+        else
+            vj_msg(VEEJAY_MSG_WARNING, "Unable to remove saved window configuration %s", path);
+    }
+
+    vj_msg(VEEJAY_MSG_INFO, "Restored default window configuration: all notebook pages are attached and the main window was resized to its minimum layout");
+    g_free(path);
+}
+
+static GtkWidget *menu_shell_find_item_named(GtkWidget *menu, const char *name)
+{
+    GtkWidget *found = NULL;
+    GList *children = NULL;
+
+    if(!menu || !GTK_IS_CONTAINER(menu) || !name)
+        return NULL;
+
+    children = gtk_container_get_children(GTK_CONTAINER(menu));
+    for(GList *node = children; node; node = node->next) {
+        GtkWidget *child = GTK_WIDGET(node->data);
+        if(child && GTK_IS_WIDGET(child)) {
+            const char *child_name = gtk_widget_get_name(child);
+            if(child_name && strcmp(child_name, name) == 0) {
+                found = child;
+                break;
+            }
+        }
+    }
+    g_list_free(children);
+
+    return found;
+}
+
+static GtkWidget *window_configuration_menu_item_new(const char *name,
+                                                     const char *label,
+                                                     const char *tooltip,
+                                                     GCallback cb)
+{
+    GtkWidget *item = gtk_menu_item_new_with_label(label);
+    gtk_widget_set_name(item, name);
+    gtk_widget_set_tooltip_text(item, tooltip);
+    g_signal_connect(item, "activate", cb, NULL);
+    return item;
+}
+
+static void init_window_configuration_menu(void)
+{
+    GtkWidget *menu_item = NULL;
+    GtkWidget *menu = NULL;
+    GtkWidget *layout_item = NULL;
+    GtkWidget *layout_menu = NULL;
+
+    if(!info || !info->main_window)
+        return;
+
+    menu_item = glade_xml_get_widget_(info->main_window, "menuitem_preference");
+    if(menu_item && GTK_IS_MENU_ITEM(menu_item))
+        menu = gtk_menu_item_get_submenu(GTK_MENU_ITEM(menu_item));
+
+    if(!menu)
+        menu = glade_xml_get_widget_(info->main_window, "menu_preference");
+
+    if(!menu_item && menu)
+        menu_item = gtk_widget_get_parent(menu);
+
+    if((!menu || !GTK_IS_MENU_SHELL(menu)) && menu_item && GTK_IS_MENU_ITEM(menu_item)) {
+        menu = gtk_menu_new();
+        gtk_menu_item_set_submenu(GTK_MENU_ITEM(menu_item), menu);
+    }
+
+    if(!menu || !GTK_IS_MENU_SHELL(menu)) {
+        vj_msg(VEEJAY_MSG_WARNING, "Could not install window-layout menu items: Preferences menu not found");
+        return;
+    }
+
+    layout_item = menu_shell_find_item_named(menu, "window_layout_menu_item");
+    if(!layout_item) {
+        GtkWidget *sep = gtk_separator_menu_item_new();
+        layout_item = gtk_menu_item_new_with_label("Window Layout");
+        gtk_widget_set_name(layout_item, "window_layout_menu_item");
+        gtk_widget_set_tooltip_text(layout_item, "Save or restore detached panel window layout");
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), sep);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), layout_item);
+        gtk_widget_show(sep);
+    }
+
+    layout_menu = GTK_IS_MENU_ITEM(layout_item) ? gtk_menu_item_get_submenu(GTK_MENU_ITEM(layout_item)) : NULL;
+    if(!layout_menu || !GTK_IS_MENU_SHELL(layout_menu)) {
+        layout_menu = gtk_menu_new();
+        gtk_menu_item_set_submenu(GTK_MENU_ITEM(layout_item), layout_menu);
+    }
+
+    if(!menu_shell_find_item_named(layout_menu, "save_window_configuration")) {
+        GtkWidget *item = window_configuration_menu_item_new(
+            "save_window_configuration",
+            "Save Window Configuration",
+            "Save the current main-window size and detached panel windows to ~/.veejay/reloaded-layout.ini",
+            G_CALLBACK(detachable_save_window_configuration));
+        gtk_menu_shell_append(GTK_MENU_SHELL(layout_menu), item);
+    }
+
+    if(!menu_shell_find_item_named(layout_menu, "restore_window_configuration")) {
+        GtkWidget *item = window_configuration_menu_item_new(
+            "restore_window_configuration",
+            "Restore Window Configuration",
+            "Restore detached panel windows from ~/.veejay/reloaded-layout.ini",
+            G_CALLBACK(detachable_restore_window_configuration));
+        gtk_menu_shell_append(GTK_MENU_SHELL(layout_menu), item);
+    }
+
+    if(!menu_shell_find_item_named(layout_menu, "restore_default_window_configuration_separator")) {
+        GtkWidget *sep = gtk_separator_menu_item_new();
+        gtk_widget_set_name(sep, "restore_default_window_configuration_separator");
+        gtk_menu_shell_append(GTK_MENU_SHELL(layout_menu), sep);
+    }
+
+    if(!menu_shell_find_item_named(layout_menu, "restore_default_window_configuration")) {
+        GtkWidget *item = window_configuration_menu_item_new(
+            "restore_default_window_configuration",
+            "Restore Default Window Configuration",
+            "Reattach all notebook pages and remove ~/.veejay/reloaded-layout.ini",
+            G_CALLBACK(detachable_restore_default_window_configuration));
+        gtk_menu_shell_append(GTK_MENU_SHELL(layout_menu), item);
+    }
+
+    if(menu_item && GTK_IS_WIDGET(menu_item))
+        gtk_widget_show(menu_item);
+    gtk_widget_show_all(layout_item);
+    gtk_widget_show(menu);
+}
+
+static void detachable_notebooks_init(void)
+{
+    if(!info || !info->main_window)
+        return;
+
+    GSList *objects = gtk_builder_get_objects(info->main_window);
+
+    for(GSList *node = objects; node; node = node->next) {
+        if(GTK_IS_NOTEBOOK(node->data))
+            detachable_notebook_setup(GTK_NOTEBOOK(node->data), NULL);
+    }
+
+    g_slist_free(objects);
+}
+
+static void detachable_windows_close_all(void)
+{
+    while(detached_notebooks_) {
+        detached_notebook_t *detached = (detached_notebook_t *) detached_notebooks_->data;
+        if(detached && detached->window && GTK_IS_WIDGET(detached->window))
+            detachable_window_delete(detached->window, NULL, detached);
+        else {
+            detached_notebooks_ = g_list_delete_link(detached_notebooks_, detached_notebooks_);
+            if(detached) {
+                g_list_free(detached->pages);
+                g_free(detached);
+            }
+        }
+    }
+}
+
 void vj_gui_init(const char *glade_file,
                  int launcher,
                  char *hostname,
@@ -15903,6 +17445,8 @@ void vj_gui_init(const char *glade_file,
 
     gtk_builder_connect_signals( gui->main_window , NULL);
     vj_gui_update_sync_samplelist_sensitivity();
+    detachable_notebooks_init();
+    init_window_configuration_menu();
     connect_audio_mixer_override_signals();
     GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
     info->tl = timeline_new();
@@ -16132,6 +17676,10 @@ void vj_gui_init(const char *glade_file,
     }
 
     ui_window_set_startup_size(mainw);
+    if(!g_object_get_data(G_OBJECT(mainw), VJ_DETACH_DATA_RESTORE_ONCE)) {
+        g_object_set_data(G_OBJECT(mainw), VJ_DETACH_DATA_RESTORE_ONCE, GINT_TO_POINTER(1));
+        detachable_restore_window_configuration(NULL, NULL);
+    }
     ui_window_log_startup_size(mainw, "startup");
 }
 
@@ -17118,6 +18666,7 @@ static void create_sequencer_slots(int nx, int ny)
     GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "SampleSequencerBox");
     GtkWidget *outer;
     GtkWidget *toolbar;
+    GtkWidget *progress_row;
     GtkWidget *button;
     const gboolean compact = smallest_possible ? TRUE : FALSE;
     const int sequence_view_w = compact ? 480 : 520;
@@ -17140,6 +18689,11 @@ static void create_sequencer_slots(int nx, int ny)
     gtk_box_pack_start(GTK_BOX(outer), toolbar, FALSE, FALSE, compact ? 0 : 2);
     gtk_widget_show(toolbar);
 
+    progress_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 3);
+    add_class(progress_row, "sequencer-toolbar");
+    gtk_box_pack_start(GTK_BOX(outer), progress_row, FALSE, FALSE, compact ? 0 : 1);
+    gtk_widget_show(progress_row);
+
     sequence_toolbar_hide_legacy_row();
 
     button = sequence_toolbar_pack_existing(toolbar, "seqactive", FALSE, FALSE, 0);
@@ -17158,9 +18712,9 @@ static void create_sequencer_slots(int nx, int ny)
     if(button)
         gtk_widget_set_tooltip_text(button, "Stop recording from this sequence");
 
-    button = sequence_toolbar_pack_existing(toolbar, "rec_seq_progress", TRUE, TRUE, compact ? 1 : 4);
+    button = sequence_toolbar_pack_existing(progress_row, "rec_seq_progress", TRUE, TRUE, compact ? 0 : 2);
     if(button) {
-        gtk_widget_set_size_request(button, compact ? 80 : 120, -1);
+        gtk_widget_set_size_request(button, -1, -1);
         gtk_widget_set_tooltip_text(button, "Sequence recording progress");
     }
 

@@ -59,11 +59,6 @@ size, 3 for quarter size, and 4 for one eighth size.
 Allocate \fIN\fR sample-bank pages. The default is 12 pages. The maximum is
 512 pages.
 .TP
-.BR -s , " --size " \fIN\fR "|" \fICxR\fR "|" \fIC:R\fR "|" \fIC,R\fR
-Set sample-bank pages or layout. A single integer sets the number of pages.
-A two-number form sets columns and rows. The default layout is 6x2 with 12
-pages.
-.TP
 .BR -v , " --verbose"
 Enable more verbose logging.
 .TP
@@ -164,9 +159,10 @@ Play the sample or stream in the slot.
 .B Shift + left click on a populated slot
 Set the slot as the current mixing channel.
 .PP
-The active bank selector changes the visible sample-bank page. The default
-layout is 6 columns by 2 rows. The default number of pages is 12. In
-low-bandwidth mode, sample images are not loaded.
+The active bank selector changes the visible sample-bank page. Each page contains
+12 slots. When the sample bank has more space, Reloaded keeps square cells and
+shows consecutive pages to fill the available area. The default number of pages
+is 12. In low-bandwidth mode, sample images are not loaded.
 .SH SAMPLE AND STREAM PANELS
 The sample panel shows sample title, start and end positions, playback speed,
 slow-motion multiplier, hold-frame controls, sample audio volume, transitions,
@@ -621,16 +617,8 @@ Use the system GTK theme instead of Reloaded's CSS:
 Use a custom CSS file and load a MIDI layout:
 .B gveejay-reloaded --theme ./dark-live.css --midi ./layout.xml
 .TP
-Start with the default 6x2 grid and 24 sample-bank pages:
-.B gveejay-reloaded --size 24
-.TP
-Start with a two-column by four-row sample-bank layout:
-.B gveejay-reloaded --size 2x4
-.TP
-Use colon or comma layout syntax:
-.B gveejay-reloaded --size 3:4
-.br
-.B gveejay-reloaded --size 3,4
+Start with 24 sample-bank pages:
+.B gveejay-reloaded --sample-pages 24
 .SH BUGS
 Report bugs through the Veejay issue tracker. When reporting UI bugs, include
 the Reloaded version, GTK version, backend version, the selected play mode,

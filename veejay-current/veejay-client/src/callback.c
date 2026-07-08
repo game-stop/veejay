@@ -75,7 +75,7 @@ static gboolean curve_editor_is_local_dirty(void)
 
 static int audio_input_selector_active_from_ui(void);
 static int audio_global_source_controls_allowed(void);
-static int audio_input_selector_external_from_ui(void);
+static int G_GNUC_UNUSED audio_input_selector_external_from_ui(void);
 
 extern void vj_midi_learning_vims_toggle(void *vv, char *widget, int id);
 extern void vj_midi_learning_vims_toggle2(void *vv, char *widget, int id, int arg);
@@ -432,10 +432,12 @@ void	on_subrender_toggled(GtkWidget *widget, gpointer user_data)
 
     int enabled = 0;
 
-    if(widget && GTK_IS_TOGGLE_BUTTON(widget))
+    if(widget && GTK_IS_TOGGLE_BUTTON(widget)) {
         enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
-    else
+    }
+    else {
         enabled = is_button_toggled("toggle_subrender") ? 1 : 0;
+    }
 
 	multi_vims( VIMS_SUB_RENDER,"%d %d",0,enabled);
     vj_midi_learning_vims_toggle2(info->midi, "toggle_subrender", VIMS_SUB_RENDER, 0);
@@ -1255,7 +1257,7 @@ enum {
 static int audio_input_selector_active_from_ui(void);
 static const char *audio_input_selector_name_from_active(int active);
 
-static int audio_current_sample_has_own_audio_source(void)
+static int G_GNUC_UNUSED audio_current_sample_has_own_audio_source(void)
 {
     int source;
     int mode;
@@ -1292,7 +1294,7 @@ static int audio_global_source_controls_allowed(void)
     return 1;
 }
 
-static int audio_input_selector_external_from_ui(void)
+static int G_GNUC_UNUSED audio_input_selector_external_from_ui(void)
 {
     int active = audio_input_selector_active_from_ui();
 
@@ -1821,8 +1823,11 @@ static void audio_sync_set_master_wav_options_visible(int visible)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_MASTER_WAV_OPTIONS_GRID];
 
-    if(w)
-        gtk_widget_set_visible(w, visible ? TRUE : FALSE);
+    if(!w)
+        return;
+
+    gtk_widget_set_no_show_all(w, visible ? FALSE : TRUE);
+    gtk_widget_set_visible(w, visible ? TRUE : FALSE);
 }
 
 static void audio_sync_set_external_source_guarded(int use_wav)

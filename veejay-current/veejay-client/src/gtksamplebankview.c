@@ -35,6 +35,12 @@
 #ifndef GVR_SAMPLE_BANK_ROWS
 #define GVR_SAMPLE_BANK_ROWS 2
 #endif
+#ifndef GVR_SAMPLE_BANK_VISIBLE_MAX
+#define GVR_SAMPLE_BANK_VISIBLE_MAX 512
+#endif
+#ifndef GVR_SAMPLE_BANK_DYNAMIC_CELL
+#define GVR_SAMPLE_BANK_DYNAMIC_CELL 120
+#endif
 
 #define GVR_SB_TYPE_SAMPLE      0
 #define GVR_SB_TYPE_YUV4MPEG    1
@@ -74,11 +80,17 @@ struct _GvrSampleBankView {
     int current_page;
     int selected_page;
     int selected_slot;
+    int hover_page;
     int hover_slot;
     int current_sample_id;
     int current_sample_type;
     GdkRectangle header_rect;
-    GdkRectangle cell_rect[GVR_SAMPLE_BANK_SLOTS];
+    GdkRectangle cell_rect[GVR_SAMPLE_BANK_VISIBLE_MAX];
+    int cell_page[GVR_SAMPLE_BANK_VISIBLE_MAX];
+    int cell_slot[GVR_SAMPLE_BANK_VISIBLE_MAX];
+    int layout_cells;
+    int layout_columns;
+    int layout_rows;
 };
 
 struct _GvrSampleBankViewClass {
@@ -231,38 +243,108 @@ static void gvr_draw_ellipsized_text(cairo_t *cr,
     cairo_restore(cr);
 }
 
+
+static int gvr_sample_bank_view_visible_page_step(GvrSampleBankView *view)
+{
+    int cells = view ? view->layout_cells : GVR_SAMPLE_BANK_SLOTS;
+    int pages;
+
+    if(cells < GVR_SAMPLE_BANK_SLOTS)
+        cells = GVR_SAMPLE_BANK_SLOTS;
+
+    pages = cells / GVR_SAMPLE_BANK_SLOTS;
+    if(pages < 1)
+        pages = 1;
+
+    return pages;
+}
+
 static void gvr_sample_bank_view_layout(GvrSampleBankView *view, int width, int height)
 {
     const int outer = 5;
     const int inner = 5;
-    const int columns = gvr_clampi(view->columns, 1, GVR_SAMPLE_BANK_SLOTS);
-    const int rows = gvr_clampi(view->rows, 1, GVR_SAMPLE_BANK_SLOTS);
-    const int grid_x = outer;
-    const int grid_y = outer;
+    const int base_columns = gvr_clampi(view->columns, 1, GVR_SAMPLE_BANK_SLOTS);
+    const int base_rows = gvr_clampi(view->rows, 1, GVR_SAMPLE_BANK_SLOTS);
     const int grid_w = width - outer * 2;
     const int grid_h = height - outer * 2;
-    const int cell_w = grid_w / columns;
-    const int cell_h = grid_h / rows;
+    int columns = base_columns;
+    int rows = base_rows;
+    int cell;
+    int total_w;
+    int total_h;
+    int start_x;
+    int start_y;
 
     view->header_rect.x = 0;
     view->header_rect.y = 0;
     view->header_rect.width = 0;
     view->header_rect.height = 0;
+    view->layout_cells = 0;
+    view->layout_columns = base_columns;
+    view->layout_rows = base_rows;
 
-    for(int slot = 0; slot < GVR_SAMPLE_BANK_SLOTS; slot++) {
-        int sx = slot % columns;
-        int sy = slot / columns;
-        GdkRectangle *r = &view->cell_rect[slot];
+    for(int i = 0; i < GVR_SAMPLE_BANK_VISIBLE_MAX; i++) {
+        view->cell_rect[i].x = 0;
+        view->cell_rect[i].y = 0;
+        view->cell_rect[i].width = 0;
+        view->cell_rect[i].height = 0;
+        view->cell_page[i] = -1;
+        view->cell_slot[i] = -1;
+    }
 
-        if(sy >= rows || cell_w <= 2 || cell_h <= 2) {
-            r->x = r->y = r->width = r->height = 0;
-            continue;
-        }
+    if(grid_w <= 2 || grid_h <= 2)
+        return;
 
-        r->x = grid_x + sx * cell_w + (sx > 0 ? inner / 2 : 0);
-        r->y = grid_y + sy * cell_h + (sy > 0 ? inner / 2 : 0);
-        r->width = cell_w - inner;
-        r->height = cell_h - inner;
+    columns = grid_w / GVR_SAMPLE_BANK_DYNAMIC_CELL;
+    rows = grid_h / GVR_SAMPLE_BANK_DYNAMIC_CELL;
+
+    if(columns < base_columns)
+        columns = base_columns;
+    if(rows < base_rows)
+        rows = base_rows;
+
+    while(columns * rows > GVR_SAMPLE_BANK_VISIBLE_MAX && rows > base_rows)
+        rows--;
+    while(columns * rows > GVR_SAMPLE_BANK_VISIBLE_MAX && columns > base_columns)
+        columns--;
+
+    cell = (grid_w - inner * (columns - 1)) / columns;
+    {
+        int cell_h = (grid_h - inner * (rows - 1)) / rows;
+        if(cell_h < cell)
+            cell = cell_h;
+    }
+
+    if(cell < 8)
+        cell = 8;
+
+    total_w = columns * cell + inner * (columns - 1);
+    total_h = rows * cell + inner * (rows - 1);
+    start_x = (width - total_w) / 2;
+    start_y = (height - total_h) / 2;
+
+    if(start_x < outer)
+        start_x = outer;
+    if(start_y < outer)
+        start_y = outer;
+
+    view->layout_columns = columns;
+    view->layout_rows = rows;
+
+    for(int idx = 0; idx < columns * rows && idx < GVR_SAMPLE_BANK_VISIBLE_MAX; idx++) {
+        const int sx = idx % columns;
+        const int sy = idx / columns;
+        const int page = view->current_page + (idx / GVR_SAMPLE_BANK_SLOTS);
+        const int slot = idx % GVR_SAMPLE_BANK_SLOTS;
+        GdkRectangle *r = &view->cell_rect[idx];
+
+        r->x = start_x + sx * (cell + inner);
+        r->y = start_y + sy * (cell + inner);
+        r->width = cell;
+        r->height = cell;
+        view->cell_page[idx] = page;
+        view->cell_slot[idx] = slot;
+        view->layout_cells++;
     }
 }
 
@@ -280,12 +362,13 @@ static void gvr_sample_bank_view_recount_page(GvrSampleBankView *view, int page)
     view->pages[page].size = n;
 }
 
+
 static gboolean gvr_sample_bank_view_hit(GvrSampleBankView *view, double x, double y, int *page, int *slot, gboolean *header)
 {
-    for(int s = 0; s < GVR_SAMPLE_BANK_SLOTS; s++) {
-        if(gvr_rect_contains(&view->cell_rect[s], x, y)) {
-            *page = view->current_page;
-            *slot = s;
+    for(int i = 0; i < view->layout_cells; i++) {
+        if(gvr_rect_contains(&view->cell_rect[i], x, y)) {
+            *page = view->cell_page[i];
+            *slot = view->cell_slot[i];
             *header = FALSE;
             return TRUE;
         }
@@ -347,14 +430,28 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
     if(page != view->current_page)
         view->current_page = page;
 
-    for(int slot = 0; slot < GVR_SAMPLE_BANK_SLOTS; slot++) {
-        GdkRectangle *r = &view->cell_rect[slot];
-        GvrSampleBankCell *cell = &view->pages[page].cells[slot];
-        gboolean filled = cell->sample_id > 0;
-        gboolean selected = (page == view->selected_page && slot == view->selected_slot);
-        gboolean current = (filled && cell->sample_id == view->current_sample_id && cell->sample_type == view->current_sample_type);
-        gboolean hover = (slot == view->hover_slot);
+    for(int idx = 0; idx < view->layout_cells; idx++) {
+        GdkRectangle *r = &view->cell_rect[idx];
+        int cell_page = view->cell_page[idx];
+        int slot = view->cell_slot[idx];
+        GvrSampleBankCell empty_cell;
+        GvrSampleBankCell *cell = &empty_cell;
+        gboolean filled;
+        gboolean selected;
+        gboolean current;
+        gboolean hover;
         double rr, gg, bb, tr, tg, tb;
+
+        memset(&empty_cell, 0, sizeof(empty_cell));
+
+        if(cell_page >= 0 && cell_page < view->page_count &&
+           slot >= 0 && slot < GVR_SAMPLE_BANK_SLOTS)
+            cell = &view->pages[cell_page].cells[slot];
+
+        filled = cell->sample_id > 0;
+        selected = (cell_page == view->selected_page && slot == view->selected_slot);
+        current = (filled && cell->sample_id == view->current_sample_id && cell->sample_type == view->current_sample_type);
+        hover = (cell_page == view->hover_page && slot == view->hover_slot);
 
         if(r->width <= 0 || r->height <= 0)
             continue;
@@ -482,6 +579,8 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
     return FALSE;
 }
 
+static gboolean gvr_sample_bank_view_cell_valid(GvrSampleBankView *view, int page, int slot);
+
 static void gvr_sample_bank_view_emit_page(GvrSampleBankView *view)
 {
     g_signal_emit(view,
@@ -490,11 +589,13 @@ static void gvr_sample_bank_view_emit_page(GvrSampleBankView *view)
                   view->current_page);
 }
 
+
 static gboolean gvr_sample_bank_view_scroll(GtkWidget *widget, GdkEventScroll *event)
 {
     GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
     int old_page = view->current_page;
     int delta = 0;
+    int step;
 
     if(event->direction == GDK_SCROLL_UP)
         delta = -1;
@@ -508,7 +609,8 @@ static gboolean gvr_sample_bank_view_scroll(GtkWidget *widget, GdkEventScroll *e
     if(delta == 0)
         return FALSE;
 
-    view->current_page = gvr_clampi(view->current_page + delta, 0, view->page_count - 1);
+    step = gvr_sample_bank_view_visible_page_step(view);
+    view->current_page = gvr_clampi(view->current_page + delta * step, 0, view->page_count - 1);
     if(view->current_page != old_page) {
         gtk_widget_queue_draw(widget);
         gvr_sample_bank_view_emit_page(view);
@@ -541,6 +643,9 @@ static gboolean gvr_sample_bank_view_button_press(GtkWidget *widget, GdkEventBut
     }
 
     if(slot < 0 || slot >= GVR_SAMPLE_BANK_SLOTS)
+        return FALSE;
+
+    if(!gvr_sample_bank_view_cell_valid(view, page, slot))
         return FALSE;
 
     if(event->button == 1) {
@@ -577,6 +682,7 @@ static gboolean gvr_sample_bank_view_button_press(GtkWidget *widget, GdkEventBut
     return FALSE;
 }
 
+
 static gboolean gvr_sample_bank_view_motion(GtkWidget *widget, GdkEventMotion *event)
 {
     GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
@@ -585,12 +691,14 @@ static gboolean gvr_sample_bank_view_motion(GtkWidget *widget, GdkEventMotion *e
     gboolean header = FALSE;
 
     if(gvr_sample_bank_view_hit(view, event->x, event->y, &page, &slot, &header) && !header) {
-        if(slot != view->hover_slot) {
+        if(page != view->hover_page || slot != view->hover_slot) {
+            view->hover_page = page;
             view->hover_slot = slot;
             gtk_widget_queue_draw(widget);
         }
     }
-    else if(view->hover_slot >= 0) {
+    else if(view->hover_slot >= 0 || view->hover_page >= 0) {
+        view->hover_page = -1;
         view->hover_slot = -1;
         gtk_widget_queue_draw(widget);
     }
@@ -598,12 +706,14 @@ static gboolean gvr_sample_bank_view_motion(GtkWidget *widget, GdkEventMotion *e
     return FALSE;
 }
 
+
 static gboolean gvr_sample_bank_view_leave(GtkWidget *widget, GdkEventCrossing *event)
 {
     GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
     (void)event;
 
-    if(view->hover_slot >= 0) {
+    if(view->hover_slot >= 0 || view->hover_page >= 0) {
+        view->hover_page = -1;
         view->hover_slot = -1;
         gtk_widget_queue_draw(widget);
     }
@@ -618,13 +728,15 @@ static gboolean gvr_sample_bank_view_cell_valid(GvrSampleBankView *view, int pag
            slot >= 0 && slot < GVR_SAMPLE_BANK_SLOTS;
 }
 
+
 static int gvr_sample_bank_view_keyboard_slot(GvrSampleBankView *view)
 {
     if(view->selected_page == view->current_page &&
        view->selected_slot >= 0 && view->selected_slot < GVR_SAMPLE_BANK_SLOTS)
         return view->selected_slot;
 
-    if(view->hover_slot >= 0 && view->hover_slot < GVR_SAMPLE_BANK_SLOTS)
+    if(view->hover_page == view->current_page &&
+       view->hover_slot >= 0 && view->hover_slot < GVR_SAMPLE_BANK_SLOTS)
         return view->hover_slot;
 
     return 0;
@@ -884,9 +996,13 @@ static void gvr_sample_bank_view_init(GvrSampleBankView *view)
     view->current_page = 0;
     view->selected_page = -1;
     view->selected_slot = -1;
+    view->hover_page = -1;
     view->hover_slot = -1;
     view->current_sample_id = -1;
     view->current_sample_type = -1;
+    view->layout_cells = 0;
+    view->layout_columns = view->columns;
+    view->layout_rows = view->rows;
 
     gtk_widget_set_can_focus(GTK_WIDGET(view), TRUE);
     gtk_widget_set_has_tooltip(GTK_WIDGET(view), TRUE);
@@ -973,6 +1089,7 @@ int gvr_sample_bank_view_get_current_page(GtkWidget *widget)
     return GVR_SAMPLE_BANK_VIEW(widget)->current_page;
 }
 
+
 void gvr_sample_bank_view_step_page(GtkWidget *widget, int delta)
 {
     GvrSampleBankView *view;
@@ -981,7 +1098,8 @@ void gvr_sample_bank_view_step_page(GtkWidget *widget, int delta)
         return;
 
     view = GVR_SAMPLE_BANK_VIEW(widget);
-    gvr_sample_bank_view_set_current_page(widget, view->current_page + delta);
+    gvr_sample_bank_view_set_current_page(widget,
+        view->current_page + delta * gvr_sample_bank_view_visible_page_step(view));
 }
 
 void gvr_sample_bank_view_set_slot(GtkWidget *widget,
@@ -1088,6 +1206,8 @@ void gvr_sample_bank_view_clear_all(GtkWidget *widget)
 
     view->selected_page = -1;
     view->selected_slot = -1;
+    view->hover_page = -1;
+    view->hover_slot = -1;
     view->current_sample_id = -1;
     view->current_sample_type = -1;
     gtk_widget_queue_draw(widget);

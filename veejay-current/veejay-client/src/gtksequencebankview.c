@@ -149,15 +149,16 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
     const int inner = compact ? 2 : 4;
     const int header_h = compact ? 14 : 18;
 
-    int bank_side_w = (width - (outer * 2) - gap) / 2;
-    int bank_side_h = (height - (outer * 2) - gap) / 2;
-    int bank_side = bank_side_w < bank_side_h ? bank_side_w : bank_side_h;
+    int bank_w = (width - (outer * 2) - gap) / 2;
+    int bank_h = (height - (outer * 2) - gap) / 2;
 
-    if(bank_side < 24)
-        bank_side = 24;
+    if(bank_w < 24)
+        bank_w = 24;
+    if(bank_h < 24)
+        bank_h = 24;
 
-    int grid_space_w = bank_side - (inner * 2);
-    int grid_space_h = bank_side - header_h - (inner * 2);
+    int grid_space_w = bank_w - (inner * 2);
+    int grid_space_h = bank_h - header_h - (inner * 2);
     int cell = grid_space_w / GVR_SEQUENCE_COLUMNS;
     int cell_h = grid_space_h / GVR_SEQUENCE_ROWS;
 
@@ -167,8 +168,8 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
         cell = 2;
 
     const int grid_side = cell * GVR_SEQUENCE_COLUMNS;
-    const int total_w = bank_side * 2 + gap;
-    const int total_h = bank_side * 2 + gap;
+    const int total_w = bank_w * 2 + gap;
+    const int total_h = bank_h * 2 + gap;
     int start_x = (width - total_w) / 2;
     int start_y = (height - total_h) / 2;
 
@@ -183,10 +184,10 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
         GdkRectangle *br = &view->bank_rect[bank];
         GdkRectangle *hr = &view->header_rect[bank];
 
-        br->x = start_x + col * (bank_side + gap);
-        br->y = start_y + row * (bank_side + gap);
-        br->width = bank_side;
-        br->height = bank_side;
+        br->x = start_x + col * (bank_w + gap);
+        br->y = start_y + row * (bank_h + gap);
+        br->width = bank_w;
+        br->height = bank_h;
 
         hr->x = br->x;
         hr->y = br->y;
