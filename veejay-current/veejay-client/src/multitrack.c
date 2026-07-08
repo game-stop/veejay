@@ -53,6 +53,7 @@ typedef struct
 	GtkWidget *panel;
 	GtkWidget *hbox;
 	GtkWidget *area;
+	GdkPixbuf *preview_pixbuf;
 	GtkWidget *sub_frame;
 	GtkWidget *sub_hbox;
 	GtkWidget *toggle;
@@ -81,6 +82,7 @@ typedef struct
 	GtkWidget *main_box;
 	GtkWidget *status_bar;
 	GtkWidget *scroll;
+	GtkWidget *grid;
 	void	  *data;
 	int	  selected;
 	int	  sensitive;
@@ -93,6 +95,7 @@ typedef struct
 	GtkWidget	*preview_toggle;
 	int	  pw;
 	int  	  ph;
+	int	  quality;
     int   track_status[__MAX_TRACKS];
 } multitracker_t;
 
@@ -102,13 +105,21 @@ static void		*parent__ = NULL;
 static char	*mt_new_connection_dialog(multitracker_t *mt, int *port_num, int *error);
 static void	multitrack_set_preview_toggle_state(multitracker_t *mt, int track, int active);
 static void	multitrack_update_track_label(multitracker_t *mt, int track, int current);
+static void	multitrack_mark_current_track(multitracker_t *mt);
+static void	multitrack_set_current_track(multitracker_t *mt, int track);
+static void	multitrack_select_first_open_track(multitracker_t *mt);
+static void	multitrack_refresh_track_state(multitracker_t *mt, int track);
+static void	multitrack_apply_track_preview_size(multitracker_t *mt, int track, int track_width);
+static void	multitrack_render_track_preview(multitracker_t *mt, int track);
+static gboolean	multitrack_preview_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data);
+static void	multitrack_grid_size_allocate(GtkWidget *widget, GtkAllocation *allocation, gpointer user_data);
+static void	multitrack_update_scroll_height(multitracker_t *mt);
 static void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
 static sequence_view_t *new_sequence_view( void *vp, int num );
 static void	update_pos( void *data, gint total, gint current );
 static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data);
 
-extern GdkPixbuf       *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 extern void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line );
 extern void    vj_msg(int type, const char format[], ...);
 
@@ -201,6 +212,8 @@ static	void	status_print(multitracker_t *mt, const char format[], ... )
 	va_end(args);
 }
 
+
+
 static	GdkPixbuf	*load_logo_image(int dw, int dh )
 {
 	char path[1024];
@@ -257,6 +270,182 @@ static void	calculate_img_dimension(int w, int h, int *dst_w, int *dst_h, float 
 	*dst_w = tmp_w;
 	*dst_h = tmp_h;
 }
+
+static float multitrack_preview_aspect(multitracker_t *mt)
+{
+	float ratio = 4.0f / 3.0f;
+
+	if(mt && mt->aspect_ratio > 0.05f)
+		ratio = mt->aspect_ratio;
+	else if(mt && mt->width > 0 && mt->height > 0)
+		ratio = (float) mt->width / (float) mt->height;
+
+	if(ratio < 0.25f || ratio > 8.0f)
+		ratio = 4.0f / 3.0f;
+
+	return ratio;
+}
+
+static void multitrack_apply_quality(multitracker_t *mt, int *w, int *h)
+{
+	int q = mt ? mt->quality : 0;
+
+	while(q > 0) {
+		*w /= 2;
+		*h /= 2;
+		q--;
+	}
+
+	if(*w < 16)
+		*w = 16;
+	if(*h < 16)
+		*h = 16;
+
+	*w &= ~1;
+	*h &= ~1;
+}
+
+static void multitrack_fetch_base_size(multitracker_t *mt, int track, int *w, int *h)
+{
+	*w = 0;
+	*h = 0;
+
+	if(!mt)
+		return;
+
+	if(track == mt->master_track && mt->width > 0 && mt->height > 0) {
+		*w = mt->width;
+		*h = mt->height;
+		return;
+	}
+
+	if(track >= 0 && track < MAX_TRACKS && mt->view && mt->view[track]) {
+		const int min_w = 176;
+		const int max_w = 240;
+		float ratio = multitrack_preview_aspect(mt);
+		*w = mt->view[track]->dim[0];
+		if(*w < min_w)
+			*w = min_w;
+		else if(*w > max_w)
+			*w = max_w;
+		*h = (int) (((float) *w / ratio) + 0.5f);
+	}
+
+	if((*w <= 0 || *h <= 0) && mt->width > 0 && mt->height > 0) {
+		float ratio = multitrack_preview_aspect(mt);
+		*w = 176;
+		*h = (int) (((float) *w / ratio) + 0.5f);
+	}
+
+	if(*w <= 0 || *h <= 0) {
+		*w = 176;
+		*h = 144;
+	}
+}
+
+static void multitrack_preview_size_from_track_width(multitracker_t *mt, int track_width, int *dst_w, int *dst_h)
+{
+	const int min_w = 176;
+	float ratio = multitrack_preview_aspect(mt);
+	int w = track_width > 0 ? track_width - 12 : min_w;
+	int h;
+
+	if(w < min_w)
+		w = min_w;
+
+	h = (int) (((float) w / ratio) + 0.5f);
+	if(h < 16)
+		h = 16;
+
+	*dst_w = w;
+	*dst_h = h;
+}
+
+static void multitrack_update_scroll_height(multitracker_t *mt)
+{
+	int min_h = 0;
+	int nat_h = 0;
+	int req_h;
+	gint cur_w = -1;
+	gint cur_h = -1;
+
+	if(!mt || !mt->scroll || !mt->grid)
+		return;
+
+	gtk_widget_get_preferred_height(mt->grid, &min_h, &nat_h);
+	req_h = nat_h > min_h ? nat_h : min_h;
+
+	if(req_h < 260)
+		req_h = 260;
+
+	req_h += 4;
+	gtk_widget_get_size_request(mt->scroll, &cur_w, &cur_h);
+	if(cur_w == -1 && cur_h == req_h)
+		return;
+
+	gtk_widget_set_size_request(mt->scroll, -1, req_h);
+}
+
+static void multitrack_apply_track_preview_size(multitracker_t *mt, int track, int track_width)
+{
+	sequence_view_t *v;
+	int w = 0;
+	int h = 0;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
+
+	v = mt->view[track];
+	multitrack_preview_size_from_track_width(mt, track_width, &w, &h);
+
+	if(v->dim[0] == w && v->dim[1] == h)
+		return;
+
+	int old_h = v->dim[1];
+	v->dim[0] = w;
+	v->dim[1] = h;
+	mt->pw = w;
+	mt->ph = h;
+
+	if(v->event_box)
+		gtk_widget_set_size_request_(v->event_box, w, -1);
+	if(v->frame)
+		gtk_widget_set_size_request_(v->frame, w, -1);
+	gtk_widget_set_size_request_(v->area, w, h);
+
+	if(old_h != h)
+		gtk_widget_queue_resize(v->event_box);
+	multitrack_render_track_preview(mt, track);
+	multitrack_update_scroll_height(mt);
+}
+
+static void multitrack_grid_size_allocate(GtkWidget *widget, GtkAllocation *allocation, gpointer user_data)
+{
+	multitracker_t *mt = (multitracker_t*) user_data;
+	int avail_w;
+	int track_width;
+
+	if(!mt || !allocation || allocation->width <= 0)
+		return;
+
+	avail_w = allocation->width - 2;
+	if(avail_w < 176 * MAX_TRACKS)
+		avail_w = 176 * MAX_TRACKS;
+
+	if(mt->grid)
+		gtk_widget_set_size_request_(mt->grid, avail_w, -1);
+
+	track_width = avail_w / MAX_TRACKS;
+	if(track_width <= 0)
+		return;
+
+	for(int i = 0; i < MAX_TRACKS; i++)
+		multitrack_apply_track_preview_size(mt, i, track_width);
+
+	multitrack_update_scroll_height(mt);
+	(void) widget;
+}
+
 
 
 int		multitrack_get_sequence_view_id( void *data )
@@ -786,11 +975,12 @@ int		update_multitrack_widgets( void *data, int *array, int track )
 
 static	void	sequence_preview_size(multitracker_t *mt, int track_num)
 {
-	float ratio = 0.0f;
 	int tmp_w = 0;
 	int tmp_h = 0;
 
-	calculate_img_dimension(mt->width,mt->height, &tmp_w, &tmp_h, &ratio, 160, 120,0);
+	multitrack_fetch_base_size(mt, track_num, &tmp_w, &tmp_h);
+	multitrack_apply_quality(mt, &tmp_w, &tmp_h);
+
 	if(!gvr_track_configure( mt->preview, track_num,tmp_w,tmp_h ) )
 	{
 		veejay_msg(0, "Unable to configure preview %dx%d",tmp_w,tmp_h );
@@ -816,8 +1006,13 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 	multitrack_set_preview_toggle_state(mt, v->num, status);
 	sequence_preview_size( mt, v->num );
 
-	if( !status )
-		gtk_image_clear( GTK_IMAGE(v->area ) );
+	if( !status ) {
+		if(v->preview_pixbuf) {
+			g_object_unref(v->preview_pixbuf);
+			v->preview_pixbuf = NULL;
+		}
+		gtk_widget_queue_draw(v->area);
+	}
 	
 }
 
@@ -858,6 +1053,10 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	seqv->event_box = gtk_event_box_new();
 	gtk_event_box_set_visible_window( GTK_EVENT_BOX(seqv->event_box), TRUE );
+    gtk_widget_set_hexpand(seqv->event_box, TRUE);
+    gtk_widget_set_halign(seqv->event_box, GTK_ALIGN_FILL);
+    gtk_widget_set_vexpand(seqv->event_box, FALSE);
+    gtk_widget_set_valign(seqv->event_box, GTK_ALIGN_START);
     gtk_widget_set_can_focus(seqv->event_box, TRUE);
     gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->event_box),
         "Empty track. Use Add Track to connect another Veejay instance.");
@@ -871,6 +1070,11 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	snprintf(track_title,sizeof(track_title), "Track %d", num );
 	seqv->frame = gtk_frame_new( track_title );
+    gtk_widget_set_hexpand(seqv->frame, TRUE);
+    gtk_widget_set_halign(seqv->frame, GTK_ALIGN_FILL);
+    gtk_widget_set_vexpand(seqv->frame, FALSE);
+    gtk_widget_set_valign(seqv->frame, GTK_ALIGN_START);
+    gtk_frame_set_shadow_type(GTK_FRAME(seqv->frame), GTK_SHADOW_NONE);
     gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->frame),
         "Empty track. Use Add Track to connect another Veejay instance.");
 
@@ -879,15 +1083,26 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_container_add( GTK_CONTAINER( seqv->event_box), seqv->frame );
 
 	seqv->main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,0);
+    gtk_widget_set_hexpand(seqv->main_vbox, TRUE);
+    gtk_widget_set_halign(seqv->main_vbox, GTK_ALIGN_FILL);
+    gtk_widget_set_vexpand(seqv->main_vbox, FALSE);
+    gtk_widget_set_valign(seqv->main_vbox, GTK_ALIGN_START);
 	gtk_container_add( GTK_CONTAINER( seqv->frame ), seqv->main_vbox );
 	gtk_widget_show( GTK_WIDGET( seqv->main_vbox ) );
 
-	seqv->area = gtk_image_new();
+	seqv->area = gtk_drawing_area_new();
+    gtk_widget_set_halign(seqv->area, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(seqv->area, GTK_ALIGN_START);
+    gtk_widget_set_hexpand(seqv->area, TRUE);
+    gtk_widget_set_vexpand(seqv->area, FALSE);
     gtk_widget_set_tooltip_text(GTK_WIDGET(seqv->area),
         "Empty track. Use Add Track to connect another Veejay instance.");
+    g_signal_connect(G_OBJECT(seqv->area), "draw", G_CALLBACK(multitrack_preview_draw), seqv);
 
 	gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
-	gtk_widget_set_size_request_( seqv->area, 176,144  ); 
+	seqv->dim[0] = 176;
+	seqv->dim[1] = 144;
+	gtk_widget_set_size_request_( seqv->area, 176, seqv->dim[1]  ); 
 	seqv->panel = gtk_frame_new(NULL);
 
 	seqv->toggle = gtk_toggle_button_new_with_label( "Preview off" );
@@ -1003,7 +1218,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(seqv->panel), FALSE );
 
-    add_class( GTK_WIDGET(seqv->frame), "track");
+    add_class( GTK_WIDGET(seqv->event_box), "track");
 	gtk_widget_show( GTK_WIDGET( seqv->area ) );
 
 
@@ -1100,13 +1315,48 @@ void		*multitrack_new(
 	mt->main_window = win;
 	mt->main_box    = box;
 	mt->status_bar  = msg;
+	gtk_widget_set_hexpand(mt->main_box, TRUE);
+	gtk_widget_set_halign(mt->main_box, GTK_ALIGN_FILL);
+	gtk_widget_set_vexpand(mt->main_box, FALSE);
+	gtk_widget_set_valign(mt->main_box, GTK_ALIGN_START);
  	mt->logo = load_logo_image(0,0);
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-	gtk_widget_set_size_request(mt->scroll, 50 + max_w * 2, max_h + 40);
+    gtk_widget_set_hexpand(mt->scroll, TRUE);
+    gtk_widget_set_halign(mt->scroll, GTK_ALIGN_FILL);
+    gtk_widget_set_vexpand(mt->scroll, FALSE);
+    gtk_widget_set_valign(mt->scroll, GTK_ALIGN_START);
+
+	gint scroll_w = max_w + 80;
+	gint scroll_h = max_h + 40;
+	if(scroll_w < 480)
+		scroll_w = 480;
+	else if(scroll_w > 960)
+		scroll_w = 960;
+	if(scroll_h < 260)
+		scroll_h = 260;
+	else if(scroll_h > 420)
+		scroll_h = 420;
+
+	gtk_widget_set_size_request(mt->scroll, -1, scroll_h);
+	veejay_msg(VEEJAY_MSG_INFO,
+		"Multitrack scroll request: %dx%d (preview cap %dx%d, tracks %d)",
+		scroll_w,
+		scroll_h,
+		max_w,
+		max_h,
+		MAX_TRACKS);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
 	GtkWidget *grid = gtk_grid_new();
+	mt->grid = grid;
+    gtk_widget_set_hexpand(grid, TRUE);
+    gtk_widget_set_halign(grid, GTK_ALIGN_FILL);
+    gtk_widget_set_vexpand(grid, FALSE);
+    gtk_widget_set_valign(grid, GTK_ALIGN_START);
+    gtk_grid_set_column_homogeneous(GTK_GRID(grid), TRUE);
+    gtk_grid_set_column_spacing(GTK_GRID(grid), 0);
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 0);
 
 	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , TRUE,TRUE, 0 );
     gtk_widget_show(mt->scroll);
@@ -1114,19 +1364,32 @@ void		*multitrack_new(
 	for( c = 0; c < MAX_TRACKS; c ++ )
 	{
 		mt->view[c] = new_sequence_view( mt,  c );
+        gtk_widget_set_hexpand(mt->view[c]->event_box, TRUE);
+        gtk_widget_set_halign(mt->view[c]->event_box, GTK_ALIGN_FILL);
+        gtk_widget_set_vexpand(mt->view[c]->event_box, FALSE);
+        gtk_widget_set_valign(mt->view[c]->event_box, GTK_ALIGN_START);
 		gtk_grid_attach( GTK_GRID(grid), mt->view[c]->event_box, c, 0, 1, 1 );
 	}
 
 	gtk_scrolled_window_add_with_viewport(
 			GTK_SCROLLED_WINDOW( mt->scroll ), grid );
 
+    GtkWidget *viewport = gtk_bin_get_child(GTK_BIN(mt->scroll));
+    if(viewport) {
+        gtk_widget_set_hexpand(viewport, TRUE);
+        gtk_widget_set_halign(viewport, GTK_ALIGN_FILL);
+        g_signal_connect(G_OBJECT(viewport), "size-allocate", G_CALLBACK(multitrack_grid_size_allocate), mt);
+    }
+
 	gtk_widget_show(grid);
+	g_signal_connect(G_OBJECT(mt->scroll), "size-allocate", G_CALLBACK(multitrack_grid_size_allocate), mt);
+	multitrack_update_scroll_height(mt);
 
 	mt->master_track = 0;
 	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
 
 	for( c = 0; c < MAX_TRACKS; c ++ )
-		multitrack_update_track_label(mt, c, c == 0);
+		multitrack_update_track_label(mt, c, 0);
 
 	parent__ = infog;
 
@@ -1153,7 +1416,7 @@ int		multitrack_add_track( void *data )
 		status_print( mt,
 			"Veejay %s:%d is already connected on track %d. Double-click that track to focus it.",
 			hostname, port_num, track );
-		multitrack_update_track_label(mt, track, track == 0);
+		multitrack_update_track_label(mt, track, track == mt->master_track);
 		free( hostname );
 		return 0;
 	}
@@ -1161,13 +1424,12 @@ int		multitrack_add_track( void *data )
 	if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 	{
 		status_print( mt, "Connection established with Veejay running on %s, port %d", hostname, port_num );
-		gvr_track_configure(mt->preview, track, mt->pw, mt->ph);
+		sequence_preview_size(mt, track);
 		gvr_track_toggle_preview(mt->preview, track, gveejay_user_preview());
-		multitrack_set_preview_toggle_state(mt, track, gvr_get_preview_status(mt->preview, track));
-		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
-		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), (track == 0 ? FALSE : TRUE) );
+		if(!gvr_track_test(mt->preview, mt->master_track))
+			multitrack_set_current_track(mt, track);
         mt->track_status[ track ] = 1;
-		multitrack_update_track_label(mt, track, track == 0);
+		multitrack_mark_current_track(mt);
 		res = 1;
 	}
 	else
@@ -1202,21 +1464,37 @@ void		multitrack_cleanup_track( void *data, int track )
 	mt->view[track]->status_lock = 1;
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), FALSE );
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), FALSE );
-	gtk_image_clear( GTK_IMAGE(mt->view[track]->area ) );
+	if(mt->view[track]->preview_pixbuf) {
+		g_object_unref(mt->view[track]->preview_pixbuf);
+		mt->view[track]->preview_pixbuf = NULL;
+	}
+	gtk_widget_queue_draw(mt->view[track]->area);
 	mt->view[track]->status_lock = 0;
     mt->track_status[ track ] = 0;
-	multitrack_update_track_label(mt, track, track == 0);
+
+	if(mt->master_track == track)
+		multitrack_select_first_open_track(mt);
+
+	multitrack_mark_current_track(mt);
 }
 
 void		multitrack_close_track( void *data )
 {
 	multitracker_t *mt = (multitracker_t*) data;
 
-	if( mt->selected > 0 && mt->selected < MAX_TRACKS )
+	if(!mt || mt->selected < 0 || mt->selected >= MAX_TRACKS)
+		return;
+
+	if(mt->selected == mt->master_track)
 	{
-		gvr_track_disconnect( mt->preview, mt->selected );
-        multitrack_cleanup_track(data, mt->selected );
+		status_print(mt,
+			"Track %d is the current Reloaded connection. Double-click another track before removing it.",
+			mt->selected);
+		return;
 	}
+
+	gvr_track_disconnect( mt->preview, mt->selected );
+    multitrack_cleanup_track(data, mt->selected );
 }
 
 void        multitrack_close_tracks(void *data)
@@ -1229,13 +1507,18 @@ void        multitrack_close_tracks(void *data)
     }
     mt->master_track = 0;
     mt->selected = 0;
+	multitrack_mark_current_track(mt);
 }
 
 void		multitrack_disconnect(void *data)
 {
 	multitracker_t *mt = (multitracker_t*) data;
-	//release connection to veejay
-	gvr_track_disconnect( mt->preview, 0 );
+
+	if(!mt)
+		return;
+
+	gvr_track_disconnect( mt->preview, mt->master_track );
+	multitrack_cleanup_track( data, mt->master_track );
 }
 
 static void multitrack_update_track_tooltip(multitracker_t *mt, int track, int current)
@@ -1297,9 +1580,85 @@ static void multitrack_update_track_label(multitracker_t *mt, int track, int cur
 		snprintf(track_title, sizeof(track_title), "Track %d", mt->view[track]->num);
 
 	gtk_frame_set_label(GTK_FRAME(mt->view[track]->frame), track_title);
-	multitrack_update_track_tooltip(mt, track, current);
+
+	remove_class(GTK_WIDGET(mt->view[track]->event_box), "track-current");
+
+	if(current && port > 0)
+		add_class(GTK_WIDGET(mt->view[track]->frame), "track-current");
+	else
+		remove_class(GTK_WIDGET(mt->view[track]->frame), "track-current");
+
+	multitrack_update_track_tooltip(mt, track, current && port > 0);
+
+	gtk_widget_queue_draw(GTK_WIDGET(mt->view[track]->event_box));
+	gtk_widget_queue_draw(GTK_WIDGET(mt->view[track]->frame));
 }
 
+static void multitrack_set_current_track(multitracker_t *mt, int track)
+{
+	int old_track;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS)
+		return;
+	if(!gvr_track_test(mt->preview, track))
+		return;
+
+	old_track = mt->master_track;
+	mt->master_track = track;
+	mt->selected = track;
+	gvr_set_master(mt->preview, track);
+
+	if(old_track != track && old_track >= 0 && old_track < MAX_TRACKS && gvr_track_test(mt->preview, old_track))
+		sequence_preview_size(mt, old_track);
+	sequence_preview_size(mt, track);
+}
+
+static void multitrack_select_first_open_track(multitracker_t *mt)
+{
+	int i;
+
+	if(!mt)
+		return;
+
+	for(i = 0; i < MAX_TRACKS; i++)
+	{
+		if(gvr_track_test(mt->preview, i))
+		{
+			multitrack_set_current_track(mt, i);
+			return;
+		}
+	}
+
+	mt->master_track = 0;
+	mt->selected = 0;
+}
+
+static void multitrack_refresh_track_state(multitracker_t *mt, int track)
+{
+	int connected;
+	int current;
+
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
+
+	connected = gvr_track_test(mt->preview, track);
+	current = (connected && track == mt->master_track);
+
+	multitrack_update_track_label(mt, track, current);
+
+	if(connected)
+	{
+		multitrack_set_preview_toggle_state(mt, track, gvr_get_preview_status(mt->preview, track));
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE);
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), current ? FALSE : TRUE);
+	}
+	else
+	{
+		multitrack_set_preview_toggle_state(mt, track, 0);
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), FALSE);
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), FALSE);
+	}
+}
 
 static void multitrack_mark_current_track(multitracker_t *mt)
 {
@@ -1308,63 +1667,20 @@ static void multitrack_mark_current_track(multitracker_t *mt)
 	if(!mt)
 		return;
 
-	gvr_set_master(mt->preview, 0);
-	mt->master_track = 0;
-	mt->selected = 0;
+	if(!gvr_track_test(mt->preview, mt->master_track))
+		multitrack_select_first_open_track(mt);
+	else
+		gvr_set_master(mt->preview, mt->master_track);
 
 	for(i = 0; i < MAX_TRACKS; i++)
-	{
-		if(!mt->view[i])
-			continue;
-		multitrack_update_track_label(mt, i, i == 0);
-		if(gvr_track_test(mt->preview, i))
-		{
-			multitrack_set_preview_toggle_state(mt, i, gvr_get_preview_status(mt->preview, i));
-			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[i]->panel), TRUE);
-			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[i]->toggle), (i == 0 ? FALSE : TRUE));
-		}
-	}
-}
-
-static int multitrack_promote_track_to_current(multitracker_t *mt, int track)
-{
-	int tmp_status;
-
-	if(!mt || track < 0 || track >= MAX_TRACKS)
-		return 0;
-	if(!gvr_track_test(mt->preview, track))
-		return 0;
-
-	if(track != 0)
-	{
-		if(!gvr_track_swap(mt->preview, 0, track))
-			return 0;
-
-		tmp_status = mt->track_status[0];
-		mt->track_status[0] = mt->track_status[track];
-		mt->track_status[track] = tmp_status;
-
-		gvr_track_configure(mt->preview, 0, mt->pw, mt->ph);
-		gvr_track_configure(mt->preview, track, mt->pw, mt->ph);
-		gvr_track_toggle_preview(mt->preview, 0, gveejay_user_preview());
-		multitrack_set_preview_toggle_state(mt, 0, gvr_get_preview_status(mt->preview, 0));
-		multitrack_set_preview_toggle_state(mt, track, gvr_get_preview_status(mt->preview, track));
-
-		if(mt->view[0] && mt->view[track])
-		{
-			gtk_image_clear(GTK_IMAGE(mt->view[0]->area));
-			gtk_image_clear(GTK_IMAGE(mt->view[track]->area));
-		}
-	}
-
-	multitrack_mark_current_track(mt);
-	return 1;
+		multitrack_refresh_track_state(mt, i);
 }
 
 void    multitrack_set_master_track(void *data, int track)
 {
 	multitracker_t *mt = (multitracker_t*) data;
-	multitrack_promote_track_to_current(mt, track);
+	multitrack_set_current_track(mt, track);
+	multitrack_mark_current_track(mt);
 }
 
 int		multrack_audoadd( void *data, char *hostname, int port_num )
@@ -1388,21 +1704,14 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		}
 	}
 
-	gvr_track_configure(mt->preview, track, mt->pw,mt->ph);
-
-    mt->view[track]->status_lock = 1;
-
+	sequence_preview_size(mt, track);
     gvr_track_toggle_preview( mt->preview, track, gveejay_user_preview() );
-    int preview = gvr_get_preview_status( mt->preview, track );
-	multitrack_set_preview_toggle_state(mt, track, preview);
 
-    gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
-    gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), (track == 0 ? FALSE : TRUE) );
+	if(!gvr_track_test(mt->preview, mt->master_track))
+		multitrack_set_current_track(mt, track);
+
     mt->track_status[track] = 1;
-    mt->view[track]->status_lock = 0;
-
-	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
-	multitrack_update_track_label(mt, track, track == 0);
+	multitrack_mark_current_track(mt);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s:%d on track %d", hostname, port_num, track);
 
@@ -1431,30 +1740,50 @@ void		multitrack_configure( void *data, float fps, int video_width, int video_he
 	*box_h = mt->height;
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Multitrack %d x %d, %2.2f, ratio %f", mt->width,mt->height,mt->fps,mt->aspect_ratio);
+
+	for(int i = 0; i < MAX_TRACKS; i++) {
+		if(mt->view && mt->view[i] && gtk_widget_get_allocated_width(mt->view[i]->event_box) > 1)
+			multitrack_apply_track_preview_size(mt, i, gtk_widget_get_allocated_width(mt->view[i]->event_box));
+	}
 }
 
 void		multitrack_set_quality( void *data , int quality )
 {
 	multitracker_t *mt = (multitracker_t*) data;
-	float ratio = 0.0f;
-	int w = 0;
-	int h = 0;
-    int i;
 
-	calculate_img_dimension(mt->width,mt->height,&w,&h,&ratio,vj_get_preview_box_w(),vj_get_preview_box_h(),quality);
+	if(!mt)
+		return;
 
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Preview image dimensions changed to %d x %d",w,h);
+	if(quality < 0)
+		quality = 0;
+	else if(quality > 3)
+		quality = 3;
 
-    for( i = 0; i < MAX_TRACKS; i ++ ) {
-	    if(!gvr_track_configure( mt->preview, i,w,h ) )
-	    {
-		    veejay_msg(0, "Unable to configure preview %dx%d",w , h );
-	    }
-    }
+	mt->quality = quality;
 
-	mt->pw = w;
-	mt->ph = h;
+	for(int i = 0; i < MAX_TRACKS; i++)
+		sequence_preview_size(mt, i);
+}
+
+void		multitrack_resize( void *data, int w, int h )
+{
+	multitracker_t *mt = (multitracker_t*) data;
+	int fallback_track_width;
+
+	if(!mt || w <= 0 || h <= 0)
+		return;
+
+	fallback_track_width = w / MAX_TRACKS;
+
+	for(int i = 0; i < MAX_TRACKS; i++) {
+		int track_width = 0;
+		if(mt->view && mt->view[i])
+			track_width = gtk_widget_get_allocated_width(mt->view[i]->event_box);
+		if(track_width <= 1)
+			track_width = fallback_track_width;
+		if(track_width > 1)
+			multitrack_apply_track_preview_size(mt, i, track_width);
+	}
 }
 
 void		multitrack_set_logo(void *data , GtkWidget *img)
@@ -1519,19 +1848,100 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 		gvr_queue_cxvims( mt->preview, id, VIMS_STREAM_NEW_UNICAST, port, (unsigned char*)host );
 }
 
+static void multitrack_fit_pixbuf_to_box(GdkPixbuf *img, int box_w, int box_h, int *dst_w, int *dst_h)
+{
+	int src_w = gdk_pixbuf_get_width(img);
+	int src_h = gdk_pixbuf_get_height(img);
+	float ratio;
+	int w = box_w;
+	int h;
+
+	if(src_w <= 0 || src_h <= 0 || box_w <= 0 || box_h <= 0) {
+		*dst_w = 1;
+		*dst_h = 1;
+		return;
+	}
+
+	ratio = (float) src_w / (float) src_h;
+	h = (int) (((float) w / ratio) + 0.5f);
+
+	if(h > box_h) {
+		h = box_h;
+		w = (int) (((float) h * ratio) + 0.5f);
+	}
+
+	if(w < 1)
+		w = 1;
+	if(h < 1)
+		h = 1;
+
+	*dst_w = w;
+	*dst_h = h;
+}
+
+static gboolean multitrack_preview_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+{
+	sequence_view_t *v = (sequence_view_t*) user_data;
+	GtkAllocation a;
+	int w;
+	int h;
+	int x;
+	int y;
+	cairo_pattern_t *pattern;
+
+	gtk_widget_get_allocation(widget, &a);
+
+	cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+	cairo_rectangle(cr, 0, 0, a.width, a.height);
+	cairo_fill(cr);
+
+	if(!v || !v->preview_pixbuf || a.width <= 0 || a.height <= 0)
+		return TRUE;
+
+	multitrack_fit_pixbuf_to_box(v->preview_pixbuf, a.width, a.height, &w, &h);
+	x = (a.width - w) / 2;
+	y = (a.height - h) / 2;
+
+	cairo_save(cr);
+	cairo_translate(cr, x, y);
+	cairo_scale(cr,
+		((double) w) / ((double) gdk_pixbuf_get_width(v->preview_pixbuf)),
+		((double) h) / ((double) gdk_pixbuf_get_height(v->preview_pixbuf)));
+	gdk_cairo_set_source_pixbuf(cr, v->preview_pixbuf, 0, 0);
+	pattern = cairo_get_source(cr);
+	if(pattern)
+		cairo_pattern_set_filter(pattern, CAIRO_FILTER_BILINEAR);
+	cairo_rectangle(cr, 0, 0,
+		gdk_pixbuf_get_width(v->preview_pixbuf),
+		gdk_pixbuf_get_height(v->preview_pixbuf));
+	cairo_fill(cr);
+	cairo_restore(cr);
+
+	return TRUE;
+}
+
+static void multitrack_render_track_preview(multitracker_t *mt, int track)
+{
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track])
+		return;
+
+	gtk_widget_queue_draw(mt->view[track]->area);
+}
+
 void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 {
 	multitracker_t *mt = (multitracker_t*) data;
-	float ratio = 0.0f;
-	int w = 0;
-	int h = 0;
+	sequence_view_t *v;
 
-	calculate_img_dimension(mt->width,mt->height, &w, &h, &ratio, 160, 120,0);
+	if(!mt || track < 0 || track >= MAX_TRACKS || !mt->view[track] || !img)
+		return;
 
-	GdkPixbuf *scaled = vj_gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
-	gtk_image_set_from_pixbuf( GTK_IMAGE(mt->view[track]->area), scaled);
+	v = mt->view[track];
+	if(v->preview_pixbuf)
+		g_object_unref(v->preview_pixbuf);
+	v->preview_pixbuf = g_object_ref(img);
 
-	g_object_unref( scaled );
+	multitrack_render_track_preview(mt, track);
 }
 
 /*! \brief Multi track sequence view button_press_event callback.
@@ -1548,13 +1958,15 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
     sequence_view_t *v = (sequence_view_t*) user_data;
     multitracker_t *mt = v->backlink;
 
+    mt->selected = v->num;
+
     if(event->type == GDK_2BUTTON_PRESS)
     {
       if( !gvr_track_test( mt->preview , v->num ) )
         return FALSE;
 
-      if( v->num == 0 ) {
-        vj_msg(VEEJAY_MSG_INFO, "Track 0 already is the current Reloaded connection");
+      if( v->num == mt->master_track ) {
+        vj_msg(VEEJAY_MSG_INFO, "Track %d already is the current Reloaded connection", v->num);
         return FALSE;
       }
 
@@ -1568,19 +1980,26 @@ static gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
       if(!host)
         return FALSE;
 
-      vj_gui_disable();
+      int old_master = mt->master_track;
+      int already_connected = 0;
+      const char *connected_host = vj_gui_connected_host();
+      int connected_port = vj_gui_connected_port();
 
-      if(!multitrack_promote_track_to_current(mt, v->num))
+      if(connected_port == port && connected_host && strcmp(connected_host, host) == 0)
+        already_connected = 1;
+
+      multitrack_set_current_track(mt, v->num);
+      multitrack_refresh_track_state(mt, old_master);
+      multitrack_refresh_track_state(mt, v->num);
+
+      if(!already_connected)
       {
-        free(host);
+        vj_gui_disable();
+        vj_gui_cb( 1, host, port );
         vj_gui_enable();
-        return FALSE;
       }
 
-      vj_gui_cb( 1, host, port );
-      vj_gui_enable();
-
-      vj_msg(VEEJAY_MSG_INFO, "Switched current Reloaded connection to track 0 (%s:%d)", host, port );
+      vj_msg(VEEJAY_MSG_INFO, "Switched current Reloaded connection to track %d (%s:%d)", v->num, host, port );
       free(host);
     }
     return FALSE;

@@ -143,12 +143,39 @@ static gboolean gvr_rect_contains(const GdkRectangle *r, double x, double y)
 
 static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, int height)
 {
-    const int outer = 6;
-    const int gap = 8;
-    const int inner = 5;
-    const int header_h = 24;
-    const int bank_w = (width - (outer * 2) - gap) / 2;
-    const int bank_h = (height - (outer * 2) - gap) / 2;
+    const int compact = (width < 520 || height < 340);
+    const int outer = compact ? 3 : 6;
+    const int gap = compact ? 4 : 8;
+    const int inner = compact ? 2 : 4;
+    const int header_h = compact ? 14 : 18;
+
+    int bank_side_w = (width - (outer * 2) - gap) / 2;
+    int bank_side_h = (height - (outer * 2) - gap) / 2;
+    int bank_side = bank_side_w < bank_side_h ? bank_side_w : bank_side_h;
+
+    if(bank_side < 24)
+        bank_side = 24;
+
+    int grid_space_w = bank_side - (inner * 2);
+    int grid_space_h = bank_side - header_h - (inner * 2);
+    int cell = grid_space_w / GVR_SEQUENCE_COLUMNS;
+    int cell_h = grid_space_h / GVR_SEQUENCE_ROWS;
+
+    if(cell_h < cell)
+        cell = cell_h;
+    if(cell < 2)
+        cell = 2;
+
+    const int grid_side = cell * GVR_SEQUENCE_COLUMNS;
+    const int total_w = bank_side * 2 + gap;
+    const int total_h = bank_side * 2 + gap;
+    int start_x = (width - total_w) / 2;
+    int start_y = (height - total_h) / 2;
+
+    if(start_x < outer)
+        start_x = outer;
+    if(start_y < outer)
+        start_y = outer;
 
     for(int bank = 0; bank < GVR_SEQUENCE_BANKS; bank++) {
         const int col = bank & 1;
@@ -156,37 +183,28 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
         GdkRectangle *br = &view->bank_rect[bank];
         GdkRectangle *hr = &view->header_rect[bank];
 
-        br->x = outer + col * (bank_w + gap);
-        br->y = outer + row * (bank_h + gap);
-        br->width = bank_w;
-        br->height = bank_h;
+        br->x = start_x + col * (bank_side + gap);
+        br->y = start_y + row * (bank_side + gap);
+        br->width = bank_side;
+        br->height = bank_side;
 
         hr->x = br->x;
         hr->y = br->y;
         hr->width = br->width;
         hr->height = header_h;
 
-        const int grid_x = br->x + inner;
-        const int grid_y = br->y + header_h + inner;
-        const int grid_w = br->width - (inner * 2);
-        const int grid_h = br->height - header_h - (inner * 2);
-        const int cell_w = grid_w / GVR_SEQUENCE_COLUMNS;
-        const int cell_h = grid_h / GVR_SEQUENCE_ROWS;
+        const int grid_x = br->x + (br->width - grid_side) / 2;
+        const int grid_y = br->y + header_h + ((br->height - header_h - grid_side) / 2);
 
         for(int slot = 0; slot < GVR_SEQUENCE_SLOTS; slot++) {
             GdkRectangle *cr = &view->cell_rect[bank][slot];
             const int sx = slot % GVR_SEQUENCE_COLUMNS;
             const int sy = slot / GVR_SEQUENCE_COLUMNS;
 
-            if(cell_w <= 1 || cell_h <= 1) {
-                gvr_rect_clear(cr);
-                continue;
-            }
-
-            cr->x = grid_x + sx * cell_w;
-            cr->y = grid_y + sy * cell_h;
-            cr->width = cell_w - 1;
-            cr->height = cell_h - 1;
+            cr->x = grid_x + sx * cell;
+            cr->y = grid_y + sy * cell;
+            cr->width = cell - 1;
+            cr->height = cell - 1;
         }
     }
 }
@@ -319,13 +337,19 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
         cairo_rectangle(cr, hr->x + 1, hr->y + 1, hr->width - 2, hr->height - 1);
         cairo_fill(cr);
 
-        snprintf(title, sizeof(title), "Bank %d%s  %d slots  rev %u",
-                 bank + 1,
-                 active_bank ? (view->sequence_active ? "  ACTIVE" : "  SELECTED") : "",
-                 view->banks[bank].size,
-                 view->banks[bank].revision);
+        if(br->width < 230)
+            snprintf(title, sizeof(title), "B%d%s  %d",
+                     bank + 1,
+                     active_bank ? (view->sequence_active ? "*" : "") : "",
+                     view->banks[bank].size);
+        else
+            snprintf(title, sizeof(title), "Bank %d%s  %d slots  rev %u",
+                     bank + 1,
+                     active_bank ? (view->sequence_active ? "  ACTIVE" : "  SELECTED") : "",
+                     view->banks[bank].size,
+                     view->banks[bank].revision);
         gvr_set_rgba(cr, 0.850, 0.880, 0.920, 1.0);
-        gvr_draw_text(cr, title, hr->x + 8, hr->y + 16, 11.0);
+        gvr_draw_text(cr, title, hr->x + (br->width < 230 ? 4 : 8), hr->y + (br->width < 230 ? 13 : 16), br->width < 230 ? 9.0 : 11.0);
 
         for(int slot = 0; slot < GVR_SEQUENCE_SLOTS; slot++) {
             GdkRectangle *r = &view->cell_rect[bank][slot];
@@ -1582,7 +1606,7 @@ static void gvr_sequence_bank_view_init(GvrSequenceBankView *view)
                           GDK_POINTER_MOTION_MASK |
                           GDK_LEAVE_NOTIFY_MASK);
     gtk_widget_set_can_focus(GTK_WIDGET(view), TRUE);
-    gtk_widget_set_size_request(GTK_WIDGET(view), 520, 340);
+    gtk_widget_set_size_request(GTK_WIDGET(view), 520, 236);
 
     view->active_bank = 0;
     view->selected_bank = -1;

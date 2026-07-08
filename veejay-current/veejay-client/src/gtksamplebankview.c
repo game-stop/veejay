@@ -370,10 +370,10 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
             cairo_rectangle(cr, r->x, r->y, r->width, r->height);
             cairo_fill(cr);
 
-            img_area.x = r->x + 5;
-            img_area.y = r->y + 5;
-            img_area.width = r->width - 10;
-            img_area.height = r->height - footer_h - 8;
+            img_area.x = r->x + 3;
+            img_area.y = r->y + 3;
+            img_area.width = r->width - 6;
+            img_area.height = r->height - footer_h - 6;
 
             gvr_set_rgba(cr, 0.020, 0.024, 0.030, 1.0);
             cairo_rectangle(cr, img_area.x, img_area.y, img_area.width, img_area.height);

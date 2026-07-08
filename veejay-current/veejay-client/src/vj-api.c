@@ -2401,6 +2401,469 @@ static void timeline_hide_external_value_labels(void)
         timeline_hide_label_if_present(ids[i]);
 }
 
+
+static void fx_remove_from_parent(GtkWidget *w)
+{
+    GtkWidget *parent;
+
+    if(!w)
+        return;
+
+    parent = gtk_widget_get_parent(w);
+    if(parent && GTK_IS_CONTAINER(parent))
+        gtk_container_remove(GTK_CONTAINER(parent), w);
+}
+
+static void fx_box_clear(GtkWidget *box)
+{
+    GList *children;
+    GList *iter;
+
+    if(!box || !GTK_IS_CONTAINER(box))
+        return;
+
+    children = gtk_container_get_children(GTK_CONTAINER(box));
+    for(iter = children; iter; iter = iter->next)
+        gtk_container_remove(GTK_CONTAINER(box), GTK_WIDGET(iter->data));
+    g_list_free(children);
+}
+
+
+static void nav_widget_zero_margins(GtkWidget *widget)
+{
+    if(!widget)
+        return;
+
+    gtk_widget_set_margin_left(widget, 0);
+    gtk_widget_set_margin_right(widget, 0);
+    gtk_widget_set_margin_top(widget, 0);
+    gtk_widget_set_margin_bottom(widget, 0);
+}
+
+static void nav_container_tighten(GtkWidget *widget, const char *klass)
+{
+    if(!widget)
+        return;
+
+    if(klass)
+        add_class(widget, klass);
+
+    nav_widget_zero_margins(widget);
+    gtk_widget_set_hexpand(widget, FALSE);
+    gtk_widget_set_vexpand(widget, FALSE);
+
+    if(GTK_IS_BOX(widget)) {
+        gtk_box_set_spacing(GTK_BOX(widget), 0);
+        gtk_box_set_homogeneous(GTK_BOX(widget), FALSE);
+    }
+
+    if(GTK_IS_CONTAINER(widget))
+        gtk_container_set_border_width(GTK_CONTAINER(widget), 0);
+}
+
+static void init_video_navigation_button_recursive(GtkWidget *widget)
+{
+    if(!widget)
+        return;
+
+    nav_widget_zero_margins(widget);
+
+    if(GTK_IS_BUTTON(widget)) {
+        add_class(widget, "video-navigation-button");
+        gtk_widget_set_size_request(widget, 26, 24);
+        gtk_widget_set_hexpand(widget, FALSE);
+        gtk_widget_set_vexpand(widget, FALSE);
+    }
+
+    if(GTK_IS_BOX(widget)) {
+        gtk_box_set_spacing(GTK_BOX(widget), 0);
+        gtk_box_set_homogeneous(GTK_BOX(widget), FALSE);
+    }
+
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        for(GList *iter = children; iter; iter = iter->next)
+            init_video_navigation_button_recursive(GTK_WIDGET(iter->data));
+        g_list_free(children);
+    }
+}
+
+static void nav_reparent_widget(GtkWidget *child, GtkWidget *new_parent)
+{
+    GtkWidget *old_parent;
+
+    if(!child || !new_parent || !GTK_IS_CONTAINER(new_parent))
+        return;
+
+    old_parent = gtk_widget_get_parent(child);
+    if(old_parent == new_parent)
+        return;
+
+    g_object_ref(child);
+    if(old_parent && GTK_IS_CONTAINER(old_parent))
+        gtk_container_remove(GTK_CONTAINER(old_parent), child);
+    gtk_container_add(GTK_CONTAINER(new_parent), child);
+    g_object_unref(child);
+}
+
+static void nav_pack_box(GtkWidget *box, GtkWidget *child, gboolean expand, gboolean fill, guint padding)
+{
+    if(!box || !child || !GTK_IS_BOX(box))
+        return;
+
+    nav_reparent_widget(child, box);
+    gtk_box_set_child_packing(GTK_BOX(box), child, expand, fill, padding, GTK_PACK_START);
+}
+
+static void init_video_navigation_frame_layout(void)
+{
+    GtkWidget *row = glade_xml_get_widget_(info->main_window, "hbox_vidnav");
+    GtkWidget *frame = glade_xml_get_widget_(info->main_window, "frame303");
+    GtkWidget *alignment514 = glade_xml_get_widget_(info->main_window, "alignment514");
+    GtkWidget *alignment515 = glade_xml_get_widget_(info->main_window, "alignment515");
+    GtkWidget *hbox638 = glade_xml_get_widget_(info->main_window, "hbox638");
+    GtkWidget *hbox899 = glade_xml_get_widget_(info->main_window, "hbox899");
+    GtkWidget *hbox900 = glade_xml_get_widget_(info->main_window, "hbox900");
+    GtkWidget *group = widget_cache[WIDGET_VIDEO_NAVIGATION_BUTTONS];
+
+    if(row) {
+        gtk_widget_set_name(row, "hbox_vidnav");
+        add_class(row, "video-navigation-row");
+        nav_container_tighten(row, NULL);
+        if(GTK_IS_BOX(row))
+            gtk_box_set_spacing(GTK_BOX(row), 10);
+    }
+
+    if(frame) {
+        gtk_widget_set_name(frame, "frame303");
+        add_class(frame, "video-navigation-frame");
+        nav_container_tighten(frame, NULL);
+        if(GTK_IS_FRAME(frame))
+            gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_NONE);
+    }
+
+    if(alignment514) {
+        gtk_widget_set_name(alignment514, "alignment514");
+        nav_container_tighten(alignment514, "video-navigation-frame-alignment");
+    }
+
+    if(alignment515) {
+        gtk_widget_set_name(alignment515, "alignment515");
+        nav_container_tighten(alignment515, "video-navigation-frame-alignment");
+    }
+
+    if(group) {
+        gtk_widget_set_name(group, "video_navigation_buttons");
+        add_class(group, "video-navigation-attached-group");
+        nav_container_tighten(group, NULL);
+    }
+
+    if(frame && alignment515) {
+        GtkWidget *frame_row = glade_xml_get_widget_(info->main_window, "frame303_content");
+
+        if(!frame_row) {
+            frame_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+            gtk_widget_set_name(frame_row, "frame303_content");
+            add_class(frame_row, "video-navigation-frame-content");
+            gtk_widget_show(frame_row);
+        }
+
+        nav_container_tighten(frame_row, "video-navigation-frame-content");
+        nav_pack_box(frame_row, alignment514 ? alignment514 : group, FALSE, FALSE, 0);
+        nav_pack_box(frame_row, alignment515, FALSE, FALSE, 0);
+
+        if(gtk_widget_get_parent(frame_row) != frame)
+            nav_reparent_widget(frame_row, frame);
+        gtk_widget_show_all(frame_row);
+    }
+
+    if(hbox638) {
+        gtk_widget_set_name(hbox638, "hbox638");
+        add_class(hbox638, "video-navigation-secondary-area");
+        nav_container_tighten(hbox638, NULL);
+        gtk_widget_set_margin_left(hbox638, 10);
+    }
+
+    if(hbox899) {
+        gtk_widget_set_name(hbox899, "hbox899");
+        add_class(hbox899, "video-navigation-secondary-row");
+        nav_container_tighten(hbox899, NULL);
+    }
+
+    if(hbox900) {
+        gtk_widget_set_name(hbox900, "hbox900");
+        add_class(hbox900, "video-navigation-secondary-row");
+        nav_container_tighten(hbox900, NULL);
+    }
+}
+
+static void init_video_navigation_buttons(void)
+{
+    GtkWidget *row = glade_xml_get_widget_(info->main_window, "hbox_vidnav");
+    GtkWidget *group = widget_cache[WIDGET_VIDEO_NAVIGATION_BUTTONS];
+    GtkWidget *hbox638 = glade_xml_get_widget_(info->main_window, "hbox638");
+    GtkWidget *hbox899 = glade_xml_get_widget_(info->main_window, "hbox899");
+    GtkWidget *hbox900 = glade_xml_get_widget_(info->main_window, "hbox900");
+
+    init_video_navigation_frame_layout();
+
+    init_video_navigation_button_recursive(row);
+    init_video_navigation_button_recursive(group);
+    init_video_navigation_button_recursive(hbox638);
+    init_video_navigation_button_recursive(hbox899);
+    init_video_navigation_button_recursive(hbox900);
+
+    if(row && GTK_IS_BOX(row))
+        gtk_box_set_spacing(GTK_BOX(row), 10);
+    if(hbox638)
+        gtk_widget_set_margin_left(hbox638, 10);
+    if(hbox899 && GTK_IS_BOX(hbox899))
+        gtk_box_set_spacing(GTK_BOX(hbox899), 0);
+    if(hbox900 && GTK_IS_BOX(hbox900))
+        gtk_box_set_spacing(GTK_BOX(hbox900), 0);
+
+    init_video_navigation_button_recursive(widget_cache[WIDGET_BUTTON_083]);
+    init_video_navigation_button_recursive(widget_cache[WIDGET_BUTTON_084]);
+    for(int i = WIDGET_BUTTON_080; i <= WIDGET_BUTTON_088; i++)
+        init_video_navigation_button_recursive(widget_cache[i]);
+}
+
+
+static int fx_entry_split_target_position(int height)
+{
+    const int list_min = 76;
+    const int list_soft_min = 112;
+    const int list_soft_max = 340;
+    const int sliders_min = 180;
+    int list_h;
+
+    if(height <= sliders_min + list_min)
+        return sliders_min;
+
+    list_h = (height * 42) / 100;
+
+    if(list_h < list_soft_min)
+        list_h = list_soft_min;
+    if(list_h > list_soft_max)
+        list_h = list_soft_max;
+
+    if(height - list_h < sliders_min)
+        list_h = height - sliders_min;
+    if(list_h < list_min)
+        list_h = list_min;
+
+    return height - list_h;
+}
+
+static void fx_entry_split_size_allocate(GtkWidget *widget, GdkRectangle *allocation, gpointer data)
+{
+    (void)data;
+
+    if(!widget || !GTK_IS_PANED(widget) || !allocation || allocation->height <= 0)
+        return;
+
+    int target = fx_entry_split_target_position(allocation->height);
+    int current = gtk_paned_get_position(GTK_PANED(widget));
+
+    if(current < 1 || abs(current - target) > 6)
+        gtk_paned_set_position(GTK_PANED(widget), target);
+}
+
+static void init_fx_panel_split_layout(void)
+{
+    GtkWidget *vbox = glade_xml_get_widget_(info->main_window, "vbox601");
+    GtkWidget *fx_entry = glade_xml_get_widget_(info->main_window, "fx_entry_box");
+    GtkWidget *notebook = glade_xml_get_widget_(info->main_window, "notebook14");
+    GtkWidget *fx_list_box;
+    GtkWidget *split;
+
+    if(!vbox || !fx_entry || !notebook || !GTK_IS_BOX(vbox))
+        return;
+
+    if(gtk_widget_get_parent(fx_entry) != vbox)
+        return;
+
+    fx_list_box = gtk_widget_get_parent(notebook);
+    if(!fx_list_box || gtk_widget_get_parent(fx_list_box) != vbox)
+        return;
+
+    split = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    gtk_widget_set_name(split, "fx_entry_split");
+    add_class(split, "fx-entry-split");
+    gtk_widget_set_hexpand(split, TRUE);
+    gtk_widget_set_vexpand(split, TRUE);
+    gtk_widget_set_halign(split, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(split, GTK_ALIGN_FILL);
+
+    g_object_ref(fx_entry);
+    g_object_ref(fx_list_box);
+
+    gtk_container_remove(GTK_CONTAINER(vbox), fx_entry);
+    gtk_container_remove(GTK_CONTAINER(vbox), fx_list_box);
+
+    gtk_widget_set_hexpand(fx_entry, TRUE);
+    gtk_widget_set_vexpand(fx_entry, TRUE);
+    gtk_widget_set_halign(fx_entry, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(fx_entry, GTK_ALIGN_FILL);
+
+    gtk_widget_set_hexpand(fx_list_box, TRUE);
+    gtk_widget_set_vexpand(fx_list_box, TRUE);
+    gtk_widget_set_halign(fx_list_box, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(fx_list_box, GTK_ALIGN_FILL);
+
+    gtk_paned_pack1(GTK_PANED(split), fx_entry, TRUE, FALSE);
+    gtk_paned_pack2(GTK_PANED(split), fx_list_box, TRUE, FALSE);
+
+    gtk_box_pack_start(GTK_BOX(vbox), split, TRUE, TRUE, 0);
+    gtk_box_reorder_child(GTK_BOX(vbox), split, 1);
+
+    g_object_unref(fx_entry);
+    g_object_unref(fx_list_box);
+
+    g_signal_connect(split, "size-allocate", G_CALLBACK(fx_entry_split_size_allocate), NULL);
+    gtk_widget_show(split);
+}
+
+static void init_fx_param_step_buttons(void)
+{
+    char name[48];
+    const int frame_w = 40;
+    const int step_size = 20;
+    const int step_pair_w = step_size * 2;
+    const int slider_w = 24;
+
+    for(int i = 0; i < MAX_UI_PARAMETERS; i++) {
+        GtkWidget *frame = widget_cache[WIDGET_FRAME_P0 + i];
+        GtkWidget *box = widget_cache[WIDGET_SLIDER_BOX_P0 + i];
+        GtkWidget *slider = widget_cache[WIDGET_SLIDER_P0 + i];
+        GtkWidget *inc = widget_cache[WIDGET_INC_P0 + i];
+        GtkWidget *dec = widget_cache[WIDGET_DEC_P0 + i];
+        GtkWidget *step_box = NULL;
+
+        if(!frame || !box || !slider || !inc || !dec || !GTK_IS_BOX(box))
+            continue;
+
+        snprintf(name, sizeof(name), "frame_p%d", i);
+        gtk_widget_set_name(frame, name);
+        add_class(frame, "fx-param-frame");
+        gtk_widget_set_size_request(frame, frame_w, -1);
+        if(GTK_IS_CONTAINER(frame))
+            gtk_container_set_border_width(GTK_CONTAINER(frame), 0);
+        gtk_widget_set_margin_left(frame, 0);
+        gtk_widget_set_margin_right(frame, 0);
+        gtk_widget_set_margin_top(frame, 0);
+        gtk_widget_set_margin_bottom(frame, 0);
+        gtk_widget_set_hexpand(frame, FALSE);
+        gtk_widget_set_vexpand(frame, TRUE);
+        gtk_widget_set_halign(frame, GTK_ALIGN_START);
+        gtk_widget_set_valign(frame, GTK_ALIGN_FILL);
+
+        snprintf(name, sizeof(name), "slider_box_p%d", i);
+        gtk_widget_set_name(box, name);
+        add_class(box, "fx-param-slider-box");
+        gtk_widget_set_size_request(box, frame_w, -1);
+        if(GTK_IS_CONTAINER(box))
+            gtk_container_set_border_width(GTK_CONTAINER(box), 0);
+        gtk_widget_set_margin_left(box, 0);
+        gtk_widget_set_margin_right(box, 0);
+        gtk_widget_set_margin_top(box, 0);
+        gtk_widget_set_margin_bottom(box, 0);
+        gtk_widget_set_hexpand(box, FALSE);
+        gtk_widget_set_vexpand(box, TRUE);
+        gtk_widget_set_halign(box, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(box, GTK_ALIGN_FILL);
+        gtk_box_set_spacing(GTK_BOX(box), 0);
+        gtk_box_set_homogeneous(GTK_BOX(box), FALSE);
+
+        snprintf(name, sizeof(name), "slider_p%d", i);
+        gtk_widget_set_name(slider, name);
+        add_class(slider, "fx-param-slider");
+        gtk_widget_set_size_request(slider, slider_w, -1);
+        gtk_widget_set_margin_left(slider, 0);
+        gtk_widget_set_margin_right(slider, 0);
+        gtk_widget_set_margin_top(slider, 0);
+        gtk_widget_set_margin_bottom(slider, 8);
+        gtk_widget_set_hexpand(slider, FALSE);
+        gtk_widget_set_vexpand(slider, TRUE);
+        gtk_widget_set_halign(slider, GTK_ALIGN_CENTER);
+        gtk_widget_set_valign(slider, GTK_ALIGN_FILL);
+        if(GTK_IS_SCALE(slider)) {
+            gtk_scale_set_draw_value(GTK_SCALE(slider), FALSE);
+            gtk_scale_set_value_pos(GTK_SCALE(slider), GTK_POS_TOP);
+        }
+
+        snprintf(name, sizeof(name), "inc_p%d", i);
+        gtk_widget_set_name(inc, name);
+        add_class(inc, "fx-param-step");
+        add_class(inc, "fx-param-inc");
+        gtk_widget_set_size_request(inc, step_size, step_size);
+        if(GTK_IS_CONTAINER(inc))
+            gtk_container_set_border_width(GTK_CONTAINER(inc), 0);
+        gtk_widget_set_margin_left(inc, 0);
+        gtk_widget_set_margin_right(inc, 0);
+        gtk_widget_set_margin_top(inc, 0);
+        gtk_widget_set_margin_bottom(inc, 0);
+        gtk_widget_set_hexpand(inc, FALSE);
+        gtk_widget_set_vexpand(inc, FALSE);
+        gtk_widget_set_halign(inc, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(inc, GTK_ALIGN_FILL);
+
+        snprintf(name, sizeof(name), "dec_p%d", i);
+        gtk_widget_set_name(dec, name);
+        add_class(dec, "fx-param-step");
+        add_class(dec, "fx-param-dec");
+        gtk_widget_set_size_request(dec, step_size, step_size);
+        if(GTK_IS_CONTAINER(dec))
+            gtk_container_set_border_width(GTK_CONTAINER(dec), 0);
+        gtk_widget_set_margin_left(dec, 0);
+        gtk_widget_set_margin_right(dec, 0);
+        gtk_widget_set_margin_top(dec, 0);
+        gtk_widget_set_margin_bottom(dec, 0);
+        gtk_widget_set_hexpand(dec, FALSE);
+        gtk_widget_set_vexpand(dec, FALSE);
+        gtk_widget_set_halign(dec, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(dec, GTK_ALIGN_FILL);
+
+        g_object_ref(slider);
+        g_object_ref(dec);
+        g_object_ref(inc);
+        fx_remove_from_parent(slider);
+        fx_remove_from_parent(dec);
+        fx_remove_from_parent(inc);
+        fx_box_clear(box);
+
+        step_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+        snprintf(name, sizeof(name), "fx_param_step_box_p%d", i);
+        gtk_widget_set_name(step_box, name);
+        add_class(step_box, "fx-param-step-box");
+        gtk_widget_set_size_request(step_box, step_pair_w, step_size);
+        gtk_widget_set_margin_left(step_box, 0);
+        gtk_widget_set_margin_right(step_box, 0);
+        gtk_widget_set_margin_top(step_box, 0);
+        gtk_widget_set_margin_bottom(step_box, 0);
+        gtk_widget_set_hexpand(step_box, FALSE);
+        gtk_widget_set_vexpand(step_box, FALSE);
+        gtk_widget_set_halign(step_box, GTK_ALIGN_CENTER);
+        gtk_widget_set_valign(step_box, GTK_ALIGN_END);
+        gtk_box_set_spacing(GTK_BOX(step_box), 0);
+        gtk_box_set_homogeneous(GTK_BOX(step_box), FALSE);
+
+        gtk_box_pack_start(GTK_BOX(step_box), dec, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(step_box), inc, FALSE, FALSE, 0);
+        gtk_box_pack_start(GTK_BOX(box), slider, TRUE, TRUE, 0);
+        gtk_box_pack_end(GTK_BOX(box), step_box, FALSE, FALSE, 0);
+
+        g_object_unref(slider);
+        g_object_unref(dec);
+        g_object_unref(inc);
+
+        gtk_widget_show(step_box);
+        gtk_widget_show(slider);
+        gtk_widget_show(dec);
+        gtk_widget_show(inc);
+    }
+}
+
 static void init_widget_cache(void)
 {
 
@@ -2414,6 +2877,9 @@ static void init_widget_cache(void)
     }
 
     timeline_hide_external_value_labels();
+    init_fx_param_step_buttons();
+    init_fx_panel_split_layout();
+    init_video_navigation_buttons();
 }
 
 static void timeline_update_compact_overlay(void)
@@ -2681,6 +3147,77 @@ static void add_class_by_name(const char *widget_name, const char *name) {
   add_class(widget, name);
 }
 
+static void ui_size_probe_widget(const char *name, GtkWidget *widget)
+{
+    if(!widget || !GTK_IS_WIDGET(widget))
+        return;
+
+    GtkRequisition min_req;
+    GtkRequisition nat_req;
+    GtkAllocation alloc;
+    gint req_w = -1;
+    gint req_h = -1;
+
+    gtk_widget_get_preferred_size(widget, &min_req, &nat_req);
+    gtk_widget_get_allocation(widget, &alloc);
+    gtk_widget_get_size_request(widget, &req_w, &req_h);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "UI size probe %-22s request=%dx%d min=%dx%d natural=%dx%d alloc=%dx%d visible=%d mapped=%d",
+               name,
+               req_w,
+               req_h,
+               min_req.width,
+               min_req.height,
+               nat_req.width,
+               nat_req.height,
+               alloc.width,
+               alloc.height,
+               gtk_widget_get_visible(widget) ? 1 : 0,
+               gtk_widget_get_mapped(widget) ? 1 : 0);
+}
+
+static void ui_size_probe_named(const char *name)
+{
+    if(!info || !info->main_window || !name)
+        return;
+
+    ui_size_probe_widget(name, glade_xml_get_widget_(info->main_window, name));
+}
+
+static void ui_size_probe(const char *stage)
+{
+    static const char *names[] = {
+        "gveejay_window",
+        "panels",
+        "notebook18",
+        "fxpanel",
+        "effectspanel",
+        "scrolledwindow23",
+        "scrolledwindow43",
+        "scrolledwindow40",
+        "samplegrid_frame",
+        "mt_box",
+        "sample_panel",
+        "hbox27",
+        "imageA",
+        "markerframe",
+        "vbox633",
+        "hbox910",
+        "sample_bank_hbox",
+        NULL
+    };
+
+    veejay_msg(VEEJAY_MSG_INFO, "UI size probe: %s", stage ? stage : "unknown");
+
+    for(int i = 0; names[i]; i++)
+        ui_size_probe_named(names[i]);
+
+    ui_size_probe_widget("sample_bank_view", info ? info->sample_bank_view : NULL);
+    ui_size_probe_widget("sample_sequencer", info ? info->sample_sequencer : NULL);
+    ui_size_probe_widget("sequence_bank_view", info ? info->sequence_bank_view : NULL);
+}
+
 void gtk_notebook_set_current_page__( GtkWidget *w, gint num, const char *f, int line )
 {
     gtk_notebook_set_current_page( GTK_NOTEBOOK(w), num );
@@ -2774,6 +3311,15 @@ static struct
 
 static int preview_box_w_ = MAX_PREVIEW_WIDTH;
 static int preview_box_h_ = MAX_PREVIEW_HEIGHT;
+static int preview_display_w_ = MAX_PREVIEW_WIDTH;
+static int preview_display_h_ = MAX_PREVIEW_HEIGHT;
+static int preview_base_w_ = MAX_PREVIEW_WIDTH;
+static int preview_base_h_ = MAX_PREVIEW_HEIGHT;
+static int preview_pending_w_ = 0;
+static int preview_pending_h_ = 0;
+static guint preview_resize_timeout_id_ = 0;
+static int preview_has_live_frame_ = 0;
+static GdkPixbuf *preview_live_pixbuf_ = NULL;
 
 static void *bankport_ = NULL;
 
@@ -2785,6 +3331,484 @@ int vj_get_preview_box_w(void)
 int vj_get_preview_box_h(void)
 {
     return preview_box_h_;
+}
+
+static inline int preview_even(int v)
+{
+    if(v < 16)
+        v = 16;
+    return v & ~1;
+}
+
+static void preview_fit_aspect(int src_w, int src_h, int max_w, int max_h, int *dst_w, int *dst_h)
+{
+    double src_ratio;
+    double box_ratio;
+    int w;
+    int h;
+
+    if(src_w <= 0 || src_h <= 0 || max_w <= 0 || max_h <= 0) {
+        *dst_w = preview_base_w_;
+        *dst_h = preview_base_h_;
+        return;
+    }
+
+    src_ratio = (double) src_w / (double) src_h;
+    box_ratio = (double) max_w / (double) max_h;
+
+    if(box_ratio > src_ratio) {
+        h = max_h;
+        w = (int)(((double) h * src_ratio) + 0.5);
+    }
+    else {
+        w = max_w;
+        h = (int)(((double) w / src_ratio) + 0.5);
+    }
+
+    if(w < 1)
+        w = 1;
+    if(h < 1)
+        h = 1;
+    if(w > max_w)
+        w = max_w;
+    if(h > max_h)
+        h = max_h;
+
+    *dst_w = w;
+    *dst_h = h;
+}
+
+static void preview_clear_live_pixbuf(void)
+{
+    if(preview_live_pixbuf_) {
+        g_object_unref(preview_live_pixbuf_);
+        preview_live_pixbuf_ = NULL;
+    }
+    preview_has_live_frame_ = 0;
+}
+
+static void preview_set_live_pixbuf(GdkPixbuf *pixbuf)
+{
+    if(preview_live_pixbuf_) {
+        g_object_unref(preview_live_pixbuf_);
+        preview_live_pixbuf_ = NULL;
+    }
+
+    if(pixbuf)
+        preview_live_pixbuf_ = g_object_ref(pixbuf);
+
+    preview_has_live_frame_ = preview_live_pixbuf_ ? 1 : 0;
+}
+
+static gboolean preview_image_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
+{
+    int aw;
+    int ah;
+    int sw;
+    int sh;
+    int dw;
+    int dh;
+    int x;
+    int y;
+    cairo_pattern_t *pattern;
+
+    (void)data;
+
+    if(!user_preview || !preview_has_live_frame_ || !preview_live_pixbuf_)
+        return FALSE;
+
+    aw = gtk_widget_get_allocated_width(widget);
+    ah = gtk_widget_get_allocated_height(widget);
+    sw = gdk_pixbuf_get_width(preview_live_pixbuf_);
+    sh = gdk_pixbuf_get_height(preview_live_pixbuf_);
+
+    if(aw <= 0 || ah <= 0 || sw <= 0 || sh <= 0)
+        return FALSE;
+
+    preview_fit_aspect(sw, sh, aw, ah, &dw, &dh);
+    if(dw > aw)
+        dw = aw;
+    if(dh > ah)
+        dh = ah;
+
+    x = (aw - dw) / 2;
+    y = (ah - dh) / 2;
+
+    cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
+    cairo_paint(cr);
+
+    cairo_save(cr);
+    cairo_rectangle(cr, x, y, dw, dh);
+    cairo_clip(cr);
+    cairo_translate(cr, x, y);
+    cairo_scale(cr, (double)dw / (double)sw, (double)dh / (double)sh);
+    gdk_cairo_set_source_pixbuf(cr, preview_live_pixbuf_, 0.0, 0.0);
+    pattern = cairo_get_source(cr);
+    if(pattern)
+        cairo_pattern_set_filter(pattern, CAIRO_FILTER_BILINEAR);
+    cairo_rectangle(cr, 0.0, 0.0, sw, sh);
+    cairo_fill(cr);
+    cairo_restore(cr);
+
+    return TRUE;
+}
+
+static void preview_promote_main_area(void)
+{
+    static const char *fill_widgets[] = {
+        "vbox606",
+        "vbox617",
+        "vbox631",
+        "vbox632",
+        "frame327",
+        "alignment542",
+        NULL
+    };
+    GtkWidget *panel;
+    GtkWidget *parent;
+    GtkWidget *alignment;
+    int i;
+
+    if(!info || !info->main_window)
+        return;
+
+    for(i = 0; fill_widgets[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, fill_widgets[i]);
+        if(!w)
+            continue;
+
+        gtk_widget_set_hexpand(w, TRUE);
+        gtk_widget_set_vexpand(w, TRUE);
+        gtk_widget_set_halign(w, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(w, GTK_ALIGN_FILL);
+
+        parent = gtk_widget_get_parent(w);
+        if(parent && GTK_IS_BOX(parent))
+            gtk_container_child_set(GTK_CONTAINER(parent), w, "expand", TRUE, "fill", TRUE, NULL);
+    }
+
+    alignment = glade_xml_get_widget_(info->main_window, "alignment542");
+    if(alignment && GTK_IS_ALIGNMENT(alignment))
+        gtk_alignment_set(GTK_ALIGNMENT(alignment), 0.5f, 0.5f, 1.0f, 1.0f);
+
+    panel = glade_xml_get_widget_(info->main_window, "hbox917");
+    parent = panel ? gtk_widget_get_parent(panel) : NULL;
+    if(parent && GTK_IS_BOX(parent))
+        gtk_container_child_set(GTK_CONTAINER(parent), panel, "expand", FALSE, "fill", TRUE, NULL);
+
+    panel = glade_xml_get_widget_(info->main_window, "hbox916");
+    parent = panel ? gtk_widget_get_parent(panel) : NULL;
+    if(parent && GTK_IS_BOX(parent))
+        gtk_container_child_set(GTK_CONTAINER(parent), panel, "expand", FALSE, "fill", TRUE, NULL);
+}
+
+static void preview_set_widget_minimum(void)
+{
+    GtkWidget *image = widget_cache[WIDGET_IMAGEA];
+    GtkWidget *frame = NULL;
+
+    preview_promote_main_area();
+
+    if(info && info->main_window)
+        frame = glade_xml_get_widget_(info->main_window, "frame327");
+
+    if(image) {
+        gtk_widget_set_size_request(image, preview_base_w_, preview_base_h_);
+        gtk_widget_set_hexpand(image, TRUE);
+        gtk_widget_set_vexpand(image, TRUE);
+        gtk_widget_set_halign(image, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(image, GTK_ALIGN_FILL);
+    }
+
+    if(frame) {
+        gtk_widget_set_size_request(frame, preview_base_w_, preview_base_h_);
+        gtk_widget_set_hexpand(frame, TRUE);
+        gtk_widget_set_vexpand(frame, TRUE);
+        gtk_widget_set_halign(frame, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(frame, GTK_ALIGN_FILL);
+    }
+}
+
+static void preview_rescale_current_image(int display_w, int display_h)
+{
+    GtkWidget *image = widget_cache[WIDGET_IMAGEA];
+
+    (void)display_w;
+    (void)display_h;
+
+    if(!preview_has_live_frame_ || !user_preview)
+        return;
+
+    if(image)
+        gtk_widget_queue_draw(image);
+}
+
+static void preview_apply_allocated_size(int alloc_w, int alloc_h, int force)
+{
+    int src_w;
+    int src_h;
+    int display_w;
+    int display_h;
+
+    if(!info || info->el.width <= 0 || info->el.height <= 0)
+        return;
+
+    src_w = info->el.width;
+    src_h = info->el.height;
+
+    if(alloc_w < preview_base_w_)
+        alloc_w = preview_base_w_;
+    if(alloc_h < preview_base_h_)
+        alloc_h = preview_base_h_;
+
+    preview_fit_aspect(src_w, src_h, alloc_w, alloc_h, &display_w, &display_h);
+
+    if(display_w < preview_base_w_ || display_h < preview_base_h_) {
+        display_w = preview_base_w_;
+        display_h = preview_base_h_;
+    }
+
+    if(!force &&
+       preview_display_w_ == display_w &&
+       preview_display_h_ == display_h)
+        return;
+
+    preview_display_w_ = display_w;
+    preview_display_h_ = display_h;
+
+    preview_rescale_current_image(display_w, display_h);
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "Preview display resized: display %dx%d, capture %dx%d, source %dx%d",
+               display_w, display_h, preview_box_w_, preview_box_h_, src_w, src_h);
+}
+
+static void preview_get_current_area_allocation(int *w, int *h)
+{
+    static const char *area_widgets[] = {
+        "vbox606",
+        "vbox617",
+        "vbox631",
+        "vbox632",
+        "frame327",
+        "alignment542",
+        NULL
+    };
+    int best_w = 0;
+    int best_h = 0;
+    int i;
+
+    if(!w || !h)
+        return;
+
+    if(info && info->main_window) {
+        for(i = 0; area_widgets[i] != NULL; i++) {
+            GtkWidget *area = glade_xml_get_widget_(info->main_window, area_widgets[i]);
+            int aw;
+            int ah;
+
+            if(!area)
+                continue;
+
+            aw = gtk_widget_get_allocated_width(area);
+            ah = gtk_widget_get_allocated_height(area);
+
+            if(aw > best_w)
+                best_w = aw;
+            if(ah > best_h)
+                best_h = ah;
+        }
+    }
+
+    *w = best_w;
+    *h = best_h;
+}
+
+static gboolean preview_resize_timeout_cb(gpointer data)
+{
+    int area_w = 0;
+    int area_h = 0;
+
+    (void)data;
+
+    preview_resize_timeout_id_ = 0;
+    preview_get_current_area_allocation(&area_w, &area_h);
+
+    if(area_w <= 1 || area_h <= 1) {
+        area_w = preview_pending_w_;
+        area_h = preview_pending_h_;
+    }
+
+    preview_apply_allocated_size(area_w, area_h, 0);
+
+    return FALSE;
+}
+
+static void preview_area_size_allocate(GtkWidget *widget, GtkAllocation *allocation, gpointer user_data)
+{
+    int area_w = 0;
+    int area_h = 0;
+
+    (void)user_data;
+
+    if(!allocation || allocation->width <= 0 || allocation->height <= 0)
+        return;
+
+    if(widget && widget == widget_cache[WIDGET_IMAGEA])
+        return;
+
+    preview_get_current_area_allocation(&area_w, &area_h);
+    preview_pending_w_ = area_w > allocation->width ? area_w : allocation->width;
+    preview_pending_h_ = area_h > allocation->height ? area_h : allocation->height;
+
+    if(preview_resize_timeout_id_ != 0) {
+        g_source_remove(preview_resize_timeout_id_);
+        preview_resize_timeout_id_ = 0;
+    }
+
+    preview_resize_timeout_id_ = g_timeout_add(160, preview_resize_timeout_cb, NULL);
+}
+
+static void preview_apply_current_allocation(int force)
+{
+    int area_w = 0;
+    int area_h = 0;
+
+    preview_get_current_area_allocation(&area_w, &area_h);
+
+    if(area_w > 1 && area_h > 1)
+        preview_apply_allocated_size(area_w, area_h, force);
+    else
+        preview_apply_allocated_size(preview_base_w_, preview_base_h_, force);
+}
+
+static void ui_compact_transport_panel(void)
+{
+    static const char *fixed_rows[] = {
+        "hbox917",
+        "veejay_frame",
+        "vbox633",
+        "hbox_vidnav",
+        "hbox910",
+        "timeline_legacy_status_grid",
+        NULL
+    };
+    static const char *compact_widgets[] = {
+        "markerframe",
+        "vbox633",
+        "hbox_vidnav",
+        "frame303",
+        "hbox638",
+        "hbox910",
+        "sample_loop_box",
+        "hbox914",
+        NULL
+    };
+    GtkWidget *frame;
+    GtkWidget *parent;
+    int i;
+
+    if(!info || !info->main_window)
+        return;
+
+    for(i = 0; fixed_rows[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, fixed_rows[i]);
+        if(!w)
+            continue;
+        gtk_widget_set_vexpand(w, FALSE);
+        gtk_widget_set_valign(w, GTK_ALIGN_START);
+        parent = gtk_widget_get_parent(w);
+        if(parent && GTK_IS_BOX(parent))
+            gtk_container_child_set(GTK_CONTAINER(parent), w, "expand", FALSE, "fill", TRUE, NULL);
+    }
+
+    for(i = 0; compact_widgets[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, compact_widgets[i]);
+        if(!w)
+            continue;
+        gtk_widget_set_vexpand(w, FALSE);
+        gtk_widget_set_valign(w, GTK_ALIGN_CENTER);
+    }
+
+    frame = glade_xml_get_widget_(info->main_window, "markerframe");
+    if(frame) {
+        gtk_widget_set_size_request(frame, -1, 96);
+        gtk_widget_set_vexpand(frame, FALSE);
+        parent = gtk_widget_get_parent(frame);
+        if(parent && GTK_IS_BOX(parent))
+            gtk_container_child_set(GTK_CONTAINER(parent), frame, "expand", FALSE, "fill", TRUE, NULL);
+    }
+
+    if(info->tl) {
+        gtk_widget_set_size_request(info->tl, -1, 92);
+        gtk_widget_set_vexpand(info->tl, FALSE);
+        gtk_widget_set_valign(info->tl, GTK_ALIGN_START);
+    }
+}
+
+static void ui_compact_fx_panel(void)
+{
+    static const char *scrolls[] = {
+        "scrolledwindow36",
+        "scrolledwindow23",
+        "scrolledwindow1",
+        "scrolledwindow43",
+        "scrolledwindow40",
+        NULL
+    };
+    static const char *fill_widgets[] = {
+        "fxpanel",
+        "vbox601",
+        "fx_entry_box",
+        "notebook14",
+        "effectspanel",
+        NULL
+    };
+    int i;
+
+    if(!info || !info->main_window)
+        return;
+
+    for(i = 0; fill_widgets[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, fill_widgets[i]);
+        GtkWidget *parent;
+
+        if(!w)
+            continue;
+
+        gtk_widget_set_vexpand(w, TRUE);
+        gtk_widget_set_valign(w, GTK_ALIGN_FILL);
+
+        parent = gtk_widget_get_parent(w);
+        if(parent && GTK_IS_BOX(parent))
+            gtk_container_child_set(GTK_CONTAINER(parent), w, "expand", TRUE, "fill", TRUE, NULL);
+    }
+
+    for(i = 0; scrolls[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, scrolls[i]);
+        GtkWidget *parent;
+
+        if(!w || !GTK_IS_SCROLLED_WINDOW(w))
+            continue;
+
+        gtk_widget_set_size_request(w, -1, 76);
+        gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(w), 76);
+#if GTK_CHECK_VERSION(3,22,0)
+        gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(w), FALSE);
+#endif
+        gtk_widget_set_vexpand(w, TRUE);
+        gtk_widget_set_valign(w, GTK_ALIGN_FILL);
+
+        parent = gtk_widget_get_parent(w);
+        if(parent && GTK_IS_BOX(parent))
+            gtk_container_child_set(GTK_CONTAINER(parent), w, "expand", TRUE, "fill", TRUE, NULL);
+    }
+
+    {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, "scrolledwindow40");
+        if(w && GTK_IS_SCROLLED_WINDOW(w))
+            gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(w), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    }
 }
 
 #ifdef STRICT_CHECKING
@@ -10076,17 +11100,11 @@ int veejay_update_multitrack( void *ptr )
                 assert( s->heights[i] > 0 );
                 assert( GDK_IS_PIXBUF( s->img_list[i] ) );
 #endif
-                if( gdk_pixbuf_get_height(s->img_list[i]) == preview_box_w_ &&
-                    gdk_pixbuf_get_width(s->img_list[i]) == preview_box_h_  )
-                    gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
-                else
-                {
-                    GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],preview_box_w_,preview_box_h_, GDK_INTERP_NEAREST );
-                    if(result)
-                    {
-                        gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
-                        g_object_unref(result);
-                    }
+                preview_set_live_pixbuf(s->img_list[i]);
+                if(maintrack) {
+                    gtk_widget_set_size_request(maintrack, preview_base_w_, preview_base_h_);
+                    preview_apply_current_allocation(0);
+                    gtk_widget_queue_draw(maintrack);
                 }
 
                 if( history[PLAY_MODE] == info->status_tokens[PLAY_MODE] &&
@@ -13866,6 +14884,8 @@ void vj_gui_set_title(char *remote, int port) {
 
 void vj_gui_free(void)
 {
+    preview_clear_live_pixbuf();
+
     if(info)
     {
         int i;
@@ -14342,6 +15362,155 @@ void vj_event_list_free(void)
 char reloaded_css_file[1024];
 int  use_css_file = 0;
 gboolean smallest_possible = FALSE;
+static gboolean high_dpi_screen_ = FALSE;
+static int ui_default_target_w_ = 1584;
+static int ui_default_target_h_ = 938;
+static int ui_profile_screen_w_ = 0;
+static int ui_profile_screen_h_ = 0;
+static int ui_profile_scale_ = 1;
+
+static void ui_update_screen_profile(gboolean log_result)
+{
+    int screen_w = 0;
+    int screen_h = 0;
+    int scale_factor = 1;
+    int monitor_w = 0;
+    int monitor_h = 0;
+    int work_w = 0;
+    int work_h = 0;
+    int monitor_scale = 1;
+    GdkScreen *screen = gdk_screen_get_default();
+
+    if(screen) {
+        screen_w = gdk_screen_get_width(screen);
+        screen_h = gdk_screen_get_height(screen);
+
+        GdkWindow *root_window = gdk_screen_get_root_window(screen);
+        if(root_window)
+            scale_factor = gdk_window_get_scale_factor(root_window);
+
+#if GTK_CHECK_VERSION(3,22,0)
+        GdkDisplay *display = gdk_screen_get_display(screen);
+        if(display) {
+            GdkMonitor *monitor = gdk_display_get_primary_monitor(display);
+            if(!monitor && gdk_display_get_n_monitors(display) > 0)
+                monitor = gdk_display_get_monitor(display, 0);
+            if(monitor) {
+                GdkRectangle geometry;
+                GdkRectangle workarea;
+                gdk_monitor_get_geometry(monitor, &geometry);
+                gdk_monitor_get_workarea(monitor, &workarea);
+                monitor_w = geometry.width;
+                monitor_h = geometry.height;
+                work_w = workarea.width;
+                work_h = workarea.height;
+                monitor_scale = gdk_monitor_get_scale_factor(monitor);
+            }
+        }
+#endif
+    }
+
+    if(scale_factor < 1)
+        scale_factor = 1;
+    if(monitor_scale < 1)
+        monitor_scale = 1;
+
+    ui_profile_screen_w_ = work_w > 0 ? work_w : (monitor_w > 0 ? monitor_w : screen_w);
+    ui_profile_screen_h_ = work_h > 0 ? work_h : (monitor_h > 0 ? monitor_h : screen_h);
+    ui_profile_scale_ = MAX(scale_factor, monitor_scale);
+
+    high_dpi_screen_ = (!smallest_possible &&
+                        (ui_profile_scale_ > 1 ||
+                         screen_w >= 1800 || screen_h >= 1000 ||
+                         monitor_w >= 1800 || monitor_h >= 1000 ||
+                         work_w >= 1800 || work_h >= 1000));
+
+    if(high_dpi_screen_) {
+        ui_default_target_w_ = 1864;
+        ui_default_target_h_ = 1080;
+        if(log_result)
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "High DPI screen detected (%dx%d work %dx%d scale %d)",
+                       screen_w, screen_h, ui_profile_screen_w_, ui_profile_screen_h_, ui_profile_scale_);
+    }
+    else if(smallest_possible) {
+        ui_default_target_w_ = 1502;
+        ui_default_target_h_ = 875;
+        if(log_result)
+            veejay_msg(VEEJAY_MSG_INFO, "Small screen compact layout selected");
+    }
+    else {
+        ui_default_target_w_ = 1584;
+        ui_default_target_h_ = 938;
+        if(log_result)
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "Normal screen target selected (%dx%d scale %d)",
+                       ui_profile_screen_w_, ui_profile_screen_h_, ui_profile_scale_);
+    }
+}
+
+static void ui_window_preferred_minimum(GtkWidget *mainw, int *w, int *h)
+{
+    GtkRequisition min_req;
+    GtkRequisition nat_req;
+
+    *w = ui_default_target_w_;
+    *h = ui_default_target_h_;
+
+    if(!mainw || !GTK_IS_WIDGET(mainw))
+        return;
+
+    gtk_widget_get_preferred_size(mainw, &min_req, &nat_req);
+
+    if(min_req.width > 0)
+        *w = min_req.width;
+    if(min_req.height > 0)
+        *h = min_req.height;
+}
+
+static void ui_window_set_startup_size(GtkWidget *mainw)
+{
+    int min_w = ui_default_target_w_;
+    int min_h = ui_default_target_h_;
+
+    if(!mainw || !GTK_IS_WINDOW(mainw))
+        return;
+
+    gtk_window_set_resizable(GTK_WINDOW(mainw), TRUE);
+    gtk_window_set_default_size(GTK_WINDOW(mainw),
+                                ui_default_target_w_,
+                                ui_default_target_h_);
+
+    ui_window_preferred_minimum(mainw, &min_w, &min_h);
+
+    gtk_window_resize(GTK_WINDOW(mainw), min_w, min_h);
+}
+
+static void ui_window_log_startup_size(GtkWidget *mainw, const char *stage)
+{
+    gint w = 0;
+    gint h = 0;
+    int min_w = ui_default_target_w_;
+    int min_h = ui_default_target_h_;
+
+    if(!mainw || !GTK_IS_WINDOW(mainw))
+        return;
+
+    ui_window_preferred_minimum(mainw, &min_w, &min_h);
+    gtk_window_get_size(GTK_WINDOW(mainw), &w, &h);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Final UI Window size: %dx%d (default target %dx%d%s, minimum %dx%d)",
+               w,
+               h,
+               ui_default_target_w_,
+               ui_default_target_h_,
+               high_dpi_screen_ ? " high-dpi" : (smallest_possible ? " small" : ""),
+               min_w,
+               min_h);
+    ui_size_probe(stage ? stage : "startup");
+}
+
 
 void vj_gui_set_stylesheet(const char *css_file, gboolean small_as_possible) {
     smallest_possible = small_as_possible;
@@ -14410,22 +15579,20 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
 
 #if (GTK_MINOR_VERSION >= 20)
 
-    int screen_w = gdk_screen_get_width(screen);
-    int screen_h = gdk_screen_get_height(screen);
+    ui_update_screen_profile(TRUE);
+
     int pad = 2;
     int margin = 1;
     const char *font_size = "100%";
 
-    if (!smallest_possible && (screen_w > 1920 || screen_h > 1080)) {
-        font_size = "120%";
-        pad=4;
-        margin=3;
-        veejay_msg(VEEJAY_MSG_INFO, "High DPI screen detected");
+    if (high_dpi_screen_) {
+        font_size = "100%";
+        pad = 1;
+        margin = 1;
     } else if (smallest_possible) {
         font_size = "98%";
-        pad=0;
-        margin=0;
-        veejay_msg(VEEJAY_MSG_INFO, "Small screen detected");
+        pad = 0;
+        margin = 0;
     }
 
     const gchar *runtime_css = NULL;
@@ -14434,13 +15601,28 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
         runtime_css = g_strdup_printf(
             "window { font-size:%s; }"
             "frame,box,scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: 0px 0px; margin: 0px; }"
-            ".fx-entry-compact spinbutton,.fx-entry-compact button,.fx-entry-compact checkbutton { padding: 0px; margin: 0px; min-height: 20px; }"
-            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 18px; }"
             ".vims-macro-compact spinbutton,.vims-macro-compact button,.vims-macro-compact radiobutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 20px; }"
             ".vims-macro-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 18px; }"
             ".veejay-actions-compact button,.veejay-actions-compact checkbutton { padding: 1px; margin: 1px; min-height: 22px; }"
             ".veejay-vims-compact entry,.veejay-vims-compact button { padding: 0px; margin: 0px; min-height: 20px; }"
-            ".veejay-side-toolbar button { padding: 1px; margin: 1px; min-height: 24px; min-width: 24px; }",
+            ".veejay-side-toolbar button { padding: 1px; margin: 1px; min-height: 24px; min-width: 24px; }"
+            ".fx-entry-split { padding:0px; margin:0px; }"
+            ".fx-entry-split > separator { min-height:3px; background-color:#323540; }"
+            ".fx-param-frame,.fx-param-slider-box { padding:0px; margin:0px; min-width:40px; }"
+            ".fx-param-frame > border { padding:0px; margin:0px; }"
+            ".fx-param-step-box { padding:0px; margin:0px; min-width:40px; min-height:20px; }"
+            ".fx-param-step,.fx-param-frame button.fx-param-step { padding:0px; margin:0px; min-width:20px; min-height:20px; }"
+            ".fx-param-step label,.fx-param-step image { padding:0px; margin:0px; }"
+            ".fx-param-slider { padding:0px; margin:0px; min-width:24px; min-height:0px; }"
+            "scale.fx-param-slider contents { min-width:24px; padding:0px; margin:0px; background-color:transparent; }"
+            "scale.fx-param-slider contents trough { min-width:4px; margin-left:10px; margin-right:10px; border:0px; }"
+            "scale.fx-param-slider contents trough highlight { min-width:4px; border:0px; }"
+            "scale.fx-param-slider contents slider { min-width:16px; min-height:16px; margin-left:-6px; margin-right:-6px; }"
+            ".video-navigation-row { padding:0px; margin:0px; }"
+            "#frame303,.video-navigation-frame,.video-navigation-frame-content,.video-navigation-attached-group,.video-navigation-frame-alignment,.video-navigation-secondary-row { padding:0px; margin:0px; border-width:0px; }"
+            "#frame303 > border,.video-navigation-frame > border { padding:0px; margin:0px; border-width:0px; }"
+            "#hbox638,.video-navigation-secondary-area { padding:0px; margin-left:10px; margin-top:0px; margin-right:0px; margin-bottom:0px; }"
+            ".video-navigation-row button,.video-navigation-button { min-width:26px; min-height:24px; padding-left:2px; padding-right:2px; padding-top:1px; padding-bottom:1px; margin:0px; }",
             font_size);
     }
     else {
@@ -14448,13 +15630,28 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "window { font-size:%s; }"
             "frame,box { padding: 0px; }"
             "scale,spinbutton,button,radiobutton,checkbutton,entry,.vertical { padding: %dpx; margin: %dpx; }"
-            ".fx-entry-compact spinbutton,.fx-entry-compact button,.fx-entry-compact checkbutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 22px; }"
-            ".fx-entry-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 20px; }"
             ".vims-macro-compact spinbutton,.vims-macro-compact button,.vims-macro-compact radiobutton { padding: 0px; margin-top: 0px; margin-bottom: 0px; min-height: 22px; }"
             ".vims-macro-compact entry { padding-top: 0px; padding-bottom: 0px; min-height: 20px; }"
             ".veejay-actions-compact button,.veejay-actions-compact checkbutton { padding: 1px; margin: 1px; min-height: 24px; }"
             ".veejay-vims-compact entry,.veejay-vims-compact button { padding: 0px; margin: 0px; min-height: 22px; }"
-            ".veejay-side-toolbar button { padding: 1px; margin: 1px; min-height: 26px; min-width: 26px; }",
+            ".veejay-side-toolbar button { padding: 1px; margin: 1px; min-height: 26px; min-width: 26px; }"
+            ".fx-entry-split { padding:0px; margin:0px; }"
+            ".fx-entry-split > separator { min-height:3px; background-color:#323540; }"
+            ".fx-param-frame,.fx-param-slider-box { padding:0px; margin:0px; min-width:40px; }"
+            ".fx-param-frame > border { padding:0px; margin:0px; }"
+            ".fx-param-step-box { padding:0px; margin:0px; min-width:40px; min-height:20px; }"
+            ".fx-param-step,.fx-param-frame button.fx-param-step { padding:0px; margin:0px; min-width:20px; min-height:20px; }"
+            ".fx-param-step label,.fx-param-step image { padding:0px; margin:0px; }"
+            ".fx-param-slider { padding:0px; margin:0px; min-width:24px; min-height:0px; }"
+            "scale.fx-param-slider contents { min-width:24px; padding:0px; margin:0px; background-color:transparent; }"
+            "scale.fx-param-slider contents trough { min-width:4px; margin-left:10px; margin-right:10px; border:0px; }"
+            "scale.fx-param-slider contents trough highlight { min-width:4px; border:0px; }"
+            "scale.fx-param-slider contents slider { min-width:16px; min-height:16px; margin-left:-6px; margin-right:-6px; }"
+            ".video-navigation-row { padding:0px; margin:0px; }"
+            "#frame303,.video-navigation-frame,.video-navigation-frame-content,.video-navigation-attached-group,.video-navigation-frame-alignment,.video-navigation-secondary-row { padding:0px; margin:0px; border-width:0px; }"
+            "#frame303 > border,.video-navigation-frame > border { padding:0px; margin:0px; border-width:0px; }"
+            "#hbox638,.video-navigation-secondary-area { padding:0px; margin-left:10px; margin-top:0px; margin-right:0px; margin-bottom:0px; }"
+            ".video-navigation-row button,.video-navigation-button { min-width:26px; min-height:24px; padding-left:2px; padding-right:2px; padding-top:1px; padding-bottom:1px; margin:0px; }",
             font_size,
             pad,
             margin);
@@ -14497,7 +15694,7 @@ static int auto_connect_to_veejay(char *host, int port_num)
                     veejay_msg(VEEJAY_MSG_DEBUG, "Failed connect on port %d", j);
                 }
             }
-            multitrack_set_quality( info->mt, 1 );
+            multitrack_set_quality( info->mt, 0 );
             i = j;
 
             info->watch.state = STATE_PLAYING;
@@ -14650,6 +15847,11 @@ void vj_gui_init(const char *glade_file,
     add_class_by_name( "framerate", "h_slider" );
 
     GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+    ui_update_screen_profile(FALSE);
+    if(smallest_possible)
+        add_class(mainw, "smallaspossible");
+    else if(high_dpi_screen_)
+        add_class(mainw, "highdpi");
 
     init_audio_beat_tooltips();
     init_audio_beat_meter_styles();
@@ -14662,6 +15864,16 @@ void vj_gui_init(const char *glade_file,
     if(!info->sample_bank_view)
         veejay_msg(VEEJAY_MSG_WARNING, "Sample bank grid widget could not be created");
     else {
+        const int sample_bank_h = smallest_possible ? 240 : 200;
+        const int sample_bank_view_h = smallest_possible ? 224 : 184;
+        gtk_widget_set_size_request(box, -1, sample_bank_h);
+        gtk_widget_set_size_request(info->sample_bank_view, 720, sample_bank_view_h);
+        gtk_widget_set_hexpand(box, TRUE);
+        gtk_widget_set_vexpand(box, TRUE);
+        gtk_widget_set_hexpand(info->sample_bank_view, TRUE);
+        gtk_widget_set_vexpand(info->sample_bank_view, TRUE);
+        gtk_widget_set_halign(info->sample_bank_view, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(info->sample_bank_view, GTK_ALIGN_FILL);
         gvr_sample_bank_view_set_layout(info->sample_bank_view, SAMPLEBANK_COLUMNS, SAMPLEBANK_ROWS);
         gvr_sample_bank_view_set_page_count(info->sample_bank_view, NUM_BANKS);
         samplebank_update_page_label();
@@ -14716,6 +15928,7 @@ void vj_gui_init(const char *glade_file,
 
     gtk_container_add( GTK_CONTAINER(frame), info->tl );
     gtk_widget_show_all(frame);
+    ui_compact_transport_panel();
 
     snprintf(text, sizeof(text), "Reloaded - version %s",VERSION);
     gtk_label_set_text(GTK_LABEL(glade_xml_get_widget_(info->main_window,
@@ -14763,6 +15976,26 @@ void vj_gui_init(const char *glade_file,
 
 
     GtkWidget *img_wid = widget_cache[WIDGET_IMAGEA];
+    static const char *preview_allocate_widgets[] = {
+        "vbox606",
+        "vbox617",
+        "vbox631",
+        "vbox632",
+        "frame327",
+        "alignment542",
+        NULL
+    };
+
+    ui_compact_fx_panel();
+    preview_set_widget_minimum();
+    if(img_wid)
+        g_signal_connect(G_OBJECT(img_wid), "draw", G_CALLBACK(preview_image_draw), NULL);
+
+    for(int i = 0; preview_allocate_widgets[i] != NULL; i++) {
+        GtkWidget *w = glade_xml_get_widget_(info->main_window, preview_allocate_widgets[i]);
+        if(w)
+            g_signal_connect(G_OBJECT(w), "size-allocate", G_CALLBACK(preview_area_size_allocate), NULL);
+    }
 
     gui->mt = multitrack_new((void(*)(int,char*,int)) vj_gui_cb,
                              NULL,
@@ -14874,6 +16107,8 @@ void vj_gui_init(const char *glade_file,
         gtk_window_move( GTK_WINDOW(lw), geo_pos_[0], geo_pos_[1] );
 
 
+    ui_window_set_startup_size(mainw);
+
     if( auto_connect ) {
         if(auto_connect_to_veejay(hostname, port_num)) {
             veejay_show_main_ui(gui);
@@ -14896,20 +16131,8 @@ void vj_gui_init(const char *glade_file,
         info->status_lock = old_lock;
     }
 
-    if (smallest_possible)
-    {
-        gtk_window_set_default_size(GTK_WINDOW(mainw), 1242, 854);
-    }
-
-    gtk_window_set_resizable(GTK_WINDOW(mainw), TRUE);
-
-    gtk_window_resize(GTK_WINDOW(mainw),
-                   smallest_possible ? 1280 : 1920,
-                   smallest_possible ? 720  : 900);
-
-    gint w, h;
-    gtk_window_get_size(GTK_WINDOW(mainw), &w, &h);
-    veejay_msg(VEEJAY_MSG_INFO,"Final UI Window size: %dx%d", w, h);
+    ui_window_set_startup_size(mainw);
+    ui_window_log_startup_size(mainw, "startup");
 }
 
 void vj_gui_preview(void)
@@ -14921,25 +16144,44 @@ void vj_gui_preview(void)
 
     multitrack_get_preview_dimensions( tmp_w,tmp_h, &w, &h );
 
-    update_spin_value2(widget_cache[WIDGET_PRIOUT_WIDTH], w);
-    update_spin_value2(widget_cache[WIDGET_PRIOUT_HEIGHT], h);
+    preview_base_w_ = preview_even(w);
+    preview_base_h_ = preview_even(h);
+    preview_box_w_ = preview_base_w_;
+    preview_box_h_ = preview_base_h_;
+    preview_display_w_ = preview_base_w_;
+    preview_display_h_ = preview_base_h_;
 
-    update_spin_range( "preview_width", 16, w, w);
-    update_spin_range( "preview_height", 16, h, h );
+    preview_set_widget_minimum();
+
+    update_spin_range2(widget_cache[WIDGET_PRIOUT_WIDTH], 16, tmp_w > preview_box_w_ ? tmp_w : preview_box_w_, preview_box_w_);
+    update_spin_range2(widget_cache[WIDGET_PRIOUT_HEIGHT], 16, tmp_h > preview_box_h_ ? tmp_h : preview_box_h_, preview_box_h_);
+
+    update_spin_range( "preview_width", 16, preview_box_w_, preview_box_w_);
+    update_spin_range( "preview_height", 16, preview_box_h_, preview_box_h_ );
 
     update_spin_incr( "preview_width", 16, 0 );
     update_spin_incr( "preview_height", 16, 0 );
     update_spin_incr( "priout_width", 16,0 );
     update_spin_incr( "priout_height", 16, 0 );
 
-    info->image_w = w;
-    info->image_h = h;
+    info->image_w = preview_box_w_;
+    info->image_h = preview_box_h_;
+
+    preview_apply_current_allocation(1);
 
 }
 
 void gveejay_preview( int p )
 {
     user_preview = p;
+
+    if(!user_preview) {
+        preview_clear_live_pixbuf();
+        if(widget_cache[WIDGET_IMAGEA]) {
+            gtk_widget_set_size_request(widget_cache[WIDGET_IMAGEA], preview_base_w_, preview_base_h_);
+            gtk_widget_queue_draw(widget_cache[WIDGET_IMAGEA]);
+        }
+    }
 }
 
 int gveejay_user_preview(void)
@@ -15072,9 +16314,11 @@ static void veejay_show_main_ui(vj_gui_t *gui)
     GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
     gtk_widget_show(mw);
+    ui_window_set_startup_size(mw);
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
     reloaded_present_window(mw);
+    ui_window_set_startup_size(mw);
 }
 
 static guint32 reloaded_present_time(void)
@@ -15201,7 +16445,7 @@ gboolean    is_alive( int *do_sync )
 
         veejay_msg(VEEJAY_MSG_DEBUG, "Connected to current track %d", current_track);
         multitrack_set_master_track( info->mt, current_track );
-        multitrack_set_quality( info->mt, 1 );
+        multitrack_set_quality( info->mt, 0 );
 
         *do_sync = 1;
         info->watch.state = STATE_PLAYING;
@@ -15222,6 +16466,10 @@ gboolean    is_alive( int *do_sync )
 static void vj_gui_disconnect_internal(int restart_schedule, int keep_multitrack)
 {
     const int quitting = (info->watch.state == STATE_QUIT);
+
+    preview_clear_live_pixbuf();
+    if(widget_cache[WIDGET_IMAGEA])
+        gtk_widget_queue_draw(widget_cache[WIDGET_IMAGEA]);
 
     if(info->key_id) {
         gtk_key_snooper_remove( info->key_id );
@@ -15871,25 +17119,32 @@ static void create_sequencer_slots(int nx, int ny)
     GtkWidget *outer;
     GtkWidget *toolbar;
     GtkWidget *button;
+    const gboolean compact = smallest_possible ? TRUE : FALSE;
+    const int sequence_view_w = compact ? 480 : 520;
+    const int sequence_view_h = compact ? 260 : 236;
+    const int sequence_frame_h = compact ? 286 : 286;
 
     info->sample_sequencer = gtk_frame_new(NULL);
     add_class(info->sample_sequencer, "sequencer");
+    gtk_widget_set_size_request(GTK_WIDGET(info->sample_sequencer), -1, sequence_frame_h);
     gtk_box_pack_start(GTK_BOX(vbox), GTK_WIDGET(info->sample_sequencer), TRUE, TRUE, 0);
     gtk_widget_show(info->sample_sequencer);
 
-    outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, compact ? 1 : 3);
+    add_class(outer, "sequencer-body");
     gtk_container_add(GTK_CONTAINER(info->sample_sequencer), outer);
     gtk_widget_show(outer);
 
-    toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 3);
-    gtk_box_pack_start(GTK_BOX(outer), toolbar, FALSE, FALSE, 2);
+    toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 3);
+    add_class(toolbar, "sequencer-toolbar");
+    gtk_box_pack_start(GTK_BOX(outer), toolbar, FALSE, FALSE, compact ? 0 : 2);
     gtk_widget_show(toolbar);
 
     sequence_toolbar_hide_legacy_row();
 
     button = sequence_toolbar_pack_existing(toolbar, "seqactive", FALSE, FALSE, 0);
     if(button) {
-        gtk_button_set_label(GTK_BUTTON(button), "Play Grid");
+        gtk_button_set_label(GTK_BUTTON(button), compact ? "Play" : "Play Grid");
         gtk_widget_set_tooltip_text(button, "Play and repeat the checked sequence bank chain");
     }
 
@@ -15903,9 +17158,9 @@ static void create_sequencer_slots(int nx, int ny)
     if(button)
         gtk_widget_set_tooltip_text(button, "Stop recording from this sequence");
 
-    button = sequence_toolbar_pack_existing(toolbar, "rec_seq_progress", TRUE, TRUE, 4);
+    button = sequence_toolbar_pack_existing(toolbar, "rec_seq_progress", TRUE, TRUE, compact ? 1 : 4);
     if(button) {
-        gtk_widget_set_size_request(button, 120, -1);
+        gtk_widget_set_size_request(button, compact ? 80 : 120, -1);
         gtk_widget_set_tooltip_text(button, "Sequence recording progress");
     }
 
@@ -15913,7 +17168,7 @@ static void create_sequencer_slots(int nx, int ny)
 
     for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
         char label[16];
-        snprintf(label, sizeof(label), "Bank %d", bank + 1);
+        snprintf(label, sizeof(label), compact ? "B%d" : "Bank %d", bank + 1);
         button = gtk_toggle_button_new_with_label(label);
         sequence_ui_bank_buttons[bank] = button;
         gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
@@ -15922,7 +17177,7 @@ static void create_sequencer_slots(int nx, int ny)
         gtk_widget_show(button);
     }
 
-    button = gtk_button_new_with_label("Clear Bank");
+    button = gtk_button_new_with_label(compact ? "Clear" : "Clear Bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_clear_clicked), NULL);
     gtk_widget_set_tooltip_text(button, "Clear the selected sequence bank immediately");
@@ -15932,13 +17187,13 @@ static void create_sequencer_slots(int nx, int ny)
     if(button)
         gtk_widget_set_tooltip_text(button, "Clear all sequence banks");
 
-    button = gtk_button_new_with_label("Copy Bank");
+    button = gtk_button_new_with_label(compact ? "Copy" : "Copy Bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_copy_clicked), NULL);
     gtk_widget_set_tooltip_text(button, "Copy the selected sequence bank");
     gtk_widget_show(button);
 
-    button = gtk_button_new_with_label("Paste Bank");
+    button = gtk_button_new_with_label(compact ? "Paste" : "Paste Bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_paste_clicked), NULL);
     gtk_widget_set_tooltip_text(button, "Paste copied sequence bank into the selected bank");
@@ -15951,7 +17206,8 @@ static void create_sequencer_slots(int nx, int ny)
     gtk_widget_show(button);
 
     info->sequence_bank_view = gvr_sequence_bank_view_new();
-    gtk_box_pack_start(GTK_BOX(outer), info->sequence_bank_view, TRUE, TRUE, 2);
+    gtk_widget_set_size_request(info->sequence_bank_view, sequence_view_w, sequence_view_h);
+    gtk_box_pack_start(GTK_BOX(outer), info->sequence_bank_view, TRUE, TRUE, compact ? 0 : 2);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-selected", G_CALLBACK(on_sequence_bank_view_bank_selected), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-assign-requested", G_CALLBACK(on_sequence_bank_view_slot_assign), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-delete-requested", G_CALLBACK(on_sequence_bank_view_slot_delete), NULL);

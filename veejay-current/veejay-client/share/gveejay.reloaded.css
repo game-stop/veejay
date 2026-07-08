@@ -140,7 +140,7 @@ scale contents slider {
     background-color: @knob-color;
     border-radius: 6px;
     min-width: 16px;
-    min-height: 16px;
+    min-height: 20px;
     margin: -5px;
 }
 
@@ -251,6 +251,21 @@ scale:disabled value {
     border-color: @slot-playing-color;
     background-color: @slot-playing-bg;
 }
+
+.track {
+    border-color: @border-color;
+    border-width: 1px;
+    border-style: solid;
+    background-color: @panel-color;
+}
+
+.track-current {
+    border-color: @slot-playing-color;
+    border-width: 3px;
+    border-style: solid;
+    background-color: @slot-playing-bg;
+}
+
 
 .recording, .armed {
     border-color: @record-color;
@@ -415,7 +430,7 @@ radiobutton:checked:disabled label {
 }
 
 notebook header tabs tab {
-    min-width: 100px; 
+    min-width: 80px; 
     
     margin: 1px 2px;
     padding: 1px 2px;
@@ -433,7 +448,7 @@ notebook header tabs tab label {
 notebook header tabs tab:checked {
     background-color: @fill-color;
     border-color: @knob-color;
-    min-width: 100px; 
+    min-width: 80px; 
 }
 
 notebook header tabs tab:hover {
@@ -1127,5 +1142,396 @@ checkbutton.offline-recorder-autoplay check:disabled {
 
 #sample_bank_hbox {
     min-width: 0;
+    min-height: 0;
+}
+
+/* Small-as-possible non-scrolled sequencer grid sizing. */
+.smallaspossible frame.sequencer,
+.smallaspossible frame.sequencer > border,
+.smallaspossible .sequencer {
+    padding: 0;
+    min-width: 0;
+    min-height: 0;
+}
+
+.smallaspossible frame.sequencer_slot,
+.smallaspossible frame.sequencer_slot > border,
+.smallaspossible .sequencer_slot {
+    padding: 0;
+    min-width: 0;
+    min-height: 0;
+}
+
+.smallaspossible .sequencer-slot-label {
+    font-size: 105%;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+}
+
+.smallaspossible frame.sequencer_slot.active,
+.smallaspossible frame.sequencer_slot.sequence-playing,
+.smallaspossible frame.sequencer_slot.sequence-playing > border,
+.smallaspossible .sequencer_slot.active,
+.smallaspossible .sequencer_slot.sequence-playing {
+    border-width: 2px;
+}
+
+.smallaspossible #SampleSequencerBox,
+.smallaspossible .sequencer,
+.smallaspossible .sequencer-body,
+.smallaspossible .sequencer-toolbar {
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+}
+
+.smallaspossible .sequencer-toolbar button {
+    min-height: 16px;
+    min-width: 20px;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: 3px;
+    padding-right: 3px;
+    margin: 0;
+}
+
+/* Normal layout trim: keep FX controls untouched, but remove dead vertical space
+ * from sample/transport/sequencer rows that inflate the window minimum. */
+#sample_panel,
+#hbox27,
+#vbox633,
+#hbox910,
+#SampleSequencerBox,
+.sequencer,
+.sequencer-body,
+.sequencer-toolbar {
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+    min-height: 0;
+}
+
+#sample_panel button,
+#sample_panel spinbutton,
+#sample_panel entry,
+#hbox27 button,
+#hbox27 spinbutton,
+#hbox27 entry,
+#vbox633 button,
+#vbox633 spinbutton,
+#vbox633 entry,
+#hbox910 button,
+#hbox910 spinbutton,
+#hbox910 entry,
+.sequencer-toolbar button,
+.sequencer-toolbar spinbutton,
+.sequencer-toolbar entry {
+    min-height: 22px;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+.highdpi #sample_panel button,
+.highdpi #sample_panel spinbutton,
+.highdpi #sample_panel entry,
+.highdpi #hbox27 button,
+.highdpi #hbox27 spinbutton,
+.highdpi #hbox27 entry,
+.highdpi #vbox633 button,
+.highdpi #vbox633 spinbutton,
+.highdpi #vbox633 entry,
+.highdpi #hbox910 button,
+.highdpi #hbox910 spinbutton,
+.highdpi #hbox910 entry,
+.highdpi .sequencer-toolbar button,
+.highdpi .sequencer-toolbar spinbutton,
+.highdpi .sequencer-toolbar entry {
+    min-height: 22px;
+}
+
+
+/* Video navigation: spacing belongs between button groups, not between buttons inside a group. */
+#hbox_vidnav,
+.video-navigation-row {
+    padding: 0;
+    margin: 0;
+    min-height: 26px;
+}
+
+#frame303,
+.video-navigation-frame,
+.video-navigation-frame-content,
+.video-navigation-attached-group,
+.video-navigation-frame-alignment,
+.video-navigation-secondary-row {
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+}
+
+#frame303 > border,
+.video-navigation-frame > border {
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+}
+
+#hbox638,
+.video-navigation-secondary-area {
+    padding: 0;
+    margin-top: 0;
+    margin-right: 0;
+    margin-bottom: 0;
+    margin-left: 10px;
+}
+
+#hbox_vidnav button,
+.video-navigation-row button,
+button.video-navigation-button {
+    min-width: 26px;
+    min-height: 24px;
+    padding-left: 2px;
+    padding-right: 2px;
+    padding-top: 1px;
+    padding-bottom: 1px;
+    margin: 0;
+}
+
+#frame303 button,
+.video-navigation-frame button,
+.video-navigation-attached-group button,
+.video-navigation-secondary-row button {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.highdpi #hbox_vidnav button,
+.highdpi .video-navigation-row button,
+.highdpi button.video-navigation-button {
+    min-width: 28px;
+    min-height: 26px;
+}
+
+/* FX parameter columns: 40px frame, centered 24px scale node, thin 4px trough, 16px knob, 2 x 20px step buttons. */
+.fx-param-frame,
+#frame_p0, #frame_p1, #frame_p2, #frame_p3, #frame_p4, #frame_p5, #frame_p6, #frame_p7,
+#frame_p8, #frame_p9, #frame_p10, #frame_p11, #frame_p12, #frame_p13, #frame_p14, #frame_p15 {
+    min-width: 40px;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.fx-param-frame > border,
+frame.fx-param-frame > border,
+#frame_p0 > border, #frame_p1 > border, #frame_p2 > border, #frame_p3 > border,
+#frame_p4 > border, #frame_p5 > border, #frame_p6 > border, #frame_p7 > border,
+#frame_p8 > border, #frame_p9 > border, #frame_p10 > border, #frame_p11 > border,
+#frame_p12 > border, #frame_p13 > border, #frame_p14 > border, #frame_p15 > border {
+    padding: 0;
+    margin: 0;
+}
+
+.fx-param-slider-box,
+#slider_box_p0, #slider_box_p1, #slider_box_p2, #slider_box_p3,
+#slider_box_p4, #slider_box_p5, #slider_box_p6, #slider_box_p7,
+#slider_box_p8, #slider_box_p9, #slider_box_p10, #slider_box_p11,
+#slider_box_p12, #slider_box_p13, #slider_box_p14, #slider_box_p15 {
+    min-width: 40px;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+}
+
+.fx-param-slider,
+scale.fx-param-slider,
+.fx-param-slider-box scale.fx-param-slider {
+    min-width: 24px;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+}
+
+scale.fx-param-slider contents,
+.fx-param-slider contents {
+    min-width: 24px;
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+scale.fx-param-slider value,
+.fx-param-slider value {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+}
+
+scale.fx-param-slider trough,
+scale.fx-param-slider contents trough,
+.fx-param-slider trough,
+.fx-param-slider contents trough {
+    min-width: 4px;
+    padding: 0;
+    margin-left: 10px;
+    margin-right: 10px;
+    border-width: 0;
+    border-radius: 2px;
+}
+
+scale.fx-param-slider trough highlight,
+scale.fx-param-slider contents trough highlight,
+.fx-param-slider trough highlight,
+.fx-param-slider contents trough highlight {
+    min-width: 4px;
+    border-width: 0;
+    border-radius: 2px;
+}
+
+scale.fx-param-slider slider,
+scale.fx-param-slider contents slider,
+.fx-param-slider slider,
+.fx-param-slider contents slider {
+    min-width: 16px;
+    min-height: 16px;
+    padding: 0;
+    margin-left: -6px;
+    margin-right: -6px;
+    border-radius: 8px;
+}
+
+.fx-param-step-box,
+#fx_param_step_box_p0, #fx_param_step_box_p1, #fx_param_step_box_p2, #fx_param_step_box_p3,
+#fx_param_step_box_p4, #fx_param_step_box_p5, #fx_param_step_box_p6, #fx_param_step_box_p7,
+#fx_param_step_box_p8, #fx_param_step_box_p9, #fx_param_step_box_p10, #fx_param_step_box_p11,
+#fx_param_step_box_p12, #fx_param_step_box_p13, #fx_param_step_box_p14, #fx_param_step_box_p15 {
+    min-width: 40px;
+    min-height: 20px;
+    padding: 0;
+    margin: 0;
+}
+
+button.fx-param-step,
+.fx-param-frame button.fx-param-step,
+#inc_p0, #dec_p0, #inc_p1, #dec_p1, #inc_p2, #dec_p2, #inc_p3, #dec_p3,
+#inc_p4, #dec_p4, #inc_p5, #dec_p5, #inc_p6, #dec_p6, #inc_p7, #dec_p7,
+#inc_p8, #dec_p8, #inc_p9, #dec_p9, #inc_p10, #dec_p10, #inc_p11, #dec_p11,
+#inc_p12, #dec_p12, #inc_p13, #dec_p13, #inc_p14, #dec_p14, #inc_p15, #dec_p15 {
+    min-width: 20px;
+    min-height: 20px;
+    padding: 0;
+    margin: 0;
+}
+
+button.fx-param-step label,
+button.fx-param-step image,
+.fx-param-frame button.fx-param-step label,
+.fx-param-frame button.fx-param-step image {
+    padding: 0;
+    margin: 0;
+}
+
+/* FX entry split: keep parameter sliders and FX list sharing the available height. */
+.fx-entry-split {
+    padding: 0;
+    margin: 0;
+}
+
+.fx-entry-split > separator {
+    min-height: 3px;
+    background-color: @border-color;
+}
+
+/* Keep the FX notebook from defining the full window minimum.  The trees stay useful
+ * through their scrolled windows, but their natural height no longer forces ~983px. */
+#notebook14,
+#effectspanel,
+#scrolledwindow36,
+#scrolledwindow23,
+#scrolledwindow1,
+#scrolledwindow43,
+#scrolledwindow40 {
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+#tree_effectmixlist,
+#tree_effectlist,
+#tree_alphalist,
+#tree_sources {
+    min-height: 0;
+}
+
+#frame327,
+#alignment542,
+#imageA {
+    min-width: 0;
+    min-height: 0;
+}
+
+/* Pass 2: keep live preview growth inside the preview frame and compact the transport/timeline band. */
+#frame327,
+#alignment542,
+#imageA {
+    min-width: 0;
+    min-height: 0;
+}
+
+#hbox917,
+#markerframe,
+#timeline_legacy_status_grid,
+#veejay_frame,
+#vbox633,
+#hbox_vidnav,
+#hbox910 {
+    padding: 0;
+    margin: 0;
+    min-height: 0;
+}
+
+#markerframe,
+#markerframe > border {
+    padding: 0;
+    margin: 0;
+}
+
+#hbox_vidnav,
+#hbox910 {
+    min-height: 28px;
+}
+
+#hbox910 scale,
+#hbox910 scale contents,
+#hbox910 scale value {
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+#hbox910 scale value {
+    min-height: 0;
+}
+
+#sample_loop_box,
+#sample_loop_box frame,
+#sample_loop_box frame > border,
+#sample_loop_box radiobutton,
+#sample_loop_box radiobutton check,
+#sample_loop_box radiobutton label {
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
     min-height: 0;
 }

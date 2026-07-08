@@ -63,6 +63,8 @@ typedef struct
 	uint8_t *data_buffer;
 	uint8_t *tmp_buffer;
 	uint8_t *status_buffer;
+	size_t data_buffer_size;
+	size_t tmp_buffer_size;
 	int	 track_list[__MAX_TRACKS];
 	int	 track_items;
 	int	 status_tokens[VJ_STATUS_ARRAY_SIZE];
@@ -164,6 +166,44 @@ static inline veejay_track_t *gvr_track_ptr(veejay_preview_t *vp, int track_num)
 	if(!gvr_track_index_valid(vp, track_num))
 		return NULL;
 	return vp->tracks[track_num];
+}
+
+static int gvr_track_ensure_buffers(veejay_track_t *v, int w, int h)
+{
+	size_t pixels;
+	size_t data_need;
+	size_t tmp_need;
+	uint8_t *data;
+	uint8_t *tmp;
+
+	if(!v || w <= 0 || h <= 0)
+		return 0;
+
+	pixels = (size_t) w * (size_t) h;
+	data_need = pixels * 3;
+	tmp_need = pixels * 4;
+
+	if(data_need > v->data_buffer_size) {
+		data = (uint8_t*) vj_malloc(data_need);
+		if(!data)
+			return 0;
+		if(v->data_buffer)
+			free(v->data_buffer);
+		v->data_buffer = data;
+		v->data_buffer_size = data_need;
+	}
+
+	if(tmp_need > v->tmp_buffer_size) {
+		tmp = (uint8_t*) vj_malloc(tmp_need);
+		if(!tmp)
+			return 0;
+		if(v->tmp_buffer)
+			free(v->tmp_buffer);
+		v->tmp_buffer = tmp;
+		v->tmp_buffer_size = tmp_need;
+	}
+
+	return 1;
 }
 
 static	void	gvr_close_connection( veejay_track_t *v )
@@ -495,6 +535,11 @@ static int veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v)
         return res;
     }
 
+    if(!gvr_track_ensure_buffers(v, v->width, v->height)) {
+        v->have_frame = 0;
+        return 0;
+    }
+
     gint bw = 0;
     res = recvvims(v, 13, &bw, v->data_buffer);
     if (res <= 0 || bw <= 0) {
@@ -795,14 +840,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 		return -1;
 	}
 
-	vt->data_buffer = (uint8_t*) vj_malloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3);
-	if(vt->data_buffer == NULL ) {
-		gvr_close_connection( vt );
-		return -1;
-	}
-
-	vt->tmp_buffer = (uint8_t*) vj_calloc( MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 4);
-	if(vt->tmp_buffer == NULL ) {
+	if(!gvr_track_ensure_buffers(vt, MAX_PREVIEW_WIDTH, MAX_PREVIEW_HEIGHT)) {
 		gvr_close_connection( vt );
 		return -1;
 	}
@@ -810,7 +848,8 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	if(new_track)
 		*new_track = track_num;
 
-	veejay_memset(vt->data_buffer, 128,MAX_PREVIEW_WIDTH * MAX_PREVIEW_HEIGHT * 3 );
+	veejay_memset(vt->data_buffer, 128, vt->data_buffer_size );
+	veejay_memset(vt->tmp_buffer, 0, vt->tmp_buffer_size );
 
 	vp->tracks[ track_num ] = vt;
 	vp->track_sync->active_list[ track_num ] = 1;
@@ -1038,14 +1077,33 @@ int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 	if(!gvr_track_index_valid(vp, track_num))
 		return 0;
 
-	w = (wid > MAX_PREVIEW_WIDTH ? MAX_PREVIEW_WIDTH : wid );
-	h = (hei > MAX_PREVIEW_HEIGHT ? MAX_PREVIEW_HEIGHT : hei );
+	w = wid;
+	h = hei;
+
+	if(w < 16)
+		w = 16;
+	if(h < 16)
+		h = 16;
+	w &= ~1;
+	h &= ~1;
 
 	v = vp->tracks[track_num];
+	if( v && v->width == w && v->height == h )
+	{
+		if( vp->track_sync ) {
+			vp->track_sync->widths[track_num] = w;
+			vp->track_sync->heights[track_num] = h;
+		}
+		return 1;
+	}
+
 	if( v )
 	{
+		if(!gvr_track_ensure_buffers(v, w, h))
+			return 0;
 		v->width  = w;
 		v->height = h;
+		v->have_frame = 0;
 	}
 
 	if( vp->track_sync ) {
@@ -1085,7 +1143,11 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 		return 0;
 	}
 
-    v->preview = status ? 1 : 0;
+    status = status ? 1 : 0;
+    if(v->preview == status)
+        return 1;
+
+    v->preview = status;
 
     veejay_msg(VEEJAY_MSG_INFO, "Live view %dx%d with %s:%d on track %d %s",
 	    v->width,
@@ -1112,9 +1174,14 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		if( vp->tracks[i] && vp->tracks[i]->active && vp->track_sync->widths[i] > 0 && vp->tracks[i]->preview &&
 			vp->tracks[i]->tmp_buffer != NULL )
 		{
-			list[i] =gdk_pixbuf_new_from_data(vp->tracks[i]->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,
-				8,vp->tracks[i]->width,vp->tracks[i]->height,
-				  vp->tracks[i]->width*3,NULL,NULL );
+			GdkPixbuf *wrapped = gdk_pixbuf_new_from_data(vp->tracks[i]->tmp_buffer, GDK_COLORSPACE_RGB, FALSE,
+				8, vp->tracks[i]->width, vp->tracks[i]->height,
+				vp->tracks[i]->width * 3, NULL, NULL);
+
+			if(wrapped) {
+				list[i] = gdk_pixbuf_copy(wrapped);
+				g_object_unref(wrapped);
+			}
 		}
 	}
 
