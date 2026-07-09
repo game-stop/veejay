@@ -5796,20 +5796,53 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p0">
+                                                  <object class="GtkBox" id="slider_stack_p0">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="halign">center</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pa</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p0_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p0">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P0 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p0_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p0">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="halign">center</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pa</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p0_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -5984,19 +6017,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p1">
+                                                  <object class="GtkBox" id="slider_stack_p1">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pb</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p1_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p1">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P1 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p1_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p1">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pb</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p1_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -6171,19 +6237,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p2">
+                                                  <object class="GtkBox" id="slider_stack_p2">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pc</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p2_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p2">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P2 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p2_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p2">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pc</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p2_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -6360,19 +6459,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p3">
+                                                  <object class="GtkBox" id="slider_stack_p3">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pd</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p3_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p3">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P3 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p3_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p3">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pd</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p3_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -6547,19 +6679,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p4">
+                                                  <object class="GtkBox" id="slider_stack_p4">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pe</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p4_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p4">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P4 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p4_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p4">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pe</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p4_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -6734,19 +6899,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p5">
+                                                  <object class="GtkBox" id="slider_stack_p5">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pf</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p5_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p5">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P5 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p5_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p5">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pf</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p5_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -6921,19 +7119,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p6">
+                                                  <object class="GtkBox" id="slider_stack_p6">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pg</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p6_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p6">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P6 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p6_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p6">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pg</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p6_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -7108,19 +7339,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p7">
+                                                  <object class="GtkBox" id="slider_stack_p7">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_ph</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p7_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p7">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P7 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p7_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p7">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_ph</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p7_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -7295,19 +7559,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p8">
+                                                  <object class="GtkBox" id="slider_stack_p8">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pi</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p8_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p8">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P8 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p8_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p8">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pi</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p8_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -7484,19 +7781,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p9">
+                                                  <object class="GtkBox" id="slider_stack_p9">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pj</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p9_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p9">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P9 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p9_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p9">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pj</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p9_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -7671,19 +8001,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p10">
+                                                  <object class="GtkBox" id="slider_stack_p10">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pk</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p10_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p10">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P10 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p10_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p10">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pk</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p10_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -7858,19 +8221,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p11">
+                                                  <object class="GtkBox" id="slider_stack_p11">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pl</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p11_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p11">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P11 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p11_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p11">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pl</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p11_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -8045,19 +8441,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p12">
+                                                  <object class="GtkBox" id="slider_stack_p12">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pm</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p12_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p12">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P12 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p12_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p12">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pm</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p12_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -8202,6 +8631,7 @@
                                     <child>
                                       <object class="GtkFrame" id="frame_p13">
                                         <property name="name">frame_p13</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <property name="label-xalign">0</property>
                                         <child>
@@ -8231,19 +8661,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p13">
+                                                  <object class="GtkBox" id="slider_stack_p13">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pn</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p13_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p13">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P13 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p13_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p13">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pn</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p13_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -8345,6 +8808,7 @@
                                     <child>
                                       <object class="GtkFrame" id="frame_p14">
                                         <property name="name">frame_p14</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <property name="label-xalign">0</property>
                                         <child>
@@ -8374,19 +8838,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p14">
+                                                  <object class="GtkBox" id="slider_stack_p14">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_po</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p14_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p14">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P14 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p14_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p14">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_po</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p14_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -8492,6 +8989,7 @@
                                     <child>
                                       <object class="GtkFrame" id="frame_p15">
                                         <property name="name">frame_p15</property>
+                                        <property name="visible">False</property>
                                         <property name="can-focus">False</property>
                                         <property name="label-xalign">0</property>
                                         <child>
@@ -8521,19 +9019,52 @@
                                                   </packing>
                                                 </child>
                                                 <child>
-                                                  <object class="GtkScale" id="slider_p15">
+                                                  <object class="GtkBox" id="slider_stack_p15">
                                                     <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="margin-bottom">8</property>
+                                                    <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
-                                                    <property name="adjustment">slider_pp</property>
-                                                    <property name="inverted">True</property>
-                                                    <property name="round-digits">0</property>
-                                                    <property name="digits">0</property>
-                                                    <signal name="value-changed" handler="on_slider_p15_value_changed" swapped="no" />
-                                                    <style>
-                                                      <class name="smallaspossible" />
-                                                    </style>
+                                                    <child>
+                                                      <object class="GtkCheckButton" id="beat_own_p15">
+                                                        <property name="visible">True</property>
+                                                        <property name="can-focus">True</property>
+                                                        <property name="receives-default">False</property>
+                                                        <property name="halign">center</property>
+                                                        <property name="valign">center</property>
+                                                        <property name="has-tooltip">True</property>
+                                                        <property name="tooltip-text" translatable="yes">Beat owns P15 when entry beat is on; off keeps manual control.</property>
+                                                        <signal name="toggled" handler="on_beat_own_p15_toggled" swapped="no" />
+                                                        <style>
+                                                          <class name="smallaspossible" />
+                                                          <class name="fx-beat-owner" />
+                                                        </style>
+                                                      </object>
+                                                      <packing>
+                                                        <property name="expand">False</property>
+                                                        <property name="fill">False</property>
+                                                        <property name="position">0</property>
+                                                      </packing>
+                                                    </child>
+                                                  <child>
+                                                    <object class="GtkScale" id="slider_p15">
+                                                      <property name="visible">True</property>
+                                                      <property name="can-focus">True</property>
+                                                      <property name="margin-bottom">8</property>
+                                                      <property name="orientation">vertical</property>
+                                                      <property name="adjustment">slider_pp</property>
+                                                      <property name="inverted">True</property>
+                                                      <property name="round-digits">0</property>
+                                                      <property name="digits">0</property>
+                                                      <signal name="value-changed" handler="on_slider_p15_value_changed" swapped="no" />
+                                                      <style>
+                                                        <class name="smallaspossible" />
+                                                      </style>
+                                                    </object>
+                                                    <packing>
+                                                      <property name="expand">True</property>
+                                                      <property name="fill">True</property>
+                                                      <property name="position">1</property>
+                                                    </packing>
+                                                  </child>
                                                   </object>
                                                   <packing>
                                                     <property name="expand">True</property>
@@ -8763,7 +9294,7 @@
                                                 </child>
                                               </object>
                                               <packing>
-                                                <property name="tab-expand">True</property>
+                                                <property name="tab-expand">False</property>
                                               </packing>
                                             </child>
                                             <child type="tab">
@@ -8805,7 +9336,7 @@
                                               <object class="GtkLabel" id="label693">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">False</property>
-                                                <property name="label" translatable="yes">image effects</property>
+                                                <property name="label" translatable="yes">Image effects</property>
                                                 <property name="angle">270</property>
                                               </object>
                                               <packing>
@@ -8840,7 +9371,7 @@
                                               <object class="GtkLabel" id="label9alpha">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">False</property>
-                                                <property name="label" translatable="yes">alpha effects</property>
+                                                <property name="label" translatable="yes">Alpha effects</property>
                                                 <property name="angle">270</property>
                                               </object>
                                               <packing>

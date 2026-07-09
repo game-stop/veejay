@@ -3859,7 +3859,7 @@
                                           <object class="GtkLabel" id="label9alpha">
                                             <property name="visible">True</property>
                                             <property name="can_focus">False</property>
-                                            <property name="label" translatable="yes">alpha effects</property>
+                                            <property name="label" translatable="yes">Alpha effects</property>
                                             <property name="angle">270</property>
                                           </object>
                                           <packing>

@@ -1339,6 +1339,7 @@ frame.fx-param-frame > border,
 }
 
 .fx-param-slider-box,
+.fx-param-slider-stack,
 #slider_box_p0, #slider_box_p1, #slider_box_p2, #slider_box_p3,
 #slider_box_p4, #slider_box_p5, #slider_box_p6, #slider_box_p7,
 #slider_box_p8, #slider_box_p9, #slider_box_p10, #slider_box_p11,
@@ -1534,4 +1535,24 @@ button.fx-param-step image,
     margin-top: 0;
     margin-bottom: 0;
     min-height: 0;
+}
+
+
+checkbutton.fx-beat-owner {
+    min-width: 14px;
+    min-height: 14px;
+    padding: 0px;
+    margin-top: 0px;
+    margin-bottom: 2px;
+}
+
+checkbutton.fx-beat-owner check {
+    min-width: 12px;
+    min-height: 12px;
+    margin: 0px;
+}
+
+checkbutton.fx-beat-owner:checked check {
+    border-color: @slot-playing-color;
+    background-color: @slot-playing-bg;
 }

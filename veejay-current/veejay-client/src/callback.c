@@ -39,6 +39,10 @@ dlclose( handle );
 
 #define SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE (-1)
 
+#ifndef VIMS_CHAIN_ENTRY_BEAT_PARAM
+#define VIMS_CHAIN_ENTRY_BEAT_PARAM 380
+#endif
+
 static gboolean curve_live_preview_user_override_state = FALSE;
 
 static void curve_live_preview_user_override(gboolean enabled)
@@ -574,6 +578,59 @@ void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data) {
            status ? "enabled" : "disabled",
            info->uc.selected_chain_entry);
 }
+
+static void beat_param_owner_toggled(GtkWidget *widget, int param)
+{
+    if(info->status_lock || info->parameter_lock)
+        return;
+
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+
+    if(info->uc.selected_chain_entry < 0) {
+        vj_msg(VEEJAY_MSG_INFO, "Select an FX chain entry before changing beat parameter ownership");
+        return;
+    }
+
+    int active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
+
+    multi_vims(VIMS_CHAIN_ENTRY_BEAT_PARAM, "%d %d %d %d", 0, info->uc.selected_chain_entry, param, active);
+
+    if(param >= 0 && param < SAMPLE_MAX_PARAMETERS) {
+        int bit = (1 << param);
+        if(active)
+            info->uc.entry_tokens[ENTRY_BEAT_PARAM_MASK] |= bit;
+        else
+            info->uc.entry_tokens[ENTRY_BEAT_PARAM_MASK] &= ~bit;
+    }
+
+    info->uc.selected_fx_param = WIDGET_SLIDER_P0 + param;
+    info->uc.reload_hint[HINT_ENTRY] = 1;
+    info->uc.reload_hint[HINT_CHAIN] = 1;
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Beat controller %s parameter P%d on FX chain entry %d",
+           active ? "owns" : "releases",
+           param,
+           info->uc.selected_chain_entry);
+}
+
+void on_beat_own_p0_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 0); }
+void on_beat_own_p1_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 1); }
+void on_beat_own_p2_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 2); }
+void on_beat_own_p3_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 3); }
+void on_beat_own_p4_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 4); }
+void on_beat_own_p5_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 5); }
+void on_beat_own_p6_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 6); }
+void on_beat_own_p7_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 7); }
+void on_beat_own_p8_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 8); }
+void on_beat_own_p9_toggled(GtkWidget *widget, gpointer user_data)  { beat_param_owner_toggled(widget, 9); }
+void on_beat_own_p10_toggled(GtkWidget *widget, gpointer user_data) { beat_param_owner_toggled(widget, 10); }
+void on_beat_own_p11_toggled(GtkWidget *widget, gpointer user_data) { beat_param_owner_toggled(widget, 11); }
+void on_beat_own_p12_toggled(GtkWidget *widget, gpointer user_data) { beat_param_owner_toggled(widget, 12); }
+void on_beat_own_p13_toggled(GtkWidget *widget, gpointer user_data) { beat_param_owner_toggled(widget, 13); }
+void on_beat_own_p14_toggled(GtkWidget *widget, gpointer user_data) { beat_param_owner_toggled(widget, 14); }
+void on_beat_own_p15_toggled(GtkWidget *widget, gpointer user_data) { beat_param_owner_toggled(widget, 15); }
 
 void    on_button_audio_mute_toggled(GtkWidget *widget, gpointer user_data) {
 
@@ -7264,33 +7321,53 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
     }
 }
 
+static int callback_playmode_panel_page(int pm)
+{
+    switch(pm)
+    {
+        case MODE_SAMPLE:
+            return 0;
+        case MODE_STREAM:
+            return 1;
+        case MODE_PLAIN:
+            return 2;
+        default:
+            break;
+    }
+
+    return 2;
+}
+
+static void callback_sync_playmode_panel_pages(void)
+{
+    GtkWidget *n = glade_xml_get_widget_(info->main_window, "panels");
+    int page_needed = callback_playmode_panel_page(info->status_tokens[PLAY_MODE]);
+
+    if(!n || !GTK_IS_NOTEBOOK(n))
+        return;
+
+    for(int i = 0; i < 3; i++)
+    {
+        GtkWidget *page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(n), i);
+
+        if(!page)
+            continue;
+
+        if(i == page_needed)
+            gtk_widget_show(page);
+        else
+            gtk_widget_hide(page);
+    }
+
+    if(gtk_notebook_get_current_page(GTK_NOTEBOOK(n)) != page_needed)
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(n), page_needed);
+}
+
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *m = glade_xml_get_widget_(info->main_window , "notebook18");
 	gtk_notebook_set_current_page( GTK_NOTEBOOK(m), 6 );
-
-	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
-
-	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-
-	gint page_needed = 2;
-
-	switch( info->status_tokens[PLAY_MODE] )
-	{
-		case MODE_SAMPLE:
-			page_needed =0 ; break;
-		case MODE_STREAM:
-			page_needed = 1; break;
-		case MODE_PLAIN:
-			page_needed = 2; break;
-		default:
-			break;
-	}
-
-	if( page_needed != page )
-		gtk_notebook_set_current_page(
-				GTK_NOTEBOOK(n),
-				page_needed );
+	callback_sync_playmode_panel_pages();
 }
 
 static gint timeline_marker_last_sent_sample = -1;
@@ -8029,15 +8106,7 @@ void	on_filter_effects_changed( GtkWidget *w, effectlist_data *user_data)
 
 void	on_console1_activate(GtkWidget *w, gpointer user_data)
 {
-	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
-	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK( n ) );
-
-	if( page == MODE_PLAIN )
-		gtk_notebook_set_current_page( GTK_NOTEBOOK(n),
-				info->status_tokens[PLAY_MODE] );
-	else
-		gtk_notebook_set_current_page( GTK_NOTEBOOK(n),
-				MODE_PLAIN );
+	callback_sync_playmode_panel_pages();
 }
 
 gboolean	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)

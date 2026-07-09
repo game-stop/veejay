@@ -591,6 +591,22 @@ enum {
   WIDGET_AUDIO_MIXER_ORIGINAL_RADIO = 433,
   WIDGET_AUDIO_MIXER_EXTERNAL_RADIO = 434,
   WIDGET_AUDIO_MIXER_MIX_RADIO = 435,
+  WIDGET_BEAT_OWN_P0 = 436,
+  WIDGET_BEAT_OWN_P1 = 437,
+  WIDGET_BEAT_OWN_P2 = 438,
+  WIDGET_BEAT_OWN_P3 = 439,
+  WIDGET_BEAT_OWN_P4 = 440,
+  WIDGET_BEAT_OWN_P5 = 441,
+  WIDGET_BEAT_OWN_P6 = 442,
+  WIDGET_BEAT_OWN_P7 = 443,
+  WIDGET_BEAT_OWN_P8 = 444,
+  WIDGET_BEAT_OWN_P9 = 445,
+  WIDGET_BEAT_OWN_P10 = 446,
+  WIDGET_BEAT_OWN_P11 = 447,
+  WIDGET_BEAT_OWN_P12 = 448,
+  WIDGET_BEAT_OWN_P13 = 449,
+  WIDGET_BEAT_OWN_P14 = 450,
+  WIDGET_BEAT_OWN_P15 = 451,
   WIDGET_CURVE_SPIN_ANIMATION_SEED = 413,
   WIDGET_CURVE_BUTTON_ANIMATION_SHUFFLE = 414,
   WIDGET_CURVE_SPIN_ANIMATION_DETAIL = 415,
@@ -992,6 +1008,22 @@ static struct
     { "label_p10_beat",         WIDGET_LABEL_P10_BEAT },
     { "label_p11_beat",         WIDGET_LABEL_P11_BEAT },
     { "label_p12_beat",         WIDGET_LABEL_P12_BEAT },
+    { "beat_own_p0",            WIDGET_BEAT_OWN_P0 },
+    { "beat_own_p1",            WIDGET_BEAT_OWN_P1 },
+    { "beat_own_p2",            WIDGET_BEAT_OWN_P2 },
+    { "beat_own_p3",            WIDGET_BEAT_OWN_P3 },
+    { "beat_own_p4",            WIDGET_BEAT_OWN_P4 },
+    { "beat_own_p5",            WIDGET_BEAT_OWN_P5 },
+    { "beat_own_p6",            WIDGET_BEAT_OWN_P6 },
+    { "beat_own_p7",            WIDGET_BEAT_OWN_P7 },
+    { "beat_own_p8",            WIDGET_BEAT_OWN_P8 },
+    { "beat_own_p9",            WIDGET_BEAT_OWN_P9 },
+    { "beat_own_p10",           WIDGET_BEAT_OWN_P10 },
+    { "beat_own_p11",           WIDGET_BEAT_OWN_P11 },
+    { "beat_own_p12",           WIDGET_BEAT_OWN_P12 },
+    { "beat_own_p13",           WIDGET_BEAT_OWN_P13 },
+    { "beat_own_p14",           WIDGET_BEAT_OWN_P14 },
+    { "beat_own_p15",           WIDGET_BEAT_OWN_P15 },
     { "inc_p0",                 WIDGET_INC_P0 },
     { "inc_p1",                 WIDGET_INC_P1 },
     { "inc_p2",                 WIDGET_INC_P2 },
@@ -1623,7 +1655,7 @@ enum
     ENTRY_VIDEO_ENABLED = 9,
     ENTRY_BEAT_FLAG = 10,
     ENTRY_SUBRENDER_ENTRY = 11,
-    ENTRY_BEAT_GLOBAL_STATE = 12,
+    ENTRY_BEAT_PARAM_MASK = 12,
     ENTRY_P0 = 13,
     ENTRY_P1 = 14,
     ENTRY_P2 = 15,
@@ -1651,8 +1683,8 @@ enum
 #define STATUS_CHAIN_ENTRY_NUM_PARAMETERS       85
 #define STATUS_CHAIN_ENTRY_KF_TYPE              86
 #define STATUS_CHAIN_ENTRY_KF_STATUS            87
-#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED   88
-#define STATUS_CHAIN_ENTRY_TRANSITION_LOOP      89
+#define STATUS_CHAIN_ENTRY_TRANSITION_ENABLED    88
+#define STATUS_CHAIN_ENTRY_BEAT_PARAM_MASK       89
 #define STATUS_CHAIN_ENTRY_SOURCE               90
 #define STATUS_CHAIN_ENTRY_CHANNEL              91
 #define STATUS_CHAIN_ENTRY_VIDEO_ENABLED        92
@@ -2736,9 +2768,13 @@ static void init_fx_param_step_buttons(void)
         GtkWidget *frame = widget_cache[WIDGET_FRAME_P0 + i];
         GtkWidget *box = widget_cache[WIDGET_SLIDER_BOX_P0 + i];
         GtkWidget *slider = widget_cache[WIDGET_SLIDER_P0 + i];
+        GtkWidget *label = widget_cache[WIDGET_LABEL_P0 + i];
         GtkWidget *inc = widget_cache[WIDGET_INC_P0 + i];
         GtkWidget *dec = widget_cache[WIDGET_DEC_P0 + i];
+        GtkWidget *beat = widget_cache[WIDGET_BEAT_OWN_P0 + i];
+        GtkWidget *content_box = NULL;
         GtkWidget *step_box = NULL;
+        GtkWidget *slider_stack = NULL;
 
         if(!frame || !box || !slider || !inc || !dec || !GTK_IS_BOX(box))
             continue;
@@ -2792,6 +2828,43 @@ static void init_fx_param_step_buttons(void)
             gtk_scale_set_value_pos(GTK_SCALE(slider), GTK_POS_TOP);
         }
 
+        if(label) {
+            snprintf(name, sizeof(name), "label_p%d", i);
+            gtk_widget_set_name(label, name);
+            add_class(label, "p_label");
+            gtk_widget_set_size_request(label, 12, -1);
+            gtk_widget_set_margin_left(label, 0);
+            gtk_widget_set_margin_right(label, 0);
+            gtk_widget_set_margin_top(label, 0);
+            gtk_widget_set_margin_bottom(label, 0);
+            gtk_widget_set_hexpand(label, FALSE);
+            gtk_widget_set_vexpand(label, TRUE);
+            gtk_widget_set_halign(label, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(label, GTK_ALIGN_FILL);
+            if(GTK_IS_LABEL(label)) {
+                gtk_label_set_angle(GTK_LABEL(label), 90.0);
+                gtk_label_set_xalign(GTK_LABEL(label), 0.5);
+                gtk_label_set_yalign(GTK_LABEL(label), 0.0);
+                gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+            }
+        }
+
+        if(beat) {
+            snprintf(name, sizeof(name), "beat_own_p%d", i);
+            gtk_widget_set_name(beat, name);
+            add_class(beat, "fx-beat-owner");
+            add_class(beat, "smallaspossible");
+            gtk_widget_set_size_request(beat, 14, 14);
+            gtk_widget_set_margin_left(beat, 0);
+            gtk_widget_set_margin_right(beat, 0);
+            gtk_widget_set_margin_top(beat, 0);
+            gtk_widget_set_margin_bottom(beat, 2);
+            gtk_widget_set_hexpand(beat, FALSE);
+            gtk_widget_set_vexpand(beat, FALSE);
+            gtk_widget_set_halign(beat, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(beat, GTK_ALIGN_CENTER);
+        }
+
         snprintf(name, sizeof(name), "inc_p%d", i);
         gtk_widget_set_name(inc, name);
         add_class(inc, "fx-param-step");
@@ -2825,11 +2898,19 @@ static void init_fx_param_step_buttons(void)
         gtk_widget_set_valign(dec, GTK_ALIGN_FILL);
 
         g_object_ref(slider);
+        if(label)
+            g_object_ref(label);
         g_object_ref(dec);
         g_object_ref(inc);
+        if(beat)
+            g_object_ref(beat);
         fx_remove_from_parent(slider);
+        if(label)
+            fx_remove_from_parent(label);
         fx_remove_from_parent(dec);
         fx_remove_from_parent(inc);
+        if(beat)
+            fx_remove_from_parent(beat);
         fx_box_clear(box);
 
         step_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -2850,13 +2931,58 @@ static void init_fx_param_step_buttons(void)
 
         gtk_box_pack_start(GTK_BOX(step_box), dec, FALSE, FALSE, 0);
         gtk_box_pack_start(GTK_BOX(step_box), inc, FALSE, FALSE, 0);
-        gtk_box_pack_start(GTK_BOX(box), slider, TRUE, TRUE, 0);
+
+        content_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+        snprintf(name, sizeof(name), "fx_param_content_box_p%d", i);
+        gtk_widget_set_name(content_box, name);
+        add_class(content_box, "fx-param-content-box");
+        gtk_widget_set_hexpand(content_box, TRUE);
+        gtk_widget_set_vexpand(content_box, TRUE);
+        gtk_widget_set_halign(content_box, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(content_box, GTK_ALIGN_FILL);
+        gtk_box_set_spacing(GTK_BOX(content_box), 0);
+        gtk_box_set_homogeneous(GTK_BOX(content_box), FALSE);
+
+        if(label)
+            gtk_box_pack_start(GTK_BOX(content_box), label, FALSE, FALSE, 0);
+
+        if(beat) {
+            slider_stack = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+            snprintf(name, sizeof(name), "fx_param_slider_stack_p%d", i);
+            gtk_widget_set_name(slider_stack, name);
+            add_class(slider_stack, "fx-param-slider-stack");
+            gtk_widget_set_hexpand(slider_stack, TRUE);
+            gtk_widget_set_vexpand(slider_stack, TRUE);
+            gtk_widget_set_halign(slider_stack, GTK_ALIGN_FILL);
+            gtk_widget_set_valign(slider_stack, GTK_ALIGN_FILL);
+            gtk_box_set_spacing(GTK_BOX(slider_stack), 0);
+            gtk_box_set_homogeneous(GTK_BOX(slider_stack), FALSE);
+            gtk_box_pack_start(GTK_BOX(slider_stack), beat, FALSE, FALSE, 0);
+            gtk_box_pack_start(GTK_BOX(slider_stack), slider, TRUE, TRUE, 0);
+            gtk_box_pack_start(GTK_BOX(content_box), slider_stack, TRUE, TRUE, 0);
+        }
+        else {
+            gtk_box_pack_start(GTK_BOX(content_box), slider, TRUE, TRUE, 0);
+        }
+
+        gtk_box_pack_start(GTK_BOX(box), content_box, TRUE, TRUE, 0);
         gtk_box_pack_end(GTK_BOX(box), step_box, FALSE, FALSE, 0);
 
         g_object_unref(slider);
+        if(label)
+            g_object_unref(label);
         g_object_unref(dec);
         g_object_unref(inc);
+        if(beat)
+            g_object_unref(beat);
 
+        gtk_widget_show(content_box);
+        if(label)
+            gtk_widget_show(label);
+        if(slider_stack)
+            gtk_widget_show(slider_stack);
+        if(beat)
+            gtk_widget_show(beat);
         gtk_widget_show(step_box);
         gtk_widget_show(slider);
         gtk_widget_show(dec);
@@ -8194,7 +8320,8 @@ static gint load_parameter_info(void)
     p[ENTRY_KF_TYPE] = raw[3];
     p[ENTRY_KF_STATUS] = raw[4];
     p[ENTRY_TRANSITION_ENABLED] = raw[5];
-    p[ENTRY_TRANSITION_LOOP] = raw[6];
+    p[ENTRY_BEAT_PARAM_MASK] = raw[6] & ((1 << SAMPLE_MAX_PARAMETERS) - 1);
+    p[ENTRY_TRANSITION_LOOP] = 0;
     p[ENTRY_SOURCE] = raw[7];
     p[ENTRY_CHANNEL] = raw[8];
     p[ENTRY_VIDEO_ENABLED] = raw[9];
@@ -11137,11 +11264,54 @@ int veejay_update_multitrack( void *ptr )
     return 1;
 }
 
+static int ui_playmode_panel_page(int pm)
+{
+    switch(pm)
+    {
+        case MODE_SAMPLE:
+            return 0;
+        case MODE_STREAM:
+            return 1;
+        case MODE_PLAIN:
+            return 2;
+        default:
+            break;
+    }
+
+    return 2;
+}
+
+static void ui_sync_playmode_panel_pages(int pm)
+{
+    GtkWidget *n = widget_cache[WIDGET_PANELS];
+    int page_needed = ui_playmode_panel_page(pm);
+
+    if(!n || !GTK_IS_NOTEBOOK(n))
+        return;
+
+    for(int i = 0; i < 3; i++)
+    {
+        GtkWidget *page = gtk_notebook_get_nth_page(GTK_NOTEBOOK(n), i);
+
+        if(!page)
+            continue;
+
+        if(i == page_needed)
+            gtk_widget_show(page);
+        else
+            gtk_widget_hide(page);
+    }
+
+    if(gtk_notebook_get_current_page(GTK_NOTEBOOK(n)) != page_needed)
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(n), page_needed);
+}
+
 static void update_status_accessibility(int old_pm, int new_pm, int force)
 {
     int i;
 
     set_pm_page_label(new_pm);
+    ui_sync_playmode_panel_pages(new_pm);
 
     if(old_pm == new_pm && !force)
         return;
@@ -11181,26 +11351,6 @@ static void update_status_accessibility(int old_pm, int new_pm, int force)
         for(i = 0; plain_widget_map[i].plain_widget_id != PLAIN_WIDGET_NONE; i++)
             set_widget_sensitive_cached(plain_widget_map[i].widget_id, TRUE);
     }
-
-    GtkWidget *n = widget_cache[WIDGET_PANELS];
-    int page_needed = 0;
-    switch(new_pm)
-    {
-        case MODE_SAMPLE:
-            page_needed = 0;
-            break;
-        case MODE_STREAM:
-            page_needed = 1;
-            break;
-        case MODE_PLAIN:
-            page_needed = 2;
-            break;
-        default:
-            break;
-    }
-
-    if(n && GTK_IS_NOTEBOOK(n))
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(n), page_needed);
 
     samplebank_update_offline_recorder_gadget();
 }
@@ -14082,6 +14232,73 @@ static void fx_auto_apply_param_name_label_style(GtkWidget *label,
         gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
 }
 
+static GtkWidget *fx_beat_owner_widget(int param)
+{
+    if(param < 0 || param >= MAX_UI_PARAMETERS)
+        return NULL;
+
+    return widget_cache[WIDGET_BEAT_OWN_P0 + param];
+}
+
+static int fx_beat_owner_mask_has_param(int mask, int param)
+{
+    if(param < 0 || param >= SAMPLE_MAX_PARAMETERS)
+        return 0;
+
+    return (mask & (1 << param)) ? 1 : 0;
+}
+
+static void fx_beat_owner_set_guarded(int param, int active, int sensitive, int effect_id)
+{
+    GtkWidget *w = fx_beat_owner_widget(param);
+    int old_lock;
+    char tip[256];
+    const char *name = NULL;
+
+    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+        return;
+
+    active = active ? 1 : 0;
+    sensitive = sensitive ? 1 : 0;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) != active)
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active);
+
+    if(gtk_widget_is_sensitive(w) != sensitive)
+        gtk_widget_set_sensitive_(w, sensitive);
+
+    info->status_lock = old_lock;
+
+    if(effect_id > 0 && param >= 0)
+        name = _effect_get_param_description(effect_id, param);
+
+    snprintf(tip, sizeof(tip),
+             "Beat owns P%d%s%s when entry beat is on; off keeps manual control.",
+             param,
+             (name && name[0]) ? " — " : "",
+             (name && name[0]) ? name : "");
+
+    gtk_widget_set_tooltip_text(w, tip);
+}
+
+static void fx_beat_owner_clear_all(void)
+{
+    for(int i = 0; i < MAX_UI_PARAMETERS; i++)
+        fx_beat_owner_set_guarded(i, 0, 0, 0);
+}
+
+static void fx_beat_owner_sync_all(int effect_id, int num_params, int beat_mask)
+{
+    for(int i = 0; i < MAX_UI_PARAMETERS; i++) {
+        int valid = i < num_params && i < MAX_VISIBLE_FX_PARAMETERS;
+        int owned = valid ? fx_beat_owner_mask_has_param(beat_mask, i) : 0;
+        fx_beat_owner_set_guarded(i, owned, valid, effect_id);
+    }
+}
+
 static void fx_auto_clear_param_beat_ui(int param)
 {
     GtkWidget *slider;
@@ -14118,7 +14335,8 @@ static void fx_auto_clear_param_beat_ui(int param)
 
 static void fx_auto_update_param_beat_ui(int effect_id,
                                          int param,
-                                         int entry_beat_enabled)
+                                         int entry_beat_enabled,
+                                         int param_beat_owned)
 {
     GtkWidget *slider;
     GtkWidget *glyph;
@@ -14160,7 +14378,8 @@ static void fx_auto_update_param_beat_ui(int effect_id,
         gtk_label_set_text(GTK_LABEL(glyph), style->glyph);
 
         snprintf(tip, sizeof(tip),
-            "Auto FX controls P%d%s%s\n"
+            "Auto FX beat hint for P%d%s%s\n"
+            "Ownership: %s\n"
             "Beat family: %s\n"
             "Depth: normal %d%%, climax %d%%\n"
             "Envelope: attack %d ms, hold %d ms, release %d ms\n"
@@ -14168,6 +14387,7 @@ static void fx_auto_update_param_beat_ui(int effect_id,
             param,
             (param_name && param_name[0]) ? " — " : "",
             (param_name && param_name[0]) ? param_name : "",
+            param_beat_owned ? "beat" : "manual",
             style->label,
             hint->normal_depth_pct,
             hint->climax_depth_pct,
@@ -14288,6 +14508,8 @@ static void disable_fx_entry(void) {
     kf_param_combo_set_active_guarded(kf_param,
         info->uc.selected_parameter_id == VJ_KF_PARAM_CHAIN_OPACITY ? 1 : 0);
 
+    fx_beat_owner_clear_all();
+
     for( i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
         update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i], min,max, value, 0 );
@@ -14301,8 +14523,8 @@ static void disable_fx_entry(void) {
 
         update_slider_state(i, FALSE);
 
-        if( faster_ui_ )
-            gtk_widget_hide( widget_cache[WIDGET_FRAME_P0 + i]);
+        if(faster_ui_ || i >= MAX_VISIBLE_FX_PARAMETERS)
+            gtk_widget_hide(widget_cache[WIDGET_FRAME_P0 + i]);
     }
 }
 
@@ -14326,11 +14548,12 @@ static void enable_fx_entry(void) {
     {
         int param = info->uc.selected_fx_param - WIDGET_SLIDER_P0;
         int np = _effect_get_np(entry_tokens[ENTRY_FXID]);
+        int visible_np = np > MAX_VISIBLE_FX_PARAMETERS ? MAX_VISIBLE_FX_PARAMETERS : np;
 
         i = 0;
         while (( widget_map[i].id != info->uc.selected_fx_param ) && ( widget_map[i].id != -1 ) ) i++;
 
-        if(widget_map[i].id == -1 || param < 0 || param >= np || param >= SAMPLE_MAX_PARAMETERS) {
+        if(widget_map[i].id == -1 || param < 0 || param >= visible_np || param >= SAMPLE_MAX_PARAMETERS) {
             info->uc.selected_fx_param = -1;
             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_VALUE_FRIENDLYNAME] ), FX_PARAMETER_VALUE_DEFAULT_HINT );
         }
@@ -14394,25 +14617,29 @@ static void enable_fx_entry(void) {
     GtkWidget *kf_param = widget_cache[ WIDGET_COMBO_CURVE_FX_PARAM ];
 
     int np = _effect_get_np( entry_tokens[ENTRY_FXID] );
+    int visible_np = np > MAX_VISIBLE_FX_PARAMETERS ? MAX_VISIBLE_FX_PARAMETERS : np;
     gint min,max,value;
 
     kf_param_combo_rebuild_if_needed(kf_param, entry_tokens[ENTRY_FXID], np);
+    fx_beat_owner_sync_all(entry_tokens[ENTRY_FXID], visible_np, entry_tokens[ENTRY_BEAT_PARAM_MASK]);
 
-    for( i = 0; i < np ; i ++ )
+    for( i = 0; i < visible_np ; i ++ )
     {
         if(!gtk_widget_is_sensitive(widget_cache[WIDGET_SLIDER_BOX_P0 + i]))
             gtk_widget_set_sensitive_(widget_cache[WIDGET_SLIDER_BOX_P0 + i], TRUE );
 
-        if( faster_ui_ ){
-            gtk_widget_show(widget_cache[WIDGET_FRAME_P0 + i]);
-        }
+        if(widget_cache[WIDGET_FRAME_P0 + i])
+            gtk_widget_show_all(widget_cache[WIDGET_FRAME_P0 + i]);
 
         gchar *tt1 = _effect_get_param_description(entry_tokens[ENTRY_FXID],i);
         gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], tt1 );
         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_P0 + i ] ), tt1 );
 
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
-            fx_auto_update_param_beat_ui(entry_tokens[ENTRY_FXID], i, entry_tokens[ENTRY_BEAT_FLAG]);
+            fx_auto_update_param_beat_ui(entry_tokens[ENTRY_FXID],
+                                         i,
+                                         entry_tokens[ENTRY_BEAT_FLAG],
+                                         fx_beat_owner_mask_has_param(entry_tokens[ENTRY_BEAT_PARAM_MASK], i));
 
         value = entry_tokens[ENTRY_PARAMSET + i];
         if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
@@ -14444,21 +14671,18 @@ static void enable_fx_entry(void) {
     }
 
     min = 0; max = 1; value = 0;
-    for( i = np; i < MAX_UI_PARAMETERS; i ++ )
+    for( i = visible_np; i < MAX_UI_PARAMETERS; i ++ )
     {
-        if( !gtk_widget_is_sensitive(widget_cache[WIDGET_SLIDER_P0 + i]) )
-            continue;
+        if(gtk_widget_is_sensitive(widget_cache[WIDGET_SLIDER_P0 + i]))
+            update_slider_range2(widget_cache[WIDGET_SLIDER_P0 + i], min, max, value, 0);
 
-        update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i ],min,max, value, 0 );
+        gtk_widget_set_sensitive(widget_cache[WIDGET_SLIDER_BOX_P0 + i], FALSE);
 
-        gtk_widget_set_sensitive(widget_cache[ WIDGET_SLIDER_BOX_P0 + i ], FALSE );
+        if(faster_ui_ || i >= MAX_VISIBLE_FX_PARAMETERS)
+            gtk_widget_hide(widget_cache[WIDGET_FRAME_P0 + i]);
 
-        if( faster_ui_ )
-          gtk_widget_hide( widget_cache[ WIDGET_FRAME_P0 + i ] );
-
-        gtk_widget_set_tooltip_text( widget_cache[ WIDGET_SLIDER_P0 + i ], "" );
-
-        gtk_label_set_text(GTK_LABEL (widget_cache[WIDGET_LABEL_P0 + i]), "");
+        gtk_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], "");
+        gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 + i]), "");
 
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
             fx_auto_clear_param_beat_ui(i);
