@@ -62,14 +62,25 @@ vj_effect *baltantv_init(int w, int h)
     ve->limits[0][4] = 0;   ve->limits[1][4] = 255;      ve->defaults[4] = 96;
 
     ve->description = "BaltanTV";
-    ve->sub_format = -1;
+    ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Stride", "Temporal Taps", "Decay", "Feedback", "Chroma Persistence");
 
     ve->beat_hints = vje_build_beat_hint_list(
         ve->num_params,
-        VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_LOG, 3, 420, 10, 48, 1200, 4200, 0, 76
+
+        VJ_BEAT_OFF, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* Stride */
+        VJ_BEAT_OFF, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* Temporal Taps */
+
+        VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_LOG,
+            96, 235, 140, 220, 900, 3600, 0, 72,                  /* Decay */
+
+        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,
+            32, 220, 80, 190, 600, 2400, 0, 70,                   /* Feedback */
+
+        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,
+            16, 220, 48, 180, 700, 2800, 0, 58                    /* Chroma Persistence */
     );
 
     return ve;
@@ -129,74 +140,57 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
     const int chromaPersist = args[4];
 
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    uint8_t *restrict dstY = b->historyY + (b->plane * len);
-    int16_t *restrict dstU = b->historyU + (b->plane * uv_len);
-    int16_t *restrict dstV = b->historyV + (b->plane * uv_len);
-
     const int plane = b->plane;
     const int inv_taps_q16 = 65536 / taps;
+    const int live_chroma = 255 - chromaPersist;
 
-    #pragma omp parallel num_threads(b->n_threads)
+    uint8_t *restrict dstY = b->historyY + (plane * len);
+    int16_t *restrict dstU = b->historyU + (plane * len);
+    int16_t *restrict dstV = b->historyV + (plane * len);
+
+    #pragma omp parallel for schedule(static) num_threads(b->n_threads)
+    for(int i = 0; i < len; i++)
     {
-        #pragma omp for simd schedule(static)
-        for(int i = 0; i < len; i++)
-            dstY[i] = Y[i];
+        const int srcY = Y[i];
+        const int srcU = (int)U[i] - 128;
+        const int srcV = (int)V[i] - 128;
 
-        #pragma omp for simd schedule(static)
-        for(int i = 0; i < uv_len; i++)
+        dstY[i] = (uint8_t) srcY;
+        dstU[i] = (int16_t) srcU;
+        dstV[i] = (int16_t) srcV;
+
+        int accumY = 0;
+        int accumU = 0;
+        int accumV = 0;
+
+        for(int t = 0; t < taps; t++)
         {
-            dstU[i] = (int16_t)((int)U[i] - 128);
-            dstV[i] = (int16_t)((int)V[i] - 128);
+            const int idx = baltan_plane_index(plane, t, stride);
+            const int off = idx * len + i;
+
+            accumY += b->historyY[off];
+            accumU += b->historyU[off];
+            accumV += b->historyV[off];
         }
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            int accumY = 0;
+        accumY = (accumY * inv_taps_q16) >> 16;
+        accumU = (accumU * inv_taps_q16) >> 16;
+        accumV = (accumV * inv_taps_q16) >> 16;
 
-            for(int t = 0; t < taps; t++)
-            {
-                const int idx = baltan_plane_index(plane, t, stride);
-                accumY += b->historyY[idx * len + i];
-            }
+        accumY = (accumY * decay) >> 8;
 
-            accumY = ((accumY * inv_taps_q16) >> 16);
-            accumY = (accumY * decay) >> 8;
+        const int finalY = (srcY * (255 - feedback) + accumY * feedback) >> 8;
+        const int finalU = (srcU * live_chroma + accumU * chromaPersist) >> 8;
+        const int finalV = (srcV * live_chroma + accumV * chromaPersist) >> 8;
 
-            const int finalY = ((int)Y[i] * (255 - feedback) + accumY * feedback) >> 8;
-
-            Y[i] = CLAMP_Y(finalY);
-        }
-
-        #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++)
-        {
-            int accumU = 0;
-            int accumV = 0;
-
-            for(int t = 0; t < taps; t++)
-            {
-                const int idx = baltan_plane_index(plane, t, stride);
-
-                accumU += b->historyU[idx * uv_len + i];
-                accumV += b->historyV[idx * uv_len + i];
-            }
-
-            accumU = ((accumU * inv_taps_q16) >> 16);
-            accumV = ((accumV * inv_taps_q16) >> 16);
-
-            accumU = (accumU * chromaPersist) >> 8;
-            accumV = (accumV * chromaPersist) >> 8;
-
-            U[i] = CLAMP_UV(accumU + 128);
-            V[i] = CLAMP_UV(accumV + 128);
-        }
+        Y[i] = CLAMP_Y(finalY);
+        U[i] = CLAMP_UV(finalU + 128);
+        V[i] = CLAMP_UV(finalV + 128);
     }
 
     b->plane = (plane + 1) & PLANE_MASK;
