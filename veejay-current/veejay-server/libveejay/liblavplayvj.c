@@ -3070,6 +3070,47 @@ static int veejay_pipe_chain_entry_display_arg(veejay_t *info, sample_eff_chain 
     return value;
 }
 
+static int veejay_pipe_beat_hint_drives_param(int effect_id, int param_nr)
+{
+#ifdef VJ_BEAT_F_REJECT
+    const vj_beat_param_hint_t *hint = vje_get_beat_hint(effect_id, param_nr);
+
+    if(!hint)
+        return 0;
+
+    return hint->klass != VJ_BEAT_OFF && !(hint->flags & VJ_BEAT_F_REJECT);
+#else
+    (void)effect_id;
+    (void)param_nr;
+    return 0;
+#endif
+}
+
+static uint32_t veejay_pipe_effective_beat_param_mask(sample_eff_chain *entry, int num_params)
+{
+    uint32_t raw;
+    uint32_t hinted = 0;
+
+    if(!entry || entry->effect_id <= 0 || num_params <= 0)
+        return 0;
+
+    raw = sample_eff_chain_beat_param_mask(entry);
+
+    if(num_params > SAMPLE_MAX_PARAMETERS)
+        num_params = SAMPLE_MAX_PARAMETERS;
+
+    for(int i = 0; i < num_params; i++)
+    {
+        if(veejay_pipe_beat_hint_drives_param(entry->effect_id, i))
+            hinted |= SAMPLE_BEAT_PARAM_BIT(i);
+    }
+
+    if(hinted == 0)
+        return raw;
+
+    return raw & hinted;
+}
+
 static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
 {
     sample_eff_chain **src = NULL;
@@ -3118,7 +3159,7 @@ static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
     ptr = vj_sprintf(ptr, entry->kf_type);         /* 86 */
     ptr = vj_sprintf(ptr, entry->kf_status);       /* 87 */
     ptr = vj_sprintf(ptr, 0);                      /* 88 transition enabled */
-    ptr = vj_sprintf(ptr, (int)sample_eff_chain_beat_param_mask(entry)); /* 89 beat parameter ownership mask */
+    ptr = vj_sprintf(ptr, (int)veejay_pipe_effective_beat_param_mask(entry, num_params)); /* 89 effective beat parameter ownership mask */
     ptr = vj_sprintf(ptr, entry->source_type);     /* 90 */
     ptr = vj_sprintf(ptr, entry->channel);         /* 91 */
     ptr = vj_sprintf(ptr, entry->e_flag);          /* 92 */

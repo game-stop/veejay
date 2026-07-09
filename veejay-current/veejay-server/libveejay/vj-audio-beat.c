@@ -10899,11 +10899,6 @@ int vj_audio_beat_auto_build_table(void)
     {
         int n_params;
 
-#ifdef VJ_PLUGIN
-        if(fx_id >= VJ_PLUGIN)
-            continue;
-#endif
-
         if(!vje_is_valid(fx_id))
             continue;
 

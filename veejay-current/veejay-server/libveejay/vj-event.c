@@ -10345,6 +10345,65 @@ void vj_event_audio_beat_fx_entry(void *ptr, const char format[], va_list ap)
 #endif
 }
 
+static int vj_event_beat_hint_drives_param(int effect_id, int param_nr)
+{
+#ifdef VJ_BEAT_F_REJECT
+    const vj_beat_param_hint_t *hint = vje_get_beat_hint(effect_id, param_nr);
+
+    if(!hint)
+        return 0;
+
+    return hint->klass != VJ_BEAT_OFF && !(hint->flags & VJ_BEAT_F_REJECT);
+#else
+    (void)effect_id;
+    (void)param_nr;
+    return 0;
+#endif
+}
+
+static uint32_t vj_event_allowed_beat_param_mask(int effect_id)
+{
+    uint32_t hinted = 0;
+    int n_params;
+
+    if(effect_id <= 0 || !vje_is_valid(effect_id))
+        return 0;
+
+    n_params = vje_get_num_params(effect_id);
+
+    if(n_params <= 0)
+        return 0;
+
+    if(n_params > SAMPLE_MAX_PARAMETERS)
+        n_params = SAMPLE_MAX_PARAMETERS;
+
+    for(int i = 0; i < n_params; i++)
+    {
+        if(vj_event_beat_hint_drives_param(effect_id, i))
+            hinted |= SAMPLE_BEAT_PARAM_BIT(i);
+    }
+
+    if(hinted == 0)
+        return SAMPLE_BEAT_PARAM_MASK_ALL;
+
+    return hinted;
+}
+
+
+static uint32_t vj_event_effective_beat_param_mask(sample_eff_chain *entry, int num_params)
+{
+    uint32_t allowed;
+    uint32_t raw;
+
+    if(!entry || entry->effect_id <= 0 || num_params <= 0)
+        return 0;
+
+    raw = sample_eff_chain_beat_param_mask(entry);
+    allowed = vj_event_allowed_beat_param_mask(entry->effect_id);
+
+    return raw & allowed;
+}
+
 void vj_event_audio_beat_fx_param(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t *) ptr;
@@ -10439,6 +10498,15 @@ void vj_event_audio_beat_fx_param(void *ptr, const char format[], va_list ap)
         state = sample_eff_chain_beat_param_enabled(src[args[1]], args[2]) ? 0 : 1;
     else
         state = args[3] ? 1 : 0;
+
+    {
+        uint32_t allowed = vj_event_allowed_beat_param_mask(src[args[1]]->effect_id);
+
+        src[args[1]]->beat_param_mask &= allowed;
+
+        if(state && (allowed & SAMPLE_BEAT_PARAM_BIT(args[2])) == 0)
+            state = 0;
+    }
 
     sample_eff_chain_set_beat_param_enabled(src[args[1]], args[2], state);
 
@@ -13135,7 +13203,7 @@ void vj_event_send_chain_entry(void *ptr, const char format[], va_list ap)
         num_params = SAMPLE_MAX_PARAMETERS;
 
     int transition_enabled = 0;
-    int beat_param_mask = (int)sample_eff_chain_beat_param_mask(entry);
+    int beat_param_mask = (int)vj_event_effective_beat_param_mask(entry, num_params);
 
     int n = snprintf(
         payload,
@@ -13251,7 +13319,7 @@ void vj_event_send_chain_entry_parameters(void *ptr, const char format[], va_lis
         num_params = SAMPLE_MAX_PARAMETERS;
 
     int transition_enabled = 0;
-    int beat_param_mask = (int)sample_eff_chain_beat_param_mask(entry);
+    int beat_param_mask = (int)vj_event_effective_beat_param_mask(entry, num_params);
 
     char payload[4096];
     char *p = payload;
