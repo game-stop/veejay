@@ -3118,7 +3118,7 @@ static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
     ptr = vj_sprintf(ptr, entry->kf_type);         /* 86 */
     ptr = vj_sprintf(ptr, entry->kf_status);       /* 87 */
     ptr = vj_sprintf(ptr, 0);                      /* 88 transition enabled */
-    ptr = vj_sprintf(ptr, 0);                      /* 89 transition loop */
+    ptr = vj_sprintf(ptr, (int)sample_eff_chain_beat_param_mask(entry)); /* 89 beat parameter ownership mask */
     ptr = vj_sprintf(ptr, entry->source_type);     /* 90 */
     ptr = vj_sprintf(ptr, entry->channel);         /* 91 */
     ptr = vj_sprintf(ptr, entry->e_flag);          /* 92 */
@@ -7961,6 +7961,8 @@ veejay_t *veejay_malloc()
 		info->global_chain->fx_chain[i] = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain));
 		if(!info->global_chain->fx_chain[i])
 			return NULL;
+		info->global_chain->fx_chain[i]->effect_id = -1;
+		info->global_chain->fx_chain[i]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
 	}
 
 	if (!(info->uc)) 

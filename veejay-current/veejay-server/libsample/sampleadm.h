@@ -33,6 +33,8 @@
 #define SAMPLE_MAX_SAMPLES  16384 /* 4096 samples at most */
 
 #define SAMPLE_MAX_PARAMETERS 16	/* 16 parameters per effect at most */
+#define SAMPLE_BEAT_PARAM_MASK_ALL ((uint32_t)((1u << SAMPLE_MAX_PARAMETERS) - 1u))
+#define SAMPLE_BEAT_PARAM_BIT(p) ((uint32_t)(1u << (p)))
 #ifdef HAVE_XML2
 #define XMLTAG_RENDER_ENTRY "render_entry"
 #define XMLTAG_SAMPLES    "veejay_samples"
@@ -129,6 +131,7 @@ typedef struct sample_eff_t {
     int effect_id;		/* effect ID */
     int e_flag;
     int beat_flag;
+    uint32_t beat_param_mask;
     void *vje_instance;
     int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
     int speed;			/* last known play speed */
@@ -145,6 +148,35 @@ typedef struct sample_eff_t {
 	int clear;
     float audio_opacity;
 } sample_eff_chain;
+
+static inline uint32_t sample_eff_chain_beat_param_mask(sample_eff_chain *entry)
+{
+    if(!entry)
+        return 0;
+
+    return entry->beat_param_mask & SAMPLE_BEAT_PARAM_MASK_ALL;
+}
+
+static inline int sample_eff_chain_beat_param_enabled(sample_eff_chain *entry, int param_nr)
+{
+    if(!entry || param_nr < 0 || param_nr >= SAMPLE_MAX_PARAMETERS)
+        return 0;
+
+    return (sample_eff_chain_beat_param_mask(entry) & SAMPLE_BEAT_PARAM_BIT(param_nr)) ? 1 : 0;
+}
+
+static inline void sample_eff_chain_set_beat_param_enabled(sample_eff_chain *entry, int param_nr, int enabled)
+{
+    if(!entry || param_nr < 0 || param_nr >= SAMPLE_MAX_PARAMETERS)
+        return;
+
+    if(enabled)
+        entry->beat_param_mask |= SAMPLE_BEAT_PARAM_BIT(param_nr);
+    else
+        entry->beat_param_mask &= ~SAMPLE_BEAT_PARAM_BIT(param_nr);
+
+    entry->beat_param_mask &= SAMPLE_BEAT_PARAM_MASK_ALL;
+}
 
 typedef struct sample_off_rec_t {
     int duration;
@@ -264,7 +296,7 @@ extern void sample_watch_enable_events(void);
 extern void sample_watch_stop(void);
 extern void sample_move_fx_pointers(sample_eff_chain **target, sample_eff_chain **source);
 extern int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_index,int effect_id,int *args,int anim,int channel,
-    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat);
+    int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat, uint32_t beat_param_mask);
 #endif
 extern int sample_set_state(int new_state);
 extern int sample_get_state();
@@ -347,6 +379,8 @@ extern int sample_get_effect_arg(int s1, int position, int argnr);
 extern int sample_set_effect_arg(int s1, int position, int argnr, int value);
 
 extern int sample_get_all_effect_arg(sample_eff_chain *entry, int *args, int arg_len, int n_frame);
+extern int sample_chain_set_beat_param(int s1, int position, int param_nr, int enabled);
+extern int sample_chain_get_beat_param(int s1, int position, int param_nr);
 extern int sample_chain_remove(int s1, int position);
 extern int sample_chain_clear(int s1);
 extern int sample_chain_size(int s1);

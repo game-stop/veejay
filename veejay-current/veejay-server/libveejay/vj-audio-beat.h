@@ -189,6 +189,7 @@ void vj_audio_beat_set_auto_mode(vj_audio_beat_shared_t *s, int mode);
 void vj_audio_beat_set_auto_amount(vj_audio_beat_shared_t *s, int amount);
 void vj_audio_beat_set_video_fps(vj_audio_beat_shared_t *s, double fps);
 void vj_audio_beat_auto_reset(vj_audio_beat_shared_t *s);
+void vj_audio_beat_auto_mark_dirty(vj_audio_beat_shared_t *s);
 int vj_audio_beat_auto_build_table(void);
 int vj_audio_beat_auto_apply_chain(
     vj_audio_beat_shared_t *s,

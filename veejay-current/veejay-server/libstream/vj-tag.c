@@ -1521,6 +1521,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
         tag->effect_chain[i] = &fx_chain[i];
         tag->effect_chain[i]->effect_id = -1;
         tag->effect_chain[i]->e_flag = 0;
+        tag->effect_chain[i]->beat_flag = 0;
+        tag->effect_chain[i]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
         tag->effect_chain[i]->speed = INT_MAX;
         tag->effect_chain[i]->volume = 0;
         tag->effect_chain[i]->a_flag = 0;
@@ -3768,6 +3770,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int ident
     int volume = 0;
     xmlNodePtr anim = NULL;
     int beat = 0;
+    uint32_t beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
 
     veejay_memset( arg, 0, sizeof(arg));
 
@@ -3810,6 +3813,10 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int ident
             beat = get_xml_int( doc,cur );
         }
 
+        if(!xmlStrcmp( cur->name, (const xmlChar*) "beat_param_mask" )) {
+            beat_param_mask = ((uint32_t)get_xml_int(doc, cur)) & SAMPLE_BEAT_PARAM_MASK_ALL;
+        }
+
         if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
             e_flag = get_xml_int( doc, cur );
         }
@@ -3843,7 +3850,8 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag, int ident
             volume,
             kf_status,
             kf_type,
-            beat
+            beat,
+            beat_param_mask
         );
 
         if (ret == 0) {
@@ -4166,6 +4174,8 @@ static void tagCreateEffect(xmlNodePtr node, sample_eff_chain * effect, int posi
     put_xml_int( node, XMLTAG_EFFECTAUDIOVOLUME, effect->volume );
     put_xml_int( node, "kf_status", effect->kf_status );
     put_xml_int( node, "kf_type", effect->kf_type );
+    put_xml_int( node, "beat_flag", effect->beat_flag );
+    put_xml_int( node, "beat_param_mask", (int)sample_eff_chain_beat_param_mask(effect) );
 
     childnode = xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);
     tagCreateArguments(childnode, effect->arg,vje_get_num_params(effect->effect_id));

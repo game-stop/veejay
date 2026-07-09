@@ -65,6 +65,8 @@ void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ) {
 
     if( clear ) {
         entry->effect_id = -1;
+        entry->beat_flag = 0;
+        entry->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
         if( entry->kf ) {
             vpf( entry->kf );
             entry->kf = NULL;

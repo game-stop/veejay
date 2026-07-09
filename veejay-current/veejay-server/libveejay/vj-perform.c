@@ -2612,9 +2612,6 @@ static int vj_perform_ab_chain_get_fx_id(void *ctx, int chain_pos)
         return 0;
 
 
-    if(entry->beat_flag == 0)
-        return 0;
-
     return entry->effect_id;
 }
 
@@ -2857,7 +2854,7 @@ static int vj_perform_audio_beat_apply_render_chains(
 
     if(beat_fx <= 0)
     {
-        vj_perform_ab_ctx_debug_dump(info, "skip-no-beat-fx",
+        vj_perform_ab_ctx_debug_dump(info, "no-beat-fx-release-check",
                                      sample_id,
                                      playmode,
                                      renderer_id,
@@ -2866,7 +2863,6 @@ static int vj_perform_audio_beat_apply_render_chains(
                                      global_enabled,
                                      active_fx,
                                      0);
-        return 0;
     }
 
 #ifdef _OPENMP

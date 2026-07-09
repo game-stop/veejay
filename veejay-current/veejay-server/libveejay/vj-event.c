@@ -7684,6 +7684,9 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 
             if(sample_chain_add(args[0],args[1],args[2], args[3])) 
             {
+                sample_eff_chain **chain = sample_get_effect_chain(args[0]);
+                if(chain && chain[args[1]])
+                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
                 v->uc->chain_changed = 1;
             }
             else
@@ -7707,6 +7710,9 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 
             if(vj_tag_set_effect(args[0],args[1], args[2],args[3]))
             {
+                sample_eff_chain **chain = vj_tag_get_effect_chain(args[0]);
+                if(chain && chain[args[1]])
+                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
                 v->uc->chain_changed = 1;
             }   
             else
@@ -7947,6 +7953,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
             
             if(sample_chain_add( args[0],args[1],args[2],args[3]))
             {
+                sample_eff_chain **chain = sample_get_effect_chain(args[0]);
+                if(chain && chain[args[1]])
+                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
+
                 int args_offset = 4;
                 
                 for(i=0; i < num_p; i++)
@@ -7985,6 +7995,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
         
             if(vj_tag_set_effect(args[0],args[1], args[2], args[3]) )
             {
+                sample_eff_chain **chain = vj_tag_get_effect_chain(args[0]);
+                if(chain && chain[args[1]])
+                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
+
                 int args_offset = 4;
 
                 for(i=0; i < num_p; i++) 
@@ -10313,7 +10327,12 @@ void vj_event_audio_beat_fx_entry(void *ptr, const char format[], va_list ap)
 
     state = args[2] == 0 ? 0 : 1;
     src[args[1]]->beat_flag = state;
+
+    if(state && sample_eff_chain_beat_param_mask(src[args[1]]) == 0)
+        src[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
+
     v->uc->chain_changed = 1;
+    vj_audio_beat_auto_mark_dirty(&v->settings->audio_beat);
 
     veejay_msg(VEEJAY_MSG_INFO,
                "[AUDIO-BEAT] Beat modulation %s on FX entry %d",
@@ -10324,6 +10343,118 @@ void vj_event_audio_beat_fx_entry(void *ptr, const char format[], va_list ap)
     (void)format;
     (void)ap;
 #endif
+}
+
+void vj_event_audio_beat_fx_param(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t *) ptr;
+    int args[4] = { 0, -1, 0, -1 };
+    int is_sample;
+    int is_stream;
+    int state;
+    sample_eff_chain **src = NULL;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    is_sample = SAMPLE_PLAYING(v);
+    is_stream = STREAM_PLAYING(v);
+
+    if(is_sample)
+    {
+        SAMPLE_DEFAULTS(args[0]);
+
+        if(!sample_exists(args[0]))
+        {
+            p_no_sample(args[0]);
+            return;
+        }
+
+        src = sample_get_effect_chain(args[0]);
+
+        if(args[1] == -1)
+            args[1] = sample_get_selected_entry(args[0]);
+    }
+    else if(is_stream)
+    {
+        STREAM_DEFAULTS(args[0]);
+
+        if(!vj_tag_exists(args[0]))
+        {
+            p_no_tag(args[0]);
+            return;
+        }
+
+        src = vj_tag_get_effect_chain(args[0]);
+
+        if(args[1] == -1)
+            args[1] = vj_tag_get_selected_entry(args[0]);
+    }
+    else
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] FX parameter beat ownership is only available in sample or stream mode");
+        return;
+    }
+
+    if(src == NULL)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-BEAT] FX chain is not available");
+        return;
+    }
+
+    if(v_chi(args[1]) || src[args[1]] == NULL)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] Chain index out of boundaries: %d",
+                   args[1]);
+        return;
+    }
+
+    if(args[2] < 0 || args[2] >= SAMPLE_MAX_PARAMETERS)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] Parameter index out of boundaries: %d",
+                   args[2]);
+        return;
+    }
+
+    if(src[args[1]]->effect_id <= 0 || !vje_is_valid(src[args[1]]->effect_id))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] FX entry %d has no valid effect",
+                   args[1]);
+        return;
+    }
+
+    if(args[2] >= vje_get_num_params(src[args[1]]->effect_id))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-BEAT] Effect %s has no parameter %d",
+                   vje_get_description(src[args[1]]->effect_id),
+                   args[2]);
+        return;
+    }
+
+    if(args[3] < 0)
+        state = sample_eff_chain_beat_param_enabled(src[args[1]], args[2]) ? 0 : 1;
+    else
+        state = args[3] ? 1 : 0;
+
+    sample_eff_chain_set_beat_param_enabled(src[args[1]], args[2], state);
+
+    v->uc->chain_changed = 1;
+
+#ifdef HAVE_JACK
+    if(v->settings)
+        vj_audio_beat_auto_mark_dirty(&v->settings->audio_beat);
+#endif
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[AUDIO-BEAT] Beat ownership %s for FX entry %d parameter %d (%s)",
+               state ? "enabled" : "disabled",
+               args[1],
+               args[2],
+               vje_get_param_description(src[args[1]]->effect_id, args[2]));
 }
 
 void vj_event_audio_beat_enable(void *ptr, const char format[], va_list ap)
@@ -13004,7 +13135,7 @@ void vj_event_send_chain_entry(void *ptr, const char format[], va_list ap)
         num_params = SAMPLE_MAX_PARAMETERS;
 
     int transition_enabled = 0;
-    int transition_loop = 0;
+    int beat_param_mask = (int)sample_eff_chain_beat_param_mask(entry);
 
     int n = snprintf(
         payload,
@@ -13016,7 +13147,7 @@ void vj_event_send_chain_entry(void *ptr, const char format[], va_list ap)
         entry->kf_type,
         entry->kf_status,
         transition_enabled,
-        transition_loop,
+        beat_param_mask,
         entry->source_type,
         entry->channel,
         entry->e_flag,
@@ -13120,7 +13251,7 @@ void vj_event_send_chain_entry_parameters(void *ptr, const char format[], va_lis
         num_params = SAMPLE_MAX_PARAMETERS;
 
     int transition_enabled = 0;
-    int transition_loop = 0;
+    int beat_param_mask = (int)sample_eff_chain_beat_param_mask(entry);
 
     char payload[4096];
     char *p = payload;
@@ -13135,16 +13266,15 @@ void vj_event_send_chain_entry_parameters(void *ptr, const char format[], va_lis
         entry->kf_type,
         entry->kf_status,
         transition_enabled,
-        transition_loop,
+        beat_param_mask,
         entry->source_type,
         entry->channel,
         entry->e_flag,
         entry->beat_flag,
-        entry->is_rendering,
-        entry->beat_flag
+        entry->is_rendering
     };
 
-    for(int i = 0; i < 13 && p < end; i++) {
+    for(int i = 0; i < 12 && p < end; i++) {
         p += snprintf(p, (size_t)(end - p), "%d ", fields[i]);
     }
 

@@ -530,6 +530,7 @@ typedef struct
 {
     int valid;
     int num_params;
+    int explicit_hint_count;
     ab_auto_param_meta_t *params;
 } ab_auto_fx_meta_t;
 
@@ -10918,6 +10919,36 @@ int vj_audio_beat_auto_build_table(void)
 
         ab_auto_fx_table[fx_id].valid = 1;
         ab_auto_fx_table[fx_id].num_params = n_params;
+        ab_auto_fx_table[fx_id].explicit_hint_count = 0;
+
+#ifdef VJ_BEAT_F_REJECT
+        for(int hp = 0; hp < n_params; hp++)
+        {
+            const vj_beat_param_hint_t *hint = vje_get_beat_hint(fx_id, hp);
+
+            if(hint &&
+               hint->klass != VJ_BEAT_OFF &&
+               !(hint->flags & VJ_BEAT_F_REJECT))
+            {
+                int hint_role = VJ_AUDIO_BEAT_AUTO_ROLE_NONE;
+                int hint_invert = 0;
+                int hint_amount_pct = 45;
+                int hint_impulse = 0;
+                int hint_score = 0;
+
+                if(ab_auto_hint_to_role(hint->klass,
+                                        hint->flags,
+                                        &hint_role,
+                                        &hint_invert,
+                                        &hint_amount_pct,
+                                        &hint_impulse,
+                                        &hint_score) &&
+                   hint_score + hint->priority > 0)
+                    ab_auto_fx_table[fx_id].explicit_hint_count++;
+            }
+        }
+#endif
+
         built_fx++;
 
         for(int p = 0; p < n_params; p++)
@@ -10991,6 +11022,9 @@ int vj_audio_beat_auto_build_table(void)
 
             if(!m->has_hint)
             {
+                if(ab_auto_fx_table[fx_id].explicit_hint_count > 0)
+                    continue;
+
                 if(!name)
                     continue;
 
@@ -11154,7 +11188,37 @@ static int ab_auto_target_curve_owned_now(const ab_auto_target_t *t)
     return ab_auto_entry_param_curve_enabled(t->entry_ptr, t->param_nr);
 }
 
-static int ab_auto_chain_signature(void *ctx, int chain_len, vj_audio_beat_get_fx_id_func get_fx_id)
+static int ab_auto_entry_beat_param_enabled(sample_eff_chain *entry, int param_nr)
+{
+    if(!entry)
+        return 1;
+
+    if(entry->beat_flag == 0)
+        return 0;
+
+    return sample_eff_chain_beat_param_enabled(entry, param_nr);
+}
+
+static void ab_auto_target_forget_runtime(ab_auto_target_t *t)
+{
+    if(!t)
+        return;
+
+    t->active = 0;
+    t->mod_value = 0.0f;
+    t->raw_value = 0.0f;
+    t->climax_value = 0.0f;
+    t->mod_initialized = 0;
+    t->last_slew_ms = 0;
+    t->last_change_ms = 0;
+}
+
+static int ab_auto_chain_signature(
+    void *ctx,
+    int chain_len,
+    vj_audio_beat_get_fx_id_func get_fx_id,
+    vj_audio_beat_get_fx_entry_func get_entry
+)
 {
     int sig = 5381;
 
@@ -11164,12 +11228,16 @@ static int ab_auto_chain_signature(void *ctx, int chain_len, vj_audio_beat_get_f
     for(int i = 0; i < chain_len; i++)
     {
         int fx_id = get_fx_id(ctx, i);
+        sample_eff_chain *entry = get_entry ? get_entry(ctx, i) : NULL;
+        uint32_t beat_param_mask = entry ? sample_eff_chain_beat_param_mask(entry) : SAMPLE_BEAT_PARAM_MASK_ALL;
 
         if(fx_id <= 0 || !vje_is_valid(fx_id))
             continue;
 
         sig = ((sig << 5) + sig) ^ ((fx_id & 0xffff) + (i << 16));
         sig = ((sig << 5) + sig) ^ (vje_get_num_params(fx_id) & 0xff);
+        sig = ((sig << 5) + sig) ^ (entry ? (entry->beat_flag & 0x1) : 1);
+        sig = ((sig << 5) + sig) ^ (int)(beat_param_mask & 0xffffu);
     }
 
     return sig;
@@ -11612,6 +11680,9 @@ static int ab_auto_insert_numeric_fallback(
         if(fx_id >= ab_auto_fx_table_len || !ab_auto_fx_table[fx_id].valid)
             continue;
 
+        if(ab_auto_fx_table[fx_id].explicit_hint_count > 0)
+            continue;
+
         n_params = ab_auto_fx_table[fx_id].num_params;
 
         if(scanned_fx)
@@ -11665,6 +11736,9 @@ static int ab_auto_insert_numeric_fallback(
                 rank -= 60;
 
             if(rank <= 0)
+                continue;
+
+            if(!ab_auto_entry_beat_param_enabled(entry, p))
                 continue;
 
             if(ab_auto_entry_param_curve_enabled(entry, p))
@@ -11810,6 +11884,9 @@ static int ab_auto_rebuild_map(void *ctx, int chain_len, vj_audio_beat_get_fx_id
                 continue;
 
             if(!ab_auto_role_allowed(mode, m->role))
+                continue;
+
+            if(!ab_auto_entry_beat_param_enabled(entry, p))
                 continue;
 
             if(ab_auto_entry_param_curve_enabled(entry, p))
@@ -14693,6 +14770,12 @@ void vj_audio_beat_auto_reset(vj_audio_beat_shared_t *s)
     ab_auto_clear_runtime_state(1);
 }
 
+void vj_audio_beat_auto_mark_dirty(vj_audio_beat_shared_t *s)
+{
+    (void)s;
+    ab_store_i(&ab_auto_dirty, 1);
+}
+
 int vj_audio_beat_auto_apply_chain_ex(
     vj_audio_beat_shared_t *s,
     void *ctx,
@@ -14786,7 +14869,7 @@ int vj_audio_beat_auto_apply_chain_ex(
        ab_auto_signature_last_check_ms == 0 ||
        (now - ab_auto_signature_last_check_ms) >= VEEJAY_AUDIO_BEAT_AUTO_SIG_CHECK_MS)
     {
-        sig = ab_auto_chain_signature(ctx, chain_len, get_fx_id);
+        sig = ab_auto_chain_signature(ctx, chain_len, get_fx_id, get_entry);
         ab_auto_signature_last_check_ms = now;
         ab_auto_signature_last_chain_len = chain_len;
     }
@@ -14794,6 +14877,9 @@ int vj_audio_beat_auto_apply_chain_ex(
     if(sig != ab_auto_signature || dirty)
     {
         int signature_changed = sig != ab_auto_signature;
+
+        if(ab_auto_target_count > 0)
+            changed += ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
 
         if(signature_changed && ab_auto_signature != 0)
             ab_auto_trim_macro_state_on_map_change();
@@ -14818,6 +14904,28 @@ int vj_audio_beat_auto_apply_chain_ex(
         if(!t->valid)
             continue;
 
+        {
+            sample_eff_chain *entry_now = get_entry ? get_entry(ctx, t->chain_pos) : t->entry_ptr;
+
+            if(entry_now &&
+               entry_now == t->entry_ptr &&
+               entry_now->effect_id == t->effect_id &&
+               !ab_auto_entry_beat_param_enabled(entry_now, t->param_nr))
+            {
+                current = get_arg(ctx, t->chain_pos, t->param_nr);
+
+                if(current != t->base_value &&
+                   vje_is_param_value_valid(t->effect_id, t->param_nr, t->base_value) &&
+                   set_arg(ctx, t->chain_pos, t->param_nr, t->base_value))
+                    changed++;
+
+                t->last_value = t->base_value;
+                ab_auto_target_forget_runtime(t);
+                need_dirty_store = 1;
+                continue;
+            }
+        }
+
         if(get_fx_id(ctx, t->chain_pos) != t->effect_id)
         {
             need_dirty_store = 1;
@@ -14827,13 +14935,7 @@ int vj_audio_beat_auto_apply_chain_ex(
         if(ab_auto_target_curve_owned_now(t))
         {
             t->last_value = t->base_value;
-            t->active = 0;
-            t->mod_value = 0.0f;
-            t->raw_value = 0.0f;
-            t->climax_value = 0.0f;
-            t->mod_initialized = 0;
-            t->last_slew_ms = 0;
-            t->last_change_ms = 0;
+            ab_auto_target_forget_runtime(t);
             need_dirty_store = 1;
             continue;
         }
@@ -15047,16 +15149,17 @@ int vj_audio_beat_auto_modulate_args(
         if(t->param_nr < 0 || t->param_nr >= n_params)
             continue;
 
+        if(!ab_auto_entry_beat_param_enabled(entry, t->param_nr))
+        {
+            t->last_value = args[t->param_nr];
+            ab_auto_target_forget_runtime(t);
+            continue;
+        }
+
         if(ab_auto_entry_param_curve_enabled(entry, t->param_nr))
         {
             t->last_value = args[t->param_nr];
-            t->active = 0;
-            t->mod_value = 0.0f;
-            t->raw_value = 0.0f;
-            t->climax_value = 0.0f;
-            t->mod_initialized = 0;
-            t->last_slew_ms = 0;
-            t->last_change_ms = 0;
+            ab_auto_target_forget_runtime(t);
             continue;
         }
 
