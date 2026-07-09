@@ -2843,8 +2843,6 @@ static void init_fx_param_step_buttons(void)
             gtk_widget_set_valign(label, GTK_ALIGN_FILL);
             if(GTK_IS_LABEL(label)) {
                 gtk_label_set_angle(GTK_LABEL(label), 90.0);
-                gtk_label_set_xalign(GTK_LABEL(label), 0.5);
-                gtk_label_set_yalign(GTK_LABEL(label), 0.0);
                 gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
             }
         }
@@ -16154,6 +16152,36 @@ static gchar *detachable_widget_name(GtkWidget *widget)
     return NULL;
 }
 
+static gboolean detachable_notebook_is_internal(GtkNotebook *notebook)
+{
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook) || !GTK_IS_BUILDABLE(notebook))
+        return FALSE;
+
+    const gchar *name = gtk_buildable_get_name(GTK_BUILDABLE(notebook));
+    return name &&
+           (!strcmp(name, "effectspanel") ||
+            !strcmp(name, "panels"));
+}
+
+static void detachable_notebook_keep_internal(GtkNotebook *notebook)
+{
+    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+        return;
+
+    gtk_notebook_set_show_tabs(notebook, FALSE);
+    gtk_notebook_set_show_border(notebook, FALSE);
+    gtk_notebook_set_scrollable(notebook, FALSE);
+
+    gint n_pages = gtk_notebook_get_n_pages(notebook);
+    for(gint i = 0; i < n_pages; i++) {
+        GtkWidget *page = gtk_notebook_get_nth_page(notebook, i);
+        if(page && GTK_IS_WIDGET(page)) {
+            gtk_notebook_set_tab_reorderable(notebook, page, FALSE);
+            gtk_notebook_set_tab_detachable(notebook, page, FALSE);
+        }
+    }
+}
+
 static gchar *detachable_page_title(GtkNotebook *notebook, GtkWidget *page)
 {
     gchar *title = NULL;
@@ -16532,6 +16560,11 @@ static void detachable_notebook_setup(GtkNotebook *notebook, detached_notebook_t
 
     if(g_object_get_data(G_OBJECT(notebook), VJ_DETACH_DATA_DETACHED_NOTEBOOK))
         return;
+
+    if(detachable_notebook_is_internal(notebook)) {
+        detachable_notebook_keep_internal(notebook);
+        return;
+    }
 
     gtk_notebook_set_scrollable(notebook, TRUE);
     gtk_notebook_set_show_tabs(notebook, TRUE);
