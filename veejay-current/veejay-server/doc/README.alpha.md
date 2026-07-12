@@ -1,97 +1,227 @@
+```text
+ ______     __         ______   __  __     ______
+/\  __ \   /\ \       /\  == \ /\ \_\ \   /\  __ \
+\ \  __ \  \ \ \____  \ \  _-/ \ \  __ \  \ \  __ \
+ \ \_\ \_\  \ \_____\  \ \_\    \ \_\ \_\  \ \_\ \_\
+  \/_/\/_/   \/_____/   \/_/     \/_/\/_/   \/_/\/_/
+ ______     __  __     ______     __   __     __   __     ______     __
+/\  ___\   /\ \_\ \   /\  __ \   /\ "-.\ \   /\ "-.\ \   /\  ___\   /\ \
+\ \ \____  \ \  __ \  \ \  __ \  \ \ \-.  \  \ \ \-.  \  \ \  __\   \ \ \____
+ \ \_____\  \ \_\ \_\  \ \_\ \_\  \ \_\"\_\  \ \_\"\_\  \ \_____\  \ \_____\
+  \/_____/   \/_/\/_/   \/_/\/_/   \/_/ \/_/   \/_/ \/_/   \/_____/   \/_____/
+                                                                     in Veejay
 ```
- ______     __         ______   __  __     ______    
-/\  __ \   /\ \       /\  == \ /\ \_\ \   /\  __ \   
-\ \  __ \  \ \ \____  \ \  _-/ \ \  __ \  \ \  __ \  
- \ \_\ \_\  \ \_____\  \ \_\    \ \_\ \_\  \ \_\ \_\ 
-  \/_/\/_/   \/_____/   \/_/     \/_/\/_/   \/_/\/_/ 
- ______     __  __     ______     __   __     __   __     ______     __        
-/\  ___\   /\ \_\ \   /\  __ \   /\ "-.\ \   /\ "-.\ \   /\  ___\   /\ \       
-\ \ \____  \ \  __ \  \ \  __ \  \ \ \-.  \  \ \ \-.  \  \ \  __\   \ \ \____  
- \ \_____\  \ \_\ \_\  \ \_\ \_\  \ \_\\"\_\  \ \_\\"\_\  \ \_____\  \ \_____\ 
-  \/_____/   \/_/\/_/   \/_/\/_/   \/_/ \/_/   \/_/ \/_/   \/_____/   \/_____/ 
-                                                                     in veejay
-```
-**Veejay has some support for alpha channel compositing**
 
-In general, you will need to add an alpha channel to your playing sample or
-stream by using one of the "Alpha:" filters in veejay.
+# Alpha channel compositing
 
-Then, the alpha channel will be combined used FX that can deal with Alpha. Some
-effects have a mode parameter `Alpha` that functions like an on/off switch but
-others require an extra alpha channel to work.
+Veejay provides a low-level alpha channel that can be generated, modified and
+used by effects in the FX chain.
 
-By default, the alpha channel is set to `0` (completely invisible) so such effects
-will always result in a black screen if you have not added an alpha channel.
+Alpha values range from:
 
-In Reloaded, you can toggle the white button next to 'Alpha Clear' to switch 
-between `0` (completely invisible) and `255` (completely visible)
+- `0`: completely transparent
+- `255`: completely opaque
 
-Also, you can toggle the alpha-button to set the fade method to alpha blending
-in the (manual) chain fader
+Alpha processing is disabled by default. Normal playback therefore remains on
+the faster non-alpha processing path until alpha is explicitly required.
 
-The chain fader fades the original (unchanged) image to the image that is rendered
-by the FX chain, either with an opacity value or by using alpha channel information 
+Alpha becomes active when either:
 
-In Reloaded, the chain fader is located next to the FX chain (the vertical slider).
+- an effect writes an alpha channel;
+- **Initialize alpha** is enabled in Reloaded;
+- an alpha-aware mixer or chain-fader operation requires a valid alpha channel.
 
-_Alpha compositing is still in development and feedback is of course welcome_
+Effects that do not use alpha do not cause alpha planes to be initialized or
+copied.
 
+## Initializing alpha
 
-List of "Alpha:" FX
--------------------
-* **The 'Set by Color Key' operator**
+Reloaded provides an **Initialize alpha** checkbutton.
 
-Use this filter to create an alpha channel from the foreground object.
+When it is disabled, Veejay does not automatically initialize the alpha channel.
+An alpha-producing effect must create it before an effect that reads alpha can
+use it.
 
-The filter requires an existing alpha channel to decide which pixel from source B to composite in. Pixels with an alpha of `0` are skipped.
-Using the parameters `R,G,B` and `Angle` you can select which pixels belong to the background and key them out, leaving a mask of the foreground object.
+When it is enabled, the adjacent value selects the initial alpha value:
 
-* **The 'Select by Chroma Key' operator**
+- `0`: initialize as completely transparent
+- `255`: initialize as completely opaque
 
-Use this filter to create an alpha channel from the foreground object.
+The initialization is performed only when the active FX chain needs alpha.
 
-The filter may use an existing alpha channel to decide which pixel from source B to composite in. Pixels with an alpha of `0` are skipped optionally.
+Disabling initialization allows an already generated alpha channel to persist
+between frames where appropriate.
 
-* **Luma Key**
+The controls are synchronized from the Veejay status stream, so Reloaded shows
+the alpha initialization state currently used by the backend.
 
-Luma Key in `Mode 3` will composite-in pixels from source B using its alpha channel
+## Source A and source B
 
-* **Alpha Blend**
+Mixer effects operate on two sources:
 
-Image in source B will be blended on top of source A using its alpha channel
+- **Source A** is the image currently passing through the FX chain.
+- **Source B** is the mixing source selected for that FX-chain entry.
 
-* **Black and White Mask by Threshold**
+For normal overlay compositing, source A is the background and source B is the
+foreground.
 
-This filter creates a black/white image from a minimum and maximum threshold value.
+When an effect needs alpha from source B, enable **Source FX** for that chain
+entry if the alpha mask is generated by effects in source B's own FX chain.
 
-You can set a `Mode` parameter so that the render result is written as an Alpha channel
+The global mixing-source FX switch must also be enabled. Reloaded automatically
+requests this when Source FX is enabled for an individual entry.
 
-* **LVD Scale0Tilt / Crop,Scale,Tilt**
+## Alpha Blend
 
-This filter is a port of the [frei0r](https://frei0r.dyne.org/) filter "scale0tilt.so"
+**Alpha: Blend** composites source B over source A using source B's alpha
+channel.
 
-You can use it to crop, scale, tilt an image from source B over source A
-If the `Alpha` paramater is set to `1`, the final result will be an opaque pixel with the transparency of each pixel determined by the alpha channel values
+Its **Opacity** parameter scales the complete overlay from `0` to `255`.
 
-* **Flatten Image**
+- `0`: source B is invisible
+- `255`: source B uses its full alpha mask
 
-Use this to multiply the alpha channel against a black background
+If source B has no generated or initialized alpha channel, Alpha Blend treats
+source B as fully opaque. This makes a normal B-over-A overlay work without first
+adding Alpha Fill.
 
-* **Alpha Fill**
+To use a generated mask:
 
-Solid value fill of the alpha channel into `0 - 255` range
+1. Add an alpha-producing effect to source B.
+2. Enable **Source FX** on the Alpha Blend entry.
+3. Select source B as the mixing source.
+4. Adjust the Alpha Blend Opacity parameter.
 
-* **Set from Image / Mixing source**
+## Chain fader
 
-Use the luminance channel of the image as a new Alpha channel
+The vertical chain fader next to the FX chain fades between:
 
-You can use the FX switch parameter to scale the values to full range `0 - 255` if needed.
-If you have no result in the Alpha channel, flip this parameter.
+- the original, unchanged source image;
+- the image produced by the FX chain.
 
-* **Alpha to Greyscale**
+It can operate using either:
 
-Use this FX to display the alpha channel as a greyscale image.
+- a uniform opacity value;
+- the alpha channel produced by the FX chain.
 
-* **Transition Map**
+Enable the alpha fade method to use the processed frame's alpha channel as the
+fade map.
 
-Use this FX to blend over time using a greyscale image as an opacity map
+If no valid alpha channel exists, the performer safely falls back to normal
+opacity fading rather than using stale alpha data.
+
+## Alpha validity
+
+An allocated alpha buffer is not automatically considered a valid alpha mask.
+
+The performer tracks whether alpha was intentionally initialized or generated.
+This prevents unused or stale alpha data from affecting later effects.
+
+Alpha validity is preserved through:
+
+- FX-chain processing;
+- mixing-source rendering;
+- nested source FX chains;
+- internal frame caches.
+
+When a source changes, only that source's cached alpha state is invalidated.
+
+# Alpha effects
+
+## Alpha: Fill
+
+Fills the complete alpha channel with a value from `0` to `255`.
+
+This is useful for creating a uniform alpha channel or explicitly starting an
+alpha-processing chain.
+
+## Alpha: Advanced Chroma Key Mask
+
+Creates an alpha mask by selecting a colour range.
+
+Use **Show Mask** to preview the generated mask as a greyscale image. Disabling
+Show Mask restores the normal colour image while continuing to write the same
+alpha mask.
+
+## Alpha: Show alpha as greyscale
+
+Displays the current alpha channel as a greyscale image:
+
+- black represents transparent pixels;
+- white represents opaque pixels.
+
+The alpha channel itself is not changed.
+
+## Alpha: Negate Alpha Channel
+
+Inverts or subtracts from the current alpha channel.
+
+With the default value `255`, transparent pixels become opaque and opaque pixels
+become transparent.
+
+Values that would become negative are clamped to zero.
+
+## Alpha: Quantize
+
+Reduces the alpha channel to discrete steps.
+
+This can create posterized or stepped transparency masks.
+
+## Alpha: Flatten Image
+
+Multiplies the image against a black background using its alpha channel.
+
+The **Clear Alpha** parameter optionally clears the alpha channel after the image
+has been flattened.
+
+## Alpha: Transition Mask
+
+Uses source A's alpha channel as a per-pixel transition map between source A and
+source B.
+
+The Time Index, Smooth, Direction and Threshold parameters control how the
+transition progresses.
+
+## Alpha: Blend
+
+Composites source B over source A using source B's alpha channel and the Opacity
+parameter.
+
+## Black and White Mask by Threshold
+
+Creates a black-and-white image from minimum and maximum threshold values.
+
+Its mode parameter can write the result into the alpha channel.
+
+## Set from Image / Mixing Source
+
+Uses image luminance as a new alpha channel.
+
+The effect switch can scale the generated values to the full `0–255` range.
+
+Enable Source FX when the luminance mask is generated inside the selected mixing
+source's FX chain.
+
+## Luma Key
+
+Luma Key can use source B's alpha channel in its alpha-compositing mode.
+
+## Crop, Scale, Tilt / LVD Scale0Tilt
+
+This frei0r-based effect can crop, scale and position source B over source A.
+
+When its Alpha parameter is enabled, source B's alpha channel controls pixel
+transparency.
+
+# Current limitations
+
+Alpha support is currently intended as a low-level compositing foundation.
+
+Most decoded video formats are still loaded as YUV without preserving a native
+alpha channel. Alpha is therefore normally created inside Veejay using Alpha
+effects.
+
+Alpha-aware media decoding and a higher-level compositing workflow may be added
+later.
+
+Feedback and test reports are welcome.
