@@ -39,6 +39,16 @@ dlclose( handle );
 
 #define SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE (-1)
 
+static inline int callback_playmode_is_sample(int mode)
+{
+    return mode == MODE_SAMPLE || mode == MODE_PATTERN;
+}
+
+static inline int callback_playmode_effective(int mode)
+{
+    return callback_playmode_is_sample(mode) ? MODE_SAMPLE : mode;
+}
+
 #ifndef VIMS_CHAIN_ENTRY_BEAT_PARAM
 #define VIMS_CHAIN_ENTRY_BEAT_PARAM 380
 #endif
@@ -398,7 +408,7 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
     GtkAdjustment *a = gtk_range_get_adjustment( GTK_RANGE( widget ));
     gdouble slider_val = gtk_adjustment_get_value (a);
     gint val = 0;
-    switch(info->status_tokens[PLAY_MODE])
+    switch(callback_playmode_effective(info->status_tokens[PLAY_MODE]))
     {
       case MODE_PLAIN:
         val = slider_val * info->status_tokens[TOTAL_FRAMES];
@@ -473,14 +483,14 @@ void	on_fx_followfade_toggled( GtkWidget *widget, gpointer data )
 {
 	int val = is_button_toggled( "fx_followfade" ) ? 1:0;
 	follow_return_id = info->status_tokens[CURRENT_ID];
-	follow_return_type = info->status_tokens[PLAY_MODE];
+	follow_return_type = callback_playmode_effective(info->status_tokens[PLAY_MODE]);
 	multi_vims( VIMS_CHAIN_FOLLOW_FADE,"%d", val );
 	vj_midi_learning_vims_toggle(info->midi, "fx_followfade", VIMS_CHAIN_FOLLOW_FADE);
 }
 
 void	on_button_return_clicked( GtkWidget *widget, gpointer data)
 {
-	multi_vims( (follow_return_type == 0 ? VIMS_SAMPLE_SELECT: VIMS_STREAM_SELECT),"%d", follow_return_id );
+	multi_vims( (follow_return_type == MODE_SAMPLE ? VIMS_SAMPLE_SELECT : VIMS_STREAM_SELECT),"%d", follow_return_id );
 }
 
 void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
@@ -507,7 +517,7 @@ void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
 	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0,title );
 
 	int id = info->status_tokens[CURRENT_ID];
-	int pm = info->status_tokens[PLAY_MODE];
+	int pm = callback_playmode_effective(info->status_tokens[PLAY_MODE]);
 	int type = (pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE]);
 
 	if(id > 0 && (pm == MODE_SAMPLE || pm == MODE_STREAM))
@@ -740,7 +750,7 @@ static void sample_volume_sync_from_current(int pm)
     int volume = 100;
     int sample_id;
 
-    if(pm != MODE_SAMPLE)
+    if(!callback_playmode_is_sample(pm))
         return;
 
     sample_id = info->status_tokens[CURRENT_ID];
@@ -758,7 +768,7 @@ static void sample_volume_sync_from_status(int *history, int force)
     int volume;
     int sample_id;
 
-    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]))
         return;
 
     if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_VOLUME) {
@@ -792,7 +802,7 @@ void on_sample_volume_value_changed(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]))
         return;
 
     sample_id = info->status_tokens[CURRENT_ID];
@@ -1319,7 +1329,7 @@ static int G_GNUC_UNUSED audio_current_sample_has_own_audio_source(void)
     int source;
     int mode;
 
-    if(!info || info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+    if(!info || !callback_playmode_is_sample(info->status_tokens[PLAY_MODE]))
         return 0;
 
     if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_SYNC_MODE)
@@ -2189,7 +2199,7 @@ static int sample_audio_sync_apply_selection_preserve_anchor(const char *reason)
     int video_anchor;
     int wav_anchor_ms;
 
-    if(!info || info->status_tokens[PLAY_MODE] != MODE_SAMPLE || info->status_tokens[CURRENT_ID] <= 0)
+    if(!info || !callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) || info->status_tokens[CURRENT_ID] <= 0)
         return 0;
 
     sample_id = info->status_tokens[CURRENT_ID];
@@ -2318,7 +2328,7 @@ void on_sample_audio_sync_set_here_button_clicked(GtkWidget *widget, gpointer us
     (void)widget;
     (void)user_data;
 
-    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE || info->status_tokens[CURRENT_ID] <= 0) {
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) || info->status_tokens[CURRENT_ID] <= 0) {
         vj_msg(VEEJAY_MSG_WARNING,
                "Select/play a sample before binding an audio sync source");
         return;
@@ -2398,7 +2408,7 @@ void on_sample_audio_sync_rearm_button_clicked(GtkWidget *widget, gpointer user_
     (void)widget;
     (void)user_data;
 
-    sample_id = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) ? info->status_tokens[CURRENT_ID] : 0;
+    sample_id = callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) ? info->status_tokens[CURRENT_ID] : 0;
     if(sample_id <= 0)
         return;
 
@@ -2479,7 +2489,7 @@ void on_sample_audio_sync_clear_button_clicked(GtkWidget *widget, gpointer user_
     (void)widget;
     (void)user_data;
 
-    sample_id = (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) ? info->status_tokens[CURRENT_ID] : 0;
+    sample_id = callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) ? info->status_tokens[CURRENT_ID] : 0;
     multi_vims(VIMS_SAMPLE_AUDIO_SYNC_CLEAR, "%d", sample_id);
     {
         GtkWidget *combo = audio_sync_named_widget("sample_audio_sync_source_combo");
@@ -5479,7 +5489,7 @@ void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 
 void on_chain_togglechain_toggled( GtkWidget *widget, gpointer user_data)
 {
-    switch(info->status_tokens[PLAY_MODE])
+    switch(callback_playmode_effective(info->status_tokens[PLAY_MODE]))
     {
       case MODE_STREAM:
             on_check_streamfx_toggled( widget, user_data);
@@ -6102,7 +6112,7 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		int arg = is_button_toggled( "freestyle" );
+		int arg = is_button_toggled( "freestyle" ) ? 0 : 1;
 		int start = is_button_toggled( "samplerand" );
 
 		int vims_id = VIMS_SAMPLE_RAND_START;
@@ -6119,9 +6129,6 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 			single_vims( vims_id );
 			vj_midi_learning_vims_simple(info->midi, NULL, vims_id );
 		}
-
-		vj_msg(VEEJAY_MSG_INFO, "You should restart the sample randomizer now.");
-
 	}
 }
 
@@ -6876,7 +6883,7 @@ void update_curve_shape(void)
     int lo = 0;
     int hi = 0;
 
-    if (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
+    if (callback_playmode_is_sample(info->status_tokens[PLAY_MODE])) {
         lo = info->status_tokens[SAMPLE_START];
         hi = info->status_tokens[SAMPLE_END];
     } else {
@@ -6989,7 +6996,7 @@ static gboolean curve_current_animation_range(int *lo, int *hi)
     if(!lo || !hi)
         return FALSE;
 
-    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
+    if(callback_playmode_is_sample(info->status_tokens[PLAY_MODE])) {
         *lo = info->status_tokens[SAMPLE_START];
         *hi = info->status_tokens[SAMPLE_END];
     } else {
@@ -7325,7 +7332,7 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
 
 static int callback_playmode_panel_page(int pm)
 {
-    switch(pm)
+    switch(callback_playmode_effective(pm))
     {
         case MODE_SAMPLE:
             return 0;
@@ -7387,7 +7394,7 @@ static void timeline_marker_move_reset_cache(void)
 
 static gboolean timeline_marker_mode_is_sample(void)
 {
-    return info && info->tl && info->status_tokens[PLAY_MODE] == MODE_SAMPLE;
+    return info && info->tl && callback_playmode_is_sample(info->status_tokens[PLAY_MODE]);
 }
 
 static gboolean timeline_marker_can_send(void)
@@ -7555,7 +7562,7 @@ void on_timeline_audio_offset_changed(GtkWidget *widget, gpointer user_data)
     if(!info || info->status_lock || !widget)
         return;
 
-    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE || info->status_tokens[CURRENT_ID] <= 0)
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) || info->status_tokens[CURRENT_ID] <= 0)
         return;
 
     sample_id = info->status_tokens[CURRENT_ID];
@@ -9249,7 +9256,7 @@ void on_button_offline_start_sample_clicked(GtkWidget *widget, gpointer user_dat
     int n_frames = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( widget_cache[ WIDGET_BUFFEREDSTREAMLENGTH ] ));
     int cur_id = info->status_tokens[ CURRENT_ID ];
 
-    if(info->status_tokens[PLAY_MODE] != MODE_SAMPLE || cur_id <= 0) {
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) || cur_id <= 0) {
         vj_msg(VEEJAY_MSG_WARNING, "Select the sample that should receive the offline stream recording first");
         return;
     }

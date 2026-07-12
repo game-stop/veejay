@@ -95,6 +95,16 @@ static gpointer castIntToGpointer(int val)
 
 #define MAX_SLOW 25
 
+static inline int ui_playmode_is_sample(int mode)
+{
+    return mode == MODE_SAMPLE || mode == MODE_PATTERN;
+}
+
+static inline int ui_playmode_effective(int mode)
+{
+    return ui_playmode_is_sample(mode) ? MODE_SAMPLE : mode;
+}
+
 static inline int ui_audio_sync_mode_is_control_only(int mode)
 {
     return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
@@ -3004,7 +3014,7 @@ static void timeline_update_compact_overlay(void)
     if(!info || !info->tl)
         return;
 
-    pm = info->status_tokens[PLAY_MODE];
+    pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
 
     if(pm == MODE_SAMPLE) {
         source_start = info->status_tokens[SAMPLE_START];
@@ -6218,7 +6228,7 @@ static void ui_stream_trickplay_set_sensitive(int stream_mode, int supported, in
 
 static int vj_kf_timeline_length(void)
 {
-    int pm = info->status_tokens[PLAY_MODE];
+    int pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
     int len = 0;
 
     if(pm == MODE_SAMPLE) {
@@ -6248,7 +6258,7 @@ static int vj_kf_timeline_length(void)
 
 static int vj_kf_timeline_position(void)
 {
-    int pm = info->status_tokens[PLAY_MODE];
+    int pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
     int len = vj_kf_timeline_length();
     int pos = info->status_tokens[FRAME_NUM];
 
@@ -6412,7 +6422,7 @@ static void update_curve_widget(GtkWidget *curve)
             curve_live_preview_user_override(FALSE);
 
         static int last_none_pm = INT_MIN;
-        int pm = info->status_tokens[PLAY_MODE];
+        int pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
         int len = 1;
         int pos = info->status_tokens[FRAME_NUM];
         gfloat max_x;
@@ -9193,7 +9203,7 @@ static void load_effectchain_info(void)
         GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]),
         info->status_tokens[SAMPLE_FX]);
 
-    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
+    if(ui_playmode_is_sample(info->status_tokens[PLAY_MODE])) {
         gtk_toggle_button_set_active(
             GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]),
             info->status_tokens[SAMPLE_FX]);
@@ -10225,6 +10235,8 @@ int get_and_draw_frame(int type, char *wid_name)
 
 static void select_slot(int pm)
 {
+    pm = ui_playmode_effective(pm);
+
     set_activation_of_slot_in_samplebank(FALSE);
     info->selected_slot = NULL;
 
@@ -10853,7 +10865,7 @@ static void load_samplelist_info(void)
                                                   slot && slot->title ? slot->title : (gchar *) effective_title,
                                                   slot && slot->timecode ? slot->timecode : timecode);
 
-                if(info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+                if(info->status_tokens[CURRENT_ID] == values[0] && ui_playmode_is_sample(info->status_tokens[PLAY_MODE]))
                     sample_title_entry_sync_text(effective_title);
 
                 free(timecode);
@@ -12251,7 +12263,7 @@ int veejay_update_multitrack( void *ptr )
     }
 
     info->status_lock = 1;
-    info->uc.playmode = info->status_tokens[ PLAY_MODE ];
+    info->uc.playmode = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
     update_gui();
     info->prev_mode = info->status_tokens[ PLAY_MODE ];
 
@@ -12315,7 +12327,7 @@ int veejay_update_multitrack( void *ptr )
 
 static int ui_playmode_panel_page(int pm)
 {
-    switch(pm)
+    switch(ui_playmode_effective(pm))
     {
         case MODE_SAMPLE:
             return 0;
@@ -12358,6 +12370,9 @@ static void ui_sync_playmode_panel_pages(int pm)
 static void update_status_accessibility(int old_pm, int new_pm, int force)
 {
     int i;
+
+    old_pm = ui_playmode_effective(old_pm);
+    new_pm = ui_playmode_effective(new_pm);
 
     set_pm_page_label(new_pm);
     ui_sync_playmode_panel_pages(new_pm);
@@ -12411,7 +12426,7 @@ static void set_pm_page_label(int type)
     GtkWidget *mode = widget_cache[WIDGET_LABEL_CURRENT_MODE];
     GtkWidget *source = widget_cache[WIDGET_LABEL_CURRENTSOURCE];
 
-    switch(type)
+    switch(ui_playmode_effective(type))
     {
         case MODE_SAMPLE:
             tab_label = "Sample";
@@ -13820,7 +13835,7 @@ static int audio_sync_current_sample_has_own_audio_source(void)
     int source;
     int mode;
 
-    if(!info || info->status_tokens[PLAY_MODE] != MODE_SAMPLE)
+    if(!info || !ui_playmode_is_sample(info->status_tokens[PLAY_MODE]))
         return 0;
 
     if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_SYNC_MODE)
@@ -14478,7 +14493,7 @@ static void audio_sync_update_audible_route_label(void)
 
     record_source = info->status_tokens[RECORD_AUDIO_SOURCE];
 
-    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+    if(ui_playmode_is_sample(info->status_tokens[PLAY_MODE]) &&
        VIMS_STATUS_TOKENS > SAMPLE_AUDIO_SYNC_WAV_LOOP)
     {
         int source = info->status_tokens[SAMPLE_AUDIO_SYNC_SOURCE];
@@ -14785,6 +14800,9 @@ static void update_audio_sync_status_widgets(int *history, int force)
 static void update_globalinfo(int *history, int pm, int last_pm)
 {
     int i;
+
+    pm = ui_playmode_effective(pm);
+    last_pm = ui_playmode_effective(last_pm);
     const gboolean source_changed = (last_pm != pm) ||
                                     history[CURRENT_ID] != info->status_tokens[CURRENT_ID];
     total_frames_ = (pm == MODE_STREAM ? ui_stream_transport_length() : info->status_tokens[TOTAL_FRAMES] );
@@ -15806,6 +15824,8 @@ static void sync_chain_entry_beat_toggle_from_status(void)
 
 static void process_reload_hints(int *history, int pm)
 {
+    pm = ui_playmode_effective(pm);
+
     int *entry_tokens = &(info->uc.entry_tokens[0]);
     int md = info->uc.reload_hint[HINT_MACRODELAY];
     if( md ) {
@@ -16019,32 +16039,28 @@ void update_gui(void)
     int old_status_lock = info->status_lock;
     info->status_lock = 1;
 
-    int pm = info->status_tokens[PLAY_MODE];
-    int last_pm = info->prev_mode;
+    int raw_pm = info->status_tokens[PLAY_MODE];
+    int raw_last_pm = info->prev_mode;
+    int pm = ui_playmode_effective(raw_pm);
+    int last_pm = ui_playmode_effective(raw_last_pm);
+    int randplayer_active = (raw_pm == MODE_PATTERN);
 
     int *history = NULL;
 
-    if( last_pm < 0 )
-        history = info->history_tokens[0];
+    if(raw_last_pm < 0)
+        history = info->history_tokens[MODE_SAMPLE];
     else
-        history = info->history_tokens[ last_pm ];
+        history = info->history_tokens[raw_last_pm];
 
-    if( info->uc.randplayer && pm != last_pm )
+    if(info->uc.randplayer != randplayer_active)
     {
-        info->uc.randplayer = 0;
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_SAMPLERAND] ), FALSE );
+        info->uc.randplayer = randplayer_active;
+        gtk_toggle_button_set_active(
+            GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLERAND]),
+            randplayer_active ? TRUE : FALSE);
     }
 
-    if( pm == MODE_PATTERN && last_pm != pm)
-    {
-        if(!info->uc.randplayer )
-        {
-            info->uc.randplayer = 1;
-            gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_SAMPLERAND] ), TRUE );
-        }
-        info->status_tokens[PLAY_MODE] = MODE_SAMPLE;
-        pm = MODE_SAMPLE;
-    }
+    info->uc.playmode = pm;
 
     update_audio_beat_status_widgets(history, last_pm < 0);
     update_audio_sync_status_widgets(history, last_pm < 0);
@@ -16305,7 +16321,7 @@ int vj_img_cb(GdkPixbuf *img)
         return 0;
 
     int sample_id = info->status_tokens[CURRENT_ID];
-    int pm = info->status_tokens[PLAY_MODE];
+    int pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
     int sample_type = (pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE]);
     sample_slot_t *slot = info->selected_slot;
 
@@ -20498,7 +20514,7 @@ static gboolean samplebank_slot_is_current(sample_slot_t *slot)
     if (info->status_tokens[CURRENT_ID] != slot->sample_id)
         return FALSE;
 
-    if (info->status_tokens[PLAY_MODE] == MODE_SAMPLE &&
+    if (ui_playmode_is_sample(info->status_tokens[PLAY_MODE]) &&
         slot->sample_type == 0)
         return TRUE;
 
