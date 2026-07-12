@@ -1605,6 +1605,157 @@ gtk3_curve_live_trace_slot_for_x(Gtk3CurvePrivate *priv,
   return slot;
 }
 
+static gint
+gtk3_curve_live_trace_history_capacity(Gtk3CurvePrivate *priv)
+{
+  gfloat min_x;
+  gfloat max_x;
+  gfloat span;
+  gint capacity;
+
+  if (!priv)
+    return GTK3_CURVE_LIVE_TRACE_LEN;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  span = max_x - min_x;
+  capacity = (gint) floorf(span + 0.5f) + 1;
+
+  if (capacity < 2)
+    capacity = 2;
+  else if (capacity > GTK3_CURVE_LIVE_TRACE_LEN)
+    capacity = GTK3_CURVE_LIVE_TRACE_LEN;
+
+  return capacity;
+}
+
+static gint
+gtk3_curve_live_trace_iteration_count(Gtk3CurvePrivate *priv)
+{
+  if (!gtk3_curve_live_trace_use_local_axis(priv))
+    return GTK3_CURVE_LIVE_TRACE_LEN;
+
+  return MIN(priv->live_trace_count,
+             gtk3_curve_live_trace_history_capacity(priv));
+}
+
+static gboolean
+gtk3_curve_live_trace_point_at_order(Gtk3CurvePrivate *priv,
+                                     gint              trace,
+                                     gint              order,
+                                     gint             *slot,
+                                     gfloat           *x_value,
+                                     gfloat           *value)
+{
+  gint idx;
+
+  if (!priv || trace < 0 || trace >= GTK3_CURVE_LIVE_TRACE_MAX || order < 0)
+    return FALSE;
+
+  if (!priv->live_trace_point_used || !priv->live_trace_x || !priv->live_trace_values)
+    return FALSE;
+
+  if (gtk3_curve_live_trace_use_local_axis(priv)) {
+    gint capacity = gtk3_curve_live_trace_history_capacity(priv);
+    gint count = MIN(priv->live_trace_count, capacity);
+    gint oldest;
+    gfloat min_x;
+    gfloat max_x;
+    gfloat step;
+
+    if (order >= count)
+      return FALSE;
+
+    oldest = (count < capacity) ? 0 : priv->live_trace_pos;
+    if (oldest < 0 || oldest >= capacity)
+      oldest = 0;
+
+    idx = (oldest + order) % capacity;
+
+    min_x = gtk3_curve_live_domain_min_x(priv);
+    max_x = gtk3_curve_live_domain_max_x(priv);
+    if (!isfinite(min_x))
+      min_x = 0.0f;
+    if (!isfinite(max_x) || max_x <= min_x)
+      max_x = min_x + 1.0f;
+
+    step = (capacity > 1) ? (max_x - min_x) / (gfloat)(capacity - 1) : 1.0f;
+
+    if (x_value)
+      *x_value = max_x - ((gfloat)(count - 1 - order) * step);
+  }
+  else {
+    if (order >= GTK3_CURVE_LIVE_TRACE_LEN)
+      return FALSE;
+
+    idx = order;
+
+    if (x_value)
+      *x_value = priv->live_trace_x[trace][idx];
+  }
+
+  if (!priv->live_trace_point_used[trace][idx])
+    return FALSE;
+
+  if (slot)
+    *slot = idx;
+  if (value)
+    *value = priv->live_trace_values[trace][idx];
+
+  return TRUE;
+}
+
+static gboolean
+gtk3_curve_live_trace_clock_x_for_slot(Gtk3CurvePrivate *priv,
+                                       gint              slot,
+                                       gfloat           *x_value)
+{
+  gint capacity;
+  gint count;
+  gint oldest;
+  gint order;
+  gfloat min_x;
+  gfloat max_x;
+  gfloat step;
+
+  if (!priv || !x_value || !gtk3_curve_live_trace_use_local_axis(priv))
+    return FALSE;
+
+  capacity = gtk3_curve_live_trace_history_capacity(priv);
+  count = MIN(priv->live_trace_count, capacity);
+
+  if (count <= 0 || slot < 0 || slot >= capacity)
+    return FALSE;
+
+  oldest = (count < capacity) ? 0 : priv->live_trace_pos;
+  if (oldest < 0 || oldest >= capacity)
+    oldest = 0;
+
+  order = slot - oldest;
+  if (order < 0)
+    order += capacity;
+  if (order < 0 || order >= count)
+    return FALSE;
+
+  min_x = gtk3_curve_live_domain_min_x(priv);
+  max_x = gtk3_curve_live_domain_max_x(priv);
+  if (!isfinite(min_x))
+    min_x = 0.0f;
+  if (!isfinite(max_x) || max_x <= min_x)
+    max_x = min_x + 1.0f;
+
+  step = (capacity > 1) ? (max_x - min_x) / (gfloat)(capacity - 1) : 1.0f;
+  *x_value = max_x - ((gfloat)(count - 1 - order) * step);
+
+  return TRUE;
+}
+
 static gboolean
 gtk3_curve_live_graph_rect(gint graph_width,
                            gint graph_height,
@@ -1789,6 +1940,7 @@ gtk3_curve_draw_live_trace_current_dot(Gtk3CurvePrivate *priv,
   gdouble x;
   gdouble y;
   gdouble radius = 2.8;
+  gfloat x_value;
 
   if (!priv || !cr || !r)
     return;
@@ -1805,7 +1957,12 @@ gtk3_curve_draw_live_trace_current_dot(Gtk3CurvePrivate *priv,
   if (!priv->live_trace_point_used || !priv->live_trace_point_used[trace][idx])
     return;
 
-  if (!gtk3_curve_live_project_x(priv, r, priv->live_trace_x[trace][idx], &x))
+  x_value = priv->live_trace_x[trace][idx];
+  if (gtk3_curve_live_trace_use_local_axis(priv) &&
+      !gtk3_curve_live_trace_clock_x_for_slot(priv, idx, &x_value))
+    return;
+
+  if (!gtk3_curve_live_project_x(priv, r, x_value, &x))
     return;
 
   y = gtk3_curve_live_project_y_norm(priv, r, priv->live_trace_values[trace][idx]);
@@ -1954,6 +2111,8 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
     gdouble sx[GTK3_CURVE_LIVE_TRACE_LEN];
     gdouble sy[GTK3_CURVE_LIVE_TRACE_LEN];
     gint n = 0;
+    gint iteration_count;
+    gboolean scrolling_history;
 
     if (!priv->live_trace_active[t])
       continue;
@@ -1976,18 +2135,33 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
     gfloat last_value_x = 0.0f;
     gboolean have_last_value_x = FALSE;
     gfloat jump_threshold = gtk3_curve_live_trace_draw_jump_threshold(priv);
+    scrolling_history = gtk3_curve_live_trace_use_local_axis(priv);
+    iteration_count = gtk3_curve_live_trace_iteration_count(priv);
 
-    for (gint idx = 0; idx < GTK3_CURVE_LIVE_TRACE_LEN; idx++) {
+    for (gint order = 0; order < iteration_count; order++) {
+      gint idx;
       gdouble x;
       gdouble y;
       gfloat value_x;
+      gfloat trace_value;
 
-      if (!priv->live_trace_point_used || !priv->live_trace_point_used[t][idx])
+      if (!gtk3_curve_live_trace_point_at_order(priv,
+                                                t,
+                                                order,
+                                                &idx,
+                                                &value_x,
+                                                &trace_value)) {
+        if (scrolling_history && n > 0) {
+          gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
+          n = 0;
+          have_last_value_x = FALSE;
+        }
         continue;
+      }
 
-      value_x = priv->live_trace_x[t][idx];
-
-      if (have_last_value_x && fabsf(value_x - last_value_x) > jump_threshold) {
+      if (!scrolling_history &&
+          have_last_value_x &&
+          fabsf(value_x - last_value_x) > jump_threshold) {
         gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
         n = 0;
         have_last_value_x = FALSE;
@@ -2000,7 +2174,7 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
         continue;
       }
 
-      y = gtk3_curve_live_project_y_norm(priv, &gr, priv->live_trace_values[t][idx]);
+      y = gtk3_curve_live_project_y_norm(priv, &gr, trace_value);
 
       if (n > 0 && x < sx[n - 1] - 0.5) {
         gtk3_curve_draw_live_trace_segment(cr, GTK3_CURVE_TYPE_LINEAR, sx, sy, n);
@@ -2927,16 +3101,21 @@ gtk3_curve_live_trace_value_at_x(Gtk3CurvePrivate *priv,
   if (jump_threshold < 1.0f)
     jump_threshold = 1.0f;
 
-  for (gint idx = 0; idx < GTK3_CURVE_LIVE_TRACE_LEN; idx++) {
+  gint iteration_count = gtk3_curve_live_trace_iteration_count(priv);
+
+  for (gint order = 0; order < iteration_count; order++) {
+    gint idx;
     gfloat px;
     gfloat pv;
     gfloat d;
 
-    if (!priv->live_trace_point_used[trace][idx])
+    if (!gtk3_curve_live_trace_point_at_order(priv,
+                                              trace,
+                                              order,
+                                              &idx,
+                                              &px,
+                                              &pv))
       continue;
-
-    px = priv->live_trace_x[trace][idx];
-    pv = priv->live_trace_values[trace][idx];
 
     if (!isfinite(px) || !isfinite(pv))
       continue;
@@ -6116,6 +6295,45 @@ gtk3_curve_live_trace_clear_overwrite(Gtk3CurvePrivate *priv,
   priv->live_trace_have_source_x = TRUE;
 }
 
+static gint
+gtk3_curve_live_trace_clock_write_slot(Gtk3CurvePrivate *priv,
+                                       gfloat            x_value)
+{
+  gint capacity;
+  gint write_pos;
+  gboolean new_sample;
+
+  if (!priv)
+    return 0;
+
+  capacity = gtk3_curve_live_trace_history_capacity(priv);
+  new_sample = (!priv->live_trace_have_source_x ||
+                fabsf(x_value - priv->live_trace_last_source_x) > 0.0001f);
+
+  if (!new_sample &&
+      priv->live_trace_last_slot >= 0 &&
+      priv->live_trace_last_slot < capacity &&
+      priv->live_trace_slot_used[priv->live_trace_last_slot])
+    return priv->live_trace_last_slot;
+
+  write_pos = priv->live_trace_pos;
+  if (write_pos < 0 || write_pos >= capacity)
+    write_pos = 0;
+
+  gtk3_curve_live_trace_clear_slot_range(priv, write_pos, write_pos);
+
+  priv->live_trace_slot_used[write_pos] = TRUE;
+  if (priv->live_trace_count < capacity)
+    priv->live_trace_count++;
+
+  priv->live_trace_last_slot = write_pos;
+  priv->live_trace_pos = (write_pos + 1) % capacity;
+  priv->live_trace_last_source_x = x_value;
+  priv->live_trace_have_source_x = TRUE;
+
+  return write_pos;
+}
+
 static gboolean G_GNUC_UNUSED
 gtk3_curve_live_trace_is_explicit_wrap(Gtk3CurvePrivate *priv,
                                       gint              trace,
@@ -6389,20 +6607,30 @@ gtk3_curve_live_trace_push_at(GtkWidget   *widget,
 
   priv->live_trace_clear_on_next_push = FALSE;
 
-  gtk3_curve_live_trace_clear_overwrite(priv, x_value);
+  gint write_pos;
 
-  gint write_pos = gtk3_curve_live_trace_slot_for_x(priv, x_value);
-  gboolean replace_previous = priv->live_trace_slot_used[write_pos];
+  if (gtk3_curve_live_trace_use_local_axis(priv)) {
+    write_pos = gtk3_curve_live_trace_clock_write_slot(priv, x_value);
+  }
+  else {
+    gboolean replace_previous;
 
-  priv->live_trace_slot_used[write_pos] = TRUE;
+    gtk3_curve_live_trace_clear_overwrite(priv, x_value);
+
+    write_pos = gtk3_curve_live_trace_slot_for_x(priv, x_value);
+    replace_previous = priv->live_trace_slot_used[write_pos];
+
+    priv->live_trace_slot_used[write_pos] = TRUE;
+    priv->live_trace_last_slot = write_pos;
+    priv->live_trace_pos = write_pos;
+
+    if (!replace_previous && priv->live_trace_count < GTK3_CURVE_LIVE_TRACE_LEN)
+      priv->live_trace_count++;
+  }
+
   if (priv->live_trace_point_used)
     priv->live_trace_point_used[trace][write_pos] = TRUE;
-  priv->live_trace_last_slot = write_pos;
   priv->live_trace_last_slot_for[trace] = write_pos;
-  priv->live_trace_pos = write_pos;
-
-  if (!replace_previous && priv->live_trace_count < GTK3_CURVE_LIVE_TRACE_LEN)
-    priv->live_trace_count++;
 
   priv->live_trace_x[trace][write_pos] = x_value;
   priv->live_trace_values[trace][write_pos] = value;
@@ -6495,9 +6723,12 @@ gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
 
   if (!isfinite(x_value)) {
     if (priv->live_trace_count > 0) {
+      gint ring_len = gtk3_curve_live_trace_use_local_axis(priv) ?
+        gtk3_curve_live_trace_history_capacity(priv) :
+        GTK3_CURVE_LIVE_TRACE_LEN;
       gint idx = priv->live_trace_pos - 1;
       if (idx < 0)
-        idx += GTK3_CURVE_LIVE_TRACE_LEN;
+        idx += ring_len;
       x_value = priv->live_trace_x[GTK3_CURVE_LIVE_TRACE_MAX - 1][idx];
     } else {
       x_value = gtk3_curve_live_trace_use_local_axis(priv) ? 0.0f : (gfloat) priv->current_position;
