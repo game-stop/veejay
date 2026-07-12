@@ -64,6 +64,7 @@ int vje_get_param_default( int fx_id, int param_nr );
 int vje_get_param_min_limit( int fx_id, int param_nr );
 int vje_get_param_max_limit( int fx_id, int param_nr );
 int vje_get_extra_frame( int fx_id );
+int vje_get_alpha_flags( int fx_id );
 int vje_is_param_value_valid( int fx_id, int param_nr, int value );
 int vje_has_rgbkey( int fx_id );
 int vje_is_valid( int fx_id );

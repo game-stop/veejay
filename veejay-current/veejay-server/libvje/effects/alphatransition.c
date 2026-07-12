@@ -21,6 +21,12 @@
 #include "common.h"
 #include "alphatransition.h"
 
+static inline unsigned int alphatransition_div255(unsigned int value)
+{
+    value += 128;
+    return (value + (value >> 8)) >> 8;
+}
+
 /* almost the same as masktransition.c, but adding threshold and direction parameters */
 
 vj_effect *alphatransition_init(int width, int height)
@@ -31,7 +37,7 @@ vj_effect *alphatransition_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1255;
+    ve->limits[1][0] = 1256;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 1000;
 	ve->limits[0][2] = 0;
@@ -48,13 +54,13 @@ vj_effect *alphatransition_init(int width, int height)
 	ve->sub_format = 1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
-	ve->alpha = FLAG_ALPHA_SRC_A;
+	ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_IN_BLEND;
 		 
 	ve->param_description = vje_build_param_list(ve->num_params, "Time Index", "Smooth", "Direction", "Threshold" );
 
     ve->hints = vje_init_value_hint_list( ve->num_params );
 
-    vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "Channel A", "Channel B" );
+    vje_build_value_hint_list( ve->hints, ve->limits[1][2], 2, "B to A", "A to B" );
 
     return ve;
 }
@@ -105,15 +111,15 @@ void alphatransition_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
 
         if (direction == 0)
         {
-            Y[i]  = (uint8_t)((alpha * Y[i]  + ia * Y2[i])  >> 8);
-            Cb[i] = (uint8_t)((alpha * Cb[i] + ia * Cb2[i]) >> 8);
-            Cr[i] = (uint8_t)((alpha * Cr[i] + ia * Cr2[i]) >> 8);
+            Y[i]  = (uint8_t)alphatransition_div255(alpha * Y[i]  + ia * Y2[i]);
+            Cb[i] = (uint8_t)alphatransition_div255(alpha * Cb[i] + ia * Cb2[i]);
+            Cr[i] = (uint8_t)alphatransition_div255(alpha * Cr[i] + ia * Cr2[i]);
         }
         else
         {
-            Y[i]  = (uint8_t)((ia * Y[i]  + alpha * Y2[i])  >> 8);
-            Cb[i] = (uint8_t)((ia * Cb[i] + alpha * Cb2[i]) >> 8);
-            Cr[i] = (uint8_t)((ia * Cr[i] + alpha * Cr2[i]) >> 8);
+            Y[i]  = (uint8_t)alphatransition_div255(ia * Y[i]  + alpha * Y2[i]);
+            Cb[i] = (uint8_t)alphatransition_div255(ia * Cb[i] + alpha * Cb2[i]);
+            Cr[i] = (uint8_t)alphatransition_div255(ia * Cr[i] + alpha * Cr2[i]);
         }
     }
 }

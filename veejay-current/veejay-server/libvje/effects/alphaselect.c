@@ -55,7 +55,7 @@ vj_effect *alphaselect_init(int w, int h)
     ve->sub_format = 1;
     ve->rgb_conv = 1;
 
-    ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL | FLAG_ALPHA_SRC_A;
+    ve->alpha = FLAG_ALPHA_OUT;
 
     ve->param_description = vje_build_param_list(ve->num_params,
         "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Show Mask", "Invert");
@@ -63,7 +63,6 @@ vj_effect *alphaselect_init(int w, int h)
     return ve;
 }
 
-#define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
 
 void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
 {
@@ -138,34 +137,13 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
             if (invert)
                 alpha = 255 - alpha;
 
-            const int alpha_inv = 255 - alpha;
+            A[pos] = (uint8_t)alpha;
 
             if (show_mask)
             {
-                A[pos]  = (uint8_t)alpha;
                 Y[pos]  = (uint8_t)alpha;
                 Cb[pos] = 128;
                 Cr[pos] = 128;
-            }
-            else
-            {
-                if (alpha_inv == 0)
-                {
-                    continue;
-                }
-
-                if (alpha_inv == 255)
-                {
-                    Y[pos]  = Y[pos];
-                    Cb[pos] = Cb[pos];
-                    Cr[pos] = Cr[pos];
-                }
-                else
-                {
-                    Y[pos]  = DIV255(Y[pos]  * alpha_inv + Y[pos]  * alpha);
-                    Cb[pos] = DIV255(Cb[pos] * alpha_inv + Cb[pos] * alpha);
-                    Cr[pos] = DIV255(Cr[pos] * alpha_inv + Cr[pos] * alpha);
-                }
             }
         }
     }

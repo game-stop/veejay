@@ -152,6 +152,14 @@
 #define SAMPLE_AUDIO_SYNC_WAV_LOOP            VJ_STATUS_SAMPLE_AUDIO_SYNC_WAV_LOOP
 #define SAMPLE_AUDIO_SYNC_STATUS_LAST         VJ_STATUS_SAMPLE_AUDIO_SYNC_LAST
 
+#define ALPHA_INITIALIZE                      VJ_STATUS_ALPHA_INITIALIZE
+#define ALPHA_VALUE                           VJ_STATUS_ALPHA_VALUE
+#define ALPHA_STATUS_LAST                     VJ_STATUS_ALPHA_LAST
+
+#if VJ_STATUS_ARRAY_SIZE <= ALPHA_VALUE
+#error "VJ_STATUS_ARRAY_SIZE is too small for alpha initialization status fields"
+#endif
+
 #define STREAM_BUFFER_STATE_UNSUPPORTED   0
 #define STREAM_BUFFER_STATE_OFF           1
 #define STREAM_BUFFER_STATE_EMPTY         2

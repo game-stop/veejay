@@ -55,6 +55,6 @@ void alphanegate_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp parallel for num_threads(n_threads) schedule(static)
     for (int i = 0; i < len; i++)
     {
-        A[i] = (uint8_t)(val - A[i]);
+        A[i] = (uint8_t)((A[i] < val) ? (val - A[i]) : 0);
     }
 }

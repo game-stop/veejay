@@ -3329,6 +3329,23 @@ static char *veejay_pipe_append_sample_audio_sync_status(veejay_t *info, char *p
     return ptr;
 }
 
+static char *veejay_pipe_append_alpha_status(veejay_t *info, char *ptr)
+{
+    video_playback_setup *settings = info ? info->settings : NULL;
+    int enabled = settings && settings->clear_alpha ? 1 : 0;
+    int value = settings ? settings->alpha_value : 0;
+
+    if(value < 0)
+        value = 0;
+    else if(value > 255)
+        value = 255;
+
+    ptr = vj_sprintf(ptr, enabled);
+    ptr = vj_sprintf(ptr, value);
+
+    return ptr;
+}
+
 static char *veejay_pipe_append_audio_beat_config_status(veejay_t *info, char *ptr)
 {
 #ifdef HAVE_JACK
@@ -3524,7 +3541,8 @@ static void veejay_pipe_write_status(veejay_t * info)
                  VJ_AUDIO_BEAT_CONFIG_STATUS_TOKENS +
                  VJ_AUDIO_MIXER_STATUS_TOKENS +
                  VJ_STREAM_TRICKPLAY_STATUS_TOKENS +
-                 VJ_STATUS_SAMPLE_AUDIO_SYNC_TOKENS) *
+                 VJ_STATUS_SAMPLE_AUDIO_SYNC_TOKENS +
+                 VJ_ALPHA_STATUS_TOKENS) *
         (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
@@ -3550,6 +3568,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     ptr = veejay_pipe_append_audio_mixer_status(info, ptr);
     ptr = veejay_pipe_append_stream_trickplay_status(info, ptr);
     ptr = veejay_pipe_append_sample_audio_sync_status(info, ptr);
+    ptr = veejay_pipe_append_alpha_status(info, ptr);
     ptr = veejay_pipe_pad_status_tokens(info->status_what, ptr, VIMS_STATUS_TOKENS);
 
     *ptr = '\0';
@@ -7985,6 +8004,8 @@ veejay_t *veejay_malloc()
     }
 	info->settings->fxdepth = 1; //@ default to on (VEEJAY_CLASSIC env turns it off)
 	info->settings->color_vibrance = 98;
+    info->settings->clear_alpha = 0;
+    info->settings->alpha_value = 0;
 	
 	veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 

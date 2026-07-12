@@ -3858,8 +3858,8 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 
 	index_map_[VIMS_ALPHA_COMPOSITE]				=	_new_event(
 				"%d %d",
-				VIMS_BEZERK,	
-				"Enable or disable alpha channel clear every frame period",
+				VIMS_ALPHA_COMPOSITE,
+				"Configure alpha channel initialization for each frame",
 				vj_event_alpha_composite,
 				2,
 				VIMS_ALLOW_ANY,

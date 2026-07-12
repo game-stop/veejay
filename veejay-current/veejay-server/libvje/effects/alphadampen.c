@@ -34,13 +34,13 @@ vj_effect *alphadampen_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->defaults[0] = 64;
 
-    ve->description       = "Alpha: Dampen";
+    ve->description       = "Alpha: Quantize";
     ve->sub_format        = -1;
     ve->extra_frame       = 0;
     ve->has_user          = 0;
     ve->parallel          = 1;
-    ve->param_description = vje_build_param_list(ve->num_params, "Dampening value");
-    ve->alpha             = FLAG_ALPHA_OUT;
+    ve->param_description = vje_build_param_list(ve->num_params, "Quantization Step");
+    ve->alpha             = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT;
 
     return ve;
 }
@@ -48,9 +48,7 @@ vj_effect *alphadampen_init(int w, int h)
 void alphadampen_apply(void *ptr, VJFrame *frame, int *args)
 {
     const int n_threads = vje_advise_num_threads(frame->len);
-    int base = args[0];
-    if(base <= 0)
-        base = 1;
+    const int base = args[0];
 
     uint8_t *A = frame->data[3];
     const int len = frame->len;
@@ -71,4 +69,3 @@ void alphadampen_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 }
-

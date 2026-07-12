@@ -15608,28 +15608,29 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
 }
 
 
-void vj_event_alpha_composite(void *ptr, const char format[], va_list ap) 
+void vj_event_alpha_composite(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
-    int args[4];
-    
-    P_A(args,sizeof(args), NULL,0,format,ap);
+    int args[2];
 
-    if( args[0] == 0 ) {
-        v->settings->clear_alpha = 0;
-        v->settings->alpha_value = args[1];
-        if(v->settings->alpha_value < 0 )
-            v->settings->alpha_value = 0;
-        else if (v->settings->alpha_value > 255 )
-            v->settings->alpha_value = 255;
-        veejay_msg(VEEJAY_MSG_INFO,"Enabled alpha channel leaking (no clear)");
-    } else if (args[0] == 1 ) {
-        v->settings->clear_alpha = 1;
-        v->settings->alpha_value = args[1];
-        if(v->settings->alpha_value < 0 )
-            v->settings->alpha_value = 0;
-        else if (v->settings->alpha_value > 255 )
-            v->settings->alpha_value = 255;
-        veejay_msg(VEEJAY_MSG_INFO,"New alpha mask every frame (default alpha value is %d)", v->settings->alpha_value);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(args[0] != 0 && args[0] != 1) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Alpha clear must be 0 or 1");
+        return;
     }
+
+    int alpha_value = args[1];
+    if(alpha_value < 0)
+        alpha_value = 0;
+    else if(alpha_value > 255)
+        alpha_value = 255;
+
+    v->settings->clear_alpha = args[0];
+    v->settings->alpha_value = alpha_value;
+
+    if(v->settings->clear_alpha)
+        veejay_msg(VEEJAY_MSG_INFO, "Alpha channel initialized to %d every frame", alpha_value);
+    else
+        veejay_msg(VEEJAY_MSG_INFO, "Alpha channel clear disabled; previous alpha values are preserved");
 }

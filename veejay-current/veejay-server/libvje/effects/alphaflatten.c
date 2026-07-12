@@ -21,6 +21,12 @@
 #include "common.h"
 #include "alphaflatten.h"
 
+static inline unsigned int alphaflatten_div255(unsigned int value)
+{
+    value += 128;
+    return (value + (value >> 8)) >> 8;
+}
+
 vj_effect *alphaflatten_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -49,6 +55,7 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[0];
     const int len  = frame->len;
     const int n_threads = vje_advise_num_threads(len);
+    const unsigned int black_y = get_pixel_range_min_Y();
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -61,9 +68,9 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
         unsigned int a  = A[i];
         unsigned int ia = 255 - a;
 
-        Y[i] = (uint8_t)((a * Y[i]) >> 8);
-        U[i] = (uint8_t)((a * U[i] + ia * 128) >> 8);
-        V[i] = (uint8_t)((a * V[i] + ia * 128) >> 8);
+        Y[i] = (uint8_t)alphaflatten_div255(a * Y[i] + ia * black_y);
+        U[i] = (uint8_t)alphaflatten_div255(a * U[i] + ia * 128);
+        V[i] = (uint8_t)alphaflatten_div255(a * V[i] + ia * 128);
     }
 
     if (mode)

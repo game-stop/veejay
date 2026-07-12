@@ -52,6 +52,7 @@ void vj_gui_update_sync_samplelist_sensitivity(void);
 void samplebank_goto_page(int page);
 void samplebank_step_page(int delta);
 int samplebank_get_page(void);
+void alpha_composite_sync_from_status(int enabled, int alpha_value);
 
 gboolean boxbg_draw ( GtkWidget *w,  cairo_t *cr);
 gboolean boxfg_draw ( GtkWidget *w, cairo_t *cr );

@@ -774,6 +774,17 @@ int vje_get_extra_frame( int fx_id )
     return vj_effect_map [ idx ]->extra_frame;
 }
 
+int vje_get_alpha_flags( int fx_id )
+{
+    CHECK_BOUNDS(fx_id)
+
+    int idx = vj_fx_map[ fx_id ];
+    if(idx < 0)
+        return FLAG_ALPHA_NONE;
+
+    return vj_effect_map[ idx ]->alpha;
+}
+
 int vje_is_param_value_valid( int fx_id, int param_nr, int value )
 {
     if( param_nr < 0 || param_nr >= vje_get_num_params(fx_id) )

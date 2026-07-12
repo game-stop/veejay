@@ -50,6 +50,7 @@
 #include <veejaycore/avcommon.h>
 #include <veejaycore/vevo.h>
 #include <src/vj-api.h>
+#include <src/callback.h>
 #include <fcntl.h>
 #include <veejaycore/mjpeg_logging.h>
 #include <veejaycore/yuv4mpeg.h>
@@ -1353,10 +1354,10 @@ static struct
     {"Transition duration in frames for the selected stream."},
     {"Transition shape number for the selected stream."},
     {"Enable shape transitions when switching samples or streams. Configure the current transition in the properties panel."},
-    {"Render the selected mixer source through its own FX chain before it is used as the extra frame."},
-    {"Use alpha-transition behaviour for the chain fader. This changes how chain opacity/fade in/out is applied; it does not force-fill the output alpha channel."},
-    {"Request output alpha compositing. The backend receives the selected fill value, but alpha preservation/fill behaviour is handled by the performer/compositor."},
-    {"Alpha value used by output alpha compositing: off = 0, on = 255."},
+    {"Master switch for processing mixing sources through their own FX chains. Enabling Source FX on an individual entry turns this on automatically."},
+    {"Use the processed alpha mask for the chain fader instead of normal opacity. This is separate from Alpha Blend and alpha initialization."},
+    {"Initialize alpha only when an active FX needs it. Enabled resets alpha to the selected value; disabled preserves existing or generated alpha."},
+    {"Initial alpha value: off is transparent (0), on is opaque (255). Used only while Initialize alpha is enabled."},
     {"Preview the alpha channel instead of the normal image when the preview path supports it."},
     {"Show Alpha / Matte effects. These effects read, write, or transform the alpha plane/matte data."},
     {"Enable or disable feedback rendering. Some navigation and sample-grid controls are locked while feedback is active."},
@@ -4413,7 +4414,7 @@ static void init_alpha_ui_polish(void)
     GtkWidget *w;
 
     set_button_label_by_name("alpha_effects", "Alpha / Matte");
-    set_button_label_by_name("alphacomposite", "Output alpha");
+    set_button_label_by_name("alphacomposite", "Initialize alpha");
 
     w = glade_xml_get_widget_(info->main_window, "alpha_effects");
     if(w)
@@ -4424,12 +4425,19 @@ static void init_alpha_ui_polish(void)
         set_tooltip_by_widget(w, tooltips[TOOLTIP_ALPHA_PREVIEW].text);
 
     w = glade_xml_get_widget_(info->main_window, "alphacomposite");
-    if(w)
+    if(w) {
+        if(GTK_IS_TOGGLE_BUTTON(w))
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), FALSE);
         set_tooltip_by_widget(w, tooltips[TOOLTIP_OUTPUT_ALPHA_COMPOSITE].text);
+    }
 
     w = glade_xml_get_widget_(info->main_window, "toggle_alpha255");
-    if(w)
+    if(w) {
+        if(GTK_IS_TOGGLE_BUTTON(w))
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), FALSE);
+        gtk_widget_set_sensitive(w, FALSE);
         set_tooltip_by_widget(w, tooltips[TOOLTIP_OUTPUT_ALPHA_FILL_VALUE].text);
+    }
 
     if(widget_cache[WIDGET_TOGGLE_FADEMETHOD])
         set_tooltip_by_widget(widget_cache[WIDGET_TOGGLE_FADEMETHOD],
@@ -14834,6 +14842,15 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_MESSAGE_FORWARDING]), state);
     }
 
+    if(last_pm < 0 ||
+       info->status_tokens[ALPHA_INITIALIZE] != history[ALPHA_INITIALIZE] ||
+       info->status_tokens[ALPHA_VALUE] != history[ALPHA_VALUE])
+    {
+        alpha_composite_sync_from_status(
+            info->status_tokens[ALPHA_INITIALIZE],
+            info->status_tokens[ALPHA_VALUE]);
+    }
+
     if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) && info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ) {
         info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
         select_chain_entry(info->uc.selected_chain_entry);
@@ -15480,6 +15497,36 @@ static void disable_fx_entry(void) {
     }
 }
 
+static int fx_is_alpha_blend(int fx_id)
+{
+    const char *name = _effect_get_description(fx_id);
+    return name && strcmp(name, "Alpha: Blend") == 0;
+}
+
+static void update_source_fx_entry_tooltip(int fx_id)
+{
+    GtkWidget *w = widget_cache[WIDGET_SUBRENDER_ENTRY_TOGGLE];
+
+    if(!w)
+        return;
+
+    if(fx_is_alpha_blend(fx_id)) {
+        gtk_widget_set_tooltip_text(
+            w,
+            "Render B through its FX chain before blending. Enable this when B's Alpha / Matte effects create the mask; B is fully opaque when no mask exists.");
+    }
+    else if(_effect_get_mix(fx_id)) {
+        gtk_widget_set_tooltip_text(
+            w,
+            "Render the selected mixing source through its own FX chain before it is used as source B. The global source-FX master is enabled automatically.");
+    }
+    else {
+        gtk_widget_set_tooltip_text(
+            w,
+            "Source-FX rendering is available only for effects that use a mixing source.");
+    }
+}
+
 static void enable_fx_entry(void) {
 
     int *entry_tokens = &(info->uc.entry_tokens[0]);
@@ -15490,6 +15537,8 @@ static void enable_fx_entry(void) {
     }
 
     char *fx_name =  _effect_get_description( entry_tokens[ENTRY_FXID] );
+
+    update_source_fx_entry_tooltip(entry_tokens[ENTRY_FXID]);
 
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTNAME] ),fx_name );
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_EFFECTANIM_NAME] ), fx_name );
