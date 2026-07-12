@@ -1298,7 +1298,7 @@ static struct
     {"Mouse left/right: Play slot,\nShift + Mouse left: Put sample in slot.\nYou can also put selected samples."},
     {"Mouse left: Select slot (sample in slot),\nMouse double click: Play sample in slot,\nShift + Mouse left: Set slot as mixing current mixing channel"},
     {"Select a SRT sequence to edit"},
-    {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample"},
+    {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample\nCtrl + Shift + L: add fx to favourite list\n"},
     {"Filter the effects list by any string"},
     {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
 
@@ -8703,6 +8703,288 @@ enum
     FX_NUM,
 };
 
+enum
+{
+    FAVOURITE_FX_STRING = 0,
+    FAVOURITE_FX_TYPE,
+    FAVOURITE_FX_NUM,
+};
+
+#define FAVOURITE_FX_CONFIG "reloaded-favourites.cfg"
+#define FAVOURITE_FX_GROUP  "favourites"
+
+static GtkListStore *favourite_fx_store = NULL;
+
+static gchar *favourite_fx_config_dir(void)
+{
+    return g_build_filename(g_get_home_dir(), ".veejay", NULL);
+}
+
+static gchar *favourite_fx_config_path(void)
+{
+    gchar *dir = favourite_fx_config_dir();
+    gchar *path = g_build_filename(dir, FAVOURITE_FX_CONFIG, NULL);
+    g_free(dir);
+    return path;
+}
+
+static const gchar *favourite_fx_type(gint effect_id)
+{
+    effect_constr *ec = info->effect_info[effect_id];
+
+    if(ec && strncasecmp("alpha:", ec->description, 6) == 0)
+        return "Alpha";
+    if(ec && ec->is_video)
+        return "Video";
+    return "Image";
+}
+
+static gboolean favourite_fx_find(const gchar *name, GtkTreeIter *match)
+{
+    GtkTreeIter iter;
+    gboolean valid;
+
+    if(!favourite_fx_store || !name)
+        return FALSE;
+
+    valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(favourite_fx_store), &iter);
+    while(valid) {
+        gchar *row_name = NULL;
+        gtk_tree_model_get(GTK_TREE_MODEL(favourite_fx_store), &iter,
+                           FAVOURITE_FX_STRING, &row_name, -1);
+        if(row_name && strcmp(row_name, name) == 0) {
+            if(match)
+                *match = iter;
+            g_free(row_name);
+            return TRUE;
+        }
+        g_free(row_name);
+        valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(favourite_fx_store), &iter);
+    }
+
+    return FALSE;
+}
+
+static void favourite_fx_save(void)
+{
+    GKeyFile *key_file;
+    GtkTreeIter iter;
+    gboolean valid;
+    gchar *path;
+    gchar *dir;
+    gchar *data;
+    gsize length = 0;
+    gint count = 0;
+    GError *error = NULL;
+
+    if(!favourite_fx_store)
+        return;
+
+    key_file = g_key_file_new();
+    valid = gtk_tree_model_get_iter_first(GTK_TREE_MODEL(favourite_fx_store), &iter);
+    while(valid) {
+        gchar *name = NULL;
+        gchar *key;
+
+        gtk_tree_model_get(GTK_TREE_MODEL(favourite_fx_store), &iter,
+                           FAVOURITE_FX_STRING, &name, -1);
+        key = g_strdup_printf("effect%d", count);
+        g_key_file_set_string(key_file, FAVOURITE_FX_GROUP, key, name ? name : "");
+        g_free(key);
+        g_free(name);
+        count++;
+        valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(favourite_fx_store), &iter);
+    }
+
+    g_key_file_set_integer(key_file, FAVOURITE_FX_GROUP, "version", 1);
+    g_key_file_set_integer(key_file, FAVOURITE_FX_GROUP, "count", count);
+
+    data = g_key_file_to_data(key_file, &length, &error);
+    dir = favourite_fx_config_dir();
+    path = favourite_fx_config_path();
+    g_mkdir_with_parents(dir, 0700);
+
+    if(!data || !g_file_set_contents(path, data, length, &error))
+        vj_msg(VEEJAY_MSG_WARNING, "Unable to save FX favourites%s%s",
+               error && error->message ? ": " : "",
+               error && error->message ? error->message : "");
+
+    if(error)
+        g_error_free(error);
+    g_free(path);
+    g_free(dir);
+    g_free(data);
+    g_key_file_free(key_file);
+}
+
+static gboolean favourite_fx_add(const gchar *name, gboolean save)
+{
+    GtkTreeIter iter;
+    gint effect_id = 0;
+
+    if(!name || favourite_fx_find(name, NULL))
+        return FALSE;
+    if(vevo_property_get(fx_list_, name, 0, &effect_id) != 0 || effect_id <= 0)
+        return FALSE;
+
+    gtk_list_store_append(favourite_fx_store, &iter);
+    gtk_list_store_set(favourite_fx_store, &iter,
+                       FAVOURITE_FX_STRING, name,
+                       FAVOURITE_FX_TYPE, favourite_fx_type(effect_id),
+                       -1);
+    if(save)
+        favourite_fx_save();
+    return TRUE;
+}
+
+static gboolean favourite_fx_remove(const gchar *name, gboolean save)
+{
+    GtkTreeIter iter;
+
+    if(!favourite_fx_find(name, &iter))
+        return FALSE;
+
+    gtk_list_store_remove(favourite_fx_store, &iter);
+    if(save)
+        favourite_fx_save();
+    return TRUE;
+}
+
+static void favourite_fx_toggle(const gchar *name)
+{
+    if(!favourite_fx_remove(name, FALSE))
+        favourite_fx_add(name, FALSE);
+    favourite_fx_save();
+}
+
+static void favourite_fx_load(void)
+{
+    GKeyFile *key_file;
+    gchar *path;
+    gint count;
+    GError *error = NULL;
+
+    if(!favourite_fx_store)
+        return;
+
+    gtk_list_store_clear(favourite_fx_store);
+    path = favourite_fx_config_path();
+    if(!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+        g_free(path);
+        return;
+    }
+
+    key_file = g_key_file_new();
+    if(!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, &error)) {
+        vj_msg(VEEJAY_MSG_WARNING, "Unable to load FX favourites%s%s",
+               error && error->message ? ": " : "",
+               error && error->message ? error->message : "");
+        if(error)
+            g_error_free(error);
+        g_key_file_free(key_file);
+        g_free(path);
+        return;
+    }
+
+    count = g_key_file_get_integer(key_file, FAVOURITE_FX_GROUP, "count", &error);
+    if(error) {
+        g_error_free(error);
+        error = NULL;
+        count = 0;
+    }
+
+    for(gint i = 0; i < count; i++) {
+        gchar *key = g_strdup_printf("effect%d", i);
+        gchar *name = g_key_file_get_string(key_file, FAVOURITE_FX_GROUP, key, NULL);
+        if(name && *name)
+            favourite_fx_add(name, FALSE);
+        g_free(name);
+        g_free(key);
+    }
+
+    g_key_file_free(key_file);
+    g_free(path);
+}
+
+static gboolean favourite_fx_button_press(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
+{
+    GtkTreePath *path = NULL;
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+    gchar *name = NULL;
+    (void) user_data;
+
+    if(event->type != GDK_BUTTON_PRESS || event->button != 1 ||
+       !(event->state & GDK_CONTROL_MASK) || !(event->state & GDK_SHIFT_MASK))
+        return FALSE;
+
+    if(!gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(widget),
+                                      (gint) event->x, (gint) event->y,
+                                      &path, NULL, NULL, NULL))
+        return FALSE;
+
+    gtk_tree_view_set_cursor(GTK_TREE_VIEW(widget), path, NULL, FALSE);
+    model = gtk_tree_view_get_model(GTK_TREE_VIEW(widget));
+    if(gtk_tree_model_get_iter(model, &iter, path))
+        gtk_tree_model_get(model, &iter, FX_STRING, &name, -1);
+
+    if(name)
+        favourite_fx_toggle(name);
+
+    g_free(name);
+    gtk_tree_path_free(path);
+    return TRUE;
+}
+
+static gboolean favourite_fx_key_press(GtkWidget *widget, GdkEventKey *event, gpointer user_data)
+{
+    GtkTreeSelection *selection;
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+    gchar *name = NULL;
+    (void) user_data;
+
+    if(event->keyval != GDK_KEY_Delete && event->keyval != GDK_KEY_BackSpace)
+        return FALSE;
+
+    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(widget));
+    if(!gtk_tree_selection_get_selected(selection, &model, &iter))
+        return FALSE;
+
+    gtk_tree_model_get(model, &iter, FAVOURITE_FX_STRING, &name, -1);
+    if(name)
+        favourite_fx_remove(name, TRUE);
+    g_free(name);
+    return TRUE;
+}
+
+static void favourite_fx_rows_reordered(GtkTreeModel *model,
+                                         GtkTreePath *path,
+                                         GtkTreeIter *iter,
+                                         gint *new_order,
+                                         gpointer user_data)
+{
+    (void) model;
+    (void) path;
+    (void) iter;
+    (void) new_order;
+    (void) user_data;
+    favourite_fx_save();
+}
+
+static void favourite_fx_toggled(GtkToggleButton *button, gpointer user_data)
+{
+    GtkWidget *panel;
+    (void) user_data;
+
+    if(!gtk_toggle_button_get_active(button))
+        return;
+
+    panel = glade_xml_get_widget_(info->main_window, "effectspanel");
+    if(GTK_IS_NOTEBOOK(panel))
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(panel), 3);
+}
+
 gboolean view_fx_selection_func (GtkTreeSelection *selection,
                                  GtkTreeModel     *model,
                                  GtkTreePath      *path,
@@ -8862,14 +9144,17 @@ static gboolean effect_row_visible (GtkTreeModel *model, GtkTreeIter *iter, gpoi
 void setup_effectlist_info(void)
 {
     int i;
-    GtkWidget *trees[3];
+    GtkWidget *trees[4];
+    GtkWidget *favourite_button;
     trees[0] = glade_xml_get_widget_( info->main_window, "tree_effectlist");
     trees[1] = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
     trees[2] = glade_xml_get_widget_( info->main_window, "tree_alphalist" );
+    trees[3] = glade_xml_get_widget_( info->main_window, "tree_favouritelist" );
 
     set_tooltip_by_widget (trees[0], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_ALPHA_EFFECTS].text);
+    set_tooltip_by_widget (trees[3], "Double-click to use an effect. Drag to reorder. Delete removes it. Ctrl+Shift-click toggles favourites.");
 
     fx_list_ = (vevo_port_t*) vpn( 200 );
 
@@ -8897,17 +9182,34 @@ void setup_effectlist_info(void)
         g_object_unref( G_OBJECT( fxlist_data.stores[i].list ));
     }
 
+    favourite_fx_store = gtk_list_store_new(FAVOURITE_FX_NUM, G_TYPE_STRING, G_TYPE_STRING);
+    gtk_tree_view_set_model(GTK_TREE_VIEW(trees[3]), GTK_TREE_MODEL(favourite_fx_store));
+    gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(trees[3]), TRUE);
+    gtk_tree_view_set_reorderable(GTK_TREE_VIEW(trees[3]), TRUE);
+    g_object_unref(G_OBJECT(favourite_fx_store));
+
     setup_tree_text_column( "tree_effectlist", FX_STRING, "Effect",0 );
     setup_tree_text_column( "tree_effectmixlist", FX_STRING, "Effect",0 );
     setup_tree_text_column( "tree_alphalist", FX_STRING, "Alpha / Matte",0);
+    setup_tree_text_column( "tree_favouritelist", FAVOURITE_FX_STRING, "Effect",0);
+    setup_tree_text_column( "tree_favouritelist", FAVOURITE_FX_TYPE, "Type",72);
+    gtk_tree_view_column_set_expand(gtk_tree_view_get_column(GTK_TREE_VIEW(trees[3]), 0), TRUE);
 
-    for(i = 0; i < 3;  i ++ )
+    for(i = 0; i < 4;  i ++ )
     {
         g_signal_connect( trees[i],"row-activated", (GCallback) on_effectlist_row_activated, NULL );
+        g_signal_connect( trees[i],"button-press-event", G_CALLBACK(favourite_fx_button_press), NULL );
         GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[i]));
         gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
         gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
     }
+
+    g_signal_connect(trees[3], "key-press-event", G_CALLBACK(favourite_fx_key_press), NULL);
+    g_signal_connect(favourite_fx_store, "rows-reordered", G_CALLBACK(favourite_fx_rows_reordered), NULL);
+
+    favourite_button = glade_xml_get_widget_(info->main_window, "favourite_effects");
+    set_tooltip_by_widget(favourite_button, "Your ordered FX list. Ctrl+Shift-click any effect to add or remove it.");
+    g_signal_connect(favourite_button, "toggled", G_CALLBACK(favourite_fx_toggled), NULL);
 
     GtkWidget *entry_filterfx = glade_xml_get_widget_( info->main_window, "filter_effects");
     set_tooltip_by_widget (entry_filterfx, tooltips[TOOLTIP_FXFILTER].text);
@@ -9042,6 +9344,7 @@ void load_effectlist_info(void)
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
+    favourite_fx_load();
     free(fxtext);
 
 }
