@@ -117,6 +117,7 @@ typedef void (*vevo_event)(void *ptr, const char format[], va_list ap);
 
 void vj_event_get_sample_sequences_all(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_select(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_queue(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_copy(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_clear_all(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_scratch_sensitivity(void *ptr, const char format[], va_list ap);
@@ -4248,6 +4249,17 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				0,
 				"Selected bank bitmask (optional, 1..15)",
 				1,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_QUEUE ]			=	_new_event(
+				"%d",
+				VIMS_SEQUENCE_QUEUE,
+				"Queue a sequence bank for the next active-bank boundary",
+				vj_event_sequence_queue,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Sequence bank (-1=cancel, 0..3=queue)",
+				-1,
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_COPY ]			=	_new_event(

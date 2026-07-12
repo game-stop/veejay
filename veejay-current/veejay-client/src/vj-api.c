@@ -78,6 +78,16 @@
 #include <assert.h>
 #endif
 
+#ifndef VIMS_SEQUENCE_QUEUE
+#define VIMS_SEQUENCE_QUEUE 451
+#endif
+#ifndef VJ_SEQUENCE_STATUS_SELECTED_MASK
+#define VJ_SEQUENCE_STATUS_SELECTED_MASK(value) ((value) & 0x0f)
+#endif
+#ifndef VJ_SEQUENCE_STATUS_QUEUED_BANK
+#define VJ_SEQUENCE_STATUS_QUEUED_BANK(value) ((((value) >> 8) & 0x0f) - 1)
+#endif
+
 static gpointer castIntToGpointer(int val)
 {
     return GINT_TO_POINTER(val);
@@ -10322,6 +10332,11 @@ static int sequence_ui_play_grid_requested = 0;
 static int sequence_ui_selected_bank_mask = 1;
 static int sequence_ui_bank_mask_pending = 0;
 static int sequence_ui_bank_button_sync = 0;
+static int sequence_ui_queue_bank_changes = 0;
+static int sequence_ui_queue_pending = -2;
+/* SEQUENCE_BANK_QUEUE_UI_V2 */
+/* SEQUENCE_BANK_QUEUE_UI_V3 */
+/* SEQUENCE_BANK_QUEUE_UI_V4 */
 static GtkWidget *sequence_ui_bank_buttons[VJ_SEQUENCE_BANKS];
 
 static void sequence_ui_request_bank(int bank);
@@ -10355,6 +10370,28 @@ static int sequence_ui_active_bank(void)
     return bank;
 }
 
+static int sequence_ui_status_queued_bank(void)
+{
+    int bank = VJ_SEQUENCE_STATUS_QUEUED_BANK(
+        info->status_tokens[STATUS_SEQUENCE_RESERVED]);
+
+    return (bank >= 0 && bank < VJ_SEQUENCE_BANKS) ? bank : -1;
+}
+
+static int sequence_ui_queued_bank(void)
+{
+    int status_bank = sequence_ui_status_queued_bank();
+
+    if(sequence_ui_queue_pending >= -1) {
+        if(status_bank == sequence_ui_queue_pending)
+            sequence_ui_queue_pending = -2;
+        else
+            return sequence_ui_queue_pending;
+    }
+
+    return status_bank;
+}
+
 static int sequence_ui_all_bank_mask(void)
 {
     return (1 << VJ_SEQUENCE_BANKS) - 1;
@@ -10376,7 +10413,8 @@ static int sequence_ui_normalize_bank_mask(int mask, int active_bank)
 static int sequence_ui_current_bank_mask(void)
 {
     int active_bank = sequence_ui_active_bank();
-    int mask = info->status_tokens[STATUS_SEQUENCE_RESERVED];
+    int mask = VJ_SEQUENCE_STATUS_SELECTED_MASK(
+        info->status_tokens[STATUS_SEQUENCE_RESERVED]);
 
     if(sequence_ui_bank_mask_pending) {
         int local_mask = sequence_ui_normalize_bank_mask(sequence_ui_selected_bank_mask, active_bank);
@@ -10423,6 +10461,8 @@ static void sequence_ui_sync_bank_buttons(int active_bank, int mask)
     mask = sequence_ui_normalize_bank_mask(mask, active_bank);
     sequence_ui_selected_bank_mask = mask;
 
+    int queued_bank = sequence_ui_queued_bank();
+
     sequence_ui_bank_button_sync = 1;
     for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
         GtkWidget *button = sequence_ui_bank_buttons[bank];
@@ -10431,6 +10471,17 @@ static void sequence_ui_sync_bank_buttons(int active_bank, int mask)
 
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),
                                      (mask & (1 << bank)) != 0);
+
+        GtkStyleContext *context = gtk_widget_get_style_context(button);
+        if(bank == active_bank)
+            gtk_style_context_add_class(context, "active-bank");
+        else
+            gtk_style_context_remove_class(context, "active-bank");
+
+        if(bank == queued_bank)
+            gtk_style_context_add_class(context, "queued-bank");
+        else
+            gtk_style_context_remove_class(context, "queued-bank");
     }
     sequence_ui_bank_button_sync = 0;
 }
@@ -10444,10 +10495,12 @@ static void sequence_ui_send_bank_select(int bank, int mask)
     sequence_ui_selected_bank_mask = mask;
     sequence_ui_bank_mask_pending = 1;
 
+    sequence_ui_queue_pending = -1;
     sequence_ui_request_bank(bank);
     multi_vims(VIMS_SEQUENCE_SELECT, "%d %d", bank, mask);
 
     if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_set_queued_bank(info->sequence_bank_view, -1);
         gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
     }
@@ -10467,6 +10520,37 @@ static void sequence_ui_send_bank_mask_only(int mask)
     multi_vims(VIMS_SEQUENCE_SELECT, "%d %d", active_bank, mask);
     sequence_ui_sync_bank_buttons(active_bank, mask);
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void sequence_ui_send_bank_queue(int bank)
+{
+    if(bank < -1 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    sequence_ui_queue_pending = bank;
+    multi_vims(VIMS_SEQUENCE_QUEUE, "%d", bank);
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_queued_bank(info->sequence_bank_view, bank);
+
+    sequence_ui_sync_bank_buttons(sequence_ui_active_bank(),
+                                  sequence_ui_current_bank_mask());
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_queue_mode_toggled(GtkToggleButton *button, gpointer user_data)
+{
+    (void)user_data;
+
+    sequence_ui_queue_bank_changes =
+        gtk_toggle_button_get_active(button) ? 1 : 0;
+
+    if(!sequence_ui_queue_bank_changes)
+        sequence_ui_send_bank_queue(-1);
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_queue_mode(info->sequence_bank_view,
+                                              sequence_ui_queue_bank_changes != 0);
 }
 
 static void sequence_ui_request_bank(int bank)
@@ -10526,12 +10610,13 @@ static gboolean sequence_bank_view_bank_has_content(int bank)
 
 static void sequence_ui_rearm_play_grid_for_bank(int bank)
 {
-    if(!sequence_ui_wants_play_grid())
+    if(!sequence_ui_wants_play_grid() && !sequence_ui_queue_bank_changes)
         return;
 
     if(!sequence_bank_view_bank_has_content(bank))
         return;
 
+    sequence_ui_sync_play_grid_toggle(1);
     multi_vims(VIMS_SEQUENCE_STATUS, "%d", 1);
 
     if(info->sequence_bank_view)
@@ -10555,6 +10640,8 @@ static void sequence_bank_view_set_active_status(void)
     sequence_ui_sync_bank_buttons(bank, mask);
     gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
     gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, active);
+    gvr_sequence_bank_view_set_queued_bank(info->sequence_bank_view,
+                                           sequence_ui_queued_bank());
     gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
 }
 
@@ -10591,6 +10678,8 @@ static void load_sequence_list_legacy(void)
         gvr_sequence_bank_view_set_bank_size(info->sequence_bank_view, bank, size);
         gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, active != 0);
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+        gvr_sequence_bank_view_set_queued_bank(info->sequence_bank_view,
+                                               sequence_ui_queued_bank());
         gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
     }
 
@@ -12369,6 +12458,8 @@ static void update_sequence_playing_from_status(void)
         sequence_ui_sync_bank_buttons(bank, sequence_ui_current_bank_mask());
         gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
         gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, active);
+        gvr_sequence_bank_view_set_queued_bank(info->sequence_bank_view,
+                                               sequence_ui_queued_bank());
         gvr_sequence_bank_view_set_current_slot(info->sequence_bank_view, bank, playing);
     }
 
@@ -19494,6 +19585,26 @@ static void on_sequence_bank_button_toggled(GtkWidget *widget, gpointer user_dat
     gboolean checked = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 
     if(checked) {
+        if(sequence_ui_queue_bank_changes &&
+           info->status_tokens[SEQ_ACT] != 0 &&
+           bank != active_bank)
+        {
+            if(!sequence_bank_view_bank_has_content(bank)) {
+                sequence_ui_sync_bank_buttons(active_bank, mask);
+                vj_msg(VEEJAY_MSG_INFO,
+                       "Empty sequence bank %d cannot be queued",
+                       bank + 1);
+                return;
+            }
+
+            mask |= (1 << bank);
+            if(info->sequence_bank_view)
+                gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+            sequence_ui_send_bank_mask_only(mask);
+            sequence_ui_send_bank_queue(bank);
+            return;
+        }
+
         mask |= (1 << bank);
         sequence_ui_send_bank_select(bank, mask);
         sequence_ui_rearm_play_grid_for_bank(bank);
@@ -19505,6 +19616,35 @@ static void on_sequence_bank_button_toggled(GtkWidget *widget, gpointer user_dat
         vj_msg(VEEJAY_MSG_INFO, "Active sequence bank must remain checked");
         return;
     }
+
+    if(bank == sequence_ui_queued_bank())
+        sequence_ui_send_bank_queue(-1);
+
+    mask &= ~(1 << bank);
+    sequence_ui_send_bank_mask_only(mask);
+}
+
+static void on_sequence_bank_delete_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    int bank = sequence_ui_target_bank();
+    int active_bank = sequence_ui_active_bank();
+    int mask = sequence_ui_current_bank_mask();
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    if(bank == active_bank) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Select another sequence bank before removing bank %d from the playback chain",
+               bank + 1);
+        return;
+    }
+
+    if(bank == sequence_ui_queued_bank())
+        sequence_ui_send_bank_queue(-1);
 
     mask &= ~(1 << bank);
     sequence_ui_send_bank_mask_only(mask);
@@ -19524,12 +19664,54 @@ static void on_sequence_bank_clear_clicked(GtkWidget *widget, gpointer user_data
     (void)user_data;
     int bank = sequence_ui_target_bank();
 
+    if(bank == sequence_ui_queued_bank())
+        sequence_ui_send_bank_queue(-1);
+
     multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
     if(bank == sequence_ui_active_bank())
         info->sequence_playing = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void on_sequence_bank_view_bank_queue_requested(GtkWidget *widget,
+                                                               gint bank,
+                                                               gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(bank == -1) {
+        sequence_ui_send_bank_queue(-1);
+        return;
+    }
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    if(info->status_tokens[SEQ_ACT] == 0) {
+        int mask = sequence_ui_current_bank_mask() | (1 << bank);
+        sequence_ui_send_bank_select(bank, mask);
+        sequence_ui_rearm_play_grid_for_bank(bank);
+        return;
+    }
+
+    if(bank == sequence_ui_active_bank())
+        return;
+
+    if(!sequence_bank_view_bank_has_content(bank)) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Empty sequence bank %d cannot be queued",
+               bank + 1);
+        return;
+    }
+
+    int mask = sequence_ui_current_bank_mask() | (1 << bank);
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+    sequence_ui_send_bank_mask_only(mask);
+    sequence_ui_send_bank_queue(bank);
 }
 
 static void on_sequence_bank_view_bank_selected(GtkWidget *widget, gint bank, gpointer user_data)
@@ -19540,8 +19722,17 @@ static void on_sequence_bank_view_bank_selected(GtkWidget *widget, gint bank, gp
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         return;
 
-    if(info->sequence_bank_view)
-        gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+    if(bank == sequence_ui_active_bank()) {
+        if(info->sequence_bank_view)
+            gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+        if(info->status_tokens[SEQ_ACT] == 0)
+            sequence_ui_rearm_play_grid_for_bank(bank);
+        return;
+    }
+
+    int mask = sequence_ui_current_bank_mask() | (1 << bank);
+    sequence_ui_send_bank_select(bank, mask);
+    sequence_ui_rearm_play_grid_for_bank(bank);
 }
 
 static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint slot, gpointer user_data)
@@ -19648,6 +19839,10 @@ static void sequence_bank_view_copy_bank_to_target(int src_bank, int dst_bank)
         return;
     }
 
+    if(dst_bank == sequence_ui_queued_bank() &&
+       !sequence_bank_view_bank_has_content(src_bank))
+        sequence_ui_send_bank_queue(-1);
+
     multi_vims(VIMS_SEQUENCE_COPY, "%d %d", src_bank, dst_bank);
 
     if(info->sequence_bank_view)
@@ -19704,6 +19899,9 @@ static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpoin
 
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         return;
+
+    if(bank == sequence_ui_queued_bank())
+        sequence_ui_send_bank_queue(-1);
 
     multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
 
@@ -19763,7 +19961,44 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
     if(!gvr_sequence_bank_view_get_cell_at(widget, x, y, &bank, &slot, &header))
         return FALSE;
 
-    if(header || bank < 0 || slot < 0)
+    if(header) {
+        char header_tip[768];
+        int active_bank = sequence_ui_active_bank();
+        int queued_bank = sequence_ui_queued_bank();
+        gboolean populated = sequence_bank_view_bank_has_content(bank);
+
+        if(bank == active_bank) {
+            snprintf(header_tip, sizeof(header_tip),
+                     "Bank %d is active.%s\nLeft click keeps it selected. Right click opens bank actions.",
+                     bank + 1,
+                     info->status_tokens[SEQ_ACT] != 0 ? " Play Grid is running." : "");
+        }
+        else if(bank == queued_bank) {
+            snprintf(header_tip, sizeof(header_tip),
+                     "Bank %d is queued for the next bank boundary.\nLeft click cancels the queue. Selecting another populated bank replaces it.",
+                     bank + 1);
+        }
+        else if(!populated) {
+            snprintf(header_tip, sizeof(header_tip),
+                     "Bank %d is empty.\nIt can be selected for editing, but it cannot be queued until it contains a slot.",
+                     bank + 1);
+        }
+        else if(sequence_ui_queue_bank_changes && info->status_tokens[SEQ_ACT] != 0) {
+            snprintf(header_tip, sizeof(header_tip),
+                     "Bank %d is populated.\nLeft click queues it until the active bank completes. Selecting another bank replaces the queue.",
+                     bank + 1);
+        }
+        else {
+            snprintf(header_tip, sizeof(header_tip),
+                     "Bank %d is populated.\nLeft click selects and activates it immediately. Right click offers one-shot queued playback and bank actions.",
+                     bank + 1);
+        }
+
+        gtk_tooltip_set_text(tooltip, header_tip);
+        return TRUE;
+    }
+
+    if(bank < 0 || slot < 0)
         return FALSE;
 
     int sample_id = 0;
@@ -19905,85 +20140,118 @@ static void create_sequencer_slots(int nx, int ny)
     gtk_container_add(GTK_CONTAINER(info->sample_sequencer), outer);
     gtk_widget_show(outer);
 
-    toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 3);
+    toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 2);
     add_class(toolbar, "sequencer-toolbar");
-    gtk_box_pack_start(GTK_BOX(outer), toolbar, FALSE, FALSE, compact ? 0 : 2);
+    gtk_box_pack_start(GTK_BOX(outer), toolbar, FALSE, FALSE, compact ? 0 : 1);
     gtk_widget_show(toolbar);
-
-    progress_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 3);
-    add_class(progress_row, "sequencer-toolbar");
-    gtk_box_pack_start(GTK_BOX(outer), progress_row, FALSE, FALSE, compact ? 0 : 1);
-    gtk_widget_show(progress_row);
 
     sequence_toolbar_hide_legacy_row();
 
     button = sequence_toolbar_pack_existing(toolbar, "seqactive", FALSE, FALSE, 0);
     if(button) {
-        gtk_button_set_label(GTK_BUTTON(button), compact ? "Play" : "Play Grid");
-        gtk_widget_set_tooltip_text(button, "Play and repeat the checked sequence bank chain");
+        add_class(button, "sequence-play-grid");
+        gtk_button_set_label(GTK_BUTTON(button), "Play Grid");
+        gtk_widget_set_tooltip_text(button,
+            "Start or stop playback of the checked sequence-bank chain. Playback begins with the active bank and repeats the checked banks.");
     }
 
-    sequence_toolbar_add_separator(toolbar);
-
-    button = sequence_toolbar_pack_existing(toolbar, "rec_seq_start", FALSE, FALSE, 0);
-    if(button)
-        gtk_widget_set_tooltip_text(button, "Play and record this sequence to a new sample");
-
-    button = sequence_toolbar_pack_existing(toolbar, "seq_rec_stop", FALSE, FALSE, 0);
-    if(button)
-        gtk_widget_set_tooltip_text(button, "Stop recording from this sequence");
-
-    button = sequence_toolbar_pack_existing(progress_row, "rec_seq_progress", TRUE, TRUE, compact ? 0 : 2);
-    if(button) {
-        gtk_widget_set_size_request(button, -1, -1);
-        gtk_widget_set_tooltip_text(button, "Sequence recording progress");
-    }
+    button = gtk_check_button_new_with_label("Wait End");
+    add_class(button, "sequence-queue-toggle");
+    gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+    g_signal_connect(G_OBJECT(button), "toggled", G_CALLBACK(on_sequence_queue_mode_toggled), NULL);
+    gtk_widget_set_tooltip_text(button,
+        "Off: selecting a bank switches immediately. On: while Play Grid is running, selecting a populated non-active bank queues it until the current bank completes; selecting another bank replaces the queue, and selecting the queued bank again cancels it. When Play Grid is stopped, selecting a populated bank starts it immediately. Empty banks cannot be queued.");
+    gtk_widget_show_all(button);
 
     sequence_toolbar_add_separator(toolbar);
 
     for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
         char label[16];
-        snprintf(label, sizeof(label), compact ? "B%d" : "Bank %d", bank + 1);
+        snprintf(label, sizeof(label), "B%d", bank + 1);
         button = gtk_toggle_button_new_with_label(label);
+        add_class(button, "sequence-bank-button");
         sequence_ui_bank_buttons[bank] = button;
         gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
         g_signal_connect(G_OBJECT(button), "toggled", G_CALLBACK(on_sequence_bank_button_toggled), GINT_TO_POINTER(bank));
-        gtk_widget_set_tooltip_text(button, "Check to include this bank in chained sequence playback/recording. Checking a bank also makes it active. The active bank stays checked.");
+        gtk_widget_set_tooltip_text(button,
+            "Check to include this bank in Play Grid. Checking also selects it. With Wait End enabled during playback, a populated non-active bank is queued; selecting another replaces it, and unchecking the queued bank cancels it. When Play Grid is stopped, checking a populated bank starts it immediately. Empty banks cannot be queued. The active bank remains checked.");
         gtk_widget_show(button);
     }
 
-    button = gtk_button_new_with_label(compact ? "Clear" : "Clear Bank");
+    button = gtk_button_new_with_label("Clear");
+    add_class(button, "sequence-clear-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_clear_clicked), NULL);
-    gtk_widget_set_tooltip_text(button, "Clear the selected sequence bank immediately");
+    gtk_widget_set_tooltip_text(button,
+        "Erase every slot in the selected bank. Other banks are unchanged; an armed queue to this bank is cancelled when it becomes empty.");
     gtk_widget_show(button);
 
-    button = sequence_toolbar_pack_existing(toolbar, "button_seq_clearall", FALSE, FALSE, 0);
-    if(button)
-        gtk_widget_set_tooltip_text(button, "Clear all sequence banks");
+    button = gtk_button_new_with_label("Delete");
+    add_class(button, "sequence-delete-bank");
+    gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
+    g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_delete_clicked), NULL);
+    gtk_widget_set_tooltip_text(button,
+        "Remove the selected non-active bank from the checked playback chain without erasing its slots. The active bank cannot be removed; removing the queued bank cancels the queue.");
+    gtk_widget_show(button);
 
-    button = gtk_button_new_with_label(compact ? "Copy" : "Copy Bank");
+    button = gtk_button_new_with_label("Copy");
+    add_class(button, "sequence-copy-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_copy_clicked), NULL);
-    gtk_widget_set_tooltip_text(button, "Copy the selected sequence bank");
+    gtk_widget_set_tooltip_text(button,
+        "Copy all slots from the selected bank to the sequence-bank clipboard.");
     gtk_widget_show(button);
 
-    button = gtk_button_new_with_label(compact ? "Paste" : "Paste Bank");
+    button = gtk_button_new_with_label("Paste");
+    add_class(button, "sequence-paste-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_paste_clicked), NULL);
-    gtk_widget_set_tooltip_text(button, "Paste copied sequence bank into the selected bank");
+    gtk_widget_set_tooltip_text(button,
+        "Replace the selected bank with the copied bank contents.");
     gtk_widget_show(button);
 
     button = gtk_button_new_with_label("Refresh");
+    add_class(button, "sequence-refresh");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_refresh_clicked), NULL);
-    gtk_widget_set_tooltip_text(button, "Refresh all sequence banks");
+    gtk_widget_set_tooltip_text(button,
+        "Reload all four sequence banks and their active, checked, playing, and queued state from the backend.");
     gtk_widget_show(button);
 
     info->sequence_bank_view = gvr_sequence_bank_view_new();
+    gvr_sequence_bank_view_set_queue_mode(info->sequence_bank_view,
+                                              sequence_ui_queue_bank_changes != 0);
     gtk_widget_set_size_request(info->sequence_bank_view, sequence_view_w, sequence_view_h);
     gtk_box_pack_start(GTK_BOX(outer), info->sequence_bank_view, TRUE, TRUE, compact ? 0 : 2);
+
+    progress_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 3);
+    add_class(progress_row, "sequencer-record-row");
+    gtk_box_pack_start(GTK_BOX(outer), progress_row, FALSE, FALSE, compact ? 0 : 1);
+    gtk_widget_show(progress_row);
+
+    button = sequence_toolbar_pack_existing(progress_row, "rec_seq_start", FALSE, FALSE, 0);
+    if(button) {
+        add_class(button, "sequence-record-start");
+        gtk_widget_set_tooltip_text(button,
+            "Start Play Grid and record its output to a new sample.");
+    }
+
+    button = sequence_toolbar_pack_existing(progress_row, "seq_rec_stop", FALSE, FALSE, 0);
+    if(button) {
+        add_class(button, "sequence-record-stop");
+        gtk_widget_set_tooltip_text(button,
+            "Stop the current sequence recording. Play Grid playback continues until stopped separately.");
+    }
+
+    button = sequence_toolbar_pack_existing(progress_row, "rec_seq_progress", TRUE, TRUE, compact ? 0 : 2);
+    if(button) {
+        add_class(button, "sequence-record-progress");
+        gtk_widget_set_size_request(button, -1, -1);
+        gtk_widget_set_tooltip_text(button,
+            "Progress of the current Play Grid recording.");
+    }
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-selected", G_CALLBACK(on_sequence_bank_view_bank_selected), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-queue-requested", G_CALLBACK(on_sequence_bank_view_bank_queue_requested), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-assign-requested", G_CALLBACK(on_sequence_bank_view_slot_assign), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-delete-requested", G_CALLBACK(on_sequence_bank_view_slot_delete), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "slot-reorder-requested", G_CALLBACK(on_sequence_bank_view_slot_reorder), NULL);

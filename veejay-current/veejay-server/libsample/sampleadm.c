@@ -3439,6 +3439,8 @@ static void sampleadm_sequence_load_bank(sequencer_t *s, int bank)
     if(s->current < 0 || s->current >= MAX_SEQUENCES)
         s->current = 0;
 
+    s->queued_bank = -1;
+
     if(s->revision == 0)
         s->revision = 1;
 }

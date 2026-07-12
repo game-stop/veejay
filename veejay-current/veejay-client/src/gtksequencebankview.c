@@ -68,6 +68,8 @@ struct _GvrSequenceBankView {
     GtkDrawingArea parent_instance;
     GvrSequenceBank banks[GVR_SEQUENCE_BANKS];
     int active_bank;
+    int queued_bank;
+    gboolean queue_mode;
     int selected_bank;
     int selected_slot;
     int hover_bank;
@@ -112,6 +114,7 @@ struct _GvrSequenceBankViewClass {
 
 enum {
     SIGNAL_BANK_SELECTED,
+    SIGNAL_BANK_QUEUE_REQUESTED,
     SIGNAL_SLOT_ASSIGN_REQUESTED,
     SIGNAL_SLOT_DELETE_REQUESTED,
     SIGNAL_SLOT_REORDER_REQUESTED,
@@ -323,30 +326,43 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
         GdkRectangle *br = &view->bank_rect[bank];
         GdkRectangle *hr = &view->header_rect[bank];
         gboolean active_bank = (bank == view->active_bank);
+        gboolean queued_bank = (bank == view->queued_bank && !active_bank);
         char title[96];
 
-        gvr_set_rgba(cr, active_bank ? 0.125 : 0.100, active_bank ? 0.135 : 0.105, active_bank ? 0.155 : 0.118, 1.0);
+        gvr_set_rgba(cr, active_bank ? 0.125 : (queued_bank ? 0.155 : 0.100),
+                     active_bank ? 0.135 : (queued_bank ? 0.125 : 0.105),
+                     active_bank ? 0.155 : (queued_bank ? 0.085 : 0.118),
+                     1.0);
         cairo_rectangle(cr, br->x, br->y, br->width, br->height);
         cairo_fill(cr);
 
-        gvr_set_rgba(cr, active_bank ? 0.300 : 0.170, active_bank ? 0.420 : 0.180, active_bank ? 0.650 : 0.205, 1.0);
-        cairo_set_line_width(cr, active_bank ? 2.5 : 1.0);
+        if(active_bank)
+            gvr_set_rgba(cr, 0.300, 0.420, 0.650, 1.0);
+        else if(queued_bank)
+            gvr_set_rgba(cr, 0.940, 0.600, 0.160, 1.0);
+        else
+            gvr_set_rgba(cr, 0.170, 0.180, 0.205, 1.0);
+        cairo_set_line_width(cr, (active_bank || queued_bank) ? 2.5 : 1.0);
         cairo_rectangle(cr, br->x + 0.5, br->y + 0.5, br->width - 1, br->height - 1);
         cairo_stroke(cr);
 
-        gvr_set_rgba(cr, active_bank ? 0.150 : 0.115, active_bank ? 0.170 : 0.125, active_bank ? 0.210 : 0.145, 1.0);
+        gvr_set_rgba(cr,
+                     active_bank ? 0.150 : (queued_bank ? 0.200 : 0.115),
+                     active_bank ? 0.170 : (queued_bank ? 0.145 : 0.125),
+                     active_bank ? 0.210 : (queued_bank ? 0.090 : 0.145),
+                     1.0);
         cairo_rectangle(cr, hr->x + 1, hr->y + 1, hr->width - 2, hr->height - 1);
         cairo_fill(cr);
 
         if(br->width < 230)
             snprintf(title, sizeof(title), "B%d%s  %d",
                      bank + 1,
-                     active_bank ? (view->sequence_active ? "*" : "") : "",
+                     active_bank ? (view->sequence_active ? "*" : "") : (queued_bank ? ">" : ""),
                      view->banks[bank].size);
         else
             snprintf(title, sizeof(title), "Bank %d%s  %d slots  rev %u",
                      bank + 1,
-                     active_bank ? (view->sequence_active ? "  ACTIVE" : "  SELECTED") : "",
+                     active_bank ? (view->sequence_active ? "  ACTIVE" : "  SELECTED") : (queued_bank ? "  QUEUED" : ""),
                      view->banks[bank].size,
                      view->banks[bank].revision);
         gvr_set_rgba(cr, 0.850, 0.880, 0.920, 1.0);
@@ -465,6 +481,50 @@ static gboolean gvr_sequence_bank_view_hit(GvrSequenceBankView *view, double x, 
     *slot = -1;
     *header = FALSE;
     return FALSE;
+}
+
+static void gvr_sequence_bank_view_activate_bank(GtkWidget *widget,
+                                                    GvrSequenceBankView *view,
+                                                    int bank)
+{
+    if(!view || bank < 0 || bank >= GVR_SEQUENCE_BANKS)
+        return;
+
+    if(view->queue_mode && view->sequence_active) {
+        if(bank == view->active_bank) {
+            gtk_widget_queue_draw(widget);
+            return;
+        }
+
+        if(bank == view->queued_bank) {
+            view->queued_bank = -1;
+            g_signal_emit(view,
+                          gvr_sequence_bank_view_signals[SIGNAL_BANK_QUEUE_REQUESTED],
+                          0,
+                          -1);
+            gtk_widget_queue_draw(widget);
+            return;
+        }
+
+        if(view->banks[bank].size <= 0) {
+            gtk_widget_queue_draw(widget);
+            return;
+        }
+
+        view->queued_bank = bank;
+        g_signal_emit(view,
+                      gvr_sequence_bank_view_signals[SIGNAL_BANK_QUEUE_REQUESTED],
+                      0,
+                      bank);
+    }
+    else {
+        g_signal_emit(view,
+                      gvr_sequence_bank_view_signals[SIGNAL_BANK_SELECTED],
+                      0,
+                      bank);
+    }
+
+    gtk_widget_queue_draw(widget);
 }
 
 static void gvr_sequence_bank_view_recount_bank(GvrSequenceBankView *view, int bank)
@@ -979,8 +1039,7 @@ static gboolean gvr_sequence_bank_view_key_press(GtkWidget *widget, GdkEventKey 
                 view->selected_slot = 0;
             gvr_sequence_bank_view_clear_selected_cells(view);
             view->selection_anchor_slot = view->selected_slot;
-            g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_BANK_SELECTED], 0, bank);
-            gtk_widget_queue_draw(widget);
+            gvr_sequence_bank_view_activate_bank(widget, view, bank);
             return TRUE;
         }
     }
@@ -1070,6 +1129,7 @@ enum {
     GVR_SEQUENCE_MENU_PASTE_BANK,
     GVR_SEQUENCE_MENU_COPY_TO_BANK,
     GVR_SEQUENCE_MENU_CLEAR_BANK,
+    GVR_SEQUENCE_MENU_QUEUE_BANK,
     GVR_SEQUENCE_MENU_REFRESH
 };
 
@@ -1148,6 +1208,24 @@ static void gvr_sequence_bank_view_menu_action(GtkMenuItem *item, gpointer user_
                 g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_BANK_CLEAR_REQUESTED], 0, view->selected_bank);
             gtk_widget_queue_draw(data->widget);
             break;
+        case GVR_SEQUENCE_MENU_QUEUE_BANK: {
+            int bank = view->selected_bank;
+
+            if(bank == view->active_bank)
+                break;
+
+            if(bank == view->queued_bank)
+                bank = -1;
+            else if(bank < 0 || bank >= GVR_SEQUENCE_BANKS || view->banks[bank].size <= 0)
+                break;
+
+            if(view->sequence_active)
+                view->queued_bank = bank;
+
+            g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_BANK_QUEUE_REQUESTED], 0, bank);
+            gtk_widget_queue_draw(data->widget);
+            break;
+        }
         case GVR_SEQUENCE_MENU_REFRESH:
             g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_REFRESH_REQUESTED], 0);
             break;
@@ -1237,6 +1315,21 @@ static void gvr_sequence_bank_view_popup_menu(GtkWidget *widget,
         gtk_widget_show(sep);
     }
 
+    if(view->selected_bank == view->queued_bank)
+        gvr_sequence_bank_view_menu_item(menu, "Cancel queued bank", widget, GVR_SEQUENCE_MENU_QUEUE_BANK, -1, TRUE);
+    else if(view->queued_bank >= 0)
+        gvr_sequence_bank_view_menu_item(menu, "Replace queued bank", widget, GVR_SEQUENCE_MENU_QUEUE_BANK, -1,
+                                         bank_valid && view->selected_bank != view->active_bank &&
+                                         view->banks[view->selected_bank].size > 0);
+    else
+        gvr_sequence_bank_view_menu_item(menu, "Play after current bank", widget, GVR_SEQUENCE_MENU_QUEUE_BANK, -1,
+                                         bank_valid && view->selected_bank != view->active_bank &&
+                                         view->banks[view->selected_bank].size > 0);
+
+    GtkWidget *queue_sep = gtk_separator_menu_item_new();
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), queue_sep);
+    gtk_widget_show(queue_sep);
+
     gvr_sequence_bank_view_menu_item(menu, "Copy whole bank", widget, GVR_SEQUENCE_MENU_COPY_BANK, -1, bank_valid);
     gvr_sequence_bank_view_menu_item(menu, "Paste bank here", widget, GVR_SEQUENCE_MENU_PASTE_BANK, -1, can_paste_bank);
     gvr_sequence_bank_view_menu_item(menu, "Clear bank", widget, GVR_SEQUENCE_MENU_CLEAR_BANK, -1, bank_valid);
@@ -1284,7 +1377,7 @@ static gboolean gvr_sequence_bank_view_button_press(GtkWidget *widget, GdkEventB
         gtk_widget_queue_draw(widget);
 
         if(event->button == 1)
-            g_signal_emit(view, gvr_sequence_bank_view_signals[SIGNAL_BANK_SELECTED], 0, bank);
+            gvr_sequence_bank_view_activate_bank(widget, view, bank);
         else if(event->button == 3)
             gvr_sequence_bank_view_popup_menu(widget, view, event, TRUE);
 
@@ -1514,6 +1607,17 @@ static void gvr_sequence_bank_view_class_init(GvrSequenceBankViewClass *klass)
                      1,
                      G_TYPE_INT);
 
+    gvr_sequence_bank_view_signals[SIGNAL_BANK_QUEUE_REQUESTED] =
+        g_signal_new("bank-queue-requested",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_FIRST,
+                     0,
+                     NULL, NULL,
+                     g_cclosure_marshal_VOID__INT,
+                     G_TYPE_NONE,
+                     1,
+                     G_TYPE_INT);
+
     gvr_sequence_bank_view_signals[SIGNAL_SLOT_ASSIGN_REQUESTED] =
         g_signal_new("slot-assign-requested",
                      G_TYPE_FROM_CLASS(klass),
@@ -1610,6 +1714,8 @@ static void gvr_sequence_bank_view_init(GvrSequenceBankView *view)
     gtk_widget_set_size_request(GTK_WIDGET(view), 520, 236);
 
     view->active_bank = 0;
+    view->queued_bank = -1;
+    view->queue_mode = FALSE;
     view->selected_bank = -1;
     view->selected_slot = -1;
     view->hover_bank = -1;
@@ -1664,7 +1770,43 @@ void gvr_sequence_bank_view_set_active_bank(GtkWidget *widget, int bank)
 
     GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(widget);
     view->active_bank = gvr_clampi(bank, 0, GVR_SEQUENCE_BANKS - 1);
+    if(view->queued_bank == view->active_bank)
+        view->queued_bank = -1;
     gtk_widget_queue_draw(widget);
+}
+
+void gvr_sequence_bank_view_set_queued_bank(GtkWidget *widget, int bank)
+{
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget))
+        return;
+
+    GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(widget);
+    view->queued_bank = (bank >= 0 && bank < GVR_SEQUENCE_BANKS && bank != view->active_bank) ? bank : -1;
+    gtk_widget_queue_draw(widget);
+}
+
+int gvr_sequence_bank_view_get_queued_bank(GtkWidget *widget)
+{
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget))
+        return -1;
+
+    return GVR_SEQUENCE_BANK_VIEW(widget)->queued_bank;
+}
+
+void gvr_sequence_bank_view_set_queue_mode(GtkWidget *widget, gboolean enabled)
+{
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget))
+        return;
+
+    GVR_SEQUENCE_BANK_VIEW(widget)->queue_mode = enabled ? TRUE : FALSE;
+}
+
+gboolean gvr_sequence_bank_view_get_queue_mode(GtkWidget *widget)
+{
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget))
+        return FALSE;
+
+    return GVR_SEQUENCE_BANK_VIEW(widget)->queue_mode;
 }
 
 void gvr_sequence_bank_view_set_selected_bank(GtkWidget *widget, int bank)
@@ -1760,6 +1902,8 @@ void gvr_sequence_bank_view_clear_bank(GtkWidget *widget, int bank)
     memset(view->banks[bank].cells, 0, sizeof(view->banks[bank].cells));
     view->banks[bank].current = -1;
     view->banks[bank].size = 0;
+    if(view->queued_bank == bank)
+        view->queued_bank = -1;
     if(view->selected_bank == bank)
         gvr_sequence_bank_view_clear_selected_cells(view);
     gtk_widget_queue_draw(widget);

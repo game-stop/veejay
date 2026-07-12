@@ -166,6 +166,7 @@ typedef struct
 	int rec_id;
 	int active_bank;
 	int selected_bank_mask;
+	int queued_bank;
 	unsigned int revision;
 	sequence_bank_t banks[VJ_SEQUENCE_BANKS];
 } sequencer_t;

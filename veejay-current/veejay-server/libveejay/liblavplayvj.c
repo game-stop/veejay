@@ -3202,7 +3202,7 @@ static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
     if(selected_mask == 0)
         selected_mask = (1 << active_bank);
     selected_mask |= (1 << active_bank);
-    ptr = vj_sprintf(ptr, selected_mask);
+    ptr = vj_sprintf(ptr, VJ_SEQUENCE_STATUS_PACK(selected_mask, seq->queued_bank));
 
     return ptr;
 }
@@ -8050,8 +8050,10 @@ veejay_t *veejay_malloc()
 		return NULL;
 	
 	info->seq = (sequencer_t*) vj_calloc(sizeof( sequencer_t) );
-    if(info->seq)
+    if(info->seq) {
         info->seq->selected_bank_mask = 1;
+        info->seq->queued_bank = -1;
+    }
     if(info->settings)
         info->settings->transition.seq_bank = -1;
     info->audio = AUDIO_PLAY;

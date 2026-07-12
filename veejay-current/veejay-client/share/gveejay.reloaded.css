@@ -1556,3 +1556,78 @@ checkbutton.fx-beat-owner:checked check {
     border-color: @slot-playing-color;
     background-color: @slot-playing-bg;
 }
+
+
+.sequencer-toolbar,
+.sequencer-record-row {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: transparent;
+}
+
+.sequencer-toolbar .sequence-bank-button {
+    min-width: 24px;
+}
+
+.sequencer-toolbar .sequence-bank-button.active-bank {
+    border-color: @slot-playing-color;
+    border-width: 2px;
+}
+
+.sequencer-toolbar .sequence-bank-button.queued-bank {
+    background-color: #3a3018;
+    border-color: @warn-color;
+    border-width: 2px;
+}
+
+.sequencer-toolbar .sequence-bank-button.queued-bank label {
+    color: @text-color;
+    background-color: transparent;
+}
+
+.sequencer-toolbar .sequence-queue-toggle:checked check {
+    background-color: @warn-color;
+    border-color: @warn-color;
+}
+
+.sequencer-toolbar .sequence-delete-bank:hover {
+    border-color: @record-color;
+}
+
+.sequencer-record-row .sequence-record-progress {
+    min-width: 120px;
+}
+
+.sequencer-toolbar .sequence-play-grid {
+    min-width: 58px;
+}
+
+.sequencer-toolbar .sequence-queue-toggle {
+    padding-left: 2px;
+    padding-right: 2px;
+}
+
+.sequencer-toolbar .sequence-clear-bank,
+.sequencer-toolbar .sequence-delete-bank,
+.sequencer-toolbar .sequence-copy-bank,
+.sequencer-toolbar .sequence-paste-bank,
+.sequencer-toolbar .sequence-refresh {
+    min-width: 38px;
+}
+
+.sequencer-record-row {
+    padding-top: 1px;
+}
+
+.sequencer-record-row .sequence-record-start,
+.sequencer-record-row .sequence-record-stop {
+    min-width: 72px;
+}
+
+.sequencer-record-row .sequence-record-progress {
+    min-width: 160px;
+}
+

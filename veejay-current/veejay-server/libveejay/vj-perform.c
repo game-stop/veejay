@@ -3161,10 +3161,43 @@ static int vj_perform_find_sequence_id(veejay_t *info,
     return 0;
 }
 
+static int vj_perform_find_sequence_id_in_bank(sequencer_t *seq,
+                                                int bank,
+                                                int start_slot,
+                                                int *type,
+                                                int *slot_out)
+{
+    if(!seq || !vj_perform_sequence_bank_valid(bank))
+        return 0;
+
+    if(start_slot < 0)
+        start_slot = 0;
+
+    for(int slot = start_slot; slot < MAX_SEQUENCES; slot++) {
+        seq_sample_t *entry = &seq->banks[bank].samples[slot];
+
+        if(entry->sample_id <= 0)
+            continue;
+
+        if(type)
+            *type = entry->type;
+        if(slot_out)
+            *slot_out = slot;
+        return entry->sample_id;
+    }
+
+    return 0;
+}
+
 static inline void vj_perform_sequence_set_current(veejay_t *info, int bank, int slot)
 {
     if(!info || !info->seq)
         return;
+
+    int consume_queue =
+        vj_perform_sequence_bank_valid(bank) &&
+        bank == info->seq->queued_bank &&
+        bank != info->seq->active_bank;
 
     if(vj_perform_sequence_bank_valid(bank) && bank != info->seq->active_bank)
         vj_perform_sequence_load_bank(info, bank);
@@ -3173,6 +3206,9 @@ static inline void vj_perform_sequence_set_current(veejay_t *info, int bank, int
 
     if(info->seq->active_bank >= 0 && info->seq->active_bank < VJ_SEQUENCE_BANKS)
         info->seq->banks[info->seq->active_bank].current = slot;
+
+    if(consume_queue)
+        info->seq->queued_bank = -1;
 }
 
 static int vj_perform_sequence_transition_still_valid(veejay_t *info)
@@ -3344,7 +3380,7 @@ int vj_perform_next_sequence( veejay_t *info, int *type, int *next_bank, int *ne
     int sample_id;
     int next_current_bank = 0;
     int next_current_slot = 0;
-    int next_sample_id;
+    int next_sample_id = 0;
 
     if(!info || !info->seq)
         return 0;
@@ -3364,12 +3400,34 @@ int vj_perform_next_sequence( veejay_t *info, int *type, int *next_bank, int *ne
         return 0;
     }
 
-    next_sample_id = vj_perform_find_sequence_id(info,
-                                                 type,
-                                                 current_bank,
-                                                 current_slot + 1,
-                                                 &next_current_bank,
-                                                 &next_current_slot);
+    int queued_bank = info->seq->queued_bank;
+    if(vj_perform_sequence_bank_valid(queued_bank) && queued_bank != current_bank) {
+        int later_slot = -1;
+        int later_id = vj_perform_find_sequence_id_in_bank(info->seq,
+                                                           current_bank,
+                                                           current_slot + 1,
+                                                           NULL,
+                                                           &later_slot);
+
+        if(later_id <= 0) {
+            next_sample_id = vj_perform_find_sequence_id_in_bank(info->seq,
+                                                                  queued_bank,
+                                                                  0,
+                                                                  type,
+                                                                  &next_current_slot);
+            if(next_sample_id > 0)
+                next_current_bank = queued_bank;
+        }
+    }
+
+    if(next_sample_id <= 0) {
+        next_sample_id = vj_perform_find_sequence_id(info,
+                                                     type,
+                                                     current_bank,
+                                                     current_slot + 1,
+                                                     &next_current_bank,
+                                                     &next_current_slot);
+    }
 
     if(next_sample_id <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "No valid next sequence to play. Sequence Play disabled");
