@@ -4217,29 +4217,33 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_ADD ]			=	_new_event(
-				"%d %d %d",
+				"%d %d %d %d",
 				VIMS_SEQUENCE_ADD,
-				"Add a sample to the sequence",
+				"Add a sample to a sequence bank",
 				vj_event_sequencer_add_sample,
-				3,
-				VIMS_REQUIRE_ALL_PARAMS,
+				4,
+				VIMS_ALLOW_ANY,
 				"Seq ID",
 				0,
 				"Sample ID",
 				0,
 				"Type",
 				0,
+				"Sequence bank (-1=current, 0..3)",
+				-1,
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_DEL ]			=	_new_event(
-				"%d",
+				"%d %d",
 				VIMS_SEQUENCE_DEL,
-				"Del sample from sequence slot",
+				"Delete a sample from a sequence bank",
 				vj_event_sequencer_del_sample,
-				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				2,
+				VIMS_ALLOW_ANY,
 				"Seq ID",
 				0,
+				"Sequence bank (-1=current, 0..3)",
+				-1,
 				NULL );
 
 	index_map_[ VIMS_SEQUENCE_SELECT ]			=	_new_event(

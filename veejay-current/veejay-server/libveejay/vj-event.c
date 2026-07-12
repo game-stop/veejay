@@ -610,6 +610,40 @@ static void vj_event_sample_next1( veejay_t *v );
 static int vj_sequence_bank_valid(int bank);
 static unsigned int vj_sequence_next_revision(unsigned int revision);
 static void vj_sequence_store_active_bank(sequencer_t *s);
+static seq_sample_t *vj_sequence_edit_bank_samples(sequencer_t *s, int bank)
+{
+    vj_sequence_store_active_bank(s);
+
+    if(bank == s->active_bank)
+        return s->samples;
+
+    return s->banks[bank].samples;
+}
+
+static int vj_sequence_count_slots(seq_sample_t *samples)
+{
+    int count = 0;
+
+    for(int i = 0; i < MAX_SEQUENCES; i++)
+        if(samples[i].sample_id > 0)
+            count++;
+
+    return count;
+}
+
+static void vj_sequence_touch_bank(sequencer_t *s, int bank)
+{
+    s->revision = vj_sequence_next_revision(s->revision);
+    s->banks[bank].revision = vj_sequence_next_revision(s->banks[bank].revision);
+
+    if(bank == s->active_bank) {
+        vj_sequence_store_active_bank(s);
+        return;
+    }
+
+    s->banks[bank].size = vj_sequence_count_slots(s->banks[bank].samples);
+}
+
 static void vj_sequence_load_bank(sequencer_t *s, int bank);
 static int vj_sequence_selected_duration(veejay_t *v);
 static void vj_event_release_beat_transport_for_source_switch(veejay_t *v);
@@ -14672,17 +14706,6 @@ static int vj_sequence_all_bank_mask(void)
     return (1 << VJ_SEQUENCE_BANKS) - 1;
 }
 
-static int vj_sequence_count_slots(seq_sample_t *samples)
-{
-    int count = 0;
-
-    for(int i = 0; i < MAX_SEQUENCES; i++)
-        if(samples[i].sample_id > 0)
-            count++;
-
-    return count;
-}
-
 static int vj_sequence_selected_bank_mask(sequencer_t *s)
 {
     int bank;
@@ -14829,88 +14852,128 @@ static void vj_event_clear_sequence_boundary_state(veejay_t *v)
 void    vj_event_sequencer_add_sample(      void *ptr,  const char format[],    va_list ap )
 {
     int args[5];
-    veejay_t *v = (veejay_t*)ptr;
+    veejay_t *info = (veejay_t*)ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     int seq = args[0];
     int id = args[1];
     int type = args[2];
+    int bank = args[3];
 
-    if( seq < 0 || seq >= MAX_SEQUENCES )
-    {
-        veejay_msg( VEEJAY_MSG_ERROR,"Slot not within bounds");
+    if(bank < 0)
+        bank = info->seq->active_bank;
+
+    if(!vj_sequence_bank_valid(bank)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Sequence bank %d is invalid", bank);
         return;
     }
 
-    if( type == 0 ) {
-        if( sample_exists(id ))
+    if(seq < 0 || seq >= MAX_SEQUENCES)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,"Slot not within bounds");
+        return;
+    }
+
+    seq_sample_t *samples = vj_sequence_edit_bank_samples(info->seq, bank);
+
+    if(type == 0) {
+        if(sample_exists(id))
         {
-            v->seq->samples[seq].sample_id = id;
-            v->seq->samples[seq].type = type;
-            vj_sequence_touch_active_bank(v->seq);
-            veejay_msg(VEEJAY_MSG_INFO, "Added sample %d to sequence bank %d slot %d/%d",id, v->seq->active_bank, seq,MAX_SEQUENCES );
+            samples[seq].sample_id = id;
+            samples[seq].type = type;
+            vj_sequence_touch_bank(info->seq, bank);
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "Added sample %d to sequence bank %d slot %d/%d",
+                       id, bank, seq, MAX_SEQUENCES);
         }
         else
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist. It cannot be added to the sequencer",id);
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Sample %d does not exist. It cannot be added to the sequencer",
+                       id);
         }
     }
     else {
-        if( vj_tag_exists(id) )
+        if(vj_tag_exists(id))
         {
-            v->seq->samples[seq].sample_id = id;
-            v->seq->samples[seq].type = vj_tag_get_type(id);
-            vj_sequence_touch_active_bank(v->seq);
-            veejay_msg(VEEJAY_MSG_INFO, "Added stream %d to sequence bank %d slot %d/%d", id, v->seq->active_bank, seq, MAX_SEQUENCES );
+            samples[seq].sample_id = id;
+            samples[seq].type = vj_tag_get_type(id);
+            vj_sequence_touch_bank(info->seq, bank);
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "Added stream %d to sequence bank %d slot %d/%d",
+                       id, bank, seq, MAX_SEQUENCES);
         }
         else
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist. It cannot be added to the sequencer", id );
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Stream %d does not exist. It cannot be added to the sequencer",
+                       id);
         }
     }
-
 }
 
 void    vj_event_sequencer_del_sample(      void *ptr,  const char format[],    va_list ap )
 {
     int args[5];
-    veejay_t *v = (veejay_t*)ptr;
+    veejay_t *info = (veejay_t*)ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
     int seq_it = args[0];
+    int bank = args[1];
 
-    if( seq_it == -1 ) {
-        for( int i = 0; i < MAX_SEQUENCES; i ++ )
+    if(bank < 0)
+        bank = info->seq->active_bank;
+
+    if(!vj_sequence_bank_valid(bank)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Sequence bank %d is invalid", bank);
+        return;
+    }
+
+    seq_sample_t *samples = vj_sequence_edit_bank_samples(info->seq, bank);
+
+    if(seq_it == -1) {
+        for(int i = 0; i < MAX_SEQUENCES; i++)
         {
-            v->seq->samples[i].sample_id = 0;
-            v->seq->samples[i].type = 0;
+            samples[i].sample_id = 0;
+            samples[i].type = 0;
         }
-        v->seq->active = 0;
-        v->seq->current = 0;
-        vj_sequence_touch_active_bank(v->seq);
 
-        veejay_msg(VEEJAY_MSG_INFO, "Deleted all sequences in bank %d", v->seq->active_bank);
+        if(bank == info->seq->active_bank) {
+            info->seq->active = 0;
+            info->seq->current = 0;
+        }
+        else {
+            info->seq->banks[bank].current = 0;
+        }
+
+        vj_sequence_touch_bank(info->seq, bank);
+        veejay_msg(VEEJAY_MSG_INFO, "Deleted all sequences in bank %d", bank);
         return;
     }
 
-    if( seq_it < 0 || seq_it >= MAX_SEQUENCES )
+    if(seq_it < 0 || seq_it >= MAX_SEQUENCES)
     {
-        veejay_msg( VEEJAY_MSG_ERROR, "Sequence slot %d is not used, nothing deleted",seq_it );
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Sequence slot %d is not used, nothing deleted",
+                   seq_it);
         return;
     }
 
-    if( v->seq->samples[ seq_it ].sample_id )
+    if(samples[seq_it].sample_id)
     {
-        veejay_msg(VEEJAY_MSG_INFO, "Deleted sequence bank %d slot %d (Sample %d)", v->seq->active_bank, seq_it, v->seq->samples[ seq_it ].sample_id );
-        v->seq->samples[ seq_it ].sample_id = 0;
-        v->seq->samples[ seq_it ].type = 0;
-        vj_sequence_touch_active_bank(v->seq);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Deleted sequence bank %d slot %d (Sample %d)",
+                   bank, seq_it, samples[seq_it].sample_id);
+        samples[seq_it].sample_id = 0;
+        samples[seq_it].type = 0;
+        vj_sequence_touch_bank(info->seq, bank);
     }
     else
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sequence bank %d slot %d already empty", v->seq->active_bank, seq_it );
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Sequence bank %d slot %d already empty",
+                   bank, seq_it);
     }
-
 }
 
 void    vj_event_get_sample_sequences(      void *ptr,  const char format[],    va_list ap )

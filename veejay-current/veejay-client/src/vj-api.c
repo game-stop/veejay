@@ -18824,16 +18824,11 @@ static void on_sequence_bank_clear_clicked(GtkWidget *widget, gpointer user_data
     (void)user_data;
     int bank = sequence_ui_target_bank();
 
-    if(bank != sequence_ui_active_bank()) {
-        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
-    }
-
-    multi_vims(VIMS_SEQUENCE_DEL, "-1");
-    if(info->sequence_bank_view) {
-        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
+    if(info->sequence_bank_view)
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
-    }
-    info->sequence_playing = -1;
+    if(bank == sequence_ui_active_bank())
+        info->sequence_playing = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -18845,23 +18840,14 @@ static void on_sequence_bank_view_bank_selected(GtkWidget *widget, gint bank, gp
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         return;
 
-    sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
     if(info->sequence_bank_view)
-        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    sequence_ui_rearm_play_grid_for_bank(bank);
-    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+        gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
 }
 
 static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint slot, gpointer user_data)
 {
     (void)widget;
     (void)user_data;
-
-    if(bank != sequence_ui_active_bank()) {
-        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
-        if(info->sequence_bank_view)
-            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    }
 
     int id = info->status_tokens[CURRENT_ID];
     int pm = info->status_tokens[PLAY_MODE];
@@ -18882,10 +18868,9 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
        old_id > 0)
         return;
 
-    multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d", slot, id, type);
+    multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d %d", slot, id, type, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, id, type);
-    sequence_ui_rearm_play_grid_for_bank(bank);
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -18894,24 +18879,18 @@ static void on_sequence_bank_view_slot_delete(GtkWidget *widget, gint bank, gint
     (void)widget;
     (void)user_data;
 
-    if(bank != sequence_ui_active_bank()) {
-        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
-        if(info->sequence_bank_view)
-            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    }
-
-    multi_vims(VIMS_SEQUENCE_DEL, "%d", slot);
+    multi_vims(VIMS_SEQUENCE_DEL, "%d %d", slot, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, -1, -1);
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
-static void sequence_bank_view_send_slot_update(int slot, int sample_id, int sample_type)
+static void sequence_bank_view_send_slot_update(int bank, int slot, int sample_id, int sample_type)
 {
     if(sample_id > 0)
-        multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d", slot, sample_id, sample_type);
+        multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d %d", slot, sample_id, sample_type, bank);
     else
-        multi_vims(VIMS_SEQUENCE_DEL, "%d", slot);
+        multi_vims(VIMS_SEQUENCE_DEL, "%d %d", slot, bank);
 }
 
 static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gint from_slot, gint to_slot, gpointer user_data)
@@ -18923,12 +18902,6 @@ static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gin
        to_slot < 0 || to_slot >= MAX_SEQUENCES ||
        from_slot == to_slot)
         return;
-
-    if(bank != sequence_ui_active_bank()) {
-        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
-        if(info->sequence_bank_view)
-            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    }
 
     int from_id = -1;
     int from_type = -1;
@@ -18944,8 +18917,8 @@ static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gin
     if(from_id <= 0)
         return;
 
-    sequence_bank_view_send_slot_update(from_slot, to_id, to_type);
-    sequence_bank_view_send_slot_update(to_slot, from_id, from_type);
+    sequence_bank_view_send_slot_update(bank, from_slot, to_id, to_type);
+    sequence_bank_view_send_slot_update(bank, to_slot, from_id, from_type);
 
     if(info->sequence_bank_view) {
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, from_slot, to_id, to_type);
@@ -19032,17 +19005,13 @@ static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpoin
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         return;
 
-    if(bank != sequence_ui_active_bank())
-        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
+    multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
 
-    multi_vims(VIMS_SEQUENCE_DEL, "-1");
-
-    if(info->sequence_bank_view) {
-        gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
+    if(info->sequence_bank_view)
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
-    }
 
-    info->sequence_playing = -1;
+    if(bank == sequence_ui_active_bank())
+        info->sequence_playing = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -19056,18 +19025,10 @@ static void on_sequence_bank_view_slot_paste(GtkWidget *widget, gint bank, gint 
        sample_id <= 0)
         return;
 
-    if(bank != sequence_ui_active_bank()) {
-        sequence_ui_send_bank_select(bank, sequence_ui_current_bank_mask());
-        if(info->sequence_bank_view)
-            gvr_sequence_bank_view_set_active_bank(info->sequence_bank_view, bank);
-    }
-
-    sequence_bank_view_send_slot_update(slot, sample_id, sample_type);
+    sequence_bank_view_send_slot_update(bank, slot, sample_id, sample_type);
 
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, sample_type);
-
-    sequence_ui_rearm_play_grid_for_bank(bank);
 
     vj_msg(VEEJAY_MSG_INFO,
            "Pasted sequence entry to bank %d slot %d",
