@@ -31,31 +31,6 @@
 #define MAX_INDEX 1024
 #define VIMS_DEFAULT_ARG_MAX 16
 
-#ifndef VIMS_AUDIO_SYNC_WAV_PROFILE_SET
-#define VIMS_AUDIO_SYNC_WAV_PROFILE_SET 273
-#endif
-#ifndef VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR
-#define VIMS_AUDIO_SYNC_WAV_PROFILE_CLEAR 274
-#endif
-#ifndef VIMS_SAMPLE_AUDIO_SYNC_SET
-#define VIMS_SAMPLE_AUDIO_SYNC_SET 275
-#endif
-#ifndef VIMS_SAMPLE_AUDIO_SYNC_CLEAR
-#define VIMS_SAMPLE_AUDIO_SYNC_CLEAR 276
-#endif
-#ifndef VIMS_SAMPLE_AUDIO_SYNC_REARM
-#define VIMS_SAMPLE_AUDIO_SYNC_REARM 277
-#endif
-#ifndef VIMS_SAMPLE_SYNC_SAMPLELIST
-#define VIMS_SAMPLE_SYNC_SAMPLELIST 122
-#endif
-#ifndef VIMS_SAMPLE_LOAD_SAMPLELIST_B64
-#define VIMS_SAMPLE_LOAD_SAMPLELIST_B64 123
-#endif
-#ifndef VIMS_GET_SAMPLELIST
-#define VIMS_GET_SAMPLELIST 450
-#endif
-
 #define VIMS_REQUIRE_ALL_PARAMS (1<<0)			/* all params needed */
 #define VIMS_DONT_PARSE_PARAMS (1<<1)		/* dont parse arguments */
 #define VIMS_LONG_PARAMS (1<<3)				/* long string arguments (bundle, plugin) */
@@ -2104,6 +2079,22 @@ void		vj_init_vevo_events(void)
 				"Effect enabled (1) or disabled (0)",
 				1,
 				NULL );
+
+	index_map_[VIMS_CHAIN_ENTRY_SWAP]			= 	_new_event(
+				"%d %d %d",
+				VIMS_CHAIN_ENTRY_SWAP,
+				"Swap two FX chain entries without recreating their instances",
+				vj_event_chain_entry_swap,
+				3,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_STREAM_ID_HELP,
+				0,
+				"Source Chain Index",
+				0,
+				"Destination Chain Index",
+				0,
+				NULL );
+
 	index_map_[VIMS_CHAIN_ENTRY_SET_PRESET]			=	_new_event(
 				"%d %d %d %d %s",
 				VIMS_CHAIN_ENTRY_SET_PRESET,

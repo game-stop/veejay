@@ -84,39 +84,6 @@ static gpointer castIntToGpointer(int val)
 
 #define MAX_SLOW 25
 
-#ifndef VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
-#define VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY (VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW + 1)
-#endif
-#undef VJ_AUDIO_SYNC_MODE_MAX
-#define VJ_AUDIO_SYNC_MODE_MAX VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY
-
-#ifndef VJ_SEQUENCE_BANKS
-#define VJ_SEQUENCE_BANKS 4
-#endif
-
-#undef STATUS_SEQUENCE_ACTIVE_BANK
-#undef STATUS_SEQUENCE_REVISION
-#undef STATUS_SEQUENCE_SIZE
-#undef STATUS_SEQUENCE_BANK0_REVISION
-#undef STATUS_SEQUENCE_BANK1_REVISION
-#undef STATUS_SEQUENCE_BANK2_REVISION
-#undef STATUS_SEQUENCE_BANK3_REVISION
-#undef STATUS_SEQUENCE_RESERVED
-#undef STATUS_SEQUENCE_LAST
-#undef STATUS_SEQUENCE_END
-#undef STATUS_SEQUENCE_UPDATED
-#define STATUS_SEQUENCE_ACTIVE_BANK       111
-#define STATUS_SEQUENCE_REVISION          112
-#define STATUS_SEQUENCE_SIZE              113
-#define STATUS_SEQUENCE_BANK0_REVISION    114
-#define STATUS_SEQUENCE_BANK1_REVISION    115
-#define STATUS_SEQUENCE_BANK2_REVISION    116
-#define STATUS_SEQUENCE_BANK3_REVISION    117
-#define STATUS_SEQUENCE_RESERVED          118
-#define STATUS_SEQUENCE_LAST              118
-#define STATUS_SEQUENCE_END               119
-#define STATUS_SEQUENCE_UPDATED           STATUS_SEQUENCE_REVISION
-
 static inline int ui_audio_sync_mode_is_control_only(int mode)
 {
     return mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL;
@@ -1300,7 +1267,7 @@ static struct
     {"Select a SRT sequence to edit"},
     {"Double click: add effect to current entry in chain list,\n [+] Shift L: add disabled,\n [+] Ctrl L: add to selected sample\nCtrl + Shift + L: add fx to favourite list\n"},
     {"Filter the effects list by any string"},
-    {"Shift + Mouse left : Toogle selected fx,\nControl + Mouse left : Toogle selected fx anim"},
+    {"Shift + Mouse left: Toggle selected FX,\nControl + Mouse left: Toggle selected FX animation,\nDrag a filled row onto another slot to swap or move the complete live FX entry,\nDrop an FX from an effect list onto a slot to insert or replace it"},
 
     {"Enable or disable the audio beat detector. It analyses Original video audio when that source is selected, or the selected JACK/WAV external provider."},
     {"Action performed on beat hits: none, Auto FX modulation, Break Beat with Auto FX, or pure Break Beat transport scratching."},
@@ -2116,7 +2083,9 @@ enum
     FXC_RUN_STATE = 10,
     FXC_BEAT_STATE = 11,
     FXC_SUBRENDER_STATE = 12,
-    FXC_N_COLS = 13,
+    FXC_DROP_ACTIVE = 13,
+    FXC_DROP_COLOR = 14,
+    FXC_N_COLS = 15,
 };
 
 enum {
@@ -7902,6 +7871,9 @@ static void reset_tree(const char *name)
     }
 }
 
+static gboolean fx_chain_dnd_selection_blocked(void);
+static gboolean fx_chain_selection_silent = FALSE;
+
 void    select_chain_entry(int entry)
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
@@ -7912,6 +7884,18 @@ void    select_chain_entry(int entry)
     gtk_tree_path_free(path);
 }
 
+static void fx_chain_restore_visual_selection(GtkWidget *tree, int entry)
+{
+    GtkTreeSelection *selection;
+
+    if(entry < 0 || entry >= SAMPLE_MAX_EFFECTS)
+        return;
+
+    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+    gtk_tree_selection_unselect_all(selection);
+    select_chain_entry(entry);
+}
+
 
 gboolean view_entry_selection_func (GtkTreeSelection *selection,
                                     GtkTreeModel     *model,
@@ -7919,6 +7903,11 @@ gboolean view_entry_selection_func (GtkTreeSelection *selection,
                                     gboolean          path_currently_selected,
                                     gpointer          userdata)
 {
+    if(fx_chain_selection_silent)
+        return TRUE;
+    if(fx_chain_dnd_selection_blocked())
+        return FALSE;
+
     GtkTreeIter iter;
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
@@ -8428,6 +8417,668 @@ static void clear_tree_view_columns(GtkTreeView *view)
     g_list_free(columns);
 }
 
+
+#define FX_DND_EFFECT_TARGET "application/x-gveejay-effect-id"
+#define FX_DND_CHAIN_TARGET  "application/x-gveejay-chain-entry"
+#define FX_DND_SOURCE_EFFECT_KEY "gveejay-fx-dnd-source-effect"
+
+enum {
+    FX_DND_INFO_EFFECT = 0x6601,
+    FX_DND_INFO_CHAIN = 0x6602,
+};
+
+typedef struct {
+    gboolean button_down;
+    gboolean drag_started;
+    GtkTreePath *pressed_path;
+    int source_entry;
+    int source_effect_id;
+} fx_chain_dnd_state_t;
+
+static fx_chain_dnd_state_t fx_chain_dnd_state = {
+    FALSE,
+    FALSE,
+    NULL,
+    -1,
+    0
+};
+
+static int fx_chain_drop_target_entry = -1;
+
+static void fx_chain_dnd_clear_press(void)
+{
+    if(fx_chain_dnd_state.pressed_path)
+        gtk_tree_path_free(fx_chain_dnd_state.pressed_path);
+
+    fx_chain_dnd_state.button_down = FALSE;
+    fx_chain_dnd_state.drag_started = FALSE;
+    fx_chain_dnd_state.pressed_path = NULL;
+    fx_chain_dnd_state.source_entry = -1;
+    fx_chain_dnd_state.source_effect_id = 0;
+}
+
+static gboolean fx_chain_dnd_selection_blocked(void)
+{
+    return fx_chain_dnd_state.button_down;
+}
+
+static void fx_dnd_set_int(GtkSelectionData *selection_data, int value)
+{
+    char text[32];
+    int len = snprintf(text, sizeof(text), "%d", value);
+    if(len > 0)
+        gtk_selection_data_set(selection_data,
+                               gtk_selection_data_get_target(selection_data),
+                               8,
+                               (const guchar*)text,
+                               len + 1);
+}
+
+static gboolean fx_dnd_get_int(GtkSelectionData *selection_data, int *value)
+{
+    const guchar *data = gtk_selection_data_get_data(selection_data);
+    int len = gtk_selection_data_get_length(selection_data);
+    char text[32];
+    char *end = NULL;
+    long parsed;
+
+    if(!data || len <= 0 || len >= (int)sizeof(text))
+        return FALSE;
+
+    memcpy(text, data, len);
+    text[len] = '\0';
+    parsed = strtol(text, &end, 10);
+    if(end == text)
+        return FALSE;
+
+    while(*end != '\0') {
+        if(!g_ascii_isspace((guchar)*end))
+            return FALSE;
+        end++;
+    }
+
+    if(parsed < INT_MIN || parsed > INT_MAX)
+        return FALSE;
+
+    *value = (int)parsed;
+    return TRUE;
+}
+
+static gboolean fx_dnd_chain_entry_at_bin_pos(GtkTreeView *tree,
+                                               gint x,
+                                               gint y,
+                                               int *entry,
+                                               int *effect_id,
+                                               GtkTreePath **out_path)
+{
+    GtkTreePath *path = NULL;
+    GtkTreeViewColumn *column = NULL;
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+    gint cell_x = 0;
+    gint cell_y = 0;
+    gint chain_entry = -1;
+    gint chain_effect_id = 0;
+
+    if(!gtk_tree_view_get_path_at_pos(tree, x, y, &path, &column, &cell_x, &cell_y))
+        return FALSE;
+
+    model = gtk_tree_view_get_model(tree);
+    if(!model || !gtk_tree_model_get_iter(model, &iter, path)) {
+        gtk_tree_path_free(path);
+        return FALSE;
+    }
+
+    gtk_tree_model_get(model, &iter,
+                       FXC_ID, &chain_entry,
+                       FXC_EFFECT_ID, &chain_effect_id,
+                       -1);
+    if(chain_entry < 0 || chain_entry >= SAMPLE_MAX_EFFECTS) {
+        gtk_tree_path_free(path);
+        return FALSE;
+    }
+
+    if(entry)
+        *entry = chain_entry;
+    if(effect_id)
+        *effect_id = chain_effect_id;
+    if(out_path)
+        *out_path = path;
+    else
+        gtk_tree_path_free(path);
+
+    return TRUE;
+}
+
+static gboolean fx_dnd_chain_entry_at_drag_pos(GtkTreeView *tree,
+                                                gint x,
+                                                gint y,
+                                                int *entry,
+                                                int *effect_id,
+                                                GtkTreePath **out_path)
+{
+    GtkTreePath *path = NULL;
+    GtkTreeViewDropPosition drop_pos;
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+    gint chain_entry = -1;
+    gint chain_effect_id = 0;
+
+    if(!gtk_tree_view_get_dest_row_at_pos(tree, x, y, &path, &drop_pos))
+        return FALSE;
+
+    model = gtk_tree_view_get_model(tree);
+    if(!model || !gtk_tree_model_get_iter(model, &iter, path)) {
+        gtk_tree_path_free(path);
+        return FALSE;
+    }
+
+    gtk_tree_model_get(model, &iter,
+                       FXC_ID, &chain_entry,
+                       FXC_EFFECT_ID, &chain_effect_id,
+                       -1);
+    if(chain_entry < 0 || chain_entry >= SAMPLE_MAX_EFFECTS) {
+        gtk_tree_path_free(path);
+        return FALSE;
+    }
+
+    if(entry)
+        *entry = chain_entry;
+    if(effect_id)
+        *effect_id = chain_effect_id;
+    if(out_path)
+        *out_path = path;
+    else
+        gtk_tree_path_free(path);
+
+    return TRUE;
+}
+
+static void fx_chain_drop_target_clear(GtkWidget *widget)
+{
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(widget));
+    GtkTreePath *path;
+    GtkTreeIter iter;
+
+    if(fx_chain_drop_target_entry >= 0 && model) {
+        path = gtk_tree_path_new_from_indices(fx_chain_drop_target_entry, -1);
+        if(gtk_tree_model_get_iter(model, &iter, path))
+            gtk_list_store_set(GTK_LIST_STORE(model), &iter,
+                               FXC_DROP_ACTIVE, FALSE,
+                               -1);
+        gtk_tree_path_free(path);
+    }
+
+    fx_chain_drop_target_entry = -1;
+}
+
+static void fx_chain_drop_target_set(GtkWidget *widget,
+                                     GtkTreePath *path,
+                                     int entry)
+{
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(widget));
+    GtkTreeIter iter;
+    GdkRGBA highlight;
+    GtkStyleContext *context;
+
+    if(!model || !gtk_tree_model_get_iter(model, &iter, path))
+        return;
+
+    if(entry == fx_chain_drop_target_entry) {
+        gboolean active = FALSE;
+        gtk_tree_model_get(model, &iter, FXC_DROP_ACTIVE, &active, -1);
+        if(active)
+            return;
+    }
+
+    fx_chain_drop_target_clear(widget);
+
+    if(!gtk_tree_model_get_iter(model, &iter, path))
+        return;
+
+    context = gtk_widget_get_style_context(widget);
+    if(!gtk_style_context_lookup_color(context, "preselect-color", &highlight))
+        gdk_rgba_parse(&highlight, "#d85f00");
+    highlight.alpha = 0.78;
+
+    gtk_list_store_set(GTK_LIST_STORE(model), &iter,
+                       FXC_DROP_ACTIVE, TRUE,
+                       FXC_DROP_COLOR, &highlight,
+                       -1);
+    fx_chain_drop_target_entry = entry;
+}
+
+static void fx_chain_drop_add_renderer_attributes(GtkTreeView *tree)
+{
+    GList *columns = gtk_tree_view_get_columns(tree);
+
+    for(GList *item = columns; item; item = item->next) {
+        GtkTreeViewColumn *column = GTK_TREE_VIEW_COLUMN(item->data);
+        GList *cells = gtk_cell_layout_get_cells(GTK_CELL_LAYOUT(column));
+
+        for(GList *cell = cells; cell; cell = cell->next) {
+            gtk_tree_view_column_add_attribute(column,
+                                               GTK_CELL_RENDERER(cell->data),
+                                               "cell-background-set",
+                                               FXC_DROP_ACTIVE);
+            gtk_tree_view_column_add_attribute(column,
+                                               GTK_CELL_RENDERER(cell->data),
+                                               "cell-background-rgba",
+                                               FXC_DROP_COLOR);
+        }
+
+        g_list_free(cells);
+    }
+
+    g_list_free(columns);
+}
+
+static gboolean fx_list_drag_button_press(GtkWidget *widget,
+                                          GdkEventButton *event,
+                                          gpointer user_data)
+{
+    GtkTreeView *tree = GTK_TREE_VIEW(widget);
+    GtkTreePath *path = NULL;
+    GtkTreeModel *model;
+    GtkTreeIter iter;
+    gchar *name = NULL;
+    gint bin_x = (gint)event->x;
+    gint bin_y = (gint)event->y;
+    int effect_id = 0;
+
+    (void)user_data;
+
+    g_object_set_data(G_OBJECT(widget), FX_DND_SOURCE_EFFECT_KEY, NULL);
+
+    if(event->type != GDK_BUTTON_PRESS || event->button != 1)
+        return FALSE;
+
+    if(event->window != gtk_tree_view_get_bin_window(tree)) {
+        gtk_tree_view_convert_widget_to_bin_window_coords(tree,
+                                                           (gint)event->x,
+                                                           (gint)event->y,
+                                                           &bin_x,
+                                                           &bin_y);
+    }
+
+    if(!gtk_tree_view_get_path_at_pos(tree, bin_x, bin_y,
+                                      &path, NULL, NULL, NULL))
+        return FALSE;
+
+    model = gtk_tree_view_get_model(tree);
+    if(gtk_tree_model_get_iter(model, &iter, path)) {
+        gtk_tree_model_get(model, &iter, 0, &name, -1);
+        if(name)
+            vevo_property_get(fx_list_, name, 0, &effect_id);
+    }
+
+    if(effect_id > 0)
+        g_object_set_data(G_OBJECT(widget),
+                          FX_DND_SOURCE_EFFECT_KEY,
+                          GINT_TO_POINTER(effect_id));
+
+    g_free(name);
+    gtk_tree_path_free(path);
+    return FALSE;
+}
+
+static void fx_list_drag_end(GtkWidget *widget,
+                             GdkDragContext *context,
+                             gpointer user_data)
+{
+    (void)context;
+    (void)user_data;
+    g_object_set_data(G_OBJECT(widget), FX_DND_SOURCE_EFFECT_KEY, NULL);
+}
+
+static gboolean fx_chain_drag_button_press(GtkWidget *widget,
+                                            GdkEventButton *event,
+                                            gpointer user_data)
+{
+    (void)user_data;
+
+    if(event->type != GDK_BUTTON_PRESS || event->button != 1)
+        return FALSE;
+    if(event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK))
+        return FALSE;
+
+    GtkTreeView *tree = GTK_TREE_VIEW(widget);
+    GtkTreePath *path = NULL;
+    int source_entry = -1;
+    int source_effect_id = 0;
+    gint bin_x = (gint)event->x;
+    gint bin_y = (gint)event->y;
+
+    if(event->window != gtk_tree_view_get_bin_window(tree)) {
+        gtk_tree_view_convert_widget_to_bin_window_coords(tree,
+                                                           (gint)event->x,
+                                                           (gint)event->y,
+                                                           &bin_x,
+                                                           &bin_y);
+    }
+
+    if(!fx_dnd_chain_entry_at_bin_pos(tree,
+                                      bin_x,
+                                      bin_y,
+                                      &source_entry,
+                                      &source_effect_id,
+                                      &path) ||
+       source_effect_id <= 0) {
+        if(path)
+            gtk_tree_path_free(path);
+        return FALSE;
+    }
+
+    fx_chain_dnd_clear_press();
+    fx_chain_dnd_state.button_down = TRUE;
+    fx_chain_dnd_state.pressed_path = path;
+    fx_chain_dnd_state.source_entry = source_entry;
+    fx_chain_dnd_state.source_effect_id = source_effect_id;
+    return FALSE;
+}
+
+static gboolean fx_chain_drag_button_release(GtkWidget *widget,
+                                              GdkEventButton *event,
+                                              gpointer user_data)
+{
+    (void)user_data;
+
+    if(event->button != 1 || !fx_chain_dnd_state.button_down)
+        return FALSE;
+
+    gboolean select_pressed_row = !fx_chain_dnd_state.drag_started &&
+                                  fx_chain_dnd_state.pressed_path != NULL;
+    GtkTreePath *path = select_pressed_row
+        ? gtk_tree_path_copy(fx_chain_dnd_state.pressed_path)
+        : NULL;
+
+    fx_chain_dnd_clear_press();
+
+    if(path) {
+        gtk_tree_view_set_cursor(GTK_TREE_VIEW(widget), path, NULL, FALSE);
+        gtk_tree_path_free(path);
+    }
+
+    return FALSE;
+}
+
+static void fx_chain_drag_begin(GtkWidget *widget,
+                                GdkDragContext *context,
+                                gpointer user_data)
+{
+    (void)widget;
+    (void)context;
+    (void)user_data;
+    fx_chain_dnd_state.drag_started = TRUE;
+}
+
+static void fx_chain_drag_end(GtkWidget *widget,
+                              GdkDragContext *context,
+                              gpointer user_data)
+{
+    (void)context;
+    (void)user_data;
+    fx_chain_drop_target_clear(widget);
+    fx_chain_dnd_clear_press();
+}
+
+static void fx_list_drag_data_get(GtkWidget *widget,
+                                  GdkDragContext *context,
+                                  GtkSelectionData *selection_data,
+                                  guint target_info,
+                                  guint time,
+                                  gpointer user_data)
+{
+    (void)context;
+    (void)time;
+    (void)user_data;
+
+    if(target_info != FX_DND_INFO_EFFECT)
+        return;
+
+    int effect_id = GPOINTER_TO_INT(
+        g_object_get_data(G_OBJECT(widget), FX_DND_SOURCE_EFFECT_KEY));
+
+    if(effect_id > 0)
+        fx_dnd_set_int(selection_data, effect_id);
+}
+
+
+static void fx_chain_drag_data_get(GtkWidget *widget,
+                                   GdkDragContext *context,
+                                   GtkSelectionData *selection_data,
+                                   guint target_info,
+                                   guint time,
+                                   gpointer user_data)
+{
+    (void)widget;
+    (void)context;
+    (void)time;
+    (void)user_data;
+
+    if(target_info != FX_DND_INFO_CHAIN)
+        return;
+
+    if(fx_chain_dnd_state.source_entry >= 0 &&
+       fx_chain_dnd_state.source_entry < SAMPLE_MAX_EFFECTS &&
+       fx_chain_dnd_state.source_effect_id > 0)
+        fx_dnd_set_int(selection_data, fx_chain_dnd_state.source_entry);
+}
+
+static gboolean fx_chain_drag_motion(GtkWidget *widget,
+                                     GdkDragContext *context,
+                                     gint x,
+                                     gint y,
+                                     guint time,
+                                     gpointer user_data)
+{
+    GtkTreePath *path = NULL;
+    int destination = -1;
+
+    (void)user_data;
+
+    if(!fx_dnd_chain_entry_at_drag_pos(GTK_TREE_VIEW(widget),
+                                       x,
+                                       y,
+                                       &destination,
+                                       NULL,
+                                       &path)) {
+        fx_chain_drop_target_clear(widget);
+        return FALSE;
+    }
+
+    GdkAtom target = gtk_drag_dest_find_target(widget, context, NULL);
+    if(target == GDK_NONE) {
+        gtk_tree_path_free(path);
+        fx_chain_drop_target_clear(widget);
+        return FALSE;
+    }
+
+    GdkDragAction action;
+    if(target == gdk_atom_intern_static_string(FX_DND_CHAIN_TARGET)) {
+        action = GDK_ACTION_MOVE;
+    }
+    else {
+        GdkDragAction actions = gdk_drag_context_get_actions(context);
+        action = (actions & GDK_ACTION_COPY) ? GDK_ACTION_COPY : GDK_ACTION_MOVE;
+    }
+
+    fx_chain_drop_target_set(widget, path, destination);
+    gtk_tree_path_free(path);
+    gdk_drag_status(context, action, time);
+    return TRUE;
+}
+
+static void fx_chain_drag_leave(GtkWidget *widget,
+                                GdkDragContext *context,
+                                guint time,
+                                gpointer user_data)
+{
+    (void)context;
+    (void)time;
+    (void)user_data;
+    fx_chain_drop_target_clear(widget);
+}
+
+static gboolean fx_chain_drag_drop(GtkWidget *widget,
+                                   GdkDragContext *context,
+                                   gint x,
+                                   gint y,
+                                   guint time,
+                                   gpointer user_data)
+{
+    GtkTreePath *path = NULL;
+    int destination = -1;
+
+    (void)user_data;
+
+    if(!fx_dnd_chain_entry_at_drag_pos(GTK_TREE_VIEW(widget),
+                                       x,
+                                       y,
+                                       &destination,
+                                       NULL,
+                                       &path)) {
+        fx_chain_drop_target_clear(widget);
+        return FALSE;
+    }
+
+    fx_chain_drop_target_set(widget, path, destination);
+    gtk_tree_path_free(path);
+
+    GdkAtom target = gtk_drag_dest_find_target(widget, context, NULL);
+    if(target == GDK_NONE) {
+        fx_chain_drop_target_clear(widget);
+        return FALSE;
+    }
+
+    gtk_drag_get_data(widget, context, target, time);
+    return TRUE;
+}
+
+static void fx_chain_drop_refresh(void)
+{
+    info->uc.reload_hint[HINT_CHAIN] = 1;
+    info->uc.reload_hint[HINT_ENTRY] = 1;
+    info->uc.reload_hint[HINT_KF] = 1;
+}
+
+static void fx_chain_drag_data_received(GtkWidget *widget,
+                                        GdkDragContext *context,
+                                        gint x,
+                                        gint y,
+                                        GtkSelectionData *selection_data,
+                                        guint target_info,
+                                        guint time,
+                                        gpointer user_data)
+{
+    int destination = -1;
+    int value = -1;
+    gboolean success = FALSE;
+
+    (void)user_data;
+
+    if(!fx_dnd_chain_entry_at_drag_pos(GTK_TREE_VIEW(widget),
+                                       x,
+                                       y,
+                                       &destination,
+                                       NULL,
+                                       NULL) ||
+       !fx_dnd_get_int(selection_data, &value)) {
+        fx_chain_drop_target_clear(widget);
+        gtk_drag_finish(context, FALSE, FALSE, time);
+        return;
+    }
+
+    if(target_info == FX_DND_INFO_EFFECT) {
+        if(value > 0 && _effect_get_np(value) >= 0) {
+            int enabled = 1;
+
+            multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d %d",
+                       0, destination, value, enabled);
+
+            char trip[100];
+            snprintf(trip, sizeof(trip), "%03d:%d %d %d %d;",
+                     VIMS_CHAIN_ENTRY_SET_EFFECT, 0, destination, value, enabled);
+            vj_midi_learning_vims(info->midi, NULL, trip, 0);
+
+            fx_chain_drop_refresh();
+            success = TRUE;
+        }
+    }
+    else if(target_info == FX_DND_INFO_CHAIN) {
+        if(value >= 0 && value < SAMPLE_MAX_EFFECTS) {
+            if(value != destination)
+                multi_vims(VIMS_CHAIN_ENTRY_SWAP, "%d %d %d", 0, value, destination);
+
+            fx_chain_drop_refresh();
+            success = TRUE;
+        }
+    }
+
+    fx_chain_drop_target_clear(widget);
+    gtk_drag_finish(context, success, FALSE, time);
+}
+
+static void setup_effectchain_drag_and_drop(GtkWidget *tree)
+{
+    static GtkTargetEntry source_targets[] = {
+        { FX_DND_CHAIN_TARGET, GTK_TARGET_SAME_WIDGET, FX_DND_INFO_CHAIN },
+    };
+    static GtkTargetEntry destination_targets[] = {
+        { FX_DND_EFFECT_TARGET, GTK_TARGET_SAME_APP, FX_DND_INFO_EFFECT },
+        { FX_DND_CHAIN_TARGET, GTK_TARGET_SAME_WIDGET, FX_DND_INFO_CHAIN },
+    };
+
+    gtk_drag_source_set(tree,
+                        GDK_BUTTON1_MASK,
+                        source_targets,
+                        G_N_ELEMENTS(source_targets),
+                        GDK_ACTION_MOVE);
+    gtk_drag_dest_set(tree,
+                      0,
+                      destination_targets,
+                      G_N_ELEMENTS(destination_targets),
+                      GDK_ACTION_COPY | GDK_ACTION_MOVE);
+
+    g_signal_connect(tree, "button-press-event", G_CALLBACK(fx_chain_drag_button_press), NULL);
+    g_signal_connect(tree, "button-release-event", G_CALLBACK(fx_chain_drag_button_release), NULL);
+    g_signal_connect(tree, "drag-begin", G_CALLBACK(fx_chain_drag_begin), NULL);
+    g_signal_connect(tree, "drag-end", G_CALLBACK(fx_chain_drag_end), NULL);
+    g_signal_connect(tree, "drag-data-get", G_CALLBACK(fx_chain_drag_data_get), NULL);
+    g_signal_connect(tree, "drag-motion", G_CALLBACK(fx_chain_drag_motion), NULL);
+    g_signal_connect(tree, "drag-leave", G_CALLBACK(fx_chain_drag_leave), NULL);
+    g_signal_connect(tree, "drag-drop", G_CALLBACK(fx_chain_drag_drop), NULL);
+    g_signal_connect(tree, "drag-data-received", G_CALLBACK(fx_chain_drag_data_received), NULL);
+}
+
+static void setup_effectlist_drag_source(GtkWidget *tree, gboolean reorderable)
+{
+    static GtkTargetEntry effect_targets[] = {
+        { FX_DND_EFFECT_TARGET, GTK_TARGET_SAME_APP, FX_DND_INFO_EFFECT },
+    };
+
+    if(reorderable) {
+        GtkTargetList *targets = gtk_drag_source_get_target_list(tree);
+        if(targets) {
+            gtk_target_list_add(targets,
+                                gdk_atom_intern_static_string(FX_DND_EFFECT_TARGET),
+                                GTK_TARGET_SAME_APP,
+                                FX_DND_INFO_EFFECT);
+        }
+    }
+    else {
+        gtk_drag_source_set(tree,
+                            GDK_BUTTON1_MASK,
+                            effect_targets,
+                            G_N_ELEMENTS(effect_targets),
+                            GDK_ACTION_COPY);
+    }
+
+    g_signal_connect(tree, "button-press-event", G_CALLBACK(fx_list_drag_button_press), NULL);
+    g_signal_connect(tree, "drag-data-get", G_CALLBACK(fx_list_drag_data_get), NULL);
+    g_signal_connect(tree, "drag-end", G_CALLBACK(fx_list_drag_end), NULL);
+}
+
 static void setup_effectchain_info( void )
 {
     GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
@@ -8445,7 +9096,9 @@ static void setup_effectchain_info( void )
                                              G_TYPE_INT,
                                              G_TYPE_INT,
                                              G_TYPE_INT,
-                                             G_TYPE_INT);
+                                             G_TYPE_INT,
+                                             G_TYPE_BOOLEAN,
+                                             GDK_TYPE_RGBA);
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
     g_object_unref( G_OBJECT( store ));
 
@@ -8468,6 +9121,9 @@ static void setup_effectchain_info( void )
     g_signal_connect(GTK_TREE_VIEW(tree), "button-press-event",
                      (GCallback) on_effectchain_button_pressed, NULL);
 
+    fx_chain_drop_add_renderer_attributes(GTK_TREE_VIEW(tree));
+    setup_effectchain_drag_and_drop(tree);
+
     GtkTreeViewColumn *col_effect = gtk_tree_view_get_column(GTK_TREE_VIEW(tree), FXC_FXID);
 
     if (col_effect) {
@@ -8485,34 +9141,30 @@ static void setup_effectchain_info( void )
     }
 }
 
-#define FILL_EMPTY_CHAIN()                                                   \
-    do {                                                                     \
-        for (int _i = 0; _i < SAMPLE_MAX_EFFECTS; _i++) {                    \
-            gtk_list_store_append(store, &iter);                             \
-            chain_clear_row(store, &iter, _i);                               \
-        }                                                                    \
-        gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store)); \
-    } while (0)
-
 static void load_effectchain_info(void)
 {
     GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_chain");
-
     gint fxlen = 0;
+    gchar *fxtext;
+    int selected_entry;
+    gboolean previous_silent;
 
     multi_vims(VIMS_CHAIN_LIST, "%d", 0);
-    gchar *fxtext = recv_vims(4, &fxlen);
+    fxtext = recv_vims(4, &fxlen);
 
     int checksum = (fxtext && fxlen > 0) ? data_checksum(fxtext, fxlen) : 0;
-    if (info->uc.reload_hint_checksums[HINT_CHAIN] == checksum) {
-        if (fxtext)
+    if(info->uc.reload_hint_checksums[HINT_CHAIN] == checksum) {
+        if(fxtext)
             free(fxtext);
         return;
     }
     info->uc.reload_hint_checksums[HINT_CHAIN] = checksum;
 
-    set_tooltip_by_widget(tree, tooltips[TOOLTIP_FXCHAINTREE].text);
+    selected_entry = info->uc.selected_chain_entry;
+    previous_silent = fx_chain_selection_silent;
+    fx_chain_selection_silent = TRUE;
 
+    set_tooltip_by_widget(tree, tooltips[TOOLTIP_FXCHAINTREE].text);
     reset_tree("tree_chain");
 
     GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
@@ -8523,46 +9175,45 @@ static void load_effectchain_info(void)
         GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_CHAIN_TOGGLECHAIN]),
         info->status_tokens[SAMPLE_FX]);
 
-    if (info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
+    if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) {
         gtk_toggle_button_set_active(
             GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_SAMPLEFX]),
             info->status_tokens[SAMPLE_FX]);
-    } else {
+    }
+    else {
         gtk_toggle_button_set_active(
             GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CHECK_STREAMFX]),
             info->status_tokens[SAMPLE_FX]);
     }
 
+#define FILL_EMPTY_CHAIN()                                                   \
+    do {                                                                     \
+        for(int _i = 0; _i < SAMPLE_MAX_EFFECTS; _i++) {                     \
+            gtk_list_store_append(store, &iter);                             \
+            chain_clear_row(store, &iter, _i);                               \
+        }                                                                    \
+        gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store)); \
+    } while(0)
 
-    if (!fxtext || fxlen <= 0) {
+    if(!fxtext || fxlen <= 0) {
         FILL_EMPTY_CHAIN();
-
-        if (fxtext)
-            free(fxtext);
-
-
-        return;
+        goto done;
     }
 
-    if ((fxlen % VIMS_CHAIN_LIST_ENTRY_LENGTH) != 0) {
+    if((fxlen % VIMS_CHAIN_LIST_ENTRY_LENGTH) != 0) {
         veejay_msg(0,
                    "Error parsing FX chain response: payload length %d is not a multiple of %d",
                    fxlen,
                    VIMS_CHAIN_LIST_ENTRY_LENGTH);
-
         FILL_EMPTY_CHAIN();
-
-        free(fxtext);
-
-        return;
+        goto done;
     }
 
     guint arr[10];
     gint offset = 0;
     gint last_index = 0;
 
-    while (offset < fxlen)
-    {
+    while(offset < fxlen) {
         char line[VIMS_CHAIN_LIST_ENTRY_LENGTH + 1];
 
         veejay_memset(arr, 0, sizeof(arr));
@@ -8581,19 +9232,17 @@ static void load_effectchain_info(void)
                               &arr[5], &arr[6], &arr[7], &arr[8]);
 #endif
 
-        if (n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES) {
+        if(n_tokens != VIMS_CHAIN_LIST_ENTRY_VALUES) {
             veejay_msg(0,
                        "Error parsing FX chain response: expected %d tokens, got %d",
                        VIMS_CHAIN_LIST_ENTRY_VALUES,
                        n_tokens);
-
             break;
         }
 
         int chain_entry = arr[0];
         int effect_id = arr[1];
         int entry_enabled = arr[3];
-
         int beat_enabled = 0;
         int chain_source = 0;
         int chain_channel = 0;
@@ -8613,15 +9262,14 @@ static void load_effectchain_info(void)
         subrender_entry = arr[8];
 #endif
 
-        if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_EFFECTS) {
+        if(chain_entry < 0 || chain_entry >= SAMPLE_MAX_EFFECTS) {
             veejay_msg(0,
                        "Error parsing FX chain response: invalid chain entry %d",
                        chain_entry);
             break;
         }
 
-        while (last_index < chain_entry)
-        {
+        while(last_index < chain_entry) {
             gtk_list_store_append(store, &iter);
             chain_clear_row(store, &iter, last_index);
             last_index++;
@@ -8629,10 +9277,8 @@ static void load_effectchain_info(void)
 
         char *name = _effect_get_description(effect_id);
 
-        if (last_index == chain_entry)
-        {
+        if(last_index == chain_entry) {
             gchar *utf8_name = _utf8str(name);
-
             char tmp[128];
             chain_channel_label(tmp, sizeof(tmp), effect_id, chain_channel);
 
@@ -8668,21 +9314,20 @@ static void load_effectchain_info(void)
             g_free(source_type);
             g_free(mixing);
 
-            if (toggle)
+            if(toggle)
                 g_object_unref(toggle);
-            if (beat_toggle)
+            if(beat_toggle)
                 g_object_unref(beat_toggle);
-            if (kf_togglepf)
+            if(kf_togglepf)
                 g_object_unref(kf_togglepf);
-            if (subrender_toggle)
+            if(subrender_toggle)
                 g_object_unref(subrender_toggle);
         }
 
         offset += VIMS_CHAIN_LIST_ENTRY_LENGTH;
     }
 
-    while (last_index < SAMPLE_MAX_EFFECTS)
-    {
+    while(last_index < SAMPLE_MAX_EFFECTS) {
         gtk_list_store_append(store, &iter);
         chain_clear_row(store, &iter, last_index);
         last_index++;
@@ -8690,7 +9335,12 @@ static void load_effectchain_info(void)
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 
-    free(fxtext);
+done:
+    fx_chain_restore_visual_selection(tree, selected_entry);
+    fx_chain_selection_silent = previous_silent;
+
+    if(fxtext)
+        free(fxtext);
 
 #undef FILL_EMPTY_CHAIN
 }
@@ -9154,7 +9804,7 @@ void setup_effectlist_info(void)
     set_tooltip_by_widget (trees[0], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_ALPHA_EFFECTS].text);
-    set_tooltip_by_widget (trees[3], "Double-click to use an effect. Drag to reorder. Delete removes it. Ctrl+Shift-click toggles favourites.");
+    set_tooltip_by_widget (trees[3], "Double-click to use an effect. Drag within this list to reorder, or drop it onto an FX chain slot. Delete removes it. Ctrl+Shift-click toggles favourites.");
 
     fx_list_ = (vevo_port_t*) vpn( 200 );
 
@@ -9197,6 +9847,7 @@ void setup_effectlist_info(void)
 
     for(i = 0; i < 4;  i ++ )
     {
+        setup_effectlist_drag_source(trees[i], i == 3);
         g_signal_connect( trees[i],"row-activated", (GCallback) on_effectlist_row_activated, NULL );
         g_signal_connect( trees[i],"button-press-event", G_CALLBACK(favourite_fx_button_press), NULL );
         GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[i]));

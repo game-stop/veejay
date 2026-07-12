@@ -7758,6 +7758,92 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
     }
 }
 
+
+static int vj_event_remap_chain_index(int value, int source, int destination)
+{
+    if(value == source)
+        return destination;
+    if(value == destination)
+        return source;
+    return value;
+}
+
+void vj_event_chain_entry_swap(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[3];
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(v_chi(args[1]) || v_chi(args[2])) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot swap FX chain entries %d and %d: index out of bounds",
+                   args[1], args[2]);
+        return;
+    }
+
+    if(args[1] == args[2])
+        return;
+
+    if(SAMPLE_PLAYING(v)) {
+        SAMPLE_DEFAULTS(args[0]);
+
+        if(!sample_exists(args[0])) {
+            p_no_sample(args[0]);
+            return;
+        }
+
+        if(!sample_chain_swap(args[0], args[1], args[2])) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Cannot swap sample %d FX chain entries %d and %d",
+                       args[0], args[1], args[2]);
+            return;
+        }
+
+        v->uc->chain_changed = 1;
+        return;
+    }
+
+    if(STREAM_PLAYING(v)) {
+        STREAM_DEFAULTS(args[0]);
+
+        if(!vj_tag_exists(args[0])) {
+            p_no_tag(args[0]);
+            return;
+        }
+
+        sample_eff_chain **chain = vj_tag_get_effect_chain(args[0]);
+        if(!chain || !chain[args[1]] || !chain[args[2]]) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Cannot access stream %d FX chain entries %d and %d",
+                       args[0], args[1], args[2]);
+            return;
+        }
+
+        sample_eff_chain *entry = chain[args[1]];
+        chain[args[1]] = chain[args[2]];
+        chain[args[2]] = entry;
+
+        int type = 0;
+        int fader = 0;
+        int fx = 0;
+        int rec = 0;
+        int active = 0;
+        int method = 0;
+        int fade_entry = -1;
+        int alpha = 0;
+        vj_tag_var(args[0], &type, &fader, &fx, &rec, &active,
+                   &method, &fade_entry, &alpha);
+        vj_tag_set_fade_entry(args[0],
+                              vj_event_remap_chain_index(fade_entry, args[1], args[2]));
+
+        v->uc->chain_changed = 1;
+        return;
+    }
+
+    p_invalid_mode();
+}
+
 void vj_event_chain_entry_select(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;

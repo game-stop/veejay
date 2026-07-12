@@ -2808,6 +2808,31 @@ int sample_chain_add(int s1, int c, int effect_nr, int is_enabled)
     return 1;           /* return position on which it was added */
 }
 
+
+int sample_chain_swap(int s1, int source, int destination)
+{
+    sample_info *sample = sample_get(s1);
+    if(!sample)
+        return 0;
+    if(source < 0 || source >= SAMPLE_MAX_EFFECTS ||
+       destination < 0 || destination >= SAMPLE_MAX_EFFECTS)
+        return 0;
+    if(source == destination)
+        return 1;
+
+    sample_eff_chain *entry = sample->effect_chain[source];
+    sample->effect_chain[source] = sample->effect_chain[destination];
+    sample->effect_chain[destination] = entry;
+
+    if(sample->fade_entry == source)
+        sample->fade_entry = destination;
+    else if(sample->fade_entry == destination)
+        sample->fade_entry = source;
+
+    return 1;
+}
+
+
 void	sample_set_chain_paused( int s1, int paused )
 {
 	sample_info *sample = sample_get(s1);

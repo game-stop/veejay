@@ -386,6 +386,7 @@ extern int sample_chain_clear(int s1);
 extern int sample_chain_size(int s1);
 extern int sample_chain_get_free_entry(int s1);
 extern int sample_chain_add(int s1, int c, int effect_nr, int is_enabled);
+extern int sample_chain_swap(int s1, int source, int destination);
 
 /* channel depends on source , it select a channel of a certain video source */
 extern int sample_get_chain_channel(int s1, int position);
