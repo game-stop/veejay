@@ -49,8 +49,10 @@ packet_header_t  *packet_get_hdr(const void *data)
 
 int			packet_get_data(packet_header_t *h, const void *data, uint8_t *plane )
 {
+	if( h->data_size == 0 || h->data_size > CHUNK_SIZE )
+		return -1;
 	uint8_t *addr = (uint8_t*) data;
-	veejay_memcpy( plane , addr + PACKET_HEADER_LENGTH, CHUNK_SIZE );
+	veejay_memcpy( plane , addr + PACKET_HEADER_LENGTH, h->data_size );
 	return 1;
 }
 
