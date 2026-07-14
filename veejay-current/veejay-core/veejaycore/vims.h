@@ -369,6 +369,10 @@ enum {
 	VIMS_CHAIN_LIST					=	448,
 	VIMS_SEQUENCE_LIST_ALL			=	449,
 	VIMS_SEQUENCE_QUEUE			=	451,
+	VIMS_SEQUENCE_TIMELINE		=	452,
+	VIMS_SEQUENCE_PATTERN_GET	=	453,
+	VIMS_SEQUENCE_PATTERN_SET	=	454,
+	VIMS_SEQUENCE_PATTERN_CLEAR	=	455,
 	VIMS_TRACK_LIST				=	445,
 	VIMS_SAMPLE_KF_GET				=	446,
 	VIMS_PROJ_GET_POINT				=	447,
@@ -380,6 +384,19 @@ enum {
 #define VIMS_CHAIN_LIST_ENTRY_FORMAT "%02d%03d%1d%1d%1d%1d%03d%1d%1d"
 #define VIMS_CHAIN_LIST_ENTRY_LENGTH (2+3+1+1+1+1+3+1+1)
 #define VIMS_CHAIN_LIST_ENTRY_VALUES 9
+
+#define VJ_SEQUENCE_PATTERN_FORMAT_MAX 32
+#define VJ_SEQUENCE_PATTERN_DATA_MAX   (1024 * 1024)
+
+/* Timeline body: bank(2), revision(10), finite(1), total(12), entries(3). */
+/* Entry body: slot(3), source_id(5), source_type(2), start(12), length(12). */
+#define VJ_SEQUENCE_TIMELINE_REPLY_PREFIX_LENGTH 8
+#define VJ_SEQUENCE_TIMELINE_HEADER_LENGTH       28
+#define VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH        34
+
+/* Pattern body: revision(10), format_length(3), data_length(8), format, Base64 data. */
+#define VJ_SEQUENCE_PATTERN_REPLY_PREFIX_LENGTH  8
+#define VJ_SEQUENCE_PATTERN_HEADER_LENGTH        21
 
 enum {
     VJ_PLAYBACK_MODE_PLAIN = 2,
