@@ -68,6 +68,8 @@
 #include <src/utils.h>
 #include <src/sequence.h>
 #include <src/gtksequencebankview.h>
+#include <src/gtkvimspatternview.h>
+#include <src/gtkvimshistoryview.h>
 #include <src/gtksamplebankview.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
@@ -78,8 +80,33 @@
 #include <assert.h>
 #endif
 
+
 #ifndef VIMS_SEQUENCE_QUEUE
 #define VIMS_SEQUENCE_QUEUE 451
+#endif
+#ifndef VIMS_SEQUENCE_TIMELINE
+#define VIMS_SEQUENCE_TIMELINE 452
+#endif
+#ifndef VIMS_SEQUENCE_PATTERN_GET
+#define VIMS_SEQUENCE_PATTERN_GET 453
+#endif
+#ifndef VIMS_SEQUENCE_PATTERN_SET
+#define VIMS_SEQUENCE_PATTERN_SET 454
+#endif
+#ifndef VIMS_SEQUENCE_PATTERN_CLEAR
+#define VIMS_SEQUENCE_PATTERN_CLEAR 455
+#endif
+#ifndef VJ_SEQUENCE_TIMELINE_HEADER_LENGTH
+#define VJ_SEQUENCE_TIMELINE_HEADER_LENGTH 28
+#endif
+#ifndef VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH
+#define VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH 34
+#endif
+#ifndef VJ_SEQUENCE_PATTERN_HEADER_LENGTH
+#define VJ_SEQUENCE_PATTERN_HEADER_LENGTH 21
+#endif
+#ifndef VJ_SEQUENCE_PATTERN_DATA_MAX
+#define VJ_SEQUENCE_PATTERN_DATA_MAX (1024 * 1024)
 #endif
 #ifndef VJ_SEQUENCE_STATUS_SELECTED_MASK
 #define VJ_SEQUENCE_STATUS_SELECTED_MASK(value) ((value) & 0x0f)
@@ -896,9 +923,6 @@ static struct
     { "spin_framedelay",       WIDGET_SPIN_FRAMEDELAY },
     { "entry_hostname",        WIDGET_ENTRY_HOSTNAME },
     { "button_portnum",        WIDGET_BUTTON_PORTNUM },
-    { "macro_frame_position",  WIDGET_MACRO_FRAME_POSITION },
-    { "macro_dup_position",    WIDGET_MACRO_DUP_POSITION },
-    { "macro_loop_position",   WIDGET_MACRO_LOOP_POSITION },
     { "priout_width",          WIDGET_PRIOUT_WIDTH },
     { "priout_height",         WIDGET_PRIOUT_HEIGHT },
     { "spin_streamduration",   WIDGET_SPIN_STREAMDURATION },
@@ -1139,10 +1163,6 @@ static struct
     { "slider_box_g9",           WIDGET_SLIDER_BOX_G9 },
     { "slider_box_g10",          WIDGET_SLIDER_BOX_G10 },
     { "curve_chain_togglechain", WIDGET_CURVE_CHAIN_TOGGLECHAIN },
-    { "spin_macrodelay",         WIDGET_SPIN_MACRODELAY },
-    { "macrorecord1",            WIDGET_MACRORECORD1 },
-    { "macroplay1",              WIDGET_MACROPLAY1 },
-    { "macrostop1",              WIDGET_MACROSTOP1 },
     { "spin_sampleduration",   WIDGET_SPIN_SAMPLEDURATION },
     { "transition_active",      WIDGET_SAMPLE_TRANSITION_ACTIVE },
     { "transition_length",      WIDGET_SAMPLE_TRANSITION_LENGTH },
@@ -2043,6 +2063,8 @@ typedef struct
     GtkWidget   *sample_bank_view;
     GtkWidget   *sample_sequencer;
     GtkWidget   *sequence_bank_view;
+    GtkWidget   *vims_pattern_view;
+    GtkWidget   *vims_history_view;
     sample_bank_t   **sample_banks;
     sample_slot_t   *selected_slot;
     sample_slot_t   *selection_slot;
@@ -2109,15 +2131,6 @@ enum
     FXC_N_COLS = 15,
 };
 
-enum {
-	MACRO_FRAME = 0,
-	MACRO_DUP = 1,
-	MACRO_LOOP = 2,
-	MACRO_MSG_SEQ = 3,
-	MACRO_VIMS = 4,
-	MACRO_VIMS_DESCR = 5,
-};
-
 enum
 {
     V4L_NUM=0,
@@ -2178,7 +2191,6 @@ static effectlist_data fxlist_data;
 
 #define SEQUENCER_COL 10
 #define SEQUENCER_ROW 10
-static guint macro_line[4] = { 0,0,0,0 };
 
 static vj_gui_t *info = NULL;
 void *get_ui_info(void) { return (void*) info; }
@@ -2209,6 +2221,22 @@ void vj_msg(int type, const char format[], ...);
 void msg_vims(char *message);
 static void multi_vims(int id, const char format[],...);
 static void single_vims(int id);
+static int vj_kf_timeline_length(void);
+static int vj_kf_timeline_position(void);
+static inline int normalize_sequence_slot(int raw, int n_slots);
+static void sequence_vims_observe_message(const char *message);
+static const char *sequence_vims_description_lookup(int vims_id,
+                                                    gpointer user_data);
+static int sequence_vims_message_id(const char *message);
+static void sequence_vims_sync_target(void);
+static void sequence_vims_update_playback(void);
+static void sequence_vims_refresh_cell_badge(int bank, int slot);
+static void sequence_vims_refresh_badges(void);
+static void sequence_vims_refresh_bank_badge(int bank);
+static void sequence_vims_pattern_flush(void);
+static void sequence_vims_pattern_load_backend(void);
+static void sequence_vims_timeline_invalidate(int bank);
+static void sequence_vims_note_outgoing_id(int id);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
 static int get_nums2(GtkWidget *w);
@@ -2245,7 +2273,6 @@ static void set_feedback_status(void);
 static void load_effectlist_info(void);
 static void load_sequence_list(void);
 static int sequence_ui_active_bank(void);
-static inline int normalize_sequence_slot(int raw, int n_slots);
 static void sequence_bank_view_set_active_status(void);
 static void load_generator_info(void);
 static void load_samplelist_info(void);
@@ -2316,7 +2343,6 @@ static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
 static void veejay_show_main_ui(vj_gui_t *gui);
 static void reloaded_present_window(GtkWidget *w);
-void reload_macros(void);
 void reportbug(void);
 void select_chain_entry(int entry);
 static void update_slider_state(int slider_num, gboolean animated);
@@ -3154,7 +3180,7 @@ static gboolean is_edl_displayed(void)
     int panel_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
     int sample_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK15] ));
 
-    if( panel_page == 5 && sample_page == 2 )
+    if(panel_page == NOTEBOOK18_PAGE_SAMPLE && sample_page == 2)
         return TRUE;
     return FALSE;
 }
@@ -3162,7 +3188,7 @@ static gboolean is_edl_displayed(void)
 static gboolean is_fxanim_displayed(void)
 {
     int fxanim_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
-    if( fxanim_page == 1)
+    if(fxanim_page == NOTEBOOK18_PAGE_FX_ANIM)
         return TRUE;
     return FALSE;
 }
@@ -3179,7 +3205,7 @@ gboolean   periodic_pull(gpointer data)
     int deckpage = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
 
     int pm = info->status_tokens[PLAY_MODE];
-    if( pm == MODE_STREAM && deckpage == 5 && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR)
+    if(pm == MODE_STREAM && deckpage == NOTEBOOK18_PAGE_SAMPLE && info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR)
     {
         info->uc.reload_hint[HINT_GENERATOR] = 1;
     }
@@ -3516,6 +3542,7 @@ static void preview_set_live_pixbuf(GdkPixbuf *pixbuf)
 
 static gboolean preview_image_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
 {
+    GtkStyleContext *style;
     int aw;
     int ah;
     int sw;
@@ -3528,11 +3555,16 @@ static gboolean preview_image_draw(GtkWidget *widget, cairo_t *cr, gpointer data
 
     (void)data;
 
+    aw = gtk_widget_get_allocated_width(widget);
+    ah = gtk_widget_get_allocated_height(widget);
+    style = gtk_widget_get_style_context(widget);
+
+    if(aw > 0 && ah > 0)
+        gtk_render_background(style, cr, 0.0, 0.0, aw, ah);
+
     if(!user_preview || !preview_has_live_frame_ || !preview_live_pixbuf_)
         return FALSE;
 
-    aw = gtk_widget_get_allocated_width(widget);
-    ah = gtk_widget_get_allocated_height(widget);
     sw = gdk_pixbuf_get_width(preview_live_pixbuf_);
     sh = gdk_pixbuf_get_height(preview_live_pixbuf_);
 
@@ -3548,9 +3580,6 @@ static gboolean preview_image_draw(GtkWidget *widget, cairo_t *cr, gpointer data
     x = (aw - dw) / 2;
     y = (ah - dh) / 2;
 
-    cairo_set_source_rgb(cr, 0.0, 0.0, 0.0);
-    cairo_paint(cr);
-
     cairo_save(cr);
     cairo_rectangle(cr, x, y, dw, dh);
     cairo_clip(cr);
@@ -3565,6 +3594,176 @@ static gboolean preview_image_draw(GtkWidget *widget, cairo_t *cr, gpointer data
     cairo_restore(cr);
 
     return TRUE;
+}
+
+static gboolean preview_is_native_resolution(void)
+{
+    int source_w;
+    int source_h;
+
+    if(!info || info->el.width <= 0 || info->el.height <= 0)
+        return FALSE;
+
+    source_w = preview_even(info->el.width);
+    source_h = preview_even(info->el.height);
+
+    return preview_base_w_ >= source_w &&
+           preview_base_h_ >= source_h;
+}
+
+static void preview_apply_native_compact_layout(void)
+{
+    GtkWidget *image = widget_cache[WIDGET_IMAGEA];
+    GtkWidget *frame = NULL;
+    GtkWidget *alignment = NULL;
+    GtkWidget *row = NULL;
+    GtkWidget *center = NULL;
+    GtkWidget *parent = NULL;
+    const gboolean compact = preview_is_native_resolution();
+
+    if(info && info->main_window) {
+        frame = glade_xml_get_widget_(info->main_window, "frame327");
+        alignment = glade_xml_get_widget_(info->main_window, "alignment542");
+    }
+
+    if(frame) {
+        row = GTK_WIDGET(g_object_get_data(
+            G_OBJECT(frame),
+            "gvr-preview-action-row"));
+        center = GTK_WIDGET(g_object_get_data(
+            G_OBJECT(frame),
+            "gvr-preview-action-center"));
+    }
+
+    if(compact) {
+        if(image) {
+            gtk_widget_set_size_request(
+                image,
+                preview_base_w_,
+                preview_base_h_);
+            gtk_widget_set_hexpand(image, FALSE);
+            gtk_widget_set_vexpand(image, FALSE);
+            gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(image, GTK_ALIGN_CENTER);
+        }
+
+        if(alignment) {
+            gtk_widget_set_size_request(
+                alignment,
+                preview_base_w_,
+                preview_base_h_);
+            gtk_widget_set_hexpand(alignment, FALSE);
+            gtk_widget_set_vexpand(alignment, FALSE);
+            gtk_widget_set_halign(alignment, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(alignment, GTK_ALIGN_CENTER);
+
+            if(GTK_IS_ALIGNMENT(alignment))
+                gtk_alignment_set(
+                    GTK_ALIGNMENT(alignment),
+                    0.5f,
+                    0.5f,
+                    0.0f,
+                    0.0f);
+        }
+
+        if(center) {
+            gtk_widget_set_hexpand(center, FALSE);
+            gtk_widget_set_vexpand(center, FALSE);
+            gtk_widget_set_halign(center, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(center, GTK_ALIGN_CENTER);
+        }
+
+        if(row) {
+            gtk_widget_set_hexpand(row, FALSE);
+            gtk_widget_set_vexpand(row, FALSE);
+            gtk_widget_set_halign(row, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(row, GTK_ALIGN_CENTER);
+        }
+
+        if(frame) {
+            gtk_widget_set_size_request(frame, -1, preview_base_h_);
+            gtk_widget_set_hexpand(frame, FALSE);
+            gtk_widget_set_vexpand(frame, FALSE);
+            gtk_widget_set_halign(frame, GTK_ALIGN_CENTER);
+            gtk_widget_set_valign(frame, GTK_ALIGN_CENTER);
+            add_class(frame, "preview-native-compact");
+
+            parent = gtk_widget_get_parent(frame);
+            if(parent && GTK_IS_BOX(parent))
+                gtk_container_child_set(
+                    GTK_CONTAINER(parent),
+                    frame,
+                    "expand", FALSE,
+                    "fill", FALSE,
+                    NULL);
+        }
+    }
+    else {
+        if(image) {
+            gtk_widget_set_size_request(
+                image,
+                preview_base_w_,
+                preview_base_h_);
+            gtk_widget_set_hexpand(image, TRUE);
+            gtk_widget_set_vexpand(image, TRUE);
+            gtk_widget_set_halign(image, GTK_ALIGN_FILL);
+            gtk_widget_set_valign(image, GTK_ALIGN_FILL);
+        }
+
+        if(alignment) {
+            gtk_widget_set_size_request(alignment, -1, -1);
+            gtk_widget_set_hexpand(alignment, TRUE);
+            gtk_widget_set_vexpand(alignment, TRUE);
+            gtk_widget_set_halign(alignment, GTK_ALIGN_FILL);
+            gtk_widget_set_valign(alignment, GTK_ALIGN_FILL);
+
+            if(GTK_IS_ALIGNMENT(alignment))
+                gtk_alignment_set(
+                    GTK_ALIGNMENT(alignment),
+                    0.5f,
+                    0.5f,
+                    1.0f,
+                    1.0f);
+        }
+
+        if(center) {
+            gtk_widget_set_hexpand(center, TRUE);
+            gtk_widget_set_vexpand(center, TRUE);
+            gtk_widget_set_halign(center, GTK_ALIGN_FILL);
+            gtk_widget_set_valign(center, GTK_ALIGN_FILL);
+        }
+
+        if(row) {
+            gtk_widget_set_hexpand(row, TRUE);
+            gtk_widget_set_vexpand(row, TRUE);
+            gtk_widget_set_halign(row, GTK_ALIGN_FILL);
+            gtk_widget_set_valign(row, GTK_ALIGN_FILL);
+        }
+
+        if(frame) {
+            gtk_widget_set_size_request(
+                frame,
+                preview_base_w_,
+                preview_base_h_);
+            gtk_widget_set_hexpand(frame, TRUE);
+            gtk_widget_set_vexpand(frame, TRUE);
+            gtk_widget_set_halign(frame, GTK_ALIGN_FILL);
+            gtk_widget_set_valign(frame, GTK_ALIGN_FILL);
+            remove_class(frame, "preview-native-compact");
+
+            parent = gtk_widget_get_parent(frame);
+            if(parent && GTK_IS_BOX(parent))
+                gtk_container_child_set(
+                    GTK_CONTAINER(parent),
+                    frame,
+                    "expand", TRUE,
+                    "fill", TRUE,
+                    NULL);
+        }
+    }
+
+    if(frame)
+        gtk_widget_queue_resize(frame);
 }
 
 static void preview_promote_main_area(void)
@@ -3641,6 +3840,8 @@ static void preview_set_widget_minimum(void)
         gtk_widget_set_halign(frame, GTK_ALIGN_FILL);
         gtk_widget_set_valign(frame, GTK_ALIGN_FILL);
     }
+
+    preview_apply_native_compact_layout();
 }
 
 static void preview_rescale_current_image(int display_w, int display_h)
@@ -4533,55 +4734,6 @@ static void setup_v4l_devices(void)
         (GCallback) on_devicelist_row_activated, NULL );
 
 
-}
-
-gboolean vims_macro_selection_func( GtkTreeSelection *sel, GtkTreeModel *model, GtkTreePath *path, gboolean path_currently_selected, gpointer data)
-{
-	GtkTreeIter iter;
-	if( gtk_tree_model_get_iter( model, &iter, path) ) {
-
-		guint frame_num = 0, dup_num = 0, loop_num = 0, seq_no = 0;
-
-		gchar *message = NULL;
-		gtk_tree_model_get( model, &iter, MACRO_FRAME, &frame_num, -1);
-		gtk_tree_model_get( model, &iter, MACRO_DUP, &dup_num, -1);
-	    gtk_tree_model_get( model, &iter, MACRO_MSG_SEQ, &seq_no, -1);
-		gtk_tree_model_get( model, &iter, MACRO_LOOP, &loop_num, -1);
-	    gtk_tree_model_get( model, &iter, MACRO_VIMS, &message, -1 );
-
-		macro_line[0] = frame_num;
-		macro_line[1] = dup_num;
-		macro_line[2] = loop_num;
-		macro_line[3] = seq_no;
-
-		update_spin_value2(widget_cache[WIDGET_MACRO_FRAME_POSITION], frame_num);
-		update_spin_value2(widget_cache[WIDGET_MACRO_DUP_POSITION], dup_num);
-		update_spin_value2(widget_cache[WIDGET_MACRO_LOOP_POSITION], loop_num);
-		put_text( "macro_vims_message", message );
-
-		g_free(message);
-	}
-	return TRUE;
-}
-
-static void setup_macros(void)
-{
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
-	GtkListStore *store = gtk_list_store_new( 6, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING );
-
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store) );
-	GtkTreeSelection *sel = gtk_tree_view_get_selection( GTK_TREE_VIEW(tree) );
-	gtk_tree_selection_set_mode( sel, GTK_SELECTION_SINGLE );
-	gtk_tree_selection_set_select_function( sel, vims_macro_selection_func, NULL,NULL );
-
-	g_object_unref( G_OBJECT(store) );
-
-	setup_tree_text_column( "macro_macros", MACRO_FRAME, "Frame",0 );
-	setup_tree_text_column( "macro_macros", MACRO_DUP, "Dup",0);
-	setup_tree_text_column( "macro_macros", MACRO_LOOP, "Loop",0);
-	setup_tree_text_column( "macro_macros", MACRO_MSG_SEQ, "#",0);
-	setup_tree_text_column( "macro_macros", MACRO_VIMS, "VIMS Message",0);
-	setup_tree_text_column( "macro_macros", MACRO_VIMS_DESCR, "Description",0);
 }
 
 typedef struct
@@ -6009,6 +6161,14 @@ void msg_vims(char *message)
 {
     if(!info->client)
         return;
+
+    int message_id = sequence_vims_message_id(message);
+    sequence_vims_note_outgoing_id(message_id);
+    if(message_id == VIMS_SAMPLE_SAVE_SAMPLELIST ||
+       message_id == VIMS_SAMPLE_SYNC_SAMPLELIST)
+        sequence_vims_pattern_flush();
+
+    sequence_vims_observe_message(message);
     int n = vj_client_send(info->client, V_CMD, (unsigned char*)message);
     if( n <= 0 )
         reloaded_schedule_restart();
@@ -6037,11 +6197,18 @@ static void multi_vims(int id, const char format[],...)
     va_list args;
     if(!info->client)
         return;
+
+    sequence_vims_note_outgoing_id(id);
+
+    if(id == VIMS_SAMPLE_SAVE_SAMPLELIST ||
+       id == VIMS_SAMPLE_SYNC_SAMPLELIST)
+        sequence_vims_pattern_flush();
     va_start(args, format);
     vsnprintf(tmp, sizeof(tmp), format, args );
     snprintf(block, sizeof(block), "%03d:%s;",id,tmp);
     va_end(args);
 
+    sequence_vims_observe_message(block);
     if(vj_client_send( info->client, V_CMD, (unsigned char*) block)<=0 )
         reloaded_schedule_restart();
 }
@@ -6051,7 +6218,12 @@ static void single_vims(int id)
     char block[8];
     if(!info->client)
         return;
+    sequence_vims_note_outgoing_id(id);
+    if(id == VIMS_SAMPLE_SAVE_SAMPLELIST ||
+       id == VIMS_SAMPLE_SYNC_SAMPLELIST)
+        sequence_vims_pattern_flush();
     snprintf(block,sizeof(block), "%03d:;",id);
+    sequence_vims_observe_message(block);
     if(vj_client_send( info->client, V_CMD, (unsigned char*) block)<=0 )
         reloaded_schedule_restart();
 }
@@ -6273,6 +6445,1625 @@ static int vj_kf_timeline_position(void)
         pos = len - 1;
 
     return pos;
+}
+
+static gboolean sequence_vims_replaying = FALSE;
+
+static int sequence_vims_message_id(const char *message)
+{
+    char *end = NULL;
+    long id;
+
+    if(!message)
+        return -1;
+
+    while(g_ascii_isspace(*message))
+        message++;
+
+    id = strtol(message, &end, 10);
+    if(end == message || *end != ':' || id < 0 || id > 9999)
+        return -1;
+
+    return (int)id;
+}
+
+static gboolean sequence_vims_id_in_list(int id, const int *ids, size_t count)
+{
+    for(size_t i = 0; i < count; i++)
+        if(ids[i] == id)
+            return TRUE;
+
+    return FALSE;
+}
+
+static const int sequence_vims_query_ids[] = {
+    VIMS_STATUS_TOKENS,
+    VIMS_SAMPLE_LIST,
+    VIMS_STREAM_LIST,
+    VIMS_TRACK_LIST,
+    VIMS_EDITLIST_LIST,
+    VIMS_BUNDLE_LIST,
+    VIMS_KEYLIST,
+    VIMS_DEVICE_LIST,
+    VIMS_VIMS_LIST,
+    VIMS_CHAIN_LIST,
+    VIMS_GET_FEEDBACK,
+    VIMS_GET_STREAM_ARGS,
+    VIMS_GET_GENERATORS,
+    VIMS_CHAIN_GET_ENTRY,
+    VIMS_EFFECT_LIST,
+    VIMS_VIDEO_INFORMATION,
+    VIMS_GET_SAMPLE_IMAGE,
+    VIMS_RGB24_IMAGE,
+    VIMS_CALI_IMAGE,
+    VIMS_STREAM_GET_V4L,
+    VIMS_SAMPLE_KF_GET,
+    VIMS_AUDIO_BEAT_PRINT,
+    VIMS_AUDIO_SYNC_PRINT,
+    VIMS_WORKINGDIR,
+    VIMS_SEQUENCE_LIST,
+    VIMS_SEQUENCE_LIST_ALL,
+};
+
+static const int sequence_vims_sequencer_ids[] = {
+    VIMS_SEQUENCE_ADD,
+    VIMS_SEQUENCE_DEL,
+    VIMS_SEQUENCE_COPY,
+    VIMS_SEQUENCE_QUEUE,
+    VIMS_SEQUENCE_SELECT,
+    VIMS_SEQUENCE_STATUS,
+    VIMS_SEQUENCE_CLEAR_ALL,
+};
+
+static const int sequence_vims_automation_ids[] = {
+    VIMS_MACRO,
+    VIMS_CLEAR_MACRO_BANK,
+    VIMS_MACRO_SELECT,
+    VIMS_BUNDLE,
+    VIMS_BUNDLE_ADD,
+    VIMS_BUNDLE_DEL,
+    VIMS_BUNDLE_FILE,
+    VIMS_BUNDLE_SAVE,
+    VIMS_BUNDLE_CAPTURE,
+    VIMS_BUNDLE_START,
+    VIMS_BUNDLE_END,
+    VIMS_BUNDLE_ATTACH_KEY,
+};
+
+static const int sequence_vims_source_switch_ids[] = {
+    VIMS_SAMPLE_SELECT,
+    VIMS_STREAM_SELECT,
+    VIMS_SET_MODE_AND_GO,
+    VIMS_SET_PLAIN_MODE,
+    VIMS_SAMPLE_RAND_START,
+    VIMS_SAMPLE_RAND_STOP,
+};
+
+static const int sequence_vims_lifecycle_ids[] = {
+    VIMS_SAMPLE_NEW,
+    VIMS_SAMPLE_COPY,
+    VIMS_SAMPLE_DEL,
+    VIMS_SAMPLE_DEL_ALL,
+    VIMS_SAMPLE_LOAD_SAMPLELIST,
+    VIMS_SAMPLE_SAVE_SAMPLELIST,
+    VIMS_SAMPLE_SYNC_SAMPLELIST,
+    VIMS_SAMPLE_SET_DESCRIPTION,
+    VIMS_STREAM_DELETE,
+    VIMS_STREAM_NEW_AVFORMAT,
+    VIMS_STREAM_NEW_CALI,
+    VIMS_STREAM_NEW_CLONE,
+    VIMS_STREAM_NEW_COLOR,
+    VIMS_STREAM_NEW_GENERATOR,
+    VIMS_STREAM_NEW_MCAST,
+    VIMS_STREAM_NEW_SHARED,
+    VIMS_STREAM_NEW_UNICAST,
+    VIMS_STREAM_NEW_V4L,
+    VIMS_STREAM_NEW_Y4M,
+    VIMS_STREAM_SET_BUFFER_LENGTH,
+    VIMS_STREAM_SET_LENGTH,
+};
+
+static const int sequence_vims_project_edit_ids[] = {
+    VIMS_SAMPLE_SET_START,
+    VIMS_SAMPLE_SET_END,
+    VIMS_SAMPLE_SET_MARKER,
+    VIMS_SAMPLE_SET_MARKER_START,
+    VIMS_SAMPLE_SET_MARKER_END,
+    VIMS_SAMPLE_CLEAR_MARKER,
+    VIMS_SAMPLE_GROW_MARKER,
+    VIMS_SAMPLE_SHRINK_MARKER,
+    VIMS_EDITLIST_ADD,
+    VIMS_EDITLIST_ADD_SAMPLE,
+    VIMS_EDITLIST_COPY,
+    VIMS_EDITLIST_CROP,
+    VIMS_EDITLIST_CUT,
+    VIMS_EDITLIST_DEL,
+    VIMS_EDITLIST_PASTE_AT,
+    VIMS_EDITLIST_SAVE,
+};
+
+static const int sequence_vims_recording_ids[] = {
+    VIMS_RECORD_DATAFORMAT,
+    VIMS_RECORD_AUDIO_SOURCE,
+    VIMS_SAMPLE_REC_START,
+    VIMS_SAMPLE_REC_STOP,
+    VIMS_STREAM_REC_START,
+    VIMS_STREAM_REC_STOP,
+    VIMS_STREAM_OFFLINE_REC_START,
+    VIMS_STREAM_OFFLINE_REC_STOP,
+    VIMS_VLOOPBACK_START,
+    VIMS_VLOOPBACK_STOP,
+    VIMS_SCREENSHOT,
+    VIMS_V4L_CALI,
+    VIMS_V4L_BLACKFRAME,
+    VIMS_EFFECT_SET_BG,
+};
+
+static const int sequence_vims_fx_structure_ids[] = {
+    VIMS_CHAIN_CLEAR,
+    VIMS_CHAIN_ENTRY_CLEAR,
+    VIMS_CHAIN_ENTRY_SET_EFFECT,
+    VIMS_CHAIN_ENTRY_SET_PRESET,
+    VIMS_CHAIN_ENTRY_SWAP,
+    VIMS_CHAIN_SET_ENTRY,
+    VIMS_GLOBAL_CHAIN_COPY,
+    VIMS_CHAIN_ENTRY_BEAT_PARAM,
+    VIMS_CHAIN_ENTRY_BEAT_TOGGLE,
+    VIMS_SAMPLE_KF_CLEAR,
+    VIMS_SAMPLE_KF_RESET,
+    VIMS_SAMPLE_KF_STATUS,
+    VIMS_SAMPLE_KF_STATUS_PARAM,
+    VIMS_CHAIN_FOLLOW_FADE,
+};
+
+static const int sequence_vims_engine_config_ids[] = {
+    VIMS_FULLSCREEN,
+    VIMS_RESIZE_SDL_SCREEN,
+    VIMS_DEBUG_LEVEL,
+    VIMS_BEZERK,
+    VIMS_MESSAGE_FORWARDING,
+    VIMS_SYNC_CORRECTION,
+    VIMS_PROMOTION,
+    VIMS_QUIT,
+    VIMS_OSD,
+    VIMS_PREVIEW_BW,
+};
+
+static const char *sequence_vims_command_reject_reason(int id)
+{
+    if(id >= 400 && id < 500)
+        return "reserved/query/control VIMS range 400-499";
+
+    if(sequence_vims_id_in_list(id, sequence_vims_query_ids, G_N_ELEMENTS(sequence_vims_query_ids)))
+        return "query/readback command";
+    if(sequence_vims_id_in_list(id, sequence_vims_sequencer_ids, G_N_ELEMENTS(sequence_vims_sequencer_ids)))
+        return "sequencer control command";
+    if(sequence_vims_id_in_list(id, sequence_vims_automation_ids, G_N_ELEMENTS(sequence_vims_automation_ids)))
+        return "macro or bundle automation command";
+    if(sequence_vims_id_in_list(id, sequence_vims_source_switch_ids, G_N_ELEMENTS(sequence_vims_source_switch_ids)))
+        return "source or playback-mode switch";
+    if(sequence_vims_id_in_list(id, sequence_vims_lifecycle_ids, G_N_ELEMENTS(sequence_vims_lifecycle_ids)))
+        return "sample or stream lifecycle command";
+    if(sequence_vims_id_in_list(id, sequence_vims_project_edit_ids, G_N_ELEMENTS(sequence_vims_project_edit_ids)))
+        return "timeline or project-structure edit";
+    if(sequence_vims_id_in_list(id, sequence_vims_recording_ids, G_N_ELEMENTS(sequence_vims_recording_ids)))
+        return "recording, file-output or calibration command";
+    if(sequence_vims_id_in_list(id, sequence_vims_fx_structure_ids, G_N_ELEMENTS(sequence_vims_fx_structure_ids)))
+        return "FX-chain structure or automation edit";
+    if(sequence_vims_id_in_list(id, sequence_vims_engine_config_ids, G_N_ELEMENTS(sequence_vims_engine_config_ids)))
+        return "global UI or engine configuration";
+
+    return NULL;
+}
+
+static void sequence_vims_report_rejected(int id, const char *reason)
+{
+    static int last_id = -1;
+    static gint64 last_time = 0;
+    const gint64 now = g_get_monotonic_time();
+
+    if(id == last_id && now - last_time < 750000)
+        return;
+
+    last_id = id;
+    last_time = now;
+    vj_msg(VEEJAY_MSG_INFO,
+           "Pattern Learn ignored VIMS %03d (%s)",
+           id,
+           reason ? reason : "not pattern-safe");
+}
+
+typedef struct {
+    int present;
+    int source_id;
+    int source_type;
+    gint64 start;
+    gint64 length;
+} sequence_vims_timeline_slot_t;
+
+typedef struct {
+    gboolean loaded;
+    gboolean finite;
+    unsigned int revision;
+    gint64 total;
+    int entries;
+    sequence_vims_timeline_slot_t slots[MAX_SEQUENCES];
+} sequence_vims_timeline_t;
+
+static sequence_vims_timeline_t sequence_vims_timelines[VJ_SEQUENCE_BANKS];
+static guint sequence_vims_pattern_store_timeout_id = 0;
+static gboolean sequence_vims_pattern_loading = FALSE;
+static gboolean sequence_vims_pattern_dirty = FALSE;
+static unsigned int sequence_vims_pattern_backend_revision = 0;
+
+static int sequence_vims_tick_bank = -1;
+static int sequence_vims_tick_slot = -1;
+static gint64 sequence_vims_tick_frame = 0;
+static gboolean sequence_vims_tick_valid = FALSE;
+
+static int sequence_vims_active_source_bank = -999;
+static int sequence_vims_active_source_slot = -1;
+static int sequence_vims_active_cell_bank = -1;
+static int sequence_vims_active_cell_slot = -1;
+static int sequence_vims_active_bank_pattern = -1;
+
+static int sequence_vims_timing_signature[9] = {
+    -1, -1, -1, -1, -1, -1, -1, -1, -1
+};
+
+static GHashTable *sequence_vims_source_lengths = NULL;
+static int sequence_vims_stream_length_frames = 0;
+static int sequence_vims_stream_length_id = -1;
+static int sequence_vims_stream_length_type = -1;
+
+static guint64 sequence_vims_source_length_key(int sample_id, int sample_type)
+{
+    return (((guint64)(guint32)sample_type) << 32) | (guint32)sample_id;
+}
+
+static void sequence_vims_source_length_store(int sample_id, int sample_type, int frame_count)
+{
+    guint64 *key;
+
+    if(sample_id <= 0 || frame_count <= 0)
+        return;
+
+    if(!sequence_vims_source_lengths)
+        sequence_vims_source_lengths = g_hash_table_new_full(g_int64_hash,
+                                                              g_int64_equal,
+                                                              g_free,
+                                                              NULL);
+
+    key = g_new(guint64, 1);
+    *key = sequence_vims_source_length_key(sample_id, sample_type);
+    g_hash_table_replace(sequence_vims_source_lengths,
+                         key,
+                         GINT_TO_POINTER(frame_count));
+}
+
+static int sequence_vims_source_length_lookup(int sample_id, int sample_type)
+{
+    guint64 key;
+    gpointer value = NULL;
+
+    if(!sequence_vims_source_lengths || sample_id <= 0)
+        return 0;
+
+    key = sequence_vims_source_length_key(sample_id, sample_type);
+    if(!g_hash_table_lookup_extended(sequence_vims_source_lengths,
+                                     &key,
+                                     NULL,
+                                     &value))
+        return 0;
+
+    return GPOINTER_TO_INT(value);
+}
+
+static void sequence_vims_source_lengths_clear(void)
+{
+    if(sequence_vims_source_lengths)
+        g_hash_table_remove_all(sequence_vims_source_lengths);
+}
+
+static void sequence_vims_bind_cell(int bank, int slot, int sample_id, int sample_type)
+{
+    if(!info || !info->vims_pattern_view)
+        return;
+
+    gvr_vims_pattern_view_bind_cell(info->vims_pattern_view,
+                                    bank,
+                                    slot,
+                                    sample_id,
+                                    sample_type);
+    sequence_vims_refresh_cell_badge(bank, slot);
+}
+
+static void sequence_vims_stream_length_cache(int frame_count)
+{
+    if(!info ||
+       info->status_tokens[PLAY_MODE] != MODE_STREAM ||
+       info->status_tokens[CURRENT_ID] <= 0) {
+        sequence_vims_stream_length_frames = 0;
+        sequence_vims_stream_length_id = -1;
+        sequence_vims_stream_length_type = -1;
+        return;
+    }
+
+    sequence_vims_stream_length_frames = MAX(0, frame_count);
+    sequence_vims_stream_length_id = info->status_tokens[CURRENT_ID];
+    sequence_vims_stream_length_type = info->status_tokens[STREAM_TYPE];
+
+    sequence_vims_source_length_store(sequence_vims_stream_length_id,
+                                      sequence_vims_stream_length_type,
+                                      sequence_vims_stream_length_frames);
+}
+
+static int sequence_vims_stream_pattern_length(void)
+{
+    if(!info)
+        return 0;
+
+    if(info->status_tokens[PLAY_MODE] == MODE_STREAM &&
+       sequence_vims_stream_length_id == info->status_tokens[CURRENT_ID] &&
+       sequence_vims_stream_length_type == info->status_tokens[STREAM_TYPE])
+        return sequence_vims_stream_length_frames;
+
+    return MAX(0, info->status_tokens[SAMPLE_MARKER_END]);
+}
+
+
+static gboolean sequence_vims_send_raw(const char *message)
+{
+    if(!info || !info->client || !message)
+        return FALSE;
+
+    if(vj_client_send(info->client, V_CMD, (unsigned char *)message) <= 0) {
+        reloaded_schedule_restart();
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+static gboolean sequence_vims_parse_fixed_ll(const char *text,
+                                             int width,
+                                             gint64 *value)
+{
+    char buffer[32];
+    char *end = NULL;
+    gint64 parsed;
+
+    if(!text || !value || width <= 0 || width >= (int)sizeof(buffer))
+        return FALSE;
+
+    memcpy(buffer, text, (size_t)width);
+    buffer[width] = '\0';
+    parsed = g_ascii_strtoll(buffer, &end, 10);
+    if(end == buffer || *end != '\0')
+        return FALSE;
+
+    *value = parsed;
+    return TRUE;
+}
+
+static gboolean sequence_vims_parse_fixed_uint_local(const char *text,
+                                                     int width,
+                                                     unsigned int *value)
+{
+    char buffer[32];
+    char *end = NULL;
+    guint64 parsed;
+
+    if(!text || !value || width <= 0 || width >= (int)sizeof(buffer))
+        return FALSE;
+
+    memcpy(buffer, text, (size_t)width);
+    buffer[width] = '\0';
+    parsed = g_ascii_strtoull(buffer, &end, 10);
+    if(end == buffer || *end != '\0' || parsed > G_MAXUINT)
+        return FALSE;
+
+    *value = (unsigned int)parsed;
+    return TRUE;
+}
+
+static void sequence_vims_timeline_invalidate(int bank)
+{
+    if(bank < 0) {
+        memset(sequence_vims_timelines, 0, sizeof(sequence_vims_timelines));
+        sequence_vims_tick_valid = FALSE;
+        sequence_vims_tick_bank = -1;
+        sequence_vims_tick_slot = -1;
+        return;
+    }
+
+    if(bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    memset(&sequence_vims_timelines[bank],
+           0,
+           sizeof(sequence_vims_timelines[bank]));
+
+    if(sequence_vims_tick_bank == bank) {
+        sequence_vims_tick_valid = FALSE;
+        sequence_vims_tick_bank = -1;
+        sequence_vims_tick_slot = -1;
+    }
+}
+
+static void sequence_vims_note_outgoing_id(int id)
+{
+    if(id < 0)
+        return;
+
+    if(id == VIMS_SAMPLE_SET_START ||
+       id == VIMS_SAMPLE_SET_END ||
+       id == VIMS_SAMPLE_SET_LOOPTYPE ||
+       id == VIMS_SAMPLE_SET_LOOPS ||
+       id == VIMS_VIDEO_SET_SPEED ||
+       id == VIMS_SAMPLE_SET_SPEED ||
+       id == VIMS_VIDEO_SET_SLOW ||
+       id == VIMS_STREAM_SET_LENGTH)
+        sequence_vims_timeline_invalidate(-1);
+}
+
+static gboolean sequence_vims_timeline_fetch(int bank)
+{
+    char command[32];
+    gchar *body;
+    gint body_len = 0;
+    int reply_bank;
+    unsigned int revision;
+    int finite;
+    gint64 total;
+    int entries;
+    int offset;
+    sequence_vims_timeline_t parsed;
+
+    if(!info || !info->client ||
+       bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return FALSE;
+
+    snprintf(command, sizeof(command), "%03d:%d;", VIMS_SEQUENCE_TIMELINE, bank);
+    if(!sequence_vims_send_raw(command))
+        return FALSE;
+
+    body = recv_vims(8, &body_len);
+    if(!body || body_len < VJ_SEQUENCE_TIMELINE_HEADER_LENGTH) {
+        if(body)
+            free(body);
+        return FALSE;
+    }
+
+    memset(&parsed, 0, sizeof(parsed));
+
+    gint64 temporary = 0;
+    if(!sequence_vims_parse_fixed_ll(body, 2, &temporary) ||
+       temporary < 0 || temporary >= VJ_SEQUENCE_BANKS)
+    {
+        free(body);
+        return FALSE;
+    }
+    reply_bank = (int)temporary;
+
+    if(!sequence_vims_parse_fixed_uint_local(body + 2, 10, &revision) ||
+       !sequence_vims_parse_fixed_ll(body + 12, 1, &temporary) ||
+       (temporary != 0 && temporary != 1))
+    {
+        free(body);
+        return FALSE;
+    }
+    finite = temporary != 0;
+
+    if(!sequence_vims_parse_fixed_ll(body + 13, 12, &total) ||
+       !sequence_vims_parse_fixed_ll(body + 25, 3, &temporary))
+    {
+        free(body);
+        return FALSE;
+    }
+
+    entries = (int)temporary;
+    if(reply_bank != bank || entries < 0 || entries > MAX_SEQUENCES ||
+       body_len != VJ_SEQUENCE_TIMELINE_HEADER_LENGTH +
+                   entries * VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH)
+    {
+        free(body);
+        return FALSE;
+    }
+
+    parsed.loaded = TRUE;
+    parsed.finite = finite ? TRUE : FALSE;
+    parsed.revision = revision;
+    parsed.total = finite ? total : -1;
+    parsed.entries = entries;
+    offset = VJ_SEQUENCE_TIMELINE_HEADER_LENGTH;
+
+    for(int i = 0; i < entries; i++) {
+        int slot;
+        int source_id;
+        int source_type;
+        gint64 start;
+        gint64 length;
+
+        if(!sequence_vims_parse_fixed_ll(body + offset, 3, &temporary)) {
+            free(body);
+            return FALSE;
+        }
+        slot = (int)temporary;
+
+        if(!sequence_vims_parse_fixed_ll(body + offset + 3, 5, &temporary)) {
+            free(body);
+            return FALSE;
+        }
+        source_id = (int)temporary;
+
+        if(!sequence_vims_parse_fixed_ll(body + offset + 8, 2, &temporary)) {
+            free(body);
+            return FALSE;
+        }
+        source_type = (int)temporary;
+
+        if(!sequence_vims_parse_fixed_ll(body + offset + 10, 12, &start) ||
+           !sequence_vims_parse_fixed_ll(body + offset + 22, 12, &length) ||
+           slot < 0 || slot >= MAX_SEQUENCES)
+        {
+            free(body);
+            return FALSE;
+        }
+
+        parsed.slots[slot].present = 1;
+        parsed.slots[slot].source_id = source_id;
+        parsed.slots[slot].source_type = source_type;
+        parsed.slots[slot].start = start;
+        parsed.slots[slot].length = length;
+        offset += VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH;
+    }
+
+    sequence_vims_timelines[bank] = parsed;
+    free(body);
+    sequence_vims_refresh_bank_badge(bank);
+    return TRUE;
+}
+
+static gboolean sequence_vims_timeline_ensure(int bank)
+{
+    unsigned int revision;
+
+    if(!info || !info->sequence_bank_view ||
+       bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return FALSE;
+
+    revision = gvr_sequence_bank_view_get_bank_revision(info->sequence_bank_view,
+                                                         bank);
+
+    if(sequence_vims_timelines[bank].loaded &&
+       sequence_vims_timelines[bank].revision == revision)
+        return TRUE;
+
+    return sequence_vims_timeline_fetch(bank);
+}
+
+static int sequence_vims_timeline_frame_count(int bank)
+{
+    if(!sequence_vims_timeline_ensure(bank) ||
+       !sequence_vims_timelines[bank].finite ||
+       sequence_vims_timelines[bank].total <= 0)
+        return 0;
+
+    return (int)MIN(sequence_vims_timelines[bank].total,
+                    (gint64)G_MAXINT);
+}
+
+static sequence_vims_timeline_slot_t *sequence_vims_timeline_slot(int bank,
+                                                                  int slot)
+{
+    if(!sequence_vims_timeline_ensure(bank) ||
+       slot < 0 || slot >= MAX_SEQUENCES ||
+       !sequence_vims_timelines[bank].slots[slot].present)
+        return NULL;
+
+    return &sequence_vims_timelines[bank].slots[slot];
+}
+
+static gboolean sequence_vims_pattern_send_document(void)
+{
+    gchar *serialized;
+    gchar *encoded;
+    gsize serialized_length = 0;
+    gsize encoded_length;
+    gchar *command;
+    gboolean sent;
+
+    if(!info || !info->client || !info->vims_pattern_view)
+        return FALSE;
+
+    serialized = gvr_vims_pattern_view_serialize(info->vims_pattern_view,
+                                                 &serialized_length);
+    if(!serialized)
+        return FALSE;
+
+    if(strstr(serialized, "\nE\t") == NULL) {
+        g_free(serialized);
+        sent = sequence_vims_send_raw("455:;");
+        if(sent) {
+            sequence_vims_pattern_dirty = FALSE;
+            sequence_vims_pattern_backend_revision++;
+        }
+        return sent;
+    }
+
+    encoded = g_base64_encode((const guchar *)serialized, serialized_length);
+    g_free(serialized);
+    if(!encoded)
+        return FALSE;
+
+    encoded_length = strlen(encoded);
+    if(encoded_length > VJ_SEQUENCE_PATTERN_DATA_MAX) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "VIMS pattern document is too large to persist (%zu bytes)",
+               encoded_length);
+        g_free(encoded);
+        return FALSE;
+    }
+
+    command = g_strdup_printf("%03d:1 %s;",
+                              VIMS_SEQUENCE_PATTERN_SET,
+                              encoded);
+    g_free(encoded);
+
+    sent = sequence_vims_send_raw(command);
+    g_free(command);
+
+    if(sent) {
+        sequence_vims_pattern_dirty = FALSE;
+        sequence_vims_pattern_backend_revision++;
+    }
+
+    return sent;
+}
+
+static gboolean sequence_vims_pattern_store_timeout(gpointer user_data)
+{
+    (void)user_data;
+    sequence_vims_pattern_store_timeout_id = 0;
+
+    if(sequence_vims_pattern_dirty && !sequence_vims_pattern_loading)
+        sequence_vims_pattern_send_document();
+
+    return G_SOURCE_REMOVE;
+}
+
+static void sequence_vims_pattern_schedule_store(void)
+{
+    if(sequence_vims_pattern_loading)
+        return;
+
+    sequence_vims_pattern_dirty = TRUE;
+
+    if(sequence_vims_pattern_store_timeout_id)
+        g_source_remove(sequence_vims_pattern_store_timeout_id);
+
+    sequence_vims_pattern_store_timeout_id =
+        g_timeout_add(250, sequence_vims_pattern_store_timeout, NULL);
+}
+
+static void sequence_vims_pattern_flush(void)
+{
+    if(sequence_vims_pattern_store_timeout_id) {
+        g_source_remove(sequence_vims_pattern_store_timeout_id);
+        sequence_vims_pattern_store_timeout_id = 0;
+    }
+
+    if(sequence_vims_pattern_dirty && !sequence_vims_pattern_loading)
+        sequence_vims_pattern_send_document();
+}
+
+static void sequence_vims_pattern_load_backend(void)
+{
+    gchar *body;
+    gint body_len = 0;
+    unsigned int revision;
+    gint64 format_length_ll;
+    gint64 data_length_ll;
+    int format_length;
+    int data_length;
+    gchar *format;
+    guchar *decoded = NULL;
+    gsize decoded_length = 0;
+    const char *empty_document = "GVR-VIMS-PATTERN\t1\n";
+
+    if(!info || !info->client || !info->vims_pattern_view)
+        return;
+
+    if(sequence_vims_pattern_store_timeout_id) {
+        g_source_remove(sequence_vims_pattern_store_timeout_id);
+        sequence_vims_pattern_store_timeout_id = 0;
+    }
+    sequence_vims_pattern_dirty = FALSE;
+
+    if(!sequence_vims_send_raw("453:;"))
+        return;
+
+    body = recv_vims(8, &body_len);
+    if(!body || body_len < VJ_SEQUENCE_PATTERN_HEADER_LENGTH) {
+        if(body)
+            free(body);
+        return;
+    }
+
+    if(!sequence_vims_parse_fixed_uint_local(body, 10, &revision) ||
+       !sequence_vims_parse_fixed_ll(body + 10, 3, &format_length_ll) ||
+       !sequence_vims_parse_fixed_ll(body + 13, 8, &data_length_ll))
+    {
+        free(body);
+        return;
+    }
+
+    format_length = (int)format_length_ll;
+    data_length = (int)data_length_ll;
+
+    if(format_length < 0 || format_length > 31 ||
+       data_length < 0 || data_length > VJ_SEQUENCE_PATTERN_DATA_MAX ||
+       body_len != VJ_SEQUENCE_PATTERN_HEADER_LENGTH +
+                   format_length + data_length)
+    {
+        free(body);
+        return;
+    }
+
+    format = g_strndup(body + VJ_SEQUENCE_PATTERN_HEADER_LENGTH,
+                       (gsize)format_length);
+
+    sequence_vims_pattern_loading = TRUE;
+
+    if(data_length == 0) {
+        gvr_vims_pattern_view_deserialize(info->vims_pattern_view,
+                                          empty_document,
+                                          strlen(empty_document));
+    }
+    else if(g_str_has_prefix(format, "gvr-vims-pattern-b64-v")) {
+        decoded = g_base64_decode(
+            body + VJ_SEQUENCE_PATTERN_HEADER_LENGTH + format_length,
+            &decoded_length);
+
+        if(decoded && decoded_length > 0)
+            gvr_vims_pattern_view_deserialize(info->vims_pattern_view,
+                                              (const gchar *)decoded,
+                                              decoded_length);
+    }
+
+    sequence_vims_pattern_loading = FALSE;
+    sequence_vims_pattern_backend_revision = revision;
+    sequence_vims_pattern_dirty = FALSE;
+    sequence_vims_refresh_badges();
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++)
+        sequence_vims_refresh_bank_badge(bank);
+
+    g_free(decoded);
+    g_free(format);
+    free(body);
+}
+
+static void sequence_vims_refresh_timing_signature(void)
+{
+    int signature[9];
+
+    if(!info)
+        return;
+
+    signature[0] = info->status_tokens[PLAY_MODE];
+    signature[1] = info->status_tokens[CURRENT_ID];
+    signature[2] = info->status_tokens[SAMPLE_START];
+    signature[3] = info->status_tokens[SAMPLE_END];
+    signature[4] = info->status_tokens[SAMPLE_SPEED];
+    signature[5] = info->status_tokens[SAMPLE_LOOP];
+    signature[6] = info->status_tokens[SAMPLE_LOOP_STAT_STOP];
+    signature[7] = info->status_tokens[FRAME_DUP];
+    signature[8] = info->status_tokens[SAMPLE_MARKER_END];
+
+    if(sequence_vims_timing_signature[0] == signature[0] &&
+       sequence_vims_timing_signature[1] == signature[1] &&
+       memcmp(signature + 2,
+              sequence_vims_timing_signature + 2,
+              sizeof(signature) - (2 * sizeof(signature[0]))) != 0)
+        sequence_vims_timeline_invalidate(-1);
+
+    memcpy(sequence_vims_timing_signature,
+           signature,
+           sizeof(signature));
+}
+
+static void sequence_vims_sync_target(void)
+{
+    int bank = -1;
+    int slot = -1;
+    int sample_id = -1;
+    int sample_type = -1;
+    int frame_count = 0;
+    int active_bank;
+    int playing;
+    int live_source_id = -1;
+    int live_source_type = -1;
+    int live_frame_count = 0;
+    const int play_mode = info ? info->status_tokens[PLAY_MODE] : -1;
+    gboolean sequence_playback;
+
+    if(!info || !info->vims_pattern_view)
+        return;
+
+    sequence_playback = info->status_tokens[SEQ_ACT] != 0;
+
+    if(!sequence_playback) {
+        if(play_mode == MODE_SAMPLE && info->status_tokens[CURRENT_ID] > 0) {
+            live_source_id = info->status_tokens[CURRENT_ID];
+            live_source_type = 0;
+            live_frame_count = vj_kf_timeline_length();
+            sequence_vims_source_length_store(live_source_id,
+                                              live_source_type,
+                                              live_frame_count);
+            gvr_vims_pattern_view_select_cell(info->vims_pattern_view,
+                                              GVR_VIMS_PATTERN_SAMPLE_BANK,
+                                              live_source_id,
+                                              live_source_id,
+                                              live_source_type,
+                                              live_frame_count);
+        }
+        else if(play_mode == MODE_STREAM &&
+                info->status_tokens[CURRENT_ID] > 0) {
+            live_source_id = info->status_tokens[CURRENT_ID];
+            live_source_type = info->status_tokens[STREAM_TYPE];
+            live_frame_count = sequence_vims_stream_pattern_length();
+            if(live_frame_count <= 0) {
+                gvr_vims_pattern_view_clear_target(info->vims_pattern_view);
+                return;
+            }
+            sequence_vims_source_length_store(live_source_id,
+                                              live_source_type,
+                                              live_frame_count);
+            gvr_vims_pattern_view_select_cell(info->vims_pattern_view,
+                                              GVR_VIMS_PATTERN_STREAM_BANK,
+                                              live_source_id,
+                                              live_source_id,
+                                              live_source_type,
+                                              live_frame_count);
+        }
+        else {
+            gvr_vims_pattern_view_clear_target(info->vims_pattern_view);
+        }
+        return;
+    }
+
+    if(!info->sequence_bank_view)
+        return;
+
+    active_bank = sequence_ui_active_bank();
+    playing = normalize_sequence_slot(info->status_tokens[SEQ_CUR],
+                                      info->sequencer_col * info->sequencer_row);
+
+    if(playing >= 0 &&
+       gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                       active_bank,
+                                       playing,
+                                       &live_source_id,
+                                       &live_source_type) &&
+       live_source_id > 0) {
+        live_frame_count = live_source_type == 0 ?
+                           vj_kf_timeline_length() :
+                           sequence_vims_stream_pattern_length();
+        sequence_vims_source_length_store(live_source_id,
+                                          live_source_type,
+                                          live_frame_count);
+    }
+    else {
+        live_source_id = -1;
+        live_source_type = -1;
+        live_frame_count = 0;
+    }
+
+    bank = gvr_sequence_bank_view_get_selected_bank(info->sequence_bank_view);
+    if(bank >= 0 && bank < VJ_SEQUENCE_BANKS &&
+       !gvr_sequence_bank_view_get_selected_slot(info->sequence_bank_view,
+                                                  NULL,
+                                                  &slot)) {
+        frame_count = sequence_vims_timeline_frame_count(bank);
+        gvr_vims_pattern_view_select_bank(info->vims_pattern_view,
+                                          bank,
+                                          frame_count);
+        return;
+    }
+
+    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       slot < 0 || slot >= MAX_SEQUENCES) {
+        if(playing < 0) {
+            gvr_vims_pattern_view_clear_target(info->vims_pattern_view);
+            return;
+        }
+        bank = active_bank;
+        slot = playing;
+    }
+
+    if(!gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                        bank,
+                                        slot,
+                                        &sample_id,
+                                        &sample_type) ||
+       sample_id <= 0) {
+        gvr_vims_pattern_view_clear_target(info->vims_pattern_view);
+        return;
+    }
+
+    if(sample_id == live_source_id && sample_type == live_source_type)
+        frame_count = live_frame_count;
+    else
+        frame_count = sequence_vims_source_length_lookup(sample_id, sample_type);
+
+    if(frame_count <= 0 && sample_type != 0) {
+        frame_count = sequence_vims_stream_pattern_length();
+        sequence_vims_source_length_store(sample_id, sample_type, frame_count);
+    }
+
+    if(sample_type != 0 && frame_count <= 0) {
+        gvr_vims_pattern_view_clear_target(info->vims_pattern_view);
+        return;
+    }
+
+    gvr_vims_pattern_view_select_cell(info->vims_pattern_view,
+                                      bank,
+                                      slot,
+                                      sample_id,
+                                      sample_type,
+                                      frame_count);
+}
+
+void vj_gui_vims_pattern_sync_target(void)
+{
+    sequence_vims_sync_target();
+}
+
+void vj_gui_vims_pattern_set_stream_length(int frame_count)
+{
+    sequence_vims_stream_length_cache(frame_count);
+    sequence_vims_sync_target();
+}
+
+static gboolean sequence_vims_grid_button_release(GtkWidget *widget,
+                                                   GdkEventButton *event,
+                                                   gpointer user_data)
+{
+    (void)widget;
+    (void)event;
+    (void)user_data;
+    sequence_vims_sync_target();
+    return FALSE;
+}
+
+static gboolean sequence_vims_grid_key_release(GtkWidget *widget,
+                                                GdkEventKey *event,
+                                                gpointer user_data)
+{
+    (void)widget;
+    (void)event;
+    (void)user_data;
+    sequence_vims_sync_target();
+    return FALSE;
+}
+
+static void sequence_vims_observe_message(const char *message)
+{
+    GdkEvent *event;
+    const char *reason;
+    gboolean learning;
+    gboolean user_event = FALSE;
+    int id;
+
+    if(sequence_vims_replaying || !info)
+        return;
+
+    id = sequence_vims_message_id(message);
+    if(id < 0)
+        return;
+
+    learning = info->vims_pattern_view &&
+               gvr_vims_pattern_view_get_learning(
+                   info->vims_pattern_view);
+
+    event = gtk_get_current_event();
+    if(event) {
+        user_event = TRUE;
+        gdk_event_free(event);
+    }
+    else if(!learning) {
+        return;
+    }
+
+    reason = sequence_vims_command_reject_reason(id);
+    if(reason) {
+        if(learning)
+            sequence_vims_report_rejected(id, reason);
+        return;
+    }
+
+    if(user_event && info->vims_history_view) {
+        gvr_vims_history_view_push(
+            info->vims_history_view,
+            id,
+            message,
+            sequence_vims_description_lookup(id, NULL));
+    }
+
+    if(!learning)
+        return;
+
+    sequence_vims_sync_target();
+
+    int capture_frame = vj_kf_timeline_position();
+
+    if(info->status_tokens[SEQ_ACT] != 0 &&
+       info->sequence_bank_view) {
+        int selected_bank =
+            gvr_sequence_bank_view_get_selected_bank(
+                info->sequence_bank_view);
+        int selected_slot = -1;
+
+        if(selected_bank >= 0 &&
+           !gvr_sequence_bank_view_get_selected_slot(
+               info->sequence_bank_view,
+               NULL,
+               &selected_slot) &&
+           sequence_vims_tick_valid &&
+           sequence_vims_tick_bank == selected_bank)
+        {
+            capture_frame =
+                (int)MIN(sequence_vims_tick_frame,
+                         (gint64)G_MAXINT);
+        }
+        else {
+            int playing = normalize_sequence_slot(
+                info->status_tokens[SEQ_CUR],
+                info->sequencer_col * info->sequencer_row);
+            int source_id = 0;
+            int source_type = 0;
+
+            if(playing >= 0 &&
+               gvr_sequence_bank_view_get_slot(
+                   info->sequence_bank_view,
+                   sequence_ui_active_bank(),
+                   playing,
+                   &source_id,
+                   &source_type) &&
+               source_type != 0)
+                capture_frame = ui_stream_transport_position();
+        }
+    }
+
+    gvr_vims_pattern_view_capture_message(
+        info->vims_pattern_view,
+        message,
+        MAX(0, capture_frame));
+}
+
+static void sequence_vims_fire(GtkWidget *widget, const gchar *message, gpointer user_data)
+{
+    const char *reason;
+    int id;
+
+    (void)widget;
+    (void)user_data;
+
+    if(!message || !message[0])
+        return;
+
+    id = sequence_vims_message_id(message);
+    reason = id >= 0 ? sequence_vims_command_reject_reason(id) : "invalid VIMS message";
+    if(reason) {
+        sequence_vims_report_rejected(id, reason);
+        return;
+    }
+
+    sequence_vims_replaying = TRUE;
+    msg_vims((char *)message);
+    sequence_vims_replaying = FALSE;
+}
+
+static void sequence_vims_transport_request(GtkWidget *widget,
+                                            gint bank,
+                                            gint slot,
+                                            gint sample_id,
+                                            gint frame,
+                                            guint flags,
+                                            gpointer user_data)
+{
+    int start;
+    int end;
+    int absolute;
+    int active_bank;
+    int playing;
+    gboolean paused;
+
+    (void)widget;
+    (void)user_data;
+
+    if(!info || !ui_playmode_is_sample(info->status_tokens[PLAY_MODE]) ||
+       sample_id <= 0 || info->status_tokens[CURRENT_ID] != sample_id)
+        return;
+
+    if(info->status_tokens[SEQ_ACT] != 0) {
+        active_bank = sequence_ui_active_bank();
+        playing = normalize_sequence_slot(info->status_tokens[SEQ_CUR],
+                                          info->sequencer_col * info->sequencer_row);
+        if(bank != active_bank || slot != playing)
+            return;
+    }
+    else if(bank != GVR_VIMS_PATTERN_SAMPLE_BANK) {
+        return;
+    }
+
+    paused = info->status_tokens[SAMPLE_SPEED] == 0;
+    if(!paused && !(flags & GVR_VIMS_PATTERN_TRANSPORT_FORCE))
+        return;
+
+    start = info->status_tokens[SAMPLE_START];
+    end = info->status_tokens[SAMPLE_END];
+    if(end < start) {
+        int swap = start;
+        start = end;
+        end = swap;
+    }
+
+    absolute = start + MAX(0, frame);
+    if(absolute > end)
+        absolute = end;
+
+    sequence_vims_replaying = TRUE;
+    multi_vims(VIMS_VIDEO_SET_FRAME, "%d", absolute);
+    if(flags & GVR_VIMS_PATTERN_TRANSPORT_PLAY)
+        single_vims(VIMS_VIDEO_PLAY_FORWARD);
+    sequence_vims_replaying = FALSE;
+}
+
+static void sequence_vims_build_pattern_summary(int bank,
+                                                int slot,
+                                                GvrSequencePatternSummary *summary)
+{
+    GvrVimsPatternSummary source = { 0 };
+    GvrVimsPatternSummary cell = { 0 };
+    int sample_id = 0;
+    int sample_type = 0;
+
+    memset(summary, 0, sizeof(*summary));
+
+    if(!info || !info->vims_pattern_view || !info->sequence_bank_view ||
+       bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       slot < 0 || slot >= MAX_SEQUENCES)
+        return;
+
+    if(!gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                        bank,
+                                        slot,
+                                        &sample_id,
+                                        &sample_type))
+        return;
+
+    if(sample_id > 0)
+        gvr_vims_pattern_view_get_source_summary(info->vims_pattern_view,
+                                                 sample_id,
+                                                 sample_type,
+                                                 &source);
+
+    gvr_vims_pattern_view_get_cell_summary(info->vims_pattern_view,
+                                            bank,
+                                            slot,
+                                            &cell);
+
+    if(source.flags & GVR_VIMS_PATTERN_HAS_VIMS)
+        summary->flags |= GVR_SEQUENCE_PATTERN_HAS_VIMS |
+                          GVR_SEQUENCE_PATTERN_SOURCE_VIMS;
+    if(source.flags & GVR_VIMS_PATTERN_HAS_HOLD)
+        summary->flags |= GVR_SEQUENCE_PATTERN_HAS_HOLD |
+                          GVR_SEQUENCE_PATTERN_SOURCE_HOLD;
+    if(cell.flags & GVR_VIMS_PATTERN_HAS_VIMS)
+        summary->flags |= GVR_SEQUENCE_PATTERN_HAS_VIMS |
+                          GVR_SEQUENCE_PATTERN_CELL_VIMS;
+    if(cell.flags & GVR_VIMS_PATTERN_HAS_HOLD)
+        summary->flags |= GVR_SEQUENCE_PATTERN_HAS_HOLD |
+                          GVR_SEQUENCE_PATTERN_CELL_HOLD;
+
+    summary->source_events = source.event_count;
+    summary->source_rows = source.row_count;
+    summary->cell_events = cell.event_count;
+    summary->cell_rows = cell.row_count;
+}
+
+static void sequence_vims_refresh_cell_badge(int bank, int slot)
+{
+    GvrSequencePatternSummary summary;
+
+    if(!info || !info->sequence_bank_view || !info->vims_pattern_view)
+        return;
+
+    sequence_vims_build_pattern_summary(bank, slot, &summary);
+    gvr_sequence_bank_view_set_pattern_summary(info->sequence_bank_view,
+                                               bank,
+                                               slot,
+                                               &summary);
+}
+
+static void sequence_vims_refresh_bank_badge(int bank)
+{
+    GvrVimsPatternSummary pattern = { 0 };
+    GvrSequenceBankPatternSummary summary = { 0 };
+
+    if(!info || !info->sequence_bank_view || !info->vims_pattern_view ||
+       bank < 0 || bank >= VJ_SEQUENCE_BANKS)
+        return;
+
+    gvr_vims_pattern_view_get_bank_summary(info->vims_pattern_view,
+                                           bank,
+                                           &pattern);
+
+    summary.flags = pattern.flags;
+    summary.event_count = pattern.event_count;
+    summary.row_count = pattern.row_count;
+
+    if(sequence_vims_timelines[bank].loaded &&
+       sequence_vims_timelines[bank].finite &&
+       sequence_vims_timelines[bank].total > 0) {
+        summary.timeline_known = TRUE;
+        summary.timeline_length = sequence_vims_timelines[bank].total;
+    }
+
+    gvr_sequence_bank_view_set_bank_pattern_summary(info->sequence_bank_view,
+                                                    bank,
+                                                    &summary);
+}
+
+static void sequence_vims_refresh_source_badges(int source_bank, int source_id)
+{
+    if(!info || !info->sequence_bank_view || source_id <= 0)
+        return;
+
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+        for(int slot = 0; slot < MAX_SEQUENCES; slot++) {
+            int sample_id = 0;
+            int sample_type = 0;
+
+            if(!gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                                bank,
+                                                slot,
+                                                &sample_id,
+                                                &sample_type) ||
+               sample_id != source_id)
+                continue;
+
+            if(source_bank == GVR_VIMS_PATTERN_SAMPLE_BANK && sample_type != 0)
+                continue;
+            if(source_bank == GVR_VIMS_PATTERN_STREAM_BANK && sample_type == 0)
+                continue;
+
+            sequence_vims_refresh_cell_badge(bank, slot);
+        }
+    }
+}
+
+static void sequence_vims_pattern_changed(GtkWidget *widget,
+                                          gint bank,
+                                          gint slot,
+                                          guint flags,
+                                          gpointer user_data)
+{
+    (void)widget;
+    (void)flags;
+    (void)user_data;
+
+    if(bank >= 0)
+        sequence_vims_refresh_cell_badge(bank, slot);
+    else if(bank == GVR_VIMS_PATTERN_SAMPLE_BANK ||
+            bank == GVR_VIMS_PATTERN_STREAM_BANK)
+        sequence_vims_refresh_source_badges(bank, slot);
+    else if(bank == GVR_VIMS_PATTERN_SEQUENCE_BANK)
+        sequence_vims_refresh_bank_badge(slot);
+
+    sequence_vims_pattern_schedule_store();
+}
+
+static void sequence_vims_clipboard_reset(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    if(info && info->vims_pattern_view)
+        gvr_vims_pattern_view_clipboard_clear(info->vims_pattern_view);
+}
+
+static void sequence_vims_clipboard_copy(GtkWidget *widget,
+                                         gint bank,
+                                         gint slot,
+                                         gint offset,
+                                         gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    if(info && info->vims_pattern_view)
+        gvr_vims_pattern_view_clipboard_copy(info->vims_pattern_view,
+                                             bank,
+                                             slot,
+                                             offset);
+}
+
+static void sequence_vims_clipboard_paste(GtkWidget *widget,
+                                          gint offset,
+                                          gint bank,
+                                          gint slot,
+                                          gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    if(info && info->vims_pattern_view)
+        gvr_vims_pattern_view_clipboard_paste(info->vims_pattern_view,
+                                              offset,
+                                              bank,
+                                              slot);
+}
+
+static void sequence_vims_refresh_badges(void)
+{
+    if(!info || !info->vims_pattern_view || !info->sequence_bank_view)
+        return;
+
+    for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+        for(int slot = 0; slot < MAX_SEQUENCES; slot++)
+            sequence_vims_refresh_cell_badge(bank, slot);
+        sequence_vims_refresh_bank_badge(bank);
+    }
+}
+
+static void sequence_vims_update_playback(void)
+{
+    int play_mode;
+    int speed;
+    int max_linear_delta;
+
+    if(!info || !info->vims_pattern_view)
+        return;
+
+    play_mode = info->status_tokens[PLAY_MODE];
+    speed = ABS(info->status_tokens[SAMPLE_SPEED]);
+    max_linear_delta = speed > 0 ? MAX(16, speed * 8) : 0;
+
+    if(info->status_tokens[SEQ_ACT] != 0 &&
+       info->sequence_bank_view) {
+        int bank = sequence_ui_active_bank();
+        int slot = normalize_sequence_slot(info->status_tokens[SEQ_CUR],
+                                           info->sequencer_col *
+                                           info->sequencer_row);
+        int source_id = 0;
+        int source_type = 0;
+
+        if(slot >= 0 &&
+           gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                           bank,
+                                           slot,
+                                           &source_id,
+                                           &source_type) &&
+           source_id > 0) {
+            int source_bank = source_type == 0 ?
+                              GVR_VIMS_PATTERN_SAMPLE_BANK :
+                              GVR_VIMS_PATTERN_STREAM_BANK;
+            int local_frame = source_type == 0 ?
+                              vj_kf_timeline_position() :
+                              ui_stream_transport_position();
+            sequence_vims_timeline_slot_t *layout =
+                sequence_vims_timeline_slot(bank, slot);
+
+            if(local_frame < 0)
+                local_frame = 0;
+
+            if(sequence_vims_active_source_bank != source_bank ||
+               sequence_vims_active_source_slot != source_id) {
+                if(sequence_vims_active_source_bank != -999)
+                    gvr_vims_pattern_view_update_playback(
+                        info->vims_pattern_view,
+                        sequence_vims_active_source_bank,
+                        sequence_vims_active_source_slot,
+                        0,
+                        FALSE,
+                        0);
+
+                sequence_vims_active_source_bank = source_bank;
+                sequence_vims_active_source_slot = source_id;
+            }
+
+            if(sequence_vims_active_cell_bank != bank ||
+               sequence_vims_active_cell_slot != slot) {
+                if(sequence_vims_active_cell_bank >= 0)
+                    gvr_vims_pattern_view_update_playback(
+                        info->vims_pattern_view,
+                        sequence_vims_active_cell_bank,
+                        sequence_vims_active_cell_slot,
+                        0,
+                        FALSE,
+                        0);
+
+                sequence_vims_active_cell_bank = bank;
+                sequence_vims_active_cell_slot = slot;
+            }
+
+            if(sequence_vims_active_bank_pattern != bank) {
+                if(sequence_vims_active_bank_pattern >= 0)
+                    gvr_vims_pattern_view_update_bank_playback(
+                        info->vims_pattern_view,
+                        sequence_vims_active_bank_pattern,
+                        0,
+                        FALSE,
+                        0);
+
+                sequence_vims_active_bank_pattern = bank;
+                sequence_vims_tick_valid = FALSE;
+            }
+
+            if(layout && layout->start >= 0 && layout->length > 0) {
+                gint64 slot_end = layout->start + layout->length - 1;
+
+                if(!sequence_vims_tick_valid ||
+                   sequence_vims_tick_bank != bank ||
+                   sequence_vims_tick_slot != slot) {
+                    sequence_vims_tick_bank = bank;
+                    sequence_vims_tick_slot = slot;
+                    sequence_vims_tick_frame = layout->start;
+                    sequence_vims_tick_valid = TRUE;
+                }
+                else if(speed > 0) {
+                    if(sequence_vims_tick_frame < slot_end)
+                        sequence_vims_tick_frame++;
+                    else if(sequence_vims_timelines[bank].entries == 1)
+                        sequence_vims_tick_frame = layout->start;
+                }
+
+                if(sequence_vims_timelines[bank].finite &&
+                   sequence_vims_timelines[bank].total > 0 &&
+                   sequence_vims_tick_frame >=
+                       sequence_vims_timelines[bank].total)
+                    sequence_vims_tick_frame =
+                        sequence_vims_timelines[bank].total - 1;
+            }
+            else {
+                sequence_vims_tick_valid = FALSE;
+            }
+
+            gvr_vims_pattern_view_update_playback(
+                info->vims_pattern_view,
+                source_bank,
+                source_id,
+                local_frame,
+                TRUE,
+                max_linear_delta);
+
+            gvr_vims_pattern_view_update_playback(
+                info->vims_pattern_view,
+                bank,
+                slot,
+                local_frame,
+                TRUE,
+                max_linear_delta);
+
+            gvr_vims_pattern_view_update_bank_playback(
+                info->vims_pattern_view,
+                bank,
+                sequence_vims_tick_valid ?
+                    (int)MIN(sequence_vims_tick_frame, (gint64)G_MAXINT) : 0,
+                sequence_vims_tick_valid,
+                speed > 0 ? 64 : 0);
+            return;
+        }
+    }
+
+    if(sequence_vims_active_cell_bank >= 0)
+        gvr_vims_pattern_view_update_playback(info->vims_pattern_view,
+                                              sequence_vims_active_cell_bank,
+                                              sequence_vims_active_cell_slot,
+                                              0,
+                                              FALSE,
+                                              0);
+    if(sequence_vims_active_bank_pattern >= 0)
+        gvr_vims_pattern_view_update_bank_playback(info->vims_pattern_view,
+                                                   sequence_vims_active_bank_pattern,
+                                                   0,
+                                                   FALSE,
+                                                   0);
+
+    sequence_vims_active_cell_bank = -1;
+    sequence_vims_active_cell_slot = -1;
+    sequence_vims_active_bank_pattern = -1;
+    sequence_vims_tick_valid = FALSE;
+    sequence_vims_tick_bank = -1;
+    sequence_vims_tick_slot = -1;
+
+    if(play_mode == MODE_SAMPLE && info->status_tokens[CURRENT_ID] > 0) {
+        int source_id = info->status_tokens[CURRENT_ID];
+        int frame = vj_kf_timeline_position();
+
+        if(sequence_vims_active_source_bank !=
+               GVR_VIMS_PATTERN_SAMPLE_BANK ||
+           sequence_vims_active_source_slot != source_id) {
+            if(sequence_vims_active_source_bank != -999)
+                gvr_vims_pattern_view_update_playback(
+                    info->vims_pattern_view,
+                    sequence_vims_active_source_bank,
+                    sequence_vims_active_source_slot,
+                    0,
+                    FALSE,
+                    0);
+
+            sequence_vims_active_source_bank =
+                GVR_VIMS_PATTERN_SAMPLE_BANK;
+            sequence_vims_active_source_slot = source_id;
+        }
+
+        gvr_vims_pattern_view_update_playback(
+            info->vims_pattern_view,
+            GVR_VIMS_PATTERN_SAMPLE_BANK,
+            source_id,
+            frame,
+            TRUE,
+            max_linear_delta);
+        return;
+    }
+
+    if(play_mode == MODE_STREAM && info->status_tokens[CURRENT_ID] > 0) {
+        int source_id = info->status_tokens[CURRENT_ID];
+        int length = sequence_vims_stream_pattern_length();
+        int frame = ui_stream_transport_position();
+
+        if(sequence_vims_active_source_bank !=
+               GVR_VIMS_PATTERN_STREAM_BANK ||
+           sequence_vims_active_source_slot != source_id) {
+            if(sequence_vims_active_source_bank != -999)
+                gvr_vims_pattern_view_update_playback(
+                    info->vims_pattern_view,
+                    sequence_vims_active_source_bank,
+                    sequence_vims_active_source_slot,
+                    0,
+                    FALSE,
+                    0);
+
+            sequence_vims_active_source_bank =
+                GVR_VIMS_PATTERN_STREAM_BANK;
+            sequence_vims_active_source_slot = source_id;
+        }
+
+        if(length <= 0) {
+            gvr_vims_pattern_view_update_playback(
+                info->vims_pattern_view,
+                GVR_VIMS_PATTERN_STREAM_BANK,
+                source_id,
+                0,
+                FALSE,
+                0);
+            return;
+        }
+
+        frame = CLAMP(frame, 0, length - 1);
+        gvr_vims_pattern_view_update_playback(
+            info->vims_pattern_view,
+            GVR_VIMS_PATTERN_STREAM_BANK,
+            source_id,
+            frame,
+            TRUE,
+            max_linear_delta);
+        return;
+    }
+
+    if(sequence_vims_active_source_bank != -999)
+        gvr_vims_pattern_view_update_playback(
+            info->vims_pattern_view,
+            sequence_vims_active_source_bank,
+            sequence_vims_active_source_slot,
+            0,
+            FALSE,
+            0);
+
+    sequence_vims_active_source_bank = -999;
+    sequence_vims_active_source_slot = -1;
+    gvr_vims_pattern_view_stop_all_playback(info->vims_pattern_view);
 }
 
 static void vj_kf_reset_panel(void)
@@ -7331,14 +9122,6 @@ static void refresh_selected_chain_row_from_status(void)
 
 static void update_record_tab(int pm)
 {
-    if(pm == MODE_STREAM)
-    {
-        update_spin_value2(widget_cache[WIDGET_SPIN_STREAMDURATION], 1);
-        gint n_frames = get_nums2(widget_cache[WIDGET_SPIN_STREAMDURATION]);
-        char *time = format_time(n_frames, (double) info->el.fps);
-        update_label_str2(widget_cache[WIDGET_LABEL_STREAMRECORD_DURATION], time);
-        free(time);
-    }
     if(pm == MODE_SAMPLE)
     {
         on_spin_sampleduration_value_changed(NULL,NULL);
@@ -7664,7 +9447,8 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             speed = info->status_tokens[SAMPLE_SPEED];
             update_slider_value2(widget_cache[WIDGET_SPEED_SLIDER], speed, 0);
 
-            if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
+            if(speed < 0) info->play_direction = -1;
+            else if(speed > 0) info->play_direction = 1;
             if( speed < 0 ) speed *= -1;
 
             gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESPEED]), (gdouble) speed );
@@ -7703,7 +9487,8 @@ static void update_current_slot(int *history, int pm, int last_pm) {
 
             gint speed = info->status_tokens[SAMPLE_SPEED];
 
-            info->play_direction = (speed < 0) ? -1 : 1;
+            if(speed < 0) info->play_direction = -1;
+            else if(speed > 0) info->play_direction = 1;
 
             if (speed < 0)
                 speed = -speed;
@@ -10707,10 +12492,14 @@ static void load_sequence_list_legacy(void)
         offset += 6;
         if(info->sequence_bank_view)
             gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, id, sample_id, type);
+        sequence_vims_bind_cell(bank, id, sample_id, type);
         if(info->sequencer_view && info->sequencer_view->gui_slot && id < (info->sequencer_col * info->sequencer_row))
             sequencer_slot_set_content(info->sequencer_view->gui_slot[id], sample_id, type);
         id ++;
     }
+    for(; id < (SEQUENCER_COL * SEQUENCER_ROW); id++)
+        sequence_vims_bind_cell(bank, id, -1, -1);
+    sequence_vims_refresh_badges();
     free(text);
 }
 
@@ -10777,6 +12566,7 @@ static void load_sequence_list(void)
 
                 if(info->sequence_bank_view)
                     gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, type);
+                sequence_vims_bind_cell(bank, slot, sample_id, type);
 
                 if(bank == active_bank && info->sequencer_view && info->sequencer_view->gui_slot && slot < (info->sequencer_col * info->sequencer_row))
                     sequencer_slot_set_content(info->sequencer_view->gui_slot[slot], sample_id, type);
@@ -10784,6 +12574,7 @@ static void load_sequence_list(void)
         }
 
         sequence_bank_view_set_active_status();
+        sequence_vims_refresh_badges();
         free(text);
         return;
     }
@@ -10800,6 +12591,7 @@ static void load_samplelist_info(void)
     reset_tree("cali_sourcetree");
     reset_tree("tree_sources");
     reset_samplebank();
+    sequence_vims_source_lengths_clear();
 
     if(bankport_)
         vpf(bankport_);
@@ -10840,12 +12632,17 @@ static void load_samplelist_info(void)
                 gchar *title_from_list = _utf8str(descr_text);
                 const int int_id = values[0];
                 const int sample_type = 0;
+                int sample_length = values[2] - values[1] + 1;
                 const char *override_title = samplebank_lookup_title_override(int_id, sample_type);
                 const char *effective_title = title_from_list;
                 char auto_title[64];
                 gboolean auto_rec_title = samplebank_make_offline_recording_title(title_from_list,
                                                                                   auto_title,
                                                                                   sizeof(auto_title));
+
+                if(sample_length < 1)
+                    sample_length = values[1] - values[2] + 1;
+                sequence_vims_source_length_store(int_id, sample_type, sample_length);
 
                 if(override_title && (samplebank_title_is_default(int_id, sample_type, title_from_list) || auto_rec_title))
                     effective_title = override_title;
@@ -10949,6 +12746,7 @@ static void load_samplelist_info(void)
     samplebank_ready_ = 1;
     samplebank_update_page_label();
     samplebank_request_page_thumbnails(samplebank_get_page());
+    sequence_vims_sync_target();
 
 }
 
@@ -11189,6 +12987,17 @@ static void setup_rgbkey(void)
     GtkWidget *sel = widget_cache[ WIDGET_RGBKEY ];
     g_signal_connect( sel, "color-changed",
     (GCallback) on_rgbkey_color_changed, NULL );
+}
+
+static const char *sequence_vims_description_lookup(int vims_id,
+                                                    gpointer user_data)
+{
+    (void)user_data;
+
+    if(vims_id < 0 || vims_id >= VIMS_MAX)
+        return NULL;
+
+    return vj_event_list[vims_id].descr;
 }
 
 static void setup_vimslist(void)
@@ -11587,6 +13396,14 @@ static void reload_vimslist(void)
     }
 
     gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_set_description_lookup(
+            info->vims_pattern_view,
+            sequence_vims_description_lookup,
+            NULL,
+            NULL);
+
     free( eltext );
 }
 
@@ -11606,88 +13423,6 @@ void _edl_reset(void)
     }
 }
 
-void	reload_macros(void)
-{
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "macro_macros" );
-	GtkListStore *store;
-	GtkTreeIter iter;
-
-	gint consumed = 0;
-	gint len = 0;
-	single_vims( VIMS_GET_ALL_MACRO );
-	gchar *answer = recv_vims(8, &len);
-
-    int checksum = data_checksum(answer,len);
-    if( info->uc.reload_hint_checksums[HINT_MACRO] == checksum ) {
-        if(answer) free(answer);
-        return;
-    }
-    info->uc.reload_hint_checksums[HINT_MACRO] = checksum;
-
-
-	reset_tree("macro_macros");
-
-	if( answer == NULL || len < 0 )
-		return;
-
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
-    	store = GTK_LIST_STORE(model);
-
-	gchar *ptr = answer;
-
-	int error = 0;
-
-	while(consumed < len) {
-
-		long frame_num = 0;
-		int at_dup = 0;
-		int at_loop = 0;
-		int at_seq = 0;
-		int msg_len = 0;
-
-		int n = sscanf( ptr, "%08ld%02d%08d%02d%03d", &frame_num, &at_dup, &at_loop, &at_seq, &msg_len );
-		if( n != 5) {
-			error = 1;
-			break;
-		}
-
-		ptr += (8 + 2 + 8 + 2 + 3);
-
-		char *msg = strndup( ptr, msg_len );
-		int vims_id = -1;
-		n = sscanf(msg,"%03d:", &vims_id);
-		char *descr = NULL;
-		if( vims_id >= 0 && vims_id < VIMS_QUIT )
-			descr = vj_event_list[vims_id].descr;
-
-		gtk_list_store_append( store, &iter );
-    		gtk_list_store_set(store, &iter,
-    		MACRO_FRAME, (guint) frame_num,
-			MACRO_DUP, (guint) at_dup,
-			MACRO_LOOP, (guint) at_loop,
-			MACRO_MSG_SEQ, (guint) at_seq,
-			MACRO_VIMS, msg,
-			MACRO_VIMS_DESCR, (descr == NULL ? "Unknown": descr),
-			-1 );
-
-		ptr += msg_len;
-
-		free(msg);
-
-		consumed += (8 + 2 + 8 + 2 + 3);
-		consumed += msg_len;
-	}
-
-	if(error){
-		veejay_msg(0,"Unable to read all VIMS macros");
-	}
-
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-
-	free(answer);
-
-	info->uc.reload_hint[HINT_MACRO] = 0;
-}
 
 static int el_parse_dec_field(const char *buf, size_t len, size_t *off, size_t width, uint64_t *out)
 {
@@ -14815,6 +16550,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         char *time = format_time( total_frames_,(double) info->el.fps );
         if( pm == MODE_STREAM )
         {
+            sequence_vims_stream_length_cache(info->status_tokens[SAMPLE_MARKER_END]);
             gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_STREAM_LENGTH] ), (gdouble) info->status_tokens[SAMPLE_MARKER_END]);
 
             gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_STREAM_LENGTH_LABEL] ), time );
@@ -14924,14 +16660,14 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         switch(info->status_tokens[MACRO])
         {
             case 1:
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACRORECORD1] ), TRUE );
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACRORECORD] ), TRUE ); break;
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_MACRORECORD]), TRUE);
+                break;
             case 2:
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROPLAY1] ), TRUE );
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROPLAY] ), TRUE ); break;
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_MACROPLAY]), TRUE);
+                break;
             default:
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROSTOP1] ), TRUE );
-                gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( widget_cache[WIDGET_MACROSTOP] ), TRUE ); break;
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_MACROSTOP]), TRUE);
+                break;
         }
     }
 
@@ -14971,7 +16707,6 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     {
         info->uc.reload_hint[HINT_ENTRY] = 1;
         info->uc.reload_hint[HINT_CHAIN] = 1;
-	    info->uc.reload_hint[HINT_MACRO] = 1;
 
         if( pm != MODE_STREAM )
             info->uc.reload_hint[HINT_EL] = 1;
@@ -15067,9 +16802,9 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             int plainspeed =  info->status_tokens[SAMPLE_SPEED];
 
             update_slider_value2( widget_cache[WIDGET_SPEED_SLIDER], plainspeed, 0);
-            if( plainspeed < 0 )
+            if(plainspeed < 0)
                 info->play_direction = -1;
-            else
+            else if(plainspeed > 0)
                 info->play_direction = 1;
 
             if( plainspeed < 0 ) plainspeed *= -1;
@@ -15824,19 +17559,14 @@ static void sync_chain_entry_beat_toggle_from_status(void)
 
 static void process_reload_hints(int *history, int pm)
 {
+    const gboolean pattern_document_reload =
+        info->uc.reload_hint[HINT_SLIST] ? TRUE : FALSE;
+    const gboolean sequence_layout_reload =
+        info->uc.reload_hint[HINT_SEQ_ACT] == 1 ? TRUE : FALSE;
+
     pm = ui_playmode_effective(pm);
 
     int *entry_tokens = &(info->uc.entry_tokens[0]);
-    int md = info->uc.reload_hint[HINT_MACRODELAY];
-    if( md ) {
-        md = md - 1;
-        if( md <= 0 ) {
-            multi_vims( VIMS_MACRO, "%d", 1 );
-		    info->uc.reload_hint[HINT_MACRO] = 1;
-            vj_msg(VEEJAY_MSG_INFO, "Started macro record");
-        }
-    }
-
     if( pm == MODE_STREAM )
     {
         if(info->uc.reload_hint[HINT_V4L])
@@ -15858,10 +17588,14 @@ static void process_reload_hints(int *history, int pm)
         load_samplelist_info();
     }
 
-    if( info->uc.reload_hint[HINT_SEQ_ACT] == 1 )
+    if(sequence_layout_reload)
     {
+        sequence_vims_timeline_invalidate(-1);
         load_sequence_list();
     }
+
+    if(pattern_document_reload)
+        sequence_vims_pattern_load_backend();
 
     if( info->uc.reload_hint[HINT_RECORDING] == 1 && pm != MODE_PLAIN)
     {
@@ -15935,15 +17669,7 @@ static void process_reload_hints(int *history, int pm)
 
     }
 
-	if( info->uc.reload_hint[HINT_MACRO]) {
-		reload_macros();
-	}
-
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));
-
-    if( md > 0 ) {
-        info->uc.reload_hint[HINT_MACRODELAY] = md;
-    }
 
 }
 
@@ -16062,6 +17788,17 @@ void update_gui(void)
 
     info->uc.playmode = pm;
 
+    if(last_pm < 0 ||
+       history[CURRENT_FPS] != info->status_tokens[CURRENT_FPS])
+    {
+        update_slider_gvalue(
+            "framerate",
+            ui_clampd(
+                (gdouble)info->status_tokens[CURRENT_FPS] * 0.01,
+                0.0,
+                120.0));
+    }
+
     update_audio_beat_status_widgets(history, last_pm < 0);
     update_audio_sync_status_widgets(history, last_pm < 0);
 
@@ -16079,6 +17816,10 @@ void update_gui(void)
         info->uc.reload_hint[HINT_ENTRY] = 1;
 
     process_reload_hints(history, pm);
+
+    sequence_vims_refresh_timing_signature();
+    sequence_vims_sync_target();
+    sequence_vims_update_playback();
 
     on_vims_messenger();
 
@@ -16206,6 +17947,7 @@ void vj_gui_free(void)
 {
     detachable_windows_close_all();
     preview_clear_live_pixbuf();
+    sequence_vims_pattern_flush();
 
     if(info)
     {
@@ -16224,6 +17966,30 @@ void vj_gui_free(void)
 
     vpf( fx_list_ );
     vpf( bankport_ );
+
+    if(sequence_vims_source_lengths) {
+        g_hash_table_destroy(sequence_vims_source_lengths);
+        sequence_vims_source_lengths = NULL;
+    }
+    sequence_vims_stream_length_frames = 0;
+    sequence_vims_stream_length_id = -1;
+    sequence_vims_stream_length_type = -1;
+
+    if(sequence_vims_pattern_store_timeout_id) {
+        g_source_remove(sequence_vims_pattern_store_timeout_id);
+        sequence_vims_pattern_store_timeout_id = 0;
+    }
+    sequence_vims_pattern_dirty = FALSE;
+    sequence_vims_pattern_loading = FALSE;
+    sequence_vims_pattern_backend_revision = 0;
+    sequence_vims_timeline_invalidate(-1);
+    sequence_vims_active_source_bank = -999;
+    sequence_vims_active_source_slot = -1;
+    sequence_vims_active_cell_bank = -1;
+    sequence_vims_active_cell_slot = -1;
+    sequence_vims_active_bank_pattern = -1;
+    for(int i = 0; i < 9; i++)
+        sequence_vims_timing_signature[i] = -1;
 }
 
 void vj_gui_style_setup(void)
@@ -16554,7 +18320,6 @@ static void reset_connection_widget_state(void)
     reset_tree("editlisttree");
     reset_tree("tree_bundles");
     reset_tree("tree_vims");
-    reset_tree("macro_macros");
 
     reset_samplebank();
     reset_sequencer_ui_state();
@@ -16595,6 +18360,7 @@ void vj_gui_wipe(void)
     info->parameter_lock = 1;
     info->entry_lock = 1;
 
+    sequence_vims_source_lengths_clear();
     reset_connection_runtime_state();
     reset_connection_widget_state();
     reset_reloaded_runtime_ports();
@@ -17103,6 +18869,297 @@ static void detachable_notebook_update_visibility(GtkNotebook *notebook);
 static void init_window_configuration_menu(void);
 static void detachable_restore_window_configuration(GtkMenuItem *item, gpointer user_data);
 static void detachable_restore_default_window_configuration(GtkMenuItem *item, gpointer user_data);
+
+typedef struct
+{
+    GtkWidget *page;
+    GtkWidget *host;
+    GtkWidget *top;
+    GtkWidget *body;
+    GtkWidget *center;
+    GtkWidget *right;
+    GtkWidget *footer;
+    GtkWidget *footer_actions;
+    gboolean detached;
+} samplebank_action_layout_t;
+
+static samplebank_action_layout_t samplebank_action_layout_ = { 0 };
+
+static void samplebank_action_reparent(GtkWidget *widget,
+                                       GtkWidget *parent,
+                                       gboolean pack_end)
+{
+    GtkWidget *old_parent;
+
+    if(!widget || !parent || !GTK_IS_WIDGET(widget) || !GTK_IS_BOX(parent))
+        return;
+
+    old_parent = gtk_widget_get_parent(widget);
+    if(old_parent == parent)
+        return;
+
+    g_object_ref(widget);
+    if(old_parent && GTK_IS_CONTAINER(old_parent))
+        gtk_container_remove(GTK_CONTAINER(old_parent), widget);
+
+    if(pack_end)
+        gtk_box_pack_end(GTK_BOX(parent), widget, FALSE, FALSE, 0);
+    else
+        gtk_box_pack_start(GTK_BOX(parent), widget, FALSE, FALSE, 0);
+
+    g_object_unref(widget);
+}
+
+static GtkWidget *samplebank_action_pack_button_sized(GtkWidget *box,
+                                                      const char *name,
+                                                      int width,
+                                                      int height,
+                                                      gboolean fill)
+{
+    GtkWidget *button;
+
+    if(!box || !name || !info || !info->main_window)
+        return NULL;
+
+    button = glade_xml_get_widget_(info->main_window, name);
+    if(!button)
+        return NULL;
+
+    samplebank_action_reparent(button, box, FALSE);
+    gtk_widget_set_size_request(button, width, height);
+    gtk_widget_set_halign(button,
+                          fill ? GTK_ALIGN_FILL : GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(button, GTK_ALIGN_CENTER);
+    gtk_widget_show(button);
+    return button;
+}
+
+static GtkWidget *samplebank_action_pack_button(GtkWidget *column,
+                                                const char *name)
+{
+    return samplebank_action_pack_button_sized(
+        column,
+        name,
+        30,
+        28,
+        TRUE);
+}
+
+static GtkWidget *samplebank_footer_pack_button(GtkWidget *footer,
+                                                const char *name)
+{
+    GtkWidget *button =
+        samplebank_action_pack_button_sized(
+            footer,
+            name,
+            26,
+            20,
+            FALSE);
+
+    if(button)
+        add_class(button, "samplebank-footer-action");
+
+    return button;
+}
+
+static void samplebank_action_layout_set_detached(gboolean detached)
+{
+    samplebank_action_layout_t *layout = &samplebank_action_layout_;
+
+    if(!layout->host || !layout->top || !layout->body ||
+       !layout->center || !layout->right)
+        return;
+
+    layout->detached = detached ? TRUE : FALSE;
+
+    samplebank_action_reparent(layout->right,
+                               layout->top,
+                               FALSE);
+
+    gtk_orientable_set_orientation(
+        GTK_ORIENTABLE(layout->right),
+        GTK_ORIENTATION_HORIZONTAL);
+    gtk_widget_set_halign(layout->right,
+                          GTK_ALIGN_START);
+    gtk_widget_set_valign(layout->right,
+                          GTK_ALIGN_CENTER);
+
+    gtk_widget_set_no_show_all(layout->top,
+                               FALSE);
+    gtk_widget_show_all(layout->top);
+    gtk_widget_show(layout->body);
+    gtk_widget_show(layout->center);
+    gtk_widget_show(layout->right);
+
+    if(layout->detached)
+        add_class(layout->host,
+                  "samplebank-actions-detached");
+    else
+        remove_class(layout->host,
+                     "samplebank-actions-detached");
+
+    if(layout->footer_actions)
+        gtk_widget_show_all(layout->footer_actions);
+
+    gtk_widget_queue_resize(layout->host);
+}
+
+
+static void samplebank_action_layout_update_for_page(GtkWidget *page)
+{
+    if(!page || page != samplebank_action_layout_.page)
+        return;
+
+    samplebank_action_layout_set_detached(
+        g_object_get_data(G_OBJECT(page),
+                          VJ_DETACH_DATA_DETACHED) != NULL);
+}
+
+static GtkWidget *samplebank_action_layout_mount(void)
+{
+    static const char *right_buttons[] = {
+        "sampleadd",
+        "streamnew",
+        "new_colorstream",
+        "new_generatorstream"
+    };
+    static const char *footer_buttons[] = {
+        "button_samplelist_open",
+        "button_samplelist_save",
+        "samplepage",
+        "button_sample_del",
+        "button_clipcopy"
+    };
+    samplebank_action_layout_t *layout =
+        &samplebank_action_layout_;
+
+    if(layout->center)
+        return layout->center;
+
+    layout->page =
+        glade_xml_get_widget_(info->main_window,
+                              "vbox483");
+    layout->host =
+        glade_xml_get_widget_(info->main_window,
+                              "sample_bank_hbox");
+    layout->footer =
+        glade_xml_get_widget_(info->main_window,
+                              "samplebank_footer");
+
+    if(!layout->page ||
+       !layout->host ||
+       !GTK_IS_BOX(layout->host))
+        return layout->host;
+
+    gtk_orientable_set_orientation(
+        GTK_ORIENTABLE(layout->host),
+        GTK_ORIENTATION_VERTICAL);
+    add_class(layout->host,
+              "samplebank-action-shell");
+
+    layout->top =
+        gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    layout->body =
+        gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    layout->center =
+        gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    layout->right =
+        gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+
+    add_class(layout->top,
+              "samplebank-action-top");
+    add_class(layout->body,
+              "samplebank-action-body");
+    add_class(layout->center,
+              "samplebank-action-center");
+    add_class(layout->right,
+              "samplebank-action-toolbar");
+
+    gtk_widget_set_hexpand(layout->top, TRUE);
+    gtk_widget_set_hexpand(layout->body, TRUE);
+    gtk_widget_set_vexpand(layout->body, TRUE);
+    gtk_widget_set_hexpand(layout->center, TRUE);
+    gtk_widget_set_vexpand(layout->center, TRUE);
+    gtk_widget_set_halign(layout->center,
+                          GTK_ALIGN_FILL);
+    gtk_widget_set_valign(layout->center,
+                          GTK_ALIGN_FILL);
+
+    gtk_box_pack_start(GTK_BOX(layout->host),
+                       layout->top,
+                       FALSE,
+                       FALSE,
+                       0);
+    gtk_box_pack_start(GTK_BOX(layout->host),
+                       layout->body,
+                       TRUE,
+                       TRUE,
+                       0);
+    gtk_box_pack_start(GTK_BOX(layout->top),
+                       layout->right,
+                       FALSE,
+                       FALSE,
+                       0);
+    gtk_box_pack_start(GTK_BOX(layout->body),
+                       layout->center,
+                       TRUE,
+                       TRUE,
+                       0);
+
+    for(guint i = 0;
+        i < G_N_ELEMENTS(right_buttons);
+        i++)
+    {
+        samplebank_action_pack_button(
+            layout->right,
+            right_buttons[i]);
+    }
+
+    if(layout->footer && GTK_IS_BOX(layout->footer)) {
+        layout->footer_actions =
+            gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 1);
+
+        add_class(layout->footer_actions,
+                  "samplebank-footer-actions");
+
+        gtk_widget_set_halign(layout->footer_actions,
+                              GTK_ALIGN_START);
+        gtk_widget_set_valign(layout->footer_actions,
+                              GTK_ALIGN_CENTER);
+        gtk_widget_set_hexpand(layout->footer_actions,
+                               FALSE);
+        gtk_widget_set_vexpand(layout->footer_actions,
+                               FALSE);
+
+        gtk_box_pack_start(GTK_BOX(layout->footer),
+                           layout->footer_actions,
+                           FALSE,
+                           FALSE,
+                           0);
+        gtk_box_reorder_child(GTK_BOX(layout->footer),
+                              layout->footer_actions,
+                              0);
+
+        for(guint i = 0;
+            i < G_N_ELEMENTS(footer_buttons);
+            i++)
+        {
+            samplebank_footer_pack_button(
+                layout->footer_actions,
+                footer_buttons[i]);
+        }
+
+        gtk_widget_show_all(layout->footer_actions);
+    }
+
+    gtk_widget_show(layout->body);
+    gtk_widget_show(layout->center);
+    gtk_widget_show(layout->right);
+    samplebank_action_layout_set_detached(FALSE);
+
+    return layout->center;
+}
+
 
 static void detachable_preserve_hidden_descendants(GtkWidget *widget)
 {
@@ -17773,6 +19830,7 @@ static void detachable_detach_page_to_window(GtkNotebook *from,
     gtk_widget_show(page);
 
     detached->pages = g_list_append(detached->pages, page);
+    samplebank_action_layout_update_for_page(page);
 
     detachable_create_placeholder_for_page(from, page, (guint) page_num);
     detachable_notebook_update_visibility(from);
@@ -17847,6 +19905,7 @@ static void detachable_reattach_page(GtkNotebook *from, GtkWidget *page)
     gtk_notebook_set_current_page(origin, pos);
     g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW, NULL);
     g_object_set_data(G_OBJECT(page), VJ_DETACH_DATA_DETACHED, NULL);
+    samplebank_action_layout_update_for_page(page);
     gtk_widget_show(page);
     gtk_widget_show_all(tab);
     gtk_widget_show(menu);
@@ -18768,7 +20827,9 @@ void vj_gui_init(const char *glade_file,
     init_polish_tooltips();
     init_alpha_ui_polish();
 
-    GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
+    GtkWidget *box = samplebank_action_layout_mount();
+    if(!box)
+        box = glade_xml_get_widget_(info->main_window, "sample_bank_hbox");
     info->sample_bank_view = new_bank_pad(box);
     if(!info->sample_bank_view)
         veejay_msg(VEEJAY_MSG_WARNING, "Sample bank grid widget could not be created");
@@ -18776,7 +20837,7 @@ void vj_gui_init(const char *glade_file,
         const int sample_bank_h = smallest_possible ? 240 : 200;
         const int sample_bank_view_h = smallest_possible ? 224 : 184;
         gtk_widget_set_size_request(box, -1, sample_bank_h);
-        gtk_widget_set_size_request(info->sample_bank_view, 720, sample_bank_view_h);
+        gtk_widget_set_size_request(info->sample_bank_view, -1, sample_bank_view_h);
         gtk_widget_set_hexpand(box, TRUE);
         gtk_widget_set_vexpand(box, TRUE);
         gtk_widget_set_hexpand(info->sample_bank_view, TRUE);
@@ -18811,6 +20872,7 @@ void vj_gui_init(const char *glade_file,
     gtk_window_set_default(GTK_WINDOW(connection_dial), vj_button);
 
     gtk_builder_connect_signals( gui->main_window , NULL);
+
     vj_gui_update_sync_samplelist_sensitivity();
     detachable_notebooks_init();
     init_window_configuration_menu();
@@ -18873,7 +20935,6 @@ void vj_gui_init(const char *glade_file,
     setup_editlist_info();
     setup_samplelist_info();
     setup_v4l_devices();
-    setup_macros();
 	setup_colorselection();
     setup_rgbkey();
     setup_bundles();
@@ -18899,8 +20960,13 @@ void vj_gui_init(const char *glade_file,
 
     ui_compact_fx_panel();
     preview_set_widget_minimum();
-    if(img_wid)
-        g_signal_connect(G_OBJECT(img_wid), "draw", G_CALLBACK(preview_image_draw), NULL);
+    if(img_wid) {
+        add_class(img_wid, "preview-image-surface");
+        g_signal_connect(G_OBJECT(img_wid),
+                         "draw",
+                         G_CALLBACK(preview_image_draw),
+                         NULL);
+    }
 
     for(int i = 0; preview_allocate_widgets[i] != NULL; i++) {
         GtkWidget *w = glade_xml_get_widget_(info->main_window, preview_allocate_widgets[i]);
@@ -19043,10 +21109,6 @@ void vj_gui_init(const char *glade_file,
     }
 
     ui_window_set_startup_size(mainw);
-    if(!g_object_get_data(G_OBJECT(mainw), VJ_DETACH_DATA_RESTORE_ONCE)) {
-        g_object_set_data(G_OBJECT(mainw), VJ_DETACH_DATA_RESTORE_ONCE, GINT_TO_POINTER(1));
-        detachable_restore_window_configuration(NULL, NULL);
-    }
     ui_window_log_startup_size(mainw, "startup");
 }
 
@@ -19159,7 +21221,7 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
     load_editlist_info();
 
-    update_slider_value( "framerate", info->el.fps,  0 );
+    update_slider_gvalue("framerate", ui_clampd((gdouble)info->el.fps, 0.0, 120.0));
 
     veejay_memset( vims_keys_list, 0 , sizeof(vims_keys_list));
     veejay_memset( vj_event_list,  0, sizeof( vj_event_list));
@@ -19234,6 +21296,13 @@ static void veejay_show_main_ui(vj_gui_t *gui)
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
     reloaded_present_window(mw);
     ui_window_set_startup_size(mw);
+
+    if(info->client &&
+       info->watch.state == STATE_PLAYING &&
+       !g_object_get_data(G_OBJECT(mw), VJ_DETACH_DATA_RESTORE_ONCE)) {
+        g_object_set_data(G_OBJECT(mw), VJ_DETACH_DATA_RESTORE_ONCE, GINT_TO_POINTER(1));
+        detachable_restore_window_configuration(NULL, NULL);
+    }
 }
 
 static guint32 reloaded_present_time(void)
@@ -19670,6 +21739,7 @@ static void on_sequence_bank_refresh_clicked(GtkWidget *widget, gpointer user_da
 {
     (void)widget;
     (void)user_data;
+    sequence_vims_timeline_invalidate(-1);
     info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
@@ -19686,6 +21756,9 @@ static void on_sequence_bank_clear_clicked(GtkWidget *widget, gpointer user_data
     multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_clear_bank(info->vims_pattern_view, bank);
+    sequence_vims_timeline_invalidate(bank);
     if(bank == sequence_ui_active_bank())
         info->sequence_playing = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
@@ -19778,6 +21851,9 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
     multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d %d", slot, id, type, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, id, type);
+    sequence_vims_bind_cell(bank, slot, id, type);
+    sequence_vims_timeline_invalidate(bank);
+    sequence_vims_sync_target();
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -19789,6 +21865,11 @@ static void on_sequence_bank_view_slot_delete(GtkWidget *widget, gint bank, gint
     multi_vims(VIMS_SEQUENCE_DEL, "%d %d", slot, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, -1, -1);
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_clear_cell(info->vims_pattern_view, bank, slot);
+    sequence_vims_bind_cell(bank, slot, -1, -1);
+    sequence_vims_timeline_invalidate(bank);
+    sequence_vims_sync_target();
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -19831,6 +21912,10 @@ static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gin
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, from_slot, to_id, to_type);
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, to_slot, from_id, from_type);
     }
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_swap_cells(info->vims_pattern_view, bank, from_slot, to_slot);
+    sequence_vims_timeline_invalidate(bank);
+    sequence_vims_sync_target();
 
     vj_msg(VEEJAY_MSG_INFO,
            "Swapped sequence bank %d slots %d and %d",
@@ -19863,6 +21948,10 @@ static void sequence_bank_view_copy_bank_to_target(int src_bank, int dst_bank)
 
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_copy_bank(info->sequence_bank_view, src_bank, dst_bank);
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_copy_bank(info->vims_pattern_view, src_bank, dst_bank);
+    sequence_vims_timeline_invalidate(dst_bank);
+    sequence_vims_refresh_badges();
 
     vj_msg(VEEJAY_MSG_INFO,
            "Copied sequence bank %d to bank %d",
@@ -19923,6 +22012,10 @@ static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpoin
 
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_clear_bank(info->vims_pattern_view, bank);
+    sequence_vims_timeline_invalidate(bank);
+    sequence_vims_sync_target();
 
     if(bank == sequence_ui_active_bank())
         info->sequence_playing = -1;
@@ -19943,6 +22036,9 @@ static void on_sequence_bank_view_slot_paste(GtkWidget *widget, gint bank, gint 
 
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, sample_type);
+    sequence_vims_bind_cell(bank, slot, sample_id, sample_type);
+    sequence_vims_timeline_invalidate(bank);
+    sequence_vims_sync_target();
 
     vj_msg(VEEJAY_MSG_INFO,
            "Pasted sequence entry to bank %d slot %d",
@@ -19956,8 +22052,68 @@ static void on_sequence_bank_view_refresh(GtkWidget *widget, gpointer user_data)
 {
     (void)widget;
     (void)user_data;
+    sequence_vims_timeline_invalidate(-1);
     info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+static void sequence_vims_append_pattern_tooltip(char *text,
+                                                  size_t text_size,
+                                                  int bank,
+                                                  int slot)
+{
+    GvrSequencePatternSummary summary;
+    size_t used;
+
+    sequence_vims_build_pattern_summary(bank, slot, &summary);
+    if(summary.flags == 0)
+        return;
+
+    used = strlen(text);
+    if(used >= text_size)
+        return;
+
+    if(summary.source_events > 0) {
+        used += snprintf(text + used,
+                         text_size - used,
+                         "\n\nSource pattern: %u event%s on %u frame%s%s",
+                         summary.source_events,
+                         summary.source_events == 1 ? "" : "s",
+                         summary.source_rows,
+                         summary.source_rows == 1 ? "" : "s",
+                         (summary.flags & GVR_SEQUENCE_PATTERN_SOURCE_HOLD) ?
+                            " (includes Hold Frame)" : "");
+    }
+
+    if(summary.cell_events > 0 && used < text_size) {
+        used += snprintf(text + used,
+                         text_size - used,
+                         "\nCell overlay: %u event%s on %u frame%s%s",
+                         summary.cell_events,
+                         summary.cell_events == 1 ? "" : "s",
+                         summary.cell_rows,
+                         summary.cell_rows == 1 ? "" : "s",
+                         (summary.flags & GVR_SEQUENCE_PATTERN_CELL_HOLD) ?
+                            " (includes Hold Frame)" : "");
+    }
+
+    if(summary.source_events > 0 && used < text_size) {
+        used += snprintf(text + used,
+                         text_size - used,
+                         "\nThe source pattern follows this sample or stream wherever it is used.");
+    }
+
+    if(summary.cell_events > 0 && used < text_size) {
+        used += snprintf(text + used,
+                         text_size - used,
+                         "\nThe cell overlay applies only to this sequence slot.");
+    }
+
+    if(used < text_size) {
+        snprintf(text + used,
+                 text_size - used,
+                 "\nCyan corner: source pattern · Magenta corner: cell overlay · Amber dot: Hold Frame");
+    }
 }
 
 static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
@@ -20010,6 +22166,43 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
                      bank + 1);
         }
 
+        GvrSequenceBankPatternSummary pattern = { 0 };
+        gvr_sequence_bank_view_get_bank_pattern_summary(widget,
+                                                        bank,
+                                                        &pattern);
+
+        g_strlcat(header_tip,
+                  "\n\nPattern target: clicking this bank header edits the complete bank sequence pattern. Click a cell to edit only that cell overlay.",
+                  sizeof(header_tip));
+
+        if(pattern.event_count > 0) {
+            char pattern_text[256];
+
+            if(pattern.timeline_known)
+                snprintf(pattern_text,
+                         sizeof(pattern_text),
+                         "\nSequence pattern: %u event%s on %u frame%s · timeline %lld frames%s",
+                         pattern.event_count,
+                         pattern.event_count == 1 ? "" : "s",
+                         pattern.row_count,
+                         pattern.row_count == 1 ? "" : "s",
+                         (long long)pattern.timeline_length,
+                         (pattern.flags & GVR_SEQUENCE_PATTERN_HAS_HOLD) ?
+                            " · includes Hold Frame" : "");
+            else
+                snprintf(pattern_text,
+                         sizeof(pattern_text),
+                         "\nSequence pattern: %u event%s on %u frame%s · timeline unavailable%s",
+                         pattern.event_count,
+                         pattern.event_count == 1 ? "" : "s",
+                         pattern.row_count,
+                         pattern.row_count == 1 ? "" : "s",
+                         (pattern.flags & GVR_SEQUENCE_PATTERN_HAS_HOLD) ?
+                            " · includes Hold Frame" : "");
+
+            g_strlcat(header_tip, pattern_text, sizeof(header_tip));
+        }
+
         gtk_tooltip_set_text(tooltip, header_tip);
         return TRUE;
     }
@@ -20045,7 +22238,7 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
         ? source_slot->title
         : "not in sample bank";
 
-    char text[512];
+    char text[1536];
 
     if(sample_type == MODE_SAMPLE) {
         const char *length = (source_slot && source_slot->timecode && source_slot->timecode[0])
@@ -20081,6 +22274,7 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
                  slot + 1);
     }
 
+    sequence_vims_append_pattern_tooltip(text, sizeof(text), bank, slot);
     gtk_tooltip_set_text(tooltip, text);
     return TRUE;
 }
@@ -20131,6 +22325,203 @@ static void sequence_toolbar_hide_legacy_row(void)
             gtk_widget_hide(widget);
         }
     }
+}
+
+static GtkWidget *sequence_preview_pack_button(GtkWidget *column,
+                                                  const char *name)
+{
+    GtkWidget *button = glade_xml_get_widget_(info->main_window, name);
+    GtkWidget *parent;
+
+    if(!button || !column)
+        return NULL;
+
+    parent = gtk_widget_get_parent(button);
+    if(parent) {
+        g_object_ref(button);
+        gtk_container_remove(GTK_CONTAINER(parent), button);
+        gtk_box_pack_start(GTK_BOX(column), button, FALSE, FALSE, 1);
+        g_object_unref(button);
+    }
+    else {
+        gtk_box_pack_start(GTK_BOX(column), button, FALSE, FALSE, 1);
+    }
+
+    gtk_widget_set_size_request(button, 30, 28);
+    gtk_widget_set_halign(button, GTK_ALIGN_FILL);
+    gtk_widget_show(button);
+    return button;
+}
+
+static void sequence_preview_mount_action_columns(void)
+{
+    static const char *right_buttons[] = {
+        "button_054",
+        "osdbutton",
+        "button_252",
+        "sync_correction",
+        "button_001",
+        "button_251",
+        "button_200"
+    };
+    GtkWidget *frame = glade_xml_get_widget_(info->main_window,
+                                             "frame327");
+    GtkWidget *legacy_media = glade_xml_get_widget_(info->main_window,
+                                                    "vbox418");
+    GtkWidget *center;
+    GtkWidget *row;
+    GtkWidget *right;
+
+    if(!frame || !GTK_IS_FRAME(frame) ||
+       g_object_get_data(G_OBJECT(frame),
+                         "gvr-preview-action-columns"))
+        return;
+
+    center = gtk_bin_get_child(GTK_BIN(frame));
+    if(!center)
+        return;
+
+    g_object_ref(center);
+    gtk_container_remove(GTK_CONTAINER(frame), center);
+
+    row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
+    right = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+
+    add_class(row, "preview-action-row");
+    add_class(right, "preview-action-column");
+    add_class(right, "preview-action-column-right");
+
+    gtk_widget_set_valign(right, GTK_ALIGN_CENTER);
+    gtk_widget_set_halign(right, GTK_ALIGN_END);
+    gtk_widget_set_hexpand(center, TRUE);
+    gtk_widget_set_vexpand(center, TRUE);
+
+    gtk_container_add(GTK_CONTAINER(frame), row);
+    gtk_box_pack_start(GTK_BOX(row),
+                       center,
+                       TRUE,
+                       TRUE,
+                       0);
+    gtk_box_pack_end(GTK_BOX(row),
+                     right,
+                     FALSE,
+                     FALSE,
+                     1);
+    g_object_unref(center);
+
+    for(guint i = 0;
+        i < G_N_ELEMENTS(right_buttons);
+        i++)
+    {
+        sequence_preview_pack_button(
+            right,
+            right_buttons[i]);
+    }
+
+    if(legacy_media) {
+        gtk_widget_set_no_show_all(legacy_media, TRUE);
+        gtk_widget_hide(legacy_media);
+    }
+
+    g_object_set_data(G_OBJECT(frame),
+                      "gvr-preview-action-row",
+                      row);
+    g_object_set_data(G_OBJECT(frame),
+                      "gvr-preview-action-center",
+                      center);
+    g_object_set_data(G_OBJECT(frame),
+                      "gvr-preview-action-columns",
+                      GINT_TO_POINTER(1));
+    gtk_widget_show_all(row);
+    preview_set_widget_minimum();
+}
+
+
+static void sequence_vims_history_activate(GtkWidget *widget,
+                                           const gchar *message,
+                                           gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(!info || !info->vims_pattern_view ||
+       !message || !message[0])
+        return;
+
+    sequence_vims_sync_target();
+    if(!gvr_vims_pattern_view_insert_message(
+           info->vims_pattern_view,
+           message,
+           -1,
+           -1,
+           FALSE))
+    {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Select an editable Pattern target before placing a VIMS history command");
+    }
+}
+
+static gboolean sequence_vims_mount_history_page(GtkWidget *history_view)
+{
+    GtkWidget *page = glade_xml_get_widget_(info->main_window,
+                                            "vbox498");
+    GtkWidget *tab = glade_xml_get_widget_(info->main_window,
+                                           "label877");
+    GList *children;
+
+    if(!page || !GTK_IS_BOX(page) || !history_view)
+        return FALSE;
+
+    if(tab && GTK_IS_LABEL(tab))
+        gtk_label_set_markup(GTK_LABEL(tab),
+                             "<b>VIMS History</b>");
+
+    children = gtk_container_get_children(GTK_CONTAINER(page));
+    for(GList *item = children; item; item = item->next) {
+        GtkWidget *child = GTK_WIDGET(item->data);
+        gtk_widget_set_no_show_all(child, TRUE);
+        gtk_widget_hide(child);
+    }
+    g_list_free(children);
+
+    add_class(page, "vims-history-page");
+    add_class(history_view, "vims-history-view");
+    gtk_widget_set_hexpand(history_view, TRUE);
+    gtk_widget_set_vexpand(history_view, TRUE);
+    gtk_box_pack_start(GTK_BOX(page),
+                       history_view,
+                       TRUE,
+                       TRUE,
+                       0);
+    gtk_widget_show(history_view);
+    gtk_widget_show(page);
+    return TRUE;
+}
+
+static gboolean sequence_vims_mount_pattern_page(GtkWidget *pattern_view)
+{
+    GtkWidget *page = glade_xml_get_widget_(info->main_window, "vbox649");
+    GtkWidget *tab = glade_xml_get_widget_(info->main_window, "label969");
+    GList *children;
+
+    if(!page || !GTK_IS_BOX(page) || !pattern_view)
+        return FALSE;
+
+    if(tab && GTK_IS_LABEL(tab))
+        gtk_label_set_markup(GTK_LABEL(tab), "<b>Pattern</b>");
+
+    children = gtk_container_get_children(GTK_CONTAINER(page));
+    for(GList *item = children; item; item = item->next)
+        gtk_widget_destroy(GTK_WIDGET(item->data));
+    g_list_free(children);
+
+    add_class(page, "vims-pattern-page");
+    add_class(pattern_view, "vims-pattern-view");
+    gtk_widget_set_hexpand(pattern_view, TRUE);
+    gtk_widget_set_vexpand(pattern_view, TRUE);
+    gtk_box_pack_start(GTK_BOX(page), pattern_view, TRUE, TRUE, 0);
+    gtk_widget_show_all(page);
+    return TRUE;
 }
 
 static void create_sequencer_slots(int nx, int ny)
@@ -20236,9 +22627,40 @@ static void create_sequencer_slots(int nx, int ny)
 
     info->sequence_bank_view = gvr_sequence_bank_view_new();
     gvr_sequence_bank_view_set_queue_mode(info->sequence_bank_view,
-                                              sequence_ui_queue_bank_changes != 0);
+                                           sequence_ui_queue_bank_changes != 0);
     gtk_widget_set_size_request(info->sequence_bank_view, sequence_view_w, sequence_view_h);
     gtk_box_pack_start(GTK_BOX(outer), info->sequence_bank_view, TRUE, TRUE, compact ? 0 : 2);
+
+    info->vims_pattern_view = gvr_vims_pattern_view_new();
+    gvr_vims_pattern_view_set_description_lookup(
+        info->vims_pattern_view,
+        sequence_vims_description_lookup,
+        NULL,
+        NULL);
+    gtk_widget_set_size_request(info->vims_pattern_view, sequence_view_w, sequence_view_h);
+    if(!sequence_vims_mount_pattern_page(info->vims_pattern_view)) {
+        GtkWidget *fallback = gtk_frame_new("Pattern");
+        add_class(fallback, "vims-pattern-fallback");
+        gtk_container_add(GTK_CONTAINER(fallback), info->vims_pattern_view);
+        gtk_box_pack_start(GTK_BOX(outer), fallback, TRUE, TRUE, compact ? 0 : 2);
+        gtk_widget_show(fallback);
+        vj_msg(VEEJAY_MSG_ERROR, "Unable to locate Pattern page container vbox649; mounted Pattern editor in SEQ as fallback");
+    }
+
+    sequence_preview_mount_action_columns();
+
+    info->vims_history_view = gvr_vims_history_view_new();
+    gtk_widget_set_size_request(info->vims_history_view,
+                                sequence_view_w,
+                                sequence_view_h);
+    g_signal_connect(info->vims_history_view,
+                     "message-activated",
+                     G_CALLBACK(sequence_vims_history_activate),
+                     NULL);
+    if(!sequence_vims_mount_history_page(info->vims_history_view)) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Unable to locate Veejay page container vbox498 for VIMS History");
+    }
 
     progress_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, compact ? 1 : 3);
     add_class(progress_row, "sequencer-record-row");
@@ -20276,11 +22698,20 @@ static void create_sequencer_slots(int nx, int ny)
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-clear-requested", G_CALLBACK(on_sequence_bank_view_bank_clear), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "refresh-requested", G_CALLBACK(on_sequence_bank_view_refresh), NULL);
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "query-tooltip", G_CALLBACK(on_sequence_bank_view_query_tooltip), NULL);
+    g_signal_connect_after(G_OBJECT(info->sequence_bank_view), "button-release-event", G_CALLBACK(sequence_vims_grid_button_release), NULL);
+    g_signal_connect_after(G_OBJECT(info->sequence_bank_view), "key-release-event", G_CALLBACK(sequence_vims_grid_key_release), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "pattern-clipboard-reset", G_CALLBACK(sequence_vims_clipboard_reset), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "pattern-clipboard-copy", G_CALLBACK(sequence_vims_clipboard_copy), NULL);
+    g_signal_connect(G_OBJECT(info->sequence_bank_view), "pattern-clipboard-paste", G_CALLBACK(sequence_vims_clipboard_paste), NULL);
+    g_signal_connect(G_OBJECT(info->vims_pattern_view), "vims-fire", G_CALLBACK(sequence_vims_fire), NULL);
+    g_signal_connect(G_OBJECT(info->vims_pattern_view), "pattern-changed", G_CALLBACK(sequence_vims_pattern_changed), NULL);
+    g_signal_connect(G_OBJECT(info->vims_pattern_view), "transport-request", G_CALLBACK(sequence_vims_transport_request), NULL);
     gtk_widget_show(info->sequence_bank_view);
 
     info->sequencer_col = nx;
     info->sequencer_row = ny;
     info->sequence_playing = -1;
+    sequence_vims_sync_target();
 }
 
 static gboolean samplebank_locate_slot(sample_slot_t *slot, int *page, int *slot_nr)

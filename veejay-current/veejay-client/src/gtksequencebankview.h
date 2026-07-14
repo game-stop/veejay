@@ -30,6 +30,33 @@ G_BEGIN_DECLS
 #define GVR_IS_SEQUENCE_BANK_VIEW_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE((klass), GVR_TYPE_SEQUENCE_BANK_VIEW))
 #define GVR_SEQUENCE_BANK_VIEW_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS((obj), GVR_TYPE_SEQUENCE_BANK_VIEW, GvrSequenceBankViewClass))
 
+#define GVR_SEQUENCE_PATTERN_HAS_HOLD    (1u << 0)
+#define GVR_SEQUENCE_PATTERN_HAS_VIMS    (1u << 1)
+#define GVR_SEQUENCE_PATTERN_SOURCE_VIMS (1u << 2)
+#define GVR_SEQUENCE_PATTERN_CELL_VIMS   (1u << 3)
+#define GVR_SEQUENCE_PATTERN_SOURCE_HOLD (1u << 4)
+#define GVR_SEQUENCE_PATTERN_CELL_HOLD   (1u << 5)
+#define GVR_SEQUENCE_PATTERN_ANY_VIMS \
+    (GVR_SEQUENCE_PATTERN_SOURCE_VIMS | GVR_SEQUENCE_PATTERN_CELL_VIMS)
+#define GVR_SEQUENCE_PATTERN_ANY_HOLD \
+    (GVR_SEQUENCE_PATTERN_SOURCE_HOLD | GVR_SEQUENCE_PATTERN_CELL_HOLD)
+
+typedef struct {
+    guint flags;
+    guint source_events;
+    guint source_rows;
+    guint cell_events;
+    guint cell_rows;
+} GvrSequencePatternSummary;
+
+typedef struct {
+    guint flags;
+    guint event_count;
+    guint row_count;
+    gboolean timeline_known;
+    gint64 timeline_length;
+} GvrSequenceBankPatternSummary;
+
 typedef struct _GvrSequenceBankView GvrSequenceBankView;
 typedef struct _GvrSequenceBankViewClass GvrSequenceBankViewClass;
 
@@ -43,13 +70,33 @@ void gvr_sequence_bank_view_set_queue_mode(GtkWidget *widget, gboolean enabled);
 gboolean gvr_sequence_bank_view_get_queue_mode(GtkWidget *widget);
 void gvr_sequence_bank_view_set_selected_bank(GtkWidget *widget, int bank);
 int  gvr_sequence_bank_view_get_selected_bank(GtkWidget *widget);
+gboolean gvr_sequence_bank_view_get_selected_slot(GtkWidget *widget, int *bank, int *slot);
 void gvr_sequence_bank_view_set_sequence_active(GtkWidget *widget, gboolean active);
 void gvr_sequence_bank_view_set_current_slot(GtkWidget *widget, int bank, int slot);
 void gvr_sequence_bank_view_set_bank_revision(GtkWidget *widget, int bank, unsigned int revision);
+unsigned int gvr_sequence_bank_view_get_bank_revision(GtkWidget *widget, int bank);
 void gvr_sequence_bank_view_set_bank_size(GtkWidget *widget, int bank, int size);
 void gvr_sequence_bank_view_set_slot(GtkWidget *widget, int bank, int slot, int sample_id, int sample_type);
 gboolean gvr_sequence_bank_view_get_slot(GtkWidget *widget, int bank, int slot, int *sample_id, int *sample_type);
 gboolean gvr_sequence_bank_view_get_cell_at(GtkWidget *widget, int x, int y, int *bank, int *slot, gboolean *header);
+void gvr_sequence_bank_view_set_pattern_summary(GtkWidget *widget,
+                                                int bank,
+                                                int slot,
+                                                const GvrSequencePatternSummary *summary);
+gboolean gvr_sequence_bank_view_get_pattern_summary(GtkWidget *widget,
+                                                     int bank,
+                                                     int slot,
+                                                     GvrSequencePatternSummary *summary);
+void gvr_sequence_bank_view_set_bank_pattern_summary(
+        GtkWidget *widget,
+        int bank,
+        const GvrSequenceBankPatternSummary *summary);
+gboolean gvr_sequence_bank_view_get_bank_pattern_summary(
+        GtkWidget *widget,
+        int bank,
+        GvrSequenceBankPatternSummary *summary);
+void gvr_sequence_bank_view_set_pattern_flags(GtkWidget *widget, int bank, int slot, guint flags);
+guint gvr_sequence_bank_view_get_pattern_flags(GtkWidget *widget, int bank, int slot);
 void gvr_sequence_bank_view_clear_bank(GtkWidget *widget, int bank);
 void gvr_sequence_bank_view_clear_all(GtkWidget *widget);
 void gvr_sequence_bank_view_copy_bank(GtkWidget *widget, int src_bank, int dst_bank);

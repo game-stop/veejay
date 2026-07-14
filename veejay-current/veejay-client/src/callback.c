@@ -1,5 +1,4 @@
-/* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
-dlclose( handle );	
+/* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface	
  *           (C) 2002-2015 Niels Elburg <nwelburg@gmail.com>
  *           (C)      2006 Matthijs van Henten <matthijs.vanhenten@gmail.com>
  *
@@ -95,6 +94,7 @@ extern void vj_midi_learning_vims_toggle(void *vv, char *widget, int id);
 extern void vj_midi_learning_vims_toggle2(void *vv, char *widget, int id, int arg);
 extern void vj_midi_learning_vims_toggle3(void *vv, char *widget, int id, int arg0, int arg1);
 extern void vj_midi_learning_vims_dual_toggle(void *vv, char *widget, int off_id, int on_id, int arg);
+extern void vj_gui_vims_pattern_set_stream_length(int frame_count);
 
 
 static int current_stream_selected(void)
@@ -155,41 +155,36 @@ static inline double ui_clampd(double v, double lo, double hi)
     return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
 
-static int framerate_slider_value_to_ceil_x100(gdouble slider_val)
+static int framerate_slider_value_to_x100(gdouble slider_val)
 {
-    slider_val = ui_clampd(slider_val, 1.0, 240.0);
+    slider_val = ui_clampd(slider_val, 0.0, 120.0);
 
-    int fps = (int)slider_val;
-    fps += (slider_val > ((gdouble)fps + 0.000001));
+    int value_x100 = ui_clampi((int)floor((slider_val * 100.0) + 0.5), 0, 12000);
+    if(value_x100 > 0 && value_x100 < 25)
+        value_x100 = 25;
 
-    return ui_clampi(fps, 1, 240) * 100;
+    return value_x100;
 }
 
-
-static void framerate_snap_widget_to_integer(GtkWidget *w, int value_x100)
+static void framerate_snap_widget_to_x100(GtkWidget *w, int value_x100)
 {
-    GtkAdjustment *a;
-    gdouble snapped;
-    int old_lock;
+    GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(w));
+    gdouble value = ((gdouble)value_x100) / 100.0;
 
-    if(!w || !GTK_IS_RANGE(w))
+    if(fabs(gtk_adjustment_get_value(a) - value) < 0.000001)
         return;
 
-    a = gtk_range_get_adjustment(GTK_RANGE(w));
-    snapped = ((gdouble)value_x100) / 100.0;
-
-    if(gtk_adjustment_get_value(a) == snapped)
-        return;
-
-    old_lock = info->status_lock;
+    int old_lock = info->status_lock;
     info->status_lock = 1;
-    gtk_adjustment_set_value(a, snapped);
+    gtk_adjustment_set_value(a, value);
     info->status_lock = old_lock;
 }
 
 static void framerate_send_x100(int value_x100, int midi_learn)
 {
-    value_x100 = ui_clampi(value_x100, 100, 24000);
+    value_x100 = ui_clampi(value_x100, 0, 12000);
+    if(value_x100 > 0 && value_x100 < 25)
+        value_x100 = 25;
 
     if(value_x100 == framerate_last_sent_x100)
         return;
@@ -4878,26 +4873,77 @@ gboolean on_slow_slider_click(GtkWidget *widget, GdkEventButton *event, gpointer
 }
 
 
+static void playback_speed_send(gint value)
+{
+	if(current_stream_buffer_ready()) {
+		multi_vims(VIMS_STREAM_BUFFER_SET_SPEED, "%d %d", current_stream_id(), value);
+		vj_midi_learning_vims_msg2(info->midi, "speed_slider", VIMS_STREAM_BUFFER_SET_SPEED, current_stream_id(), value);
+		return;
+	}
+	if(current_stream_selected()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
+	multi_vims(VIMS_VIDEO_SET_SPEED, "%d", value);
+	vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d", value);
+	vj_midi_learning_vims_simple(info->midi, "speed_slider", VIMS_VIDEO_SET_SPEED);
+}
+
+static void playback_speed_step(gint step)
+{
+	if(info->status_lock)
+		return;
+
+	if(current_stream_selected() && !current_stream_buffer_ready()) {
+		current_stream_buffer_warn_not_ready();
+		return;
+	}
+
+	gint speed = (gint) get_slider_val("speed_slider");
+	gint direction;
+
+	if(speed < 0)
+		direction = -1;
+	else if(speed > 0)
+		direction = 1;
+	else if(current_stream_buffer_ready() && info->status_tokens[STREAM_BUFFER_DIRECTION] < 0)
+		direction = -1;
+	else
+		direction = info->play_direction < 0 ? -1 : 1;
+
+	gint magnitude = speed < 0 ? -speed : speed;
+	gint new_speed = direction * ui_clampi(magnitude + step, 0, 25);
+
+	if(new_speed == speed)
+		return;
+
+	info->play_direction = direction;
+	int old_status_lock = info->status_lock;
+	info->status_lock = 1;
+	update_slider_gvalue("speed_slider", new_speed);
+	info->status_lock = old_status_lock;
+
+	playback_speed_send(new_speed);
+}
+
+void on_speed_decrement_clicked(GtkWidget *widget, gpointer user_data)
+{
+	(void)widget;
+	(void)user_data;
+	playback_speed_step(-1);
+}
+
+void on_speed_increment_clicked(GtkWidget *widget, gpointer user_data)
+{
+	(void)widget;
+	(void)user_data;
+	playback_speed_step(1);
+}
+
 void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-	{
-		gint value = (gint) get_slider_val( "speed_slider" );
-
-		if(current_stream_buffer_ready()) {
-			multi_vims(VIMS_STREAM_BUFFER_SET_SPEED, "%d %d", current_stream_id(), value);
-			vj_midi_learning_vims_msg2(info->midi, "speed_slider", VIMS_STREAM_BUFFER_SET_SPEED, current_stream_id(), value);
-			return;
-		}
-		if(current_stream_selected()) {
-			current_stream_buffer_warn_not_ready();
-			return;
-		}
-		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
-			vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
-			value );
-		vj_midi_learning_vims_simple( info->midi, "speed_slider", VIMS_VIDEO_SET_SPEED );
-	}
+		playback_speed_send((gint) get_slider_val("speed_slider"));
 }
 
 
@@ -5263,8 +5309,11 @@ void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data)
 {
-	gint n_frames = get_nums( "spin_streamduration" );
-	char *time = format_time(n_frames,info->el.fps);
+	gint n_frames;
+	char *time;
+
+	n_frames = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widget));
+	time = format_time(n_frames,info->el.fps);
 	update_label_str( "label_streamrecord_duration", time );
 	free(time);
 }
@@ -6486,6 +6535,7 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
     max_x = (gfloat)((end_pos > 1) ? (end_pos - 1) : 1);
 
 	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", end_pos );
+	vj_gui_vims_pattern_set_stream_length(end_pos);
 
     if(info->uc.selected_parameter_id < 0) {
         gtk3_curve_live_trace_clear(info->curve);
@@ -6533,25 +6583,76 @@ int	on_curve_buttontime_clicked(void)
 
 void	on_framerate_inc_clicked( GtkWidget *w, gpointer data )
 {
-	double cur = get_slider_val( "framerate" );
-	cur += 1.0;
-	update_slider_value( "framerate", (int) cur, 0 );
+    gdouble cur = get_slider_val("framerate");
+    update_slider_gvalue("framerate", ui_clampd(cur + 1.0, 0.0, 120.0));
 }
 
 void    on_framerate_dec_clicked( GtkWidget *w, gpointer data )
 {
-        double cur = get_slider_val( "framerate" );
-        cur -= 1.0;
-        update_slider_value( "framerate", (int) cur, 0 );
+    gdouble cur = get_slider_val("framerate");
+    update_slider_gvalue("framerate", ui_clampd(cur - 1.0, 0.0, 120.0));
 }
 
+gboolean on_framerate_change_value(GtkRange *range, GtkScrollType scroll, gdouble value, gpointer data)
+{
+    GtkAdjustment *a = gtk_range_get_adjustment(range);
+    gdouble current = gtk_adjustment_get_value(a);
+
+    if(value > 0.0 && value < 0.25) {
+        gtk_adjustment_set_value(a, value < current ? 0.0 : 0.25);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean on_framerate_scroll_event(GtkWidget *w, GdkEventScroll *event, gpointer data)
+{
+    gdouble delta = 0.0;
+
+    switch(event->direction) {
+        case GDK_SCROLL_UP:
+            delta = 1.0;
+            break;
+        case GDK_SCROLL_DOWN:
+            delta = -1.0;
+            break;
+        case GDK_SCROLL_SMOOTH:
+            if(event->delta_y < 0.0)
+                delta = 1.0;
+            else if(event->delta_y > 0.0)
+                delta = -1.0;
+            break;
+        default:
+            return FALSE;
+    }
+
+    if(delta != 0.0) {
+        GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(w));
+        gdouble current = gtk_adjustment_get_value(a);
+        gdouble step = (event->state & (GDK_SHIFT_MASK | GDK_CONTROL_MASK)) ? 1.0 : 0.1;
+        gdouble value;
+
+        if(delta > 0.0 && current == 0.0 && step < 0.25)
+            value = 0.25;
+        else if(delta < 0.0 && current <= 0.25)
+            value = 0.0;
+        else
+            value = current + (delta * step);
+
+        value = floor((ui_clampd(value, 0.0, 120.0) * 100.0) + 0.5) / 100.0;
+        gtk_adjustment_set_value(a, value);
+    }
+
+    return TRUE;
+}
 
 void	on_frameratenormal_clicked( GtkWidget *w, gpointer data )
 {
-    int fps_x100 = framerate_slider_value_to_ceil_x100((gdouble)info->el.fps);
+    int fps_x100 = framerate_slider_value_to_x100((gdouble)info->el.fps);
 
     update_slider_gvalue("framerate", ((gdouble)fps_x100) / 100.0);
-    vj_msg(VEEJAY_MSG_INFO, "Playback framerate reset to %d FPS", fps_x100 / 100);
+    vj_msg(VEEJAY_MSG_INFO, "Playback framerate reset to %.2f FPS", ((gdouble)fps_x100) / 100.0);
 }
 
 void	on_framerate_value_changed( GtkWidget *w, gpointer data )
@@ -6561,10 +6662,10 @@ void	on_framerate_value_changed( GtkWidget *w, gpointer data )
 
     GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(w));
 	gdouble slider_val = gtk_adjustment_get_value(a);
-	int value = framerate_slider_value_to_ceil_x100(slider_val);
+	int value = framerate_slider_value_to_x100(slider_val);
     gint64 now_us = g_get_monotonic_time();
 
-    framerate_snap_widget_to_integer(w, value);
+    framerate_snap_widget_to_x100(w, value);
 
     if(value == framerate_last_sent_x100)
         return;
@@ -7375,7 +7476,7 @@ static void callback_sync_playmode_panel_pages(void)
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *m = glade_xml_get_widget_(info->main_window , "notebook18");
-	gtk_notebook_set_current_page( GTK_NOTEBOOK(m), 6 );
+	gtk_notebook_set_current_page(GTK_NOTEBOOK(m), NOTEBOOK18_PAGE_SAMPLE);
 	callback_sync_playmode_panel_pages();
 }
 
@@ -9081,24 +9182,6 @@ void	on_macroclear_clicked( GtkWidget *w, gpointer data )
 }
 
 
-void	on_macro_loop_position_value_changed( GtkWidget *w, gpointer data)
-{
-	if(!info->status_lock)
-		macro_line[2] = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w) );
-}
-
-void	on_macro_dup_position_value_changed( GtkWidget *w, gpointer data )
-{
-	if(!info->status_lock)
-		macro_line[1] = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w) );
-}
-
-void	on_macro_frame_position_value_changed( GtkWidget *w, gpointer data)
-{
-	if(!info->status_lock)
-		macro_line[0] = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w) );
-}
-
 void	on_macro_button_clear_bank_clicked( GtkWidget *w, gpointer data)
 {
 	int num = get_nums("macro_bank_select");
@@ -9109,26 +9192,10 @@ void	on_macro_button_clear_bank_clicked( GtkWidget *w, gpointer data)
 
 void 	on_macro_save_button_clicked( GtkWidget *w, gpointer data)
 {
-	macro_line[0] = get_nums("macro_frame_position");
-	macro_line[1] = get_nums("macro_dup_position");
-	macro_line[2] = get_nums("macro_loop_position");
-
-	char *message = get_text("macro_vims_message");
-    if(!message || message[0] == '\0') {
-        vj_msg(VEEJAY_MSG_INFO, "Enter a VIMS message before saving a macro event");
-        return;
-    }
-
-	multi_vims( VIMS_PUT_MACRO, "%u %u %u %s", macro_line[0],macro_line[1],macro_line[2], message );
-        info->uc.reload_hint[HINT_MACRO] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Saved new event at frame %u.%u, loop %u", macro_line[0],macro_line[1],macro_line[2]);
 }
 
 void	on_macro_delete_button_clicked( GtkWidget *w, gpointer data)
 {
-	multi_vims( VIMS_DEL_MACRO,"%u %u %u %u", macro_line[0], macro_line[1], macro_line[2], macro_line[3] );
-        info->uc.reload_hint[HINT_MACRO] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Removed event at frame %u.%u, loop %u #%u", macro_line[0],macro_line[1],macro_line[2],macro_line[3]);
 }
 
 void    on_macro_refresh_button_clicked( GtkWidget *w, gpointer data)
@@ -9240,7 +9307,7 @@ void on_notebook18_switch_page (GtkNotebook *notebook,
                                 guint        page_num,
                                 gpointer     user_data)
 {
-    if( page_num == 1 ) {
+    if(page_num == NOTEBOOK18_PAGE_FX_ANIM) {
         vj_kf_refresh(TRUE);
     }
 }

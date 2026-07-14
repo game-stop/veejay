@@ -55,10 +55,12 @@
 typedef struct {
     int sample_id;
     int sample_type;
+    GvrSequencePatternSummary pattern;
 } GvrSequenceCell;
 
 typedef struct {
     GvrSequenceCell cells[GVR_SEQUENCE_SLOTS];
+    GvrSequenceBankPatternSummary pattern;
     int current;
     int size;
     unsigned int revision;
@@ -122,6 +124,9 @@ enum {
     SIGNAL_BANK_PASTE_REQUESTED,
     SIGNAL_BANK_CLEAR_REQUESTED,
     SIGNAL_REFRESH_REQUESTED,
+    SIGNAL_PATTERN_CLIPBOARD_RESET,
+    SIGNAL_PATTERN_CLIPBOARD_COPY,
+    SIGNAL_PATTERN_CLIPBOARD_PASTE,
     SIGNAL_LAST
 };
 
@@ -150,29 +155,13 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
     const int outer = compact ? 3 : 6;
     const int gap = compact ? 4 : 8;
     const int inner = compact ? 2 : 4;
-    const int header_h = compact ? 14 : 18;
+    const int header_h = compact ? 19 : 22;
 
-    int bank_w = (width - (outer * 2) - gap) / 2;
-    int bank_h = (height - (outer * 2) - gap) / 2;
-
-    if(bank_w < 24)
-        bank_w = 24;
-    if(bank_h < 24)
-        bank_h = 24;
-
-    int grid_space_w = bank_w - (inner * 2);
-    int grid_space_h = bank_h - header_h - (inner * 2);
-    int cell = grid_space_w / GVR_SEQUENCE_COLUMNS;
-    int cell_h = grid_space_h / GVR_SEQUENCE_ROWS;
-
-    if(cell_h < cell)
-        cell = cell_h;
-    if(cell < 2)
-        cell = 2;
-
-    const int grid_side = cell * GVR_SEQUENCE_COLUMNS;
-    const int total_w = bank_w * 2 + gap;
-    const int total_h = bank_h * 2 + gap;
+    const int available_bank_w = (width - (outer * 2) - gap) / 2;
+    const int available_bank_h = (height - (outer * 2) - gap) / 2;
+    const int bank_side = MAX(24, MIN(available_bank_w, available_bank_h));
+    const int total_w = bank_side * 2 + gap;
+    const int total_h = bank_side * 2 + gap;
     int start_x = (width - total_w) / 2;
     int start_y = (height - total_h) / 2;
 
@@ -187,32 +176,40 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
         GdkRectangle *br = &view->bank_rect[bank];
         GdkRectangle *hr = &view->header_rect[bank];
 
-        br->x = start_x + col * (bank_w + gap);
-        br->y = start_y + row * (bank_h + gap);
-        br->width = bank_w;
-        br->height = bank_h;
+        br->x = start_x + col * (bank_side + gap);
+        br->y = start_y + row * (bank_side + gap);
+        br->width = bank_side;
+        br->height = bank_side;
 
         hr->x = br->x;
         hr->y = br->y;
         hr->width = br->width;
         hr->height = header_h;
 
-        const int grid_x = br->x + (br->width - grid_side) / 2;
-        const int grid_y = br->y + header_h + ((br->height - header_h - grid_side) / 2);
+        const int available_x = br->x + inner;
+        const int available_y = br->y + header_h + inner;
+        const int available_w = br->width - (inner * 2);
+        const int available_h = br->height - header_h - (inner * 2);
+        const int cell_span = MAX(1,
+                                  MIN(available_w / GVR_SEQUENCE_COLUMNS,
+                                      available_h / GVR_SEQUENCE_ROWS));
+        const int grid_w = cell_span * GVR_SEQUENCE_COLUMNS;
+        const int grid_h = cell_span * GVR_SEQUENCE_ROWS;
+        const int grid_x = available_x + (available_w - grid_w) / 2;
+        const int grid_y = available_y + (available_h - grid_h) / 2;
 
         for(int slot = 0; slot < GVR_SEQUENCE_SLOTS; slot++) {
             GdkRectangle *cr = &view->cell_rect[bank][slot];
             const int sx = slot % GVR_SEQUENCE_COLUMNS;
             const int sy = slot / GVR_SEQUENCE_COLUMNS;
 
-            cr->x = grid_x + sx * cell;
-            cr->y = grid_y + sy * cell;
-            cr->width = cell - 1;
-            cr->height = cell - 1;
+            cr->x = grid_x + sx * cell_span;
+            cr->y = grid_y + sy * cell_span;
+            cr->width = MAX(1, cell_span - 1);
+            cr->height = MAX(1, cell_span - 1);
         }
     }
 }
-
 
 static void gvr_sequence_slot_color(int sample_type, double *r, double *g, double *b)
 {
@@ -311,6 +308,118 @@ static void gvr_draw_centered_text(cairo_t *cr, const char *text, const GdkRecta
     cairo_restore(cr);
 }
 
+static void gvr_sequence_draw_pattern_badge(cairo_t *cr,
+                                            const GdkRectangle *r,
+                                            const GvrSequencePatternSummary *summary)
+{
+    const guint flags = summary ? summary->flags : 0;
+    const gboolean source = (flags & (GVR_SEQUENCE_PATTERN_SOURCE_VIMS |
+                                      GVR_SEQUENCE_PATTERN_SOURCE_HOLD)) != 0;
+    const gboolean cell = (flags & (GVR_SEQUENCE_PATTERN_CELL_VIMS |
+                                    GVR_SEQUENCE_PATTERN_CELL_HOLD)) != 0;
+    const gboolean hold = (flags & GVR_SEQUENCE_PATTERN_ANY_HOLD) != 0;
+    const double marker = MAX(3.0, MIN(5.0, MIN(r->width, r->height) * 0.34));
+
+    if(!source && !cell)
+        return;
+
+    if(source) {
+        gvr_set_rgba(cr, 0.250, 0.900, 1.000, 1.0);
+        cairo_move_to(cr, r->x + 1.0, r->y + 1.0);
+        cairo_line_to(cr, r->x + marker + 1.0, r->y + 1.0);
+        cairo_line_to(cr, r->x + 1.0, r->y + marker + 1.0);
+        cairo_close_path(cr);
+        cairo_fill(cr);
+    }
+
+    if(cell) {
+        gvr_set_rgba(cr, 1.000, 0.360, 0.820, 1.0);
+        cairo_move_to(cr, r->x + r->width - 1.0, r->y + 1.0);
+        cairo_line_to(cr, r->x + r->width - marker - 1.0, r->y + 1.0);
+        cairo_line_to(cr, r->x + r->width - 1.0, r->y + marker + 1.0);
+        cairo_close_path(cr);
+        cairo_fill(cr);
+    }
+
+    if(hold && r->width >= 7 && r->height >= 7) {
+        gvr_set_rgba(cr, 1.000, 0.680, 0.200, 1.0);
+        cairo_arc(cr,
+                  r->x + r->width - 3.0,
+                  r->y + r->height - 3.0,
+                  1.8,
+                  0.0,
+                  2.0 * G_PI);
+        cairo_fill(cr);
+    }
+
+    if(r->width >= 30 && r->height >= 18) {
+        const char *label = source && cell ? "S+C" : (source ? "S" : "C");
+        const double width = source && cell ? 23.0 : 11.0;
+        const double x = r->x + ((double)r->width - width) * 0.5;
+        const double y = r->y + r->height - 10.0;
+
+        gvr_set_rgba(cr, 0.025, 0.030, 0.038, 0.92);
+        cairo_rectangle(cr, x, y, width, 9.0);
+        cairo_fill(cr);
+        gvr_set_rgba(cr, 0.960, 0.970, 1.000, 1.0);
+        gvr_draw_text(cr, label, x + 2.0, y + 7.2, 6.8);
+    }
+}
+
+static void gvr_sequence_draw_bank_pattern_badge(cairo_t *cr,
+                                                   const GdkRectangle *header,
+                                                   const GvrSequenceBankPatternSummary *summary)
+{
+    const gboolean hold = summary &&
+                          (summary->flags & GVR_SEQUENCE_PATTERN_HAS_HOLD) != 0;
+    const char *label = hold ? "SEQ H" : "SEQ";
+    const double font_size = 10.5;
+    const double pad_x = 5.0;
+    const double badge_h = 17.0;
+    cairo_text_extents_t ext;
+    double badge_w;
+    double x;
+    double y;
+    double text_x;
+    double text_y;
+
+    if(!cr || !header || !summary || summary->event_count == 0)
+        return;
+
+    cairo_save(cr);
+    cairo_select_font_face(cr,
+                           "Sans",
+                           CAIRO_FONT_SLANT_NORMAL,
+                           CAIRO_FONT_WEIGHT_BOLD);
+    cairo_set_font_size(cr, font_size);
+    cairo_text_extents(cr, label, &ext);
+
+    badge_w = ceil(ext.width + pad_x * 2.0);
+    x = header->x + header->width - badge_w - 5.0;
+    y = header->y + ((double)header->height - badge_h) * 0.5;
+
+    gvr_set_rgba(cr, 0.030, 0.045, 0.055, 0.98);
+    cairo_rectangle(cr, x, y, badge_w, badge_h);
+    cairo_fill(cr);
+
+    gvr_set_rgba(cr,
+                 hold ? 0.980 : 0.360,
+                 hold ? 0.680 : 0.930,
+                 hold ? 0.200 : 0.740,
+                 1.0);
+    cairo_set_line_width(cr, 1.2);
+    cairo_rectangle(cr, x + 0.6, y + 0.6, badge_w - 1.2, badge_h - 1.2);
+    cairo_stroke(cr);
+
+    text_x = x + (badge_w - ext.width) * 0.5 - ext.x_bearing;
+    text_y = y + (badge_h - ext.height) * 0.5 - ext.y_bearing;
+
+    gvr_set_rgba(cr, 0.920, 1.000, 0.970, 1.0);
+    cairo_move_to(cr, text_x, text_y);
+    cairo_show_text(cr, label);
+    cairo_restore(cr);
+}
+
 static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
 {
     GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(widget);
@@ -367,6 +476,7 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                      view->banks[bank].revision);
         gvr_set_rgba(cr, 0.850, 0.880, 0.920, 1.0);
         gvr_draw_text(cr, title, hr->x + (br->width < 230 ? 4 : 8), hr->y + (br->width < 230 ? 13 : 16), br->width < 230 ? 9.0 : 11.0);
+        gvr_sequence_draw_bank_pattern_badge(cr, hr, &view->banks[bank].pattern);
 
         for(int slot = 0; slot < GVR_SEQUENCE_SLOTS; slot++) {
             GdkRectangle *r = &view->cell_rect[bank][slot];
@@ -399,7 +509,10 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                 if(r->width >= 18 && r->height >= 11) {
                     char label[16];
                     double tr, tg, tb;
-                    double label_size = r->width < 28 ? 10.0 : (r->width < 40 ? 12.0 : 14.0);
+                    const int label_extent = MIN(r->width, r->height);
+                    double label_size = label_extent < 18 ? 9.0 :
+                                        (label_extent < 24 ? 10.0 :
+                                         (label_extent < 34 ? 12.0 : 14.0));
                     snprintf(label, sizeof(label), "%d", sample_id);
                     gvr_sequence_slot_text_color(rr, gg, bb, &tr, &tg, &tb);
                     gvr_set_rgba(cr, tr > 0.5 ? 0.0 : 1.0, tg > 0.5 ? 0.0 : 1.0, tb > 0.5 ? 0.0 : 1.0, 0.28);
@@ -410,6 +523,7 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                     gvr_set_rgba(cr, tr, tg, tb, 1.0);
                     gvr_draw_centered_text(cr, label, r, label_size);
                 }
+
             }
             else {
                 gvr_set_rgba(cr, 0.055, 0.060, 0.068, 1.0);
@@ -448,6 +562,11 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                 cairo_rectangle(cr, r->x + 1.0, r->y + 1.0, r->width - 2.0, r->height - 2.0);
                 cairo_stroke(cr);
             }
+
+            if(filled)
+                gvr_sequence_draw_pattern_badge(cr,
+                                                r,
+                                                &view->banks[bank].cells[slot].pattern);
         }
     }
 
@@ -823,6 +942,11 @@ static int gvr_sequence_bank_view_copy_selection(GvrSequenceBankView *view, gboo
     view->copy_is_bank = whole_bank ? TRUE : FALSE;
     view->copy_bank = bank;
 
+    if(!whole_bank)
+        g_signal_emit(view,
+                      gvr_sequence_bank_view_signals[SIGNAL_PATTERN_CLIPBOARD_RESET],
+                      0);
+
     if(whole_bank) {
         base_slot = 0;
         for(int slot = 0; slot < GVR_SEQUENCE_SLOTS; slot++) {
@@ -855,6 +979,12 @@ static int gvr_sequence_bank_view_copy_selection(GvrSequenceBankView *view, gboo
             {
                 view->copy_cells[view->copy_count] = view->banks[bank].cells[slot];
                 view->copy_offsets[view->copy_count] = slot - base_slot;
+                g_signal_emit(view,
+                              gvr_sequence_bank_view_signals[SIGNAL_PATTERN_CLIPBOARD_COPY],
+                              0,
+                              bank,
+                              slot,
+                              slot - base_slot);
                 if(view->banks[bank].cells[slot].sample_id > 0)
                     copied++;
                 view->copy_count++;
@@ -947,6 +1077,13 @@ static void gvr_sequence_bank_view_paste_cells_to(GtkWidget *widget, GvrSequence
                           slot);
         }
 
+        g_signal_emit(view,
+                      gvr_sequence_bank_view_signals[SIGNAL_PATTERN_CLIPBOARD_PASTE],
+                      0,
+                      view->copy_offsets[i],
+                      bank,
+                      slot);
+
         gvr_sequence_bank_view_mark_selected_cell(view, slot);
         last = slot;
     }
@@ -1035,10 +1172,9 @@ static gboolean gvr_sequence_bank_view_key_press(GtkWidget *widget, GdkEventKey 
 
         if(bank >= 0 && bank < GVR_SEQUENCE_BANKS) {
             view->selected_bank = bank;
-            if(view->selected_slot < 0 || view->selected_slot >= GVR_SEQUENCE_SLOTS)
-                view->selected_slot = 0;
+            view->selected_slot = -1;
             gvr_sequence_bank_view_clear_selected_cells(view);
-            view->selection_anchor_slot = view->selected_slot;
+            view->selection_anchor_slot = -1;
             gvr_sequence_bank_view_activate_bank(widget, view, bank);
             return TRUE;
         }
@@ -1701,6 +1837,43 @@ static void gvr_sequence_bank_view_class_init(GvrSequenceBankViewClass *klass)
                      g_cclosure_marshal_VOID__VOID,
                      G_TYPE_NONE,
                      0);
+
+
+    gvr_sequence_bank_view_signals[SIGNAL_PATTERN_CLIPBOARD_RESET] =
+        g_signal_new("pattern-clipboard-reset",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_FIRST,
+                     0,
+                     NULL, NULL,
+                     g_cclosure_marshal_VOID__VOID,
+                     G_TYPE_NONE,
+                     0);
+
+    gvr_sequence_bank_view_signals[SIGNAL_PATTERN_CLIPBOARD_COPY] =
+        g_signal_new("pattern-clipboard-copy",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_FIRST,
+                     0,
+                     NULL, NULL,
+                     NULL,
+                     G_TYPE_NONE,
+                     3,
+                     G_TYPE_INT,
+                     G_TYPE_INT,
+                     G_TYPE_INT);
+
+    gvr_sequence_bank_view_signals[SIGNAL_PATTERN_CLIPBOARD_PASTE] =
+        g_signal_new("pattern-clipboard-paste",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_FIRST,
+                     0,
+                     NULL, NULL,
+                     NULL,
+                     G_TYPE_NONE,
+                     3,
+                     G_TYPE_INT,
+                     G_TYPE_INT,
+                     G_TYPE_INT);
 }
 
 static void gvr_sequence_bank_view_init(GvrSequenceBankView *view)
@@ -1835,6 +2008,29 @@ int gvr_sequence_bank_view_get_selected_bank(GtkWidget *widget)
     return view->selected_bank;
 }
 
+gboolean gvr_sequence_bank_view_get_selected_slot(GtkWidget *widget, int *bank, int *slot)
+{
+    if(bank)
+        *bank = -1;
+    if(slot)
+        *slot = -1;
+
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget))
+        return FALSE;
+
+    GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(widget);
+    if(view->selected_bank < 0 || view->selected_bank >= GVR_SEQUENCE_BANKS ||
+       view->selected_slot < 0 || view->selected_slot >= GVR_SEQUENCE_SLOTS)
+        return FALSE;
+
+    if(bank)
+        *bank = view->selected_bank;
+    if(slot)
+        *slot = view->selected_slot;
+    return TRUE;
+}
+
+
 void gvr_sequence_bank_view_set_sequence_active(GtkWidget *widget, gboolean active)
 {
     if(!GVR_IS_SEQUENCE_BANK_VIEW(widget))
@@ -1863,6 +2059,15 @@ void gvr_sequence_bank_view_set_bank_revision(GtkWidget *widget, int bank, unsig
     GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(widget);
     view->banks[bank].revision = revision;
     gtk_widget_queue_draw(widget);
+}
+
+unsigned int gvr_sequence_bank_view_get_bank_revision(GtkWidget *widget, int bank)
+{
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget) ||
+       bank < 0 || bank >= GVR_SEQUENCE_BANKS)
+        return 0;
+
+    return GVR_SEQUENCE_BANK_VIEW(widget)->banks[bank].revision;
 }
 
 void gvr_sequence_bank_view_set_bank_size(GtkWidget *widget, int bank, int size)
@@ -1995,6 +2200,124 @@ gboolean gvr_sequence_bank_view_get_slot(GtkWidget *widget, int bank, int slot, 
 
     return TRUE;
 }
+
+void gvr_sequence_bank_view_set_pattern_summary(GtkWidget *widget,
+                                                int bank,
+                                                int slot,
+                                                const GvrSequencePatternSummary *summary)
+{
+    GvrSequencePatternSummary empty = { 0 };
+    GvrSequenceBankView *view;
+
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget) ||
+       bank < 0 || bank >= GVR_SEQUENCE_BANKS ||
+       slot < 0 || slot >= GVR_SEQUENCE_SLOTS)
+        return;
+
+    view = GVR_SEQUENCE_BANK_VIEW(widget);
+    if(!summary)
+        summary = &empty;
+
+    if(memcmp(&view->banks[bank].cells[slot].pattern,
+              summary,
+              sizeof(*summary)) == 0)
+        return;
+
+    view->banks[bank].cells[slot].pattern = *summary;
+    gtk_widget_queue_draw(widget);
+}
+
+void gvr_sequence_bank_view_set_bank_pattern_summary(
+        GtkWidget *widget,
+        int bank,
+        const GvrSequenceBankPatternSummary *summary)
+{
+    GvrSequenceBankPatternSummary empty = { 0 };
+    GvrSequenceBankView *view;
+
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget) ||
+       bank < 0 || bank >= GVR_SEQUENCE_BANKS)
+        return;
+
+    view = GVR_SEQUENCE_BANK_VIEW(widget);
+    if(!summary)
+        summary = &empty;
+
+    if(memcmp(&view->banks[bank].pattern,
+              summary,
+              sizeof(*summary)) == 0)
+        return;
+
+    view->banks[bank].pattern = *summary;
+    gtk_widget_queue_draw(widget);
+}
+
+gboolean gvr_sequence_bank_view_get_bank_pattern_summary(
+        GtkWidget *widget,
+        int bank,
+        GvrSequenceBankPatternSummary *summary)
+{
+    if(summary)
+        memset(summary, 0, sizeof(*summary));
+
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget) ||
+       bank < 0 || bank >= GVR_SEQUENCE_BANKS)
+        return FALSE;
+
+    if(summary)
+        *summary = GVR_SEQUENCE_BANK_VIEW(widget)->banks[bank].pattern;
+
+    return GVR_SEQUENCE_BANK_VIEW(widget)->banks[bank].pattern.event_count > 0;
+}
+
+gboolean gvr_sequence_bank_view_get_pattern_summary(GtkWidget *widget,
+                                                     int bank,
+                                                     int slot,
+                                                     GvrSequencePatternSummary *summary)
+{
+    if(summary)
+        memset(summary, 0, sizeof(*summary));
+
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(widget) ||
+       bank < 0 || bank >= GVR_SEQUENCE_BANKS ||
+       slot < 0 || slot >= GVR_SEQUENCE_SLOTS)
+        return FALSE;
+
+    if(summary)
+        *summary = GVR_SEQUENCE_BANK_VIEW(widget)->banks[bank].cells[slot].pattern;
+
+    return GVR_SEQUENCE_BANK_VIEW(widget)->banks[bank].cells[slot].pattern.flags != 0;
+}
+
+void gvr_sequence_bank_view_set_pattern_flags(GtkWidget *widget,
+                                              int bank,
+                                              int slot,
+                                              guint flags)
+{
+    GvrSequencePatternSummary summary = { 0 };
+
+    if(flags & GVR_SEQUENCE_PATTERN_HAS_VIMS)
+        summary.flags |= GVR_SEQUENCE_PATTERN_HAS_VIMS |
+                         GVR_SEQUENCE_PATTERN_CELL_VIMS;
+    if(flags & GVR_SEQUENCE_PATTERN_HAS_HOLD)
+        summary.flags |= GVR_SEQUENCE_PATTERN_HAS_HOLD |
+                         GVR_SEQUENCE_PATTERN_CELL_HOLD;
+
+    gvr_sequence_bank_view_set_pattern_summary(widget, bank, slot, &summary);
+}
+
+guint gvr_sequence_bank_view_get_pattern_flags(GtkWidget *widget,
+                                               int bank,
+                                               int slot)
+{
+    GvrSequencePatternSummary summary;
+
+    if(!gvr_sequence_bank_view_get_pattern_summary(widget, bank, slot, &summary))
+        return 0;
+
+    return summary.flags;
+}
+
 
 
 gboolean gvr_sequence_bank_view_get_cell_at(GtkWidget *widget, int x, int y, int *bank, int *slot, gboolean *header)

@@ -17,8 +17,9 @@ Veejay server and can connect to, control, and disconnect from that server
 while Veejay continues to run.
 .PP
 Reloaded is intended for live video performance, sample-bank operation,
-stream control, effect-chain editing, FX animation, MIDI learning, VIMS
-messaging, preview management, recording, audio beat detection, external audio
+stream control, four-bank sequence editing, tracker-style VIMS pattern
+editing, effect-chain editing, FX animation, MIDI learning, VIMS messaging,
+preview management, recording, audio beat detection, external audio
 synchronisation, and per-sample audio routing.
 .PP
 The interface is status-driven. Many controls are refreshed from backend status
@@ -178,64 +179,263 @@ Live capture controls include brightness, contrast, hue, saturation, gamma,
 gain, RGB balance, automatic white balance, sharpness, backlight compensation,
 automatic gain, automatic hue, temperature, flips, exposure, black level, and
 whiteness. Unsupported camera controls may be hidden or insensitive.
-.SH SEQUENCE PLAY GRID
-The sequence play grid contains four sequence banks, each with one hundred
-slots. It is designed for arranging and repeating a bank chain during live
-performance or recording.
+.SH SEQUENCE EDITOR
+The Sequence page provides four banks of one hundred slots arranged as four
+10 by 10 grids. A slot can contain a sample or stream. Slot colour identifies
+the source type and the source id is printed in the cell.
 .PP
-The toolbar contains \fBPlay Grid\fR, sequence recording controls, bank toggles,
-\fBClear Bank\fR, \fBClear All\fR, \fBCopy Bank\fR, \fBPaste Bank\fR, and
-\fBRefresh\fR. Checking a bank includes it in chained playback and also makes
-it the active bank. The active bank stays checked.
+The selected bank, active playback bank, and queued bank are separate states.
+The active bank has the active outline, a queued bank has the queue outline,
+the current playing slot is highlighted, and selected cells have a selection
+outline. A slot badge of \fBH\fR, \fBV\fR, or \fBHV\fR indicates an attached
+Hold pattern, VIMS pattern, or both.
+.SS BANK PLAYBACK AND QUEUEING
 .TP
-.B Left click on a bank header
-Select and activate that bank.
+.B Play Grid
+Start or stop playback of the checked sequence-bank chain. Playback begins
+with the active bank and repeats the checked populated banks.
 .TP
-.B Right click on a bank header
-Open the bank actions menu.
+.B Wait End
+When disabled, selecting another bank switches immediately. When enabled
+during Play Grid playback, selecting a populated non-active bank queues it
+until the current bank completes. Selecting another populated bank replaces
+the queue. Selecting the queued bank again cancels it. Empty banks cannot be
+queued.
 .TP
-.B Left click on an empty cell
-Assign the current sample or stream to that sequence slot.
+.B B1 through B4
+Check a bank to include it in Play Grid and select it for editing. The active
+bank remains checked. When Play Grid is stopped, selecting a populated bank
+starts it immediately.
 .TP
-.B Shift + left click on a cell
-Clear the filled cell.
+.B Clear
+Erase every slot in the selected bank. Other banks are unchanged. Clearing a
+queued bank also cancels that queue.
 .TP
-.B Left drag
-Select a range of cells in the current bank.
+.B Delete
+Remove the selected non-active bank from the checked playback chain without
+erasing its slots. The active bank cannot be removed. Removing the queued bank
+cancels the queue.
 .TP
-.B Ctrl + left drag
-Add or remove cells from the current selection.
+.B Copy and Paste
+Copy the complete selected bank and replace another selected bank with that
+copy.
 .TP
-.B Alt + drag a filled cell
-Swap it with another slot in the same bank.
+.B Refresh
+Reload all four banks and their checked, selected, active, playing, and queued
+state from the backend.
+.SS SLOT EDITING
 .TP
-.B Right click
-Open an actions menu for assign, delete, copy, cut, paste, copy-to-bank,
-copy-bank, paste-bank, clear-bank, and refresh operations.
+.B Left click or left drag
+Select one cell or a path of cells in the selected bank.
+.TP
+.B Ctrl + left click or drag
+Toggle cells in the current selection.
+.TP
+.B Left click an empty active-bank slot
+Assign the current sample to that slot.
+.TP
+.B Shift + left click a populated active-bank slot
+Delete that slot.
+.TP
+.B Alt + drag a populated slot
+Move or swap it with another slot in the same bank.
+.TP
+.B Right click a slot or selection
+Open the slot menu. It provides assign, delete, copy, cut, paste,
+copy-selected-to-bank, whole-bank copy and paste, clear-bank, and refresh
+operations.
+.TP
+.B Right click a bank header
+Open the bank-only copy, paste, clear, and refresh menu.
+.PP
+Copying or cutting selected sequence cells also copies their attached
+per-cell VIMS patterns. Pasting the cells restores those patterns at the
+corresponding destination offsets.
+.SS SEQUENCE KEYBOARD CONTROLS
 .TP
 .B Cursor keys
 Move the selected cell.
 .TP
 .B Ctrl + cursor keys
-Extend the current cell selection in the arrow direction.
+Extend the selected path in the arrow direction.
 .TP
-.B Alt + 1 .. Alt + 4
-Select and target sequence bank 1 through 4.
+.B Alt + 1 through Alt + 4
+Select sequence bank 1 through 4.
 .TP
 .B Delete or Backspace
-Clear the selected filled slot or selected filled range.
+Delete the selected populated cell or populated selection.
 .TP
 .B Enter
-Assign the current sample or stream to the selected empty slot.
+Select a non-active bank, or assign the current sample to an empty slot in the
+active bank.
 .TP
 .B Ctrl + C, Ctrl + X, Ctrl + V
-Copy, cut, or paste selected slot cells.
+Copy, cut, or paste selected cells.
 .TP
 .B Ctrl + Shift + C, Ctrl + Shift + V
-Copy or paste a whole sequence bank.
+Copy or paste a complete sequence bank.
+.SS SEQUENCE RECORDING
+The recording row below the grids starts Play Grid and records its output to a
+new sample. Stopping sequence recording does not stop Play Grid; playback must
+be stopped separately. The progress control reports the current recording
+progress.
+.SH VIMS PATTERN EDITOR
+The Pattern page is a tracker-style editor for frame-accurate VIMS automation.
+Each row represents a source frame and contains eight event tracks, \fBV1\fR
+through \fBV8\fR. Events on the same row execute from V1 to V8.
 .PP
-Tooltips on cells identify the assigned sample or stream, title, source type,
-length where available, bank number, and slot number.
+Patterns can be attached to an individual sequence slot, a sample, a stream,
+or a complete sequence bank. During sequence playback Reloaded can run the
+source pattern, the current slot pattern, and the whole-bank pattern together.
+Outside Play Grid, the selected sample or stream pattern follows that source.
+.SS DISPLAY AND TARGETS
+The target line identifies the current bank, slot, sample, stream, or
+whole-bank target. It also reports the available frame count, edit step,
+pattern loop, and current learning policy.
+.PP
+Common commands use compact labels such as \fBHOLD\fR, \fBSPEED\fR,
+\fBSLOW\fR, \fBFX\fR, \fBBEAT\fR, \fBSYNC\fR, and \fBMIX\fR. Other allowed
+commands are abbreviated from the VIMS descriptions advertised by the
+backend. A cell tooltip shows the VIMS id, backend description, and complete
+raw command.
+.TP
+.B Step
+Display and edit every Nth frame. For example, Step 4 shows frames 0, 4, 8,
+12, and so on. Insert, pull, cursor advancement, and learned-event advancement
+use the same step.
+.PP
+An orange marker indicates events hidden between two displayed rows by the
+current Step value. Right-click the marker to reveal the hidden frame or
+quantize its events to a visible row.
+.SS PATTERN LOOP
+.TP
+.B Loop
+Enable or disable the stored pattern loop for the current target.
+.TP
+.B Loop Sel
+Set and enable the loop from the selected row range, or from the current row
+when no block is selected.
+.TP
+.B No Loop
+Remove the stored loop range.
+.PP
+The pattern loop repeats VIMS events over the selected frame range. It does
+not change the media loop mode or loop the video itself.
+.SS EVENT TRACKS
+The V1 through V8 track switches mute or enable individual event tracks.
+Ctrl-click a track switch to solo it. Shift-click a track switch to enable all
+tracks. Muted tracks remain stored but do not fire.
+.SS LEARNING VIMS
+Enable \fBCapture\fR to learn user-triggered, pattern-safe VIMS commands at
+the current pattern position. Supported buttons, toggles, spin controls,
+sliders, transport controls, FX controls, audio controls, and other UI actions
+are captured whether they use a single-argument or formatted VIMS sender.
+Backend queries, project-management commands, recursive sequencer commands,
+and other unsafe control messages remain excluded.
+.PP
+The learning policy chooses where each captured command is placed:
+.TP
+.B Column lock
+Keep using the selected V track. If that cell contains a different VIMS id,
+search downward for the next empty cell or matching id, then advance down the
+same track.
+.TP
+.B Next free
+Use the first empty track on the current row, then continue on the next row
+when all eight tracks are occupied.
+.TP
+.B Replace match
+Replace the same VIMS id on the current row. When no match exists, use the
+first empty track, then the selected track.
+.TP
+.B Overwrite
+Replace the selected cell and advance down the selected track.
+.TP
+.B Layer
+Advance across V1 through V8 and wrap to V1 on the next row.
+.TP
+.B Follow
+Follow the live playback row. While Capture is active, learned events control
+the edit cursor so repeated slider and button actions are placed according to
+the selected learning policy.
+.SS EDITING COMMANDS
+Double-click a cell, press \fBF2\fR or \fBEnter\fR, or begin typing a numeric
+VIMS id to open the inline command editor. Commands use the normal
+\fIselector:arguments;\fR syntax and one command is stored per cell.
+.TP
+.B Copy, Cut, and Paste
+Operate on the selected rectangular block. Paste mode can be
+\fBReplace\fR, \fBMerge\fR, or \fBInsert\fR.
+.TP
+.B Ins
+Insert one stepped row and move later events forward.
+.TP
+.B Pull
+Delete one stepped row and pull later events backward.
+.TP
+.B Del
+Clear the current event or selected block without moving later rows.
+.TP
+.B Clear Row
+Clear all eight tracks on the current row.
+.TP
+.B Clear Pattern
+Clear the complete pattern for the current target.
+.TP
+.B Undo and Redo
+Restore or reapply pattern edits. The editor keeps a bounded per-target edit
+history.
+.SS PATTERN KEYBOARD CONTROLS
+.TP
+.B Cursor keys
+Move by one displayed row or one event track. Shift extends the block
+selection.
+.TP
+.B Page Up, Page Down, Home, End
+Move through the pattern. Shift extends the selection.
+.TP
+.B Tab and Shift + Tab
+Move between V1 through V8.
+.TP
+.B Insert
+Insert one stepped row.
+.TP
+.B Delete or Backspace
+Clear the current event or selected block.
+.TP
+.B Shift + Delete
+Delete one stepped row and pull later events backward.
+.TP
+.B Ctrl + C, Ctrl + X, Ctrl + V
+Copy, cut, or paste the selected block.
+.TP
+.B Ctrl + Z, Ctrl + Shift + Z, Ctrl + Y
+Undo or redo.
+.TP
+.B Ctrl + L, Ctrl + Shift + L
+Set the pattern loop from the selection, or clear the loop.
+.TP
+.B Ctrl + Enter
+Seek the current source to the selected pattern row.
+.TP
+.B Shift + Enter
+Seek to the selected row and start forward playback.
+.TP
+.B Escape
+Cancel inline editing or clear the current block selection.
+.SS HISTORY, PLAYBACK, AND PERSISTENCE
+Pattern-safe rows from the VIMS History can be dragged onto a visible V1
+through V8 cell. The editor follows forward and reverse playback and handles
+seeks without replaying the complete skipped range.
+.PP
+Pattern changes are automatically serialised and stored through the backend.
+The document includes sequence-cell patterns, whole-bank patterns, sample and
+stream patterns, enabled tracks, learning policy, paste mode, and loop ranges.
+It is reloaded when Reloaded reconnects or refreshes the sequence state.
+.PP
+The Sequence editor displays \fBH\fR, \fBV\fR, and \fBHV\fR badges for slots
+with Hold and VIMS automation, so automated slots remain visible even when the
+Pattern page is not open.
 .SH EFFECTS AND FX CHAIN
 The FX panel lists available effects and exposes the current chain. Effects
 are grouped into mixing effects, image effects, alpha effects, video effects,
@@ -554,9 +754,10 @@ Recording controls choose the audio source for disk recording, including
 automatic, original audio, external JACK/WAV provider, or silence where
 available. Sample and stream recording controls have separate source selectors.
 .PP
-Sequence recording records the current sequence-bank playback into a new
-sample. The sequence toolbar exposes start, stop, and progress controls for
-this route.
+Sequence recording records Play Grid output into a new sample. Start, stop,
+and progress controls are placed in the recording row below the sequence
+grids. Stopping the recording leaves Play Grid running until it is stopped
+separately.
 .SH MEDIA AND STREAM CREATION
 The Media panel lists Veejay's working directory. Double-clicking a row adds it
 as a sample.
@@ -577,6 +778,9 @@ reset, capture, and save controls. Calibration requires a selected live stream.
 The VIMS messenger sends VIMS commands directly to the backend. Bundle editing
 allows stored VIMS command groups to be edited and reused. The VIMS scheduler
 can fire messages at selected frame, duplicate-frame, or loop positions.
+.PP
+Pattern-safe entries in the VIMS History can be dragged into the Pattern
+editor. The destination must be a visible V1 through V8 event cell.
 .PP
 Macro controls can record, play, stop, clear, delay, and loop VIMS-driven UI
 actions. Macro start and stop actions report their state through the status
@@ -622,10 +826,12 @@ Start with 24 sample-bank pages:
 .SH BUGS
 Report bugs through the Veejay issue tracker. When reporting UI bugs, include
 the Reloaded version, GTK version, backend version, the selected play mode,
-whether the selected item is a sample or stream, the active audio source, the
-selected audio-sync or beat action if relevant, whether a sample-specific audio
-route is active, and any status-bar or console messages printed after the
-action.
+whether the selected item is a sample or stream, the selected sequence bank
+and slot, Play Grid and Wait End state, any queued bank, the Pattern target,
+Step, learning policy and paste mode, the active audio source, the selected
+audio-sync or beat action if relevant, whether a sample-specific audio route is
+active, the raw VIMS command when relevant, and any status-bar or console
+messages printed after the action.
 .SH SEE ALSO
 .BR veejay (1),
 .BR jackd (1)

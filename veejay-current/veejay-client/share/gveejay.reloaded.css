@@ -1631,3 +1631,332 @@ checkbutton.fx-beat-owner:checked check {
     min-width: 160px;
 }
 
+.vims-pattern-toolbar,
+.vims-pattern-editbar,
+.vims-pattern-track-header {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    background-color: @bg-color;
+}
+
+.vims-pattern-editbar {
+    padding-bottom: 1px;
+}
+
+button.vims-pattern-tool {
+    min-width: 34px;
+    min-height: 22px;
+    padding: 0 3px;
+    margin: 0;
+}
+
+entry.vims-pattern-command {
+    min-width: 180px;
+    min-height: 22px;
+    padding: 0 4px;
+    margin: 0;
+    font-family: monospace;
+    background-color: #1b1c20;
+    border: 1px solid @knob-color;
+}
+
+entry.vims-pattern-command.error {
+    border-color: @record-color;
+    background-color: #3b2020;
+}
+
+checkbutton.vims-pattern-track-toggle {
+    min-width: 0;
+    min-height: 20px;
+    padding: 0 3px;
+    margin: 0;
+    background-color: @panel-color;
+    border-right: 1px solid @border-color;
+}
+
+checkbutton.vims-pattern-track-toggle check {
+    min-width: 11px;
+    min-height: 11px;
+    margin: 0 2px 0 0;
+}
+
+checkbutton.vims-pattern-track-toggle:checked label {
+    color: @text-color;
+    background-color: transparent;
+}
+
+
+combobox.vims-pattern-policy,
+.vims-pattern-policy {
+    min-width: 126px;
+    min-height: 22px;
+    padding: 0;
+    margin: 0;
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+}
+
+combobox.vims-pattern-policy button,
+.vims-pattern-policy button {
+    min-width: 0;
+    min-height: 20px;
+    padding: 0 4px;
+    margin: 0;
+}
+
+checkbutton.vims-pattern-loop-toggle {
+    min-width: 48px;
+    min-height: 22px;
+    padding: 0 3px;
+    margin: 0;
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+}
+
+checkbutton.vims-pattern-loop-toggle:checked {
+    color: #5ceebd;
+    background-color: #17352c;
+    border-color: #5ceebd;
+}
+
+checkbutton.vims-pattern-loop-toggle check {
+    min-width: 11px;
+    min-height: 11px;
+    margin-right: 2px;
+}
+
+checkbutton.vims-pattern-track-toggle label {
+    font-family: monospace;
+    font-size: 90%;
+    font-weight: bold;
+    background-color: transparent;
+}
+
+
+/* VIMS pattern editor: permanent Learn footer below the scrolling grid. */
+.vims-pattern-learnbar {
+    min-height: 24px;
+    padding: 2px 4px;
+    margin: 0;
+    border-top: 1px solid @border-color;
+    background-color: @panel-color;
+}
+
+.vims-pattern-learnbar button,
+.vims-pattern-learnbar checkbutton,
+.vims-pattern-learnbar combobox {
+    min-height: 20px;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin: 0;
+}
+
+.vims-pattern-learn-label {
+    color: @text-muted;
+    font-weight: bold;
+    padding-left: 2px;
+    padding-right: 2px;
+    background-color: transparent;
+}
+
+
+.vims-pattern-paste-mode {
+    min-width: 72px;
+    min-height: 20px;
+    padding: 0;
+    margin: 0 2px 0 0;
+}
+
+.vims-pattern-paste-mode button {
+    min-height: 20px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+
+/* Sample-bank actions: side columns while docked, compact top toolbar when detached. */
+.samplebank-action-shell {
+    padding: 0;
+    margin: 0;
+    background-color: @bg-color;
+}
+
+.samplebank-action-body,
+.samplebank-action-center {
+    padding: 0;
+    margin: 0;
+    background-color: @bg-color;
+}
+
+.samplebank-action-column {
+    padding: 1px;
+    margin: 0;
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+}
+
+.samplebank-action-column button {
+    min-width: 28px;
+    min-height: 26px;
+    padding: 0;
+    margin: 0;
+}
+
+.samplebank-action-column button image,
+.samplebank-action-column button label {
+    padding: 0;
+    margin: 0;
+}
+
+.samplebank-action-top {
+    min-height: 30px;
+    padding: 1px 2px;
+    margin: 0 0 2px 0;
+    background-color: @panel-color;
+    border-bottom: 1px solid @border-color;
+}
+
+.samplebank-actions-detached .samplebank-action-column {
+    border-width: 0;
+    padding: 0;
+    background-color: transparent;
+}
+
+.samplebank-actions-detached .samplebank-action-column button {
+    min-width: 30px;
+    min-height: 26px;
+    margin-left: 1px;
+    margin-right: 1px;
+}
+
+
+/* Native 1/1 preview: allocate only the image and its remaining UI buttons. */
+#frame327.preview-native-compact,
+#frame327.preview-native-compact > border,
+#frame327.preview-native-compact #alignment542,
+#frame327.preview-native-compact #imageA {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+    background-color: @bg-color;
+}
+
+.preview-action-row {
+    padding: 0;
+    margin: 0;
+    background-color: @bg-color;
+}
+
+.preview-action-column {
+    padding: 0;
+    margin: 0 1px;
+    background-color: @panel-color;
+}
+
+.preview-action-column button {
+    min-width: 28px;
+    min-height: 26px;
+    padding: 0;
+    margin: 0;
+}
+
+.preview-action-column button image,
+.preview-action-column button label {
+    padding: 0;
+    margin: 0;
+}
+
+
+/* Sample-bank footer actions: property, delete and clone/copy start at left. */
+.samplebank-footer-actions {
+    min-height: 20px;
+    padding: 0;
+    margin: 0 3px 0 0;
+    background-color: transparent;
+}
+
+button.samplebank-footer-action {
+    min-width: 24px;
+    min-height: 18px;
+    padding: 0;
+    margin: 0 1px 0 0;
+    border-width: 0;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+button.samplebank-footer-action:hover {
+    border-width: 1px;
+    border-color: @border-color;
+    background-color: @hover-color;
+}
+
+button.samplebank-footer-action image,
+button.samplebank-footer-action label {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* Docked Sample bank now reserves width only on the far right. */
+.samplebank-action-column-right {
+    margin-left: 1px;
+    margin-right: 0;
+}
+
+
+/* All preview actions share one compact column at the far right. */
+.preview-action-column-right {
+    margin-left: 1px;
+    margin-right: 0;
+}
+
+
+/* The preview aspect remainder uses the normal Reloaded background. */
+#imageA.preview-image-surface,
+.preview-image-surface {
+    background-color: @bg-color;
+}
+
+/* Load/Save now precede property/delete/copy in the Sample-bank footer. */
+.samplebank-footer-actions {
+    min-height: 20px;
+}
+
+.samplebank-footer-actions button.samplebank-footer-action {
+    min-width: 24px;
+    min-height: 18px;
+}
+
+
+/* Sample-bank creation actions always live in a compact top toolbar. */
+.samplebank-action-toolbar {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+.samplebank-action-toolbar button {
+    min-width: 30px;
+    min-height: 26px;
+    padding: 0;
+    margin: 0 1px 0 0;
+}
+
+.samplebank-action-toolbar button image,
+.samplebank-action-toolbar button label {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+
+/* The bank itself always receives the complete available width. */
+.samplebank-action-body,
+.samplebank-action-center {
+    margin: 0;
+    padding: 0;
+}

@@ -20,6 +20,17 @@
 #ifndef VJCALLBACK_H
 #define VJCALLBACK_H
 
+enum {
+    NOTEBOOK18_PAGE_FX = 0,
+    NOTEBOOK18_PAGE_FX_ANIM,
+    NOTEBOOK18_PAGE_BEAT,
+    NOTEBOOK18_PAGE_AUDIO,
+    NOTEBOOK18_PAGE_SAMPLE,
+    NOTEBOOK18_PAGE_SEQUENCE,
+    NOTEBOOK18_PAGE_PATTERN,
+    NOTEBOOK18_PAGE_MULTITRACK
+};
+
 
 #define	SLIDER_CHANGED( arg_num, value ) \
 {\
@@ -53,6 +64,8 @@ void samplebank_goto_page(int page);
 void samplebank_step_page(int delta);
 int samplebank_get_page(void);
 void alpha_composite_sync_from_status(int enabled, int alpha_value);
+void on_speed_decrement_clicked(GtkWidget *widget, gpointer user_data);
+void on_speed_increment_clicked(GtkWidget *widget, gpointer user_data);
 
 gboolean boxbg_draw ( GtkWidget *w,  cairo_t *cr);
 gboolean boxfg_draw ( GtkWidget *w, cairo_t *cr );
