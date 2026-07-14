@@ -648,6 +648,164 @@ static void vj_sequence_load_bank(sequencer_t *s, int bank);
 static int vj_sequence_selected_duration(veejay_t *v);
 static void vj_event_release_beat_transport_for_source_switch(veejay_t *v);
 
+static int vj_sequence_pattern_payload_valid(const char *data, size_t data_len)
+{
+    if(!data)
+        return 0;
+    if(data_len == 0)
+        return 1;
+    if((data_len & 3u) != 0)
+        return 0;
+
+    int padding = 0;
+    for(size_t i = 0; i < data_len; i++) {
+        int value = vj_b64_value((unsigned char)data[i]);
+
+        if(value == -1 || value == -3)
+            return 0;
+        if(value == -2) {
+            padding++;
+            if(padding > 2)
+                return 0;
+        }
+        else if(padding) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static int vj_sequence_pattern_store(sequencer_t *seq,
+                                     int version,
+                                     const char *data,
+                                     size_t data_len)
+{
+    char *copy = NULL;
+
+    if(!seq || !data || data_len > VJ_SEQUENCE_PATTERN_DATA_MAX ||
+       !vj_sequence_pattern_payload_valid(data, data_len))
+        return 0;
+
+    copy = (char*)vj_malloc(data_len + 1);
+    if(!copy)
+        return 0;
+
+    if(data_len > 0)
+        veejay_memcpy(copy, data, data_len);
+    copy[data_len] = '\0';
+
+    if(seq->vims_pattern_data)
+        free(seq->vims_pattern_data);
+
+    seq->vims_pattern_data = copy;
+    seq->vims_pattern_length = data_len;
+    seq->vims_pattern_revision = vj_sequence_next_revision(seq->vims_pattern_revision);
+
+    if(version < 1)
+        version = 1;
+
+    snprintf(seq->vims_pattern_format,
+             sizeof(seq->vims_pattern_format),
+             "gvr-vims-pattern-b64-v%d",
+             version);
+
+    return 1;
+}
+
+static void vj_sequence_pattern_clear(sequencer_t *seq)
+{
+    if(!seq)
+        return;
+
+    if(seq->vims_pattern_data) {
+        free(seq->vims_pattern_data);
+        seq->vims_pattern_data = NULL;
+    }
+
+    seq->vims_pattern_length = 0;
+    seq->vims_pattern_revision = vj_sequence_next_revision(seq->vims_pattern_revision);
+
+    if(seq->vims_pattern_format[0] == '\0')
+        snprintf(seq->vims_pattern_format,
+                 sizeof(seq->vims_pattern_format),
+                 "%s",
+                 "gvr-vims-pattern-b64-v1");
+}
+
+static long long vj_sequence_slot_duration(int sample_id, int type, int *known)
+{
+    long long base = 0;
+    long long loops = 1;
+
+    if(known)
+        *known = 0;
+
+    if(sample_id <= 0)
+        return 0;
+
+    if(type == VJ_PLAYBACK_MODE_SAMPLE) {
+        int start;
+        int end;
+        int speed;
+        int looptype;
+        int dup;
+        long long span;
+
+        if(!sample_exists(sample_id))
+            return -1;
+
+        start = sample_get_startFrame(sample_id);
+        end = sample_get_endFrame(sample_id);
+        speed = abs(sample_get_speed(sample_id));
+        looptype = sample_get_looptype(sample_id);
+        dup = sample_get_framedup(sample_id);
+
+        if(start < 0 || end < start || speed < 1)
+            return -1;
+
+        span = 1LL + (long long)(end - start);
+        base = (span + speed - 1) / speed;
+
+        if(dup > 1) {
+            if(base > LLONG_MAX / dup)
+                return -1;
+            base *= dup;
+        }
+
+        if(looptype == 2) {
+            if(base > LLONG_MAX / 2)
+                return -1;
+            base *= 2;
+        }
+        else if(looptype == 3) {
+            base = sample_get_frame_length(sample_id);
+        }
+
+        loops = sample_get_loop_stat_stop(sample_id);
+    }
+    else {
+        if(!vj_tag_exists(sample_id))
+            return -1;
+
+        base = vj_tag_get_n_frames(sample_id);
+        loops = vj_tag_get_loop_stat_stop(sample_id);
+    }
+
+    if(base < 1)
+        return -1;
+    if(loops < 1)
+        loops = 1;
+
+    if(base > (LLONG_MAX / loops))
+        return -1;
+
+    if(known)
+        *known = 1;
+
+    return base * loops;
+}
+
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
 extern int       vj_event_exists( int id );
 extern void vj_perform_record_offline_disarm(veejay_t *info);
@@ -5399,17 +5557,21 @@ void    vj_event_sample_rand_start( void *ptr, const char format[], va_list ap)
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if(args[0] == RANDTIMER_FRAME)
-        settings->randplayer.timer = RANDTIMER_FRAME;
-    else
-        settings->randplayer.timer = RANDTIMER_LENGTH;
-
-
+    settings->randplayer.timer =
+        (args[0] == RANDTIMER_FRAME) ? RANDTIMER_FRAME : RANDTIMER_LENGTH;
+    settings->randplayer.next_id = 0;
+    settings->randplayer.next_mode = VJ_PLAYBACK_MODE_SAMPLE;
+    settings->randplayer.min_delay = 0;
+    settings->randplayer.max_delay = 0;
     settings->randplayer.mode = RANDMODE_SAMPLE;
 
     vj_perform_randomize(v);
-    veejay_msg(VEEJAY_MSG_INFO, "Started sample randomizer, %s",
-            (settings->randplayer.timer == RANDTIMER_FRAME ? "freestyling" : "playing full length of gambled samples"));    
+
+    if(settings->randplayer.mode == RANDMODE_SAMPLE) {
+        veejay_msg(VEEJAY_MSG_INFO, "Started sample randomizer, %s",
+                (settings->randplayer.timer == RANDTIMER_FRAME ?
+                 "freestyling" : "playing full length of gambled samples"));
+    }
 }
 
 void    vj_event_sample_rand_stop( void *ptr, const char format[], va_list ap)
@@ -5421,7 +5583,12 @@ void    vj_event_sample_rand_stop( void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_INFO, "Stopped sample randomizer");
     else
         veejay_msg(VEEJAY_MSG_ERROR, "Sample randomizer not started");
+
     settings->randplayer.mode = RANDMODE_INACTIVE;
+    settings->randplayer.next_id = 0;
+    settings->randplayer.next_mode = VJ_PLAYBACK_MODE_SAMPLE;
+    settings->randplayer.min_delay = 0;
+    settings->randplayer.max_delay = 0;
 }
 
 void vj_event_sample_set_rand_loop(void *ptr, const char format[], va_list ap)
@@ -6783,16 +6950,22 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 {
+    veejay_t *v = (veejay_t*) ptr;
     int args[1];
-    int new_sample =0;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if( sample_exists(args[0] ))
-    {
-        new_sample = sample_copy(args[0]);
-        if(!new_sample)
-            veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d",args[0]);
+    SAMPLE_DEFAULTS(args[0]);
+
+    if(!sample_exists(args[0])) {
+        p_no_sample(args[0]);
+        return;
     }
+
+    int new_sample = sample_copy(args[0]);
+    if(new_sample <= 0)
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d", args[0]);
+    else
+        veejay_msg(VEEJAY_MSG_INFO, "Copied sample %d to sample %d", args[0], new_sample);
 }
 
 void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
@@ -9312,13 +9485,19 @@ void    vj_event_stream_new_clone( void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*) ptr;
 
     P_A(args,sizeof(args),NULL,0,format,ap);
+    STREAM_DEFAULTS(args[0]);
 
-    int id = veejay_create_tag( v, VJ_TAG_TYPE_CLONE, NULL, v->nstreams, args[0],args[0] );
+    if(!vj_tag_exists(args[0])) {
+        p_no_tag(args[0]);
+        return;
+    }
 
-    if( id <= 0 )
+    int id = veejay_create_tag(v, VJ_TAG_TYPE_CLONE, NULL, v->nstreams, args[0], args[0]);
+
+    if(id <= 0)
         veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a clone of stream %d", args[0]);
     else
-        veejay_msg(VEEJAY_MSG_ERROR, "Created a clone of stream %d", args[0]);
+        veejay_msg(VEEJAY_MSG_INFO, "Created stream %d as a clone of stream %d", id, args[0]);
 }
 
 void    vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
@@ -15134,6 +15313,234 @@ void vj_event_get_sample_sequences_all(void *ptr, const char format[], va_list a
 
     SEND_MSG(v, s_print_buf);
     free(s_print_buf);
+}
+
+
+void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1];
+    int bank;
+    int entries = 0;
+    int finite = 1;
+    long long total = 0;
+    long long cursor = 0;
+    const int header_len = VJ_SEQUENCE_TIMELINE_HEADER_LENGTH;
+    const int entry_len = VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(!v)
+        return;
+    if(!v->seq) {
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    vj_sequence_store_active_bank(v->seq);
+
+    bank = args[0];
+    if(bank < 0)
+        bank = v->seq->active_bank;
+
+    if(!vj_sequence_bank_valid(bank)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid sequence timeline bank %d", bank);
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    sequence_bank_t *b = &v->seq->banks[bank];
+
+    for(int slot = 0; slot < MAX_SEQUENCES; slot++) {
+        if(b->samples[slot].sample_id > 0)
+            entries++;
+    }
+
+    const size_t body_cap = (size_t)header_len + ((size_t)entries * (size_t)entry_len) + 1;
+    char *body = (char*)vj_calloc(body_cap);
+    if(!body) {
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    char *out = body + header_len;
+    size_t remaining = body_cap - (size_t)header_len;
+
+    for(int slot = 0; slot < MAX_SEQUENCES; slot++) {
+        seq_sample_t *entry = &b->samples[slot];
+        int known = 0;
+        long long length;
+        long long start;
+
+        if(entry->sample_id <= 0)
+            continue;
+
+        length = vj_sequence_slot_duration(entry->sample_id, entry->type, &known);
+        start = finite ? cursor : -1;
+
+        if(!known || length < 1) {
+            finite = 0;
+            total = -1;
+            start = -1;
+            length = -1;
+        }
+        else if(finite) {
+            if(cursor > LLONG_MAX - length) {
+                finite = 0;
+                total = -1;
+                start = -1;
+                length = -1;
+            }
+            else {
+                cursor += length;
+                total = cursor;
+            }
+        }
+
+        int n = snprintf(out,
+                         remaining,
+                         "%03d%05d%02d%012lld%012lld",
+                         slot,
+                         entry->sample_id,
+                         entry->type,
+                         start,
+                         length);
+        if(n != entry_len) {
+            free(body);
+            SEND_MSG(v, "00000000");
+            return;
+        }
+
+        out += n;
+        remaining -= (size_t)n;
+    }
+
+    char header[29];
+    int header_written = snprintf(header,
+                                  sizeof(header),
+                                  "%02d%010u%01d%012lld%03d",
+                                  bank,
+                                  b->revision,
+                                  finite,
+                                  finite ? total : -1,
+                                  entries);
+    if(header_written != header_len) {
+        free(body);
+        SEND_MSG(v, "00000000");
+        return;
+    }
+    veejay_memcpy(body, header, (size_t)header_len);
+
+    const int body_len = header_len + (entries * entry_len);
+    char *packet = get_print_buf(body_len + 9);
+    if(!packet) {
+        free(body);
+        return;
+    }
+    snprintf(packet, body_len + 9, "%08d%s", body_len, body);
+    SEND_MSG(v, packet);
+
+    free(packet);
+    free(body);
+}
+
+void vj_event_sequence_pattern_get(void *ptr, const char format[], va_list ap)
+{
+    (void)format;
+    (void)ap;
+
+    veejay_t *v = (veejay_t*)ptr;
+    sequencer_t *seq = v ? v->seq : NULL;
+
+    if(!v)
+        return;
+    if(!seq) {
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    const char *pattern_format = seq->vims_pattern_format[0] ?
+        seq->vims_pattern_format : "gvr-vims-pattern-b64-v1";
+    const char *data = seq->vims_pattern_data ? seq->vims_pattern_data : "";
+    size_t format_len = strnlen(pattern_format, VJ_SEQUENCE_PATTERN_FORMAT_MAX - 1);
+    size_t data_len = seq->vims_pattern_data ? seq->vims_pattern_length : 0;
+
+    if(data_len > VJ_SEQUENCE_PATTERN_DATA_MAX)
+        data_len = VJ_SEQUENCE_PATTERN_DATA_MAX;
+
+    const size_t body_len = VJ_SEQUENCE_PATTERN_HEADER_LENGTH + format_len + data_len;
+    char *packet = get_print_buf((int)body_len + 9);
+    if(!packet)
+        return;
+    char *out = packet;
+
+    out += snprintf(out, body_len + 9, "%08zu%010u%03zu%08zu",
+                    body_len,
+                    seq->vims_pattern_revision,
+                    format_len,
+                    data_len);
+
+    if(format_len > 0) {
+        veejay_memcpy(out, pattern_format, format_len);
+        out += format_len;
+    }
+    if(data_len > 0) {
+        veejay_memcpy(out, data, data_len);
+        out += data_len;
+    }
+    *out = '\0';
+
+    SEND_MSG(v, packet);
+    free(packet);
+}
+
+void vj_event_sequence_pattern_set(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1];
+    char *data = (char*)vj_malloc(VJ_SEQUENCE_PATTERN_DATA_MAX + 1);
+
+    if(!data)
+        return;
+
+    data[0] = '\0';
+    P_A(args, sizeof(args), data, VJ_SEQUENCE_PATTERN_DATA_MAX + 1, format, ap);
+
+    size_t data_len = strnlen(data, VJ_SEQUENCE_PATTERN_DATA_MAX + 1);
+    if(data_len > VJ_SEQUENCE_PATTERN_DATA_MAX) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "VIMS pattern document exceeds %d bytes",
+                   VJ_SEQUENCE_PATTERN_DATA_MAX);
+        free(data);
+        return;
+    }
+
+    if(v && v->seq && vj_sequence_pattern_store(v->seq, args[0], data, data_len)) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Stored VIMS pattern document (%zu bytes, revision %u)",
+                   data_len,
+                   v->seq->vims_pattern_revision);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to store VIMS pattern document");
+    }
+
+    free(data);
+}
+
+void vj_event_sequence_pattern_clear(void *ptr, const char format[], va_list ap)
+{
+    (void)format;
+    (void)ap;
+
+    veejay_t *v = (veejay_t*)ptr;
+    if(!v || !v->seq)
+        return;
+
+    vj_sequence_pattern_clear(v->seq);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Cleared VIMS pattern document (revision %u)",
+               v->seq->vims_pattern_revision);
 }
 
 static int vj_sequence_first_valid_slot(sequencer_t *s, int bank, int *type, int *slot)

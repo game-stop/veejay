@@ -2532,6 +2532,11 @@ int		vj_el_framelist_clone( editlist *src, editlist *dst)
 	if(!src || !dst) return 0;
 	if(dst->frame_list)
 		return 0;
+	if(src->video_frames <= 0)
+		return 1;
+	if(!src->frame_list)
+		return 0;
+
 	dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * src->video_frames );
 	if(!dst->frame_list)
 		return 0;
@@ -2545,17 +2550,162 @@ int		vj_el_framelist_clone( editlist *src, editlist *dst)
 	return 1;
 }
 
+static int vj_el_clone_build_file_map(editlist *el, char ***files_out, int **map_out, int *num_files_out)
+{
+    int *map = NULL;
+    char **files = NULL;
+    int num_files = 0;
+
+    if(!el || el->num_video_files <= 0)
+        return 0;
+
+    map = (int*) vj_malloc(sizeof(int) * el->num_video_files);
+    files = (char**) vj_calloc(sizeof(char*) * el->num_video_files);
+    if(!map || !files) {
+        if(map) free(map);
+        if(files) free(files);
+        return 0;
+    }
+
+    for(int i = 0; i < el->num_video_files; i++) {
+        map[i] = -1;
+        if(!el->video_file_list[i])
+            continue;
+
+        for(int j = 0; j < num_files; j++) {
+            if(strcmp(files[j], el->video_file_list[i]) == 0) {
+                map[i] = j;
+                break;
+            }
+        }
+
+        if(map[i] == -1) {
+            files[num_files] = el->video_file_list[i];
+            map[i] = num_files;
+            num_files++;
+        }
+    }
+
+    if(num_files <= 0) {
+        free(map);
+        free(files);
+        return 0;
+    }
+
+    *files_out = files;
+    *map_out = map;
+    *num_files_out = num_files;
+    return 1;
+}
+
+static int vj_el_clone_framelist_remap(editlist *src, editlist *dst, const int *map, int map_len)
+{
+    if(!src || !dst || !map || map_len <= 0 || dst->frame_list)
+        return 0;
+
+    if(src->video_frames <= 0)
+        return 1;
+
+    if(!src->frame_list)
+        return 0;
+
+    dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * src->video_frames);
+    if(!dst->frame_list)
+        return 0;
+
+    for(long i = 0; i < src->video_frames; i++) {
+        uint64_t entry = src->frame_list[i];
+        int old_file = N_EL_FILE(entry);
+
+        if(old_file < 0 || old_file >= map_len || map[old_file] < 0) {
+            free(dst->frame_list);
+            dst->frame_list = NULL;
+            return 0;
+        }
+
+        dst->frame_list[i] = EL_ENTRY(map[old_file], N_EL_FRAME(entry));
+    }
+
+    return 1;
+}
+
 editlist	*vj_el_clone(editlist *el)
 {
-	editlist *clone = (editlist*) vj_el_soft_clone(el);
-	if(!clone)
-		return NULL;
+    editlist *clone = NULL;
 
-	if( vj_el_framelist_clone( el, clone ) )
-		return clone;
-	
-	if(clone) vj_el_free(clone);
-	veejay_msg(VEEJAY_MSG_ERROR, "Not enough memory to clone EDL");\
-	
-	return NULL;
+    if(!el)
+        return NULL;
+
+    if(el->is_empty || !el->has_video || el->num_video_files <= 0) {
+        clone = vj_el_soft_clone_base(el);
+        if(!clone)
+            return NULL;
+
+        clone->is_clone = 0;
+        clone->num_video_files = 0;
+
+        if(el->frame_list && !vj_el_framelist_clone(el, clone)) {
+            vj_el_free(clone);
+            veejay_msg(VEEJAY_MSG_ERROR, "Not enough memory to clone EDL");
+            return NULL;
+        }
+
+        clone->source_hash = editlist_source_hash(clone);
+        return clone;
+    }
+
+    char **files = NULL;
+    int *map = NULL;
+    int num_files = 0;
+
+    if(!vj_el_clone_build_file_map(el, &files, &map, &num_files)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to build file map while cloning EDL");
+        return NULL;
+    }
+
+    clone = vj_el_init_with_args(files,
+                                 num_files,
+                                 1,
+                                 el->auto_deinter,
+                                 0,
+                                 el->video_norm,
+                                 el->pixel_format,
+                                 el->video_width,
+                                 el->video_height);
+
+    free(files);
+
+    if(!clone) {
+        free(map);
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to reopen video files while cloning EDL");
+        return NULL;
+    }
+
+    if(clone->frame_list) {
+        free(clone->frame_list);
+        clone->frame_list = NULL;
+    }
+
+    if(!vj_el_clone_framelist_remap(el, clone, map, el->num_video_files)) {
+        free(map);
+        vj_el_free(clone);
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to copy edited frame sequence while cloning EDL");
+        return NULL;
+    }
+
+    if(el->last_afile >= 0 && el->last_afile < el->num_video_files)
+        clone->last_afile = map[el->last_afile];
+    else
+        clone->last_afile = -1;
+
+    free(map);
+
+    clone->video_frames = el->video_frames;
+    clone->total_frames = el->total_frames;
+    clone->last_apos = el->last_apos;
+    clone->auto_deinter = el->auto_deinter;
+    clone->is_clone = 0;
+    clone->source_hash = editlist_source_hash(clone);
+
+    return clone;
 }

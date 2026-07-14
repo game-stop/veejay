@@ -1647,10 +1647,6 @@ static inline void vj_copy_frame_holder(VJFrame *src, ycbcr_frame *data, VJFrame
 #define VJ_AUDIO_SOURCE_TRANSITION_FADE_BLOCKS 3
 #endif
 
-#ifndef VJ_AUDIO_RESET_FADE_BLOCKS
-#define VJ_AUDIO_RESET_FADE_BLOCKS 3
-#endif
-
 static volatile int vj_audio_source_transition_guard_blocks_ = 0;
 static volatile int vj_audio_source_transition_guard_seq_ = 0;
 static volatile int vj_audio_source_transition_silence_bytes_ = 0;
@@ -2042,31 +2038,6 @@ static inline int vj_perform_audio_source_transition_guard_consume_block(int fra
 
 
 
-static void vj_perform_audio_source_transition_force_fade_blocks(int frames,
-                                                                 int frame_bytes,
-                                                                 int blocks,
-                                                                 const char *reason,
-                                                                 int edge_type,
-                                                                 long long target_frame,
-                                                                 const char *path)
-{
-    int fade_bytes;
-    
-    if(frames <= 0 || frame_bytes <= 0)
-        return;
-
-    blocks = vj_perform_clampi(blocks, 1, 8);
-
-    fade_bytes = frames * frame_bytes * blocks;
-    if(fade_bytes <= 0)
-        return;
-
-    atomic_store_int(&vj_audio_source_transition_frame_bytes_, frame_bytes);
-    atomic_store_int(&vj_audio_source_transition_fade_bytes_left_, fade_bytes);
-    atomic_store_int(&vj_audio_source_transition_fade_bytes_total_, fade_bytes);
-
-}
-
 #ifdef HAVE_JACK
 static int vj_perform_sample_external_audio_active(veejay_t *info)
 {
@@ -2107,32 +2078,6 @@ static int vj_perform_sample_external_audio_active(veejay_t *info)
 }
 #endif
 
-static void vj_perform_audio_force_loop_reset_fade(veejay_t *info, long long target_frame)
-{
-#ifdef HAVE_JACK
-    if(vj_perform_sample_external_audio_active(info))
-        return;
-#endif
-
-    editlist *el = vj_perform_audio_editlist(info);
-    int frames;
-
-    if(!vj_perform_audio_media_valid(el))
-        return;
-
-    frames = (int)((double)el->audio_rate / (double)el->video_fps);
-    if(frames <= 0)
-        frames = 1;
-
-    vj_perform_audio_source_transition_force_fade_blocks(frames,
-                                                         el->audio_bps,
-                                                         VJ_AUDIO_RESET_FADE_BLOCKS,
-                                                         "sample-normal-loop-reset",
-                                                         AUDIO_EDGE_RESET,
-                                                         target_frame,
-                                                         "loop-reset");
-}
-
 #ifdef HAVE_JACK
 static int vj_perform_sample_marker_loop_active(veejay_t *info, int *marker_start, int *marker_end)
 {
@@ -2157,9 +2102,9 @@ static int vj_perform_sample_marker_loop_active(veejay_t *info, int *marker_star
 }
 #endif
 
+#ifdef HAVE_JACK
 static void vj_perform_audio_handle_sample_loop_reset(veejay_t *info, long long target_frame)
 {
-#ifdef HAVE_JACK
     int marker_start = 0;
     int marker_end = 0;
 
@@ -2176,12 +2121,9 @@ static void vj_perform_audio_handle_sample_loop_reset(veejay_t *info, long long 
                    marker_start,
                    marker_end,
                    target_frame);
-        return;
     }
-#endif
-
-    vj_perform_audio_force_loop_reset_fade(info, target_frame);
 }
+#endif
 
 static inline int vj_perform_audio_source_transition_take_silence_bytes(int want_bytes)
 {
@@ -5470,18 +5412,6 @@ static int perform_normal_playback(
         (last_dir != 0 && cur_dir != 0 && last_dir != cur_dir);
 
 
-#ifdef HAVE_JACK
-    if (pending_edge == AUDIO_EDGE_RESET && cur_dir != 0) {
-        vj_perform_audio_source_transition_force_fade_blocks(pred_len,
-                                                             frame_bytes,
-                                                             VJ_AUDIO_RESET_FADE_BLOCKS,
-                                                             "media-reset-edge",
-                                                             pending_edge,
-                                                             cur_frame,
-                                                             "normal");
-    }
-#endif
-
     if (speed == 0 || pending_edge == AUDIO_EDGE_SILENCE) {
         veejay_memset(audio_buf, 0, pred_len * frame_bytes);
 
@@ -6245,18 +6175,6 @@ int perform_slow_motion(
 
     if (pending_edge == AUDIO_EDGE_SILENCE && cur_dir != 0)
         pending_edge = AUDIO_EDGE_JUMP;
-
-#ifdef HAVE_JACK
-    if (pending_edge == AUDIO_EDGE_RESET && cur_dir != 0) {
-        vj_perform_audio_source_transition_force_fade_blocks(pred_len,
-                                                             frame_bytes,
-                                                             VJ_AUDIO_RESET_FADE_BLOCKS,
-                                                             "media-reset-edge",
-                                                             pending_edge,
-                                                             target_frame,
-                                                             "slow-motion");
-    }
-#endif
 
     if (cur_dir == 0 || pending_edge == AUDIO_EDGE_SILENCE) {
         veejay_memset(audio_buf, 0, pred_len * frame_bytes);
@@ -12533,19 +12451,6 @@ static int vj_perform_runtime_slow_audio_chunk(veejay_t *info,
     if (pending_edge == AUDIO_EDGE_SILENCE && cur_dir != 0)
         pending_edge = AUDIO_EDGE_JUMP;
 
-#ifdef HAVE_JACK
-    if (pending_edge == AUDIO_EDGE_RESET && cur_dir != 0 &&
-        el->has_audio && target_frame != -1) {
-        vj_perform_audio_source_transition_force_fade_blocks(dst_samples,
-                                                             frame_bytes,
-                                                             VJ_AUDIO_RESET_FADE_BLOCKS,
-                                                             "media-reset-edge",
-                                                             pending_edge,
-                                                             target_frame,
-                                                             "retime");
-    }
-#endif
-
     if (cur_dir == 0 || pending_edge == AUDIO_EDGE_SILENCE ||
         !el->has_audio || target_frame == -1) {
         veejay_memset(dst, 0, (size_t)dst_samples * (size_t)frame_bytes);
@@ -17985,37 +17890,60 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         vj_perform_rand_update(info);
 }
 
+static int vj_perform_pick_random_sample(veejay_t *info)
+{
+    video_playback_setup *settings = info->settings;
+    const int highest = sample_highest_valid_id();
+    const int current =
+        (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) ?
+        info->uc->sample_id : 0;
+    int candidates = 0;
+
+    for(int id = 1; id <= highest; id++) {
+        if(sample_exists(id) && id != current)
+            candidates++;
+    }
+
+    if(candidates == 0)
+        return sample_exists(current) ? current : 0;
+
+    int pick = (int) vj_frame_rand(
+        settings->master_frame_num,
+        0,
+        candidates - 1,
+        settings->randplayer.seed++);
+
+    for(int id = 1; id <= highest; id++) {
+        if(!sample_exists(id) || id == current)
+            continue;
+
+        if(pick-- == 0)
+            return id;
+    }
+
+    return 0;
+}
+
 void    vj_perform_randomize(veejay_t *info)
 {
     video_playback_setup *settings = info->settings;
     if(settings->randplayer.mode == RANDMODE_INACTIVE)
         return;
 
-    double n_sample = (double) (sample_highest_valid_id());
-    int track_dup  = 0;
-
-    if( settings->randplayer.mode == RANDMODE_SAMPLE && n_sample > 1.0 )
-        track_dup = info->uc->sample_id;
-
     if( settings->randplayer.seed == 0 )
         settings->randplayer.seed = (unsigned long long) time(NULL);
 
-    int take_n   = vj_frame_rand(track_dup, 1, n_sample, settings->randplayer.seed ++ );
+    int take_n = vj_perform_pick_random_sample(info);
     int min_delay = 1;
     int max_delay = 0;
 
-    if(take_n == 1 && !sample_exists(take_n)) {
-        veejay_msg(0,"No samples to randomize");
+    if(take_n <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "No samples to randomize");
         settings->randplayer.mode = RANDMODE_INACTIVE;
+        settings->randplayer.next_id = 0;
+        settings->randplayer.min_delay = 0;
+        settings->randplayer.max_delay = 0;
         return;
-    }
-
-    while(!sample_exists(take_n))
-    {
-        veejay_msg(VEEJAY_MSG_DEBUG,
-         "Sample to play (at random) %d does not exist",
-            take_n);
-        take_n = vj_frame_rand(track_dup, 1, n_sample, settings->randplayer.seed ++ );
     }
 
     int remaining = sample_get_remaining_frames(take_n);
@@ -18026,7 +17954,7 @@ void    vj_perform_randomize(veejay_t *info)
     if( settings->randplayer.timer == RANDTIMER_FRAME )
     {
         max_delay = vj_frame_rand(
-            track_dup,
+            take_n,
             min_delay,
             remaining,
             settings->randplayer.seed ++ );
@@ -18053,7 +17981,11 @@ int vj_perform_rand_update(veejay_t *info)
         return 0;
     if(settings->randplayer.mode == RANDMODE_SAMPLE)
     {
-        settings->randplayer.max_delay --;
+        int step = abs(settings->current_playback_speed);
+        if(step < 1)
+            step = 1;
+
+        settings->randplayer.max_delay -= step;
         if(settings->randplayer.max_delay <= 0 )
             vj_perform_randomize(info);
         return 1;

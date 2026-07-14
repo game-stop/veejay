@@ -38,6 +38,9 @@
 #ifdef HAVE_XML2
 #define XMLTAG_RENDER_ENTRY "render_entry"
 #define XMLTAG_SAMPLES    "veejay_samples"
+#define XMLTAG_VIMS_PATTERN_FORMAT   "vims_pattern_format"
+#define XMLTAG_VIMS_PATTERN_REVISION "vims_pattern_revision"
+#define XMLTAG_VIMS_PATTERN_DATA     "vims_pattern_data"
 #define XMLTAG_SAMPLE     "sample"
 #define XMLTAG_SAMPLEID   "sampleid"
 #define XMLTAG_SAMPLEDESCR "description"

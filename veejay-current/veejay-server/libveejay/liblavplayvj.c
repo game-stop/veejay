@@ -1687,6 +1687,8 @@ int veejay_free(veejay_t * info)
 
 	if( info->dummy ) free(info->dummy );
 	
+    if(info->seq && info->seq->vims_pattern_data)
+        free(info->seq->vims_pattern_data);
     free( info->seq );
     free(info->status_what);
 	free(info->homedir);  
@@ -2397,6 +2399,15 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
                info->seq ? info->seq->current : -1,
                settings->transition.ready,
                atomic_load_long_long(&settings->current_frame_num));
+
+    if(new_pm != VJ_PLAYBACK_MODE_SAMPLE &&
+       settings->randplayer.mode != RANDMODE_INACTIVE) {
+        settings->randplayer.mode = RANDMODE_INACTIVE;
+        settings->randplayer.next_id = 0;
+        settings->randplayer.next_mode = VJ_PLAYBACK_MODE_SAMPLE;
+        settings->randplayer.min_delay = 0;
+        settings->randplayer.max_delay = 0;
+    }
 
     if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         if (!sample_exists(sample_id)) {
@@ -3801,8 +3812,12 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	vj_event_update_remote( (void*)info );
 
 	if( settings->randplayer.next_id != 0 ) {
-		veejay_change_playback_mode( info, settings->randplayer.next_mode, settings->randplayer.next_id);
+		int next_id = settings->randplayer.next_id;
+		int next_mode = settings->randplayer.next_mode;
 		settings->randplayer.next_id = 0;
+
+		if(settings->randplayer.mode != RANDMODE_INACTIVE)
+			veejay_change_playback_mode(info, next_mode, next_id);
 	}
 
 	veejay_pipe_write_status(info);
@@ -8053,6 +8068,10 @@ veejay_t *veejay_malloc()
     if(info->seq) {
         info->seq->selected_bank_mask = 1;
         info->seq->queued_bank = -1;
+        snprintf(info->seq->vims_pattern_format,
+                 sizeof(info->seq->vims_pattern_format),
+                 "%s",
+                 "gvr-vims-pattern-b64-v1");
     }
     if(info->settings)
         info->settings->transition.seq_bank = -1;

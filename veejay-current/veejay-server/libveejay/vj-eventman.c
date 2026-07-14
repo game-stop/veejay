@@ -120,6 +120,10 @@ void vj_event_sequence_select(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_queue(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_copy(void *ptr, const char format[], va_list ap);
 void vj_event_sequence_clear_all(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_pattern_get(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_pattern_set(void *ptr, const char format[], va_list ap);
+void vj_event_sequence_pattern_clear(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_scratch_sensitivity(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_source_loss_pause(void *ptr, const char format[], va_list ap);
 void vj_event_audio_beat_monitor_latency(void *ptr, const char format[], va_list ap);
@@ -1840,11 +1844,11 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_STREAM_NEW_CLONE]			=	_new_event(
 				"%d",
 				VIMS_STREAM_NEW_CLONE,
-				"Clone an existing stream as a new stream",
+				"Clone an existing non-capture stream as a new stream",
 				vj_event_stream_new_clone,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Stream ID",
+				STREAM_ID_HELP,
 				0,
 				NULL );
 
@@ -4289,6 +4293,49 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				VIMS_SEQUENCE_LIST_ALL,
 				"GUI: Get all sample sequence banks",
 				vj_event_get_sample_sequences_all,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+
+	index_map_[ VIMS_SEQUENCE_TIMELINE ]		=	_new_event(
+				"%d",
+				VIMS_SEQUENCE_TIMELINE,
+				"GUI: Get effective sequence-bank timeline layout",
+				vj_event_sequence_timeline,
+				1,
+				VIMS_ALLOW_ANY,
+				"Sequence bank (-1=current, 0..3)",
+				-1,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_PATTERN_GET ]	=	_new_event(
+				NULL,
+				VIMS_SEQUENCE_PATTERN_GET,
+				"GUI: Get persisted VIMS pattern document",
+				vj_event_sequence_pattern_get,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_PATTERN_SET ]	=	_new_event(
+				"%d %s",
+				VIMS_SEQUENCE_PATTERN_SET,
+				"Store complete Base64 VIMS pattern document",
+				vj_event_sequence_pattern_set,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				"Pattern document format version",
+				1,
+				"Base64 serialized VIMS pattern document",
+				NULL,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_PATTERN_CLEAR ]	=	_new_event(
+				NULL,
+				VIMS_SEQUENCE_PATTERN_CLEAR,
+				"Clear persisted VIMS pattern document",
+				vj_event_sequence_pattern_clear,
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );

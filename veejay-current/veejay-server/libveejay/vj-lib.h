@@ -169,6 +169,10 @@ typedef struct
 	int queued_bank;
 	unsigned int revision;
 	sequence_bank_t banks[VJ_SEQUENCE_BANKS];
+	char vims_pattern_format[VJ_SEQUENCE_PATTERN_FORMAT_MAX];
+	char *vims_pattern_data;
+	size_t vims_pattern_length;
+	unsigned int vims_pattern_revision;
 } sequencer_t;
 
 

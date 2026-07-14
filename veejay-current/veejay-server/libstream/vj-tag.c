@@ -863,21 +863,62 @@ void vj_tag_record_init(int w, int h)
 {
 }
 
+static vj_tag *vj_tag_clone_root(int which_id)
+{
+    vj_tag *source = vj_tag_get(which_id);
+    int guard = 0;
+
+    while(source && source->source_type == VJ_TAG_TYPE_CLONE) {
+        if(source->video_channel <= 0 || source->video_channel == source->id)
+            return NULL;
+        if(++guard >= SAMPLE_MAX_SAMPLES)
+            return NULL;
+        source = vj_tag_get(source->video_channel);
+    }
+
+    return source;
+}
+
+static int vj_tag_clone_source_supported(vj_tag *source)
+{
+    if(!source)
+        return 0;
+
+    switch(source->source_type) {
+        case VJ_TAG_TYPE_V4L:
+        case VJ_TAG_TYPE_VLOOPBACK:
+            return 0;
+        default:
+            return 1;
+    }
+}
+
 static int _vj_tag_new_clone(vj_tag *tag, int which_id )
 {
-    vj_tag *tag2 = vj_tag_get(which_id);
-    if( tag2 == NULL ) {
-        return 0;   
+    vj_tag *source = vj_tag_clone_root(which_id);
+    if(!source) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to resolve clone source stream %d", which_id);
+        return 0;
+    }
+
+    if(!vj_tag_clone_source_supported(source)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Stream %d uses capture source type %d and cannot be cloned",
+                   source->id,
+                   source->source_type);
+        return 0;
     }
 
     char tmp[128];
-    snprintf(tmp,sizeof(tmp),"T%d", which_id );
+    snprintf(tmp, sizeof(tmp), "T%d", source->id);
     tag->extra = strdup(tmp);
+    if(!tag->extra)
+        return 0;
 
-    tag2->clone ++;
+    source->clone++;
 
     tag->active = 1;
-    tag->video_channel = which_id;
+    tag->video_channel = source->id;
     return 1;
 }
 
@@ -1503,11 +1544,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
     tag->active = 1;
     break;
     case VJ_TAG_TYPE_CLONE:
-        snprintf(tag->source_name, SOURCE_NAME_LEN, "[clone %d]", tag->id );
-
-        if( _vj_tag_new_clone(tag,channel) == 0 ) {
+        if(_vj_tag_new_clone(tag, channel) == 0) {
             goto TAG_NEW_FAILED;
         }
+        snprintf(tag->source_name, SOURCE_NAME_LEN, "[clone of %d]", tag->video_channel);
         break;
     default:
         veejay_msg(0, "Stream type %d invalid", type );
@@ -1559,6 +1599,17 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
 TAG_NEW_FAILED:
 
     veejay_msg(0, "Failed to open stream");
+
+    if(tag->source_type == VJ_TAG_TYPE_CLONE && tag->video_channel > 0) {
+        vj_tag *source = vj_tag_get(tag->video_channel);
+        if(source && source->clone > 0)
+            source->clone--;
+    }
+
+    if(tag->extra) {
+        free(tag->extra);
+        tag->extra = NULL;
+    }
 
     if(tag->source_name)
         free(tag->source_name);
@@ -1865,7 +1916,16 @@ int vj_tag_del(int id, int skip_cleanup)
     vj_tag *tag = vj_tag_get(id);
     if (!tag)
         return 0;
-    
+
+    if(tag->clone > 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Cannot delete stream %d while %d clone%s depend on it",
+                   id,
+                   tag->clone,
+                   tag->clone == 1 ? "" : "s");
+        return 0;
+    }
+
     vj_tag_find_refs_and_delete(1, id);
     sample_find_refs_and_delete(1, id);
 

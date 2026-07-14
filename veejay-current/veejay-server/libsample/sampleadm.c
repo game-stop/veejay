@@ -703,45 +703,197 @@ int sample_set_audio_sync_lock(int sample_id, int delta_frames, int confidence)
     return 1;
 }
 
+static int sample_copy_keyframes(sample_info *source, int destination_id)
+{
+    if(!source)
+        return 0;
+
+    for(int entry = 0; entry < SAMPLE_MAX_EFFECTS; entry++) {
+        sample_eff_chain *effect = source->effect_chain[entry];
+        if(!effect || !effect->kf)
+            continue;
+
+        int num_parameters = SAMPLE_MAX_PARAMETERS;
+        if(vje_is_valid(effect->effect_id)) {
+            num_parameters = vje_get_num_params(effect->effect_id);
+            if(num_parameters > SAMPLE_MAX_PARAMETERS)
+                num_parameters = SAMPLE_MAX_PARAMETERS;
+        }
+
+        for(int parameter = 0; parameter < num_parameters; parameter++) {
+            int len = 0;
+            unsigned char *data = keyframe_pack(effect->kf, parameter, entry, &len);
+            if(!data || len <= 0) {
+                if(data) free(data);
+                continue;
+            }
+
+            int unpacked_entry = entry;
+            int result = keyframe_unpack(data, len, &unpacked_entry, destination_id, 1);
+            free(data);
+
+            if(result < 0)
+                return 0;
+        }
+    }
+
+    if(source->fade_kf) {
+        int len = 0;
+        unsigned char *data = keyframe_pack(source->fade_kf,
+                                            VJ_KF_PARAM_CHAIN_OPACITY,
+                                            VJ_KF_ENTRY_CHAIN_FADE,
+                                            &len);
+        if(data && len > 0) {
+            int unpacked_entry = VJ_KF_ENTRY_CHAIN_FADE;
+            int result = keyframe_unpack(data, len, &unpacked_entry, destination_id, 1);
+            free(data);
+            if(result < 0)
+                return 0;
+        }
+        else if(data) {
+            free(data);
+        }
+    }
+
+    return 1;
+}
+
+#if defined(HAVE_XML2) && defined(HAVE_FREETYPE)
+static void sample_copy_subtitles(void *destination, void *source)
+{
+    if(!sample_font_ || !destination || !source)
+        return;
+
+    xmlDocPtr doc = xmlNewDoc((const xmlChar*) "1.0");
+    if(!doc)
+        return;
+
+    xmlNodePtr root = xmlNewNode(NULL, (const xmlChar*) "sample");
+    if(!root) {
+        xmlFreeDoc(doc);
+        return;
+    }
+
+    xmlDocSetRootElement(doc, root);
+
+    void *current = vj_font_get_dict(sample_font_);
+    vj_font_set_dict(sample_font_, source);
+    vj_font_xml_pack(root, sample_font_);
+    vj_font_set_dict(sample_font_, destination);
+
+    xmlNodePtr node = root->xmlChildrenNode;
+    while(node) {
+        if(!xmlStrcmp(node->name, (const xmlChar*) "SUBTITLES")) {
+            vj_font_xml_unpack(doc, node->xmlChildrenNode, sample_font_);
+            break;
+        }
+        node = node->next;
+    }
+
+    vj_font_set_dict(sample_font_, current);
+    xmlFreeDoc(doc);
+}
+#endif
+
+#ifdef HAVE_XML2
+static void sample_copy_macro(void *destination, void *source)
+{
+    if(!destination || !source)
+        return;
+
+    xmlDocPtr doc = xmlNewDoc((const xmlChar*) "1.0");
+    if(!doc)
+        return;
+
+    xmlNodePtr root = xmlNewNode(NULL, (const xmlChar*) "macro");
+    if(!root) {
+        xmlFreeDoc(doc);
+        return;
+    }
+
+    xmlDocSetRootElement(doc, root);
+    vj_macro_store(source, root);
+    vj_macro_load(destination, doc, root->xmlChildrenNode);
+    xmlFreeDoc(doc);
+}
+#endif
+
 int sample_copy(int sample_id)
 {
-    int i;
-    sample_info *org, *copy;
-    if (!sample_exists(sample_id))
+    if(!sample_exists(sample_id))
         return 0;
-    org = sample_get(sample_id);
-    copy = (sample_info*) vj_calloc(sizeof(sample_info));
-    veejay_memcpy( copy,org,sizeof(sample_info));\
 
-    sample_eff_chain *b = vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+    sample_info *org = sample_get(sample_id);
+    if(!org)
+        return 0;
 
-    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
-    {
-        copy->effect_chain[i] = &b[i];
+    sample_info *copy = sample_skeleton_new(org->first_frame, org->last_frame);
+    if(!copy)
+        return 0;
 
-        if (copy->effect_chain[i] == NULL)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
+    int new_id = copy->sample_id;
+    sample_eff_chain *new_main_fx = copy->main_fx;
+    char *new_edit_list_file = copy->edit_list_file;
+    void *new_dict = copy->dict;
+    void *new_macro = copy->macro;
+
+    veejay_memcpy(copy, org, sizeof(sample_info));
+
+    copy->sample_id = new_id;
+    copy->main_fx = new_main_fx;
+    copy->edit_list_file = new_edit_list_file;
+    copy->dict = new_dict;
+    copy->macro = new_macro;
+    copy->edit_list = NULL;
+    copy->fade_kf = NULL;
+    copy->kf = NULL;
+
+    copy->encoder_active = 0;
+    copy->encoder_destination = NULL;
+    copy->encoder = NULL;
+    copy->encoder_file = NULL;
+    copy->encoder_frames_to_record = 0;
+    copy->encoder_frames_recorded = 0;
+    copy->encoder_total_frames_recorded = 0;
+
+    snprintf(copy->descr, SAMPLE_MAX_DESCR_LEN, "Sample %4d", copy->sample_id);
+
+    for(int i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+        copy->effect_chain[i] = &new_main_fx[i];
+        veejay_memcpy(copy->effect_chain[i], org->effect_chain[i], sizeof(sample_eff_chain));
+        copy->effect_chain[i]->vje_instance = NULL;
+        copy->effect_chain[i]->fx_instance = NULL;
+        copy->effect_chain[i]->kf = NULL;
+    }
+
+    if(org->edit_list) {
+        copy->edit_list = vj_el_clone(org->edit_list);
+        if(!copy->edit_list) {
+            sample_del_internal(copy, 0);
             return 0;
         }
-        veejay_memcpy( copy->effect_chain[i], org->effect_chain[i], sizeof( sample_eff_chain ) );
-	    copy->effect_chain[i]->fx_instance = NULL;
+        copy->soft_edl = 0;
     }
 
-    copy->sample_id = _new_id();
-    snprintf(copy->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", copy->sample_id);
+#ifdef HAVE_XML2
+    sample_copy_macro(copy->macro, org->macro);
+#endif
+#if defined(HAVE_XML2) && defined(HAVE_FREETYPE)
+    sample_copy_subtitles(copy->dict, org->dict);
+#endif
 
-    if(org->edit_list)
-    {
-        copy->edit_list = vj_el_clone( org->edit_list );
-        copy->soft_edl = 1;
-    }
-
-    if (sample_store(copy,0) != 0)
+    if(sample_store(copy, 0) != 0) {
+        sample_del_internal(copy, 0);
         return 0;
+    }
+
+    if(!sample_copy_keyframes(org, copy->sample_id)) {
+        sample_del(copy->sample_id);
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to copy keyframes for sample %d", sample_id);
+        return 0;
+    }
 
     recount_hash = 1;
-
     return copy->sample_id;
 }
 
@@ -3393,6 +3545,39 @@ static void LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mo
 
 }
 
+static int sampleadm_vims_pattern_payload_valid(const char *data, size_t data_len)
+{
+    int padding = 0;
+
+    if(!data)
+        return 0;
+    if(data_len == 0)
+        return 1;
+    if((data_len & 3u) != 0)
+        return 0;
+
+    for(size_t i = 0; i < data_len; i++) {
+        unsigned char c = (unsigned char)data[i];
+        int valid = (c >= 'A' && c <= 'Z') ||
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= '0' && c <= '9') ||
+                    c == '+' || c == '/' || c == '=';
+
+        if(!valid)
+            return 0;
+        if(c == '=') {
+            padding++;
+            if(padding > 2)
+                return 0;
+        }
+        else if(padding) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
 static int sampleadm_sequence_bank_valid(int bank)
 {
     return bank >= 0 && bank < VJ_SEQUENCE_BANKS;
@@ -3952,6 +4137,10 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
     int desired_pm = -1;
     int desired_id = -1;
     int desired_seq_bank = 0;
+    char *desired_pattern_format = NULL;
+    char *desired_pattern_data = NULL;
+    unsigned int desired_pattern_revision = 0;
+    int saw_pattern_data = 0;
 
     while (cur != NULL)
     {
@@ -3998,6 +4187,23 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
             LoadSequences(doc, cur->xmlChildrenNode, seq, start_at);
         }
 
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_VIMS_PATTERN_FORMAT)) {
+            if(desired_pattern_format)
+                free(desired_pattern_format);
+            desired_pattern_format = get_xml_str(doc, cur);
+        }
+
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_VIMS_PATTERN_REVISION)) {
+            desired_pattern_revision = (unsigned int)get_xml_int(doc, cur);
+        }
+
+        if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_VIMS_PATTERN_DATA)) {
+            if(desired_pattern_data)
+                free(desired_pattern_data);
+            desired_pattern_data = get_xml_str(doc, cur);
+            saw_pattern_data = 1;
+        }
+
         if (!xmlStrcmp(cur->name, (const xmlChar*) "stream")) {
             tagParseStreamFX(sampleFile, doc, cur->xmlChildrenNode, font, vp, load_mode);
         }
@@ -4005,8 +4211,66 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
         cur = cur->next;
     }
 
-    if(seq)
-        sampleadm_sequence_load_bank((sequencer_t*)seq, desired_seq_bank);
+    if(seq) {
+        sequencer_t *sequencer = (sequencer_t*)seq;
+        sampleadm_sequence_load_bank(sequencer, desired_seq_bank);
+
+        if(load_mode != SAMPLE_LOAD_APPEND) {
+            if(sequencer->vims_pattern_data) {
+                free(sequencer->vims_pattern_data);
+                sequencer->vims_pattern_data = NULL;
+            }
+            sequencer->vims_pattern_length = 0;
+
+            if(desired_pattern_format && desired_pattern_format[0]) {
+                snprintf(sequencer->vims_pattern_format,
+                         sizeof(sequencer->vims_pattern_format),
+                         "%s",
+                         desired_pattern_format);
+            }
+            else {
+                snprintf(sequencer->vims_pattern_format,
+                         sizeof(sequencer->vims_pattern_format),
+                         "%s",
+                         "gvr-vims-pattern-b64-v1");
+            }
+
+            if(saw_pattern_data && desired_pattern_data) {
+                size_t pattern_len = strnlen(desired_pattern_data,
+                                             VJ_SEQUENCE_PATTERN_DATA_MAX + 1);
+                if(pattern_len <= VJ_SEQUENCE_PATTERN_DATA_MAX &&
+                   sampleadm_vims_pattern_payload_valid(desired_pattern_data, pattern_len)) {
+                    sequencer->vims_pattern_data = (char*)vj_malloc(pattern_len + 1);
+                    if(sequencer->vims_pattern_data) {
+                        if(pattern_len > 0)
+                            veejay_memcpy(sequencer->vims_pattern_data,
+                                          desired_pattern_data,
+                                          pattern_len);
+                        sequencer->vims_pattern_data[pattern_len] = '\0';
+                        sequencer->vims_pattern_length = pattern_len;
+                    }
+                }
+                else {
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                               "Ignoring invalid or oversized VIMS pattern document in samplelist");
+                }
+            }
+
+            sequencer->vims_pattern_revision = desired_pattern_revision;
+            if(sequencer->vims_pattern_revision == 0 &&
+               sequencer->vims_pattern_length > 0)
+                sequencer->vims_pattern_revision = 1;
+        }
+        else if(saw_pattern_data) {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "Ignoring appended samplelist VIMS pattern document");
+        }
+    }
+
+    if(desired_pattern_format)
+        free(desired_pattern_format);
+    if(desired_pattern_data)
+        free(desired_pattern_data);
 
     if (desired_id > 0 && desired_pm >= 0) {
         if (desired_pm == 0 && sample_exists(desired_id)) {
@@ -4124,6 +4388,16 @@ static void SaveSequences( xmlNodePtr root, void *seq )
     sampleadm_sequence_store_active_bank(s);
 
     put_xml_int(root, "SEQUENCE_ACTIVE_BANK", s->active_bank);
+
+    put_xml_str(root,
+                XMLTAG_VIMS_PATTERN_FORMAT,
+                s->vims_pattern_format[0] ? s->vims_pattern_format : "gvr-vims-pattern-b64-v1");
+    put_xml_int(root,
+                XMLTAG_VIMS_PATTERN_REVISION,
+                (int)s->vims_pattern_revision);
+    put_xml_str(root,
+                XMLTAG_VIMS_PATTERN_DATA,
+                s->vims_pattern_data ? s->vims_pattern_data : "");
 
     for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++)
         SaveSequenceBank(root, s, bank);
