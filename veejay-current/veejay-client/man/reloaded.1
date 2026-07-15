@@ -68,7 +68,9 @@ Print the program version, linked libveejaycore version, and data directory,
 then exit.
 .TP
 .BR -X , " --tracks " \fIN\fR
-Set the number of multitrack tracks.
+Set the number of extra multitrack slots after track 0. The default is 3
+extra slots, for 4 tracks in total. Accepted values run from 0 through one
+less than the compiled maximum track count.
 .TP
 .BR -t , " --theme " \fIFILE\fR
 Load a CSS stylesheet. Use \fBsystem\fR to use the system default theme.
@@ -145,25 +147,36 @@ The speed slider controls playback speed. The slow-motion slider divides the
 current frame rate by the selected multiplier. Ctrl-clicking these sliders
 resets them to neutral.
 .SH SAMPLE BANK
-The sample bank provides quick access to sample and stream slots. Slots can be
-selected, played, and populated from selected sources.
+The sample bank provides quick access to samples and streams. Each page has
+12 slots. The grid expands to use the available area, keeps the cells square,
+and may show several consecutive pages at once.
 .TP
-.B Left or right click
-Play a slot.
+.B Single left click
+Select the sample or stream in the slot without starting playback. The
+selection is also used by actions that operate on a selected source.
 .TP
-.B Shift + left click
-Place the currently selected sample or stream into a slot.
+.B Double left click or Enter
+Start playing the selected sample or stream.
 .TP
-.B Double click
-Play the sample or stream in the slot.
+.B Shift + left click or Shift + Enter
+Use the selected sample or stream as the mixing source for the currently
+selected FX chain entry.
 .TP
-.B Shift + left click on a populated slot
-Set the slot as the current mixing channel.
+.B Cursor keys
+Move the slot selection. Home and End select the first and last slot on the
+current page.
+.TP
+.B Page Up and Page Down
+Move one sample-bank page backward or forward.
+.TP
+.B Mouse wheel
+Move backward or forward by the number of pages currently visible in the
+resizable grid.
 .PP
-The active bank selector changes the visible sample-bank page. Each page contains
-12 slots. When the sample bank has more space, Reloaded keeps square cells and
-shows consecutive pages to fill the available area. The default number of pages
-is 12. In low-bandwidth mode, sample images are not loaded.
+The page selector and page header change the current page. The default number
+of allocated pages is 12 and the maximum is 512. In low-bandwidth mode,
+thumbnail images are not loaded, but slot selection and playback remain
+available.
 .SH SAMPLE AND STREAM PANELS
 The sample panel shows sample title, start and end positions, playback speed,
 slow-motion multiplier, hold-frame controls, sample audio volume, transitions,
@@ -187,8 +200,14 @@ the source type and the source id is printed in the cell.
 The selected bank, active playback bank, and queued bank are separate states.
 The active bank has the active outline, a queued bank has the queue outline,
 the current playing slot is highlighted, and selected cells have a selection
-outline. A slot badge of \fBH\fR, \fBV\fR, or \fBHV\fR indicates an attached
-Hold pattern, VIMS pattern, or both.
+outline.
+.PP
+Pattern markers distinguish their scope. A cyan upper-left corner marks a
+source pattern that follows the sample or stream wherever it is used. A
+magenta upper-right corner marks a cell overlay that belongs only to that
+sequence slot. An amber dot marks a Hold Frame event. Larger cells also show
+\fBS\fR, \fBC\fR, or \fBS+C\fR. A bank header with a complete sequence
+pattern shows \fBSEQ\fR or \fBSEQ H\fR when it includes Hold Frame.
 .SS BANK PLAYBACK AND QUEUEING
 .TP
 .B Play Grid
@@ -206,6 +225,10 @@ queued.
 Check a bank to include it in Play Grid and select it for editing. The active
 bank remains checked. When Play Grid is stopped, selecting a populated bank
 starts it immediately.
+.TP
+.B Left click a bank header
+Select that bank and apply the same immediate-switch or Wait End queueing
+rules as the bank controls. Right-clicking the header opens the bank menu.
 .TP
 .B Clear
 Erase every slot in the selected bank. Other banks are unchanged. Clearing a
@@ -231,11 +254,13 @@ Select one cell or a path of cells in the selected bank.
 .B Ctrl + left click or drag
 Toggle cells in the current selection.
 .TP
-.B Left click an empty active-bank slot
-Assign the current sample to that slot.
+.B Left click an empty slot
+Assign the currently selected sample or stream to that slot. This works in
+inactive banks as well, so another bank can be edited while Play Grid is
+running.
 .TP
-.B Shift + left click a populated active-bank slot
-Delete that slot.
+.B Shift + left click a populated slot
+Delete that slot, including its cell-specific VIMS pattern overlay.
 .TP
 .B Alt + drag a populated slot
 Move or swap it with another slot in the same bank.
@@ -249,8 +274,9 @@ operations.
 Open the bank-only copy, paste, clear, and refresh menu.
 .PP
 Copying or cutting selected sequence cells also copies their attached
-per-cell VIMS patterns. Pasting the cells restores those patterns at the
-corresponding destination offsets.
+cell-specific VIMS pattern overlays. Pasting the cells restores those overlays
+at the corresponding destination offsets. Source patterns remain attached to
+the underlying samples or streams and are not duplicated as cell overlays.
 .SS SEQUENCE KEYBOARD CONTROLS
 .TP
 .B Cursor keys
@@ -266,8 +292,8 @@ Select sequence bank 1 through 4.
 Delete the selected populated cell or populated selection.
 .TP
 .B Enter
-Select a non-active bank, or assign the current sample to an empty slot in the
-active bank.
+Assign the currently selected sample or stream when the selected slot is
+empty. On a populated slot, collapse the selection without replacing it.
 .TP
 .B Ctrl + C, Ctrl + X, Ctrl + V
 Copy, cut, or paste selected cells.
@@ -330,8 +356,12 @@ Enable \fBCapture\fR to learn user-triggered, pattern-safe VIMS commands at
 the current pattern position. Supported buttons, toggles, spin controls,
 sliders, transport controls, FX controls, audio controls, and other UI actions
 are captured whether they use a single-argument or formatted VIMS sender.
-Backend queries, project-management commands, recursive sequencer commands,
-and other unsafe control messages remain excluded.
+The pattern safety filter rejects the reserved VIMS range 400 through 499,
+query and readback commands, sequencer control commands, macro and bundle
+automation, source or play-mode switches, sample and stream lifecycle actions,
+timeline or project-structure edits, recording and calibration commands,
+FX-chain structure and keyframe edits, and global UI or engine configuration.
+Rejected commands are reported in the log.
 .PP
 The learning policy chooses where each captured command is placed:
 .TP
@@ -383,8 +413,8 @@ Clear all eight tracks on the current row.
 Clear the complete pattern for the current target.
 .TP
 .B Undo and Redo
-Restore or reapply pattern edits. The editor keeps a bounded per-target edit
-history.
+Restore or reapply pattern edits. The editor keeps up to 64 snapshots for the
+current target and resets that history when the target changes or is reloaded.
 .SS PATTERN KEYBOARD CONTROLS
 .TP
 .B Cursor keys
@@ -424,48 +454,89 @@ Seek to the selected row and start forward playback.
 .B Escape
 Cancel inline editing or clear the current block selection.
 .SS HISTORY, PLAYBACK, AND PERSISTENCE
-Pattern-safe rows from the VIMS History can be dragged onto a visible V1
-through V8 cell. The editor follows forward and reverse playback and handles
-seeks without replaying the complete skipped range.
+The VIMS History lists pattern-safe commands newest first. Repeated
+consecutive commands are collapsed into one row with a use count. Drag a row
+onto a visible V1 through V8 cell, or double-click it or press Enter to place
+it at the current Pattern cursor. Right-click a history row to copy its raw
+command or clear the local history.
+.PP
+The editor follows forward and reverse playback and handles seeks without
+replaying the complete skipped range.
 .PP
 Pattern changes are automatically serialised and stored through the backend.
 The document includes sequence-cell patterns, whole-bank patterns, sample and
 stream patterns, enabled tracks, learning policy, paste mode, and loop ranges.
 It is reloaded when Reloaded reconnects or refreshes the sequence state.
 .PP
-The Sequence editor displays \fBH\fR, \fBV\fR, and \fBHV\fR badges for slots
-with Hold and VIMS automation, so automated slots remain visible even when the
-Pattern page is not open.
+The Sequence editor mirrors Pattern state with source and cell corner markers,
+an amber Hold Frame dot, and \fBS\fR, \fBC\fR, and \fBS+C\fR labels where
+space permits. Complete bank patterns show \fBSEQ\fR or \fBSEQ H\fR badges.
+Automated slots therefore remain visible even when the Pattern page is not
+open.
 .SH EFFECTS AND FX CHAIN
-The FX panel lists available effects and exposes the current chain. Effects
-are grouped into mixing effects, image effects, alpha effects, video effects,
-and related categories.
+The FX panel exposes the current effect chain and four effect lists: the main
+image/video list, mixing effects, Alpha / Matte effects, and the user-managed
+Favourites list. The text filter applies to the normal effect lists.
+.SS ADDING AND ORGANISING EFFECTS
 .TP
 .B Double click an effect
-Add the effect to the current chain entry.
+Insert the effect into the currently selected chain entry and enable it.
 .TP
 .B Shift + double click
-Add the effect disabled.
+Insert the effect disabled.
 .TP
 .B Ctrl + double click
-Add the effect to the selected sample.
+Insert the effect into the current chain entry of the source selected in the
+sample bank instead of the currently playing source.
 .TP
-.B Effect filter entry
-Filter the effects list by text.
+.B Ctrl + Shift + left click
+Add the clicked effect to Favourites, or remove it when it is already a
+favourite.
+.TP
+.B Drag an effect onto an FX chain row
+Insert it into an empty chain entry or replace the effect in the destination
+entry. The destination row is highlighted while dragging.
+.TP
+.B Drag a populated FX chain row onto another chain row
+Move or swap the complete live FX entry, including its current entry state.
+.PP
+Favourites are ordered manually. Drag rows inside the Favourites list to
+reorder them and press Delete or Backspace to remove the selected favourite.
+The list is saved automatically in
+\fI~/.veejay/reloaded-favourites.cfg\fR and restored at startup. Its Type
+column identifies Image, Video, and Alpha effects.
+.SS CHAIN ENTRIES
+The chain view shows the entry number, effect, Run, Beat, Anim, source type,
+source id, and Subrender state. Clicking the Run, Beat, Anim, or Subrender icon
+changes that state for the clicked entry and selects the entry. Subrender
+processes a mixing source through its own FX chain and automatically enables
+the global source-FX master when required.
+.PP
+Shift-clicking a chain row toggles the selected effect entry. Ctrl-clicking a
+chain row toggles its FX animation state. A normal click selects the entry and
+loads its parameters and source controls.
 .PP
 Each selected effect exposes up to sixteen parameters, named p0 through p15
 unless the effect supplies more specific names. Parameter sliders, increment
 and decrement controls, RGB key controls, opacity controls, and mixing-source
-controls are updated from the selected chain entry.
+controls are updated from backend status for the selected chain entry.
 .PP
-The FX chain panel can enable or disable effect-chain processing for the
-current sample or stream. Global chain controls, chain copy, and chain level
-controls apply to shared chain operations.
+The chain panel can enable or disable effect processing for the current sample
+or stream. Global chain controls copy the current chain to the Global FX chain
+and select whether that global chain renders before or after the current
+chain.
 .PP
-Beat-aware FX entries have a beat-control toggle. Enabling beat control marks
-the selected chain entry as eligible for beat-guided Auto FX modulation. The
-beat detector can also enable this toggle automatically when a compatible beat
-action is selected.
+Beat-aware entries have a beat-control state. Auto FX modulates only eligible
+parameters on entries whose beat control is enabled. Parameters owned by Auto
+FX are identified in the parameter UI by beat-hint glyphs and coloured slider
+indication.
+.SS ALPHA AND MATTE CONTROLS
+Alpha / Matte effects read, write, or transform the alpha plane. Reloaded can
+show only those effects, preview the alpha channel, initialize alpha only when
+an active effect needs it, choose transparent or opaque initial alpha, and use
+the processed alpha mask for the chain fader instead of normal opacity. These
+controls are separate from normal Alpha Blend effects and from mixing-source
+Subrender.
 .SH FX ANIMATION CURVE
 The FX animation panel edits parameter animation curves for the selected FX
 chain entry and selected parameter. It provides start and end positions,
@@ -520,7 +591,8 @@ mirrored between the FX chain and FX animation controls.
 Clear only the selected parameter animation for the current keyframe entry.
 .TP
 .B Clear entry
-Reset all keyframes for the selected FX entry.
+Reset all keyframes for the selected FX entry and clear the separate chain
+opacity animation target.
 .PP
 The curve widget shows frame, value, and timecode near the active marker. Live
 traces can be shown as underlays or as the current live overview. User edits
@@ -607,20 +679,30 @@ Bind the sample to JACK external audio.
 .B Sample source: Silence
 Bind the sample to silence from a stored frame anchor.
 .PP
-Per-sample external routes use the same external mode names as global Audio
-Sync: Queue/Monitor, Analyze External Tempo, Clean Monitor, Monitor +
-Trickplay, Visual Tempo Follow, Tempo Match Bridge, and Track Align.
+Per-sample external routes provide Queue/Monitor, Analyze External Tempo,
+Clean Monitor, Monitor + Trickplay, Visual Tempo Follow, Tempo Match Bridge,
+and Track Align. Queue/Monitor is the per-sample default and is not a separate
+global Audio Sync mode.
 .PP
+Changing the per-sample source, WAV profile, or external mode immediately
+updates and rearms the stored route while preserving the existing anchor when
+possible.
+.TP
 .B Set Here
-stores the selected sample route at the current video frame. For WAV routes it
-also stores the current WAV anchor in milliseconds. The status label reports
-routes such as Sample Original, WAV slot N with mode and switch frame, JACK
-with mode and switch frame, or Silence with switch frame.
-.PP
+Store the selected route with the current video frame as its new switch
+anchor. For WAV routes it also stores the selected WAV anchor in milliseconds.
+.TP
 .B Rearm
-re-sends the saved route for the selected sample. For WAV routes, the selected
-profile must be greater than 0. Clearing a sample route returns it to
-Follow global/default.
+Re-send the selected sample route using its saved anchor. For WAV routes the
+selected profile must be greater than 0.
+.TP
+.B Clear
+Remove the sample-specific route and return the sample to Follow
+global/default.
+.PP
+The status label reports routes such as Sample Original, WAV slot N with mode
+and switch frame, JACK with mode and switch frame, or Silence with switch
+frame.
 .SH AUDIO BEAT DETECTOR
 The Audio Beat Detector analyses the selected audio source and can drive visual
 and transport actions. It analyses Original video audio when that source is
@@ -672,7 +754,9 @@ Choose off, primary, primary + motion, motion + memory, or chaos. Higher modes
 select more motion, memory, and chaos-oriented beat-hint roles.
 .TP
 .B Auto FX amount
-Set the global intensity of automatic beat-driven parameter modulation.
+Set the global intensity of automatic beat-driven parameter modulation. Values
+0 through 100 are the normal range. In Chaos mode, values 101 through 300
+provide performance overdrive.
 .TP
 .B Scratch sensitivity
 Set Break Beat scratch sensitivity.
@@ -774,17 +858,37 @@ window offsets, and video loopback settings.
 The Image Calibration dialog captures dark, light, and flat frames for live
 stream calibration. It can run calibration globally or per stream and provides
 reset, capture, and save controls. Calibration requires a selected live stream.
-.SH VIMS MESSENGER, BUNDLES, AND MACROS
-The VIMS messenger sends VIMS commands directly to the backend. Bundle editing
-allows stored VIMS command groups to be edited and reused. The VIMS scheduler
-can fire messages at selected frame, duplicate-frame, or loop positions.
+.SH VIMS MESSENGER, HISTORY, BUNDLES, KEY BINDINGS, AND MACROS
+The VIMS messenger sends raw VIMS commands directly to the backend. The VIMS
+and Bundles dialog lists backend-advertised events and stored bundles.
+Activating an ordinary event sends it with its configured arguments;
+activating a bundle runs the stored command group. Bundles can be created,
+edited, deleted, saved,
+loaded, and reused. Saving a bundle file also includes its key bindings.
 .PP
-Pattern-safe entries in the VIMS History can be dragged into the Pattern
-editor. The destination must be a visible V1 through V8 event cell.
+The messenger editor processes one command per non-empty line. During Play, a
+line beginning with \fB+N\fR delays the next command by N update frames; the
+script wraps to line zero at the end. Single sends the next command without
+running the timed script, Rewind returns to line zero, and Clear empties the
+editor.
 .PP
-Macro controls can record, play, stop, clear, delay, and loop VIMS-driven UI
-actions. Macro start and stop actions report their state through the status
-bar and console logs.
+When Reloaded is built with SDL keyboard support, the selected VIMS event can
+be attached to a key and modifier combination, updated, or detached. Argument
+text is checked against the event format before it is stored. Bindings are
+reloaded from the backend and an assigned key press sends the stored VIMS
+command.
+.PP
+The VIMS History is a local, pattern-safe command log of up to 512 entries. It
+displays the VIMS id, a compact label, description, raw command, and repeat
+count. It is ordered newest first. Double-click a row or press Enter to insert
+it at the current Pattern cursor. Drag it to a visible Pattern cell for
+explicit placement. Right-click to copy the raw command or clear the history;
+the Clear button also removes all local history rows.
+.PP
+Macro controls can record, play, stop or reset VIMS-driven UI actions, delay
+the start of recording, select and clear macro banks, clear all recorded
+events, and refresh macro state. Start and stop actions report their state
+through the status bar and console logs.
 .SH MIDI
 The MIDI menu enables MIDI learning, toggles MIDI support, clears the MIDI
 layout, saves the MIDI layout, and loads an existing MIDI layout. Many UI
@@ -801,6 +905,9 @@ GTK3 Glade UI definition loaded at startup.
 .TP
 .I gveejay.reloaded.css
 Default Reloaded stylesheet.
+.TP
+.I ~/.veejay/reloaded-favourites.cfg
+Automatically maintained ordered FX Favourites list.
 .TP
 .I MIDI layout files
 User-saved MIDI mappings loaded or saved from the MIDI menu or command line.
