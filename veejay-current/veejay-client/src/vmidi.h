@@ -1,5 +1,6 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2007 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2026 Niels Elburg <nwelburg@gmail.com> 
+ *
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,46 +18,65 @@
  */
 #ifndef VMIDI_H
 #define VMIDI_H
+
+#include <stddef.h>
+
+typedef void (*vj_midi_mapping_func)(const char *mapping_key,
+                                     int event_type,
+                                     int parameter,
+                                     int extra,
+                                     const char *event_name,
+                                     const char *parameter_text,
+                                     const char *source_widget,
+                                     const char *message,
+                                     void *user_data);
+
 #ifdef HAVE_ALSA
-void    *vj_midi_new(void *mw, void *timeline);
-int    vj_midi_handle_events(void *vv);
-void    vj_midi_play(void *vv , int play);
-void    vj_midi_learn( void *vv , int start);
-void    vj_midi_load(void *vv, const char *filename);
-void    vj_midi_save(void *vv, const char *filename);
-void	vj_midi_reset( void *vv );
-void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra );
-void    vj_midi_learning_vims_simple( void *vv, char *widget, int id );
-void    vj_midi_learning_vims_toggle( void *vv, char *widget, int id );
-void    vj_midi_learning_vims_toggle2( void *vv, char *widget, int id, int arg );
-void    vj_midi_learning_vims_toggle3( void *vv, char *widget, int id, int arg0, int arg1 );
-void    vj_midi_learning_vims_dual_toggle( void *vv, char *widget, int off_id, int on_id, int arg );
-void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra );
-void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra );
-void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b );
-void    vj_midi_learning_vims_msg2_extra(void *vv, int id, int arg, int extra );
-void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg );
-void    vj_midi_learning_vims_spin( void *vv, char *widget, int id );
+void *vj_midi_new(void *mw, void *timeline);
+int   vj_midi_handle_events(void *vv);
+void  vj_midi_play(void *vv, int play);
+void  vj_midi_learn(void *vv, int start);
+void  vj_midi_load(void *vv, const char *filename);
+void  vj_midi_save(void *vv, const char *filename);
+void  vj_midi_reset(void *vv);
+int   vj_midi_foreach_mapping(void *vv,
+                              vj_midi_mapping_func callback,
+                              void *user_data);
+int   vj_midi_unbind(void *vv, const char *mapping_key);
+void  vj_midi_learning_vims(void *vv, char *widget, char *msg, int extra);
+void  vj_midi_learning_vims_simple(void *vv, char *widget, int id);
+void  vj_midi_learning_vims_toggle(void *vv, char *widget, int id);
+void  vj_midi_learning_vims_toggle2(void *vv, char *widget, int id, int arg);
+void  vj_midi_learning_vims_toggle3(void *vv, char *widget, int id, int arg0, int arg1);
+void  vj_midi_learning_vims_dual_toggle(void *vv, char *widget, int off_id, int on_id, int arg);
+void  vj_midi_learning_vims_complex(void *vv, char *widget, int id, int first, int extra);
+void  vj_midi_learning_vims_fx(void *vv, int widget, int id, int a, int b, int c, int extra);
+void  vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b);
+void  vj_midi_learning_vims_msg2_extra(void *vv, int id, int arg, int extra);
+void  vj_midi_learning_vims_msg(void *vv, char *widget, int id, int arg);
+void  vj_midi_learning_vims_spin(void *vv, char *widget, int id);
 #else
-void    *vj_midi_new(void *mw) { return NULL; }
-int    vj_midi_handle_events(void *vv) { return 0; }
-void    vj_midi_play(void *vv ) {}
-void    vj_midi_learn( void *vv ) {}
-void    vj_midi_load(void *vv, const char *filename) {}
-void    vj_midi_save(void *vv, const char *filename) {}
-void	vj_midi_reset( void *vv ) {}
-void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra ) {}
-void    vj_midi_learning_vims_simple( void *vv, char *widget, int id ) {}
-void    vj_midi_learning_vims_toggle( void *vv, char *widget, int id ) {}
-void    vj_midi_learning_vims_toggle2( void *vv, char *widget, int id, int arg ) {}
-void    vj_midi_learning_vims_toggle3( void *vv, char *widget, int id, int arg0, int arg1 ) {}
-void    vj_midi_learning_vims_dual_toggle( void *vv, char *widget, int off_id, int on_id, int arg ) {}
-void    vj_midi_learning_vims_complex( void *vv, char *widget, int id, int first , int extra ) {}
-void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c, int extra ) {}
-void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b ) {}
-void    vj_midi_learning_vims_msg2_extra(void *vv, int id, int arg, int extra ) {}
-void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg ) {}
-void    vj_midi_learning_vims_spin( void *vv, char *widget, int id ) {}
+static inline void *vj_midi_new(void *mw, void *timeline) { (void)mw; (void)timeline; return NULL; }
+static inline int vj_midi_handle_events(void *vv) { (void)vv; return 0; }
+static inline void vj_midi_play(void *vv, int play) { (void)vv; (void)play; }
+static inline void vj_midi_learn(void *vv, int start) { (void)vv; (void)start; }
+static inline void vj_midi_load(void *vv, const char *filename) { (void)vv; (void)filename; }
+static inline void vj_midi_save(void *vv, const char *filename) { (void)vv; (void)filename; }
+static inline void vj_midi_reset(void *vv) { (void)vv; }
+static inline int vj_midi_foreach_mapping(void *vv, vj_midi_mapping_func callback, void *user_data) { (void)vv; (void)callback; (void)user_data; return 0; }
+static inline int vj_midi_unbind(void *vv, const char *mapping_key) { (void)vv; (void)mapping_key; return 0; }
+static inline void vj_midi_learning_vims(void *vv, char *widget, char *msg, int extra) { (void)vv; (void)widget; (void)msg; (void)extra; }
+static inline void vj_midi_learning_vims_simple(void *vv, char *widget, int id) { (void)vv; (void)widget; (void)id; }
+static inline void vj_midi_learning_vims_toggle(void *vv, char *widget, int id) { (void)vv; (void)widget; (void)id; }
+static inline void vj_midi_learning_vims_toggle2(void *vv, char *widget, int id, int arg) { (void)vv; (void)widget; (void)id; (void)arg; }
+static inline void vj_midi_learning_vims_toggle3(void *vv, char *widget, int id, int arg0, int arg1) { (void)vv; (void)widget; (void)id; (void)arg0; (void)arg1; }
+static inline void vj_midi_learning_vims_dual_toggle(void *vv, char *widget, int off_id, int on_id, int arg) { (void)vv; (void)widget; (void)off_id; (void)on_id; (void)arg; }
+static inline void vj_midi_learning_vims_complex(void *vv, char *widget, int id, int first, int extra) { (void)vv; (void)widget; (void)id; (void)first; (void)extra; }
+static inline void vj_midi_learning_vims_fx(void *vv, int widget, int id, int a, int b, int c, int extra) { (void)vv; (void)widget; (void)id; (void)a; (void)b; (void)c; (void)extra; }
+static inline void vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b) { (void)vv; (void)widget; (void)id; (void)arg; (void)b; }
+static inline void vj_midi_learning_vims_msg2_extra(void *vv, int id, int arg, int extra) { (void)vv; (void)id; (void)arg; (void)extra; }
+static inline void vj_midi_learning_vims_msg(void *vv, char *widget, int id, int arg) { (void)vv; (void)widget; (void)id; (void)arg; }
+static inline void vj_midi_learning_vims_spin(void *vv, char *widget, int id) { (void)vv; (void)widget; (void)id; }
 #endif
 
 #endif

@@ -69,6 +69,8 @@ int  gvr_sequence_bank_view_get_queued_bank(GtkWidget *widget);
 void gvr_sequence_bank_view_set_queue_mode(GtkWidget *widget, gboolean enabled);
 gboolean gvr_sequence_bank_view_get_queue_mode(GtkWidget *widget);
 void gvr_sequence_bank_view_set_selected_bank(GtkWidget *widget, int bank);
+void gvr_sequence_bank_view_set_pattern_target_bank(GtkWidget *widget, int bank);
+void gvr_sequence_bank_view_set_selected_slot(GtkWidget *widget, int bank, int slot);
 int  gvr_sequence_bank_view_get_selected_bank(GtkWidget *widget);
 gboolean gvr_sequence_bank_view_get_selected_slot(GtkWidget *widget, int *bank, int *slot);
 void gvr_sequence_bank_view_set_sequence_active(GtkWidget *widget, gboolean active);

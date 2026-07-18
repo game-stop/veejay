@@ -266,12 +266,14 @@ Delete that slot, including its cell-specific VIMS pattern overlay.
 Move or swap it with another slot in the same bank.
 .TP
 .B Right click a slot or selection
-Open the slot menu. It provides assign, delete, copy, cut, paste,
+Open the slot menu. For a populated slot, \fBAdd Command > HOLD\fR inserts a
+Hold Frame event at that slot's start position on the complete bank Pattern
+timeline. The menu also provides assign, delete, copy, cut, paste,
 copy-selected-to-bank, whole-bank copy and paste, clear-bank, and refresh
 operations.
 .TP
 .B Right click a bank header
-Open the bank-only copy, paste, clear, and refresh menu.
+Open the bank-only copy, paste, clear, queue, and refresh menu.
 .PP
 Copying or cutting selected sequence cells also copies their attached
 cell-specific VIMS pattern overlays. Pasting the cells restores those overlays
@@ -389,6 +391,13 @@ Follow the live playback row. While Capture is active, learned events control
 the edit cursor so repeated slider and button actions are placed according to
 the selected learning policy.
 .SS EDITING COMMANDS
+When the complete sequence-bank timeline is selected, right-click a Pattern
+cell and choose \fBAdd Command > HOLD\fR to insert a Hold Frame command at
+that frame and V track. The same command is available from a populated
+sequencer cell and is placed at that slot's start frame on the bank timeline.
+The duration comes from the existing Hold Frames control. This submenu is not
+shown for sample, stream, or per-slot Pattern targets.
+.PP
 Double-click a cell, press \fBF2\fR or \fBEnter\fR, or begin typing a numeric
 VIMS id to open the inline command editor. Commands use the normal
 \fIselector:arguments;\fR syntax and one command is stored per cell.

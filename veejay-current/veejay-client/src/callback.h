@@ -28,7 +28,8 @@ enum {
     NOTEBOOK18_PAGE_SAMPLE,
     NOTEBOOK18_PAGE_SEQUENCE,
     NOTEBOOK18_PAGE_PATTERN,
-    NOTEBOOK18_PAGE_MULTITRACK
+    NOTEBOOK18_PAGE_MULTITRACK,
+    NOTEBOOK18_PAGE_VIMS
 };
 
 
@@ -66,6 +67,17 @@ int samplebank_get_page(void);
 void alpha_composite_sync_from_status(int enabled, int alpha_value);
 void on_speed_decrement_clicked(GtkWidget *widget, gpointer user_data);
 void on_speed_increment_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_vims_execute_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_vims_add_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_vims_clear_response_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_key_detach_clicked(GtkWidget *widget, gpointer user_data);
+void on_vims_key_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data);
+void on_vims_clear_clicked(GtkWidget *widget, gpointer user_data);
+void on_vims_delete_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data);
+void on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data);
 
 gboolean boxbg_draw ( GtkWidget *w,  cairo_t *cr);
 gboolean boxfg_draw ( GtkWidget *w, cairo_t *cr );

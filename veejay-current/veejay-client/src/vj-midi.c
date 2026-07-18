@@ -19,6 +19,8 @@
 #ifdef HAVE_ALSA
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -31,6 +33,7 @@
 #include <veejaycore/vevo.h>
 #include <src/vj-api.h>
 #include <src/gtktimeselection.h>
+#include <src/vmidi.h>
 
 extern GtkWidget *glade_xml_get_widget_( GtkBuilder *m, const char *name );
 extern void msg_vims(char *message);
@@ -188,6 +191,154 @@ static  int vj_midi_events(void *vv )
     }
     free(items);
     return len; 
+}
+
+static const char *vj_midi_event_type_name(int event_type)
+{
+    switch(event_type) {
+        case SND_SEQ_EVENT_CONTROLLER:  return "Controller";
+        case SND_SEQ_EVENT_NONREGPARAM: return "NRPN";
+        case SND_SEQ_EVENT_REGPARAM:    return "RPN";
+        case SND_SEQ_EVENT_CONTROL14:   return "14-bit Controller";
+        case SND_SEQ_EVENT_PITCHBEND:   return "Pitch Bend";
+        case SND_SEQ_EVENT_NOTE:        return "Note";
+        case SND_SEQ_EVENT_NOTEON:      return "Note On";
+        case SND_SEQ_EVENT_NOTEOFF:     return "Note Off";
+        case SND_SEQ_EVENT_KEYPRESS:    return "Key Pressure";
+        case SND_SEQ_EVENT_PGMCHANGE:   return "Program Change";
+        default:                        return "MIDI Event";
+    }
+}
+
+static void vj_midi_parameter_text(int event_type,
+                                   int parameter,
+                                   char *text,
+                                   size_t text_size)
+{
+    switch(event_type) {
+        case SND_SEQ_EVENT_CONTROLLER:
+            snprintf(text, text_size, "Channel %d / CC %d",
+                     (parameter / 256) + 1, parameter % 256);
+            break;
+        case SND_SEQ_EVENT_NOTEON:
+        case SND_SEQ_EVENT_NOTEOFF:
+            snprintf(text, text_size, "Note %d", parameter);
+            break;
+        case SND_SEQ_EVENT_NOTE:
+        case SND_SEQ_EVENT_PITCHBEND:
+        case SND_SEQ_EVENT_KEYPRESS:
+            snprintf(text, text_size, "Channel %d", parameter + 1);
+            break;
+        case SND_SEQ_EVENT_PGMCHANGE:
+            snprintf(text, text_size, "Program %d", parameter);
+            break;
+        case SND_SEQ_EVENT_NONREGPARAM:
+        case SND_SEQ_EVENT_REGPARAM:
+        case SND_SEQ_EVENT_CONTROL14:
+            snprintf(text, text_size, "Controller %d", parameter);
+            break;
+        default:
+            snprintf(text, text_size, "%d", parameter);
+            break;
+    }
+}
+
+static int vj_midi_mapping_key_parse(const char *mapping_key,
+                                     int *event_type,
+                                     int *parameter)
+{
+    char event_text[4];
+    char *end = NULL;
+    long parsed_event;
+    long parsed_parameter;
+
+    if(!mapping_key || strlen(mapping_key) < 6)
+        return 0;
+
+    memcpy(event_text, mapping_key, 3);
+    event_text[3] = '\0';
+
+    parsed_event = strtol(event_text, &end, 10);
+    if(end == event_text || *end != '\0')
+        return 0;
+
+    parsed_parameter = strtol(mapping_key + 3, &end, 10);
+    if(end == mapping_key + 3 || *end != '\0')
+        return 0;
+
+    if(event_type)
+        *event_type = (int)parsed_event;
+    if(parameter)
+        *parameter = (int)parsed_parameter;
+    return 1;
+}
+
+int vj_midi_foreach_mapping(void *vv,
+                            vj_midi_mapping_func callback,
+                            void *user_data)
+{
+    vmidi_t *v = (vmidi_t*)vv;
+    char **items;
+    int count = 0;
+
+    if(!v || !v->active || !v->vims || !callback)
+        return 0;
+
+    items = vevo_list_properties(v->vims);
+    if(!items)
+        return 0;
+
+    for(int i = 0; items[i] != NULL; i++) {
+        int event_type = 0;
+        int parameter = 0;
+        dvims_t *mapping = NULL;
+
+        if(vj_midi_mapping_key_parse(items[i], &event_type, &parameter) &&
+           vevo_property_get(v->vims, items[i], 0, &mapping) == VEVO_NO_ERROR &&
+           mapping)
+        {
+            char parameter_text[64];
+
+            vj_midi_parameter_text(event_type, parameter,
+                                   parameter_text, sizeof(parameter_text));
+            callback(items[i],
+                     event_type,
+                     parameter,
+                     mapping->extra,
+                     vj_midi_event_type_name(event_type),
+                     parameter_text,
+                     mapping->widget,
+                     mapping->msg,
+                     user_data);
+            count++;
+        }
+        free(items[i]);
+    }
+    free(items);
+    return count;
+}
+
+int vj_midi_unbind(void *vv, const char *mapping_key)
+{
+    vmidi_t *v = (vmidi_t*)vv;
+    dvims_t *mapping = NULL;
+    dvims_t *remaining = NULL;
+
+    if(!v || !v->active || !v->vims || !mapping_key || !mapping_key[0])
+        return 0;
+
+    if(vevo_property_get(v->vims, mapping_key, 0, &mapping) != VEVO_NO_ERROR ||
+       !mapping)
+        return 0;
+
+    vevo_property_del(v->vims, mapping_key);
+    if(vevo_property_get(v->vims, mapping_key, 0, &remaining) == VEVO_NO_ERROR)
+        return 0;
+
+    free(mapping->msg);
+    free(mapping->widget);
+    free(mapping);
+    return 1;
 }
 void    vj_midi_reset( void *vv )
 {

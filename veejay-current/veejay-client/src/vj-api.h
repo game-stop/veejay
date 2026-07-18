@@ -70,6 +70,17 @@ void vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
 void vj_gui_set_timeout(int timer);
 int vj_gui_sleep_time( void );
 void vj_gui_style_setup(void);
+void vj_gui_plain_sample_attention_start(void);
+
+int vj_gui_vims_get_selected_action(int *event_id, int *key, int *modifier, char **args, int *is_bundle);
+int vj_gui_vims_get_selected_bundle(int *event_id);
+int vj_gui_vims_get_binding_target(int *event_id, char **args);
+int vj_gui_vims_prompt_keybinding(int event_id, const char *initial_args, int *key, int *modifier, char **args);
+void vj_gui_vims_execute_selected(void);
+void vj_gui_vims_add_selected_to_bundle(void);
+void vj_gui_vims_clear_response(void);
+char *vj_gui_vims_editor_get_text(void);
+void vj_gui_vims_editor_clear(void);
 
 int vj_img_cb(GdkPixbuf *img );
 void vj_fork_or_connect_veejay(void);

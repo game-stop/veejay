@@ -25,6 +25,7 @@
 #include <gtk3curve.h>
 #include <veejaycore/vims.h>
 #include "callback.h"
+#include "vj-api.h"
 #include "curve.h"
 
 #define AUDIO_MASTER_JACK_UI_VALUE 1
@@ -223,6 +224,56 @@ static int sample_calctime_mulloop();
 static gboolean timeline_marker_mode_is_sample(void);
 static gboolean timeline_marker_can_send(void);
 static void timeline_marker_disable_selection_guarded(GtkWidget *widget);
+
+#define FX_CHAIN_PANEL_TOGGLE_DATA "gvr-fx-chain-panel-toggle"
+
+static GtkWidget *callback_fx_chain_panel_toggle_widget(void)
+{
+    if(!info || !info->main_window)
+        return NULL;
+
+    return g_object_get_data(G_OBJECT(info->main_window),
+                             FX_CHAIN_PANEL_TOGGLE_DATA);
+}
+
+static void sync_fx_chain_toggle_widgets(GtkWidget *origin,
+                                         gboolean active,
+                                         gboolean stream_mode)
+{
+    GtkWidget *mode_toggle;
+    GtkWidget *curve_toggle;
+    GtkWidget *panel_toggle;
+    GtkWidget *toggles[3];
+    int old_lock;
+
+    if(!info || !info->main_window)
+        return;
+
+    mode_toggle = GTK_WIDGET(glade_xml_get_widget_(
+        info->main_window, stream_mode ? "check_streamfx" : "check_samplefx"));
+    curve_toggle = GTK_WIDGET(glade_xml_get_widget_(
+        info->main_window, "curve_chain_togglechain"));
+    panel_toggle = callback_fx_chain_panel_toggle_widget();
+
+    toggles[0] = mode_toggle;
+    toggles[1] = curve_toggle;
+    toggles[2] = panel_toggle;
+
+    old_lock = info->status_lock;
+    info->status_lock = 1;
+
+    for(unsigned int i = 0; i < G_N_ELEMENTS(toggles); i++) {
+        GtkWidget *toggle = toggles[i];
+
+        if(!toggle || toggle == origin || !GTK_IS_TOGGLE_BUTTON(toggle))
+            continue;
+
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle)) != active)
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(toggle), active);
+    }
+
+    info->status_lock = old_lock;
+}
 
 static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget *second, int signal_suppression)
 {
@@ -459,6 +510,7 @@ void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SET_PLAIN_MODE );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_SET_PLAIN_MODE );
+    vj_gui_plain_sample_attention_start();
 }
 
 void	on_feedbackbutton_toggled( GtkWidget *widget, gpointer data )
@@ -5493,61 +5545,78 @@ void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
 {
 }
 
-void on_check_samplefx_toggled(GtkWidget *widget , gpointer user_data)
+void on_check_samplefx_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		int vims_id = VIMS_SAMPLE_CHAIN_DISABLE;
+    gboolean active;
 
-        if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE )
-			vims_id = VIMS_SAMPLE_CHAIN_ENABLE;
-		multi_vims( vims_id, "%d", 0 );
+    (void)user_data;
 
-		vj_midi_learning_vims_dual_toggle(info->midi, "check_samplefx", VIMS_SAMPLE_CHAIN_DISABLE, VIMS_SAMPLE_CHAIN_ENABLE, 0);
-        vj_msg(VEEJAY_MSG_INFO, "Sample FX chain %s requested",
-               gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? "enabled" : "disabled");
-	}
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
 
-    GtkWidget *check_samplefx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_samplefx"));
-    GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
+    active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 
-    toggle_siamese_widget(widget, check_samplefx, curve_chain_togglechain, 1);
+    if(!info->status_lock)
+    {
+        int vims_id = active ? VIMS_SAMPLE_CHAIN_ENABLE :
+                               VIMS_SAMPLE_CHAIN_DISABLE;
+
+        multi_vims(vims_id, "%d", 0);
+        vj_midi_learning_vims_dual_toggle(info->midi,
+                                          "check_samplefx",
+                                          VIMS_SAMPLE_CHAIN_DISABLE,
+                                          VIMS_SAMPLE_CHAIN_ENABLE,
+                                          0);
+        vj_msg(VEEJAY_MSG_INFO,
+               "Sample FX chain %s requested",
+               active ? "enabled" : "disabled");
+    }
+
+    sync_fx_chain_toggle_widgets(widget, active, FALSE);
 }
 
 void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		int vims_id = VIMS_STREAM_CHAIN_DISABLE;
+    gboolean active;
 
-        if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE )
-			vims_id = VIMS_STREAM_CHAIN_ENABLE;
-		multi_vims( vims_id, "%d", 0 );
+    (void)user_data;
 
-		vj_midi_learning_vims_dual_toggle(info->midi, "check_streamfx", VIMS_STREAM_CHAIN_DISABLE, VIMS_STREAM_CHAIN_ENABLE, 0);
-        vj_msg(VEEJAY_MSG_INFO, "Stream FX chain %s requested",
-               gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? "enabled" : "disabled");
-	}
+    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+        return;
 
-    GtkWidget *check_streamfx = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "check_streamfx"));
-    GtkWidget *curve_chain_togglechain = GTK_WIDGET(glade_xml_get_widget_( info->main_window, "curve_chain_togglechain"));
+    active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
 
-    toggle_siamese_widget(widget, check_streamfx, curve_chain_togglechain, 1);
+    if(!info->status_lock)
+    {
+        int vims_id = active ? VIMS_STREAM_CHAIN_ENABLE :
+                               VIMS_STREAM_CHAIN_DISABLE;
 
+        multi_vims(vims_id, "%d", 0);
+        vj_midi_learning_vims_dual_toggle(info->midi,
+                                          "check_streamfx",
+                                          VIMS_STREAM_CHAIN_DISABLE,
+                                          VIMS_STREAM_CHAIN_ENABLE,
+                                          0);
+        vj_msg(VEEJAY_MSG_INFO,
+               "Stream FX chain %s requested",
+               active ? "enabled" : "disabled");
+    }
+
+    sync_fx_chain_toggle_widgets(widget, active, TRUE);
 }
 
-void on_chain_togglechain_toggled( GtkWidget *widget, gpointer user_data)
+void on_chain_togglechain_toggled(GtkWidget *widget, gpointer user_data)
 {
     switch(callback_playmode_effective(info->status_tokens[PLAY_MODE]))
     {
-      case MODE_STREAM:
-            on_check_streamfx_toggled( widget, user_data);
-        break;
-      case MODE_SAMPLE:
-            on_check_samplefx_toggled( widget, user_data);
-        break;
-      default:
-        return;
+        case MODE_STREAM:
+            on_check_streamfx_toggled(widget, user_data);
+            break;
+        case MODE_SAMPLE:
+            on_check_samplefx_toggled(widget, user_data);
+            break;
+        default:
+            break;
     }
 }
 
@@ -5784,113 +5853,175 @@ void	on_vims_take_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_BUNDLE_CAPTURE );
 	info->uc.reload_hint[HINT_BUNDLES] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Create a new bundle from FX Chain. See View -> VIMS Bundles");
+	vj_msg(VEEJAY_MSG_INFO, "Created a new bundle from the FX chain. See the VIMS tab");
 }
-void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
+void on_button_key_detach_clicked(GtkWidget *widget, gpointer user_data)
 {
+    (void)widget;
+    (void)user_data;
 #ifdef HAVE_SDL
-	int key_val  = info->uc.pressed_key;
-	int key_mod  = info->uc.pressed_mod;
+    int event_id = 0;
+    int key = 0;
+    int modifier = 0;
+    if(!vj_gui_vims_get_selected_action(&event_id,
+                                        &key,
+                                        &modifier,
+                                        NULL,
+                                        NULL))
+    {
+        vj_msg(VEEJAY_MSG_ERROR, "Select a registered keybinding first");
+        return;
+    }
 
-	if( key_val > 0 )
-	{
-		multi_vims(
-			VIMS_BUNDLE_ATTACH_KEY,
-			"1 %d %d %s",
-			key_val, key_mod, "dummy" );
-		info->uc.reload_hint[HINT_BUNDLES] = 1;
-		char *strmod = sdlmod_by_id( key_mod );
-		char *strkey = sdlkey_by_id( key_val);
-		if(key_mod)
-			vj_msg(VEEJAY_MSG_INFO, "Key binding %s + %s released",strmod,strkey);
-		else
-			vj_msg(VEEJAY_MSG_INFO, "Key binding %s released", strkey );
-	}
+    if(key <= 0)
+    {
+        vj_msg(VEEJAY_MSG_INFO, "VIMS %03d has no keybinding", event_id);
+        return;
+    }
+
+    multi_vims(VIMS_BUNDLE_ATTACH_KEY,
+               "1 %d %d %s",
+               key,
+               modifier,
+               "dummy");
+    info->uc.reload_hint[HINT_BUNDLES] = 1;
+    info->uc.reload_hint[HINT_KEYS] = 1;
+
+    const char *key_name = sdlkey_by_id(key);
+    const char *mod_name = modifier ? sdlmod_by_id(modifier) : NULL;
+    if(mod_name && *mod_name)
+        vj_msg(VEEJAY_MSG_INFO, "Released %s + %s", mod_name, key_name);
+    else
+        vj_msg(VEEJAY_MSG_INFO, "Released %s", key_name);
 #endif
 }
 
-void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
+void on_button_vims_execute_clicked(GtkWidget *widget, gpointer user_data)
 {
+    (void)widget;
+    (void)user_data;
+    vj_gui_vims_execute_selected();
+}
+
+void on_button_vims_add_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    vj_gui_vims_add_selected_to_bundle();
+}
+
+void on_button_vims_clear_response_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    vj_gui_vims_clear_response();
+}
+
+void on_vims_key_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
 #ifdef HAVE_SDL
-	char which_vims[128];
-	snprintf(which_vims, sizeof(which_vims), "Press a key to bind VIMS %03d",
-			info->uc.selected_vims_entry );
+    int event_id = 0;
+    int key = 0;
+    int modifier = 0;
+    char *initial_args = NULL;
+    char *args = NULL;
 
-	int n = prompt_keydialog(
-			which_vims,
-			"Key combination" );
+    if(!vj_gui_vims_get_binding_target(&event_id, &initial_args))
+    {
+        vj_msg(VEEJAY_MSG_ERROR, "Select a VIMS command or registered action first");
+        return;
+    }
 
-	if( n == GTK_RESPONSE_ACCEPT )
-	{
-		int event_id = info->uc.selected_vims_entry;
-		int key_val  = info->uc.pressed_key;
-		int mod	     = info->uc.pressed_mod;
-		char *buf    = info->uc.selected_vims_args;
+    int response = vj_gui_vims_prompt_keybinding(event_id,
+                                                  initial_args,
+                                                  &key,
+                                                  &modifier,
+                                                  &args);
+    g_free(initial_args);
 
-		if( event_id > 0 && key_val > 0 )
-		{
-			multi_vims(
-				VIMS_BUNDLE_ATTACH_KEY,
-				"%d %d %d %s",
-				event_id, key_val, mod, buf ? buf : "dummy" );
-			info->uc.reload_hint[HINT_BUNDLES] = 1;
-			char *strmod = sdlmod_by_id( mod );
-			if(strmod)
-				vj_msg(VEEJAY_MSG_INFO, "VIMS %d attached to key combination %s + %s",
-				event_id, strmod, sdlkey_by_id( key_val));
-			else
-				vj_msg(VEEJAY_MSG_INFO, "VIMS %d attached to key %s",
-					event_id, sdlkey_by_id(key_val) );
-		}
-	}
+    if(response != GTK_RESPONSE_ACCEPT)
+    {
+        g_free(args);
+        return;
+    }
+
+    multi_vims(VIMS_BUNDLE_ATTACH_KEY,
+               "%d %d %d %s",
+               event_id,
+               key,
+               modifier,
+               args && *args ? args : "dummy");
+    info->uc.reload_hint[HINT_BUNDLES] = 1;
+    info->uc.reload_hint[HINT_KEYS] = 1;
+
+    const char *key_name = sdlkey_by_id(key);
+    const char *mod_name = modifier ? sdlmod_by_id(modifier) : NULL;
+    if(mod_name && *mod_name)
+        vj_msg(VEEJAY_MSG_INFO,
+               "VIMS %03d attached to %s + %s",
+               event_id,
+               mod_name,
+               key_name);
+    else
+        vj_msg(VEEJAY_MSG_INFO,
+               "VIMS %03d attached to %s",
+               event_id,
+               key_name);
+
+    g_free(args);
 #endif
 }
 
-
-void	on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
+void on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(count_textview_buffer( "vimsview" ) > 0 )
-	{
-		gchar *buf = get_textview_buffer( "vimsview" );
+    (void)widget;
+    (void)user_data;
+    int bundle_id = 0;
 
-		if( info->uc.selected_vims_type == 0 )
-		{
-			multi_vims( VIMS_BUNDLE_ADD, "%d %s",
-				info->uc.selected_vims_entry, buf );
-		}
-		else
-		{
-			multi_vims(
-				VIMS_BUNDLE_ATTACH_KEY,
-				"2 %d %d %s",
-				info->uc.selected_vims_accel[1],
-				info->uc.selected_vims_accel[0],
-				info->uc.selected_vims_args );
-		}
-		info->uc.reload_hint[HINT_BUNDLES] = 1;
-	}
+    if(!vj_gui_vims_get_selected_bundle(&bundle_id))
+    {
+        vj_msg(VEEJAY_MSG_ERROR, "Select a bundle event in the 500-599 range first");
+        return;
+    }
 
+    gchar *text = vj_gui_vims_editor_get_text();
+    if(!text || !*text)
+    {
+        vj_msg(VEEJAY_MSG_ERROR, "Bundle contents are empty");
+        g_free(text);
+        return;
+    }
+
+    multi_vims(VIMS_BUNDLE_ADD, "%d %s", bundle_id, text);
+    info->uc.reload_hint[HINT_BUNDLES] = 1;
+    vj_msg(VEEJAY_MSG_INFO, "Updated bundle %03d", bundle_id);
+    g_free(text);
 }
 
-void	on_vims_clear_clicked(GtkWidget *widget, gpointer user_data)
+void on_vims_clear_clicked(GtkWidget *widget, gpointer user_data)
 {
-	clear_textview_buffer( "vimsview" );
+    (void)widget;
+    (void)user_data;
+    vj_gui_vims_editor_clear();
 }
 
-void	on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
+void on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if( info->uc.selected_vims_entry >= VIMS_BUNDLE_START &&
-	    info->uc.selected_vims_entry < VIMS_BUNDLE_END )
-	{
-		multi_vims( VIMS_BUNDLE_DEL, "%d", info->uc.selected_vims_entry );
-		info->uc.reload_hint[HINT_BUNDLES] = 1;
-		vj_msg(VEEJAY_MSG_INFO, "Delete bundle %d from VIMS event list",
-			info->uc.selected_vims_entry );
-	}
-	else
-	{
-		vj_msg(VEEJAY_MSG_ERROR, "VIMS %d is not a bundle.", info->uc.selected_vims_entry );
-	}
+    (void)widget;
+    (void)user_data;
+    int bundle_id = 0;
+
+    if(!vj_gui_vims_get_selected_bundle(&bundle_id))
+    {
+        vj_msg(VEEJAY_MSG_ERROR, "Only bundle events 500-599 can be deleted here");
+        return;
+    }
+
+    multi_vims(VIMS_BUNDLE_DEL, "%d", bundle_id);
+    info->uc.reload_hint[HINT_BUNDLES] = 1;
+    vj_msg(VEEJAY_MSG_INFO, "Deleted bundle %03d", bundle_id);
 }
 
 void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
@@ -5927,19 +6058,20 @@ void	on_button_saveconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 }
 
 
-void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
+void on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(count_textview_buffer( "vimsview" ) > 0 )
-	{
-		gchar *buf = get_textview_buffer( "vimsview" );
-		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf );
-		info->uc.reload_hint[HINT_BUNDLES] = 1;
-		vj_msg(VEEJAY_MSG_INFO, "If your VIMS document was valid,you'll find it in the list.");
-	}
-	else
-	{
-		vj_msg(VEEJAY_MSG_ERROR, "VIMS document is empty, type text first.");
-	}
+    (void)widget;
+    (void)user_data;
+    gchar *text = vj_gui_vims_editor_get_text();
+    if(text && *text)
+    {
+        multi_vims(VIMS_BUNDLE_ADD, "%d %s", 0, text);
+        info->uc.reload_hint[HINT_BUNDLES] = 1;
+        vj_msg(VEEJAY_MSG_INFO, "Requested a new bundle event");
+    }
+    else
+        vj_msg(VEEJAY_MSG_ERROR, "Bundle contents are empty");
+    g_free(text);
 }
 
 void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
@@ -6431,31 +6563,6 @@ void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
 }
 
 
-void on_vims_bundles_activate (GtkMenuItem     *menuitem,
-                               gpointer         user_data)
-{
-    gtk_window_present(GTK_WINDOW(info->vims_bundle_dialog));
-}
-
-
-
-void on_vims_bundles_close(GtkDialog *dialog, gpointer user_data)
-{
-    (void)dialog;
-    (void)user_data;
-
-    if(info->vims_bundle_dialog)
-        gtk_widget_hide(info->vims_bundle_dialog);
-}
-
-gboolean on_vims_bundles_delete_event(GtkWidget *widget, GdkEvent *event, gpointer user_data)
-{
-    (void)widget;
-    (void)event;
-
-    on_vims_bundles_close(NULL, user_data);
-    return TRUE;
-}
 
 
 void on_quit_activate( GtkWidget *w, gpointer user_data )
@@ -8883,9 +8990,22 @@ on_vims_messenger_rewind_clicked( GtkButton *togglebutton, gpointer user_data)
 }
 
 void
-on_vims_messenger_clear_clicked( GtkButton *togglebutton, gpointer user_data)
+on_vims_messenger_clear_clicked(GtkButton *togglebutton, gpointer user_data)
 {
-	clear_textview_buffer( "vims_messenger_textview");
+    GtkWidget *view;
+    GtkTextBuffer *buffer;
+
+    (void)togglebutton;
+    (void)user_data;
+
+    view = glade_xml_get_widget_(info->main_window,
+                                 "vims_messenger_textview");
+    if(!view || !GTK_IS_TEXT_VIEW(view))
+        return;
+
+    buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
+    gtk_text_buffer_set_text(buffer, "", -1);
+    info->vims_line = 0;
 }
 
 static void set_transition(int active, int shape, int length)

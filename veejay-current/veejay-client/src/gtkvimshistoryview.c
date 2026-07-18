@@ -187,7 +187,7 @@ static void gvr_vims_history_draw_cell_text(cairo_t *cr,
     cairo_restore(cr);
 }
 
-#define GVR_HISTORY_ROW_HEIGHT 28
+#define GVR_HISTORY_ROW_HEIGHT 24
 #define GVR_HISTORY_HEADER_HEIGHT 23
 #define GVR_HISTORY_ID_WIDTH 62
 #define GVR_HISTORY_MAX_ENTRIES 512
@@ -204,7 +204,6 @@ struct _GvrVimsHistoryView {
     GtkBox parent_instance;
     GtkWidget *area;
     GtkWidget *scrollbar;
-    GtkWidget *status_label;
     GtkAdjustment *vadjustment;
     GPtrArray *entries;
     int selected_index;
@@ -246,19 +245,6 @@ static int gvr_vims_history_visible_rows(GvrVimsHistoryView *view)
     rows = (allocation.height - GVR_HISTORY_HEADER_HEIGHT) /
            GVR_HISTORY_ROW_HEIGHT;
     return MAX(1, rows);
-}
-
-static void gvr_vims_history_update_status(GvrVimsHistoryView *view)
-{
-    char text[128];
-    guint count = view->entries ? view->entries->len : 0;
-
-    g_snprintf(text,
-               sizeof(text),
-               "%u pattern-safe command%s · newest first · drag to Pattern",
-               count,
-               count == 1 ? "" : "s");
-    gtk_label_set_text(GTK_LABEL(view->status_label), text);
 }
 
 static void gvr_vims_history_update_adjustment(GvrVimsHistoryView *view)
@@ -737,8 +723,6 @@ static void gvr_vims_history_view_init(GvrVimsHistoryView *view)
 {
     GtkWidget *toolbar;
     GtkWidget *body;
-    GtkWidget *button;
-
     gtk_orientable_set_orientation(GTK_ORIENTABLE(view),
                                    GTK_ORIENTATION_VERTICAL);
     gtk_box_set_spacing(GTK_BOX(view), 2);
@@ -752,26 +736,6 @@ static void gvr_vims_history_view_init(GvrVimsHistoryView *view)
         "vims-history-toolbar");
     gtk_box_pack_start(GTK_BOX(view), toolbar, FALSE, FALSE, 0);
     gtk_widget_show(toolbar);
-
-    view->status_label = gtk_label_new(NULL);
-    g_object_set(G_OBJECT(view->status_label), "xalign", 0.0f, NULL);
-    gtk_widget_set_hexpand(view->status_label, TRUE);
-    gtk_box_pack_start(GTK_BOX(toolbar),
-                       view->status_label,
-                       TRUE,
-                       TRUE,
-                       4);
-    gtk_widget_show(view->status_label);
-
-    button = gtk_button_new_with_label("Clear");
-    gtk_widget_set_tooltip_text(button,
-                                "Clear the local pattern-safe VIMS history");
-    gtk_box_pack_end(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
-    g_signal_connect(button,
-                     "clicked",
-                     G_CALLBACK(gvr_vims_history_clear_clicked),
-                     view);
-    gtk_widget_show(button);
 
     body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_box_pack_start(GTK_BOX(view), body, TRUE, TRUE, 0);
@@ -837,8 +801,6 @@ static void gvr_vims_history_view_init(GvrVimsHistoryView *view)
                        FALSE,
                        0);
     gtk_widget_show(view->scrollbar);
-
-    gvr_vims_history_update_status(view);
 }
 
 GtkWidget *gvr_vims_history_view_new(void)
@@ -874,7 +836,6 @@ void gvr_vims_history_view_push(GtkWidget *widget,
             }
             view->selected_index = (int)view->entries->len - 1;
             gtk_adjustment_set_value(view->vadjustment, 0);
-            gvr_vims_history_update_status(view);
             gtk_widget_queue_draw(view->area);
             return;
         }
@@ -897,7 +858,6 @@ void gvr_vims_history_view_push(GtkWidget *widget,
     view->selected_index = (int)view->entries->len - 1;
     gvr_vims_history_update_adjustment(view);
     gtk_adjustment_set_value(view->vadjustment, 0);
-    gvr_vims_history_update_status(view);
     gtk_widget_queue_draw(view->area);
 }
 
@@ -913,6 +873,5 @@ void gvr_vims_history_view_clear(GtkWidget *widget)
     view->selected_index = -1;
     gtk_adjustment_set_value(view->vadjustment, 0);
     gvr_vims_history_update_adjustment(view);
-    gvr_vims_history_update_status(view);
     gtk_widget_queue_draw(view->area);
 }

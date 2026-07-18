@@ -93,10 +93,21 @@ gboolean gvr_vims_pattern_view_capture_message(GtkWidget *widget,
                                                 const char *message,
                                                 int live_frame);
 gboolean gvr_vims_pattern_view_insert_message(GtkWidget *widget,
+                                                const char *message,
+                                                int frame,
+                                                int column,
+                                                gboolean advance);
+gboolean gvr_vims_pattern_view_insert_message_auto_column(
+                                                    GtkWidget *widget,
                                                     const char *message,
                                                     int frame,
-                                                    int column,
                                                     gboolean advance);
+
+void gvr_vims_pattern_view_set_transport(GtkWidget *widget,
+                                          guint epoch,
+                                          int direction,
+                                          int loop_type,
+                                          int loops_remaining);
 
 void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
                                            int bank,

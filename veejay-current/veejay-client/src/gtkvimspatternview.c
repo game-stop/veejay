@@ -18,6 +18,7 @@
  */
 #include <config.h>
 #include <gtk/gtk.h>
+#include <pango/pangocairo.h>
 #include <stdlib.h>
 #include <string.h>
 #include <veejaycore/vims.h>
@@ -29,6 +30,7 @@
 #define GVR_PATTERN_FRAME_WIDTH 72
 #define GVR_PATTERN_DEFAULT_FRAMES 256
 #define GVR_PATTERN_MAX_FRAMES 10000000
+#define GVR_PATTERN_LABEL_TEXT_MAX 14
 
 typedef enum {
     GVR_PATTERN_LEARN_COLUMN_LOCK = 0,
@@ -84,6 +86,11 @@ typedef struct {
     int source_frame;
     gboolean paused;
     gboolean seeked_while_paused;
+    gboolean transport_valid;
+    guint transport_epoch;
+    int direction;
+    int loop_type;
+    int loops_remaining;
 } GvrVimsPatternPlaybackState;
 
 typedef struct {
@@ -151,12 +158,19 @@ struct _GvrVimsPatternView {
     int selection_anchor_row;
     int selection_anchor_column;
     gboolean drag_selecting;
+    int last_fired_bank;
+    int last_fired_slot;
     int last_fired_frame;
     guint last_fired_mask;
     int live_bank;
     int live_slot;
     int live_frame;
     gboolean live_active;
+    gboolean transport_valid;
+    guint transport_epoch;
+    int transport_direction;
+    int transport_loop_type;
+    int transport_loops_remaining;
 
     GvrVimsPatternDescriptionLookup description_lookup;
     gpointer description_lookup_data;
@@ -171,6 +185,7 @@ enum {
     SIGNAL_VIMS_FIRE,
     SIGNAL_PATTERN_CHANGED,
     SIGNAL_TRANSPORT_REQUEST,
+    SIGNAL_COMMAND_REQUESTED,
     SIGNAL_LAST
 };
 
@@ -402,6 +417,32 @@ static gboolean gvr_pattern_loop_valid(const GvrVimsPatternCell *cell)
            cell->loop_enabled &&
            cell->loop_start >= 0 &&
            cell->loop_end >= cell->loop_start;
+}
+
+static void gvr_pattern_loop_clamp(GvrVimsPatternCell *cell,
+                                   int frame_limit)
+{
+    if(!cell || !cell->loop_enabled)
+        return;
+
+    if(frame_limit <= 0 ||
+       cell->loop_start < 0 ||
+       cell->loop_end < cell->loop_start)
+    {
+        cell->loop_enabled = FALSE;
+        cell->loop_start = -1;
+        cell->loop_end = -1;
+        return;
+    }
+
+    cell->loop_start = MIN(cell->loop_start, frame_limit - 1);
+    cell->loop_end = MIN(cell->loop_end, frame_limit - 1);
+
+    if(cell->loop_end < cell->loop_start) {
+        cell->loop_enabled = FALSE;
+        cell->loop_start = -1;
+        cell->loop_end = -1;
+    }
 }
 
 static int gvr_pattern_loop_map_frame(const GvrVimsPatternCell *cell,
@@ -944,89 +985,308 @@ static const char *gvr_pattern_state_name(int value)
     return value ? "ON" : "OFF";
 }
 
-static gboolean gvr_pattern_description_skip_word(const char *word)
+static guint32 gvr_pattern_description_word_hash(const char *word)
 {
-    static const char *const skipped[] = {
-        "a", "an", "the", "of", "to", "from", "for", "with",
-        "using", "use", "as", "on", "in", "into", "by", "when",
-        "while", "depending", "current", "this", "each", "new",
-        "final", "all", "or", "and", "gui", "get", "set", "change",
-        "configure"
-    };
+    guint32 hash = 2166136261u;
 
-    if(!word || !word[0])
-        return TRUE;
+    while(word && *word) {
+        hash ^= (guint8)g_ascii_tolower(*word++);
+        hash *= 16777619u;
+    }
 
-    for(guint i = 0; i < G_N_ELEMENTS(skipped); i++)
-        if(g_ascii_strcasecmp(word, skipped[i]) == 0)
-            return TRUE;
-
-    return g_ascii_isdigit(word[0]);
+    return hash;
 }
 
-static const char *gvr_pattern_description_abbreviation(const char *word)
+static gboolean gvr_pattern_description_skip_hash(guint32 hash)
 {
-    static const struct {
-        const char *word;
-        const char *abbreviation;
-    } abbreviations[] = {
-        { "effect", "FX" },
-        { "effects", "FX" },
-        { "parameter", "PARAM" },
-        { "parameters", "PARAM" },
-        { "sample", "SMP" },
-        { "samples", "SMP" },
-        { "stream", "STRM" },
-        { "streams", "STRM" },
-        { "playback", "PLAY" },
-        { "framerate", "FPS" },
-        { "frames", "FRAME" },
-        { "position", "POS" },
-        { "percentage", "PCT" },
-        { "transition", "TRANS" },
-        { "transitioning", "TRANS" },
-        { "channel", "CH" },
-        { "channels", "CH" },
-        { "source", "SRC" },
-        { "duration", "DUR" },
-        { "threshold", "THRESH" },
-        { "cooldown", "COOL" },
-        { "sensitivity", "SENS" },
-        { "correction", "CORR" },
-        { "crossfade", "XFADE" },
-        { "brightness", "BRIGHT" },
-        { "saturation", "SAT" },
-        { "projection", "PROJ" },
-        { "viewport", "VIEW" },
-        { "subtitle", "SUB" },
-        { "subtitles", "SUB" },
-        { "volume", "VOL" },
-        { "opacity", "OPACITY" },
-        { "increment", "INC" },
-        { "increase", "INC" },
-        { "decrement", "DEC" },
-        { "decrease", "DEC" },
-        { "enable", "ON" },
-        { "disable", "OFF" },
-        { "enabled", "ON" },
-        { "disabled", "OFF" },
-        { "original", "ORIG" },
-        { "external", "EXT" },
-        { "provider", "SRC" },
-        { "normalized", "NORM" },
-        { "value", "VAL" },
-        { "mixing", "MIX" },
-        { "mixer", "MIX" },
-        { "detector", "DET" },
-        { "rendering", "RENDER" },
-        { "output", "OUT" }
-    };
+    switch(hash) {
+        case 0xe40c292cu:
+        case 0x4124f2e6u:
+        case 0xb40eb21cu:
+        case 0x69343c68u:
+        case 0x42454824u:
+        case 0x95cd8075u:
+        case 0xacf38390u:
+        case 0x0c4afe69u:
+        case 0x69ce1407u:
+        case 0x5791c4f4u:
+        case 0x5e25208du:
+        case 0x61342fd0u:
+        case 0x41387a9eu:
+        case 0x2f91a723u:
+        case 0x542bcc94u:
+        case 0x7f778519u:
+        case 0x0dc628ceu:
+        case 0x0dd08785u:
+        case 0xd965bbdau:
+        case 0xda2bd281u:
+        case 0x147aa128u:
+        case 0x28999611u:
+        case 0x159ac2b7u:
+        case 0x13254bc4u:
+        case 0x5d342984u:
+        case 0x0f29c2a6u:
+        case 0x37351c20u:
+        case 0x540ca757u:
+        case 0xc6270703u:
+        case 0x729d01bdu:
+        case 0xf1b0d04bu:
+        case 0xa4ee076fu:
+        case 0xfd8fc87au:
+        case 0xcbfd3c67u:
+        case 0xfd0c5087u:
+        case 0xfc0c4ef4u:
+            return TRUE;
+        default:
+            return FALSE;
+    }
+}
 
-    for(guint i = 0; i < G_N_ELEMENTS(abbreviations); i++)
-        if(g_ascii_strcasecmp(word, abbreviations[i].word) == 0)
-            return abbreviations[i].abbreviation;
-
-    return NULL;
+static const char *gvr_pattern_description_abbreviation(guint32 hash)
+{
+    switch(hash) {
+        case 0x6e6e8d54u:
+        case 0xff083465u:
+        case 0xcac3d793u:
+        case 0x6f5882f3u:
+            return "FX";
+        case 0xf510291eu:
+        case 0x35713697u:
+            return "PRESET";
+        case 0x60b4a3d6u:
+        case 0xe15d9cbfu:
+            return "CHAIN";
+        case 0x55b10110u:
+        case 0x48a52ed9u:
+            return "PARAM";
+        case 0x933b5bdeu:
+        case 0x73715157u:
+            return "DEFAULT";
+        case 0x96e382a7u:
+        case 0x5c26f3bcu:
+            return "SMP";
+        case 0x5f6f6d65u:
+        case 0x5268b9a2u:
+            return "STRM";
+        case 0xcf8a43ecu:
+            return "PLAY";
+        case 0x9b111ae4u:
+            return "FPS";
+        case 0xd20a71a6u:
+        case 0x7b71324fu:
+            return "FRAME";
+        case 0xabf8d4ddu:
+        case 0x66b6cdeau:
+            return "SEC";
+        case 0x934f4e0au:
+            return "POS";
+        case 0x97537db5u:
+            return "PCT";
+        case 0xa62782e2u:
+        case 0xb19001feu:
+            return "TRANS";
+        case 0x21c252a4u:
+        case 0xfbe86875u:
+            return "CH";
+        case 0x1bcf29d8u:
+        case 0xb7c0bbbcu:
+            return "SRC";
+        case 0x2fa0fd0du:
+            return "DUR";
+        case 0x83d03615u:
+            return "LEN";
+        case 0x4939f3f8u:
+            return "THRESH";
+        case 0x85d8a7e8u:
+            return "COOL";
+        case 0x7c2d100cu:
+            return "SENS";
+        case 0x03043d51u:
+            return "CORR";
+        case 0x96e70aa5u:
+            return "XFADE";
+        case 0x34d0622au:
+            return "BRIGHT";
+        case 0xf5a2e289u:
+            return "SAT";
+        case 0xe4497980u:
+            return "PROJ";
+        case 0xe4abbac3u:
+            return "VIEW";
+        case 0x115bfcb9u:
+        case 0x1dcef1feu:
+            return "SUB";
+        case 0x2ee0698fu:
+            return "VOL";
+        case 0xc6c2dd66u:
+            return "OPACITY";
+        case 0x3812e73eu:
+        case 0xff37c82du:
+            return "INC";
+        case 0x19cb36b2u:
+        case 0xd6819a41u:
+            return "DEC";
+        case 0xaf8bb8ceu:
+        case 0x02f3b39eu:
+            return "ON";
+        case 0xcded8c63u:
+        case 0x33f36f05u:
+            return "OFF";
+        case 0xa92b8b72u:
+            return "ORIG";
+        case 0x331d748au:
+            return "EXT";
+        case 0x10bb9798u:
+            return "NORM";
+        case 0x425ed3cau:
+            return "VAL";
+        case 0xf4bf083fu:
+        case 0xfb34269au:
+            return "MIX";
+        case 0x70aced6fu:
+            return "DET";
+        case 0xff7c4253u:
+            return "RENDER";
+        case 0x79a94f04u:
+            return "OUT";
+        case 0x593058ccu:
+        case 0x96908b6cu:
+        case 0xd467947bu:
+            return "REC";
+        case 0x3d32bd4au:
+            return "RAND";
+        case 0x685d8527u:
+        case 0x37b8f592u:
+            return "CAL";
+        case 0x6eec35c2u:
+        case 0x4ed885a3u:
+            return "GEN";
+        case 0x13ba397au:
+        case 0x1727c92bu:
+            return "PLUG";
+        case 0x815f1c7bu:
+        case 0xb0b92098u:
+        case 0x33a50cfau:
+            return "BUF";
+        case 0x24f208e4u:
+        case 0xc00385b5u:
+            return "MSG";
+        case 0x6cab33b5u:
+            return "INFO";
+        case 0xd6b302c8u:
+        case 0x11de6cdcu:
+            return "PROP";
+        case 0x763e0219u:
+            return "MON";
+        case 0xf2fb8359u:
+            return "LAT";
+        case 0x4674caeeu:
+        case 0x86daf527u:
+            return "PROF";
+        case 0x3c43ef68u:
+        case 0xf8f165eeu:
+            return "SEQ";
+        case 0x3b952e97u:
+        case 0xafd8d0ecu:
+            return "BANK";
+        case 0x70954771u:
+        case 0x3cfec826u:
+            return "SLOT";
+        case 0xfb8dc969u:
+        case 0x1a3393eeu:
+            return "KF";
+        case 0x99380614u:
+        case 0x9a321425u:
+            return "CURVE";
+        case 0x1010cf81u:
+            return "MCAST";
+        case 0x1dc014eeu:
+            return "V4L";
+        case 0x6b7b06c4u:
+            return "Y4M";
+        case 0x29df7ff5u:
+        case 0x70d5bff2u:
+            return "RES";
+        case 0xb1ba38aeu:
+            return "TRICK";
+        case 0xb2c3d7b9u:
+        case 0x23ff66c7u:
+            return "CFG";
+        case 0x4364e615u:
+        case 0x4e0a1774u:
+        case 0x11c2662du:
+            return "SEL";
+        case 0xd07076f3u:
+        case 0xa10a8b80u:
+            return "DEV";
+        case 0xb35135fau:
+        case 0xd1d746abu:
+            return "IMG";
+        case 0x090aa9abu:
+            return "IDX";
+        case 0xba4b77efu:
+            return "STATE";
+        case 0x5c6e1222u:
+            return "CLEAR";
+        case 0x650d33c0u:
+            return "RESET";
+        case 0xe562ea44u:
+            return "COPY";
+        case 0x1dff06aeu:
+            return "GLOBAL";
+        case 0xb45fa81au:
+            return "FWD";
+        case 0x675d2bc4u:
+            return "REV";
+        case 0x652b04dfu:
+        case 0x2370e859u:
+            return "START";
+        case 0x6a8e75aau:
+        case 0x6b532a96u:
+            return "END";
+        case 0xcb532ae5u:
+        case 0x160a4da9u:
+            return "STOP";
+        case 0xbe269f5cu:
+        case 0xdf66914fu:
+            return "WRITE";
+        case 0x3f110988u:
+            return "FILE";
+        case 0xab45f730u:
+        case 0xec6ee012u:
+            return "MODE";
+        case 0xe0613999u:
+            return "AUDIO";
+        case 0xcef90b6cu:
+            return "VIDEO";
+        case 0x5d8b6dabu:
+            return "ALPHA";
+        case 0xf16d8413u:
+            return "FADE";
+        case 0x7084d38du:
+        case 0x0a1997cbu:
+            return "PAUSE";
+        case 0x67c2444au:
+        case 0xdb9215fdu:
+            return "DEL";
+        case 0xe60759e9u:
+            return "LOAD";
+        case 0xccff7e48u:
+        case 0xc7e7bc2eu:
+            return "SAVE";
+        case 0xb4652c81u:
+            return "CTRL";
+        case 0x8cdfbd85u:
+            return "CONV";
+        case 0x1e99e7d9u:
+        case 0x9e010407u:
+            return "ENC";
+        case 0x40296205u:
+        case 0x93e05f71u:
+            return "TOGGLE";
+        default:
+            return NULL;
+    }
 }
 
 static gboolean gvr_pattern_format_description_label(
@@ -1039,10 +1299,13 @@ static gboolean gvr_pattern_format_description_label(
 {
     const char *description;
     char **words;
-    char base[24] = { 0 };
+    char base[GVR_PATTERN_LABEL_TEXT_MAX + 1] = { 0 };
+    char suffix[16] = { 0 };
+    gsize text_limit;
+    gsize base_limit;
     int added = 0;
 
-    if(!view || !view->description_lookup)
+    if(!view || !view->description_lookup || !label || label_size == 0)
         return FALSE;
 
     description = view->description_lookup(id,
@@ -1050,22 +1313,44 @@ static gboolean gvr_pattern_format_description_label(
     if(!description || !description[0])
         return FALSE;
 
+    text_limit = MIN((gsize)GVR_PATTERN_LABEL_TEXT_MAX,
+                     label_size - 1);
+    base_limit = text_limit;
+
+    if(argument_count > 0) {
+        g_snprintf(suffix,
+                   sizeof(suffix),
+                   "%d",
+                   arguments[argument_count - 1]);
+
+        const gsize suffix_length = strlen(suffix);
+        if(suffix_length + 1 < text_limit)
+            base_limit = text_limit - suffix_length - 1;
+        else
+            suffix[0] = '\0';
+    }
+
     words = g_strsplit_set(description,
-                           " \t\r\n/()[],:;<>-=+",
-                           -1);
+                          " \t\r\n/()[],:;<>-=+\'\".!?",
+                          -1);
 
     for(int i = 0; words && words[i] && added < 3; i++) {
         const char *abbreviation;
-        char upper[12];
+        char upper[9];
         const char *piece;
-        gsize used;
-        gsize available;
+        const gsize used = strlen(base);
+        const guint32 hash =
+            gvr_pattern_description_word_hash(words[i]);
+        gsize piece_length;
+        gsize required;
 
-        if(gvr_pattern_description_skip_word(words[i]))
+        if(!words[i][0] ||
+           g_ascii_isdigit(words[i][0]) ||
+           gvr_pattern_description_skip_hash(hash))
             continue;
 
         abbreviation =
-            gvr_pattern_description_abbreviation(words[i]);
+            gvr_pattern_description_abbreviation(hash);
         if(abbreviation) {
             piece = abbreviation;
         }
@@ -1079,18 +1364,23 @@ static gboolean gvr_pattern_format_description_label(
         if(!piece[0])
             continue;
 
-        used = strlen(base);
-        available = sizeof(base) - used;
-        if(available <= 1)
+        piece_length = strlen(piece);
+        required = used + (used > 0 ? 1 : 0) + piece_length;
+
+        if(required > base_limit) {
+            if(used == 0 && base_limit > 0) {
+                const gsize copy_length =
+                    MIN(piece_length, base_limit);
+                memcpy(base, piece, copy_length);
+                base[copy_length] = '\0';
+            }
             break;
+        }
 
         if(used > 0)
             g_strlcat(base, " ", sizeof(base));
         g_strlcat(base, piece, sizeof(base));
         added++;
-
-        if(strlen(base) >= 18)
-            break;
     }
 
     g_strfreev(words);
@@ -1098,12 +1388,12 @@ static gboolean gvr_pattern_format_description_label(
     if(!base[0])
         return FALSE;
 
-    if(argument_count > 0)
+    if(suffix[0])
         g_snprintf(label,
                    label_size,
-                   "%s %d",
+                   "%s %s",
                    base,
-                   arguments[argument_count - 1]);
+                   suffix);
     else
         g_strlcpy(label, base, label_size);
 
@@ -1359,6 +1649,80 @@ static void gvr_pattern_format_label(GvrVimsPatternView *view,
         return;
     }
 
+    if(id == VIMS_STREAM_SET_BUFFER_LENGTH) {
+        g_snprintf(label,
+                   label_size,
+                   "TRICK BUF %d",
+                   second);
+        return;
+    }
+
+    if(id == VIMS_STREAM_SET_LENGTH) {
+        g_snprintf(label, label_size, "STRM LEN %d", first);
+        return;
+    }
+
+    if(id == VIMS_CHAIN_ENTRY_CLEAR) {
+        g_snprintf(label, label_size, "CLEAR FX %d", second);
+        return;
+    }
+
+    if(id == VIMS_CHAIN_CLEAR) {
+        g_strlcpy(label, "CLEAR FX CHAIN", label_size);
+        return;
+    }
+
+    if(id == VIMS_CHAIN_SET_ENTRY) {
+        g_snprintf(label, label_size, "FX SLOT %d", first);
+        return;
+    }
+
+    if(id == VIMS_GLOBAL_CHAIN_COPY) {
+        g_strlcpy(label, "COPY GLOBAL FX", label_size);
+        return;
+    }
+
+    if(id == VIMS_SAMPLE_KF_STATUS_PARAM) {
+        g_snprintf(label,
+                   label_size,
+                   "KF%d P%d %s",
+                   second,
+                   third,
+                   gvr_pattern_state_name(fourth));
+        return;
+    }
+
+    if(id == VIMS_SAMPLE_KF_STATUS) {
+        g_snprintf(label,
+                   label_size,
+                   "KF%d %s C%d",
+                   first,
+                   gvr_pattern_state_name(second),
+                   third);
+        return;
+    }
+
+    if(id == VIMS_SAMPLE_KF_RESET) {
+        g_snprintf(label, label_size, "CLEAR KF %d", first);
+        return;
+    }
+
+    if(id == VIMS_SAMPLE_KF_CLEAR) {
+        g_snprintf(label,
+                   label_size,
+                   "CLEAR KF%d P%d",
+                   first,
+                   second);
+        return;
+    }
+
+    if(id == VIMS_CHAIN_ENTRY_SET_PRESET ||
+       id == VIMS_CHAIN_ENTRY_SET_EFFECT)
+    {
+        g_strlcpy(label, "FX PRESET", label_size);
+        return;
+    }
+
     if(id == VIMS_CHAIN_ENTRY_SET_ARG_VAL) {
         g_snprintf(label,
                    label_size,
@@ -1543,10 +1907,12 @@ static void gvr_pattern_format_label(GvrVimsPatternView *view,
     }
 
     if(id == VIMS_GLOBAL_CHAIN) {
-        g_snprintf(label,
-                   label_size,
-                   "GLOBAL %s",
-                   gvr_pattern_state_name(second));
+        if(second <= 0)
+            g_strlcpy(label, "GLOBAL FX OFF", label_size);
+        else if(second == 1)
+            g_strlcpy(label, "GLOBAL FX PRE", label_size);
+        else
+            g_strlcpy(label, "GLOBAL FX POST", label_size);
         return;
     }
 
@@ -2003,14 +2369,25 @@ static char *gvr_pattern_normalize_message(const char *message)
     }
 
     if(trimmed[length - 1] != ';') {
+        if(length + 1 >= GVR_VIMS_PATTERN_MESSAGE_MAX) {
+            g_free(copy);
+            return NULL;
+        }
+
         char *with_term = g_strdup_printf("%s;", trimmed);
         g_free(copy);
         copy = with_term;
         trimmed = copy;
+        length++;
     }
 
     if(trimmed != copy)
         memmove(copy, trimmed, strlen(trimmed) + 1);
+
+    if(length >= GVR_VIMS_PATTERN_MESSAGE_MAX) {
+        g_free(copy);
+        return NULL;
+    }
 
     return copy;
 }
@@ -2185,6 +2562,32 @@ static void gvr_pattern_set_cursor(GvrVimsPatternView *view,
 static int gvr_pattern_current_frame(GvrVimsPatternView *view)
 {
     return gvr_pattern_display_row_to_frame(view, view->selected_row);
+}
+
+static int gvr_pattern_follow_frame(GvrVimsPatternView *view,
+                                    GvrVimsPatternCell *cell,
+                                    int live_frame)
+{
+    int frame;
+    int step;
+
+    frame = gvr_pattern_loop_map_frame(cell, MAX(0, live_frame));
+    frame = gvr_pattern_clampi(frame, 0, GVR_PATTERN_MAX_FRAMES - 1);
+    step = gvr_pattern_edit_step(view);
+
+    if(view->frame_count_known)
+        frame = gvr_pattern_clampi(frame,
+                                   0,
+                                   MAX(0, view->frame_count - 1));
+
+    frame = (frame / step) * step;
+
+    if(frame + 1 > view->frame_count) {
+        view->frame_count = frame + 1;
+        gvr_pattern_update_adjustment(view);
+    }
+
+    return frame;
 }
 
 
@@ -2362,6 +2765,10 @@ static gboolean gvr_pattern_copy_block(GvrVimsPatternView *view)
                     &row->events[first_column + column_index]);
         }
     }
+
+    /* Pattern block copy becomes the active paste source. */
+    gtk_clipboard_clear(
+        gtk_clipboard_get(GDK_SELECTION_CLIPBOARD));
 
     return TRUE;
 }
@@ -2654,6 +3061,45 @@ static gboolean gvr_pattern_paste_block(
                GVR_PATTERN_PASTE_REPLACE);
 }
 
+static gboolean gvr_pattern_paste_clipboard_command(
+        GvrVimsPatternView *view)
+{
+    GtkClipboard *clipboard;
+    gchar *text;
+    gchar *normalized;
+    gboolean pasted = FALSE;
+
+    if(!view || !gvr_pattern_target_editable(view))
+        return FALSE;
+
+    clipboard = gtk_clipboard_get(GDK_SELECTION_CLIPBOARD);
+    text = gtk_clipboard_wait_for_text(clipboard);
+    if(!text)
+        return FALSE;
+
+    normalized = gvr_pattern_normalize_message(text);
+    if(normalized && gvr_pattern_parse_id(normalized) >= 0)
+        pasted = gvr_vims_pattern_view_insert_message(
+            GTK_WIDGET(view),
+            normalized,
+            -1,
+            -1,
+            FALSE);
+
+    g_free(normalized);
+    g_free(text);
+    return pasted;
+}
+
+static gboolean gvr_pattern_paste(
+        GvrVimsPatternView *view)
+{
+    if(gvr_pattern_paste_clipboard_command(view))
+        return TRUE;
+
+    return gvr_pattern_paste_block(view);
+}
+
 
 typedef struct {
     GTree *rows;
@@ -2757,22 +3203,9 @@ static gboolean gvr_pattern_insert_gap_no_undo(
             cell->loop_start += amount;
         if(cell->loop_end >= start_frame)
             cell->loop_end += amount;
-
-        if(view->frame_count_known) {
-            cell->loop_start =
-                MIN(cell->loop_start,
-                    view->frame_count - 1);
-            cell->loop_end =
-                MIN(cell->loop_end,
-                    view->frame_count - 1);
-
-            if(cell->loop_end < cell->loop_start) {
-                cell->loop_enabled = FALSE;
-                cell->loop_start = -1;
-                cell->loop_end = -1;
-            }
-        }
     }
+
+    gvr_pattern_loop_clamp(cell, context.frame_limit);
 
     if(!view->frame_count_known)
         view->frame_count = MAX(
@@ -2842,6 +3275,8 @@ static gboolean gvr_pattern_shift_current_row(GvrVimsPatternView *view,
                 cell->loop_end += context.step;
         }
     }
+
+    gvr_pattern_loop_clamp(cell, context.frame_limit);
 
     if(!view->frame_count_known)
         view->frame_count = MAX(GVR_PATTERN_DEFAULT_FRAMES,
@@ -3455,12 +3890,26 @@ static void gvr_pattern_draw_text(cairo_t *cr,
                                   double size,
                                   cairo_font_weight_t weight)
 {
-    cairo_save(cr);
-    cairo_select_font_face(cr, "Monospace", CAIRO_FONT_SLANT_NORMAL, weight);
-    cairo_set_font_size(cr, size);
-    cairo_move_to(cr, x, y);
-    cairo_show_text(cr, text ? text : "");
-    cairo_restore(cr);
+    PangoLayout *layout = pango_cairo_create_layout(cr);
+    PangoFontDescription *font = pango_font_description_new();
+    int baseline;
+
+    pango_font_description_set_family(font, "Monospace");
+    pango_font_description_set_size(font, (int)(size * PANGO_SCALE));
+    pango_font_description_set_weight(
+        font,
+        weight == CAIRO_FONT_WEIGHT_BOLD ?
+        PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
+    pango_layout_set_font_description(layout, font);
+    pango_layout_set_text(layout, text ? text : "", -1);
+    pango_layout_set_single_paragraph_mode(layout, TRUE);
+
+    baseline = pango_layout_get_baseline(layout);
+    cairo_move_to(cr, x, y - ((double)baseline / PANGO_SCALE));
+    pango_cairo_show_layout(cr, layout);
+
+    pango_font_description_free(font);
+    g_object_unref(layout);
 }
 
 static void gvr_pattern_draw_cell_text(cairo_t *cr,
@@ -3470,25 +3919,37 @@ static void gvr_pattern_draw_cell_text(cairo_t *cr,
                                        double width)
 {
     char buffer[40];
-    cairo_text_extents_t ext;
+    PangoLayout *layout = pango_cairo_create_layout(cr);
+    PangoFontDescription *font = pango_font_description_new();
+    PangoRectangle extents;
     gsize length;
+    int baseline;
 
     g_strlcpy(buffer, text ? text : "", sizeof(buffer));
     length = strlen(buffer);
 
-    cairo_save(cr);
-    cairo_select_font_face(cr, "Monospace", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-    cairo_set_font_size(cr, 10.0);
-    cairo_text_extents(cr, buffer, &ext);
+    pango_font_description_set_family(font, "Monospace");
+    pango_font_description_set_size(font, 10 * PANGO_SCALE);
+    pango_font_description_set_weight(font, PANGO_WEIGHT_BOLD);
+    pango_layout_set_font_description(layout, font);
+    pango_layout_set_single_paragraph_mode(layout, TRUE);
+    pango_layout_set_text(layout, buffer, -1);
+    pango_layout_get_pixel_extents(layout, NULL, &extents);
 
-    while(length > 1 && ext.width > width - 8.0) {
+    while(length > 1 && extents.width > width - 8.0) {
         buffer[--length] = '\0';
-        cairo_text_extents(cr, buffer, &ext);
+        pango_layout_set_text(layout, buffer, -1);
+        pango_layout_get_pixel_extents(layout, NULL, &extents);
     }
 
-    cairo_move_to(cr, x + 4.0, y + 14.0);
-    cairo_show_text(cr, buffer);
-    cairo_restore(cr);
+    baseline = pango_layout_get_baseline(layout);
+    cairo_move_to(cr,
+                  x + 4.0,
+                  y + 14.0 - ((double)baseline / PANGO_SCALE));
+    pango_cairo_show_layout(cr, layout);
+
+    pango_font_description_free(font);
+    g_object_unref(layout);
 }
 
 static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
@@ -3756,7 +4217,9 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                            event_width);
             }
 
-            if(frame == view->last_fired_frame &&
+            if(view->selected_bank == view->last_fired_bank &&
+               view->selected_slot == view->last_fired_slot &&
+               frame == view->last_fired_frame &&
                (view->last_fired_mask & (1u << column)))
             {
                 cairo_set_source_rgba(cr, 0.36, 0.93, 0.74, 0.96);
@@ -4182,7 +4645,22 @@ enum {
     GVR_PATTERN_MENU_QUANTIZE_OFFGRID,
     GVR_PATTERN_MENU_UNDO,
     GVR_PATTERN_MENU_REDO,
-    GVR_PATTERN_MENU_CLEAR_PATTERN
+    GVR_PATTERN_MENU_CLEAR_PATTERN,
+    GVR_PATTERN_MENU_ADD_HOLD,
+    GVR_PATTERN_MENU_ADD_STOP,
+    GVR_PATTERN_MENU_ADD_FORWARD,
+    GVR_PATTERN_MENU_ADD_REVERSE,
+    GVR_PATTERN_MENU_ADD_SPEED,
+    GVR_PATTERN_MENU_ADD_SLOW
+};
+
+enum {
+    GVR_PATTERN_COMMAND_HOLD = 1,
+    GVR_PATTERN_COMMAND_STOP,
+    GVR_PATTERN_COMMAND_FORWARD,
+    GVR_PATTERN_COMMAND_REVERSE,
+    GVR_PATTERN_COMMAND_SPEED,
+    GVR_PATTERN_COMMAND_SLOW
 };
 
 typedef struct {
@@ -4273,6 +4751,23 @@ static void gvr_pattern_menu_activate(GtkMenuItem *item,
         case GVR_PATTERN_MENU_CLEAR_PATTERN:
             gvr_pattern_clear_pattern_user(data->view);
             break;
+        case GVR_PATTERN_MENU_ADD_HOLD:
+        case GVR_PATTERN_MENU_ADD_STOP:
+        case GVR_PATTERN_MENU_ADD_FORWARD:
+        case GVR_PATTERN_MENU_ADD_REVERSE:
+        case GVR_PATTERN_MENU_ADD_SPEED:
+        case GVR_PATTERN_MENU_ADD_SLOW: {
+            int command = GVR_PATTERN_COMMAND_HOLD +
+                          (data->action - GVR_PATTERN_MENU_ADD_HOLD);
+
+            g_signal_emit(data->view,
+                          gvr_vims_pattern_view_signals[SIGNAL_COMMAND_REQUESTED],
+                          0,
+                          command,
+                          gvr_pattern_current_frame(data->view),
+                          data->view->selected_column);
+            break;
+        }
         default:
             break;
     }
@@ -4403,6 +4898,37 @@ static gboolean gvr_pattern_area_button_press(GtkWidget *widget,
         hidden =
             gvr_pattern_selected_offgrid_info(view);
         menu = gtk_menu_new();
+
+        if(view->selected_bank == GVR_VIMS_PATTERN_SEQUENCE_BANK) {
+            GtkWidget *command_menu = gtk_menu_new();
+            GtkWidget *command_root = gtk_menu_item_new_with_label("Add Command");
+
+            gtk_widget_set_sensitive(command_root,
+                                     gvr_pattern_target_editable(view));
+            gtk_menu_item_set_submenu(GTK_MENU_ITEM(command_root),
+                                      command_menu);
+            gtk_menu_shell_append(GTK_MENU_SHELL(menu), command_root);
+            gtk_widget_show(command_root);
+
+            gboolean command_sensitive = gvr_pattern_target_editable(view);
+
+            gvr_pattern_menu_add(command_menu, view, "HOLD", GVR_PATTERN_MENU_ADD_HOLD, command_sensitive);
+            gvr_pattern_menu_add(command_menu, view, "STOP", GVR_PATTERN_MENU_ADD_STOP, command_sensitive);
+
+            GtkWidget *transport_sep = gtk_separator_menu_item_new();
+            gtk_menu_shell_append(GTK_MENU_SHELL(command_menu), transport_sep);
+            gtk_widget_show(transport_sep);
+
+            gvr_pattern_menu_add(command_menu, view, "FORWARD", GVR_PATTERN_MENU_ADD_FORWARD, command_sensitive);
+            gvr_pattern_menu_add(command_menu, view, "REVERSE", GVR_PATTERN_MENU_ADD_REVERSE, command_sensitive);
+            gvr_pattern_menu_add(command_menu, view, "SPEED (current value)", GVR_PATTERN_MENU_ADD_SPEED, command_sensitive);
+            gvr_pattern_menu_add(command_menu, view, "SLOW (current value)", GVR_PATTERN_MENU_ADD_SLOW, command_sensitive);
+
+
+            GtkWidget *command_sep = gtk_separator_menu_item_new();
+            gtk_menu_shell_append(GTK_MENU_SHELL(menu), command_sep);
+            gtk_widget_show(command_sep);
+        }
 
         gvr_pattern_menu_add(menu,
                              view,
@@ -4616,7 +5142,7 @@ static gboolean gvr_pattern_area_key_press(GtkWidget *widget,
        (event->keyval == GDK_KEY_v ||
         event->keyval == GDK_KEY_V))
     {
-        gvr_pattern_paste_block(view);
+        gvr_pattern_paste(view);
         return TRUE;
     }
 
@@ -4980,7 +5506,7 @@ static void gvr_pattern_toolbar_paste(GtkButton *button,
                                       gpointer user_data)
 {
     (void)button;
-    gvr_pattern_paste_block(GVR_VIMS_PATTERN_VIEW(user_data));
+    gvr_pattern_paste(GVR_VIMS_PATTERN_VIEW(user_data));
 }
 
 static void gvr_pattern_paste_mode_changed(
@@ -5246,7 +5772,6 @@ static void gvr_pattern_follow_toggled(GtkToggleButton *button, gpointer user_da
     GvrVimsPatternView *view = GVR_VIMS_PATTERN_VIEW(user_data);
 
     if(gtk_toggle_button_get_active(button) &&
-       !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(view->learn_toggle)) &&
        view->live_active &&
        view->live_bank == view->selected_bank &&
        view->live_slot == view->selected_slot)
@@ -5458,6 +5983,19 @@ static void gvr_vims_pattern_view_class_init(GvrVimsPatternViewClass *klass)
                      G_TYPE_INT,
                      G_TYPE_INT,
                      G_TYPE_UINT);
+
+    gvr_vims_pattern_view_signals[SIGNAL_COMMAND_REQUESTED] =
+        g_signal_new("command-requested",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_FIRST,
+                     0,
+                     NULL, NULL,
+                     NULL,
+                     G_TYPE_NONE,
+                     3,
+                     G_TYPE_INT,
+                     G_TYPE_INT,
+                     G_TYPE_INT);
 }
 
 static GtkWidget *gvr_pattern_toolbar_button(GtkWidget *toolbar,
@@ -5510,6 +6048,8 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     view->selection_anchor_row = 0;
     view->selection_anchor_column = 0;
     view->drag_selecting = FALSE;
+    view->last_fired_bank = -1;
+    view->last_fired_slot = -1;
     view->last_fired_frame = -1;
     view->last_fired_mask = 0;
     view->live_bank = -1;
@@ -5743,7 +6283,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gvr_pattern_toolbar_button(
         editbar,
         "Paste",
-        "Paste the copied tracker block (Ctrl+V)",
+        "Paste a copied tracker block or a VIMS command from the VIMS tab (Ctrl+V)",
         G_CALLBACK(gvr_pattern_toolbar_paste),
         view);
 
@@ -6371,14 +6911,13 @@ void gvr_vims_pattern_view_set_live_position(GtkWidget *widget,
     if(view->live_active &&
        bank == view->selected_bank &&
        slot == view->selected_slot &&
-       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(view->follow_toggle)) &&
-       !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(view->learn_toggle)))
-        gvr_pattern_set_cursor(
-            view,
-            gvr_pattern_loop_map_frame(
-                gvr_pattern_cell_lookup(view, bank, slot),
-                view->live_frame),
-            view->selected_column);
+       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(view->follow_toggle)))
+        gvr_pattern_set_cursor(view,
+                               gvr_pattern_follow_frame(
+                                   view,
+                                   gvr_pattern_cell_lookup(view, bank, slot),
+                                   view->live_frame),
+                               view->selected_column);
     else
         gtk_widget_queue_draw(view->area);
 }
@@ -6512,6 +7051,88 @@ gboolean gvr_vims_pattern_view_insert_message(GtkWidget *widget,
     return TRUE;
 }
 
+gboolean gvr_vims_pattern_view_insert_message_auto_column(
+        GtkWidget *widget,
+        const char *message,
+        int frame,
+        gboolean advance)
+{
+    GvrVimsPatternView *view;
+    GvrVimsPatternCell *cell;
+    GvrVimsPatternRow *row;
+    char *normalized;
+    int id;
+    int matching_column = -1;
+    int first_empty = -1;
+
+    if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
+        return FALSE;
+
+    view = GVR_VIMS_PATTERN_VIEW(widget);
+    if(!gvr_pattern_target_editable(view))
+        return FALSE;
+
+    normalized = gvr_pattern_normalize_message(message);
+    if(!normalized)
+        return FALSE;
+
+    id = gvr_pattern_parse_id(normalized);
+    if(id < 0) {
+        g_free(normalized);
+        return FALSE;
+    }
+
+    if(frame < 0)
+        frame = gvr_pattern_current_frame(view);
+
+    frame = view->frame_count_known ?
+            gvr_pattern_clampi(frame, 0, view->frame_count - 1) :
+            gvr_pattern_clampi(frame, 0, GVR_PATTERN_MAX_FRAMES - 1);
+
+    cell = gvr_pattern_cell(view,
+                            view->selected_bank,
+                            view->selected_slot);
+    row = gvr_pattern_row_get(cell, frame, FALSE);
+
+    if(row) {
+        for(int column = 0;
+            column < GVR_VIMS_PATTERN_COLUMNS;
+            column++)
+        {
+            GvrVimsPatternEvent *event = &row->events[column];
+
+            if(event->message) {
+                if(matching_column < 0 && event->vims_id == id)
+                    matching_column = column;
+            }
+            else if(first_empty < 0) {
+                first_empty = column;
+            }
+        }
+    }
+    else {
+        first_empty = 0;
+    }
+
+    g_free(normalized);
+
+    if(matching_column >= 0)
+        return gvr_vims_pattern_view_insert_message(widget,
+                                                    message,
+                                                    frame,
+                                                    matching_column,
+                                                    advance);
+
+    if(first_empty >= 0)
+        return gvr_vims_pattern_view_insert_message(widget,
+                                                    message,
+                                                    frame,
+                                                    first_empty,
+                                                    advance);
+
+    return FALSE;
+}
+
 static void gvr_pattern_drag_data_received(GtkWidget *widget,
                                            GdkDragContext *context,
                                            gint x,
@@ -6597,15 +7218,26 @@ gboolean gvr_vims_pattern_view_capture_message(GtkWidget *widget,
         return FALSE;
     }
 
-    (void)live_frame;
-    frame = gvr_pattern_current_frame(view);
-    frame = view->frame_count_known ?
-            gvr_pattern_clampi(frame, 0, view->frame_count - 1) :
-            gvr_pattern_clampi(frame, 0, GVR_PATTERN_MAX_FRAMES - 1);
-
     cell = gvr_pattern_cell(view,
                             view->selected_bank,
                             view->selected_slot);
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(view->follow_toggle)) &&
+       live_frame >= 0 &&
+       view->live_active &&
+       view->live_bank == view->selected_bank &&
+       view->live_slot == view->selected_slot)
+    {
+        frame = gvr_pattern_follow_frame(view, cell, live_frame);
+        gvr_pattern_set_cursor(view, frame, view->selected_column);
+    }
+    else {
+        frame = gvr_pattern_current_frame(view);
+    }
+
+    frame = view->frame_count_known ?
+            gvr_pattern_clampi(frame, 0, view->frame_count - 1) :
+            gvr_pattern_clampi(frame, 0, GVR_PATTERN_MAX_FRAMES - 1);
     row = gvr_pattern_row_get(cell, frame, FALSE);
 
     if(row) {
@@ -6808,6 +7440,9 @@ static gboolean gvr_pattern_collect_fire_rows(gpointer key, gpointer value, gpoi
     GvrPatternFireRange *range = data;
     int frame = GPOINTER_TO_INT(key) - 1;
 
+    if(frame > range->to)
+        return TRUE;
+
     if(frame >= range->from && frame <= range->to)
         g_ptr_array_add(range->rows, value);
 
@@ -6842,14 +7477,12 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
                    row->events[column].message)
                 {
                     fired_mask |= 1u << column;
-                    g_signal_emit(view,
-                                  gvr_vims_pattern_view_signals[SIGNAL_VIMS_FIRE],
-                                  0,
-                                  row->events[column].message);
                 }
             }
 
             if(fired_mask) {
+                view->last_fired_bank = bank;
+                view->last_fired_slot = slot;
                 view->last_fired_frame = row->frame;
                 view->last_fired_mask = fired_mask;
             }
@@ -6865,14 +7498,12 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
                    row->events[column].message)
                 {
                     fired_mask |= 1u << column;
-                    g_signal_emit(view,
-                                  gvr_vims_pattern_view_signals[SIGNAL_VIMS_FIRE],
-                                  0,
-                                  row->events[column].message);
                 }
             }
 
             if(fired_mask) {
+                view->last_fired_bank = bank;
+                view->last_fired_slot = slot;
                 view->last_fired_frame = row->frame;
                 view->last_fired_mask = fired_mask;
             }
@@ -6882,6 +7513,25 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
     g_ptr_array_free(range.rows, TRUE);
     if(view->area)
         gtk_widget_queue_draw(view->area);
+}
+
+void gvr_vims_pattern_view_set_transport(GtkWidget *widget,
+                                          guint epoch,
+                                          int direction,
+                                          int loop_type,
+                                          int loops_remaining)
+{
+    GvrVimsPatternView *view;
+
+    if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
+        return;
+
+    view = GVR_VIMS_PATTERN_VIEW(widget);
+    view->transport_valid = TRUE;
+    view->transport_epoch = epoch;
+    view->transport_direction = direction < 0 ? -1 : direction > 0 ? 1 : 0;
+    view->transport_loop_type = loop_type;
+    view->transport_loops_remaining = loops_remaining;
 }
 
 void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
@@ -6899,6 +7549,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
     int mapped_delta;
     gboolean selected_target;
     gboolean looped;
+    gboolean transport_changed;
 
     if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
         return;
@@ -6942,6 +7593,48 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
         gvr_pattern_set_cursor(view,
                                frame,
                                view->selected_column);
+
+    transport_changed = view->transport_valid &&
+                        state->transport_valid &&
+                        (state->transport_epoch != view->transport_epoch ||
+                         state->direction != view->transport_direction ||
+                         state->loop_type != view->transport_loop_type ||
+                         state->loops_remaining != view->transport_loops_remaining);
+
+    if(transport_changed) {
+        const gboolean moved = state->source_frame >= 0 &&
+                               source_frame != state->source_frame;
+        const gboolean paused_seek = state->paused &&
+                                     (state->seeked_while_paused || moved);
+
+        if(max_linear_delta <= 0) {
+            state->paused = TRUE;
+            state->seeked_while_paused = paused_seek;
+        }
+        else {
+            if(moved || paused_seek)
+                gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
+            state->paused = FALSE;
+            state->seeked_while_paused = FALSE;
+        }
+
+        state->frame = frame;
+        state->source_frame = source_frame;
+        state->transport_valid = TRUE;
+        state->transport_epoch = view->transport_epoch;
+        state->direction = view->transport_direction;
+        state->loop_type = view->transport_loop_type;
+        state->loops_remaining = view->transport_loops_remaining;
+        return;
+    }
+
+    if(view->transport_valid) {
+        state->transport_valid = TRUE;
+        state->transport_epoch = view->transport_epoch;
+        state->direction = view->transport_direction;
+        state->loop_type = view->transport_loop_type;
+        state->loops_remaining = view->transport_loops_remaining;
+    }
 
     if(max_linear_delta <= 0) {
         if(state->source_frame < 0)
@@ -7142,6 +7835,8 @@ void gvr_vims_pattern_view_stop_all_playback(GtkWidget *widget)
     view->live_bank = -1;
     view->live_slot = -1;
     view->live_frame = -1;
+    view->last_fired_bank = -1;
+    view->last_fired_slot = -1;
     view->last_fired_frame = -1;
     view->last_fired_mask = 0;
     gtk_widget_queue_draw(view->area);
@@ -7192,11 +7887,28 @@ void gvr_vims_pattern_view_clear_bank(GtkWidget *widget, int bank)
 
 void gvr_vims_pattern_view_clear_all(GtkWidget *widget)
 {
+    GvrVimsPatternView *view;
+
     if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
         return;
 
+    view = GVR_VIMS_PATTERN_VIEW(widget);
+
     for(int bank = 0; bank < GVR_VIMS_PATTERN_BANKS; bank++)
         gvr_vims_pattern_view_clear_bank(widget, bank);
+
+    if(view->selected_bank == GVR_VIMS_PATTERN_SAMPLE_BANK ||
+       view->selected_bank == GVR_VIMS_PATTERN_STREAM_BANK)
+    {
+        gvr_pattern_history_reset(view);
+        gvr_pattern_selection_clear(view);
+    }
+
+    g_hash_table_remove_all(view->sample_cells);
+    g_hash_table_remove_all(view->stream_cells);
+    gvr_vims_pattern_view_stop_all_playback(widget);
+    gvr_pattern_sync_loop_controls(view);
+    gtk_widget_queue_draw(view->area);
 }
 
 void gvr_vims_pattern_view_swap_cells(GtkWidget *widget,

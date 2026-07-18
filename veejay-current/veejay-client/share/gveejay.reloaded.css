@@ -120,23 +120,37 @@ notebook header.top tabs tab:checked {
 }
 
 scale {
-   padding-top:1px;
-   padding-bottom:1px;
+    padding-top: 1px;
+    padding-bottom: 1px;
 }
 
 scale contents trough {
     background-color: @raised-color;
     border: 1px solid @border-color;
-    min-height: 7px;
-    margin-top: 2px;
-    margin-bottom: 2px;
+}
+
+scale.horizontal contents trough {
+    min-height: 4px;
+    margin-top: 5px;
+    margin-bottom: 5px;
 }
 
 scale contents trough highlight {
     background-color: @fill-color;
 }
 
-scale contents slider {
+scale.horizontal contents slider {
+    background-color: @knob-color;
+    border-radius: 50%;
+    min-width: 16px;
+    min-height: 16px;
+    margin-top: -5px;
+    margin-bottom: -5px;
+    margin-left: 0;
+    margin-right: 0;
+}
+
+scale.vertical contents slider {
     background-color: @knob-color;
     border-radius: 6px;
     min-width: 16px;
@@ -150,8 +164,26 @@ scale contents slider:hover {
 
 scale value {
     color: @fill-color;
-    padding-top: 5px;
     min-width: 30px;
+}
+
+scale.horizontal value {
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+scale.horizontal value.left {
+    margin-right: 6px;
+}
+
+scale.horizontal value.right {
+    margin-left: 6px;
+}
+
+scale.vertical value {
+    padding-top: 5px;
     margin-bottom: 6px;
 }
 
@@ -430,10 +462,10 @@ radiobutton:checked:disabled label {
 }
 
 notebook header tabs tab {
-    min-width: 80px; 
-    
+    min-width: 80px;
+    min-height: 0;
     margin: 1px 2px;
-    padding: 1px 2px;
+    padding: 2px 3px;
     background-color: @panel-color;
     border: 1px solid @border-color;
     border-bottom: none;
@@ -1645,6 +1677,20 @@ checkbutton.fx-beat-owner:checked check {
     padding-bottom: 1px;
 }
 
+label.vims-pattern-target-badge,
+.vims-pattern-target-badge {
+    min-width: 0;
+    min-height: 18px;
+    padding: 1px 5px;
+    margin: 1px 2px 1px 1px;
+    border: 1px solid @preselect-color;
+    border-radius: 3px;
+    background-color: #1b1c20;
+    color: @preselect-color;
+    font-size: 82%;
+    font-weight: bold;
+}
+
 button.vims-pattern-tool {
     min-width: 34px;
     min-height: 22px;
@@ -1873,8 +1919,8 @@ checkbutton.vims-pattern-track-toggle label {
 
 /* Sample-bank footer actions: property, delete and clone/copy start at left. */
 .samplebank-footer-actions {
-    min-height: 20px;
-    padding: 0;
+    min-height: 22px;
+    padding: 1px 0;
     margin: 0 3px 0 0;
     background-color: transparent;
 }
@@ -1884,13 +1930,12 @@ button.samplebank-footer-action {
     min-height: 18px;
     padding: 0;
     margin: 0 1px 0 0;
-    border-width: 0;
+    border: 1px solid transparent;
     background-color: transparent;
     box-shadow: none;
 }
 
 button.samplebank-footer-action:hover {
-    border-width: 1px;
     border-color: @border-color;
     background-color: @hover-color;
 }
@@ -1924,7 +1969,7 @@ button.samplebank-footer-action label {
 
 /* Load/Save now precede property/delete/copy in the Sample-bank footer. */
 .samplebank-footer-actions {
-    min-height: 20px;
+    min-height: 22px;
 }
 
 .samplebank-footer-actions button.samplebank-footer-action {
