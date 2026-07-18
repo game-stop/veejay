@@ -3412,6 +3412,7 @@ int vj_perform_try_sequence(veejay_t *info)
         return 0;
 
     if (loops != 0) {
+#ifdef HAVE_DEBUG_SEQUENCER
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[SEQ] boundary held mode=%s id=%d loops=%d bank=%d slot=%d transport=%lld",
                    vj_playback_mode_label(info->uc->playback_mode),
@@ -3420,6 +3421,7 @@ int vj_perform_try_sequence(veejay_t *info)
                    info->seq->active_bank,
                    info->seq->current,
                    atomic_load_long_long(&settings->current_frame_num));
+#endif
         return 0;
     }
 
@@ -3429,11 +3431,13 @@ int vj_perform_try_sequence(veejay_t *info)
     int next_id = vj_perform_next_sequence(info, &type, &next_bank_id, &next_slot_id);
 
     if (next_id <= 0) {
+#ifdef HAVE_DEBUG_SEQUENCER
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[SEQ] boundary reached but no next slot from bank=%d slot=%d id=%d",
                    info->seq->active_bank,
                    info->seq->current,
                    id);
+#endif
         return 0;
     }
 
@@ -3446,15 +3450,18 @@ int vj_perform_try_sequence(veejay_t *info)
         atomic_load_int(&settings->transition.active);
 
     if (armed_transition_active && !vj_perform_sequence_transition_still_valid(info)) {
+#ifdef HAVE_DEBUG_SEQUENCER
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[SEQ] stale armed transition dropped bank=%d slot=%d next=%d",
                    settings->transition.seq_bank,
                    settings->transition.seq_index,
                    settings->transition.next_id);
+#endif
         vj_perform_reset_transition(info);
         armed_transition_active = 0;
     }
 
+#ifdef HAVE_DEBUG_SEQUENCER
     veejay_msg(VEEJAY_MSG_DEBUG,
                "[SEQ] advance bank=%d slot=%d -> bank=%d slot=%d %s:%d -> %s:%d transition_global=%d transition_active=%d transport=%lld",
                info->seq->active_bank,
@@ -3468,6 +3475,7 @@ int vj_perform_try_sequence(veejay_t *info)
                global_transition_on,
                armed_transition_active,
                atomic_load_long_long(&settings->current_frame_num));
+#endif
 
     if (!global_transition_on || !armed_transition_active) {
         vj_perform_sequence_set_current(info, next_bank_id, next_slot_id);
@@ -15712,12 +15720,17 @@ static double osd_effective_visual_fps(veejay_t *info, const vj_audio_sync_snaps
     return base_fps * ratio;
 }
 
-static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
+static int osd_audio_clock_line(veejay_t *info,
+                                char *dst,
+                                size_t dst_len,
+                                int multiline)
 {
     video_playback_setup *settings;
     vj_audio_sync_snapshot_t snap;
-    int have_sync = 0;
-    const int audio_src = info && info->settings ? atomic_load_int(&info->settings->audio_osd.last_src) : 0;
+    int have_sync;
+    const int audio_src = info && info->settings
+                        ? atomic_load_int(&info->settings->audio_osd.last_src) : 0;
+    const char *sep = multiline ? "\n" : " | ";
     char source_bpm[24];
     char target_bpm[24];
     char audio_speed[16];
@@ -15727,11 +15740,11 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
     char queue[96];
 
     if(!dst || dst_len == 0)
-        return;
+        return 0;
     dst[0] = '\0';
 
     if(!info || !info->settings)
-        return;
+        return 0;
 
     settings = info->settings;
     have_sync = vj_audio_sync_get_snapshot(&settings->audio_sync, &snap);
@@ -15768,7 +15781,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
 
     if(!have_sync || !snap.enabled || snap.mode == 0) {
         snprintf(dst, dst_len, "AUD %s", engine);
-        return;
+        return 1;
     }
 
     osd_bpm_text(source_bpm, sizeof(source_bpm), snap.bpm);
@@ -15779,7 +15792,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
        snap.mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE ||
        snap.mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN)
     {
-        long queue_overruns = (long)osd_display_clampll(snap.target_queue_overruns, 0, 99);
+        const long queue_overruns = (long)osd_display_clampll(snap.target_queue_overruns, 0, 99);
         if(queue_overruns) {
             snprintf(queue, sizeof(queue),
                      " tq%3d/%3d ov%2ld",
@@ -15792,7 +15805,7 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
     switch(snap.mode) {
         case VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL:
             snprintf(dst, dst_len,
-                     "S:ana %s %s r%d bpm%s c%3d ph%3d l%3d tr%3d | %s",
+                     "S:ana %s %s r%d bpm%s c%3d ph%3d l%3d tr%3d%s%s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      snap.running,
@@ -15801,13 +15814,13 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
                      osd_pct100(snap.beat_phase),
                      osd_pct100(snap.level),
                      osd_pct100(snap.transient),
-                     engine);
+                     sep, engine);
             break;
 
         case VJ_AUDIO_SYNC_MODE_MONITOR:
         case VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY:
             snprintf(dst, dst_len,
-                     "S:%s %s %s r%d bpm%s c%3d l%3d tr%3d | %s",
+                     "S:%s %s %s r%d bpm%s c%3d l%3d tr%3d%s%s",
                      osd_sync_mode_name(snap.mode),
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
@@ -15816,12 +15829,12 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
                      osd_pct100(snap.confidence),
                      osd_pct100(snap.level),
                      osd_pct100(snap.transient),
-                     engine);
+                     sep, engine);
             break;
 
         case VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW:
             snprintf(dst, dst_len,
-                     "S:follow %s %s src%s/%3d clip%s/%3d r%5.3f pull%2d fps%6.2f %s%s | %s",
+                     "S:follow %s %s src%s/%3d clip%s/%3d r%5.3f pull%2d fps%6.2f %s%s%s%s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      source_bpm,
@@ -15832,13 +15845,12 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
                      osd_display_clampi(snap.max_correction_pct, 0, 99),
                      osd_effective_visual_fps(info, &snap),
                      osd_bridge_state_name(snap.bridge_state),
-                     queue,
-                     engine);
+                     queue, sep, engine);
             break;
 
         case VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE:
             snprintf(dst, dst_len,
-                     "S:bridge %s %s src%s/%3d tgt%s/%3d r%5.3f max%2d %s%s | %s",
+                     "S:bridge %s %s src%s/%3d tgt%s/%3d r%5.3f max%2d %s%s%s%s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      source_bpm,
@@ -15848,15 +15860,14 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
                      snap.bridge_correction,
                      osd_display_clampi(snap.max_correction_pct, 0, 99),
                      osd_bridge_state_name(snap.bridge_state),
-                     queue,
-                     engine);
+                     queue, sep, engine);
             break;
 
         case VJ_AUDIO_SYNC_MODE_TRACK_ALIGN:
             osd_signed_int_token(off_text, sizeof(off_text), snap.track_align_offset_ms);
             osd_signed_int_token(ppm_text, sizeof(ppm_text), snap.track_align_correction_ppm);
             snprintf(dst, dst_len,
-                     "S:align %s %s src%s/%3d clip%s/%3d %s off%s c%3d ppm%s %s%s | %s",
+                     "S:align %s %s src%s/%3d clip%s/%3d %s off%s c%3d ppm%s %s%s%s%s",
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      source_bpm,
@@ -15868,42 +15879,33 @@ static void osd_audio_clock_line(veejay_t *info, char *dst, size_t dst_len)
                      osd_pct_int(snap.track_align_confidence_pct),
                      ppm_text,
                      osd_track_state_name(snap.track_align_state),
-                     queue,
-                     engine);
+                     queue, sep, engine);
             break;
 
         default:
             snprintf(dst, dst_len,
-                     "S:%s %s %s r%d bpm%s c%3d | %s",
+                     "S:%s %s %s r%d bpm%s c%3d%s%s",
                      osd_sync_mode_name(snap.mode),
                      osd_sync_source_name(snap.source),
                      osd_audio_open_name(snap.open),
                      snap.running,
                      source_bpm,
                      osd_pct100(snap.confidence),
-                     engine);
+                     sep, engine);
             break;
     }
+
+    return multiline ? 2 : 1;
 }
 
-static char *vj_perform_audio_clock_osd_status(veejay_t *info)
+static int vj_perform_audio_clock_osd_status(veejay_t *info,
+                                             char *dst,
+                                             size_t dst_len)
 {
-    char line[1024];
-    size_t len;
-    char *status_str;
-
-    osd_audio_clock_line(info, line, sizeof(line));
-    if(line[0] == '\0')
-        return NULL;
-
-    len = strlen(line) + 1;
-    status_str = (char *)vj_malloc(len);
-    if(!status_str)
-        return NULL;
-
-    strncpy(status_str, line, len);
-    return status_str;
+    const int multiline = info && info->video_output_width < 1280;
+    return osd_audio_clock_line(info, dst, dst_len, multiline);
 }
+
 #endif
 
 
@@ -15951,16 +15953,57 @@ static double vj_perform_osd_effective_fps(veejay_t *info)
     return fps;
 }
 
-static char *vj_perform_osd_status(veejay_t *info)
+static void osd_copy_single_line(char *dst, size_t dst_len, const char *src)
 {
+    size_t n = 0;
+    int pending_space = 0;
+
+    if(!dst || dst_len == 0)
+        return;
+
+    dst[0] = '\0';
+    if(!src)
+        return;
+
+    while(*src && n + 1 < dst_len) {
+        unsigned char c = (unsigned char)*src++;
+
+        if(c == '\n' || c == '\r' || c == '\t' || c == ' ') {
+            pending_space = n > 0;
+            continue;
+        }
+
+        if(pending_space && n + 1 < dst_len)
+            dst[n++] = ' ';
+
+        dst[n++] = (char)c;
+        pending_space = 0;
+    }
+
+    dst[n] = '\0';
+}
+
+static int vj_perform_osd_status(veejay_t *info, char *dst, size_t dst_len)
+{
+    if(!info || !info->settings || !info->current_edit_list || !info->uc ||
+       !dst || dst_len == 0)
+        return 0;
+
     video_playback_setup *settings = info->settings;
     video_playback_stats *stats = &info->stats;
-
+    char view_text[128];
+    view_text[0] = '\0';
     char *more = NULL;
-    if (info->composite) {
+
+    if(info->composite) {
         void *vp = composite_get_vp(info->composite);
-        if (viewport_get_mode(vp) == 1)
+        if(viewport_get_mode(vp) == 1)
             more = viewport_get_my_status(vp);
+    }
+
+    if(more) {
+        osd_copy_single_line(view_text, sizeof(view_text), more);
+        free(more);
     }
 
     MPEG_timecode_t tc;
@@ -15978,16 +16021,17 @@ static char *vj_perform_osd_status(veejay_t *info)
     snprintf(master_timecode, sizeof(master_timecode), "%02d:%02d:%02d:%02d", tc.h, tc.m, tc.s, tc.f);
 
     float speed = settings->current_playback_speed;
-    if(info->sfd) {
-        speed = 1.0 / info->sfd;
-    }
+    if(info->sfd)
+        speed = 1.0f / info->sfd;
 
     long ur = 0;
 #ifdef HAVE_JACK
-    ur = (info->audio == AUDIO_PLAY ? vj_jack_underruns() : 0);
+    ur = info->audio == AUDIO_PLAY ? vj_jack_underruns() : 0;
 #endif
 
-    char *audio_info = osd_xrun_indicator( ur,stats->xruns);
+    const char *audio_info = osd_xrun_indicator(ur, stats->xruns);
+    const char *drift_info = osd_drift_indicator(stats->delta_s, settings->spvf);
+    const char *perf_info = osd_performance_indicator(stats->render_duration, settings->spvf);
     double effective_fps = vj_perform_osd_effective_fps(info);
     char speed_text[32];
     char fps_text[32];
@@ -15995,18 +16039,21 @@ static char *vj_perform_osd_status(veejay_t *info)
     osd_speed_token(speed_text, sizeof(speed_text), speed);
     snprintf(fps_text, sizeof(fps_text), "%6.2f", effective_fps);
 
-    const char *mode_str = "Plain";
+    const char *mode_str = "PLAIN ";
     int mode_total = 1;
-    switch (info->uc->playback_mode) {
+    switch(info->uc->playback_mode) {
         case VJ_PLAYBACK_MODE_SAMPLE:
-            mode_str = "Sample";
+            mode_str = "SAMPLE";
             mode_total = sample_size();
             break;
         case VJ_PLAYBACK_MODE_TAG:
-            mode_str = "Stream";
+            mode_str = "STREAM";
             mode_total = vj_tag_size();
             break;
     }
+
+    int source_id = vj_perform_clampi(info->uc->sample_id, -999, 9999);
+    mode_total = vj_perform_clampi(mode_total, 0, 9999);
 
     long long skipped = (long long)stats->total_frames_skipped;
     if(skipped < 0)
@@ -16014,96 +16061,103 @@ static char *vj_perform_osd_status(veejay_t *info)
     else if(skipped > 9999)
         skipped = 9999;
 
-    char buf[1024];
-    if(info->video_output_width < 1920)
-        snprintf(buf, sizeof(buf),
-            "OUT %s | SRC %s | %s %3d/%3d F%8lld\n"
-            "DROP%4lld SP%sx FPS%s %s %s\n%s",
-            master_timecode,
-            timecode,
-            mode_str,
-            info->uc->sample_id,
-            mode_total,
-            (long long)stats->current_frame,
-            skipped,
-            speed_text,
-            fps_text,
-            osd_drift_indicator(stats->delta_s, settings->spvf),
-            audio_info,
-            osd_performance_indicator(stats->render_duration, settings->spvf)
-        );
-    else
-        snprintf(buf, sizeof(buf),
-            "OUT %s | SRC %s | %s %3d/%3d F%8lld "
-            "DROP%4lld SP%sx FPS%s %s %s %s",
-            master_timecode,
-            timecode,
-            mode_str,
-            info->uc->sample_id,
-            mode_total,
-            (long long)stats->current_frame,
-            skipped,
-            speed_text,
-            fps_text,
-            osd_drift_indicator(stats->delta_s, settings->spvf),
-            audio_info,
-            osd_performance_indicator(stats->render_duration, settings->spvf)
-        );
+    const char *view_sep = view_text[0] ? "  VIEW " : "";
 
-    int total_len = strlen(buf) + 1 + (more ? strlen(more) + 4 : 0);
-    char *status_str = (char *)vj_malloc(total_len);
-    if (!status_str) {
-        if (more) free(more);
-        return NULL;
+    if(info->video_output_width < 1280) {
+        snprintf(dst, dst_len,
+                 "PLAY  OUT %s  SRC %s%s%s\n"
+                 "SRC   %-6s %4d/%-4d  FRAME %9lld  SPEED %sx\n"
+                 "PERF  FPS%s  DROP %4lld  CLK %s  AUD %s\n"
+                 "LOAD  %s",
+                 master_timecode,
+                 timecode,
+                 view_sep,
+                 view_text,
+                 mode_str,
+                 source_id,
+                 mode_total,
+                 (long long)stats->current_frame,
+                 speed_text,
+                 fps_text,
+                 skipped,
+                 drift_info,
+                 audio_info,
+                 perf_info);
+    }
+    else {
+        snprintf(dst, dst_len,
+                 "PLAY  OUT %s  SRC %s  %-6s %4d/%-4d  FRAME %9lld%s%s\n"
+                 "PERF  SPEED %sx  FPS%s  DROP %4lld  CLK %s  AUD %s  %s",
+                 master_timecode,
+                 timecode,
+                 mode_str,
+                 source_id,
+                 mode_total,
+                 (long long)stats->current_frame,
+                 view_sep,
+                 view_text,
+                 speed_text,
+                 fps_text,
+                 skipped,
+                 drift_info,
+                 audio_info,
+                 perf_info);
     }
 
-    if (more) {
-        snprintf(status_str, total_len, "%s | %s", more, buf);
-        free(more);
-    } else {
-        strncpy(status_str, buf, total_len);
-    }
-
-    return status_str;
+    dst[dst_len - 1] = '\0';
+    return dst[0] ? (info->video_output_width < 1280 ? 4 : 2) : 0;
 }
 
-static  void    vj_perform_render_osd( veejay_t *info, video_playback_setup *settings,VJFrame *frame )
+static void vj_perform_render_osd(veejay_t *info,
+                                  video_playback_setup *settings,
+                                  VJFrame *frame)
 {
-    if(info->use_osd <= 0 )
+    if(info->use_osd <= 0)
         return;
 
-    if( !frame->ssm)
-    {
-        chroma_supersample(
-            settings->sample_mode,
-            frame,
-            frame->data );
+    if(!frame->ssm) {
+        chroma_supersample(settings->sample_mode, frame, frame->data);
         vj_perform_set_444(frame);
     }
 
-    char *osd_text = NULL;
-    char *audio_top_text = NULL;
+    char status_buffer[2048];
+    char audio_buffer[2048];
+    char *owned_osd_text = NULL;
+    const char *osd_text = NULL;
     int placement = 0;
-    if( info->use_osd == 2 ) {
+    int osd_lines = 0;
+    int audio_lines = 0;
+
+    if(info->use_osd == 2) {
         placement = 1;
-        osd_text = vj_perform_print_credits(info);
-    } else if (info->use_osd == 1 ) {
-        osd_text = vj_perform_osd_status(info);
+        owned_osd_text = vj_perform_print_credits(info);
+        osd_text = owned_osd_text;
+    }
+    else if(info->use_osd == 1) {
+        osd_lines = vj_perform_osd_status(info, status_buffer, sizeof(status_buffer));
+        if(osd_lines > 0)
+            osd_text = status_buffer;
 #ifdef HAVE_JACK
-        audio_top_text = vj_perform_audio_clock_osd_status(info);
+        audio_lines = vj_perform_audio_clock_osd_status(info, audio_buffer, sizeof(audio_buffer));
 #endif
-    } else if (info->use_osd == 3 && info->composite ) {
+    }
+    else if(info->use_osd == 3 && info->composite) {
         placement = 1;
-        osd_text = viewport_get_my_help( composite_get_vp(info->composite ) );
+        owned_osd_text = viewport_get_my_help(composite_get_vp(info->composite));
+        osd_text = owned_osd_text;
     }
-    if(audio_top_text) {
-        vj_font_render_osd_status(info->osd,frame,audio_top_text,1);
-        free(audio_top_text);
-    }
+
+    if(audio_lines > 0)
+        vj_font_render_osd_panel_lines(info->osd, frame, audio_buffer, 1, audio_lines);
+
     if(osd_text) {
-        vj_font_render_osd_status(info->osd,frame,osd_text,placement);
-        free(osd_text);
+        if(osd_lines > 0)
+            vj_font_render_osd_panel_lines(info->osd, frame, osd_text, placement, osd_lines);
+        else
+            vj_font_render_osd_status(info->osd, frame, (char*)osd_text, placement);
     }
+
+    free(owned_osd_text);
 }
 
 static inline size_t vj_output_hold_frame_size(const VJFrame *frame, int plane_sizes[4])
@@ -16146,6 +16200,70 @@ static inline void vj_output_hold_planes(performer_t *p, const int plane_sizes[4
     planes[3] = plane_sizes[3] > 0 ? (planes[2] + plane_sizes[2]) : NULL;
 }
 
+static inline void vj_perform_output_hold_advance(video_playback_setup *s, int manual)
+{
+    if(!s->output_hold_active)
+        return;
+
+    if(s->output_hold_frames_left > 0)
+        s->output_hold_frames_left--;
+
+    s->hold_pos = s->output_hold_frames_left;
+    s->hold_resume++;
+
+    if(s->output_hold_frames_left > 0)
+        return;
+
+    s->output_hold_active = 0;
+    s->output_hold_capture = 0;
+    s->output_hold_frames_left = 0;
+    s->output_hold_frames_total = 0;
+    s->hold_status = 0;
+    s->hold_pos = 0;
+    s->hold_resume = 0;
+
+    if(!manual) {
+        s->output_hold_ready = 0;
+        s->hold_fx_prev = 0;
+    }
+
+    atomic_store_double(&s->smoothed_drift_us, 0.0);
+    veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze");
+}
+
+static inline int vj_perform_output_hold_replay(veejay_t *info,
+                                                performer_t *p,
+                                                VJFrame *dst)
+{
+    video_playback_setup *s = info->settings;
+    const int manual = s->hold_fx ? 1 : 0;
+    const int timed = s->output_hold_active ? 1 : 0;
+
+    if(!manual && !timed)
+        return 0;
+
+    if(s->output_hold_capture || !s->output_hold_ready ||
+       (manual && !s->hold_fx_prev))
+        return 0;
+
+    int plane_sizes[4];
+    size_t need = vj_output_hold_frame_size(dst, plane_sizes);
+    if(need == 0 || !p->output_hold_buffer || p->output_hold_buflen < need) {
+        s->output_hold_ready = 0;
+        s->output_hold_capture = 1;
+        return 0;
+    }
+
+    uint8_t *hold_planes[4];
+    vj_output_hold_planes(p, plane_sizes, hold_planes);
+    vj_frame_copy(hold_planes, dst->data, plane_sizes);
+
+    if(timed)
+        vj_perform_output_hold_advance(s, manual);
+
+    return 1;
+}
+
 static inline void vj_perform_output_hold_update(veejay_t *info, performer_t *p, VJFrame *dst)
 {
     video_playback_setup *s = info->settings;
@@ -16186,31 +16304,8 @@ static inline void vj_perform_output_hold_update(veejay_t *info, performer_t *p,
         vj_frame_copy(hold_planes, dst->data, plane_sizes);
     }
 
-    if(timed) {
-        if(s->output_hold_frames_left > 0)
-            s->output_hold_frames_left--;
-
-        s->hold_pos = s->output_hold_frames_left;
-        s->hold_resume++;
-
-        if(s->output_hold_frames_left <= 0) {
-            s->output_hold_active = 0;
-            s->output_hold_capture = 0;
-            s->output_hold_frames_left = 0;
-            s->output_hold_frames_total = 0;
-            s->hold_status = 0;
-            s->hold_pos = 0;
-            s->hold_resume = 0;
-
-            if(!manual) {
-                s->output_hold_ready = 0;
-                s->hold_fx_prev = 0;
-            }
-
-            atomic_store_double(&s->smoothed_drift_us, 0.0);
-            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze");
-        }
-    }
+    if(timed)
+        vj_perform_output_hold_advance(s, manual);
 }
 
 
@@ -16235,10 +16330,16 @@ static  void    vj_perform_finish_chain( veejay_t *info,performer_t *p,VJFrame *
 static  void    vj_perform_finish_render( veejay_t *info,performer_t *p,VJFrame *frame, video_playback_setup *settings )
 {
     uint8_t *pri[4];
-    char *osd_text = NULL;
-    char *more_text = NULL;
-    char *audio_top_text = NULL;
-    int   placement= 0;
+    char status_buffer[2048];
+    char more_buffer[2048];
+    char audio_buffer[2048];
+    char *owned_osd_text = NULL;
+    const char *osd_text = NULL;
+    const char *more_text = NULL;
+    int placement = 0;
+    int osd_lines = 0;
+    int more_lines = 0;
+    int audio_lines = 0;
 
     pri[0] = p->primary_buffer[0]->Y;
     pri[1] = p->primary_buffer[0]->Cb;
@@ -16262,19 +16363,26 @@ static  void    vj_perform_finish_render( veejay_t *info,performer_t *p,VJFrame 
         }
 
 #ifdef HAVE_SDL
-        if( info->use_osd == 2 ) {
-            osd_text = vj_perform_print_credits(info);
-            placement= 1;
-        } else if (info->use_osd == 1 ) {
-            osd_text = vj_perform_osd_status(info);
-            placement= 0;
-#ifdef HAVE_JACK
-            audio_top_text = vj_perform_audio_clock_osd_status(info);
-#endif
-        } else if (info->use_osd == 3 && info->composite ) {
+        if(info->use_osd == 2) {
+            owned_osd_text = vj_perform_print_credits(info);
+            osd_text = owned_osd_text;
             placement = 1;
-            osd_text = viewport_get_my_help( composite_get_vp(info->composite ) );
-            more_text = vj_perform_osd_status(info);
+        }
+        else if(info->use_osd == 1) {
+            osd_lines = vj_perform_osd_status(info, status_buffer, sizeof(status_buffer));
+            if(osd_lines > 0)
+                osd_text = status_buffer;
+#ifdef HAVE_JACK
+            audio_lines = vj_perform_audio_clock_osd_status(info, audio_buffer, sizeof(audio_buffer));
+#endif
+        }
+        else if(info->use_osd == 3 && info->composite) {
+            placement = 1;
+            owned_osd_text = viewport_get_my_help(composite_get_vp(info->composite));
+            osd_text = owned_osd_text;
+            more_lines = vj_perform_osd_status(info, more_buffer, sizeof(more_buffer));
+            if(more_lines > 0)
+                more_text = more_buffer;
         }
 #endif
     }
@@ -16299,15 +16407,23 @@ static  void    vj_perform_finish_render( veejay_t *info,performer_t *p,VJFrame 
             composite_process_divert(info->composite,out.data,frame, info->splitter, settings->composite );
         }
 
-        if(osd_text || more_text || audio_top_text) {
-            VJFrame *tst = composite_get_draw_buffer( info->composite );
+        if(osd_text || more_text || audio_lines > 0) {
+            VJFrame *tst = composite_get_draw_buffer(info->composite);
             if(tst) {
-                if(audio_top_text)
-                    vj_font_render_osd_status(info->osd,tst,audio_top_text,1);
-                if(osd_text)
-                    vj_font_render_osd_status(info->osd,tst,osd_text,placement);
-                if(more_text)
-                    vj_font_render_osd_status(info->osd,tst,more_text,0);
+                if(audio_lines > 0)
+                    vj_font_render_osd_panel_lines(info->osd, tst, audio_buffer, 1, audio_lines);
+                if(osd_text) {
+                    if(osd_lines > 0)
+                        vj_font_render_osd_panel_lines(info->osd, tst, osd_text, placement, osd_lines);
+                    else
+                        vj_font_render_osd_status(info->osd, tst, (char*)osd_text, placement);
+                }
+                if(more_text) {
+                    if(more_lines > 0)
+                        vj_font_render_osd_panel_lines(info->osd, tst, more_text, 0, more_lines);
+                    else
+                        vj_font_render_osd_status(info->osd, tst, (char*)more_text, 0);
+                }
                 free(tst);
             }
         }
@@ -16327,20 +16443,23 @@ static  void    vj_perform_finish_render( veejay_t *info,performer_t *p,VJFrame 
             vj_split_process( info->splitter, frame );
         }
 
-        if(audio_top_text)
-            vj_font_render_osd_status(info->osd,frame,audio_top_text,1);
-        if( osd_text )
-            vj_font_render_osd_status(info->osd,frame,osd_text,placement);
-        if(more_text)
-            vj_font_render_osd_status(info->osd,frame,more_text,0);
+        if(audio_lines > 0)
+            vj_font_render_osd_panel_lines(info->osd, frame, audio_buffer, 1, audio_lines);
+        if(osd_text) {
+            if(osd_lines > 0)
+                vj_font_render_osd_panel_lines(info->osd, frame, osd_text, placement, osd_lines);
+            else
+                vj_font_render_osd_status(info->osd, frame, (char*)osd_text, placement);
+        }
+        if(more_text) {
+            if(more_lines > 0)
+                vj_font_render_osd_panel_lines(info->osd, frame, more_text, 0, more_lines);
+            else
+                vj_font_render_osd_status(info->osd, frame, (char*)more_text, 0);
+        }
     }
 
-    if( osd_text)
-        free(osd_text);
-    if( more_text)
-        free(more_text);
-    if( audio_top_text)
-        free(audio_top_text);
+    free(owned_osd_text);
 
     if(settings->splitscreen && info->splitter)
         vj_split_render(info->splitter);
@@ -16527,11 +16646,13 @@ static void vj_perform_end_transition(veejay_t *info, int mode, int sample)
     int target_slot = settings->transition.seq_index;
 
     if (!vj_perform_sequence_transition_still_valid(info)) {
+#ifdef HAVE_DEBUG_SEQUENCER
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[SEQ] stale completed transition ignored bank=%d slot=%d next=%d",
                    target_bank,
                    target_slot,
                    settings->transition.next_id);
+#endif
         vj_perform_reset_transition(info);
         settings->transition.ready = 0;
         return;
@@ -17300,6 +17421,12 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     video_playback_setup *settings = info->settings;
     performer_t *p = g->A;
 
+    if(vj_perform_output_hold_replay(info, p, dst)) {
+        if(vj_perform_record_presented_video_frame(info, dst))
+            vj_perform_record_video_frame(info);
+        return 1;
+    }
+
 #ifdef HAVE_JACK
     {
         static int ab_queue_seq = 0;
@@ -17340,11 +17467,13 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 
     int transition_enabled = atomic_load_int(&settings->transition.active) && atomic_load_int(&settings->transition.global_state);
     if (transition_enabled && !vj_perform_sequence_transition_still_valid(info)) {
+#ifdef HAVE_DEBUG_SEQUENCER
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[SEQ] stale render transition dropped bank=%d slot=%d next=%d",
                    settings->transition.seq_bank,
                    settings->transition.seq_index,
                    settings->transition.next_id);
+#endif
         vj_perform_reset_transition(info);
         transition_enabled = 0;
     }
@@ -17615,6 +17744,7 @@ static int vj_perform_maybe_publish_sequence_boundary(veejay_t *info,
 void vj_perform_inc_frame(veejay_t *info, int num)
 {
     video_playback_setup *settings = info->settings;
+    const int transport_epoch_before = veejay_transport_epoch_get(info);
     const int mode = info->uc->playback_mode;
     const int seq_active = info->seq && info->seq->active;
     const int seq_transition_active =
@@ -17857,6 +17987,9 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         atomic_store_int(&settings->audio_direction_changed, 1);
 
     if (edge_type != AUDIO_EDGE_NONE) {
+        if(veejay_transport_epoch_get(info) == transport_epoch_before)
+            veejay_transport_epoch_bump(info);
+
         vj_perform_initiate_edge_change_ex(info, edge_type, prev_dir, next_dir);
 #ifdef HAVE_JACK
         if(normal_loop_reset_edge)

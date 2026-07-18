@@ -1172,6 +1172,1535 @@ static inline int playback_dir(int speed)
     return (speed > 0) ? 1 : ((speed < 0) ? -1 : 0);
 }
 
+void veejay_transport_epoch_bump(veejay_t *info)
+{
+    video_playback_setup *settings;
+    int current;
+    int next;
+
+    if(!info || !info->settings)
+        return;
+
+    settings = info->settings;
+    current = __atomic_load_n(&settings->transport_epoch, __ATOMIC_RELAXED);
+
+    do {
+        next = (current + 1) & VJ_SEQUENCE_STATUS_TRANSPORT_EPOCH_BITS;
+        if(next == 0)
+            next = 1;
+    } while(!__atomic_compare_exchange_n(&settings->transport_epoch,
+                                         &current,
+                                         next,
+                                         0,
+                                         __ATOMIC_RELAXED,
+                                         __ATOMIC_RELAXED));
+}
+
+int veejay_transport_epoch_get(veejay_t *info)
+{
+    if(!info || !info->settings)
+        return 0;
+    return atomic_load_int(&info->settings->transport_epoch);
+}
+
+extern int vj_event_exists(int id);
+
+#define VJ_PATTERN_BANK_SAMPLE   (-1)
+#define VJ_PATTERN_BANK_STREAM   (-2)
+#define VJ_PATTERN_BANK_SEQUENCE (-3)
+#define VJ_PATTERN_COLUMNS       8
+#define VJ_PATTERN_ALL_COLUMNS   ((1u << VJ_PATTERN_COLUMNS) - 1u)
+#define VJ_PATTERN_MAX_FRAMES    10000000
+#define VJ_PATTERN_MESSAGE_MAX   256
+#define VJ_PATTERN_TICK_DEDUP_MAX 32
+
+typedef struct {
+    int frame;
+    int column;
+    int vims_id;
+    char *message;
+} vj_pattern_event_t;
+
+typedef struct {
+    int bank;
+    int slot;
+    int sample_id;
+    int sample_type;
+    int loop_enabled;
+    int loop_start;
+    int loop_end;
+    vj_pattern_event_t *events;
+    int event_count;
+    int event_capacity;
+} vj_pattern_target_t;
+
+typedef struct {
+    int active;
+    int bank;
+    int slot;
+    int frame;
+    int source_frame;
+    int paused;
+    int seeked_while_paused;
+    int transport_valid;
+    unsigned int transport_epoch;
+    int direction;
+    int loop_type;
+    int loops_remaining;
+} vj_pattern_playback_state_t;
+
+typedef struct {
+    unsigned int compiled_revision;
+    const char *compiled_data;
+    size_t compiled_length;
+    char compiled_format[VJ_SEQUENCE_PATTERN_FORMAT_MAX];
+    unsigned int enabled_columns_mask;
+    vj_pattern_target_t *targets;
+    int target_count;
+    int target_capacity;
+    vj_pattern_playback_state_t source_state;
+    vj_pattern_playback_state_t cell_state;
+    vj_pattern_playback_state_t bank_state;
+    unsigned int transport_epoch;
+    int transport_valid;
+    int bank_tick_valid;
+    int bank_tick_bank;
+    int bank_tick_slot;
+    long long bank_tick_frame;
+    int replaying;
+    int master_missing_reported;
+    int tick_transport_changed;
+    int tick_transport_cutoff_frame;
+    int tick_transport_reverse;
+    int tick_dedup_count;
+    int tick_dedup_ids[VJ_PATTERN_TICK_DEDUP_MAX];
+    const char *tick_dedup_messages[VJ_PATTERN_TICK_DEDUP_MAX];
+} vj_pattern_runtime_t;
+
+static int vj_pattern_int_compare(const void *a, const void *b)
+{
+    const vj_pattern_event_t *ea = (const vj_pattern_event_t*)a;
+    const vj_pattern_event_t *eb = (const vj_pattern_event_t*)b;
+
+    if(ea->frame != eb->frame)
+        return (ea->frame > eb->frame) - (ea->frame < eb->frame);
+    return (ea->column > eb->column) - (ea->column < eb->column);
+}
+
+static void vj_pattern_state_reset(vj_pattern_playback_state_t *state)
+{
+    if(!state)
+        return;
+
+    memset(state, 0, sizeof(*state));
+    state->bank = INT_MIN;
+    state->slot = -1;
+    state->frame = -1;
+    state->source_frame = -1;
+}
+
+static void vj_pattern_target_clear(vj_pattern_target_t *target)
+{
+    if(!target)
+        return;
+
+    for(int i = 0; i < target->event_count; i++)
+        free(target->events[i].message);
+    free(target->events);
+    memset(target, 0, sizeof(*target));
+}
+
+static void vj_pattern_runtime_clear_document(vj_pattern_runtime_t *runtime)
+{
+    if(!runtime)
+        return;
+
+    for(int i = 0; i < runtime->target_count; i++)
+        vj_pattern_target_clear(&runtime->targets[i]);
+    free(runtime->targets);
+    runtime->targets = NULL;
+    runtime->target_count = 0;
+    runtime->target_capacity = 0;
+    runtime->enabled_columns_mask = VJ_PATTERN_ALL_COLUMNS;
+}
+
+static void vj_pattern_runtime_free(void *ptr)
+{
+    vj_pattern_runtime_t *runtime = (vj_pattern_runtime_t*)ptr;
+
+    if(!runtime)
+        return;
+
+    vj_pattern_runtime_clear_document(runtime);
+    free(runtime);
+}
+
+static vj_pattern_runtime_t *vj_pattern_runtime_get(sequencer_t *seq)
+{
+    vj_pattern_runtime_t *runtime;
+
+    if(!seq)
+        return NULL;
+
+    runtime = (vj_pattern_runtime_t*)seq->vims_pattern_runtime;
+    if(runtime)
+        return runtime;
+
+    runtime = (vj_pattern_runtime_t*)vj_calloc(sizeof(*runtime));
+    if(!runtime)
+        return NULL;
+
+    runtime->compiled_revision = UINT_MAX;
+    runtime->enabled_columns_mask = VJ_PATTERN_ALL_COLUMNS;
+    runtime->bank_tick_bank = -1;
+    runtime->bank_tick_slot = -1;
+    vj_pattern_state_reset(&runtime->source_state);
+    vj_pattern_state_reset(&runtime->cell_state);
+    vj_pattern_state_reset(&runtime->bank_state);
+    seq->vims_pattern_runtime = runtime;
+    return runtime;
+}
+
+static int vj_pattern_base64_value(unsigned char c)
+{
+    if(c >= 'A' && c <= 'Z') return c - 'A';
+    if(c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if(c >= '0' && c <= '9') return c - '0' + 52;
+    if(c == '+') return 62;
+    if(c == '/') return 63;
+    return -1;
+}
+
+static unsigned char *vj_pattern_base64_decode(const char *text,
+                                                size_t text_len,
+                                                size_t *decoded_len)
+{
+    unsigned char *out;
+    size_t padding = 0;
+    size_t out_len;
+    size_t oi = 0;
+
+    if(decoded_len)
+        *decoded_len = 0;
+    if(!text || (text_len & 3u) != 0)
+        return NULL;
+
+    if(text_len > 0 && text[text_len - 1] == '=')
+        padding++;
+    if(text_len > 1 && text[text_len - 2] == '=')
+        padding++;
+
+    out_len = (text_len / 4u) * 3u;
+    if(padding > out_len)
+        return NULL;
+    out_len -= padding;
+
+    out = (unsigned char*)vj_malloc(out_len + 1u);
+    if(!out)
+        return NULL;
+
+    for(size_t i = 0; i < text_len; i += 4u) {
+        int v0 = vj_pattern_base64_value((unsigned char)text[i]);
+        int v1 = vj_pattern_base64_value((unsigned char)text[i + 1]);
+        int v2 = text[i + 2] == '=' ? 0 :
+                 vj_pattern_base64_value((unsigned char)text[i + 2]);
+        int v3 = text[i + 3] == '=' ? 0 :
+                 vj_pattern_base64_value((unsigned char)text[i + 3]);
+        const int last = (i + 4u == text_len);
+
+        if(v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0 ||
+           (!last && (text[i + 2] == '=' || text[i + 3] == '=')) ||
+           (text[i + 2] == '=' && text[i + 3] != '=') ||
+           (text[i + 2] == '=' && (v1 & 0x0f) != 0) ||
+           (text[i + 3] == '=' && text[i + 2] != '=' && (v2 & 0x03) != 0))
+        {
+            free(out);
+            return NULL;
+        }
+
+        if(oi < out_len)
+            out[oi++] = (unsigned char)((v0 << 2) | (v1 >> 4));
+        if(oi < out_len)
+            out[oi++] = (unsigned char)((v1 << 4) | (v2 >> 2));
+        if(oi < out_len)
+            out[oi++] = (unsigned char)((v2 << 6) | v3);
+    }
+
+    out[out_len] = '\0';
+    if(decoded_len)
+        *decoded_len = out_len;
+    return out;
+}
+
+static int vj_pattern_parse_int(const char *text, int *value)
+{
+    char *end = NULL;
+    long parsed;
+
+    if(!text || !*text || !value)
+        return 0;
+
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    if(errno || end == text || *end != '\0' || parsed < INT_MIN || parsed > INT_MAX)
+        return 0;
+
+    *value = (int)parsed;
+    return 1;
+}
+
+static int vj_pattern_split_fields(char *line, char **fields, int max_fields)
+{
+    int count = 0;
+    char *p = line;
+
+    if(!line || !fields || max_fields < 1)
+        return 0;
+
+    fields[count++] = p;
+    while(*p && count < max_fields) {
+        if(*p == '\t') {
+            *p = '\0';
+            fields[count++] = p + 1;
+        }
+        p++;
+    }
+
+    return count;
+}
+
+static int vj_pattern_target_valid(int bank, int slot)
+{
+    if(bank == VJ_PATTERN_BANK_SAMPLE || bank == VJ_PATTERN_BANK_STREAM)
+        return slot > 0;
+    if(bank == VJ_PATTERN_BANK_SEQUENCE)
+        return slot >= 0 && slot < VJ_SEQUENCE_BANKS;
+    return bank >= 0 && bank < VJ_SEQUENCE_BANKS &&
+           slot >= 0 && slot < MAX_SEQUENCES;
+}
+
+static int vj_pattern_id_in_list(int id, const int *ids, size_t count)
+{
+    for(size_t i = 0; i < count; i++)
+        if(ids[i] == id)
+            return 1;
+    return 0;
+}
+
+static int vj_pattern_command_allowed(int id)
+{
+    static const int sequencer_ids[] = {
+        VIMS_SEQUENCE_ADD, VIMS_SEQUENCE_DEL, VIMS_SEQUENCE_COPY,
+        VIMS_SEQUENCE_QUEUE, VIMS_SEQUENCE_SELECT, VIMS_SEQUENCE_STATUS,
+        VIMS_SEQUENCE_CLEAR_ALL, VIMS_SEQUENCE_TIMELINE,
+        VIMS_SEQUENCE_PATTERN_GET, VIMS_SEQUENCE_PATTERN_SET,
+        VIMS_SEQUENCE_PATTERN_CLEAR, VIMS_SEQUENCE_LIST,
+        VIMS_SEQUENCE_LIST_ALL
+    };
+    static const int automation_ids[] = {
+        VIMS_MACRO, VIMS_CLEAR_MACRO_BANK, VIMS_MACRO_SELECT,
+        VIMS_BUNDLE, VIMS_BUNDLE_ADD, VIMS_BUNDLE_DEL,
+        VIMS_BUNDLE_FILE, VIMS_BUNDLE_SAVE, VIMS_BUNDLE_CAPTURE,
+        VIMS_BUNDLE_START, VIMS_BUNDLE_END, VIMS_BUNDLE_ATTACH_KEY
+    };
+    static const int source_switch_ids[] = {
+        VIMS_SAMPLE_SELECT, VIMS_STREAM_SELECT, VIMS_SET_MODE_AND_GO,
+        VIMS_SET_PLAIN_MODE, VIMS_SAMPLE_RAND_START, VIMS_SAMPLE_RAND_STOP
+    };
+    static const int lifecycle_ids[] = {
+        VIMS_SAMPLE_NEW, VIMS_SAMPLE_COPY, VIMS_SAMPLE_DEL,
+        VIMS_SAMPLE_DEL_ALL, VIMS_SAMPLE_LOAD_SAMPLELIST,
+        VIMS_SAMPLE_LOAD_SAMPLELIST_B64, VIMS_SAMPLE_SAVE_SAMPLELIST,
+        VIMS_SAMPLE_SYNC_SAMPLELIST,
+        VIMS_SAMPLE_SET_DESCRIPTION, VIMS_STREAM_DELETE,
+        VIMS_STREAM_NEW_AVFORMAT, VIMS_STREAM_NEW_CALI,
+        VIMS_STREAM_NEW_CLONE, VIMS_STREAM_NEW_COLOR,
+        VIMS_STREAM_NEW_GENERATOR, VIMS_STREAM_NEW_MCAST,
+        VIMS_STREAM_NEW_SHARED, VIMS_STREAM_NEW_UNICAST,
+        VIMS_STREAM_NEW_V4L, VIMS_STREAM_NEW_Y4M,
+        VIMS_STREAM_SET_BUFFER_LENGTH, VIMS_STREAM_SET_LENGTH
+    };
+    static const int project_ids[] = {
+        VIMS_SAMPLE_SET_START, VIMS_SAMPLE_SET_END, VIMS_SAMPLE_SET_MARKER,
+        VIMS_SAMPLE_SET_MARKER_START, VIMS_SAMPLE_SET_MARKER_END,
+        VIMS_SAMPLE_CLEAR_MARKER, VIMS_SAMPLE_GROW_MARKER,
+        VIMS_SAMPLE_SHRINK_MARKER, VIMS_EDITLIST_ADD,
+        VIMS_EDITLIST_ADD_SAMPLE, VIMS_EDITLIST_COPY,
+        VIMS_EDITLIST_CROP, VIMS_EDITLIST_CUT, VIMS_EDITLIST_DEL,
+        VIMS_EDITLIST_PASTE_AT, VIMS_EDITLIST_SAVE, VIMS_EDITLIST_LOAD
+    };
+    static const int recording_ids[] = {
+        VIMS_RECORD_DATAFORMAT, VIMS_RECORD_AUDIO_SOURCE,
+        VIMS_SAMPLE_REC_START, VIMS_SAMPLE_REC_STOP,
+        VIMS_STREAM_REC_START, VIMS_STREAM_REC_STOP,
+        VIMS_STREAM_OFFLINE_REC_START, VIMS_STREAM_OFFLINE_REC_STOP,
+        VIMS_VLOOPBACK_START, VIMS_VLOOPBACK_STOP, VIMS_SCREENSHOT,
+        VIMS_V4L_CALI, VIMS_V4L_BLACKFRAME, VIMS_EFFECT_SET_BG,
+        VIMS_OUTPUT_Y4M_START, VIMS_OUTPUT_Y4M_STOP
+    };
+    static const int fx_structure_ids[] = {
+        VIMS_CHAIN_ENTRY_SWAP, VIMS_CHAIN_SET_ENTRY,
+        VIMS_CHAIN_ENTRY_BEAT_PARAM, VIMS_CHAIN_ENTRY_BEAT_TOGGLE,
+        VIMS_SAMPLE_KF_CLEAR, VIMS_SAMPLE_KF_RESET,
+        VIMS_CHAIN_FOLLOW_FADE
+    };
+    static const int engine_ids[] = {
+        VIMS_FULLSCREEN, VIMS_RESIZE_SDL_SCREEN, VIMS_DEBUG_LEVEL,
+        VIMS_BEZERK, VIMS_MESSAGE_FORWARDING, VIMS_SYNC_CORRECTION,
+        VIMS_PROMOTION, VIMS_QUIT, VIMS_CLOSE, VIMS_SUSPEND,
+        VIMS_OSD, VIMS_PREVIEW_BW
+    };
+
+    if(id <= 0 || id >= VIMS_MAX ||
+       (id >= 400 && id < 500) ||
+       (id >= VIMS_BUNDLE_START && id <= VIMS_BUNDLE_END))
+        return 0;
+    if(!vj_event_exists(id))
+        return 0;
+    if(vj_pattern_id_in_list(id, sequencer_ids, sizeof(sequencer_ids) / sizeof(sequencer_ids[0])) ||
+       vj_pattern_id_in_list(id, automation_ids, sizeof(automation_ids) / sizeof(automation_ids[0])) ||
+       vj_pattern_id_in_list(id, source_switch_ids, sizeof(source_switch_ids) / sizeof(source_switch_ids[0])) ||
+       vj_pattern_id_in_list(id, lifecycle_ids, sizeof(lifecycle_ids) / sizeof(lifecycle_ids[0])) ||
+       vj_pattern_id_in_list(id, project_ids, sizeof(project_ids) / sizeof(project_ids[0])) ||
+       vj_pattern_id_in_list(id, recording_ids, sizeof(recording_ids) / sizeof(recording_ids[0])) ||
+       vj_pattern_id_in_list(id, fx_structure_ids, sizeof(fx_structure_ids) / sizeof(fx_structure_ids[0])) ||
+       vj_pattern_id_in_list(id, engine_ids, sizeof(engine_ids) / sizeof(engine_ids[0])))
+        return 0;
+
+    return 1;
+}
+
+static int vj_pattern_message_valid(const char *message,
+                                    size_t message_len,
+                                    int expected_id)
+{
+    char *end = NULL;
+    long parsed;
+    const char *semicolon;
+
+    if(!message || message_len < 5 || message_len >= VJ_PATTERN_MESSAGE_MAX ||
+       message[message_len] != '\0' || memchr(message, '\0', message_len) != NULL)
+        return 0;
+
+    while(message_len > 0 && (*message == ' ' || *message == '\t' ||
+                              *message == '\r' || *message == '\n')) {
+        message++;
+        message_len--;
+    }
+
+    errno = 0;
+    parsed = strtol(message, &end, 10);
+    if(errno || end == message || *end != ':' || parsed != expected_id ||
+       parsed < 0 || parsed > 9999 || !vj_pattern_command_allowed((int)parsed))
+        return 0;
+
+    semicolon = strchr(end + 1, ';');
+    if(!semicolon || semicolon != message + message_len - 1)
+        return 0;
+
+    return strchr(semicolon + 1, ';') == NULL;
+}
+
+static vj_pattern_target_t *vj_pattern_target_find(vj_pattern_runtime_t *runtime,
+                                                    int bank,
+                                                    int slot,
+                                                    int create)
+{
+    if(!runtime)
+        return NULL;
+
+    for(int i = 0; i < runtime->target_count; i++) {
+        if(runtime->targets[i].bank == bank && runtime->targets[i].slot == slot)
+            return &runtime->targets[i];
+    }
+
+    if(!create)
+        return NULL;
+
+    if(runtime->target_count >= runtime->target_capacity) {
+        int new_capacity = runtime->target_capacity > 0 ? runtime->target_capacity * 2 : 16;
+        vj_pattern_target_t *new_targets = (vj_pattern_target_t*)realloc(
+            runtime->targets, sizeof(*new_targets) * (size_t)new_capacity);
+        if(!new_targets)
+            return NULL;
+        memset(new_targets + runtime->target_capacity,
+               0,
+               sizeof(*new_targets) * (size_t)(new_capacity - runtime->target_capacity));
+        runtime->targets = new_targets;
+        runtime->target_capacity = new_capacity;
+    }
+
+    vj_pattern_target_t *target = &runtime->targets[runtime->target_count++];
+    memset(target, 0, sizeof(*target));
+    target->bank = bank;
+    target->slot = slot;
+    target->sample_id = -1;
+    target->sample_type = -1;
+    target->loop_start = -1;
+    target->loop_end = -1;
+    return target;
+}
+
+static int vj_pattern_target_add_event(vj_pattern_target_t *target,
+                                       int frame,
+                                       int column,
+                                       int vims_id,
+                                       char *message)
+{
+    if(!target || !message)
+        return 0;
+
+    for(int i = 0; i < target->event_count; i++) {
+        if(target->events[i].frame == frame && target->events[i].column == column) {
+            free(target->events[i].message);
+            target->events[i].vims_id = vims_id;
+            target->events[i].message = message;
+            return 1;
+        }
+    }
+
+    if(target->event_count >= target->event_capacity) {
+        int new_capacity = target->event_capacity > 0 ? target->event_capacity * 2 : 16;
+        vj_pattern_event_t *new_events = (vj_pattern_event_t*)realloc(
+            target->events, sizeof(*new_events) * (size_t)new_capacity);
+        if(!new_events)
+            return 0;
+        target->events = new_events;
+        target->event_capacity = new_capacity;
+    }
+
+    vj_pattern_event_t *event = &target->events[target->event_count++];
+    event->frame = frame;
+    event->column = column;
+    event->vims_id = vims_id;
+    event->message = message;
+    return 1;
+}
+
+static int vj_pattern_compile_document(sequencer_t *seq,
+                                       vj_pattern_runtime_t *runtime)
+{
+    unsigned char *decoded = NULL;
+    size_t decoded_len = 0;
+    char *document;
+    char *save = NULL;
+    char *line;
+    int accepted = 0;
+    int rejected = 0;
+
+#ifndef HAVE_DEBUG_VIMS_PATTERN
+    (void)accepted;
+    (void)rejected;
+#endif
+
+    if(!seq || !runtime)
+        return 0;
+
+    vj_pattern_runtime_clear_document(runtime);
+    runtime->compiled_revision = seq->vims_pattern_revision;
+    runtime->compiled_data = seq->vims_pattern_data;
+    runtime->compiled_length = seq->vims_pattern_length;
+    snprintf(runtime->compiled_format,
+             sizeof(runtime->compiled_format),
+             "%s",
+             seq->vims_pattern_format);
+
+    if(!seq->vims_pattern_data || seq->vims_pattern_length == 0)
+        return 1;
+    if(strcmp(seq->vims_pattern_format, "gvr-vims-pattern-b64-v1") != 0) {
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[PATTERN] unsupported persisted format '%s' at revision %u",
+                   seq->vims_pattern_format,
+                   seq->vims_pattern_revision);
+#endif
+        return 0;
+    }
+
+    decoded = vj_pattern_base64_decode(seq->vims_pattern_data,
+                                       seq->vims_pattern_length,
+                                       &decoded_len);
+    if(!decoded || decoded_len == 0 || decoded_len > VJ_SEQUENCE_PATTERN_DATA_MAX)
+        goto fail;
+
+    document = (char*)decoded;
+    line = strtok_r(document, "\n", &save);
+    if(!line ||
+       (strcmp(line, "GVR-VIMS-PATTERN\t1") != 0 &&
+        strcmp(line, "GVR-VIMS-PATTERN\t2") != 0 &&
+        strcmp(line, "GVR-VIMS-PATTERN\t3") != 0))
+        goto fail;
+
+    while((line = strtok_r(NULL, "\n", &save)) != NULL) {
+        char *fields[10];
+        int count;
+
+        if(*line == '\0')
+            continue;
+
+        count = vj_pattern_split_fields(line, fields, 10);
+        if(count == 2 && strcmp(fields[0], "M") == 0) {
+            int mask;
+            if(vj_pattern_parse_int(fields[1], &mask))
+                runtime->enabled_columns_mask = (unsigned int)mask & VJ_PATTERN_ALL_COLUMNS;
+            continue;
+        }
+
+        if(count == 8 && strcmp(fields[0], "L") == 0) {
+            int bank, slot, sample_id, sample_type, enabled, loop_start, loop_end;
+            if(vj_pattern_parse_int(fields[1], &bank) &&
+               vj_pattern_parse_int(fields[2], &slot) &&
+               vj_pattern_parse_int(fields[3], &sample_id) &&
+               vj_pattern_parse_int(fields[4], &sample_type) &&
+               vj_pattern_parse_int(fields[5], &enabled) &&
+               vj_pattern_parse_int(fields[6], &loop_start) &&
+               vj_pattern_parse_int(fields[7], &loop_end) &&
+               vj_pattern_target_valid(bank, slot) &&
+               loop_start >= 0 && loop_end >= loop_start &&
+               loop_end < VJ_PATTERN_MAX_FRAMES)
+            {
+                vj_pattern_target_t *target = vj_pattern_target_find(runtime, bank, slot, 1);
+                if(target) {
+                    target->sample_id = sample_id;
+                    target->sample_type = sample_type;
+                    target->loop_enabled = enabled ? 1 : 0;
+                    target->loop_start = loop_start;
+                    target->loop_end = loop_end;
+                }
+            }
+            continue;
+        }
+
+        if(count == 10 && strcmp(fields[0], "E") == 0) {
+            int bank, slot, sample_id, sample_type, frame, column, vims_id;
+            size_t message_len = 0;
+            unsigned char *message_data = NULL;
+            char *message = NULL;
+
+            if(!vj_pattern_parse_int(fields[1], &bank) ||
+               !vj_pattern_parse_int(fields[2], &slot) ||
+               !vj_pattern_parse_int(fields[3], &sample_id) ||
+               !vj_pattern_parse_int(fields[4], &sample_type) ||
+               !vj_pattern_parse_int(fields[5], &frame) ||
+               !vj_pattern_parse_int(fields[6], &column) ||
+               !vj_pattern_parse_int(fields[7], &vims_id) ||
+               !vj_pattern_target_valid(bank, slot) ||
+               frame < 0 || frame >= VJ_PATTERN_MAX_FRAMES ||
+               column < 0 || column >= VJ_PATTERN_COLUMNS ||
+               vims_id < 0 || vims_id > 9999)
+            {
+                rejected++;
+                continue;
+            }
+
+            message_data = vj_pattern_base64_decode(fields[9],
+                                                     strlen(fields[9]),
+                                                     &message_len);
+            if(!message_data ||
+               !vj_pattern_message_valid((const char*)message_data,
+                                         message_len,
+                                         vims_id))
+            {
+                free(message_data);
+                rejected++;
+                continue;
+            }
+
+            message = (char*)message_data;
+            vj_pattern_target_t *target = vj_pattern_target_find(runtime, bank, slot, 1);
+            if(!target || !vj_pattern_target_add_event(target,
+                                                       frame,
+                                                       column,
+                                                       vims_id,
+                                                       message))
+            {
+                free(message);
+                goto fail;
+            }
+
+            target->sample_id = sample_id;
+            target->sample_type = sample_type;
+            accepted++;
+        }
+    }
+
+    for(int i = 0; i < runtime->target_count; i++) {
+        vj_pattern_target_t *target = &runtime->targets[i];
+        if(target->event_count > 1)
+            qsort(target->events,
+                  (size_t)target->event_count,
+                  sizeof(target->events[0]),
+                  vj_pattern_int_compare);
+    }
+
+    free(decoded);
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[PATTERN] compiled revision %u: %d event%s in %d target%s, %d rejected",
+               runtime->compiled_revision,
+               accepted,
+               accepted == 1 ? "" : "s",
+               runtime->target_count,
+               runtime->target_count == 1 ? "" : "s",
+               rejected);
+#endif
+    return 1;
+
+fail:
+    free(decoded);
+    vj_pattern_runtime_clear_document(runtime);
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[PATTERN] unable to compile persisted revision %u",
+               seq->vims_pattern_revision);
+#endif
+    return 0;
+}
+
+static void vj_pattern_compile_if_needed(sequencer_t *seq,
+                                         vj_pattern_runtime_t *runtime)
+{
+    if(!seq || !runtime)
+        return;
+
+    if(runtime->compiled_revision != seq->vims_pattern_revision ||
+       runtime->compiled_data != seq->vims_pattern_data ||
+       runtime->compiled_length != seq->vims_pattern_length ||
+       strcmp(runtime->compiled_format, seq->vims_pattern_format) != 0)
+        vj_pattern_compile_document(seq, runtime);
+}
+
+static int vj_pattern_loop_valid(const vj_pattern_target_t *target)
+{
+    return target && target->loop_enabled && target->loop_start >= 0 &&
+           target->loop_end >= target->loop_start;
+}
+
+static int vj_pattern_map_frame(const vj_pattern_target_t *target, int frame)
+{
+    long long length;
+    long long offset;
+
+    if(!vj_pattern_loop_valid(target) || frame <= target->loop_end)
+        return frame;
+
+    length = (long long)target->loop_end - target->loop_start + 1LL;
+    offset = (long long)frame - target->loop_start;
+    return target->loop_start + (int)(offset % length);
+}
+
+static int vj_pattern_command_changes_transport(int id)
+{
+    switch(id) {
+        case VIMS_VIDEO_PLAY_FORWARD:
+        case VIMS_VIDEO_PLAY_BACKWARD:
+        case VIMS_VIDEO_PLAY_STOP:
+        case VIMS_VIDEO_SKIP_FRAME:
+        case VIMS_VIDEO_PREV_FRAME:
+        case VIMS_VIDEO_SKIP_SECOND:
+        case VIMS_VIDEO_PREV_SECOND:
+        case VIMS_VIDEO_GOTO_START:
+        case VIMS_VIDEO_GOTO_END:
+        case VIMS_VIDEO_SET_FRAME:
+        case VIMS_VIDEO_SET_SPEED:
+        case VIMS_VIDEO_SET_SLOW:
+        case VIMS_VIDEO_SET_SPEEDK:
+        case VIMS_VIDEO_PLAY_STOP_ALL:
+        case VIMS_VIDEO_SET_FRAME_PERCENTAGE:
+        case VIMS_VIDEO_SET_FREEZE:
+        case VIMS_SAMPLE_SET_LOOPTYPE:
+        case VIMS_SAMPLE_SET_SPEED:
+        case VIMS_SAMPLE_SET_POSITION:
+        case VIMS_SAMPLE_TOGGLE_LOOP:
+        case VIMS_SAMPLE_TOGGLE_RAND_LOOP:
+        case VIMS_SAMPLE_SET_LOOPS:
+        case VIMS_STREAM_BUFFER_FORWARD:
+        case VIMS_STREAM_BUFFER_BACKWARD:
+        case VIMS_STREAM_BUFFER_STOP:
+        case VIMS_STREAM_BUFFER_SET_SPEED:
+        case VIMS_STREAM_BUFFER_SET_SLOW:
+        case VIMS_STREAM_BUFFER_SET_FRAME:
+        case VIMS_STREAM_BUFFER_SKIP_FRAME:
+        case VIMS_STREAM_BUFFER_SKIP_SECOND:
+        case VIMS_STREAM_BUFFER_PREV_SECOND:
+        case VIMS_RESUME_ID:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static int vj_pattern_command_deduplicate_per_tick(int id)
+{
+    return id == VIMS_VIDEO_PLAY_STOP ||
+           id == VIMS_VIDEO_PLAY_STOP_ALL;
+}
+
+static int vj_pattern_tick_command_seen(const vj_pattern_runtime_t *runtime,
+                                        const vj_pattern_event_t *event)
+{
+    if(!runtime || !event || !event->message ||
+       !vj_pattern_command_deduplicate_per_tick(event->vims_id))
+        return 0;
+
+    for(int i = 0; i < runtime->tick_dedup_count; i++) {
+        if(runtime->tick_dedup_ids[i] == event->vims_id &&
+           runtime->tick_dedup_messages[i] &&
+           strcmp(runtime->tick_dedup_messages[i], event->message) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
+static void vj_pattern_tick_command_record(vj_pattern_runtime_t *runtime,
+                                           const vj_pattern_event_t *event)
+{
+    if(!runtime || !event || !event->message ||
+       !vj_pattern_command_deduplicate_per_tick(event->vims_id) ||
+       runtime->tick_dedup_count >= VJ_PATTERN_TICK_DEDUP_MAX)
+        return;
+
+    const int index = runtime->tick_dedup_count++;
+    runtime->tick_dedup_ids[index] = event->vims_id;
+    runtime->tick_dedup_messages[index] = event->message;
+}
+
+static int vj_pattern_master_client_ensure(veejay_t *info,
+                                           vj_pattern_runtime_t *runtime)
+{
+    vj_client *client;
+
+    if(!info || !runtime)
+        return 0;
+    if(info->master_client) {
+        runtime->master_missing_reported = 0;
+        return 1;
+    }
+    if(!info->master_origin || !*info->master_origin || info->master_origin_port <= 0) {
+        if(!runtime->master_missing_reported) {
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[PATTERN] cannot dispatch persisted commands: master endpoint is unavailable");
+#endif
+            runtime->master_missing_reported = 1;
+        }
+        return 0;
+    }
+
+    client = vj_client_alloc();
+    if(!client)
+        return 0;
+
+    if(vj_client_connect(client, info->master_origin, NULL,
+                         info->master_origin_port) != 1)
+    {
+        vj_client_close(client);
+        vj_client_free(client);
+        if(!runtime->master_missing_reported) {
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[PATTERN] cannot connect command path to master %s:%d",
+                       info->master_origin,
+                       info->master_origin_port);
+#endif
+            runtime->master_missing_reported = 1;
+        }
+        return 0;
+    }
+
+    info->master_client = client;
+    runtime->master_missing_reported = 0;
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[PATTERN] connected persisted-command path to master %s:%d",
+               info->master_origin,
+               info->master_origin_port);
+#endif
+    return 1;
+}
+
+static int vj_pattern_fire_message(veejay_t *info,
+                                   vj_pattern_runtime_t *runtime,
+                                   const vj_pattern_target_t *target,
+                                   const vj_pattern_event_t *event)
+{
+    int delivered = 0;
+
+    if(!info || !runtime || !target || !event || !event->message || runtime->replaying)
+        return 0;
+
+    if(vj_pattern_tick_command_seen(runtime, event)) {
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[PATTERN] suppress duplicate pause command at bank=%d slot=%d frame=%d V%d: %s",
+                   target->bank,
+                   target->slot,
+                   event->frame,
+                   event->column + 1,
+                   event->message);
+#endif
+        return 1;
+    }
+
+    runtime->replaying = 1;
+
+    if(!info->is_master && info->master_origin != NULL) {
+        if(vj_pattern_master_client_ensure(info, runtime)) {
+            delivered = vj_client_send(info->master_client,
+                                       V_CMD,
+                                       (unsigned char*)event->message) > 0;
+            if(!delivered) {
+                vj_client_close(info->master_client);
+                vj_client_free(info->master_client);
+                info->master_client = NULL;
+                if(!runtime->master_missing_reported) {
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+                    veejay_msg(VEEJAY_MSG_DEBUG,
+                               "[PATTERN] master command send failed; reconnecting on the next event");
+#endif
+                    runtime->master_missing_reported = 1;
+                }
+            }
+        }
+    }
+    else {
+        vj_event_parse_and_maybe_requeue_events(info,
+                                               event->message,
+                                               (int)strlen(event->message));
+        delivered = 1;
+    }
+
+    runtime->replaying = 0;
+
+    if(delivered)
+        vj_pattern_tick_command_record(runtime, event);
+
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+    if(delivered && vj_pattern_command_changes_transport(event->vims_id)) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[PATTERN] fire bank=%d slot=%d frame=%d V%d: %s",
+                   target->bank,
+                   target->slot,
+                   event->frame,
+                   event->column + 1,
+                   event->message);
+    }
+#endif
+
+    return delivered;
+}
+
+typedef struct {
+    unsigned int epoch;
+    int playback_mode;
+    int source_id;
+    int speed;
+} vj_pattern_transport_snapshot_t;
+
+static void vj_pattern_transport_snapshot(veejay_t *info,
+                                          vj_pattern_transport_snapshot_t *snapshot)
+{
+    if(!snapshot)
+        return;
+
+    memset(snapshot, 0, sizeof(*snapshot));
+    if(!info)
+        return;
+
+    snapshot->epoch = (unsigned int)veejay_transport_epoch_get(info);
+    if(info->uc) {
+        snapshot->playback_mode = info->uc->playback_mode;
+        snapshot->source_id = info->uc->sample_id;
+    }
+    if(info->settings)
+        snapshot->speed = info->settings->current_playback_speed;
+
+    if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
+       info->uc->sample_id > 0 && sample_exists(info->uc->sample_id))
+    {
+        int start = 0;
+        int end = 0;
+        int loop_type = 0;
+        int sample_speed = snapshot->speed;
+
+        if(sample_get_short_info(info->uc->sample_id,
+                                 &start,
+                                 &end,
+                                 &loop_type,
+                                 &sample_speed) == 0)
+            snapshot->speed = sample_speed;
+    }
+}
+
+static int vj_pattern_transport_snapshot_changed(
+        const vj_pattern_transport_snapshot_t *before,
+        const vj_pattern_transport_snapshot_t *after)
+{
+    return before && after &&
+           (before->epoch != after->epoch ||
+            before->playback_mode != after->playback_mode ||
+            before->source_id != after->source_id ||
+            before->speed != after->speed);
+}
+
+static int vj_pattern_fire_row(veejay_t *info,
+                               vj_pattern_runtime_t *runtime,
+                               const vj_pattern_target_t *target,
+                               int first,
+                               int last,
+                               int frame,
+                               int reverse)
+{
+    vj_pattern_transport_snapshot_t before;
+    vj_pattern_transport_snapshot_t after;
+
+    int delivered_transport = 0;
+
+    vj_pattern_transport_snapshot(info, &before);
+    for(int i = first; i <= last; i++) {
+        const vj_pattern_event_t *event = &target->events[i];
+        if((runtime->enabled_columns_mask & (1u << event->column)) &&
+           vj_pattern_fire_message(info, runtime, target, event) &&
+           vj_pattern_command_changes_transport(event->vims_id))
+            delivered_transport = 1;
+    }
+    vj_pattern_transport_snapshot(info, &after);
+
+    if(!delivered_transport &&
+       !vj_pattern_transport_snapshot_changed(&before, &after))
+        return 0;
+
+    runtime->tick_transport_changed = 1;
+    runtime->tick_transport_cutoff_frame = frame;
+    runtime->tick_transport_reverse = reverse ? 1 : 0;
+    return 1;
+}
+
+static void vj_pattern_fire_range(veejay_t *info,
+                                  vj_pattern_runtime_t *runtime,
+                                  const vj_pattern_target_t *target,
+                                  int from,
+                                  int to,
+                                  int reverse)
+{
+    if(!runtime || !target || from > to || target->event_count <= 0)
+        return;
+
+    if(runtime->tick_transport_changed) {
+        if((reverse ? 1 : 0) != runtime->tick_transport_reverse)
+            return;
+        if(!reverse) {
+            if(from > runtime->tick_transport_cutoff_frame)
+                return;
+            if(to > runtime->tick_transport_cutoff_frame)
+                to = runtime->tick_transport_cutoff_frame;
+        }
+        else {
+            if(to < runtime->tick_transport_cutoff_frame)
+                return;
+            if(from < runtime->tick_transport_cutoff_frame)
+                from = runtime->tick_transport_cutoff_frame;
+        }
+    }
+
+    if(!reverse) {
+        int i = 0;
+        while(i < target->event_count) {
+            const int frame = target->events[i].frame;
+            int last = i;
+
+            while(last + 1 < target->event_count &&
+                  target->events[last + 1].frame == frame)
+                last++;
+
+            if(frame > to)
+                break;
+            if(frame >= from &&
+               vj_pattern_fire_row(info, runtime, target, i, last, frame, 0))
+                break;
+            i = last + 1;
+        }
+        return;
+    }
+
+    int i = target->event_count - 1;
+    while(i >= 0) {
+        const int frame = target->events[i].frame;
+        int first = i;
+
+        while(first > 0 && target->events[first - 1].frame == frame)
+            first--;
+
+        if(frame >= from && frame <= to &&
+           vj_pattern_fire_row(info, runtime, target, first, i, frame, 1))
+            break;
+        if(frame < from)
+            break;
+        i = first - 1;
+    }
+}
+
+static void vj_pattern_process_target(veejay_t *info,
+                                      vj_pattern_runtime_t *runtime,
+                                      vj_pattern_playback_state_t *state,
+                                      int bank,
+                                      int slot,
+                                      int source_frame,
+                                      int active,
+                                      int max_linear_delta,
+                                      unsigned int epoch,
+                                      int direction,
+                                      int loop_type,
+                                      int loops_remaining)
+{
+    vj_pattern_target_t *target;
+    int frame;
+    int source_delta;
+    int mapped_delta;
+    int looped;
+    int transport_changed;
+
+    if(!runtime || !state)
+        return;
+
+    if(!active || !vj_pattern_target_valid(bank, slot)) {
+        vj_pattern_state_reset(state);
+        return;
+    }
+
+    if(!state->active || state->bank != bank || state->slot != slot) {
+        vj_pattern_state_reset(state);
+        state->active = 1;
+        state->bank = bank;
+        state->slot = slot;
+    }
+
+    if(source_frame < 0)
+        source_frame = 0;
+    target = vj_pattern_target_find(runtime, bank, slot, 0);
+    frame = vj_pattern_map_frame(target, source_frame);
+    looped = vj_pattern_loop_valid(target);
+
+    transport_changed = state->transport_valid &&
+                        (state->transport_epoch != epoch ||
+                         state->direction != direction ||
+                         state->loop_type != loop_type ||
+                         state->loops_remaining != loops_remaining);
+
+    if(transport_changed) {
+        const int moved = state->source_frame >= 0 && source_frame != state->source_frame;
+        const int paused_seek = state->paused && (state->seeked_while_paused || moved);
+
+        if(max_linear_delta <= 0) {
+            state->paused = 1;
+            state->seeked_while_paused = paused_seek;
+        }
+        else {
+            if(moved || paused_seek)
+                vj_pattern_fire_range(info, runtime, target, frame, frame, 0);
+            state->paused = 0;
+            state->seeked_while_paused = 0;
+        }
+
+        state->frame = frame;
+        state->source_frame = source_frame;
+        state->transport_valid = 1;
+        state->transport_epoch = epoch;
+        state->direction = direction;
+        state->loop_type = loop_type;
+        state->loops_remaining = loops_remaining;
+        return;
+    }
+
+    state->transport_valid = 1;
+    state->transport_epoch = epoch;
+    state->direction = direction;
+    state->loop_type = loop_type;
+    state->loops_remaining = loops_remaining;
+
+    if(max_linear_delta <= 0) {
+        if(state->source_frame < 0)
+            state->seeked_while_paused = 1;
+        else if(state->paused && source_frame != state->source_frame)
+            state->seeked_while_paused = 1;
+        else if(!state->paused)
+            state->seeked_while_paused = 0;
+
+        state->frame = frame;
+        state->source_frame = source_frame;
+        state->paused = 1;
+        return;
+    }
+
+    if(max_linear_delta < 1)
+        max_linear_delta = 1;
+
+    if(state->paused) {
+        source_delta = source_frame - state->source_frame;
+        mapped_delta = frame - state->frame;
+
+        if(state->seeked_while_paused) {
+            vj_pattern_fire_range(info, runtime, target, frame, frame, 0);
+        }
+        else if(looped && source_delta > 0 && source_delta <= max_linear_delta &&
+                frame < state->frame)
+        {
+            vj_pattern_fire_range(info, runtime, target,
+                                  state->frame + 1, target->loop_end, 0);
+            vj_pattern_fire_range(info, runtime, target,
+                                  target->loop_start, frame, 0);
+        }
+        else if(looped && source_delta < 0 && -source_delta <= max_linear_delta &&
+                frame > state->frame)
+        {
+            vj_pattern_fire_range(info, runtime, target,
+                                  target->loop_start, state->frame - 1, 1);
+            vj_pattern_fire_range(info, runtime, target,
+                                  frame, target->loop_end, 1);
+        }
+        else if(mapped_delta > 0 && mapped_delta <= max_linear_delta) {
+            vj_pattern_fire_range(info, runtime, target,
+                                  state->frame + 1, frame, 0);
+        }
+        else if(mapped_delta < 0 && -mapped_delta <= max_linear_delta) {
+            vj_pattern_fire_range(info, runtime, target,
+                                  frame, state->frame - 1, 1);
+        }
+        else if(mapped_delta != 0) {
+            vj_pattern_fire_range(info, runtime, target, frame, frame, 0);
+        }
+
+        state->frame = frame;
+        state->source_frame = source_frame;
+        state->paused = 0;
+        state->seeked_while_paused = 0;
+        return;
+    }
+
+    if(state->frame < 0 || state->source_frame < 0) {
+        vj_pattern_fire_range(info, runtime, target, frame, frame, 0);
+        state->frame = frame;
+        state->source_frame = source_frame;
+        state->paused = 0;
+        state->seeked_while_paused = 0;
+        return;
+    }
+
+    if(source_frame == state->source_frame)
+        return;
+
+    source_delta = source_frame - state->source_frame;
+    mapped_delta = frame - state->frame;
+
+    if(looped && source_delta > 0 && source_delta <= max_linear_delta &&
+       frame < state->frame)
+    {
+        vj_pattern_fire_range(info, runtime, target,
+                              state->frame + 1, target->loop_end, 0);
+        vj_pattern_fire_range(info, runtime, target,
+                              target->loop_start, frame, 0);
+    }
+    else if(looped && source_delta < 0 && -source_delta <= max_linear_delta &&
+            frame > state->frame)
+    {
+        vj_pattern_fire_range(info, runtime, target,
+                              target->loop_start, state->frame - 1, 1);
+        vj_pattern_fire_range(info, runtime, target,
+                              frame, target->loop_end, 1);
+    }
+    else if(abs(source_delta) <= max_linear_delta) {
+        if(mapped_delta > 0)
+            vj_pattern_fire_range(info, runtime, target,
+                                  state->frame + 1, frame, 0);
+        else if(mapped_delta < 0)
+            vj_pattern_fire_range(info, runtime, target,
+                                  frame, state->frame - 1, 1);
+    }
+    else {
+        vj_pattern_fire_range(info, runtime, target, frame, frame, 0);
+    }
+
+    state->frame = frame;
+    state->source_frame = source_frame;
+}
+
+static long long vj_pattern_sequence_slot_duration(veejay_t *info,
+                                                   int sample_id,
+                                                   int type,
+                                                   int *known)
+{
+    long long base = 0;
+    long long loops = 1;
+
+    if(known)
+        *known = 0;
+    if(sample_id <= 0)
+        return 0;
+
+    if(type == 0 || type == VJ_PLAYBACK_MODE_SAMPLE) {
+        int start, end, looptype, speed;
+        int dup;
+        long long span;
+
+        if(!sample_exists(sample_id) ||
+           sample_get_short_info(sample_id, &start, &end, &looptype, &speed) != 0)
+            return -1;
+
+        speed = abs(speed);
+        if(speed < 1 && info && info->settings && info->uc &&
+           info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
+           info->uc->sample_id == sample_id &&
+           info->settings->current_playback_speed == 0)
+            speed = abs(info->settings->previous_playback_speed);
+
+        dup = sample_get_framedup(sample_id);
+        if(start < 0 || end < start || speed < 1)
+            return -1;
+
+        span = 1LL + (long long)(end - start);
+        base = (span + speed - 1) / speed;
+        if(dup > 1) {
+            if(base > LLONG_MAX / dup)
+                return -1;
+            base *= dup;
+        }
+        if(looptype == 2) {
+            if(base > LLONG_MAX / 2)
+                return -1;
+            base *= 2;
+        }
+        else if(looptype == 3) {
+            base = sample_get_frame_length(sample_id);
+        }
+        loops = sample_get_loop_stat_stop(sample_id);
+    }
+    else {
+        if(!vj_tag_exists(sample_id))
+            return -1;
+        base = vj_tag_get_n_frames(sample_id);
+        loops = vj_tag_get_loop_stat_stop(sample_id);
+    }
+
+    if(base < 1)
+        return -1;
+    if(loops < 1)
+        loops = 1;
+    if(base > LLONG_MAX / loops)
+        return -1;
+
+    if(known)
+        *known = 1;
+    return base * loops;
+}
+
+static int vj_pattern_sequence_layout(veejay_t *info,
+                                      int bank,
+                                      int slot,
+                                      long long *start,
+                                      long long *length,
+                                      int *entries)
+{
+    sequence_bank_t *sequence_bank;
+    long long cursor = 0;
+    long long target_start = -1;
+    long long target_length = -1;
+    int count = 0;
+
+    if(start) *start = -1;
+    if(length) *length = -1;
+    if(entries) *entries = 0;
+    if(!info || !info->seq || bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       slot < 0 || slot >= MAX_SEQUENCES)
+        return 0;
+
+    sequence_bank = &info->seq->banks[bank];
+    for(int i = 0; i < MAX_SEQUENCES; i++) {
+        seq_sample_t *entry = &sequence_bank->samples[i];
+        int known = 0;
+        long long duration;
+
+        if(entry->sample_id <= 0)
+            continue;
+
+        duration = vj_pattern_sequence_slot_duration(info,
+                                                     entry->sample_id,
+                                                     entry->type,
+                                                     &known);
+        if(!known || duration < 1)
+            return 0;
+
+        count++;
+        if(i == slot) {
+            target_start = cursor;
+            target_length = duration;
+        }
+
+        if(cursor > LLONG_MAX - duration)
+            return 0;
+        cursor += duration;
+    }
+
+    if(target_start < 0 || target_length < 1)
+        return 0;
+
+    if(start) *start = target_start;
+    if(length) *length = target_length;
+    if(entries) *entries = count;
+    return 1;
+}
+
+static void vj_pattern_backend_tick(veejay_t *info)
+{
+    video_playback_setup *settings;
+    sequencer_t *seq;
+    vj_pattern_runtime_t *runtime;
+    unsigned int epoch;
+    int signed_speed;
+    int speed;
+    int direction;
+    int max_linear_delta;
+    int mode;
+    int source_id;
+    int source_bank;
+    int local_frame;
+    int loop_type = 1;
+    int loops_remaining = 0;
+
+    if(!info || !info->settings || !info->uc || !info->seq)
+        return;
+
+    settings = info->settings;
+    seq = info->seq;
+    runtime = vj_pattern_runtime_get(seq);
+    if(!runtime)
+        return;
+
+    vj_pattern_compile_if_needed(seq, runtime);
+    runtime->tick_transport_changed = 0;
+    runtime->tick_transport_cutoff_frame = -1;
+    runtime->tick_transport_reverse = 0;
+    runtime->tick_dedup_count = 0;
+
+    epoch = (unsigned int)veejay_transport_epoch_get(info);
+    if(!runtime->transport_valid || runtime->transport_epoch != epoch) {
+        runtime->transport_epoch = epoch;
+        runtime->transport_valid = 1;
+        runtime->bank_tick_valid = 0;
+    }
+
+    signed_speed = settings->current_playback_speed;
+    speed = abs(signed_speed);
+    direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
+    max_linear_delta = speed > 0 ? INT_MAX : 0;
+    mode = info->uc->playback_mode;
+    source_id = info->uc->sample_id;
+
+    if(mode == VJ_PLAYBACK_MODE_SAMPLE && source_id > 0 && sample_exists(source_id)) {
+        int start = 0;
+        int end = 0;
+        int sample_speed = signed_speed;
+
+        if(sample_get_short_info(source_id, &start, &end, &loop_type, &sample_speed) != 0)
+            return;
+        signed_speed = sample_speed;
+        local_frame = (int)(atomic_load_long_long(&settings->current_frame_num) - start);
+        if(local_frame < 0)
+            local_frame = 0;
+        loops_remaining = sample_get_loops(source_id);
+        source_bank = VJ_PATTERN_BANK_SAMPLE;
+    }
+    else if(mode == VJ_PLAYBACK_MODE_TAG && source_id > 0 && vj_tag_exists(source_id)) {
+        long long frame = atomic_load_long_long(&settings->current_frame_num);
+        local_frame = frame < 0 ? 0 : frame > INT_MAX ? INT_MAX : (int)frame;
+        loops_remaining = vj_tag_get_loops(source_id);
+        source_bank = VJ_PATTERN_BANK_STREAM;
+        loop_type = 1;
+    }
+    else {
+        vj_pattern_process_target(info, runtime, &runtime->source_state,
+                                  VJ_PATTERN_BANK_SAMPLE, -1, 0, 0, 0,
+                                  epoch, direction, loop_type, loops_remaining);
+        vj_pattern_process_target(info, runtime, &runtime->cell_state,
+                                  0, -1, 0, 0, 0,
+                                  epoch, direction, loop_type, loops_remaining);
+        vj_pattern_process_target(info, runtime, &runtime->bank_state,
+                                  VJ_PATTERN_BANK_SEQUENCE, -1, 0, 0, 0,
+                                  epoch, direction, loop_type, loops_remaining);
+        runtime->bank_tick_valid = 0;
+        return;
+    }
+
+    speed = abs(signed_speed);
+    direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
+    max_linear_delta = speed > 0 ? INT_MAX : 0;
+
+    vj_pattern_process_target(info, runtime, &runtime->source_state,
+                              source_bank, source_id, local_frame, 1,
+                              max_linear_delta, epoch, direction,
+                              loop_type, loops_remaining);
+
+    if(seq->active && seq->active_bank >= 0 && seq->active_bank < VJ_SEQUENCE_BANKS &&
+       seq->current >= 0 && seq->current < MAX_SEQUENCES)
+    {
+        const int bank = seq->active_bank;
+        const int slot = seq->current;
+        long long slot_start;
+        long long slot_length;
+        int entries;
+
+        vj_pattern_process_target(info, runtime, &runtime->cell_state,
+                                  bank, slot, local_frame, 1,
+                                  max_linear_delta, epoch, direction,
+                                  loop_type, loops_remaining);
+
+        if(!runtime->tick_transport_changed &&
+           vj_pattern_sequence_layout(info, bank, slot,
+                                      &slot_start, &slot_length, &entries))
+        {
+            const long long slot_end = slot_start + slot_length - 1;
+
+            if(!runtime->bank_tick_valid || runtime->bank_tick_bank != bank ||
+               runtime->bank_tick_slot != slot)
+            {
+                runtime->bank_tick_valid = 1;
+                runtime->bank_tick_bank = bank;
+                runtime->bank_tick_slot = slot;
+                runtime->bank_tick_frame = slot_start;
+            }
+            else if(speed > 0) {
+                if(runtime->bank_tick_frame < slot_end)
+                    runtime->bank_tick_frame++;
+                else if(entries == 1)
+                    runtime->bank_tick_frame = slot_start;
+            }
+
+            vj_pattern_process_target(info, runtime, &runtime->bank_state,
+                                      VJ_PATTERN_BANK_SEQUENCE, bank,
+                                      runtime->bank_tick_frame > INT_MAX ? INT_MAX :
+                                      (int)runtime->bank_tick_frame,
+                                      1, speed > 0 ? 64 : 0,
+                                      epoch, 1, 1, 0);
+        }
+        else {
+            runtime->bank_tick_valid = 0;
+            vj_pattern_process_target(info, runtime, &runtime->bank_state,
+                                      VJ_PATTERN_BANK_SEQUENCE, bank,
+                                      0, 0, 0, epoch, 0, 1, 0);
+        }
+        return;
+    }
+
+    vj_pattern_process_target(info, runtime, &runtime->cell_state,
+                              0, -1, 0, 0, 0,
+                              epoch, direction, loop_type, loops_remaining);
+    vj_pattern_process_target(info, runtime, &runtime->bank_state,
+                              VJ_PATTERN_BANK_SEQUENCE, -1, 0, 0, 0,
+                              epoch, direction, loop_type, loops_remaining);
+    runtime->bank_tick_valid = 0;
+}
+
+
 static inline int playback_retime_audio_slice(int old_sfd, int new_sfd, int old_slice)
 {
     if (old_sfd <= 1 || new_sfd <= 1)
@@ -1446,8 +2975,10 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
                                   atomic_load_long_long(&settings->current_frame_num),
                                   "speed-change");
 
-    if (real_direction_flip)
+    if (real_direction_flip) {
+        veejay_transport_epoch_bump(info);
         atomic_store_int(&settings->audio_direction_changed, 1);
+    }
 
     if (edge_type != AUDIO_EDGE_NONE) {
         atomic_store_int(&settings->audio_slice, 0);
@@ -1490,6 +3021,9 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
         veejay_output_hold_release_timed(info, NULL, 1);
         return 1;
     }
+
+    if(settings->output_hold_active)
+        return 1;
 
     int frames = hold_pos;
     if(frames < 1)
@@ -1687,8 +3221,12 @@ int veejay_free(veejay_t * info)
 
 	if( info->dummy ) free(info->dummy );
 	
-    if(info->seq && info->seq->vims_pattern_data)
-        free(info->seq->vims_pattern_data);
+    if(info->seq) {
+        vj_pattern_runtime_free(info->seq->vims_pattern_runtime);
+        info->seq->vims_pattern_runtime = NULL;
+        if(info->seq->vims_pattern_data)
+            free(info->seq->vims_pattern_data);
+    }
     free( info->seq );
     free(info->status_what);
 	free(info->homedir);  
@@ -1847,6 +3385,8 @@ int veejay_set_frame(veejay_t *info, long framenum)
 
     if ((long long)framenum != current_frame_num) {
         const int dir = playback_dir(settings->current_playback_speed);
+
+        veejay_transport_epoch_bump(info);
 
         int edge_type = AUDIO_EDGE_JUMP;
         if (dir == 0)
@@ -2114,6 +3654,7 @@ static const char *vj_looptype_label(int looptype)
     }
 }
 
+#ifdef HAVE_DEBUG_SEQUENCER
 static void veejay_log_sample_transport_state(veejay_t *info,
                                               const char *where,
                                               int sample_id)
@@ -2156,6 +3697,7 @@ static void veejay_log_sample_transport_state(veejay_t *info,
                seq_slot,
                boundary);
 }
+#endif
 
 int veejay_start_playing_sample(veejay_t *info, int sample_id)
 {
@@ -2203,7 +3745,9 @@ int veejay_start_playing_sample(veejay_t *info, int sample_id)
                vj_looptype_label(looptype),
                atomic_load_long_long(&settings->current_frame_num));
 
+#ifdef HAVE_DEBUG_SEQUENCER
     veejay_log_sample_transport_state(info, "start-sample", sample_id);
+#endif
 
     return 1;
 }
@@ -2268,9 +3812,11 @@ static void veejay_seq_prepare_sample_position(veejay_t *info, int sample_id)
     if (sample_get_short_info(sample_id, &start, &end, &loop, &speed) != 0)
         return;
 
+#ifdef HAVE_DEBUG_SEQUENCER
     const long old_resume = sample_get_resume(sample_id);
     const long long old_frame = info && info->settings ?
         atomic_load_long_long(&info->settings->current_frame_num) : -1;
+#endif
 
     sample_set_loop_stats(sample_id, 0);
     sample_set_loops(sample_id, -1);
@@ -2279,6 +3825,7 @@ static void veejay_seq_prepare_sample_position(veejay_t *info, int sample_id)
     const int resume = (speed < 0) ? end : start;
     sample_set_resume(sample_id, resume);
 
+#ifdef HAVE_DEBUG_SEQUENCER
     if (info && info->settings) {
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[SEQ] seed sample=%d range=%d..%d speed=%d loop=%s old_resume=%ld new_resume=%d old_transport=%lld bank=%d slot=%d",
@@ -2293,6 +3840,7 @@ static void veejay_seq_prepare_sample_position(veejay_t *info, int sample_id)
                    info->seq ? info->seq->active_bank : -1,
                    info->seq ? info->seq->current : -1);
     }
+#endif
 }
 
 static int veejay_sequence_bank_valid(int bank)
@@ -2433,6 +3981,9 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         }
     }
 
+    if(current_pm != new_pm || cur_id != sample_id)
+        veejay_transport_epoch_bump(info);
+
     veejay_output_hold_release_on_transport(info);
 
     if (current_pm == VJ_PLAYBACK_MODE_SAMPLE) {
@@ -2510,7 +4061,9 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 
             long pos = sample_get_resume(sample_id);
             veejay_set_frame(info, pos);
+#ifdef HAVE_DEBUG_SEQUENCER
             veejay_log_sample_transport_state(info, "post-seed", sample_id);
+#endif
         }
         else if (new_pm == VJ_PLAYBACK_MODE_TAG ||
                  new_pm == VJ_PLAYBACK_MODE_PLAIN) {
@@ -3194,8 +4747,11 @@ static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
     sequencer_t *seq = info->seq;
 
     if(!seq) {
-        for(int i = 0; i < VJ_SEQUENCE_STATUS_TOKENS; i++)
+        for(int i = 0; i < VJ_SEQUENCE_STATUS_TOKENS - 1; i++)
             ptr = vj_sprintf(ptr, 0);
+        ptr = vj_sprintf(ptr,
+                         VJ_SEQUENCE_STATUS_PACK_TRANSPORT(
+                             0, -1, veejay_transport_epoch_get(info)));
         return ptr;
     }
 
@@ -3213,7 +4769,11 @@ static char *veejay_pipe_append_sequence_status(veejay_t *info, char *ptr)
     if(selected_mask == 0)
         selected_mask = (1 << active_bank);
     selected_mask |= (1 << active_bank);
-    ptr = vj_sprintf(ptr, VJ_SEQUENCE_STATUS_PACK(selected_mask, seq->queued_bank));
+    ptr = vj_sprintf(ptr,
+                     VJ_SEQUENCE_STATUS_PACK_TRANSPORT(
+                         selected_mask,
+                         seq->queued_bank,
+                         veejay_transport_epoch_get(info)));
 
     return ptr;
 }
@@ -3819,6 +5379,8 @@ static void veejay_handle_callbacks(veejay_t *info) {
 		if(settings->randplayer.mode != RANDMODE_INACTIVE)
 			veejay_change_playback_mode(info, next_mode, next_id);
 	}
+
+	vj_pattern_backend_tick(info);
 
 	veejay_pipe_write_status(info);
 

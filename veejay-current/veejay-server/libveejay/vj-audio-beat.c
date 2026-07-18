@@ -4996,7 +4996,9 @@ void *vj_audio_beat_thread(void *arg)
 
     ab_store_i(&s->running, 1);
 
+#ifdef HAVE_DEBUG_AUDIO_BEAT
     veejay_msg(VEEJAY_MSG_DEBUG, "[AUDIO-BEAT] analysis thread started");
+#endif
 
     while(!ab_load_i(&s->stop_request))
     {
@@ -5276,7 +5278,9 @@ beat_process_hit:
     ab_store_i(&s->open, 0);
     ab_store_i(&s->running, 0);
 
+#ifdef HAVE_DEBUG_AUDIO_BEAT
     veejay_msg(VEEJAY_MSG_DEBUG, "Beat analysis thread finished");
+#endif
     return NULL;
 }
 
@@ -5346,8 +5350,10 @@ int vj_audio_beat_disable(vj_audio_beat_shared_t *s)
 
     if(ab_breakbeat_state.active)
     {
+#ifdef HAVE_DEBUG_AUDIO_BEAT
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-BEAT] disable requested while break-beat owns transport; release deferred to transport-aware path");
+#endif
     }
     else
     {
@@ -7265,12 +7271,14 @@ static inline void ab_breakbeat_apply_transport(veejay_t *v, int speed)
             return;
         }
 
+#ifdef HAVE_DEBUG_AUDIO_BEAT
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-BEAT][BREAK] taking over beat-owned pause requested speed=%d hit=%d consumed=%d hold=%ld",
                    speed,
                    ab_load_i(&s->hit_seq),
                    ab_load_i(&s->consumed_seq),
                    ab_load_l(&s->hold_until_ms));
+#endif
     }
 
     if(v->settings->current_playback_speed != speed)
@@ -7959,6 +7967,7 @@ int vj_audio_beat_release_transport(veejay_t *v, vj_audio_beat_shared_t *s)
     if(ab_action_is_breakbeat(action) && changed)
         ab_store_l(&ab_breakbeat_user_override_until_ms, ab_now_ms() + 350L);
 
+#ifdef HAVE_DEBUG_AUDIO_BEAT
     if(changed)
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-BEAT] released beat transport ownership action=%s(%d) paused=%d break_active=%d hold=%ld",
@@ -7967,6 +7976,7 @@ int vj_audio_beat_release_transport(veejay_t *v, vj_audio_beat_shared_t *s)
                    was_paused,
                    was_breakbeat_active,
                    hold_until);
+#endif
 
     return changed;
 }
@@ -8035,6 +8045,7 @@ void vj_audio_beat_user_transport_override(veejay_t *v, vj_audio_beat_shared_t *
             ab_store_l(&ab_breakbeat_user_override_until_ms, ab_now_ms() + 350L);
     }
 
+#ifdef HAVE_DEBUG_AUDIO_BEAT
     veejay_msg(VEEJAY_MSG_DEBUG,
                "[AUDIO-BEAT] user transport override req=%d action=%s(%d) paused=%d break_active=%d hold=%ld manual_pause=%d",
                requested_speed,
@@ -8044,6 +8055,7 @@ void vj_audio_beat_user_transport_override(veejay_t *v, vj_audio_beat_shared_t *
                was_breakbeat_active,
                hold_until,
                force_manual_pause);
+#endif
 }
 
 static int ab_breakbeat_fallback_if_due(veejay_t *v, vj_audio_beat_shared_t *s, long now)
@@ -9138,10 +9150,12 @@ void vj_audio_beat_set_action(vj_audio_beat_shared_t *s, int action)
        !ab_action_is_breakbeat(action) &&
        ab_breakbeat_state.active)
     {
+#ifdef HAVE_DEBUG_AUDIO_BEAT
         veejay_msg(VEEJAY_MSG_DEBUG,
                    "[AUDIO-BEAT] action change preserves active break-beat transport until release old=%s(%d) new=%s(%d)",
                    ab_action_name(old_action), old_action,
                    ab_action_name(action), action);
+#endif
     }
     else if(ab_action_is_breakbeat(old_action) ||
             ab_action_is_breakbeat(action))

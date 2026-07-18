@@ -1948,7 +1948,7 @@ void		vj_init_vevo_events(void)
 				VIMS_LONG_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
-				"space separated value string" ,
+				"Optional space-separated values (empty=effect defaults)",
 				NULL,
 				NULL );	
 
@@ -2071,8 +2071,8 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_CHAIN_ENTRY_SET_EFFECT]			=	_new_event(
 				"%d %d %d %d",
 				VIMS_CHAIN_ENTRY_SET_EFFECT,
-				"Add effect to chain entry with default values",
-				vj_event_chain_entry_set,
+				"Legacy alias for setting an effect with default values",
+				vj_event_chain_entry_preset,
 				4,
 				VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
@@ -2103,10 +2103,10 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_CHAIN_ENTRY_SET_PRESET]			=	_new_event(
 				"%d %d %d %d %s",
 				VIMS_CHAIN_ENTRY_SET_PRESET,
-				"Preset effect on chain entry",
+				"Set effect on chain entry with optional parameter values",
 				vj_event_chain_entry_preset,
 				5,
-				VIMS_LONG_PARAMS,
+				VIMS_LONG_PARAMS | VIMS_ALLOW_ANY,
 				SAMPLE_STREAM_ID_HELP,
 				0,
 				"Chain Index (-1=current)",

@@ -173,6 +173,7 @@ typedef struct
 	char *vims_pattern_data;
 	size_t vims_pattern_length;
 	unsigned int vims_pattern_revision;
+	void *vims_pattern_runtime;
 } sequencer_t;
 
 
@@ -415,6 +416,7 @@ typedef struct {
 	volatile double fps_epoch_s;
 	volatile long long fps_epoch_frame;
 	volatile int fps_generation;
+	volatile int transport_epoch;
 	volatile double runtime_playback_rate;
 	volatile long long anchor_frame;
 #ifdef HAVE_JACK
@@ -739,6 +741,8 @@ typedef struct veejay_t
 	global_chain_t *global_chain;
 } veejay_t;
 
+void veejay_transport_epoch_bump(veejay_t *info);
+int veejay_transport_epoch_get(veejay_t *info);
 
 
 typedef struct {

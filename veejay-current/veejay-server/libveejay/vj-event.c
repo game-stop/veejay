@@ -527,24 +527,19 @@ static int vj_event_send_long_vims(vj_client *client, int vims_id, const char *a
         return 0;
 
     size_t msg_len = (size_t)prefix_len + arg_len + 1;
-    size_t packet_payload_len = msg_len;
-
-    if(packet_payload_len > VJ_LONG_VIMS_PAYLOAD_MAX)
+    if(msg_len > VJ_LONG_VIMS_PAYLOAD_MAX || msg_len > INT_MAX)
         return 0;
 
-    size_t packet_len = 1 + 8 + packet_payload_len;
-    unsigned char *packet = (unsigned char*)vj_malloc(packet_len);
-    if(!packet)
+    unsigned char *message = (unsigned char*)vj_malloc(msg_len);
+    if(!message)
         return 0;
 
-    packet[0] = 'X';
-    snprintf((char*)packet + 1, 9, "%08zu", packet_payload_len);
-    memcpy(packet + 9, prefix, (size_t)prefix_len);
-    memcpy(packet + 9 + prefix_len, arg, arg_len);
-    packet[9 + prefix_len + arg_len] = ';';
+    memcpy(message, prefix, (size_t)prefix_len);
+    memcpy(message + prefix_len, arg, arg_len);
+    message[prefix_len + arg_len] = ';';
 
-    int ret = vj_client_send_buf(client, V_CMD, packet, packet_len);
-    free(packet);
+    int ret = vj_client_send_long(client, V_CMD, message, (int)msg_len);
+    free(message);
 
     return ret > 0;
 }
@@ -704,6 +699,8 @@ static int vj_sequence_pattern_store(sequencer_t *seq,
 
     if(version < 1)
         version = 1;
+    else if(version > 99999999)
+        version = 99999999;
 
     snprintf(seq->vims_pattern_format,
              sizeof(seq->vims_pattern_format),
@@ -733,7 +730,10 @@ static void vj_sequence_pattern_clear(sequencer_t *seq)
                  "gvr-vims-pattern-b64-v1");
 }
 
-static long long vj_sequence_slot_duration(int sample_id, int type, int *known)
+static long long vj_sequence_slot_duration(veejay_t *v,
+                                           int sample_id,
+                                           int type,
+                                           int *known)
 {
     long long base = 0;
     long long loops = 1;
@@ -758,6 +758,13 @@ static long long vj_sequence_slot_duration(int sample_id, int type, int *known)
         start = sample_get_startFrame(sample_id);
         end = sample_get_endFrame(sample_id);
         speed = abs(sample_get_speed(sample_id));
+        if(speed < 1 &&
+           v && v->settings && v->uc &&
+           v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
+           v->uc->sample_id == sample_id &&
+           v->settings->current_playback_speed == 0)
+            speed = abs(v->settings->previous_playback_speed);
+
         looptype = sample_get_looptype(sample_id);
         dup = sample_get_framedup(sample_id);
 
@@ -2560,6 +2567,7 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
     char *fmt = vj_event_vevo_get_event_format(net_id);
     int flags = vj_event_vevo_get_flags(net_id);
     char *str = NULL;
+    int parsed_args = 0;
     char *arg_str = strndup(current_msg + v1_offset, current_len - v1_offset);
     char *arguments = arg_str;
 
@@ -2591,12 +2599,23 @@ int vj_event_parse_msg( void *ptr, char *msg, int msg_len )
             }
         }
 
-        if(failed_arg) continue;
-        if(*arguments == ';' || *arguments == 0) break;
+        if(failed_arg)
+            continue;
+
+        parsed_args = i + 1;
+
+        if(*arguments == ';' || *arguments == 0)
+            break;
         if(*arguments == ' ') arguments++;
     }
 
-    vj_event_fire_net_event(v, net_id, str, i_args, np, 0);
+    vj_event_fire_net_event(v,
+                            net_id,
+                            str,
+                            i_args,
+                            net_id == VIMS_CHAIN_ENTRY_SET_PRESET ?
+                                parsed_args : np,
+                            0);
 
     if(fmt) free(fmt);
     if(arg_str) free(arg_str);
@@ -2807,8 +2826,24 @@ void vj_event_dispatch_requeued_events(veejay_t *v) {
         if (v->master_client) {
             char *bundle = vj_bundle_format_messages(to_master_n_queued, to_master_buf);
             if (bundle) {
+                size_t bundle_len = strlen(bundle);
                 veejay_msg(VEEJAY_MSG_DEBUG, "Dispatch %s", bundle);
-                vj_client_send(v->master_client, V_CMD, (unsigned char*) bundle);           
+                if(bundle_len > INT_MAX) {
+                    veejay_msg(VEEJAY_MSG_ERROR,
+                               "Forwarded VIMS bundle is too large (%zu bytes)",
+                               bundle_len);
+                }
+                else if(bundle_len > 999) {
+                    vj_client_send_long(v->master_client,
+                                        V_CMD,
+                                        (unsigned char*)bundle,
+                                        (int)bundle_len);
+                }
+                else {
+                    vj_client_send(v->master_client,
+                                   V_CMD,
+                                   (unsigned char*)bundle);
+                }
                 free(bundle);
             }
         }
@@ -7870,65 +7905,7 @@ void vj_event_chain_entry_set_defaults(void *ptr, const char format[], va_list a
 
 void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*)ptr;
-    int args[MAX_ARGUMENTS];
-
-    P_A(args,sizeof(args),NULL,0,format,ap);
-
-    if(SAMPLE_PLAYING(v)) 
-    {
-        SAMPLE_DEFAULTS(args[0]);
-
-        if(sample_exists(args[0]))
-        {
-            if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
-    
-            if(v_chi(args[1]))
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-                return;
-            }
-
-            if(sample_chain_add(args[0],args[1],args[2], args[3])) 
-            {
-                sample_eff_chain **chain = sample_get_effect_chain(args[0]);
-                if(chain && chain[args[1]])
-                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
-                v->uc->chain_changed = 1;
-            }
-            else
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot set effect %d on sample %d chain %d",args[2],args[0],args[1]);
-            }
-        }
-    }
-    if( STREAM_PLAYING(v)) 
-    {
-        STREAM_DEFAULTS(args[0]);
-        if(vj_tag_exists(args[0]))
-        {
-            if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]); 
-
-            if(v_chi(args[1]))
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
-                return;
-            }
-
-            if(vj_tag_set_effect(args[0],args[1], args[2],args[3]))
-            {
-                sample_eff_chain **chain = vj_tag_get_effect_chain(args[0]);
-                if(chain && chain[args[1]])
-                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
-                v->uc->chain_changed = 1;
-            }   
-            else
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot set effect %d on stream %d chain %d",args[2],args[0],args[1]);
-            }
-
-        }
-    }
+    vj_event_chain_entry_preset(ptr, format, ap);
 }
 
 
@@ -8201,117 +8178,167 @@ void vj_event_chain_entry_set_narg_val(void *ptr,const char format[], va_list ap
 
 void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 {
-    long int tmp = 0;
-    int base = 10;
-    int index = 4; // sample, chain, fx_id, status
     int args[MAX_ARGUMENTS];
-    char str[1024]; 
+    char str[1024] = { 0 };
     veejay_t *v = (veejay_t*)ptr;
-    veejay_memset(args,0,sizeof(int) * MAX_ARGUMENTS); 
-   
-    P_A(args,sizeof(args),str,sizeof(str),format,ap);
+    int value_count = 0;
+
+    veejay_memset(args, 0, sizeof(args));
+    P_A(args, sizeof(args), str, sizeof(str), format, ap);
 
     char *end = str;
-    char *next;
 
-    while (index < MAX_ARGUMENTS) {
-        tmp = strtol(end, &next, base);
+    while(value_count < (MAX_ARGUMENTS - 4)) {
+        char *next;
+        long value = strtol(end, &next, 10);
 
-        if (end == next) {
+        if(end == next)
             break;
-        }
 
-        args[index++] = (int) tmp;
+        args[4 + value_count] = (int)value;
+        value_count++;
         end = next;
     }
 
-    if(SAMPLE_PLAYING(v)) 
-    {
-        int num_p = 0;  
+    int real_id = args[2];
+    int num_p = vje_get_num_params(real_id);
 
+    if(num_p < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot set invalid effect %d",
+                   real_id);
+        return;
+    }
+
+    if(num_p > (MAX_ARGUMENTS - 4))
+        num_p = MAX_ARGUMENTS - 4;
+
+    if(value_count == 0) {
+        for(int i = 0; i < num_p; i++)
+            args[4 + i] = vje_get_param_default(real_id, i);
+    }
+
+    if(SAMPLE_PLAYING(v))
+    {
         SAMPLE_DEFAULTS(args[0]);
 
         if(sample_exists(args[0]))
         {
-            if(args[1] == -1) args[1] = sample_get_selected_entry(args[0]);
+            if(args[1] == -1)
+                args[1] = sample_get_selected_entry(args[0]);
+
             if(v_chi(args[1]))
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Chain index out of bounds: %d",
+                           args[1]);
                 return;
             }
 
-            int real_id = args[2];
-            int i;
-            num_p   = vje_get_num_params(real_id);
-            
-            if(sample_chain_add( args[0],args[1],args[2],args[3]))
+            if(sample_chain_add(args[0], args[1], real_id, args[3]))
             {
-                sample_eff_chain **chain = sample_get_effect_chain(args[0]);
-                if(chain && chain[args[1]])
-                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
+                sample_eff_chain **chain =
+                    sample_get_effect_chain(args[0]);
 
-                int args_offset = 4;
-                
-                for(i=0; i < num_p; i++)
+                if(chain && chain[args[1]])
+                    chain[args[1]]->beat_param_mask =
+                        SAMPLE_BEAT_PARAM_MASK_ALL;
+
+                for(int i = 0; i < num_p; i++)
                 {
-                    if(vje_is_param_value_valid(real_id,i,args[(i+args_offset)]) )
+                    int value = args[4 + i];
+
+                    if(vje_is_param_value_valid(real_id, i, value) &&
+                       sample_set_effect_arg(args[0],
+                                             args[1],
+                                             i,
+                                             value) == -1)
                     {
-                        if(sample_set_effect_arg(args[0],args[1],i,args[(i+args_offset)] )==-1) 
-                        {
-                            veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",
-                            i,
-                            args[(i+args_offset)],
-                            vje_get_description(real_id));
-                        }
+                        veejay_msg(VEEJAY_MSG_ERROR,
+                                   "Error setting argument %d value %d for %s",
+                                   i,
+                                   value,
+                                   vje_get_description(real_id));
                     }
                 }
+
                 v->uc->chain_changed = 1;
             }
+            else
+            {
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Cannot set effect %d on sample %d chain %d",
+                           real_id,
+                           args[0],
+                           args[1]);
+            }
         }
+
+        return;
     }
-    if( STREAM_PLAYING(v)) 
+
+    if(STREAM_PLAYING(v))
     {
         STREAM_DEFAULTS(args[0]);
 
-        if(vj_tag_exists(args[0])) 
+        if(vj_tag_exists(args[0]))
         {
-            if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+            if(args[1] == -1)
+                args[1] = vj_tag_get_selected_entry(args[0]);
+
             if(v_chi(args[1]))
             {
-                veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds %d", args[1]);
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Chain index out of bounds: %d",
+                           args[1]);
                 return;
             }
 
-            int real_id = args[2];
-            int num_p   = vje_get_num_params(real_id);
-            int i;
-        
-            if(vj_tag_set_effect(args[0],args[1], args[2], args[3]) )
+            if(vj_tag_set_effect(args[0], args[1], real_id, args[3]))
             {
-                sample_eff_chain **chain = vj_tag_get_effect_chain(args[0]);
+                sample_eff_chain **chain =
+                    vj_tag_get_effect_chain(args[0]);
+
                 if(chain && chain[args[1]])
-                    chain[args[1]]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
+                    chain[args[1]]->beat_param_mask =
+                        SAMPLE_BEAT_PARAM_MASK_ALL;
 
-                int args_offset = 4;
-
-                for(i=0; i < num_p; i++) 
+                for(int i = 0; i < num_p; i++)
                 {
-                    if(vje_is_param_value_valid(real_id, i, args[i+args_offset]) )
+                    int value = args[4 + i];
+
+                    if(vje_is_param_value_valid(real_id, i, value) &&
+                       vj_tag_set_effect_arg(args[0],
+                                             args[1],
+                                             i,
+                                             value))
                     {
-                        if(vj_tag_set_effect_arg(args[0],args[1],i,args[i+args_offset]))
-                        {
-                            veejay_msg(VEEJAY_MSG_DEBUG, "Changed parameter %d to %d (%s)",
-                                i,
-                                args[i+args_offset],
-                                vje_get_description(real_id));
-                        }
+                        veejay_msg(VEEJAY_MSG_DEBUG,
+                                   "Changed parameter %d to %d (%s)",
+                                   i,
+                                   value,
+                                   vje_get_description(real_id));
                     }
                 }
+
                 v->uc->chain_changed = 1;
             }
+            else
+            {
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Cannot set effect %d on stream %d chain %d",
+                           real_id,
+                           args[0],
+                           args[1]);
+            }
         }
+
+        return;
     }
+
+    p_invalid_mode();
 }
+
 
 void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 {
@@ -15375,7 +15402,10 @@ void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap)
         if(entry->sample_id <= 0)
             continue;
 
-        length = vj_sequence_slot_duration(entry->sample_id, entry->type, &known);
+        length = vj_sequence_slot_duration(v,
+                                           entry->sample_id,
+                                           entry->type,
+                                           &known);
         start = finite ? cursor : -1;
 
         if(!known || length < 1) {

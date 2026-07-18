@@ -60,6 +60,7 @@ extern  int vj_tag_size();
 #include FT_GLYPH_H
 
 #define BSIZE 256
+#define VJ_OSD_MAX_LINES 8
 
 typedef struct
 {   
@@ -129,8 +130,23 @@ typedef struct {
     char    *prev;
     pthread_mutex_t mutex;
 
-    srt_seq_t  *osd_sub;
     int         osd_prepared;
+    int         osd_width;
+    int         osd_height;
+    int         osd_font;
+    int         osd_font_size;
+    unsigned char *osd_font_path;
+    int         osd_cell_width;
+    int         osd_line_height;
+    int         osd_pad_x;
+    int         osd_pad_y;
+    int         osd_panel_x;
+    int         osd_panel_w;
+    int         osd_base_x;
+    int         osd_max_cols;
+    int         osd_panel_h[VJ_OSD_MAX_LINES + 1];
+    int         osd_panel_top_y[VJ_OSD_MAX_LINES + 1];
+    int         osd_panel_bottom_y[VJ_OSD_MAX_LINES + 1];
 
     int  text_buflen;
     unsigned char text_buffer[2048];
@@ -1668,6 +1684,40 @@ static void draw_glyph(
     }
 }
 
+static inline void draw_glyph_plain(
+        VJFrame *picture,
+        FT_Bitmap *bitmap,
+        unsigned int x,
+        unsigned int y,
+        uint8_t *yuv_fgcolor)
+{
+    if(!bitmap->buffer || x >= (unsigned int)picture->width ||
+       y >= (unsigned int)picture->height)
+        return;
+
+    const unsigned int rows = (y + bitmap->rows > (unsigned int)picture->height)
+                            ? (unsigned int)picture->height - y : bitmap->rows;
+    const unsigned int cols = (x + bitmap->width > (unsigned int)picture->width)
+                            ? (unsigned int)picture->width - x : bitmap->width;
+    const int stride = picture->width;
+
+    for(unsigned int r = 0; r < rows; r++) {
+        const uint8_t *src = bitmap->buffer + r * bitmap->pitch;
+        const int offset = (int)(y + r) * stride + (int)x;
+        uint8_t *Y = picture->data[0] + offset;
+        uint8_t *U = picture->data[1] + offset;
+        uint8_t *V = picture->data[2] + offset;
+
+        for(unsigned int c = 0; c < cols; c++) {
+            if(src[c >> 3] & (0x80 >> (c & 7))) {
+                Y[c] = yuv_fgcolor[0];
+                U[c] = yuv_fgcolor[1];
+                V[c] = yuv_fgcolor[2];
+            }
+        }
+    }
+}
+
 static inline void draw_transparent_box(
         VJFrame *picture,
         unsigned int x,
@@ -1677,26 +1727,37 @@ static inline void draw_transparent_box(
         uint8_t *yuv_color,
         uint8_t opacity)
 {
+    if(x >= (unsigned int)picture->width || y >= (unsigned int)picture->height)
+        return;
+
+    const unsigned int x_end = (x + width > (unsigned int)picture->width)
+                             ? (unsigned int)picture->width : x + width;
+    const unsigned int y_end = (y + height > (unsigned int)picture->height)
+                             ? (unsigned int)picture->height : y + height;
+    const int count = (int)(x_end - x);
+    const int stride = picture->width;
     const int op1 = opacity;
     const int op0 = 255 - op1;
-    const int w = picture->width;
-    int i, j;
-    uint8_t *A[3] = { picture->data[0], picture->data[1], picture->data[2] };
+    const int add_y = op1 * yuv_color[0];
+    const int add_u = op1 * yuv_color[1];
+    const int add_v = op1 * yuv_color[2];
 
-    unsigned int x_end = x + width;
-    unsigned int y_end = y + height;
+    if(count <= 0 || y >= y_end)
+        return;
 
-    if (x_end > picture->width) x_end = picture->width;
-    if (y_end > picture->height) y_end = picture->height;
+    for(unsigned int row = y; row < y_end; row++) {
+        const int offset = (int)row * stride + (int)x;
+        uint8_t *Y = picture->data[0] + offset;
+        uint8_t *U = picture->data[1] + offset;
+        uint8_t *V = picture->data[2] + offset;
 
-    for (j = y; j < y_end; j++)
 #pragma omp simd
-        for (i = x; i < x_end; i++) {
-            int p = i + (j * w);
-            A[0][p] = (op0 * A[0][p] + op1 * yuv_color[0]) >> 8;
-            A[1][p] = (op0 * A[1][p] + op1 * yuv_color[1]) >> 8;
-            A[2][p] = (op0 * A[2][p] + op1 * yuv_color[2]) >> 8;
+        for(int i = 0; i < count; i++) {
+            Y[i] = (uint8_t)((op0 * Y[i] + add_y) >> 8);
+            U[i] = (uint8_t)((op0 * U[i] + add_u) >> 8);
+            V[i] = (uint8_t)((op0 * V[i] + add_v) >> 8);
         }
+    }
 }
 
 
@@ -1906,37 +1967,89 @@ void vj_font_render(void *ctx, void *_picture, long position)
     font_unlock(f);
 }
 
-static void vj_font_prepare_osd(vj_font_t *f, int w)
+static int vj_font_osd_cell_width(const vj_font_t *f)
 {
-    if (!f || f->osd_prepared)
+    int cell = 0;
+
+    if(!f)
+        return 1;
+
+    for(int c = 32; c < 127; c++)
+        if(f->advance[c] > cell)
+            cell = f->advance[c];
+
+    if(cell < 1)
+        cell = f->current_size;
+    if(cell < 1)
+        cell = 1;
+
+    return cell;
+}
+
+static void vj_font_prepare_osd(vj_font_t *f, int w, int h)
+{
+    if(!f || w <= 0 || h <= 0)
         return;
 
-    f->osd_sub = (srt_seq_t*) calloc(1, sizeof(srt_seq_t));
-    if (!f->osd_sub)
+    if(f->osd_prepared &&
+       f->osd_width == w && f->osd_height == h &&
+       f->current_size == f->osd_font_size &&
+       f->font == f->osd_font_path)
         return;
 
-    const float BASE_AT_1920 = 24.0;
-    int MIN_SIZE = 8;
-    int MAX_SIZE = 48;
+    int size;
+    int font;
 
-    if (w <= 480) MIN_SIZE = 12;
+    if(f->osd_prepared && f->osd_width == w && f->osd_height == h) {
+        size = f->osd_font_size;
+        font = f->osd_font;
+    } else {
+        const int min_size = w <= 480 ? 12 : 8;
+        size = (w + 40) / 80;
+        if(size < min_size)
+            size = min_size;
+        else if(size > 48)
+            size = 48;
+        font = f->osd_prepared ? f->osd_font : f->current_font;
+    }
 
-    float sizef = (float)w * (BASE_AT_1920 / 1920.0f);
-    int size = floorf(sizef + 0.5f);
+    if((size != f->current_size || f->font != select_font(f, font)) &&
+       !configure(f, size, font)) {
+        f->osd_prepared = 0;
+        return;
+    }
 
-    if (size < MIN_SIZE) size = MIN_SIZE;
-    if (size > MAX_SIZE) size = MAX_SIZE;
+    f->osd_width = w;
+    f->osd_height = h;
+    f->osd_font = font;
+    f->osd_font_size = size;
+    f->osd_font_path = f->font;
+    f->osd_cell_width = vj_font_osd_cell_width(f);
+    f->osd_line_height = f->text_height + 3;
+    if(f->osd_line_height < f->current_size + 2)
+        f->osd_line_height = f->current_size + 2;
 
-    f->current_size = size;
-    f->osd_sub->x = 1;
-    f->osd_sub->y = -1;
-    f->osd_sub->size = f->current_size;
-    f->osd_sub->font = f->current_font;
-    f->osd_sub->use_bg = 1;
-    f->osd_sub->outline = 0;
+    f->osd_pad_x = 7;
+    f->osd_pad_y = 5;
+    f->osd_panel_x = 6;
+    f->osd_panel_w = w - 12;
+    f->osd_base_x = f->osd_panel_x + f->osd_pad_x;
+    f->osd_max_cols = (f->osd_panel_w - f->osd_pad_x * 2) / f->osd_cell_width;
+    if(f->osd_max_cols < 1)
+        f->osd_max_cols = 1;
 
-    _rgb2yuv(255, 255, 255, f->fgcolor[0], f->fgcolor[1], f->fgcolor[2]);
-    _rgb2yuv(0, 0, 0, f->bgcolor[0], f->bgcolor[1], f->bgcolor[2]);
+    for(int lines = 1; lines <= VJ_OSD_MAX_LINES; lines++) {
+        const int panel_h = f->osd_pad_y * 2 + lines * f->osd_line_height;
+        int bottom_y = h - panel_h - 6;
+        if(bottom_y < 0)
+            bottom_y = 0;
+        f->osd_panel_h[lines] = panel_h;
+        f->osd_panel_top_y[lines] = 6;
+        f->osd_panel_bottom_y[lines] = bottom_y;
+    }
+
+    _rgb2yuv(246, 248, 250, f->fgcolor[0], f->fgcolor[1], f->fgcolor[2]);
+    _rgb2yuv(8, 10, 14, f->bgcolor[0], f->bgcolor[1], f->bgcolor[2]);
 
     f->osd_prepared = 1;
 }
@@ -2037,6 +2150,104 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y)
     }
 }
 
+
+static void vj_font_text_osd_panel_render(vj_font_t *f,
+                                          VJFrame *picture,
+                                          const unsigned char *text,
+                                          int placement,
+                                          int lines)
+{
+    if(!f || !picture || !text || !*text)
+        return;
+
+    if(lines < 1)
+        lines = 1;
+    else if(lines > VJ_OSD_MAX_LINES)
+        lines = VJ_OSD_MAX_LINES;
+
+    const int panel_y = placement == 1
+                      ? f->osd_panel_top_y[lines]
+                      : f->osd_panel_bottom_y[lines];
+    const int panel_h = f->osd_panel_h[lines];
+    const int base_y = panel_y + f->osd_pad_y;
+    const int line_h = f->osd_line_height;
+    const int cell_w = f->osd_cell_width;
+    int pen_x = f->osd_base_x;
+    int pen_y = base_y;
+    int col = 0;
+    int row = 0;
+
+    draw_transparent_box(picture,
+                         (unsigned int)f->osd_panel_x,
+                         (unsigned int)panel_y,
+                         (unsigned int)f->osd_panel_w,
+                         (unsigned int)panel_h,
+                         f->bgcolor,
+                         184);
+
+    for(const unsigned char *p = text; *p; p++) {
+        const unsigned char c = *p;
+
+        if(c == '\n') {
+            if(++row >= lines)
+                break;
+            col = 0;
+            pen_x = f->osd_base_x;
+            pen_y += line_h;
+            continue;
+        }
+
+        if(col >= f->osd_max_cols)
+            continue;
+
+        if(c > ' ' && c < 127) {
+            const int gx = pen_x + f->bitmap_left[c];
+            const int gy = pen_y + f->baseline - f->bitmap_top[c];
+
+            if(gx >= 0 && gy >= 0)
+                draw_glyph_plain(picture, &(f->bitmaps[c]),
+                                 (unsigned int)gx, (unsigned int)gy,
+                                 f->fgcolor);
+        }
+
+        pen_x += cell_w;
+        col++;
+    }
+}
+
+void vj_font_render_osd_panel_lines(void *ctx,
+                                    void *_picture,
+                                    const char *status_str,
+                                    int placement,
+                                    int lines)
+{
+    if(!ctx || !_picture || !status_str || !*status_str)
+        return;
+
+    vj_font_t *f = (vj_font_t*)ctx;
+    VJFrame *picture = (VJFrame*)_picture;
+
+    font_lock(f);
+    vj_font_prepare_osd(f, picture->width, picture->height);
+    if(f->osd_prepared)
+        vj_font_text_osd_panel_render(f, picture,
+                                      (const unsigned char*)status_str,
+                                      placement, lines);
+    font_unlock(f);
+}
+
+void vj_font_render_osd_panel(void *ctx, void *_picture, const char *status_str, int placement)
+{
+    if(!status_str || !*status_str)
+        return;
+
+    int lines = 1;
+    for(const char *p = status_str; *p; p++)
+        lines += (*p == '\n');
+
+    vj_font_render_osd_panel_lines(ctx, _picture, status_str, placement, lines);
+}
+
 void vj_font_render_osd_status(void *ctx, void *_picture, char *status_str, int placement)
 {
     if (!ctx || !_picture || !status_str)
@@ -2045,15 +2256,13 @@ void vj_font_render_osd_status(void *ctx, void *_picture, char *status_str, int 
     vj_font_t *f = (vj_font_t *) ctx;
     VJFrame *pic = (VJFrame*) _picture;
 
-    if (!f->osd_prepared)
-        vj_font_prepare_osd(f, pic->width);
-
+    font_lock(f);
+    vj_font_prepare_osd(f, pic->width, pic->height);
     vj_font_set_osd_text(f, status_str);
 
-    int x = 5;
-    int y = (placement == 1) ? f->baseline : -1;
+    const int x = 5;
+    const int y = (placement == 1) ? f->baseline : -1;
 
-    font_lock(f);
     vj_font_text_osd_render(f, _picture, x, y);
     font_unlock(f);
 }
