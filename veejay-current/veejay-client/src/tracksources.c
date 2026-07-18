@@ -72,9 +72,9 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 		{
 		     veejay_bind_track( v->track_id, id_data );
         }
-        
+
         gtk_list_store_set(GTK_LIST_STORE(model), &iter,1, multitrack_get_track_status(v->mt, id_data), -1 );
-        
+
 		g_free(data);
 	}
 	gtk_tree_path_free( path );
@@ -109,8 +109,8 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 			g_free( uname );
 		}
 	}
-		
-	
+
+
 	gtk_tree_view_set_model( GTK_TREE_VIEW( widget ), model );	
 
 }
@@ -151,13 +151,17 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 			"activatable",
 			1,
 			NULL);
-		
-	GtkTreeViewColumn *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view),0);
-	gtk_tree_view_column_set_fixed_width(  col , 40 );
 
-	col = gtk_tree_view_get_column( GTK_TREE_VIEW( view ), 1 );
-	gtk_tree_view_column_set_clickable(  col , TRUE );
-	gtk_tree_view_column_set_fixed_width(  col , 20 );
+	GtkTreeViewColumn *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view), 0 );
+	gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_GROW_ONLY );
+	gtk_tree_view_column_set_min_width( col, 64 );
+	gtk_tree_view_column_set_expand( col, TRUE );
+
+	col = gtk_tree_view_get_column( GTK_TREE_VIEW(view), 1 );
+	gtk_tree_view_column_set_sizing( col, GTK_TREE_VIEW_COLUMN_FIXED );
+	gtk_tree_view_column_set_fixed_width( col, 32 );
+	gtk_tree_view_column_set_expand( col, FALSE );
+	gtk_tree_view_column_set_clickable( col, TRUE );
 
 	gtk_tree_view_column_set_cell_data_func( col,
 		wrenderer, cell_data_func, NULL,NULL);
@@ -191,7 +195,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data, void *mt)
 	my_view->view = view;
 
 	g_assert( GTK_IS_TREE_VIEW( view ) );
-	
+
 	model = GTK_TREE_MODEL( store );
 	gtk_tree_view_set_model ( GTK_TREE_VIEW( view ), model );
 	g_signal_connect( wrenderer, "toggled",

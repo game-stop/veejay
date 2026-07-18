@@ -27,13 +27,17 @@
 #define GVR_SEQUENCE_BANKS 4
 #endif
 #ifndef GVR_SEQUENCE_SLOTS
-#define GVR_SEQUENCE_SLOTS 100
+#define GVR_SEQUENCE_SLOTS 120
 #endif
 #ifndef GVR_SEQUENCE_COLUMNS
-#define GVR_SEQUENCE_COLUMNS 10
+#define GVR_SEQUENCE_COLUMNS 12
 #endif
 #ifndef GVR_SEQUENCE_ROWS
 #define GVR_SEQUENCE_ROWS 10
+#endif
+
+#if (GVR_SEQUENCE_COLUMNS * GVR_SEQUENCE_ROWS) != GVR_SEQUENCE_SLOTS
+#error "GVR sequencer grid dimensions do not match slot capacity"
 #endif
 
 #define GVR_SEQ_TYPE_SAMPLE      0
@@ -137,14 +141,82 @@ static guint gvr_sequence_bank_view_signals[SIGNAL_LAST];
 
 G_DEFINE_TYPE(GvrSequenceBankView, gvr_sequence_bank_view, GTK_TYPE_DRAWING_AREA)
 
+
+typedef struct {
+    char family[128];
+    double points;
+} GvrSequenceFontMetrics;
+
+static void gvr_sequence_font_metrics(GtkWidget *widget,
+                                      GvrSequenceFontMetrics *metrics)
+{
+    GtkStyleContext *style = NULL;
+    PangoFontDescription *font = NULL;
+    const char *family;
+    int size;
+
+    g_strlcpy(metrics->family, "Sans", sizeof(metrics->family));
+    metrics->points = 10.0;
+
+    if(widget) {
+        style = gtk_widget_get_style_context(widget);
+        if(style)
+            gtk_style_context_get(style,
+                                  gtk_style_context_get_state(style),
+                                  "font",
+                                  &font,
+                                  NULL);
+    }
+
+    if(!font && widget) {
+        PangoContext *context = gtk_widget_get_pango_context(widget);
+        const PangoFontDescription *fallback =
+            context ? pango_context_get_font_description(context) : NULL;
+
+        if(fallback)
+            font = pango_font_description_copy(fallback);
+    }
+
+    if(!font)
+        return;
+
+    family = pango_font_description_get_family(font);
+    if(family && family[0])
+        g_strlcpy(metrics->family, family, sizeof(metrics->family));
+
+    size = pango_font_description_get_size(font);
+    if(size > 0) {
+        metrics->points = (double)size / PANGO_SCALE;
+        if(pango_font_description_get_size_is_absolute(font))
+            metrics->points *= 72.0 / 96.0;
+        metrics->points = CLAMP(metrics->points, 6.0, 32.0);
+    }
+
+    pango_font_description_free(font);
+}
+
+static double gvr_sequence_font_px(const GvrSequenceFontMetrics *metrics,
+                                   double scale)
+{
+    return MAX(6.5,
+               metrics->points *
+               (96.0 / 72.0) * scale);
+}
+
+static int gvr_sequence_bank_view_min_height(GtkWidget *widget)
+{
+    GvrSequenceFontMetrics metrics;
+    double base_font;
+
+    gvr_sequence_font_metrics(widget, &metrics);
+    base_font = gvr_sequence_font_px(&metrics, 0.75);
+
+    return MAX(236, (int)ceil(216.0 + base_font * 2.0));
+}
+
 static int gvr_clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
-}
-
-static void gvr_rect_clear(GdkRectangle *r)
-{
-    r->x = r->y = r->width = r->height = 0;
 }
 
 static gboolean gvr_rect_contains(const GdkRectangle *r, double x, double y)
@@ -152,19 +224,28 @@ static gboolean gvr_rect_contains(const GdkRectangle *r, double x, double y)
     return x >= r->x && y >= r->y && x < (r->x + r->width) && y < (r->y + r->height);
 }
 
-static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, int height)
+static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view,
+                                          int width,
+                                          int height)
 {
-    const int compact = (width < 520 || height < 340);
-    const int outer = compact ? 3 : 6;
-    const int gap = compact ? 4 : 8;
-    const int inner = compact ? 2 : 4;
-    const int header_h = compact ? 19 : 22;
+    GvrSequenceFontMetrics font_metrics;
+    double base_font;
 
-    const int available_bank_w = (width - (outer * 2) - gap) / 2;
-    const int available_bank_h = (height - (outer * 2) - gap) / 2;
-    const int bank_side = MAX(24, MIN(available_bank_w, available_bank_h));
-    const int total_w = bank_side * 2 + gap;
-    const int total_h = bank_side * 2 + gap;
+    gvr_sequence_font_metrics(GTK_WIDGET(view), &font_metrics);
+    base_font = gvr_sequence_font_px(&font_metrics, 0.75);
+
+    const int compact = (width < 520 || height < 340);
+    const int outer = compact ? 1 : 3;
+    const int gap = compact ? 2 : 4;
+    const int inner = compact ? 1 : 2;
+    const int header_h = MAX(compact ? 19 : 22,
+                             (int)ceil(base_font +
+                                       (compact ? 7.0 : 10.0)));
+
+    const int bank_w = MAX(24, (width - (outer * 2) - gap) / 2);
+    const int bank_h = MAX(24, (height - (outer * 2) - gap) / 2);
+    const int total_w = bank_w * 2 + gap;
+    const int total_h = bank_h * 2 + gap;
     int start_x = (width - total_w) / 2;
     int start_y = (height - total_h) / 2;
 
@@ -179,10 +260,10 @@ static void gvr_sequence_bank_view_layout(GvrSequenceBankView *view, int width, 
         GdkRectangle *br = &view->bank_rect[bank];
         GdkRectangle *hr = &view->header_rect[bank];
 
-        br->x = start_x + col * (bank_side + gap);
-        br->y = start_y + row * (bank_side + gap);
-        br->width = bank_side;
-        br->height = bank_side;
+        br->x = start_x + col * (bank_w + gap);
+        br->y = start_y + row * (bank_h + gap);
+        br->width = bank_w;
+        br->height = bank_h;
 
         hr->x = br->x;
         hr->y = br->y;
@@ -284,10 +365,10 @@ static void gvr_set_rgba(cairo_t *cr, double r, double g, double b, double a)
     cairo_set_source_rgba(cr, r, g, b, a);
 }
 
-static void gvr_draw_text(cairo_t *cr, const char *text, double x, double y, double size)
+static void gvr_draw_text(cairo_t *cr, const char *family, const char *text, double x, double y, double size)
 {
     cairo_save(cr);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
+    cairo_select_font_face(cr, family ? family : "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
     cairo_set_font_size(cr, size);
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, text);
@@ -296,12 +377,12 @@ static void gvr_draw_text(cairo_t *cr, const char *text, double x, double y, dou
 
 static gboolean gvr_sequence_bank_view_slot_in_selection(GvrSequenceBankView *view, int bank, int slot);
 
-static void gvr_draw_centered_text(cairo_t *cr, const char *text, const GdkRectangle *r, double size)
+static void gvr_draw_centered_text(cairo_t *cr, const char *family, const char *text, const GdkRectangle *r, double size)
 {
     cairo_text_extents_t ext;
 
     cairo_save(cr);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+    cairo_select_font_face(cr, family ? family : "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
     cairo_set_font_size(cr, size);
     cairo_text_extents(cr, text, &ext);
     cairo_move_to(cr,
@@ -312,6 +393,8 @@ static void gvr_draw_centered_text(cairo_t *cr, const char *text, const GdkRecta
 }
 
 static void gvr_sequence_draw_pattern_badge(cairo_t *cr,
+                                            const char *family,
+                                            double tiny_font,
                                             const GdkRectangle *r,
                                             const GvrSequencePatternSummary *summary)
 {
@@ -357,28 +440,56 @@ static void gvr_sequence_draw_pattern_badge(cairo_t *cr,
 
     if(r->width >= 30 && r->height >= 18) {
         const char *label = source && cell ? "S+C" : (source ? "S" : "C");
-        const double width = source && cell ? 23.0 : 11.0;
-        const double x = r->x + ((double)r->width - width) * 0.5;
-        const double y = r->y + r->height - 10.0;
+        cairo_text_extents_t ext;
+        const double pad_x = 2.5;
+        const double pad_y = 1.5;
+        double badge_w;
+        double badge_h;
+        double x;
+        double y;
 
-        gvr_set_rgba(cr, 0.025, 0.030, 0.038, 0.92);
-        cairo_rectangle(cr, x, y, width, 9.0);
-        cairo_fill(cr);
-        gvr_set_rgba(cr, 0.960, 0.970, 1.000, 1.0);
-        gvr_draw_text(cr, label, x + 2.0, y + 7.2, 6.8);
+        cairo_save(cr);
+        cairo_select_font_face(cr,
+                               family ? family : "Sans",
+                               CAIRO_FONT_SLANT_NORMAL,
+                               CAIRO_FONT_WEIGHT_NORMAL);
+        cairo_set_font_size(cr, tiny_font);
+        cairo_text_extents(cr, label, &ext);
+
+        badge_w = ceil(ext.width + pad_x * 2.0);
+        badge_h = ceil(ext.height + pad_y * 2.0);
+
+        if(badge_w <= r->width - 4.0 && badge_h <= r->height - 3.0) {
+            x = r->x + ((double)r->width - badge_w) * 0.5;
+            y = r->y + r->height - badge_h - 1.0;
+
+            gvr_set_rgba(cr, 0.025, 0.030, 0.038, 0.92);
+            cairo_rectangle(cr, x, y, badge_w, badge_h);
+            cairo_fill(cr);
+
+            gvr_set_rgba(cr, 0.960, 0.970, 1.000, 1.0);
+            cairo_move_to(cr,
+                          x + (badge_w - ext.width) * 0.5 - ext.x_bearing,
+                          y + (badge_h - ext.height) * 0.5 - ext.y_bearing);
+            cairo_show_text(cr, label);
+        }
+
+        cairo_restore(cr);
     }
 }
 
 static void gvr_sequence_draw_bank_pattern_badge(cairo_t *cr,
+                                                   const char *family,
+                                                   double base_font,
                                                    const GdkRectangle *header,
                                                    const GvrSequenceBankPatternSummary *summary)
 {
     const char *label = "PAT";
-    const double label_size = 10.5;
-    const double count_size = 8.0;
+    const double label_size = MAX(8.0, base_font * 1.05);
+    const double count_size = MAX(7.0, base_font * 0.80);
     const double gap = 3.0;
     const double pad_x = 5.0;
-    const double badge_h = 17.0;
+    const double badge_h = MAX(17.0, ceil(label_size + 7.0));
     char count_label[32];
     cairo_text_extents_t label_ext;
     cairo_text_extents_t count_ext;
@@ -397,7 +508,7 @@ static void gvr_sequence_draw_bank_pattern_badge(cairo_t *cr,
 
     cairo_save(cr);
     cairo_select_font_face(cr,
-                           "Sans",
+                           family ? family : "Sans",
                            CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_BOLD);
     cairo_set_font_size(cr, label_size);
@@ -439,9 +550,23 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
 {
     GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(widget);
     GtkAllocation allocation;
+    GvrSequenceFontMetrics font_metrics;
+    const char *font_family;
+    double base_font;
+    double tiny_font;
+    double font_factor;
 
     gtk_widget_get_allocation(widget, &allocation);
-    gvr_sequence_bank_view_layout(view, allocation.width, allocation.height);
+    gvr_sequence_font_metrics(widget, &font_metrics);
+    font_family = font_metrics.family;
+    base_font = gvr_sequence_font_px(&font_metrics, 0.75);
+    tiny_font = CLAMP(gvr_sequence_font_px(&font_metrics, 0.55),
+                      6.5,
+                      10.5);
+    font_factor = base_font / 10.0;
+    gvr_sequence_bank_view_layout(view,
+                                  allocation.width,
+                                  allocation.height);
 
     gvr_set_rgba(cr, 0.070, 0.075, 0.085, 1.0);
     cairo_paint(cr);
@@ -494,8 +619,17 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                      active_bank ? (view->sequence_active ? "  ACTIVE" : "  SELECTED") : (queued_bank ? "  QUEUED" : ""),
                      view->banks[bank].size);
         gvr_set_rgba(cr, 0.850, 0.880, 0.920, 1.0);
-        gvr_draw_text(cr, title, hr->x + (br->width < 230 ? 4 : 8), hr->y + (br->width < 230 ? 13 : 16), br->width < 230 ? 9.0 : 11.0);
-        gvr_sequence_draw_bank_pattern_badge(cr, hr, &view->banks[bank].pattern);
+        gvr_draw_text(cr,
+                      font_family,
+                      title,
+                      hr->x + (br->width < 230 ? 4 : 8),
+                      hr->y + ((double)hr->height + base_font * 0.65) * 0.5,
+                      MAX(7.0, (br->width < 230 ? 0.90 : 1.05) * base_font));
+        gvr_sequence_draw_bank_pattern_badge(cr,
+                                                font_family,
+                                                base_font,
+                                                hr,
+                                                &view->banks[bank].pattern);
 
         if(pattern_target) {
             const double left = hr->x + 1.5;
@@ -544,18 +678,20 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                     char label[16];
                     double tr, tg, tb;
                     const int label_extent = MIN(r->width, r->height);
-                    double label_size = label_extent < 18 ? 9.0 :
-                                        (label_extent < 24 ? 10.0 :
-                                         (label_extent < 34 ? 12.0 : 14.0));
+                    double geometric_size = label_extent < 18 ? 9.0 :
+                                            (label_extent < 24 ? 10.0 :
+                                             (label_extent < 34 ? 12.0 : 14.0));
+                    double label_size = MIN(geometric_size * font_factor,
+                                            MAX(7.0, label_extent * 0.62));
                     snprintf(label, sizeof(label), "%d", sample_id);
                     gvr_sequence_slot_text_color(rr, gg, bb, &tr, &tg, &tb);
                     gvr_set_rgba(cr, tr > 0.5 ? 0.0 : 1.0, tg > 0.5 ? 0.0 : 1.0, tb > 0.5 ? 0.0 : 1.0, 0.28);
                     cairo_save(cr);
                     cairo_translate(cr, 1.0, 1.0);
-                    gvr_draw_centered_text(cr, label, r, label_size);
+                    gvr_draw_centered_text(cr, font_family, label, r, label_size);
                     cairo_restore(cr);
                     gvr_set_rgba(cr, tr, tg, tb, 1.0);
-                    gvr_draw_centered_text(cr, label, r, label_size);
+                    gvr_draw_centered_text(cr, font_family, label, r, label_size);
                 }
 
             }
@@ -631,6 +767,8 @@ static gboolean gvr_sequence_bank_view_draw(GtkWidget *widget, cairo_t *cr)
 
             if(filled)
                 gvr_sequence_draw_pattern_badge(cr,
+                                                font_family,
+                                                tiny_font,
                                                 r,
                                                 &view->banks[bank].cells[slot].pattern);
         }
@@ -2056,10 +2194,22 @@ static gboolean gvr_sequence_bank_view_leave(GtkWidget *widget, GdkEventCrossing
     return FALSE;
 }
 
+
+static void gvr_sequence_bank_view_style_updated(GtkWidget *widget)
+{
+    GTK_WIDGET_CLASS(gvr_sequence_bank_view_parent_class)->style_updated(widget);
+    gtk_widget_set_size_request(widget,
+                                520,
+                                gvr_sequence_bank_view_min_height(widget));
+    gtk_widget_queue_resize(widget);
+    gtk_widget_queue_draw(widget);
+}
+
 static void gvr_sequence_bank_view_class_init(GvrSequenceBankViewClass *klass)
 {
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
+    widget_class->style_updated = gvr_sequence_bank_view_style_updated;
     widget_class->draw = gvr_sequence_bank_view_draw;
     widget_class->button_press_event = gvr_sequence_bank_view_button_press;
     widget_class->button_release_event = gvr_sequence_bank_view_button_release;
@@ -2245,7 +2395,10 @@ static void gvr_sequence_bank_view_init(GvrSequenceBankView *view)
                           GDK_POINTER_MOTION_MASK |
                           GDK_LEAVE_NOTIFY_MASK);
     gtk_widget_set_can_focus(GTK_WIDGET(view), TRUE);
-    gtk_widget_set_size_request(GTK_WIDGET(view), 520, 236);
+    gtk_widget_set_size_request(GTK_WIDGET(view),
+                                520,
+                                gvr_sequence_bank_view_min_height(
+                                    GTK_WIDGET(view)));
 
     view->active_bank = 0;
     view->queued_bank = -1;

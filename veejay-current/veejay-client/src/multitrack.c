@@ -1150,10 +1150,14 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	GtkWidget *scroll = gtk_scrolled_window_new(NULL,NULL);
 	gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(scroll), GTK_SHADOW_ETCHED_IN );
-	gtk_widget_set_size_request_(scroll,30,140);
+	gtk_widget_set_size_request_(scroll,-1,140);
+	gtk_widget_set_hexpand(scroll, TRUE);
+	gtk_widget_set_halign(scroll, GTK_ALIGN_FILL);
 	gtk_container_set_border_width(GTK_CONTAINER(scroll),0);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC );
-	GtkWidget *vvvbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
+	GtkWidget *vvvbox = gtk_box_new(GTK_ORIENTATION_VERTICAL,3);
+	gtk_widget_set_hexpand(vvvbox, TRUE);
+	gtk_widget_set_halign(vvvbox, GTK_ALIGN_FILL);
 	seqv->tracks = create_track_view(seqv->num, MAX_TRACKS, (void*) seqv, (void*) vp );
 	gtk_tree_view_set_headers_visible( GTK_TREE_VIEW( get_track_tree(seqv->tracks)) , FALSE );
 	gtk_widget_set_size_request_( get_track_tree(seqv->tracks),20,80 );
@@ -1164,39 +1168,63 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_widget_show( get_track_tree(seqv->tracks));
 	gtk_box_pack_start( GTK_BOX(vvvbox), scroll, TRUE,TRUE, 0);
 
-	GtkWidget *hhbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);
+	GtkWidget *control_grid = gtk_grid_new();
+	GtkWidget *speed_label = gtk_label_new("Speed");
+	GtkWidget *opacity_label = gtk_label_new("Opacity");
+	gtk_grid_set_column_spacing(GTK_GRID(control_grid), 6);
+	gtk_grid_set_row_spacing(GTK_GRID(control_grid), 2);
+	gtk_widget_set_margin_start(control_grid, 4);
+	gtk_widget_set_margin_end(control_grid, 4);
+	gtk_widget_set_margin_top(control_grid, 2);
+	gtk_widget_set_margin_bottom(control_grid, 2);
+	gtk_label_set_xalign(GTK_LABEL(speed_label), 0.0f);
+	gtk_label_set_xalign(GTK_LABEL(opacity_label), 0.0f);
+	gtk_label_set_width_chars(GTK_LABEL(speed_label), 7);
+	gtk_label_set_width_chars(GTK_LABEL(opacity_label), 7);
 
-	seqv->sliders_[0] = gtk_scale_new_with_range( GTK_ORIENTATION_VERTICAL,
+	seqv->sliders_[0] = gtk_scale_new_with_range( GTK_ORIENTATION_HORIZONTAL,
                                                 -12.0,12.0,1.0 );
-
-    gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[0]), "Speed" );
-
-	seqv->sliders_[1] = gtk_scale_new_with_range( GTK_ORIENTATION_VERTICAL,
+	seqv->sliders_[1] = gtk_scale_new_with_range( GTK_ORIENTATION_HORIZONTAL,
                                                 0.0, 1.0, 0.01 );
 
-    gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[1]), "Opacity");
+	gtk_widget_set_hexpand(seqv->sliders_[0], TRUE);
+	gtk_widget_set_halign(seqv->sliders_[0], GTK_ALIGN_FILL);
+	gtk_widget_set_hexpand(seqv->sliders_[1], TRUE);
+	gtk_widget_set_halign(seqv->sliders_[1], GTK_ALIGN_FILL);
+    gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[0]), "Playback speed" );
+    gtk_widget_set_tooltip_text( GTK_WIDGET(seqv->sliders_[1]), "Track opacity" );
 
     a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[0]));
     gtk_adjustment_set_value( a, 1.0 );
     a = gtk_range_get_adjustment( GTK_RANGE( seqv->sliders_[1]));
     gtk_adjustment_set_value( a, 0.0 );
 
-
+	gtk_scale_set_digits( GTK_SCALE(seqv->sliders_[0]), 0 );
 	gtk_scale_set_digits( GTK_SCALE(seqv->sliders_[1]), 2 );
+	gtk_scale_set_draw_value(GTK_SCALE(seqv->sliders_[0]), TRUE);
+	gtk_scale_set_draw_value(GTK_SCALE(seqv->sliders_[1]), TRUE);
+	gtk_scale_set_value_pos(GTK_SCALE(seqv->sliders_[0]), GTK_POS_RIGHT);
+	gtk_scale_set_value_pos(GTK_SCALE(seqv->sliders_[1]), GTK_POS_RIGHT);
+
 	g_signal_connect( G_OBJECT( seqv->sliders_[0] ), "value_changed", G_CALLBACK( seq_speed ),
 				(gpointer*)seqv );
 	g_signal_connect( G_OBJECT( seqv->sliders_[1] ), "value_changed", G_CALLBACK( seq_opacity ),
 				(gpointer*)seqv );
 
-	gtk_box_pack_start( GTK_BOX( hhbox ), seqv->sliders_[0], TRUE, TRUE, 0 );
-	gtk_box_pack_start( GTK_BOX( hhbox ), seqv->sliders_[1], TRUE, TRUE, 0 );
-	gtk_widget_show( seqv->sliders_[0] );
-	gtk_widget_show( seqv->sliders_[1] );
-	gtk_box_pack_start( GTK_BOX(vvvbox), hhbox, TRUE,TRUE, 0 );
-	gtk_widget_show( hhbox );
-	gtk_container_add( GTK_CONTAINER( box ), vvvbox );
-	gtk_widget_show( vvvbox );
-	gtk_widget_show( box );
+	gtk_grid_attach(GTK_GRID(control_grid), speed_label, 0, 0, 1, 1);
+	gtk_grid_attach(GTK_GRID(control_grid), seqv->sliders_[0], 1, 0, 1, 1);
+	gtk_grid_attach(GTK_GRID(control_grid), opacity_label, 0, 1, 1, 1);
+	gtk_grid_attach(GTK_GRID(control_grid), seqv->sliders_[1], 1, 1, 1, 1);
+
+	gtk_widget_show(speed_label);
+	gtk_widget_show(opacity_label);
+	gtk_widget_show(seqv->sliders_[0]);
+	gtk_widget_show(seqv->sliders_[1]);
+	gtk_widget_show(control_grid);
+	gtk_box_pack_start(GTK_BOX(vvvbox), control_grid, FALSE, TRUE, 0);
+	gtk_container_add(GTK_CONTAINER(box), vvvbox);
+	gtk_widget_show(vvvbox);
+	gtk_widget_show(box);
 
 
 	GtkWidget *hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL,0);

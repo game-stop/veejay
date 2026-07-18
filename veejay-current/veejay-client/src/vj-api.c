@@ -72,10 +72,15 @@
 #include <src/gtkvimshistoryview.h>
 #include <src/gtkvimsview.h>
 #include <src/gtksamplebankview.h>
+#include <src/gtkeditlistview.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
 #include <src/vmidi.h>
 #include <src/utils-gtk.h>
+
+#ifndef VIMS_EDITLIST_MOVE_RANGE
+#define VIMS_EDITLIST_MOVE_RANGE 454
+#endif
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -220,8 +225,6 @@ enum {
   WIDGET_MACRORECORD = 37,
   WIDGET_MACROPLAY = 38,
   WIDGET_MACROSTOP = 39,
-  WIDGET_BUTTON_EL_SELSTART = 40,
-  WIDGET_BUTTON_EL_SELEND = 41,
   WIDGET_LABEL_LOOP_STAT_STOP = 42,
   WIDGET_SAMPLE_LOOPSTOP = 43,
   WIDGET_STREAM_LOOPSTOP = 44,
@@ -675,6 +678,7 @@ enum {
   PLAIN_WIDGET_VJFRAMERATE,
   PLAIN_WIDGET_SAMPLE_HOLD_HBOX,
   PLAIN_WIDGET_MARKERFRAME,
+  PLAIN_WIDGET_PANEL,
   PLAIN_WIDGET_NONE,
 };
 
@@ -834,6 +838,7 @@ static struct
     { PLAIN_WIDGET_VJFRAMERATE,                 WIDGET_VJFRAMERATE },
     { PLAIN_WIDGET_SAMPLE_HOLD_HBOX,            WIDGET_SAMPLE_HOLD_HBOX },
     { PLAIN_WIDGET_MARKERFRAME,                 WIDGET_MARKERFRAME },
+    { PLAIN_WIDGET_PANEL,                       WIDGET_PANELS },
     { PLAIN_WIDGET_NONE,                        -1 },
 };
 
@@ -850,7 +855,6 @@ static struct
     { "label_curframe",         WIDGET_LABEL_CURFRAME },
     { "label_mouseat",          WIDGET_LABEL_MOUSEAT },
     { "label_curtime",          WIDGET_LABEL_CURTIME },
-    { "label_sampleposition",   WIDGET_LABEL_SAMPLEPOSITION },
     { "vims_messenger_play",    WIDGET_VIMS_MESSENGER_PLAY },
     { "statusbar",              WIDGET_STATUSBAR },
     { "loop_none",              WIDGET_LOOP_NONE },
@@ -880,17 +884,12 @@ static struct
     { "stream_buffer_speed_value", WIDGET_STREAM_BUFFER_SPEED_VALUE },
     { "stream_buffer_mode_value", WIDGET_STREAM_BUFFER_MODE_VALUE },
     { "button_fadedur",         WIDGET_BUTTON_FADEDUR },
-    { "label_totframes",        WIDGET_LABEL_TOTFRAMES },
-    { "label_samplelength",     WIDGET_LABEL_SAMPLELENGTH },
     { "label_totaltime",        WIDGET_LABEL_TOTALTIME },
     { "sample_length_label",    WIDGET_SAMPLE_LENGTH_LABEL },
-    { "label_samplepos",        WIDGET_LABEL_SAMPLEPOS },
     { "feedbackbutton",         WIDGET_FEEDBACKBUTTON },
     { "macrorecord",            WIDGET_MACRORECORD },
     { "macroplay",              WIDGET_MACROPLAY },
     { "macrostop",              WIDGET_MACROSTOP },
-    { "button_el_selstart",     WIDGET_BUTTON_EL_SELSTART },
-    { "button_el_selend",       WIDGET_BUTTON_EL_SELEND },
     { "label_loop_stat_stop",   WIDGET_LABEL_LOOP_STAT_STOP },
     { "sample_loopstop",        WIDGET_SAMPLE_LOOPSTOP },
     { "stream_loopstop",        WIDGET_STREAM_LOOPSTOP },
@@ -1741,14 +1740,6 @@ enum
     NUM_HINTS = 20,
 };
 
-enum
-{
-    PAGE_CONSOLE =0,
-    PAGE_FX = 3,
-    PAGE_EL = 1,
-    PAGE_SAMPLEEDIT = 2,
-};
-
 typedef struct
 {
     int channel;
@@ -1784,7 +1775,6 @@ typedef struct
     int recording[2];
 
     int selected_chain_entry;
-    int selected_el_entry;
     int selected_fx_param;
 
     int render_record;
@@ -2033,8 +2023,6 @@ typedef struct
     effect_constr **effect_info;
     GList       *devlist;
     GList       *chalist;
-    GList       *editlist;
-    GList       *elref;
     long        window_id;
     int run_state;
     int play_direction;
@@ -2045,6 +2033,7 @@ typedef struct
     GtkWidget   *vims_pattern_view;
     GtkWidget   *vims_history_view;
     GtkWidget   *vims_view;
+    GtkWidget   *edit_list_view;
     sample_bank_t   **sample_banks;
     sample_slot_t   *selected_slot;
     sample_slot_t   *selection_slot;
@@ -2152,8 +2141,11 @@ static effectlist_data fxlist_data;
 #define VEEJAY_MSG_OUTPUT   4
 #define GENERATOR_PARAMS 11
 
-#define SEQUENCER_COL 10
+#define SEQUENCER_COL 12
 #define SEQUENCER_ROW 10
+#if (SEQUENCER_COL * SEQUENCER_ROW) != MAX_SEQUENCES
+#error "GUI sequencer grid dimensions do not match backend slot capacity"
+#endif
 
 static vj_gui_t *info = NULL;
 void *get_ui_info(void) { return (void*) info; }
@@ -2172,10 +2164,9 @@ static GtkTreeModel *cali_sourcemodel = NULL;
 static int next_available_absolute_slot = 0;
 
 
-static GtkWidget *editlist_tree = NULL;
-static GtkListStore *editlist_store = NULL;
-static GtkTreeModel *editlist_model = NULL;
 static guint periodic_pull_timeout_id = 0;
+static int edit_list_attached_playmode = -1;
+static int edit_list_attached_source_id = -1;
 
 static int get_slider_val(const char *name);
 static int get_slider_val2(GtkWidget *w);
@@ -2236,6 +2227,9 @@ static void ui_transport_controls_set_sensitive(int sensitive);
 static gint load_parameter_info(void);
 static void load_v4l_info(void);
 static void reload_editlist_contents(void);
+static void edit_list_mount_view(void);
+static void edit_list_attach_to_playmode(int play_mode);
+static gboolean edit_list_playmode_is_editable(int play_mode);
 static void load_effectchain_info(void);
 static void fx_chain_controls_sync_from_status(int play_mode, int active);
 static void fx_chain_panel_toggle_mount(void);
@@ -2395,15 +2389,11 @@ static void timeline_hide_external_value_labels(void)
         WIDGET_LABEL_CURFRAME,
         WIDGET_LABEL_MOUSEAT,
         WIDGET_LABEL_CURTIME,
-        WIDGET_LABEL_SAMPLEPOSITION,
         WIDGET_LABEL_MARKEREND,
         WIDGET_LABEL_MARKERDURATION,
         WIDGET_LABEL_MARKERSTART,
-        WIDGET_LABEL_TOTFRAMES,
-        WIDGET_LABEL_SAMPLELENGTH,
         WIDGET_LABEL_TOTALTIME,
         WIDGET_SAMPLE_LENGTH_LABEL,
-        WIDGET_LABEL_SAMPLEPOS,
         WIDGET_PLAYHINT,
         WIDGET_LABEL_LOOP_STAT_STOP,
         WIDGET_LABEL_LOOP_STATS,
@@ -3142,16 +3132,6 @@ static void vj_kf_reset_shape_combo(void)
     info->status_lock = osl;
 }
 
-static gboolean is_edl_displayed(void)
-{
-    int panel_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
-    int sample_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK15] ));
-
-    if(panel_page == NOTEBOOK18_PAGE_SAMPLE && sample_page == 2)
-        return TRUE;
-    return FALSE;
-}
-
 static gboolean is_fxanim_displayed(void)
 {
     int fxanim_page = gtk_notebook_get_current_page( GTK_NOTEBOOK( widget_cache[ WIDGET_NOTEBOOK18 ] ));
@@ -3356,6 +3336,8 @@ void vj_gui_plain_sample_attention_start(void)
 {
     GtkWidget *start = widget_cache[WIDGET_BUTTON_SAMPLESTART];
     GtkWidget *end = widget_cache[WIDGET_BUTTON_SAMPLEEND];
+
+    set_pm_page_label(MODE_PLAIN);
 
     if(!start || !end)
         return;
@@ -4854,24 +4836,6 @@ static void setup_v4l_devices(void)
 
 }
 
-typedef struct
-{
-    int id;
-    int nl;
-    long n1;
-    long n2;
-    int tf;
-} el_ref;
-
-typedef struct
-{
-    int pos;
-    char *filename;
-    char *fourcc;
-    int num_frames;
-} el_constr;
-
-
 int _effect_is_gen(int effect_id)
 {
     effect_constr *ec = info->effect_info[effect_id];
@@ -4896,7 +4860,6 @@ int _effect_get_rgb(int effect_id)
     return 0;
 }
 
-
 int _effect_get_np(int effect_id)
 {
     effect_constr *ec = info->effect_info[effect_id];
@@ -4905,7 +4868,7 @@ int _effect_get_np(int effect_id)
     return 0;
 }
 
-int _effect_get_minmax( int effect_id, int *min, int *max, int index )
+int _effect_get_minmax(int effect_id, int *min, int *max, int index)
 {
     effect_constr *ec = info->effect_info[effect_id];
     if(ec != NULL && index < ec->num_arg) {
@@ -4958,150 +4921,6 @@ char *_effect_get_hint(int effect_id, int p, int v)
         return FX_PARAMETER_VALUE_DEFAULT_HINT;
 
     return ec->hints[p]->description[v];
-}
-
-el_constr *_el_entry_new( int pos, char *file, int nf , char *fourcc)
-{
-    el_constr *el = g_new( el_constr , 1 );
-    el->filename = strdup( file );
-    el->num_frames = nf;
-    el->pos = pos;
-    el->fourcc = strdup(fourcc);
-    return el;
-}
-
-void _el_entry_free( el_constr *entry )
-{
-    if(entry)
-    {
-        if(entry->filename) free(entry->filename);
-        if(entry->fourcc) free(entry->fourcc);
-        free(entry);
-    }
-}
-
-void _el_entry_reset(void)
-{
-    if(info->editlist != NULL)
-    {
-        int n = g_list_length( info->editlist );
-        int i;
-        for( i = 0; i <= n ; i ++)
-            _el_entry_free( g_list_nth_data( info->editlist, i ) );
-        g_list_free(info->editlist);
-        info->editlist=NULL;
-    }
-}
-
-int _el_get_nframes( int pos )
-{
-    int n = g_list_length( info->editlist );
-    int i;
-    for( i = 0; i <= n ; i ++)
-    {
-        el_constr *el = g_list_nth_data( info->editlist, i );
-        if(!el) return 0;
-        if(el->pos == pos)
-            return el->num_frames;
-    }
-    return 0;
-}
-
-el_ref *_el_ref_new( int row_num,int nl, long n1, long n2, int tf)
-{
-    el_ref *el = vj_calloc(sizeof(el_ref));
-    el->id = row_num;
-    el->nl = nl;
-    el->n1 = n1;
-    el->n2 = n2;
-    el->tf = tf;
-    return el;
-}
-
-void _el_ref_free( el_ref *entry )
-{
-    if(entry) free(entry);
-}
-
-void _el_ref_reset(void)
-{
-    if(info->elref != NULL)
-    {
-        int n = g_list_length( info->elref );
-        int i;
-        for(i = 0; i <= n; i ++ )
-        {
-            el_ref *edl = g_list_nth_data(info->elref, i );
-            if(edl)
-                free(edl);
-        }
-        g_list_free(info->elref);
-        info->elref = NULL;
-    }
-}
-
-int _el_ref_end_frame( int row_num )
-{
-    int n = g_list_length( info->elref );
-    int i;
-    for ( i = 0 ; i <= n; i ++ )
-    {
-        el_ref *el  = g_list_nth_data( info->elref, i );
-        if(el->id == row_num )
-        {
-
-
-            return (el->tf + el->n2 - el->n1);
-        }
-    }
-    return 0;
-}
-
-int _el_ref_start_frame( int row_num )
-{
-    int n = g_list_length( info->elref );
-    int i;
-    for ( i = 0 ; i <= n; i ++ )
-    {
-        el_ref *el  = g_list_nth_data( info->elref, i );
-        if(el != NULL && el->id == row_num )
-        {
-
-
-            return (el->tf);
-        }
-    }
-    return 0;
-}
-
-char *_el_get_fourcc( int pos )
-{
-    int n = g_list_length( info->editlist );
-    int i;
-    for( i = 0; i <= n; i ++ )
-    {
-        el_constr *el = g_list_nth_data( info->editlist, i );
-        if(el == NULL) {
-            return NULL;
-        }
-        if(el->pos == pos)
-            return el->fourcc;
-    }
-    return NULL;
-}
-
-
-char *_el_get_filename( int pos )
-{
-    int n = g_list_length( info->editlist );
-    int i;
-    for( i = 0; i <= n; i ++ )
-    {
-        el_constr *el = g_list_nth_data( info->editlist, i );
-        if(el != NULL && el->pos == pos)
-            return el->filename;
-    }
-    return NULL;
 }
 
 static void ui_beat_hint_reset(ui_beat_param_hint_t *h)
@@ -6725,6 +6544,7 @@ static const int sequence_vims_project_edit_ids[] = {
     VIMS_EDITLIST_CUT,
     VIMS_EDITLIST_DEL,
     VIMS_EDITLIST_PASTE_AT,
+    VIMS_EDITLIST_MOVE_RANGE,
     VIMS_EDITLIST_SAVE,
 };
 
@@ -9158,8 +8978,9 @@ static void update_label_str2(GtkWidget *label, const char *text)
 {
 #ifdef STRICT_CHECKING
     assert(label != NULL);
+    assert(GTK_IS_LABEL(label));
 #else
-    if(!label || !text)
+    if(!label || !GTK_IS_LABEL(label) || !text)
         return;
 #endif
 
@@ -9707,10 +9528,61 @@ const char *get_stream_prefix(int type)
     }
 }
 
+static void update_stream_inspector_source(int stream_id, int stream_type)
+{
+    GtkWidget *summary;
+    char text[96];
+
+    if(!info || !info->main_window)
+        return;
+
+    summary = GTK_WIDGET(glade_xml_get_widget_(info->main_window,
+                                               "stream_source_summary"));
+    if(!GTK_IS_LABEL(summary))
+        return;
+
+    snprintf(text, sizeof(text), "Stream %d  ·  %s", stream_id,
+             get_stream_prefix(stream_type));
+    gtk_label_set_text(GTK_LABEL(summary), text);
+}
+
+static void stream_source_page_set_available(gboolean available)
+{
+    GtkWidget *notebook_widget;
+    GtkWidget *source_page;
+    gint source_page_num;
+
+    if(!info || !info->main_window)
+        return;
+
+    notebook_widget = GTK_WIDGET(glade_xml_get_widget_(info->main_window,
+                                                        "stream_control_notebook"));
+    source_page = GTK_WIDGET(glade_xml_get_widget_(info->main_window,
+                                                    "stream_source_page"));
+
+    if(!GTK_IS_NOTEBOOK(notebook_widget) || !GTK_IS_WIDGET(source_page))
+        return;
+
+    source_page_num = gtk_notebook_page_num(GTK_NOTEBOOK(notebook_widget), source_page);
+
+    if(available) {
+        gtk_widget_show(source_page);
+        return;
+    }
+
+    if(source_page_num >= 0 &&
+       gtk_notebook_get_current_page(GTK_NOTEBOOK(notebook_widget)) == source_page_num)
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook_widget), 0);
+
+    gtk_widget_hide(source_page);
+}
+
 static void update_current_slot(int *history, int pm, int last_pm) {
     gint update = 0;
     const gboolean source_changed = (pm != last_pm) ||
-                                    info->status_tokens[CURRENT_ID] != history[CURRENT_ID];
+                                    info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
+                                    (pm == MODE_STREAM &&
+                                     info->status_tokens[STREAM_TYPE] != history[STREAM_TYPE]);
 
     if(source_changed)
     {
@@ -9719,58 +9591,79 @@ static void update_current_slot(int *history, int pm, int last_pm) {
         update_record_tab( pm );
         sample_volume_sync_from_status(history, 1);
 
-        if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
+        if(pm == MODE_STREAM &&
+           info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX)
         {
             info->uc.reload_hint[HINT_V4L] = 1;
             for(k = 0; capt_card_set[k].name != NULL; k ++ )
             {
-                show_widget( capt_card_set[k].name );
-                show_widget( capt_label_set[k].name );
+                show_widget(capt_card_set[k].name);
+                show_widget(capt_label_set[k].name);
             }
         }
         else
         {
-            for(k = 0; capt_card_set[k].name != NULL ; k ++ )
+            for(k = 0; capt_card_set[k].name != NULL; k ++ )
             {
-                hide_widget( capt_card_set[k].name );
-                hide_widget( capt_label_set[k].name );
+                hide_widget(capt_card_set[k].name);
+                hide_widget(capt_label_set[k].name);
             }
         }
 
-        switch(info->status_tokens[STREAM_TYPE])
+        if(pm == MODE_STREAM)
         {
-            case STREAM_GENERATOR:
-                    if(!gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
-                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), TRUE );
-                    }
+            update_stream_inspector_source(info->status_tokens[CURRENT_ID],
+                                           info->status_tokens[STREAM_TYPE]);
+
+            switch(info->status_tokens[STREAM_TYPE])
+            {
+                case STREAM_GENERATOR:
+                    stream_source_page_set_available(TRUE);
+                    show_widget("stream_source_controls_frame");
+                    show_widget("stream_row6_params_frame");
                     show_widget("frame_fxtree1");
                     hide_widget("notebook16");
+                    if(!gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1])))
+                        gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1]), TRUE);
                     break;
-            case STREAM_WHITE:
+                case STREAM_WHITE:
+                    stream_source_page_set_available(TRUE);
+                    show_widget("stream_source_controls_frame");
+                    hide_widget("stream_row6_params_frame");
                     hide_widget("frame_fxtree1");
-                    if(gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
-                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), FALSE );
-                    }
-
                     show_widget("notebook16");
-                    notebook_set_page("notebook16",1 );
+                    notebook_set_page("notebook16", 1);
+                    if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1])))
+                        gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1]), FALSE);
                     break;
-            case STREAM_VIDEO4LINUX:
+                case STREAM_VIDEO4LINUX:
+                    stream_source_page_set_available(TRUE);
+                    show_widget("stream_source_controls_frame");
+                    hide_widget("stream_row6_params_frame");
                     hide_widget("frame_fxtree1");
-                    if(gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
-                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), FALSE );
-                    }
-
                     show_widget("notebook16");
-                    notebook_set_page("notebook16",0 );
+                    notebook_set_page("notebook16", 0);
+                    if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1])))
+                        gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1]), FALSE);
                     break;
-            default:
-                    hide_widget( "frame_fxtree1");
-                    if(gtk_widget_is_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ) ) ) {
-                        gtk_widget_set_sensitive( GTK_WIDGET( widget_cache[WIDGET_FRAME_FXTREE1] ), FALSE );
-                    }
-                    hide_widget( "notebook16");
+                default:
+                    stream_source_page_set_available(FALSE);
+                    hide_widget("stream_source_controls_frame");
+                    hide_widget("stream_row6_params_frame");
+                    hide_widget("frame_fxtree1");
+                    hide_widget("notebook16");
+                    if(gtk_widget_is_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1])))
+                        gtk_widget_set_sensitive(GTK_WIDGET(widget_cache[WIDGET_FRAME_FXTREE1]), FALSE);
                     break;
+            }
+        }
+        else
+        {
+            stream_source_page_set_available(FALSE);
+            hide_widget("stream_source_controls_frame");
+            hide_widget("stream_row6_params_frame");
+            hide_widget("frame_fxtree1");
+            hide_widget("notebook16");
         }
 
         info->uc.reload_hint[HINT_HISTORY] = 1;
@@ -13150,30 +13043,6 @@ static void load_samplelist_info(void)
 
 }
 
-gboolean view_el_selection_func (GtkTreeSelection *selection,
-                                 GtkTreeModel     *model,
-                                 GtkTreePath      *path,
-                                 gboolean          path_currently_selected,
-                                 gpointer          userdata)
-{
-    GtkTreeIter iter;
-
-    if (gtk_tree_model_get_iter(model, &iter, path))
-    {
-        gint num = 0;
-        gtk_tree_model_get(model, &iter, COLUMN_INT, &num, -1);
-
-        if (!path_currently_selected)
-        {
-            info->uc.selected_el_entry = num;
-            gint frame_num =0;
-            frame_num = _el_ref_start_frame( num );
-            update_spin_value2(widget_cache[WIDGET_BUTTON_EL_SELSTART], frame_num);
-            update_spin_value2(widget_cache[WIDGET_BUTTON_EL_SELEND], _el_ref_end_frame(num));
-        }
-    }
-    return TRUE;
-}
 
 enum
 {
@@ -14240,26 +14109,6 @@ static void on_vims_action_selection_changed(GtkWidget *widget,
     vims_update_controls();
 }
 
-void
-on_editlist_row_activated(GtkTreeView *treeview,
-                          GtkTreePath *path,
-                          GtkTreeViewColumn *col,
-                          gpointer user_data)
-{
-    GtkTreeModel *model;
-    GtkTreeIter iter;
-
-    model = gtk_tree_view_get_model(treeview);
-    if(gtk_tree_model_get_iter(model,&iter,path))
-    {
-        gint num = 0;
-        gtk_tree_model_get(model,&iter, COLUMN_INT, &num, -1);
-        gint frame_num = _el_ref_start_frame( num );
-
-        multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (int) frame_num );
-    }
-}
-
 void on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 {
     if(!info->status_lock && info->selected_slot)
@@ -14505,28 +14354,6 @@ static void setup_bundles(void)
     vims_update_controls();
 }
 
-static void setup_editlist_info(void)
-{
-    editlist_tree = glade_xml_get_widget_( info->main_window, "editlisttree");
-    editlist_store = gtk_list_store_new( 5,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING ,G_TYPE_STRING);
-    gtk_tree_view_set_model( GTK_TREE_VIEW(editlist_tree), GTK_TREE_MODEL(editlist_store));
-    g_object_unref( G_OBJECT( editlist_store ));
-    editlist_model = gtk_tree_view_get_model( GTK_TREE_VIEW(editlist_tree ));
-    editlist_store = GTK_LIST_STORE(editlist_model);
-
-    setup_tree_text_column( "editlisttree", COLUMN_INT, "#",0);
-    setup_tree_text_column( "editlisttree", COLUMN_STRING0, "Timecode",0 );
-    setup_tree_text_column( "editlisttree", COLUMN_STRINGA, "Filename",0);
-    setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration",0);
-    setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC",0);
-
-    g_signal_connect( editlist_tree, "row-activated",
-    (GCallback) on_editlist_row_activated, NULL );
-
-    GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(editlist_tree));
-    gtk_tree_selection_set_select_function(selection, view_el_selection_func, NULL, NULL);
-    gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-}
 
 static const char *vims_description_for_event(int event_id)
 {
@@ -14889,22 +14716,351 @@ static void reload_vimslist(void)
     free(eltext);
 }
 
-void _edl_reset(void)
+
+
+
+static gboolean edit_list_playmode_is_editable(int play_mode)
 {
-    if( info->elref != NULL)
-    {
-        int n = g_list_length(info->elref);
-        int i;
-        for( i = 0; i <=n ; i ++ )
-        {
-            void *ptr = g_list_nth_data( info->elref , i );
-            if(ptr)
-                free(ptr);
+    play_mode = ui_playmode_effective(play_mode);
+    return play_mode == MODE_SAMPLE || play_mode == MODE_PLAIN;
+}
+
+static int edit_list_source_id_for_mode(int play_mode)
+{
+    play_mode = ui_playmode_effective(play_mode);
+    return play_mode == MODE_SAMPLE ? info->status_tokens[CURRENT_ID] : 0;
+}
+
+static int edit_list_total_frames_for_mode(int play_mode, int parsed_total)
+{
+    play_mode = ui_playmode_effective(play_mode);
+
+    if(play_mode == MODE_PLAIN)
+        return MAX(0, info->status_tokens[TOTAL_FRAMES]);
+
+    if(parsed_total > 0)
+        return parsed_total;
+
+    return MAX(0, info->status_tokens[TOTAL_FRAMES]);
+}
+
+static void edit_list_attach_to_playmode(int play_mode)
+{
+    GtkWidget *host;
+    GtkWidget *parent;
+    const char *host_name;
+
+    if(!info || !info->main_window || !info->edit_list_view)
+        return;
+
+    play_mode = ui_playmode_effective(play_mode);
+    if(play_mode != MODE_SAMPLE && play_mode != MODE_PLAIN) {
+        if(edit_list_attached_playmode != -1) {
+            gvr_edit_list_view_clear_selection(info->edit_list_view);
+            gvr_edit_list_view_set_clipboard(info->edit_list_view,
+                                             FALSE,
+                                             0,
+                                             FALSE,
+                                             0,
+                                             0);
+            info->selection[0] = -1;
+            info->selection[1] = -1;
+            edit_list_attached_playmode = -1;
+            edit_list_attached_source_id = -1;
         }
-        g_list_free( info->elref );
+        return;
+    }
+
+    const int source_id = play_mode == MODE_SAMPLE
+                        ? info->status_tokens[CURRENT_ID]
+                        : 0;
+
+    host_name = play_mode == MODE_PLAIN
+              ? "edit_list_plain_host"
+              : "edit_list_view_host";
+    host = glade_xml_get_widget_(info->main_window, host_name);
+
+    if(!host || !GTK_IS_BOX(host))
+        return;
+
+    if(edit_list_attached_playmode != play_mode ||
+       edit_list_attached_source_id != source_id)
+    {
+        gvr_edit_list_view_clear_selection(info->edit_list_view);
+        gvr_edit_list_view_set_clipboard(info->edit_list_view,
+                                         FALSE,
+                                         0,
+                                         FALSE,
+                                         0,
+                                         0);
+        info->selection[0] = -1;
+        info->selection[1] = -1;
+        edit_list_attached_playmode = play_mode;
+        edit_list_attached_source_id = source_id;
+    }
+
+    parent = gtk_widget_get_parent(info->edit_list_view);
+    if(parent != host) {
+        g_object_ref(info->edit_list_view);
+        if(parent && GTK_IS_CONTAINER(parent))
+            gtk_container_remove(GTK_CONTAINER(parent), info->edit_list_view);
+        gtk_box_pack_start(GTK_BOX(host), info->edit_list_view, TRUE, TRUE, 0);
+        g_object_unref(info->edit_list_view);
+    }
+
+    gvr_edit_list_view_set_sample(info->edit_list_view,
+                                  source_id,
+                                  edit_list_total_frames_for_mode(play_mode,
+                                                                  info->el.num_frames),
+                                  info->el.fps);
+    gvr_edit_list_view_set_editable(info->edit_list_view,
+                                    edit_list_playmode_is_editable(play_mode));
+    gvr_edit_list_view_set_playhead(info->edit_list_view,
+                                    info->status_tokens[FRAME_NUM]);
+    gtk_widget_show_all(host);
+}
+
+static gboolean edit_list_action_has_selection(int in_frame, int out_frame)
+{
+    return in_frame >= 0 && out_frame >= in_frame;
+}
+
+static void edit_list_action_log(const char *verb, int in_frame, int out_frame)
+{
+    char *start = format_time(in_frame, info->el.fps);
+    char *end = format_time(out_frame, info->el.fps);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "%s Edit List range %d-%d (%s-%s)",
+           verb,
+           in_frame,
+           out_frame,
+           start,
+           end);
+
+    free(start);
+    free(end);
+}
+
+static void edit_list_action_requested(GtkWidget *widget,
+                                       int action,
+                                       int in_frame,
+                                       int out_frame,
+                                       int position,
+                                       gpointer user_data)
+{
+    gchar *filename;
+
+    (void)widget;
+    (void)user_data;
+
+    if(!info || !edit_list_playmode_is_editable(info->status_tokens[PLAY_MODE]))
+        return;
+
+    switch((GvrEditListAction)action) {
+        case GVR_EDIT_LIST_ACTION_APPEND_FILE:
+            filename = dialog_open_file("Append videofile to Edit List", FILE_FILTER_DEFAULT);
+            if(filename) {
+                multi_vims(VIMS_EDITLIST_ADD, "%s", filename);
+                vj_msg(VEEJAY_MSG_INFO, "Append '%s' to Edit List", filename);
+                g_free(filename);
+                info->uc.reload_hint[HINT_EL] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_APPEND_FILE_AND_SAMPLE:
+            filename = dialog_open_file("Append videofile and create sample", FILE_FILTER_DEFAULT);
+            if(filename) {
+                multi_vims(VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename);
+                g_free(filename);
+                info->uc.reload_hint[HINT_EL] = 1;
+                info->uc.reload_hint[HINT_SLIST] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_SAVE_LIST:
+            filename = dialog_save_file("Save Edit List", "veejay-editlist.edl");
+            if(filename) {
+                multi_vims(VIMS_EDITLIST_SAVE,
+                           "%d %d %s",
+                           0,
+                           -1,
+                           filename);
+                vj_msg(VEEJAY_MSG_INFO, "Saved Edit List to %s", filename);
+                g_free(filename);
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_SAVE_SELECTION:
+            if(!edit_list_action_has_selection(in_frame, out_frame))
+                break;
+            filename = dialog_save_file("Save Edit List Selection", "veejay-editlist.edl");
+            if(filename) {
+                multi_vims(VIMS_EDITLIST_SAVE,
+                           "%d %d %s",
+                           in_frame,
+                           out_frame,
+                           filename);
+                vj_msg(VEEJAY_MSG_INFO, "Saved Edit List selection to %s", filename);
+                g_free(filename);
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_CUT:
+            if(edit_list_action_has_selection(in_frame, out_frame)) {
+                multi_vims(VIMS_EDITLIST_CUT, "%d %d", in_frame, out_frame);
+                edit_list_action_log("Cut", in_frame, out_frame);
+                info->uc.reload_hint[HINT_EL] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_COPY:
+            if(edit_list_action_has_selection(in_frame, out_frame)) {
+                multi_vims(VIMS_EDITLIST_COPY, "%d %d", in_frame, out_frame);
+                edit_list_action_log("Copied", in_frame, out_frame);
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_PASTE:
+            if(position < 0)
+                position = info->status_tokens[FRAME_NUM];
+            if(ui_playmode_effective(info->status_tokens[PLAY_MODE]) == MODE_SAMPLE)
+                multi_vims(VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
+            multi_vims(VIMS_EDITLIST_PASTE_AT, "%d", position);
+            vj_msg(VEEJAY_MSG_INFO, "Paste Edit List buffer at frame %d", position);
+            info->uc.reload_hint[HINT_EL] = 1;
+            break;
+
+        case GVR_EDIT_LIST_ACTION_DELETE:
+            if(edit_list_action_has_selection(in_frame, out_frame)) {
+                multi_vims(VIMS_EDITLIST_DEL, "%d %d", in_frame, out_frame);
+                if(ui_playmode_effective(info->status_tokens[PLAY_MODE]) == MODE_SAMPLE)
+                    multi_vims(VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
+                edit_list_action_log("Deleted", in_frame, out_frame);
+                gvr_edit_list_view_clear_selection(info->edit_list_view);
+                info->uc.reload_hint[HINT_EL] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_CROP:
+            if(edit_list_action_has_selection(in_frame, out_frame)) {
+                multi_vims(VIMS_EDITLIST_CROP, "%d %d", in_frame, out_frame);
+                if(ui_playmode_effective(info->status_tokens[PLAY_MODE]) == MODE_SAMPLE)
+                    multi_vims(VIMS_SAMPLE_CLEAR_MARKER, "%d", 0);
+                edit_list_action_log("Cropped to", in_frame, out_frame);
+                gvr_edit_list_view_clear_selection(info->edit_list_view);
+                info->uc.reload_hint[HINT_EL] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_NEW_SAMPLE:
+            if(edit_list_action_has_selection(in_frame, out_frame)) {
+                multi_vims(VIMS_SAMPLE_NEW, "%d %d", in_frame, out_frame);
+                edit_list_action_log("Created sample from", in_frame, out_frame);
+                info->uc.reload_hint[HINT_SLIST] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_MOVE_RANGE:
+            if(edit_list_action_has_selection(in_frame, out_frame) && position >= 0) {
+                multi_vims(VIMS_EDITLIST_MOVE_RANGE,
+                           "%d %d %d", in_frame, out_frame, position);
+                vj_msg(VEEJAY_MSG_INFO,
+                       "Move Edit List range %d-%d to insertion boundary %d",
+                       in_frame, out_frame, position);
+                info->uc.reload_hint[HINT_EL] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_COPY_RANGE_TO:
+            if(edit_list_action_has_selection(in_frame, out_frame) && position >= 0) {
+                multi_vims(VIMS_EDITLIST_COPY, "%d %d", in_frame, out_frame);
+                multi_vims(VIMS_EDITLIST_PASTE_AT, "%d", position);
+                vj_msg(VEEJAY_MSG_INFO,
+                       "Copy Edit List range %d-%d to insertion boundary %d",
+                       in_frame, out_frame, position);
+                info->uc.reload_hint[HINT_EL] = 1;
+            }
+            break;
+
+        case GVR_EDIT_LIST_ACTION_REFRESH:
+            info->uc.reload_hint[HINT_EL] = 1;
+            break;
+
+        default:
+            break;
     }
 }
 
+static void edit_list_seek_requested(GtkWidget *widget,
+                                     int frame,
+                                     gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(!info || !edit_list_playmode_is_editable(info->status_tokens[PLAY_MODE]))
+        return;
+
+    multi_vims(VIMS_VIDEO_SET_FRAME, "%d", frame);
+}
+
+static void edit_list_selection_changed(GtkWidget *widget,
+                                        int in_frame,
+                                        int out_frame,
+                                        gboolean active,
+                                        gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(!info)
+        return;
+
+    if(active) {
+        info->selection[0] = in_frame;
+        info->selection[1] = out_frame;
+    }
+    else {
+        info->selection[0] = -1;
+        info->selection[1] = -1;
+    }
+}
+
+static void edit_list_mount_view(void)
+{
+    GtkWidget *host;
+
+    if(!info || !info->main_window || info->edit_list_view)
+        return;
+
+    host = glade_xml_get_widget_(info->main_window, "edit_list_view_host");
+    if(!host || !GTK_IS_BOX(host)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Edit List host widget not found");
+        return;
+    }
+
+    info->edit_list_view = gvr_edit_list_view_new();
+    gtk_widget_set_hexpand(info->edit_list_view, TRUE);
+    gtk_widget_set_vexpand(info->edit_list_view, TRUE);
+    gtk_box_pack_start(GTK_BOX(host), info->edit_list_view, TRUE, TRUE, 0);
+
+    g_signal_connect(info->edit_list_view,
+                     "action-requested",
+                     G_CALLBACK(edit_list_action_requested),
+                     NULL);
+    g_signal_connect(info->edit_list_view,
+                     "seek-requested",
+                     G_CALLBACK(edit_list_seek_requested),
+                     NULL);
+    g_signal_connect(info->edit_list_view,
+                     "selection-changed",
+                     G_CALLBACK(edit_list_selection_changed),
+                     NULL);
+
+    gvr_edit_list_view_set_editable(info->edit_list_view, FALSE);
+    gtk_widget_show_all(host);
+}
 
 static int el_parse_dec_field(const char *buf, size_t len, size_t *off, size_t width, uint64_t *out)
 {
@@ -14931,193 +15087,226 @@ static int el_parse_dec_field(const char *buf, size_t len, size_t *off, size_t w
     return 1;
 }
 
-static void reload_editlist_contents(void)
+
+
+typedef struct {
+    int id;
+    char *filename;
+    char *fourcc;
+} edit_list_file_t;
+
+static void edit_list_file_free(gpointer data)
 {
-    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "editlisttree");
-    GtkListStore *store;
-    GtkTreeIter iter;
+    edit_list_file_t *file = data;
 
-    gint len = 0;
-    single_vims(VIMS_EDITLIST_LIST);
-    gchar *eltext = recv_vims(6, &len);
-
-    size_t offset = 0;
-    uint64_t u = 0;
-
-    reset_tree("editlisttree");
-    _el_ref_reset();
-    _el_entry_reset();
-    _edl_reset();
-
-    if (!eltext || len <= 0)
+    if(!file)
         return;
 
-#define FAIL() goto cleanup
-#define NEED(N) do { if (offset + (size_t)(N) > (size_t)len) FAIL(); } while (0)
+    g_free(file->filename);
+    g_free(file->fourcc);
+    g_free(file);
+}
 
-    if (!el_parse_dec_field(eltext, len, &offset, 4, &u))
-        FAIL();
+static edit_list_file_t *edit_list_file_find(GPtrArray *files, int id)
+{
+    if(!files)
+        return NULL;
 
-    int num_files = (int)u;
-
-    for (int i = 0; i < num_files; i++) {
-        if (!el_parse_dec_field(eltext, len, &offset, 4, &u))
-            FAIL();
-
-        size_t name_len = (size_t)u;
-        NEED(name_len);
-
-        char *file = g_strndup(eltext + offset, name_len);
-        if (!file)
-            FAIL();
-
-        offset += name_len;
-
-        if (!g_utf8_validate(file, -1, NULL)) {
-            g_free(file);
-            FAIL();
-        }
-
-        if (!el_parse_dec_field(eltext, len, &offset, 4, &u)) {
-            g_free(file);
-            FAIL();
-        }
-
-        int iterv = (int)u;
-
-        if (!el_parse_dec_field(eltext, len, &offset, 10, &u)) {
-            g_free(file);
-            FAIL();
-        }
-
-        long num_frames = (long)u;
-
-        NEED(4);
-
-        char *fourcc = g_strndup(eltext + offset, 4);
-        if (!fourcc) {
-            g_free(file);
-            FAIL();
-        }
-
-        offset += 4;
-
-        el_constr *el = _el_entry_new(iterv, file, num_frames, fourcc);
-        info->editlist = g_list_append(info->editlist, el);
-
-        g_free(file);
-        g_free(fourcc);
+    for(guint i = 0; i < files->len; i++) {
+        edit_list_file_t *file = g_ptr_array_index(files, i);
+        if(file && file->id == id)
+            return file;
     }
 
-    if (!tree)
-        FAIL();
+    return NULL;
+}
 
-    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
-    if (!GTK_IS_LIST_STORE(model))
-        FAIL();
-
-    store = GTK_LIST_STORE(model);
-
-    if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
-        FAIL();
-
-    long cur_file = (long)u;
-
-    if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
-        FAIL();
-
-    long cur_start = (long)u;
-
+static void reload_editlist_contents(void)
+{
+    GPtrArray *files = g_ptr_array_new_with_free_func(edit_list_file_free);
+    GArray *segments = g_array_new(FALSE, FALSE, sizeof(GvrEditListSegment));
+    gchar *eltext = NULL;
+    gint len = 0;
+    size_t offset = 0;
+    uint64_t u = 0;
     int total_frames = 0;
     int row_num = 0;
 
-#define APPEND_SEGMENT(FILE_IDX, START, END) do {                                \
-    long file_idx_ = (FILE_IDX);                                                  \
-    long seg_start_ = (START);                                                    \
-    long seg_end_ = (END);                                                        \
-                                                                                  \
-    if (seg_end_ < seg_start_)                                                    \
-        FAIL();                                                                   \
-                                                                                  \
-    total_frames += (int)(seg_end_ - seg_start_ + 1);                             \
-                                                                                  \
-    info->elref = g_list_append(info->elref,                                      \
-        _el_ref_new(row_num, (int)file_idx_, seg_start_, seg_end_, total_frames)); \
-                                                                                  \
-    char *tmpname = _el_get_filename((int)file_idx_);                             \
-    gchar *fname_raw = tmpname ? get_relative_path(tmpname) : g_strdup("(missing)"); \
-    gchar *fname = g_utf8_validate(fname_raw, -1, NULL)                           \
-                 ? g_strdup(fname_raw)                                            \
-                 : g_utf8_make_valid(fname_raw, -1);                              \
-    char *timecode = format_selection_time(seg_start_, seg_end_);                 \
-    gchar *gfourcc = _utf8str(_el_get_fourcc((int)file_idx_));                    \
-    gchar *timeline = format_selection_time(0, total_frames);                     \
-                                                                                  \
-    gtk_list_store_append(store, &iter);                                          \
-    gtk_list_store_set(store, &iter,                                              \
-        COLUMN_INT, (guint)row_num,                                               \
-        COLUMN_STRING0, timeline,                                                 \
-        COLUMN_STRINGA, fname,                                                    \
-        COLUMN_STRINGB, timecode,                                                 \
-        COLUMN_STRINGC, gfourcc,                                                  \
-        -1);                                                                      \
-                                                                                  \
-    free(timecode);                                                               \
-    g_free(gfourcc);                                                              \
-    g_free(fname);                                                                \
-    g_free(fname_raw);                                                            \
-    free(timeline);                                                               \
-                                                                                  \
-    row_num++;                                                                    \
-} while (0)
+    if(!info || !info->edit_list_view)
+        goto cleanup;
 
-    while ((size_t)len - offset > 16) {
-        if ((size_t)len - offset < 48)
-            FAIL();
-
-        if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
-            FAIL();
-
-        long prev_end = (long)u;
-
-        if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
-            FAIL();
-
-        long next_file = (long)u;
-
-        if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
-            FAIL();
-
-        long next_start = (long)u;
-
-        APPEND_SEGMENT(cur_file, cur_start, prev_end);
-
-        cur_file = next_file;
-        cur_start = next_start;
+    single_vims(VIMS_EDITLIST_LIST);
+    eltext = recv_vims(6, &len);
+    if(!eltext || len <= 0) {
+        gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0);
+        gvr_edit_list_view_set_sample(info->edit_list_view,
+                                      edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
+                                      edit_list_total_frames_for_mode(
+                                          info->status_tokens[PLAY_MODE], 0),
+                                      info->el.fps);
+        goto cleanup;
     }
 
-    if (!el_parse_dec_field(eltext, len, &offset, 16, &u))
-        FAIL();
+#define EL_FAIL() goto parse_fail
+#define EL_NEED(N) do { if(offset + (size_t)(N) > (size_t)len) EL_FAIL(); } while(0)
 
-    long final_end = (long)u;
+    if(!el_parse_dec_field(eltext, len, &offset, 4, &u))
+        EL_FAIL();
 
-    APPEND_SEGMENT(cur_file, cur_start, final_end);
+    int num_files = (int)u;
 
-    gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+    if(num_files <= 0) {
+        gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0);
+        gvr_edit_list_view_set_sample(info->edit_list_view,
+                                      edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
+                                      edit_list_total_frames_for_mode(
+                                          info->status_tokens[PLAY_MODE], 0),
+                                      info->el.fps);
+        goto cleanup;
+    }
 
-#undef APPEND_SEGMENT
-#undef NEED
-#undef FAIL
+    for(int i = 0; i < num_files; i++) {
+        edit_list_file_t *entry;
+        gchar *raw_name;
+        gchar *relative_name;
+        gchar *display_name;
+        size_t name_len;
 
-    free(eltext);
-    return;
+        if(!el_parse_dec_field(eltext, len, &offset, 4, &u))
+            EL_FAIL();
+
+        name_len = (size_t)u;
+        EL_NEED(name_len);
+        raw_name = g_strndup(eltext + offset, name_len);
+        offset += name_len;
+
+        if(!raw_name)
+            EL_FAIL();
+
+        relative_name = get_relative_path(raw_name);
+        if(!relative_name)
+            relative_name = g_strdup(raw_name);
+        display_name = g_utf8_validate(relative_name, -1, NULL)
+                     ? g_strdup(relative_name)
+                     : g_utf8_make_valid(relative_name, -1);
+        g_free(relative_name);
+        g_free(raw_name);
+
+        if(!el_parse_dec_field(eltext, len, &offset, 4, &u)) {
+            g_free(display_name);
+            EL_FAIL();
+        }
+
+        entry = g_new0(edit_list_file_t, 1);
+        entry->id = (int)u;
+        entry->filename = display_name;
+
+        if(!el_parse_dec_field(eltext, len, &offset, 10, &u)) {
+            edit_list_file_free(entry);
+            EL_FAIL();
+        }
+
+        EL_NEED(4);
+        entry->fourcc = g_strndup(eltext + offset, 4);
+        offset += 4;
+        g_ptr_array_add(files, entry);
+    }
+
+    if(!el_parse_dec_field(eltext, len, &offset, 16, &u))
+        EL_FAIL();
+    long current_file = (long)u;
+
+    if(!el_parse_dec_field(eltext, len, &offset, 16, &u))
+        EL_FAIL();
+    long current_start = (long)u;
+
+#define EL_APPEND_SEGMENT(FILE_ID, FILE_IN, FILE_OUT) do {                       \
+    long file_id_ = (FILE_ID);                                                    \
+    long file_in_ = (FILE_IN);                                                    \
+    long file_out_ = (FILE_OUT);                                                  \
+    edit_list_file_t *file_;                                                      \
+    GvrEditListSegment segment_;                                                  \
+    int length_;                                                                  \
+                                                                                  \
+    if(file_out_ < file_in_)                                                      \
+        EL_FAIL();                                                                \
+                                                                                  \
+    length_ = (int)(file_out_ - file_in_ + 1);                                    \
+    file_ = edit_list_file_find(files, (int)file_id_);                            \
+    veejay_memset(&segment_, 0, sizeof(segment_));                                \
+    segment_.index = row_num++;                                                   \
+    segment_.filename = file_ && file_->filename ? file_->filename : "(missing)"; \
+    segment_.timeline_in = total_frames;                                          \
+    segment_.timeline_out = total_frames + length_ - 1;                           \
+    segment_.file_in = (int)file_in_;                                             \
+    segment_.file_out = (int)file_out_;                                           \
+    segment_.fourcc = file_ && file_->fourcc ? file_->fourcc : "";               \
+    total_frames += length_;                                                      \
+    g_array_append_val(segments, segment_);                                       \
+} while(0)
+
+    while((size_t)len - offset > 16) {
+        long previous_end;
+        long next_file;
+        long next_start;
+
+        if((size_t)len - offset < 48)
+            EL_FAIL();
+
+        if(!el_parse_dec_field(eltext, len, &offset, 16, &u))
+            EL_FAIL();
+        previous_end = (long)u;
+
+        if(!el_parse_dec_field(eltext, len, &offset, 16, &u))
+            EL_FAIL();
+        next_file = (long)u;
+
+        if(!el_parse_dec_field(eltext, len, &offset, 16, &u))
+            EL_FAIL();
+        next_start = (long)u;
+
+        EL_APPEND_SEGMENT(current_file, current_start, previous_end);
+        current_file = next_file;
+        current_start = next_start;
+    }
+
+    if(!el_parse_dec_field(eltext, len, &offset, 16, &u))
+        EL_FAIL();
+
+    EL_APPEND_SEGMENT(current_file, current_start, (long)u);
+
+    gvr_edit_list_view_set_segments(info->edit_list_view,
+                                    (const GvrEditListSegment *)segments->data,
+                                    segments->len);
+    gvr_edit_list_view_set_sample(info->edit_list_view,
+                                  edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
+                                  edit_list_total_frames_for_mode(
+                                      info->status_tokens[PLAY_MODE],
+                                      total_frames),
+                                  info->el.fps);
+    gvr_edit_list_view_set_playhead(info->edit_list_view,
+                                    info->status_tokens[FRAME_NUM]);
+    gvr_edit_list_view_set_editable(info->edit_list_view,
+                                    edit_list_playmode_is_editable(info->status_tokens[PLAY_MODE]));
+    goto cleanup;
+
+parse_fail:
+    veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse Edit List response");
+    gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0);
+    gvr_edit_list_view_set_sample(info->edit_list_view,
+                                  edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
+                                  edit_list_total_frames_for_mode(
+                                      info->status_tokens[PLAY_MODE], 0),
+                                  info->el.fps);
 
 cleanup:
-#undef APPEND_SEGMENT
-#undef NEED
-#undef FAIL
-
-    free(eltext);
+#undef EL_APPEND_SEGMENT
+#undef EL_NEED
+#undef EL_FAIL
+    if(eltext)
+        free(eltext);
+    g_array_free(segments, TRUE);
+    g_ptr_array_free(files, TRUE);
 }
 
 static int should_enable_drop_frame_timecode(float fps)
@@ -15200,6 +15389,7 @@ static int load_editlist_info(void)
     }
 
     const char *norm_str = "Digital";
+
     switch(values[3]) {
         case 1: norm_str = "PAL"; break;
         case 0: norm_str = "NTSC"; break;
@@ -15209,23 +15399,20 @@ static int load_editlist_info(void)
     snprintf(tmp, sizeof(tmp), "%s", norm_str);
     update_label_str2(widget_cache[WIDGET_LABEL_EL_NORM], tmp);
 
-    snprintf(tmp,sizeof(tmp), "%dx%d", values[0], values[1]);
+    snprintf(tmp, sizeof(tmp), "%dx%d", values[0], values[1]);
     update_label_str2(widget_cache[WIDGET_LABEL_EL_WH], tmp);
-
-    update_label_f( "label_el_fps", fps );
+    update_label_f("label_el_fps", fps);
 
     update_spin_value2(widget_cache[WIDGET_SCREENSHOT_WIDTH], info->el.width);
     update_spin_value2(widget_cache[WIDGET_SCREENSHOT_HEIGHT], info->el.height);
 
-
-    snprintf( tmp, sizeof(tmp), "%s",
-        ( values[2] == 0 ? "progressive" : (values[2] == 1 ? "top first" : "bottom first" ) ) );
+    snprintf(tmp, sizeof(tmp), "%s",
+             values[2] == 0 ? "progressive" :
+             (values[2] == 1 ? "top first" : "bottom first"));
     update_label_str2(widget_cache[WIDGET_LABEL_EL_INTER], tmp);
-
     update_label_i2(widget_cache[WIDGET_LABEL_EL_ARATE], (int)rate, 0);
     update_label_i2(widget_cache[WIDGET_LABEL_EL_ACHANS], values[7], 0);
     update_label_i2(widget_cache[WIDGET_LABEL_EL_ABITS], values[5], 0);
-
 
     int button_global_state = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( widget_cache[ WIDGET_GLOBAL_TRANSITIONS_TOGGLE ]));
     if( button_global_state != global_transition_state ) {
@@ -15591,8 +15778,9 @@ static void update_status_accessibility(int old_pm, int new_pm, int force)
     old_pm = ui_playmode_effective(old_pm);
     new_pm = ui_playmode_effective(new_pm);
 
-    set_pm_page_label(new_pm);
     ui_sync_playmode_panel_pages(new_pm);
+    set_pm_page_label(new_pm);
+    edit_list_attach_to_playmode(new_pm);
 
     if(old_pm == new_pm && !force)
         return;
@@ -15644,32 +15832,84 @@ static void update_status_accessibility(int old_pm, int new_pm, int force)
     samplebank_update_offline_recorder_gadget();
 }
 
+static GtkWidget *playmode_find_tab_label(GtkWidget *widget)
+{
+    if(!widget || !GTK_IS_WIDGET(widget))
+        return NULL;
+
+    if(GTK_IS_LABEL(widget))
+        return widget;
+
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        GtkWidget *label = NULL;
+
+        for(GList *node = children; node && !label; node = node->next) {
+            if(node->data && GTK_IS_WIDGET(node->data))
+                label = playmode_find_tab_label(GTK_WIDGET(node->data));
+        }
+
+        g_list_free(children);
+        return label;
+    }
+
+    return NULL;
+}
+
+static GtkWidget *playmode_notebook_tab_label(void)
+{
+    GtkWidget *notebook = widget_cache[WIDGET_NOTEBOOK18];
+    GtkWidget *page = widget_cache[WIDGET_PANELS];
+    GtkWidget *tab = NULL;
+
+    if(GTK_IS_NOTEBOOK(notebook) && GTK_IS_WIDGET(page) &&
+       gtk_notebook_page_num(GTK_NOTEBOOK(notebook), page) >= 0)
+    {
+        tab = gtk_notebook_get_tab_label(GTK_NOTEBOOK(notebook), page);
+    }
+
+    return playmode_find_tab_label(tab);
+}
+
+static void playmode_set_label_markup(GtkWidget *label, const gchar *markup)
+{
+    if(!GTK_IS_LABEL(label))
+        return;
+
+    gtk_label_set_markup(GTK_LABEL(label), markup);
+    gtk_widget_queue_resize(label);
+    gtk_widget_queue_draw(label);
+}
+
 static void set_pm_page_label(int type)
 {
-    const char *tab_label = "Plain";
+    const char *tab_label;
     gchar ftitle[32];
-    GtkWidget *mode = widget_cache[WIDGET_LABEL_CURRENT_MODE];
+    GtkWidget *cached_mode = widget_cache[WIDGET_LABEL_CURRENT_MODE];
+    GtkWidget *visible_mode = playmode_notebook_tab_label();
     GtkWidget *source = widget_cache[WIDGET_LABEL_CURRENTSOURCE];
 
     switch(ui_playmode_effective(type))
     {
-        case MODE_SAMPLE:
-            tab_label = "Sample";
-            break;
         case MODE_STREAM:
             tab_label = "Stream";
             break;
+        case MODE_SAMPLE:
+            tab_label = "Sample";
+            break;
         case MODE_PLAIN:
         default:
+            tab_label = "Plain";
             break;
     }
 
     snprintf(ftitle, sizeof(ftitle), "<b>%s</b>", tab_label);
 
-    if(mode)
-        gtk_label_set_markup(GTK_LABEL(mode), ftitle);
+    playmode_set_label_markup(cached_mode, ftitle);
+    if(visible_mode != cached_mode)
+        playmode_set_label_markup(visible_mode, ftitle);
 
-    if(source)
+    if(GTK_IS_LABEL(source))
         gtk_label_set_text(GTK_LABEL(source), tab_label);
 }
 
@@ -18028,6 +18268,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     pm = ui_playmode_effective(pm);
     last_pm = ui_playmode_effective(last_pm);
+    set_pm_page_label(pm);
     const gboolean source_changed = (last_pm != pm) ||
                                     history[CURRENT_ID] != info->status_tokens[CURRENT_ID];
     total_frames_ = (pm == MODE_STREAM ? ui_stream_transport_length() : info->status_tokens[TOTAL_FRAMES] );
@@ -18052,24 +18293,23 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             update_spin_range2( widget_cache[WIDGET_BUTTON_FADEDUR],0, total_frames_, ( total_frames_ > 25 ? 25 : total_frames_-1 ) );
         }
 
-        update_label_i2( widget_cache[WIDGET_LABEL_TOTFRAMES], total_frames_, 1 );
-
-        if( pm == MODE_SAMPLE ) {
-            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_SAMPLELENGTH] ), time );
-        }
-
-        update_label_i2( widget_cache[ WIDGET_LABEL_TOTFRAMES ], total_frames_, 1 );
-
-        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_TOTALTIME] ), time );
+        update_label_str2(widget_cache[WIDGET_LABEL_TOTALTIME], time);
 
         if(pm == MODE_SAMPLE)
-            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_SAMPLE_LENGTH_LABEL] ), time );
+            update_label_str2(widget_cache[WIDGET_SAMPLE_LENGTH_LABEL], time);
         else
-            gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_SAMPLE_LENGTH_LABEL] ), "0:00:00:00" );
+            update_label_str2(widget_cache[WIDGET_SAMPLE_LENGTH_LABEL], "0:00:00:00");
 
         timeline_set_length( info->tl, (gdouble) total_frames_ , (gdouble) current_frame_);
 
-        if(pm != MODE_SAMPLE &&
+        if(info->edit_list_view)
+            gvr_edit_list_view_set_sample(info->edit_list_view,
+                                          edit_list_source_id_for_mode(pm),
+                                          edit_list_total_frames_for_mode(pm,
+                                                                          total_frames_),
+                                          info->el.fps);
+
+        if(pm == MODE_STREAM &&
            timeline_get_selection(TIMELINE_SELECTION(info->tl)))
         {
             timeline_set_selection(info->tl, FALSE);
@@ -18085,6 +18325,13 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     }
 
     info->status_frame = (pm == MODE_STREAM ? ui_stream_transport_position() : info->status_tokens[FRAME_NUM]);
+
+    if(info->edit_list_view) {
+        gvr_edit_list_view_set_editable(info->edit_list_view,
+                                        edit_list_playmode_is_editable(pm));
+        if(edit_list_playmode_is_editable(pm))
+            gvr_edit_list_view_set_playhead(info->edit_list_view, info->status_frame);
+    }
 
     gint timeline_frame = info->status_frame;
 
@@ -18113,13 +18360,6 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_CURTIME] ), current_time_ );
     gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_MOUSEAT] ), mouse_at_time);
-
-
-
-    if( pm == MODE_SAMPLE && is_edl_displayed() ) {
-        gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_SAMPLEPOSITION] ), current_time_ );
-        update_label_i2( widget_cache[ WIDGET_LABEL_SAMPLEPOS ], info->status_frame, 1);
-    }
 
     free(current_time_);
     free(mouse_at_time);
@@ -18210,13 +18450,6 @@ static void update_globalinfo(int *history, int pm, int last_pm)
             timeline_clear_points( info->tl );
         }
 
-        if( pm == MODE_SAMPLE ) {
-            info->selection[0] = info->status_tokens[SAMPLE_MARKER_START];
-            info->selection[1] = info->status_tokens[SAMPLE_MARKER_END];
-
-            gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_BUTTON_EL_SELSTART] ), (gdouble) info->selection[0]);
-            gtk_spin_button_set_value( GTK_SPIN_BUTTON( widget_cache[WIDGET_BUTTON_EL_SELEND ] ), (gdouble) info->selection[1]);
-        }
         if( pm == MODE_STREAM ) {
             info->selection[0] = 0;
             info->selection[1] = total_frames_;
@@ -19748,6 +19981,8 @@ static void reset_connection_runtime_state(void)
     framerate_last_sent_x100 = -1;
     framerate_pending_x100 = -1;
     framerate_last_sent_us = 0;
+    edit_list_attached_playmode = -1;
+    edit_list_attached_source_id = -1;
 
     follow_return_id = 0;
     follow_return_type = 0;
@@ -19765,8 +20000,6 @@ static void reset_connection_runtime_state(void)
 
 static void reset_connection_data_state(void)
 {
-    _el_entry_reset();
-    _el_ref_reset();
     _effect_reset();
 
     veejay_memset(info->status_tokens, 0, sizeof(int) * VJ_STATUS_ARRAY_SIZE);
@@ -19805,7 +20038,8 @@ static void reset_connection_widget_state(void)
     reset_tree("tree_chain");
     reset_tree("tree_sources");
     reset_tree("cali_sourcetree");
-    reset_tree("editlisttree");
+    if(info->edit_list_view)
+        gvr_edit_list_view_clear(info->edit_list_view);
     if(info->vims_view)
         gvr_vims_view_clear_data(info->vims_view);
 
@@ -22033,6 +22267,497 @@ static void detachable_restore_default_window_configuration(GtkMenuItem *item, g
     g_free(path);
 }
 
+
+#define APPEARANCE_CONFIG_GROUP "Appearance"
+#define APPEARANCE_CONFIG_FONT_FAMILY "FontFamily"
+#define APPEARANCE_CONFIG_FONT_SIZE "FontSize"
+#define APPEARANCE_FONT_SIZE_MIN 6
+#define APPEARANCE_FONT_SIZE_MAX 32
+
+static gchar *appearance_default_font_name_ = NULL;
+static gchar *appearance_saved_font_name_ = NULL;
+
+typedef struct
+{
+    GtkWidget *dialog;
+    GtkWidget *font_button;
+    GtkWidget *size_spin;
+    GtkWidget *preview_label;
+    GtkWidget *live_toggle;
+    gchar *baseline_font_name;
+    gboolean updating;
+} appearance_dialog_t;
+
+enum
+{
+    APPEARANCE_RESPONSE_DEFAULTS = 1,
+    APPEARANCE_RESPONSE_SAVED,
+    APPEARANCE_RESPONSE_APPLY
+};
+
+static gchar *appearance_config_path(void)
+{
+    const gchar *home = g_get_home_dir();
+    gchar *dir;
+    gchar *path;
+
+    if(home && *home)
+        dir = g_build_filename(home, ".veejay", NULL);
+    else
+        dir = g_build_filename(g_get_user_config_dir(), "veejay", NULL);
+
+    g_mkdir_with_parents(dir, 0700);
+    path = g_build_filename(dir, "reloaded-ui.ini", NULL);
+    g_free(dir);
+
+    return path;
+}
+
+static gchar *appearance_current_font_name(void)
+{
+    GtkSettings *settings = gtk_settings_get_default();
+    gchar *font_name = NULL;
+
+    if(settings)
+        g_object_get(settings, "gtk-font-name", &font_name, NULL);
+
+    if(!font_name || !*font_name) {
+        g_free(font_name);
+        font_name = g_strdup("Sans 10");
+    }
+
+    return font_name;
+}
+
+static gboolean appearance_parse_font_name(const gchar *font_name,
+                                           gchar **family,
+                                           gint *size)
+{
+    PangoFontDescription *desc;
+    const gchar *parsed_family;
+    gint parsed_size;
+
+    if(!font_name || !*font_name)
+        return FALSE;
+
+    desc = pango_font_description_from_string(font_name);
+    if(!desc)
+        return FALSE;
+
+    parsed_family = pango_font_description_get_family(desc);
+    parsed_size = pango_font_description_get_size(desc);
+
+    if(family)
+        *family = g_strdup(parsed_family && *parsed_family ? parsed_family : "Sans");
+
+    if(size) {
+        if(parsed_size <= 0)
+            parsed_size = 10 * PANGO_SCALE;
+        *size = CLAMP((parsed_size + (PANGO_SCALE / 2)) / PANGO_SCALE,
+                      APPEARANCE_FONT_SIZE_MIN,
+                      APPEARANCE_FONT_SIZE_MAX);
+    }
+
+    pango_font_description_free(desc);
+    return TRUE;
+}
+
+static gchar *appearance_build_font_name(const gchar *family, gint size)
+{
+    PangoFontDescription *desc = pango_font_description_new();
+    gchar *font_name;
+
+    pango_font_description_set_family(desc, family && *family ? family : "Sans");
+    pango_font_description_set_style(desc, PANGO_STYLE_NORMAL);
+    pango_font_description_set_weight(desc, PANGO_WEIGHT_NORMAL);
+    pango_font_description_set_size(desc,
+                                    CLAMP(size,
+                                          APPEARANCE_FONT_SIZE_MIN,
+                                          APPEARANCE_FONT_SIZE_MAX) * PANGO_SCALE);
+
+    font_name = pango_font_description_to_string(desc);
+    pango_font_description_free(desc);
+    return font_name;
+}
+
+static void appearance_apply_font_name(const gchar *font_name)
+{
+    GtkSettings *settings;
+
+    if(!font_name || !*font_name)
+        return;
+
+    settings = gtk_settings_get_default();
+    if(settings)
+        g_object_set(settings, "gtk-font-name", font_name, NULL);
+}
+
+static gchar *appearance_load_saved_font_name(void)
+{
+    GKeyFile *key_file = g_key_file_new();
+    gchar *path = appearance_config_path();
+    gchar *family = NULL;
+    gchar *font_name = NULL;
+    gint size = 0;
+    GError *error = NULL;
+
+    if(!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, &error)) {
+        if(error && !g_error_matches(error, G_FILE_ERROR, G_FILE_ERROR_NOENT))
+            vj_msg(VEEJAY_MSG_WARNING, "Unable to load interface appearance from %s: %s", path, error->message);
+        g_clear_error(&error);
+        g_key_file_free(key_file);
+        g_free(path);
+        return NULL;
+    }
+
+    family = g_key_file_get_string(key_file,
+                                   APPEARANCE_CONFIG_GROUP,
+                                   APPEARANCE_CONFIG_FONT_FAMILY,
+                                   &error);
+    if(error) {
+        vj_msg(VEEJAY_MSG_WARNING, "Invalid interface appearance file %s: %s", path, error->message);
+        g_clear_error(&error);
+        g_key_file_free(key_file);
+        g_free(path);
+        return NULL;
+    }
+
+    size = g_key_file_get_integer(key_file,
+                                  APPEARANCE_CONFIG_GROUP,
+                                  APPEARANCE_CONFIG_FONT_SIZE,
+                                  &error);
+    if(error || size < APPEARANCE_FONT_SIZE_MIN || size > APPEARANCE_FONT_SIZE_MAX) {
+        vj_msg(VEEJAY_MSG_WARNING, "Invalid font size in interface appearance file %s", path);
+        g_clear_error(&error);
+        g_free(family);
+        g_key_file_free(key_file);
+        g_free(path);
+        return NULL;
+    }
+
+    font_name = appearance_build_font_name(family, size);
+    g_free(family);
+    g_key_file_free(key_file);
+    g_free(path);
+    return font_name;
+}
+
+static gboolean appearance_save_font_name(const gchar *font_name)
+{
+    GKeyFile *key_file;
+    gchar *path;
+    gchar *family = NULL;
+    gchar *data;
+    gsize length = 0;
+    gint size = 0;
+    GError *error = NULL;
+    gboolean saved = FALSE;
+
+    if(!appearance_parse_font_name(font_name, &family, &size))
+        return FALSE;
+
+    key_file = g_key_file_new();
+    path = appearance_config_path();
+
+    g_key_file_set_string(key_file, APPEARANCE_CONFIG_GROUP, "Format", "1");
+    g_key_file_set_string(key_file,
+                          APPEARANCE_CONFIG_GROUP,
+                          APPEARANCE_CONFIG_FONT_FAMILY,
+                          family);
+    g_key_file_set_integer(key_file,
+                           APPEARANCE_CONFIG_GROUP,
+                           APPEARANCE_CONFIG_FONT_SIZE,
+                           size);
+
+    data = g_key_file_to_data(key_file, &length, &error);
+    if(data && g_file_set_contents(path, data, length, &error)) {
+        g_free(appearance_saved_font_name_);
+        appearance_saved_font_name_ = g_strdup(font_name);
+        vj_msg(VEEJAY_MSG_INFO, "Saved interface appearance to %s", path);
+        saved = TRUE;
+    }
+    else {
+        vj_msg(VEEJAY_MSG_WARNING,
+               "Unable to save interface appearance to %s: %s",
+               path,
+               error ? error->message : "unknown error");
+    }
+
+    g_clear_error(&error);
+    g_free(data);
+    g_free(family);
+    g_free(path);
+    g_key_file_free(key_file);
+    return saved;
+}
+
+static void appearance_preferences_bootstrap(void)
+{
+    if(!appearance_default_font_name_)
+        appearance_default_font_name_ = appearance_current_font_name();
+
+    g_free(appearance_saved_font_name_);
+    appearance_saved_font_name_ = appearance_load_saved_font_name();
+
+    if(appearance_saved_font_name_)
+        appearance_apply_font_name(appearance_saved_font_name_);
+}
+
+static gchar *appearance_dialog_font_name(appearance_dialog_t *ctx)
+{
+    gchar *button_font;
+    gchar *family = NULL;
+    gchar *font_name;
+    gint ignored_size = 0;
+    gint size;
+
+    button_font = gtk_font_chooser_get_font(GTK_FONT_CHOOSER(ctx->font_button));
+    appearance_parse_font_name(button_font, &family, &ignored_size);
+    size = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(ctx->size_spin));
+    font_name = appearance_build_font_name(family, size);
+
+    g_free(button_font);
+    g_free(family);
+    return font_name;
+}
+
+static void appearance_dialog_update_preview(appearance_dialog_t *ctx)
+{
+    gchar *font_name = appearance_dialog_font_name(ctx);
+    gchar *family = NULL;
+    gint size = 0;
+    PangoAttrList *attributes = pango_attr_list_new();
+
+    appearance_parse_font_name(font_name, &family, &size);
+    pango_attr_list_insert(attributes, pango_attr_family_new(family));
+    pango_attr_list_insert(attributes, pango_attr_size_new(size * PANGO_SCALE));
+    gtk_label_set_attributes(GTK_LABEL(ctx->preview_label), attributes);
+    pango_attr_list_unref(attributes);
+
+    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ctx->live_toggle)))
+        appearance_apply_font_name(font_name);
+
+    g_free(family);
+    g_free(font_name);
+}
+
+static void appearance_dialog_set_font(appearance_dialog_t *ctx, const gchar *font_name)
+{
+    gchar *family = NULL;
+    gchar *chooser_font;
+    gint size = 10;
+
+    if(!appearance_parse_font_name(font_name, &family, &size))
+        return;
+
+    chooser_font = appearance_build_font_name(family, size);
+    ctx->updating = TRUE;
+    gtk_font_chooser_set_font(GTK_FONT_CHOOSER(ctx->font_button), chooser_font);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(ctx->size_spin), size);
+    ctx->updating = FALSE;
+
+    g_free(chooser_font);
+    g_free(family);
+    appearance_dialog_update_preview(ctx);
+}
+
+static void appearance_dialog_control_changed(GtkWidget *widget, gpointer user_data)
+{
+    appearance_dialog_t *ctx = (appearance_dialog_t *) user_data;
+    (void) widget;
+
+    if(!ctx || ctx->updating)
+        return;
+
+    appearance_dialog_update_preview(ctx);
+}
+
+static void appearance_dialog_live_toggled(GtkToggleButton *toggle, gpointer user_data)
+{
+    appearance_dialog_t *ctx = (appearance_dialog_t *) user_data;
+
+    if(!ctx || ctx->updating)
+        return;
+
+    if(gtk_toggle_button_get_active(toggle))
+        appearance_dialog_update_preview(ctx);
+    else
+        appearance_apply_font_name(ctx->baseline_font_name);
+}
+
+static appearance_dialog_t *appearance_dialog_new(GtkWindow *parent)
+{
+    appearance_dialog_t *ctx = g_new0(appearance_dialog_t, 1);
+    GtkWidget *content;
+    GtkWidget *grid;
+    GtkWidget *heading;
+    GtkWidget *family_label;
+    GtkWidget *size_label;
+    GtkWidget *preview_frame;
+    GtkWidget *preview_box;
+    GtkWidget *hint;
+
+    ctx->dialog = gtk_dialog_new_with_buttons(
+        "Interface Appearance",
+        parent,
+        GTK_DIALOG_DESTROY_WITH_PARENT,
+        "Restore Defaults", APPEARANCE_RESPONSE_DEFAULTS,
+        "Restore Saved", APPEARANCE_RESPONSE_SAVED,
+        "Apply", APPEARANCE_RESPONSE_APPLY,
+        "Cancel", GTK_RESPONSE_CANCEL,
+        "Save", GTK_RESPONSE_ACCEPT,
+        NULL);
+
+    gtk_window_set_resizable(GTK_WINDOW(ctx->dialog), FALSE);
+    gtk_dialog_set_default_response(GTK_DIALOG(ctx->dialog), GTK_RESPONSE_ACCEPT);
+    gtk_container_set_border_width(GTK_CONTAINER(ctx->dialog), 6);
+
+    content = gtk_dialog_get_content_area(GTK_DIALOG(ctx->dialog));
+    gtk_box_set_spacing(GTK_BOX(content), 10);
+    gtk_container_set_border_width(GTK_CONTAINER(content), 10);
+
+    heading = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(heading), "<b>Interface font</b>");
+    gtk_label_set_xalign(GTK_LABEL(heading), 0.0f);
+    gtk_box_pack_start(GTK_BOX(content), heading, FALSE, FALSE, 0);
+
+    grid = gtk_grid_new();
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 8);
+    gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
+    gtk_widget_set_hexpand(grid, TRUE);
+    gtk_box_pack_start(GTK_BOX(content), grid, FALSE, FALSE, 0);
+
+    family_label = gtk_label_new("Font family");
+    gtk_label_set_xalign(GTK_LABEL(family_label), 0.0f);
+    gtk_grid_attach(GTK_GRID(grid), family_label, 0, 0, 1, 1);
+
+    ctx->font_button = gtk_font_button_new();
+    gtk_font_button_set_show_style(GTK_FONT_BUTTON(ctx->font_button), FALSE);
+    gtk_font_button_set_show_size(GTK_FONT_BUTTON(ctx->font_button), FALSE);
+    gtk_font_button_set_use_font(GTK_FONT_BUTTON(ctx->font_button), FALSE);
+    gtk_font_button_set_use_size(GTK_FONT_BUTTON(ctx->font_button), FALSE);
+    gtk_widget_set_hexpand(ctx->font_button, TRUE);
+    gtk_grid_attach(GTK_GRID(grid), ctx->font_button, 1, 0, 1, 1);
+
+    size_label = gtk_label_new("Font size");
+    gtk_label_set_xalign(GTK_LABEL(size_label), 0.0f);
+    gtk_grid_attach(GTK_GRID(grid), size_label, 0, 1, 1, 1);
+
+    ctx->size_spin = gtk_spin_button_new_with_range(APPEARANCE_FONT_SIZE_MIN,
+                                                     APPEARANCE_FONT_SIZE_MAX,
+                                                     1.0);
+    gtk_spin_button_set_numeric(GTK_SPIN_BUTTON(ctx->size_spin), TRUE);
+    gtk_widget_set_halign(ctx->size_spin, GTK_ALIGN_START);
+    gtk_grid_attach(GTK_GRID(grid), ctx->size_spin, 1, 1, 1, 1);
+
+    preview_frame = gtk_frame_new("Preview");
+    gtk_box_pack_start(GTK_BOX(content), preview_frame, FALSE, FALSE, 0);
+
+    preview_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    gtk_container_set_border_width(GTK_CONTAINER(preview_box), 10);
+    gtk_container_add(GTK_CONTAINER(preview_frame), preview_box);
+
+    ctx->preview_label = gtk_label_new("VeeJay Reloaded — Sample 12 · Stream 4 · 00:01:23:12");
+    gtk_label_set_xalign(GTK_LABEL(ctx->preview_label), 0.0f);
+    gtk_box_pack_start(GTK_BOX(preview_box), ctx->preview_label, FALSE, FALSE, 0);
+
+    ctx->live_toggle = gtk_check_button_new_with_label("Preview changes immediately");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ctx->live_toggle), TRUE);
+    gtk_box_pack_start(GTK_BOX(content), ctx->live_toggle, FALSE, FALSE, 0);
+
+    hint = gtk_label_new("Saved in ~/.veejay/reloaded-ui.ini. Controls with an explicit monospace font keep that font.");
+    gtk_label_set_line_wrap(GTK_LABEL(hint), TRUE);
+    gtk_label_set_xalign(GTK_LABEL(hint), 0.0f);
+    gtk_style_context_add_class(gtk_widget_get_style_context(hint), "dim-label");
+    gtk_box_pack_start(GTK_BOX(content), hint, FALSE, FALSE, 0);
+
+    ctx->baseline_font_name = appearance_current_font_name();
+    appearance_dialog_set_font(ctx, ctx->baseline_font_name);
+
+    g_signal_connect(ctx->font_button,
+                     "font-set",
+                     G_CALLBACK(appearance_dialog_control_changed),
+                     ctx);
+    g_signal_connect(ctx->size_spin,
+                     "value-changed",
+                     G_CALLBACK(appearance_dialog_control_changed),
+                     ctx);
+    g_signal_connect(ctx->live_toggle,
+                     "toggled",
+                     G_CALLBACK(appearance_dialog_live_toggled),
+                     ctx);
+
+    GtkWidget *saved_button = gtk_dialog_get_widget_for_response(GTK_DIALOG(ctx->dialog),
+                                                                 APPEARANCE_RESPONSE_SAVED);
+    gtk_widget_set_sensitive(saved_button, appearance_saved_font_name_ != NULL);
+
+    gtk_widget_show_all(content);
+    return ctx;
+}
+
+static void appearance_dialog_free(appearance_dialog_t *ctx)
+{
+    if(!ctx)
+        return;
+
+    g_free(ctx->baseline_font_name);
+    g_free(ctx);
+}
+
+static void appearance_preferences_show(GtkMenuItem *item, gpointer user_data)
+{
+    GtkWidget *mainw = detachable_main_window();
+    appearance_dialog_t *ctx;
+    gboolean done = FALSE;
+    (void) item;
+    (void) user_data;
+
+    ctx = appearance_dialog_new(mainw && GTK_IS_WINDOW(mainw) ? GTK_WINDOW(mainw) : NULL);
+
+    while(!done) {
+        gint response = gtk_dialog_run(GTK_DIALOG(ctx->dialog));
+
+        switch(response) {
+            case APPEARANCE_RESPONSE_DEFAULTS:
+                appearance_dialog_set_font(ctx, appearance_default_font_name_);
+                break;
+            case APPEARANCE_RESPONSE_SAVED: {
+                gchar *saved = appearance_load_saved_font_name();
+                if(saved) {
+                    g_free(appearance_saved_font_name_);
+                    appearance_saved_font_name_ = g_strdup(saved);
+                    appearance_dialog_set_font(ctx, saved);
+                    g_free(saved);
+                }
+                break;
+            }
+            case APPEARANCE_RESPONSE_APPLY: {
+                gchar *font_name = appearance_dialog_font_name(ctx);
+                appearance_apply_font_name(font_name);
+                g_free(ctx->baseline_font_name);
+                ctx->baseline_font_name = g_strdup(font_name);
+                g_free(font_name);
+                break;
+            }
+            case GTK_RESPONSE_ACCEPT: {
+                gchar *font_name = appearance_dialog_font_name(ctx);
+                appearance_apply_font_name(font_name);
+                appearance_save_font_name(font_name);
+                g_free(font_name);
+                done = TRUE;
+                break;
+            }
+            default:
+                appearance_apply_font_name(ctx->baseline_font_name);
+                done = TRUE;
+                break;
+        }
+    }
+
+    gtk_widget_destroy(ctx->dialog);
+    appearance_dialog_free(ctx);
+}
+
 static GtkWidget *menu_shell_find_item_named(GtkWidget *menu, const char *name)
 {
     GtkWidget *found = NULL;
@@ -22073,6 +22798,7 @@ static void init_window_configuration_menu(void)
 {
     GtkWidget *menu_item = NULL;
     GtkWidget *menu = NULL;
+    GtkWidget *appearance_item = NULL;
     GtkWidget *layout_item = NULL;
     GtkWidget *layout_menu = NULL;
 
@@ -22095,13 +22821,24 @@ static void init_window_configuration_menu(void)
     }
 
     if(!menu || !GTK_IS_MENU_SHELL(menu)) {
-        vj_msg(VEEJAY_MSG_WARNING, "Could not install window-layout menu items: Preferences menu not found");
+        vj_msg(VEEJAY_MSG_WARNING, "Could not install Preferences menu items: Preferences menu not found");
         return;
+    }
+
+    appearance_item = menu_shell_find_item_named(menu, "interface_appearance_menu_item");
+    if(!appearance_item) {
+        appearance_item = window_configuration_menu_item_new(
+            "interface_appearance_menu_item",
+            "Interface Appearance...",
+            "Choose the default interface font family and size",
+            G_CALLBACK(appearance_preferences_show));
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), appearance_item);
     }
 
     layout_item = menu_shell_find_item_named(menu, "window_layout_menu_item");
     if(!layout_item) {
         GtkWidget *sep = gtk_separator_menu_item_new();
+        gtk_widget_set_name(sep, "window_layout_menu_separator");
         layout_item = gtk_menu_item_new_with_label("Window Layout");
         gtk_widget_set_name(layout_item, "window_layout_menu_item");
         gtk_widget_set_tooltip_text(layout_item, "Save or restore detached panel window layout");
@@ -22151,6 +22888,8 @@ static void init_window_configuration_menu(void)
 
     if(menu_item && GTK_IS_WIDGET(menu_item))
         gtk_widget_show(menu_item);
+    if(appearance_item)
+        gtk_widget_show_all(appearance_item);
     gtk_widget_show_all(layout_item);
     gtk_widget_show(menu);
 }
@@ -22201,6 +22940,7 @@ void vj_gui_init(const char *glade_file,
     char text[100];
 
     faster_ui_ = fasterui;
+    appearance_preferences_bootstrap();
 
     vj_gui_t *gui = (vj_gui_t*)vj_calloc(sizeof(vj_gui_t));
     if(!gui)
@@ -22414,16 +23154,14 @@ void vj_gui_init(const char *glade_file,
     veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
     veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
 
-    info->elref = NULL;
     info->effect_info = (effect_constr**) vj_calloc(sizeof(effect_constr*) * EFFECT_LIST_SIZE );
     info->devlist = NULL;
     info->chalist = NULL;
-    info->editlist = NULL;
 
     setup_vimslist();
     setup_effectchain_info();
     setup_effectlist_info();
-    setup_editlist_info();
+    edit_list_mount_view();
     setup_samplelist_info();
     setup_v4l_devices();
 	setup_colorselection();

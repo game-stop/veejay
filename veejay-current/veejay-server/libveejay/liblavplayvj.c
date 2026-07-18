@@ -99,6 +99,10 @@
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #include <veejaycore/vims.h>
+
+#ifndef VIMS_EDITLIST_MOVE_RANGE
+#define VIMS_EDITLIST_MOVE_RANGE 454
+#endif
 #include <sched.h>
 #include <libveejay/vj-shm.h>
 #include <pthread.h>
@@ -1149,7 +1153,7 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		}
         snprintf(recover_edl, len + 1, "%s/recovery/recovery_editlist_p%d.edl", info->homedir, (int)my_pid);
         
-		int re = veejay_save_all( info, recover_edl, 0, 0 );
+		int re = veejay_save_all( info, recover_edl, 0, -1 );
 		int rs= 0;
 		if(re) {
 			rs = sample_writeToFile( recover_samples,info->composite,info->seq,info->font,
@@ -1527,7 +1531,8 @@ static int vj_pattern_command_allowed(int id)
         VIMS_SAMPLE_SHRINK_MARKER, VIMS_EDITLIST_ADD,
         VIMS_EDITLIST_ADD_SAMPLE, VIMS_EDITLIST_COPY,
         VIMS_EDITLIST_CROP, VIMS_EDITLIST_CUT, VIMS_EDITLIST_DEL,
-        VIMS_EDITLIST_PASTE_AT, VIMS_EDITLIST_SAVE, VIMS_EDITLIST_LOAD
+        VIMS_EDITLIST_PASTE_AT, VIMS_EDITLIST_MOVE_RANGE,
+        VIMS_EDITLIST_SAVE, VIMS_EDITLIST_LOAD
     };
     static const int recording_ids[] = {
         VIMS_RECORD_DATAFORMAT, VIMS_RECORD_AUDIO_SOURCE,
@@ -4028,6 +4033,7 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
     if (new_pm == VJ_PLAYBACK_MODE_PLAIN) {
         info->uc->playback_mode = new_pm;
         info->current_edit_list = info->edit_list;
+        veejay_reset_el_buffer(info);
 
         atomic_store_long_long(&settings->min_frame_num, 0);
         atomic_store_long_long(&settings->max_frame_num,
@@ -9885,6 +9891,7 @@ static void	veejay_reset_el_buffer( veejay_t *info )
 
     settings->save_list = NULL;
     settings->save_list_len = 0;
+    settings->save_list_source = NULL;
 }
 
 static int veejay_edit_range_valid(editlist *el, long start, long end, const char *what)
@@ -9947,6 +9954,7 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 
     settings->save_list = new_save_list;
     settings->save_list_len = copy_len;
+    settings->save_list_source = el;
 
     veejay_msg(VEEJAY_MSG_DEBUG,
                "Copied frames %ld - %ld to buffer (of size %llu)",
@@ -9956,43 +9964,26 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 
     return 1;
 }
-editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
+editlist *veejay_edit_copy_to_new(veejay_t *info, editlist *el, long start, long end)
 {
-	long len = end - start;
-  
-	if(el->is_empty)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No frames in EDL to copy");
-		return 0;
-	}
+    if(!veejay_edit_range_valid(el, start, end, "copy to new EDL"))
+        return NULL;
 
-	if( end > el->total_frames)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample end is outside of editlist");
-		return NULL;
-	}
+    const uint64_t copy_len = (uint64_t)(end - start) + 1u;
 
-    if( start < 0 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Sample start cannot be a negative value");
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "New EDL %ld - %ld (%llu frames)",
+               start,
+               end,
+               (unsigned long long)copy_len);
+
+    editlist *new_el = vj_el_soft_clone_range(el, start, end);
+    if(!new_el) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");
         return NULL;
     }
 
-	if(len < 1 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
-		return NULL;
-	}
-
-    veejay_msg(VEEJAY_MSG_DEBUG, "New EDL %ld - %ld (%ld frames)", start,end, len);
-	/* Copy edl */
-	editlist *new_el = vj_el_soft_clone_range( el,start,end );
-	if(!new_el)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");
-		return NULL;
-	}
-
-	return new_el;
+    return new_el;
 }
 
 int veejay_edit_delete(veejay_t *info, editlist *el, long start, long end)
@@ -10114,24 +10105,25 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 		return 0;
 	}
 
-	if(el->is_empty)
-	{
-		destination = 0;
-	}
-	else
-	{
-		if (destination < 0 || destination > el->total_frames)
-		{
-			if(destination < 0)
-				veejay_msg(VEEJAY_MSG_ERROR, 
-					    "Destination cannot be negative");
-			if(destination > el->total_frames)
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List");
-			return 0;
-    		}
-	}
+    if(settings->save_list_source != el) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "The EDL clipboard belongs to a different Edit List");
+        return 0;
+    }
 
     uint64_t old_count = el->is_empty ? 0 : (uint64_t)el->video_frames;
+
+    if(el->is_empty)
+        destination = 0;
+
+    if(destination < 0 || (uint64_t)destination > old_count)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Paste destination %ld is outside insertion range 0 - %llu",
+                   destination,
+                   (unsigned long long)old_count);
+        return 0;
+    }
     uint64_t add_count = settings->save_list_len;
     uint64_t new_count = old_count + add_count;
 
@@ -10178,38 +10170,76 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 	return 1;
 }
 
-int veejay_edit_move(veejay_t * info,editlist *el, long start, long end,
-		      long destination)
+int veejay_edit_move(veejay_t *info, editlist *el, long start, long end,
+                     long destination)
 {
-    long dest_real;
-    if( el->is_empty )
-		return 0;
-	
-    if (destination > el->total_frames || destination < 0
-		|| start < 0 || end < 0 || start >= el->total_frames
-		|| end > el->total_frames || end < start)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid parameters for moving video from %ld - %ld to position %ld",
-			start,end,destination);
-		veejay_msg(VEEJAY_MSG_ERROR, "Range is 0 - %ld", el->total_frames);   
-		return 0;
+    video_playback_setup *settings;
+    uint64_t *block;
+    uint64_t length;
+    uint64_t old_count;
+    long final_start;
+
+    if(!veejay_edit_range_valid(el, start, end, "move"))
+        return 0;
+
+    old_count = (uint64_t)el->video_frames;
+    if(destination < 0 || (uint64_t)destination > old_count) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Move destination %ld is outside insertion range 0-%llu",
+                   destination,
+                   (unsigned long long)old_count);
+        return 0;
     }
 
-    if (destination < start)
-		dest_real = destination;
-    else if (destination > end)
-		dest_real = destination - (end - start + 1);
-    else
-		dest_real = start;
+    if(destination >= start && destination <= end + 1)
+        return 1;
 
-    if (!veejay_edit_cut(info, el, start, end))
-		return 0;
+    length = (uint64_t)(end - start + 1);
+    if(length > (uint64_t)SIZE_MAX / sizeof(uint64_t)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Move range is too large");
+        return 0;
+    }
 
-    if (!veejay_edit_paste(info, el,dest_real))
-		return 0;
+    block = (uint64_t*)vj_malloc((size_t)(length * sizeof(uint64_t)));
+    if(!block) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate temporary EDL move buffer");
+        return 0;
+    }
 
+    veejay_memcpy(block,
+                  el->frame_list + start,
+                  (size_t)(length * sizeof(uint64_t)));
 
-	return 1;
+    if(destination < start) {
+        uint64_t shifted = (uint64_t)(start - destination);
+        memmove(el->frame_list + destination + length,
+                el->frame_list + destination,
+                (size_t)(shifted * sizeof(uint64_t)));
+        veejay_memcpy(el->frame_list + destination,
+                      block,
+                      (size_t)(length * sizeof(uint64_t)));
+        final_start = destination;
+    }
+    else {
+        uint64_t shifted = (uint64_t)destination - (uint64_t)(end + 1);
+        final_start = destination - (long)length;
+        memmove(el->frame_list + start,
+                el->frame_list + end + 1,
+                (size_t)(shifted * sizeof(uint64_t)));
+        veejay_memcpy(el->frame_list + final_start,
+                      block,
+                      (size_t)(length * sizeof(uint64_t)));
+    }
+
+    free(block);
+
+    settings = (video_playback_setup*)info->settings;
+    atomic_store_long_long(&settings->current_frame_num, final_start);
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "Moved inclusive EDL range %ld-%ld to insertion boundary %ld (new start %ld)",
+               start, end, destination, final_start);
+    return 1;
 }
 
 int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
@@ -11372,7 +11402,9 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 	if( e->num_video_files <= 0 )
 		return 0;
 		
-	if(n1 == 0 && n2 == 0 )
+	if(n1 < 0)
+		n1 = 0;
+	if(n2 < 0)
 		n2 = e->total_frames;
 
 	if( vj_el_write_editlist( filename, n1,n2, e ) )

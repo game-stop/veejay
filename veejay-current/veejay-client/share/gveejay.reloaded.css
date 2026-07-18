@@ -2005,3 +2005,290 @@ button.samplebank-footer-action label {
     margin: 0;
     padding: 0;
 }
+
+/* Edit List custom widget -------------------------------------------------- */
+.edit-list-view {
+    background-color: @bg-color;
+    padding: 0;
+    margin: 0;
+    font-size: 105%;
+}
+
+.edit-list-toolbar,
+.edit-list-status,
+.edit-list-timeline-controls,
+.edit-list-rangebar {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    padding: 3px;
+    margin: 0;
+}
+
+.edit-list-toolbar button,
+.edit-list-timeline-controls button,
+.edit-list-rangebar button {
+    min-height: 22px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.edit-list-status label,
+.edit-list-timeline-controls label,
+.edit-list-rangebar label {
+    color: @text-color;
+}
+
+.edit-list-overview {
+    background-color: #1b1c20;
+    border: 1px solid @border-color;
+    min-height: 82px;
+}
+
+
+.edit-list-timeline-controls {
+    padding-top: 1px;
+    padding-bottom: 1px;
+}
+
+.edit-list-timeline-controls button {
+    min-width: 22px;
+    min-height: 20px;
+    padding: 0 4px;
+}
+
+.edit-list-timeline-controls scale {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.edit-list-timeline-controls scale.horizontal contents trough {
+    min-height: 3px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.edit-list-timeline scrollbar.horizontal {
+    min-height: 9px;
+}
+
+.edit-list-tree {
+    background-color: @bg-color;
+}
+
+.edit-list-tree header button {
+    min-height: 20px;
+    padding: 2px 4px;
+    background-color: @raised-color;
+}
+
+.edit-list-tree:selected {
+    background-color: @fill-color;
+}
+
+.edit-list-toolbar .destructive-action,
+.edit-list-rangebar .destructive-action {
+    border-color: @record-color;
+}
+
+.edit-list-toolbar .destructive-action:hover,
+.edit-list-rangebar .destructive-action:hover {
+    background-color: #3b2020;
+}
+
+.smallaspossible .edit-list-toolbar,
+.smallaspossible .edit-list-status,
+.smallaspossible .edit-list-timeline-controls,
+.smallaspossible .edit-list-rangebar {
+    padding: 1px;
+}
+
+.smallaspossible .edit-list-toolbar button,
+.smallaspossible .edit-list-timeline-controls button,
+.smallaspossible .edit-list-rangebar button {
+    min-height: 18px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+
+/* Selected-sample Properties inspector. */
+.sample-properties-page {
+    background-color: @bg-color;
+}
+
+frame.property-card,
+frame.property-card > border {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    border-radius: 4px;
+}
+
+frame.property-card > border {
+    padding: 0;
+}
+
+.property-card-title {
+    color: @text-color;
+    font-weight: bold;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.property-label {
+    color: @text-muted;
+}
+
+.property-hint {
+    color: @text-muted;
+    font-size: 90%;
+}
+
+button.property-apply {
+    min-width: 64px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.sample-properties-page spinbutton {
+    min-width: 84px;
+}
+
+.sample-properties-page scale {
+    min-width: 140px;
+}
+
+.append-stream-expander {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    border-radius: 4px;
+    padding: 4px 6px;
+}
+
+.append-stream-panel {
+    background-color: @panel-color;
+    border-top: 1px solid @border-color;
+    padding-top: 4px;
+}
+
+.append-stream-warning {
+    color: @warn-color;
+    font-size: 90%;
+}
+
+button.append-stream-start {
+    min-width: 112px;
+    background-color: #3b2020;
+    border-color: @record-color;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+button.append-stream-start:hover {
+    background-color: #4b2828;
+    border-color: #aa5a5a;
+}
+
+button.append-stream-stop {
+    min-width: 74px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+/* Record to Disk workflow. */
+.record-to-disk-page {
+    background-color: @bg-color;
+}
+
+frame.record-card,
+frame.record-card > border,
+frame.record-action-card,
+frame.record-action-card > border {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    border-radius: 4px;
+}
+
+frame.record-card > border,
+frame.record-action-card > border {
+    padding: 0;
+}
+
+.record-card-title {
+    color: @text-color;
+    font-weight: bold;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.record-page-hint,
+.record-field-label {
+    color: @text-muted;
+}
+
+.record-page-hint {
+    font-size: 90%;
+}
+
+.record-duration-value {
+    color: @slot-playing-color;
+    font-weight: bold;
+    font-size: 110%;
+}
+
+.record-to-disk-page spinbutton {
+    min-width: 86px;
+}
+
+.record-to-disk-page combobox {
+    min-width: 220px;
+}
+
+frame.record-action-card,
+frame.record-action-card > border {
+    border-color: @record-color;
+    background-color: #302729;
+}
+
+button.record-start-button {
+    min-width: 132px;
+    padding-left: 9px;
+    padding-right: 9px;
+    background-color: #3b2020;
+    border-color: @record-color;
+}
+
+button.record-start-button:hover {
+    background-color: #4b2828;
+    border-color: #aa5a5a;
+}
+
+button.record-stop-button {
+    min-width: 74px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.record-to-disk-page progressbar trough {
+    min-height: 12px;
+    border-width: 1px;
+}
+
+.record-to-disk-page progressbar progress {
+    background-color: @record-color;
+}
+
+.smallaspossible .record-to-disk-page {
+    margin: 2px;
+}
+
+.smallaspossible frame.record-card,
+.smallaspossible frame.record-action-card {
+    margin: 0;
+}
+
+.smallaspossible button.record-start-button,
+.smallaspossible button.record-stop-button {
+    min-height: 20px;
+    padding-top: 0;
+    padding-bottom: 0;
+}

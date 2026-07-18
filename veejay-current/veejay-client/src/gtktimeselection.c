@@ -223,22 +223,102 @@ static void timeline_audio_lane_emit_changed(GtkWidget *widget);
 static void timeline_class_init(TimelineSelectionClass *class);
 static void timeline_init(TimelineSelection *te);
 static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr);
+static void timeline_style_updated(GtkWidget *widget);
 
 static GObjectClass *parent_class = NULL;
 static gint timeline_signals[LAST_SIGNAL] = { 0 };
 
+static GtkWidgetClass *timeline_parent_widget_class = NULL;
+
+static double timeline_font_points(GtkWidget *widget)
+{
+  PangoContext *context;
+  const PangoFontDescription *font;
+  int size;
+  double points;
+
+  if(!widget)
+    return 10.0;
+
+  context = gtk_widget_get_pango_context(widget);
+  font = context ? pango_context_get_font_description(context) : NULL;
+  size = font ? pango_font_description_get_size(font) : 0;
+  if(size <= 0)
+    return 10.0;
+
+  points = (double)size / PANGO_SCALE;
+  if(pango_font_description_get_size_is_absolute(font))
+    points *= 72.0 / 96.0;
+  return CLAMP(points, 6.0, 32.0);
+}
+
+static double timeline_font_px(GtkWidget *widget, double scale)
+{
+  return MAX(7.0,
+             timeline_font_points(widget) *
+             (96.0 / 72.0) * scale);
+}
+
+static const char *timeline_font_family(GtkWidget *widget)
+{
+  PangoContext *context;
+  const PangoFontDescription *font;
+  const char *family;
+
+  if(!widget)
+    return "Sans";
+
+  context = gtk_widget_get_pango_context(widget);
+  font = context ? pango_context_get_font_description(context) : NULL;
+  family = font ? pango_font_description_get_family(font) : NULL;
+  return (family && family[0]) ? family : "Sans";
+}
+
+static double timeline_label_font_size(TimelineSelection *te)
+{
+  return timeline_font_px(te ? te->widget : NULL, 0.90);
+}
+
+static double timeline_info_font_size(TimelineSelection *te)
+{
+  return timeline_font_px(te ? te->widget : NULL, 0.86);
+}
+
+static double timeline_ruler_font_size(TimelineSelection *te)
+{
+  return timeline_font_px(te ? te->widget : NULL, 0.82);
+}
+
+static int timeline_min_height(GtkWidget *widget)
+{
+  double delta = MAX(0.0, timeline_font_px(widget, 0.90) - 12.0);
+  return MAX(128,
+             (int)ceil(128.0 + delta * 3.0));
+}
+
+static void timeline_update_font_metrics(TimelineSelection *te)
+{
+  double label_size;
+
+  if(!te || !te->widget)
+    return;
+
+  label_size = timeline_label_font_size(te);
+  te->frame_height = MAX(14.0, ceil(label_size * 1.15));
+  te->font_line = MAX(24.0, ceil(label_size * 2.0));
+  gtk_widget_set_size_request(te->widget,
+                              200,
+                              timeline_min_height(te->widget));
+}
+
 #define TIMELINE_STEPPER_HIT_PX     28.0
 #define TIMELINE_SELECTION_HIT_PX   8.0
 #define TIMELINE_MIN_FRAMES         1.0
-#define TIMELINE_MIN_HEIGHT_PX      128
-#define TIMELINE_LABEL_FONT_SIZE    12.0
-#define TIMELINE_INFO_FONT_SIZE     12.0
 #define TIMELINE_DEFAULT_SCROLL_STEP_FRAMES 13
 #define TIMELINE_CTRL_SCROLL_STEP_FRAMES    25
 #define TIMELINE_SHIFT_SCROLL_STEP_FRAMES   50
 #define TIMELINE_SCRATCH_SCROLL_EDGE_STEP_FRAMES 5
 #define TIMELINE_BEAT_GRID_MIN_PX   10.0
-#define TIMELINE_FRAME_RULER_FONT_SIZE 11.0
 
 #ifdef TIMELINE_DEBUG
 static const char *timeline_action_name(TimelineAction action)
@@ -763,7 +843,9 @@ static void finalize(GObject *object)
 static void timeline_class_init(TimelineSelectionClass *class)
 {
   GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(class);
+  timeline_parent_widget_class = GTK_WIDGET_CLASS(g_type_class_peek_parent(class));
   widget_class->draw = timeline_draw;
+  widget_class->style_updated = timeline_style_updated;
 
   GObjectClass *gobject_class = G_OBJECT_CLASS(class);
   parent_class = G_OBJECT_CLASS(g_type_class_peek(GTK_TYPE_DRAWING_AREA));
@@ -952,6 +1034,20 @@ static void timeline_class_init(TimelineSelectionClass *class)
                                                 G_TYPE_NONE,
                                                 0,
                                                 NULL);
+}
+
+
+static void timeline_style_updated(GtkWidget *widget)
+{
+  TimelineSelection *te = TIMELINE_SELECTION(widget);
+
+  if(timeline_parent_widget_class &&
+     timeline_parent_widget_class->style_updated)
+    timeline_parent_widget_class->style_updated(widget);
+
+  timeline_update_font_metrics(te);
+  gtk_widget_queue_resize(widget);
+  gtk_widget_queue_draw(widget);
 }
 
 static void timeline_init(TimelineSelection *te)
@@ -2908,10 +3004,10 @@ static void timeline_draw_frame_ruler(TimelineSelection *te,
 
     cairo_save(cr);
     cairo_select_font_face(cr,
-                           "Sans",
+                           timeline_font_family(te->widget),
                            CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_BOLD);
-    cairo_set_font_size(cr, TIMELINE_FRAME_RULER_FONT_SIZE);
+    cairo_set_font_size(cr, timeline_ruler_font_size(te));
 
     /* Human-facing local frame ruler: 1..N, not the internal 0..N-1 indices.
      * The final label is always shown, so intermediate labels near the right
@@ -3098,10 +3194,10 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
 
   cairo_set_antialias(cr, CAIRO_ANTIALIAS_FAST);
   cairo_select_font_face(cr,
-                         "Sans",
+                         timeline_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_BOLD);
-  cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+  cairo_set_font_size(cr, timeline_label_font_size(te));
 
   gdouble tri_h = te->has_stepper ? te->stepper_draw_size : 0.0;
   gdouble track_h = marker_height;
@@ -3110,7 +3206,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
   gdouble audio_lane_extra = te->audio_lane_active ? (audio_lane_gap + audio_lane_h + 4.0) : 0.0;
   gdouble row_gap = 6.0;
 
-  gdouble row_step = 20.0;
+  gdouble row_step = MAX(20.0, timeline_label_font_size(te) + 8.0);
   gdouble wav_info_extra = te->audio_lane_active ? row_step : 0.0;
   gdouble label_rows_h = row_gap + (row_step * 2.0) + wav_info_extra + 12.0;
   gdouble group_h = tri_h + track_h + audio_lane_extra + label_rows_h;
@@ -3158,7 +3254,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
       gdouble pill_y = MAX(9.0, track_y - 3.0);
 
       snprintf(text, sizeof(text), "BPM %d.%d", bpm10 / 10, bpm10 % 10);
-      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+      cairo_set_font_size(cr, timeline_info_font_size(te));
 
       timeline_draw_text_pill(cr,
                               text,
@@ -3169,7 +3265,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
                               0.95,
                               &info_bg,
                               te->audio_grid_locked ? 0.72 : 0.42);
-      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+      cairo_set_font_size(cr, timeline_label_font_size(te));
   }
 
 
@@ -3538,9 +3634,9 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
             snprintf(text, sizeof(text), "%s %d/%d  %s", state, pos_f, nframes_i - 1, aux);
     }
 
-    cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+    cairo_set_font_size(cr, timeline_info_font_size(te));
     timeline_draw_plain_text(cr, text, 4.0, bottom_row_y, &color, 0.80 + pulse * 0.15);
-    cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+    cairo_set_font_size(cr, timeline_label_font_size(te));
   }
 
   {
@@ -3565,9 +3661,9 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
       else
           snprintf(text, sizeof(text), "%s", total_tc);
 
-      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+      cairo_set_font_size(cr, timeline_info_font_size(te));
       timeline_draw_right_text(cr, text, width - 4.0, bottom_row_y, &dim_fg, 0.58);
-      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+      cairo_set_font_size(cr, timeline_label_font_size(te));
   }
 
 
@@ -3608,20 +3704,20 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
           snprintf(text, sizeof(text), "Audio: JACK external  %s  switch %dfr",
                    mode_name, display_start_frame);
 
-      cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+      cairo_set_font_size(cr, timeline_info_font_size(te));
       timeline_draw_plain_text(cr, text, 4.0, wav_info_row_y, &color, 0.74);
 
       if (width > 455.0)
           timeline_draw_right_text(cr, edit_hint, width - 4.0, wav_info_row_y, &dim_fg, te->audio_lane_drag ? 0.72 : 0.46);
 
-      cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+      cairo_set_font_size(cr, timeline_label_font_size(te));
   }
 
   if (te->current_location != MOUSE_OUTSIDE && !timeline_latch_visible(te)) {
       const gchar *hint = timeline_hover_hint(te);
 
       if (hint && *hint && width > 210.0) {
-          cairo_set_font_size(cr, TIMELINE_INFO_FONT_SIZE);
+          cairo_set_font_size(cr, timeline_info_font_size(te));
           timeline_draw_text_pill(cr,
                                   hint,
                                   width * 0.5,
@@ -3631,7 +3727,7 @@ static gboolean timeline_draw(GtkWidget *widget, cairo_t *cr)
                                   0.76,
                                   &col2,
                                   0.16);
-          cairo_set_font_size(cr, TIMELINE_LABEL_FONT_SIZE);
+          cairo_set_font_size(cr, timeline_label_font_size(te));
       }
   }
 
@@ -3644,7 +3740,8 @@ GtkWidget *timeline_new(void)
   GtkWidget *widget = GTK_WIDGET(g_object_new(timeline_get_type(), NULL));
   TimelineSelection *te = TIMELINE_SELECTION(widget);
 
-  gtk_widget_set_size_request(widget, 200, TIMELINE_MIN_HEIGHT_PX);
+  te->widget = widget;
+  timeline_update_font_metrics(te);
   gtk_widget_set_can_focus(widget, TRUE);
 
   gtk_widget_set_events(widget,
@@ -3677,8 +3774,6 @@ GtkWidget *timeline_new(void)
 
   g_signal_connect(G_OBJECT(widget), "focus-out-event",
                    G_CALLBACK(event_focus_out), NULL);
-
-  te->widget = widget;
 
   TL_EVT(te, "new", "timeline widget created");
 

@@ -19,12 +19,13 @@
 #include <config.h>
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <veejaycore/vims.h>
 #include "gtkvimspatternview.h"
 
-#define GVR_PATTERN_ROW_HEIGHT 21
+#define GVR_PATTERN_ROW_HEIGHT_MIN 21
 #define GVR_PATTERN_HEADER_HEIGHT 0
 #define GVR_PATTERN_ALL_COLUMNS_MASK ((1u << GVR_VIMS_PATTERN_COLUMNS) - 1u)
 #define GVR_PATTERN_FRAME_WIDTH 96
@@ -193,6 +194,61 @@ enum {
 static guint gvr_vims_pattern_view_signals[SIGNAL_LAST];
 
 G_DEFINE_TYPE(GvrVimsPatternView, gvr_vims_pattern_view, GTK_TYPE_BOX)
+
+
+static double gvr_pattern_font_points(GtkWidget *widget)
+{
+    PangoContext *context;
+    const PangoFontDescription *font;
+    int size;
+    double points;
+
+    if(!widget)
+        return 10.0;
+
+    context = gtk_widget_get_pango_context(widget);
+    font = context ? pango_context_get_font_description(context) : NULL;
+    size = font ? pango_font_description_get_size(font) : 0;
+    if(size <= 0)
+        return 10.0;
+
+    points = (double)size / PANGO_SCALE;
+    if(pango_font_description_get_size_is_absolute(font))
+        points *= 72.0 / 96.0;
+    return CLAMP(points, 6.0, 32.0);
+}
+
+static double gvr_pattern_font_px(GvrVimsPatternView *view,
+                                  double scale)
+{
+    return MAX(7.0,
+               gvr_pattern_font_points(view ? view->area : NULL) *
+               (96.0 / 72.0) * scale);
+}
+
+static int gvr_pattern_row_height(GvrVimsPatternView *view)
+{
+    return MAX(GVR_PATTERN_ROW_HEIGHT_MIN,
+               (int)ceil(gvr_pattern_font_px(view, 1.0) + 7.0));
+}
+
+static PangoFontDescription *gvr_pattern_font_description(GtkWidget *widget,
+                                                           double scale,
+                                                           PangoWeight weight)
+{
+    PangoContext *context = widget ? gtk_widget_get_pango_context(widget) : NULL;
+    const PangoFontDescription *base = context ? pango_context_get_font_description(context) : NULL;
+    PangoFontDescription *font = base ?
+        pango_font_description_copy(base) :
+        pango_font_description_from_string("Monospace 10");
+
+    pango_font_description_set_family(font, "Monospace");
+    pango_font_description_set_size(
+        font,
+        (int)lrint(gvr_pattern_font_points(widget) * scale * PANGO_SCALE));
+    pango_font_description_set_weight(font, weight);
+    return font;
+}
 
 static void gvr_pattern_update_target_label(GvrVimsPatternView *view);
 static void gvr_pattern_update_history_buttons(GvrVimsPatternView *view);
@@ -2423,7 +2479,7 @@ static int gvr_pattern_visible_rows(GvrVimsPatternView *view)
     int rows;
 
     gtk_widget_get_allocation(view->area, &allocation);
-    rows = (allocation.height - GVR_PATTERN_HEADER_HEIGHT) / GVR_PATTERN_ROW_HEIGHT;
+    rows = (allocation.height - GVR_PATTERN_HEADER_HEIGHT) / gvr_pattern_row_height(view);
     return rows < 1 ? 1 : rows;
 }
 
@@ -3922,21 +3978,21 @@ static void gvr_pattern_update_target_label(GvrVimsPatternView *view)
     }
 }
 
-static void gvr_pattern_draw_text(cairo_t *cr,
+static void gvr_pattern_draw_text(GtkWidget *widget,
+                                  cairo_t *cr,
                                   const char *text,
                                   double x,
                                   double y,
-                                  double size,
+                                  double scale,
                                   cairo_font_weight_t weight)
 {
     PangoLayout *layout = pango_cairo_create_layout(cr);
-    PangoFontDescription *font = pango_font_description_new();
+    PangoFontDescription *font;
     int baseline;
 
-    pango_font_description_set_family(font, "Monospace");
-    pango_font_description_set_size(font, (int)(size * PANGO_SCALE));
-    pango_font_description_set_weight(
-        font,
+    font = gvr_pattern_font_description(
+        widget,
+        scale,
         weight == CAIRO_FONT_WEIGHT_BOLD ?
         PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
     pango_layout_set_font_description(layout, font);
@@ -3951,15 +4007,17 @@ static void gvr_pattern_draw_text(cairo_t *cr,
     g_object_unref(layout);
 }
 
-static void gvr_pattern_draw_cell_text(cairo_t *cr,
+static void gvr_pattern_draw_cell_text(GtkWidget *widget,
+                                       cairo_t *cr,
                                        const char *text,
                                        double x,
-                                       double y,
-                                       double width)
+                                       double baseline_y,
+                                       double width,
+                                       double scale)
 {
     char buffer[40];
     PangoLayout *layout = pango_cairo_create_layout(cr);
-    PangoFontDescription *font = pango_font_description_new();
+    PangoFontDescription *font;
     PangoRectangle extents;
     gsize length;
     int baseline;
@@ -3967,9 +4025,9 @@ static void gvr_pattern_draw_cell_text(cairo_t *cr,
     g_strlcpy(buffer, text ? text : "", sizeof(buffer));
     length = strlen(buffer);
 
-    pango_font_description_set_family(font, "Monospace");
-    pango_font_description_set_size(font, 10 * PANGO_SCALE);
-    pango_font_description_set_weight(font, PANGO_WEIGHT_BOLD);
+    font = gvr_pattern_font_description(widget,
+                                        scale,
+                                        PANGO_WEIGHT_BOLD);
     pango_layout_set_font_description(layout, font);
     pango_layout_set_single_paragraph_mode(layout, TRUE);
     pango_layout_set_text(layout, buffer, -1);
@@ -3984,7 +4042,7 @@ static void gvr_pattern_draw_cell_text(cairo_t *cr,
     baseline = pango_layout_get_baseline(layout);
     cairo_move_to(cr,
                   x + 4.0,
-                  y + 14.0 - ((double)baseline / PANGO_SCALE));
+                  baseline_y - ((double)baseline / PANGO_SCALE));
     pango_cairo_show_layout(cr, layout);
 
     pango_font_description_free(font);
@@ -4004,12 +4062,18 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
     int frame_count;
     int step;
     double event_width;
+    int row_height;
+    double font_px;
+    double baseline_offset;
 
     if(!view)
         return FALSE;
 
     gtk_widget_get_allocation(widget, &allocation);
     rows = gvr_pattern_visible_rows(view);
+    row_height = gvr_pattern_row_height(view);
+    font_px = gvr_pattern_font_px(view, 1.0);
+    baseline_offset = (row_height + font_px * 0.65) * 0.5;
     display_rows = gvr_pattern_display_row_count(view);
     frame_count = gvr_pattern_effective_frame_count(view);
     step = gvr_pattern_edit_step(view);
@@ -4031,7 +4095,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
         const int next_frame =
             MIN(frame_count, frame + step);
         double y = GVR_PATTERN_HEADER_HEIGHT +
-                   row_index * GVR_PATTERN_ROW_HEIGHT;
+                   row_index * row_height;
         gboolean selected_row =
             display_row == view->selected_row;
         gboolean live_row =
@@ -4059,7 +4123,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                             0,
                             y,
                             allocation.width,
-                            GVR_PATTERN_ROW_HEIGHT);
+                            row_height);
             cairo_fill(cr);
         }
 
@@ -4069,7 +4133,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                             0,
                             y,
                             allocation.width,
-                            GVR_PATTERN_ROW_HEIGHT);
+                            row_height);
             cairo_fill(cr);
         }
         else if(selected_row) {
@@ -4078,7 +4142,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                             0,
                             y,
                             allocation.width,
-                            GVR_PATTERN_ROW_HEIGHT);
+                            row_height);
             cairo_fill(cr);
         }
         else if((display_row & 3) == 0) {
@@ -4087,7 +4151,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                             0,
                             y,
                             allocation.width,
-                            GVR_PATTERN_ROW_HEIGHT);
+                            row_height);
             cairo_fill(cr);
         }
 
@@ -4097,11 +4161,12 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                              live_row ? 0.72 : 0.66,
                              live_row ? 0.28 : 0.72);
         gvr_pattern_draw_text(
+            widget,
             cr,
             frame_text,
             8,
-            y + 15,
-            10.0,
+            y + baseline_offset,
+            1.0,
             selected_row ?
             CAIRO_FONT_WEIGHT_BOLD :
             CAIRO_FONT_WEIGHT_NORMAL);
@@ -4122,11 +4187,12 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                hidden.events);
 
                 cairo_set_source_rgb(cr, 1.0, 0.68, 0.20);
-                gvr_pattern_draw_text(cr,
+                gvr_pattern_draw_text(widget,
+                                      cr,
                                       hidden_text,
                                       GVR_PATTERN_FRAME_WIDTH - 30.0,
-                                      y + 14.0,
-                                      8.0,
+                                      y + baseline_offset,
+                                      0.8,
                                       CAIRO_FONT_WEIGHT_BOLD);
             }
         }
@@ -4147,10 +4213,10 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                 cairo_set_line_width(cr, 1.5);
                 cairo_move_to(cr,
                               0,
-                              y + GVR_PATTERN_ROW_HEIGHT - 0.5);
+                              y + row_height - 0.5);
                 cairo_line_to(cr,
                               allocation.width,
-                              y + GVR_PATTERN_ROW_HEIGHT - 0.5);
+                              y + row_height - 0.5);
                 cairo_stroke(cr);
             }
         }
@@ -4181,7 +4247,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                 x,
                                 y,
                                 event_width,
-                                GVR_PATTERN_ROW_HEIGHT);
+                                row_height);
                 cairo_fill(cr);
             }
 
@@ -4195,7 +4261,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                 x + 1,
                                 y + 1,
                                 event_width - 2,
-                                GVR_PATTERN_ROW_HEIGHT - 2);
+                                row_height - 2);
                 cairo_fill(cr);
             }
 
@@ -4211,7 +4277,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                 x + 1,
                                 y + 1,
                                 event_width - 2,
-                                GVR_PATTERN_ROW_HEIGHT - 2);
+                                row_height - 2);
                 cairo_fill(cr);
                 cairo_set_source_rgba(cr,
                                       0.90,
@@ -4223,7 +4289,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                 x + 1.5,
                                 y + 1.5,
                                 event_width - 3,
-                                GVR_PATTERN_ROW_HEIGHT - 3);
+                                row_height - 3);
                 cairo_stroke(cr);
             }
             else if(block_selected) {
@@ -4237,7 +4303,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                 x + 1.5,
                                 y + 1.5,
                                 event_width - 3,
-                                GVR_PATTERN_ROW_HEIGHT - 3);
+                                row_height - 3);
                 cairo_stroke(cr);
             }
 
@@ -4249,11 +4315,13 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                 else
                     cairo_set_source_rgb(cr, 0.62, 0.82, 1.0);
 
-                gvr_pattern_draw_cell_text(cr,
+                gvr_pattern_draw_cell_text(widget,
+                                           cr,
                                            event->label,
                                            x,
-                                           y,
-                                           event_width);
+                                           y + baseline_offset,
+                                           event_width,
+                                           1.0);
             }
 
             if(event && event->message &&
@@ -4268,7 +4336,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                 x + 2.0,
                                 y + 2.0,
                                 event_width - 4.0,
-                                GVR_PATTERN_ROW_HEIGHT - 4.0);
+                                row_height - 4.0);
                 cairo_stroke(cr);
             }
         }
@@ -4303,7 +4371,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
     {
         double y =
             GVR_PATTERN_HEADER_HEIGHT +
-            row_index * GVR_PATTERN_ROW_HEIGHT + 0.5;
+            row_index * row_height + 0.5;
         cairo_move_to(cr, 0, y);
         cairo_line_to(cr, allocation.width, y);
     }
@@ -4370,7 +4438,7 @@ static gboolean gvr_pattern_position_from_xy(GvrVimsPatternView *view,
     top_row = (int)gtk_adjustment_get_value(view->vadjustment);
     display_row = top_row +
                   (int)((y - GVR_PATTERN_HEADER_HEIGHT) /
-                        GVR_PATTERN_ROW_HEIGHT);
+                        gvr_pattern_row_height(view));
     *frame = gvr_pattern_display_row_to_frame(view, display_row);
 
     if(x < GVR_PATTERN_FRAME_WIDTH) {
@@ -5979,10 +6047,25 @@ static void gvr_vims_pattern_view_finalize(GObject *object)
         gvr_vims_pattern_view_parent_class)->finalize(object);
 }
 
+
+static void gvr_vims_pattern_view_style_updated(GtkWidget *widget)
+{
+    GvrVimsPatternView *view = GVR_VIMS_PATTERN_VIEW(widget);
+
+    GTK_WIDGET_CLASS(gvr_vims_pattern_view_parent_class)->style_updated(widget);
+    if(view->area && view->vadjustment) {
+        gvr_pattern_update_adjustment(view);
+        gtk_widget_queue_resize(view->area);
+        gtk_widget_queue_draw(view->area);
+    }
+}
+
 static void gvr_vims_pattern_view_class_init(GvrVimsPatternViewClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
+    GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
+    widget_class->style_updated = gvr_vims_pattern_view_style_updated;
     object_class->finalize = gvr_vims_pattern_view_finalize;
 
     gvr_vims_pattern_view_signals[SIGNAL_VIMS_FIRE] =

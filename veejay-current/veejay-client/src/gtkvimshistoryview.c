@@ -18,6 +18,7 @@
  */
 #include <config.h>
 #include <gtk/gtk.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <veejaycore/vims.h>
@@ -159,8 +160,9 @@ static void gvr_vims_history_draw_text(cairo_t *cr,
 static void gvr_vims_history_draw_cell_text(cairo_t *cr,
                                             const char *text,
                                             double x,
-                                            double y,
-                                            double width)
+                                            double baseline,
+                                            double width,
+                                            double font_size)
 {
     char buffer[40];
     cairo_text_extents_t ext;
@@ -174,7 +176,7 @@ static void gvr_vims_history_draw_cell_text(cairo_t *cr,
                            "Monospace",
                            CAIRO_FONT_SLANT_NORMAL,
                            CAIRO_FONT_WEIGHT_BOLD);
-    cairo_set_font_size(cr, 10.0);
+    cairo_set_font_size(cr, font_size);
     cairo_text_extents(cr, buffer, &ext);
 
     while(length > 1 && ext.width > width - 8.0) {
@@ -182,13 +184,13 @@ static void gvr_vims_history_draw_cell_text(cairo_t *cr,
         cairo_text_extents(cr, buffer, &ext);
     }
 
-    cairo_move_to(cr, x + 4.0, y + 14.0);
+    cairo_move_to(cr, x + 4.0, baseline);
     cairo_show_text(cr, buffer);
     cairo_restore(cr);
 }
 
-#define GVR_HISTORY_ROW_HEIGHT 24
-#define GVR_HISTORY_HEADER_HEIGHT 23
+#define GVR_HISTORY_ROW_HEIGHT_MIN 24
+#define GVR_HISTORY_HEADER_HEIGHT_MIN 23
 #define GVR_HISTORY_ID_WIDTH 62
 #define GVR_HISTORY_MAX_ENTRIES 512
 
@@ -224,6 +226,49 @@ G_DEFINE_TYPE(GvrVimsHistoryView,
               gvr_vims_history_view,
               GTK_TYPE_BOX)
 
+
+static double gvr_vims_history_font_points(GtkWidget *widget)
+{
+    PangoContext *context;
+    const PangoFontDescription *font;
+    int size;
+    double points;
+
+    if(!widget)
+        return 10.0;
+
+    context = gtk_widget_get_pango_context(widget);
+    font = context ? pango_context_get_font_description(context) : NULL;
+    size = font ? pango_font_description_get_size(font) : 0;
+    if(size <= 0)
+        return 10.0;
+
+    points = (double)size / PANGO_SCALE;
+    if(pango_font_description_get_size_is_absolute(font))
+        points *= 72.0 / 96.0;
+    return CLAMP(points, 6.0, 32.0);
+}
+
+static double gvr_vims_history_font_px(GvrVimsHistoryView *view,
+                                        double scale)
+{
+    return MAX(7.0,
+               gvr_vims_history_font_points(view ? view->area : NULL) *
+               (96.0 / 72.0) * scale);
+}
+
+static int gvr_vims_history_row_height(GvrVimsHistoryView *view)
+{
+    return MAX(GVR_HISTORY_ROW_HEIGHT_MIN,
+               (int)ceil(gvr_vims_history_font_px(view, 0.75) + 14.0));
+}
+
+static int gvr_vims_history_header_height(GvrVimsHistoryView *view)
+{
+    return MAX(GVR_HISTORY_HEADER_HEIGHT_MIN,
+               (int)ceil(gvr_vims_history_font_px(view, 0.75) + 12.0));
+}
+
 static void gvr_vims_history_entry_free(gpointer data)
 {
     GvrVimsHistoryEntry *entry = data;
@@ -242,8 +287,8 @@ static int gvr_vims_history_visible_rows(GvrVimsHistoryView *view)
     int rows;
 
     gtk_widget_get_allocation(view->area, &allocation);
-    rows = (allocation.height - GVR_HISTORY_HEADER_HEIGHT) /
-           GVR_HISTORY_ROW_HEIGHT;
+    rows = (allocation.height - gvr_vims_history_header_height(view)) /
+           gvr_vims_history_row_height(view);
     return MAX(1, rows);
 }
 
@@ -291,10 +336,20 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
     GvrVimsHistoryView *view = GVR_VIMS_HISTORY_VIEW(user_data);
     GtkAllocation allocation;
     int visible;
+    int row_height;
+    int header_height;
+    double font_size;
+    double small_font_size;
+    double header_baseline;
     double descr_width;
 
     gtk_widget_get_allocation(widget, &allocation);
     visible = gvr_vims_history_visible_rows(view);
+    row_height = gvr_vims_history_row_height(view);
+    header_height = gvr_vims_history_header_height(view);
+    font_size = gvr_vims_history_font_px(view, 0.75);
+    small_font_size = gvr_vims_history_font_px(view, 0.68);
+    header_baseline = (header_height + font_size) * 0.5 - 1.0;
     descr_width = MAX(120.0,
                       MIN(300.0,
                           allocation.width * 0.38));
@@ -307,35 +362,35 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
                     0,
                     0,
                     allocation.width,
-                    GVR_HISTORY_HEADER_HEIGHT);
+                    header_height);
     cairo_fill(cr);
 
     cairo_set_source_rgb(cr, 0.82, 0.85, 0.90);
     gvr_vims_history_draw_text(cr,
                           "VIMS",
                           8,
-                          16,
-                          10.0,
+                          header_baseline,
+                          font_size,
                           CAIRO_FONT_WEIGHT_BOLD);
     gvr_vims_history_draw_text(cr,
                           "DESCRIPTION",
                           GVR_HISTORY_ID_WIDTH + 6,
-                          16,
-                          10.0,
+                          header_baseline,
+                          font_size,
                           CAIRO_FONT_WEIGHT_BOLD);
     gvr_vims_history_draw_text(cr,
                           "COMMAND",
                           GVR_HISTORY_ID_WIDTH + descr_width + 10,
-                          16,
-                          10.0,
+                          header_baseline,
+                          font_size,
                           CAIRO_FONT_WEIGHT_BOLD);
 
     for(int row = 0; row <= visible; row++) {
         int index = -1;
         GvrVimsHistoryEntry *entry =
             gvr_vims_history_entry_at_row(view, row, &index);
-        const double y = GVR_HISTORY_HEADER_HEIGHT +
-                         row * GVR_HISTORY_ROW_HEIGHT;
+        const double y = header_height + row * row_height;
+        const double baseline = y + (row_height + font_size) * 0.5 - 1.0;
         char id_text[16];
         char count_text[24];
 
@@ -348,7 +403,7 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
                             0,
                             y,
                             allocation.width,
-                            GVR_HISTORY_ROW_HEIGHT);
+                            row_height);
             cairo_fill(cr);
         }
         else if((row & 1) == 0) {
@@ -357,7 +412,7 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
                             0,
                             y,
                             allocation.width,
-                            GVR_HISTORY_ROW_HEIGHT);
+                            row_height);
             cairo_fill(cr);
         }
 
@@ -366,8 +421,8 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
         gvr_vims_history_draw_text(cr,
                               id_text,
                               8,
-                              y + 18,
-                              10.0,
+                              baseline,
+                              font_size,
                               CAIRO_FONT_WEIGHT_BOLD);
 
         cairo_set_source_rgb(cr, 0.78, 0.81, 0.86);
@@ -376,17 +431,19 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
             entry->description && entry->description[0] ?
                 entry->description : entry->label,
             GVR_HISTORY_ID_WIDTH,
-            y + 3,
-            descr_width);
+            baseline,
+            descr_width,
+            font_size);
 
         cairo_set_source_rgb(cr, 0.72, 0.78, 0.90);
         gvr_vims_history_draw_cell_text(
             cr,
             entry->message,
             GVR_HISTORY_ID_WIDTH + descr_width + 4,
-            y + 3,
+            baseline,
             allocation.width -
-                (GVR_HISTORY_ID_WIDTH + descr_width + 4));
+                (GVR_HISTORY_ID_WIDTH + descr_width + 4),
+            font_size);
 
         if(entry->count > 1) {
             g_snprintf(count_text,
@@ -397,8 +454,8 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
             gvr_vims_history_draw_text(cr,
                                   count_text,
                                   allocation.width - 38,
-                                  y + 18,
-                                  9.0,
+                                  baseline,
+                                  small_font_size,
                                   CAIRO_FONT_WEIGHT_BOLD);
         }
     }
@@ -418,8 +475,8 @@ static gboolean gvr_vims_history_draw(GtkWidget *widget,
     cairo_stroke(cr);
 
     for(int row = 0; row <= visible; row++) {
-        const double y = GVR_HISTORY_HEADER_HEIGHT +
-                         row * GVR_HISTORY_ROW_HEIGHT + 0.5;
+        const double y = header_height +
+                         row * row_height + 0.5;
         cairo_move_to(cr, 0, y);
         cairo_line_to(cr, allocation.width, y);
     }
@@ -497,11 +554,11 @@ static gboolean gvr_vims_history_button_press(GtkWidget *widget,
 
     gtk_widget_grab_focus(widget);
 
-    if(event->y < GVR_HISTORY_HEADER_HEIGHT)
+    if(event->y < gvr_vims_history_header_height(view))
         return FALSE;
 
-    display_row = (int)((event->y - GVR_HISTORY_HEADER_HEIGHT) /
-                        GVR_HISTORY_ROW_HEIGHT);
+    display_row = (int)((event->y - gvr_vims_history_header_height(view)) /
+                        gvr_vims_history_row_height(view));
     entry = gvr_vims_history_entry_at_row(view,
                                           display_row,
                                           &index);
@@ -615,10 +672,10 @@ static gboolean gvr_vims_history_query_tooltip(GtkWidget *widget,
     if(!keyboard_mode) {
         int display_row;
 
-        if(y < GVR_HISTORY_HEADER_HEIGHT)
+        if(y < gvr_vims_history_header_height(view))
             return FALSE;
-        display_row = (y - GVR_HISTORY_HEADER_HEIGHT) /
-                      GVR_HISTORY_ROW_HEIGHT;
+        display_row = (y - gvr_vims_history_header_height(view)) /
+                      gvr_vims_history_row_height(view);
         entry = gvr_vims_history_entry_at_row(view,
                                               display_row,
                                               &index);
@@ -699,11 +756,26 @@ static void gvr_vims_history_view_finalize(GObject *object)
     G_OBJECT_CLASS(gvr_vims_history_view_parent_class)->finalize(object);
 }
 
+
+static void gvr_vims_history_view_style_updated(GtkWidget *widget)
+{
+    GvrVimsHistoryView *view = GVR_VIMS_HISTORY_VIEW(widget);
+
+    GTK_WIDGET_CLASS(gvr_vims_history_view_parent_class)->style_updated(widget);
+    if(view->area && view->vadjustment) {
+        gvr_vims_history_update_adjustment(view);
+        gtk_widget_queue_resize(view->area);
+        gtk_widget_queue_draw(view->area);
+    }
+}
+
 static void gvr_vims_history_view_class_init(
         GvrVimsHistoryViewClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
+    GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
+    widget_class->style_updated = gvr_vims_history_view_style_updated;
     object_class->finalize = gvr_vims_history_view_finalize;
 
     gvr_vims_history_signals[HISTORY_SIGNAL_MESSAGE_ACTIVATED] =

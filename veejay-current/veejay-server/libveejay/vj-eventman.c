@@ -23,6 +23,10 @@
 #include <veejaycore/vevo.h>
 #include <libveejay/vj-event.h>
 #include <veejaycore/vims.h>
+
+#ifndef VIMS_EDITLIST_MOVE_RANGE
+#define VIMS_EDITLIST_MOVE_RANGE 454
+#endif
 #include <libveejay/vevo.h>
 #include <veejaycore/libvevo.h>
 #include <veejaycore/vj-msg.h>
@@ -46,6 +50,7 @@ extern void vj_event_audio_sync_wav_profile_clear(void *ptr, const char format[]
 extern void vj_event_sample_audio_sync_set(void *ptr, const char format[], va_list ap);
 extern void vj_event_sample_audio_sync_clear(void *ptr, const char format[], va_list ap);
 extern void vj_event_sample_audio_sync_rearm(void *ptr, const char format[], va_list ap);
+extern void vj_event_el_move_range(void *ptr, const char format[], va_list ap);
 static	vevo_port_t **index_map_ = NULL;
 static  int *requires_id_map_ = NULL;
 
@@ -1352,7 +1357,7 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Starting position",
 				0,
-				"Ending position",
+				"Inclusive ending position (-1=final frame)",
 				-1,
 				NULL );
 
@@ -2934,17 +2939,31 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_EDITLIST_PASTE_AT]			=	_new_event(
 				"%d",
 				VIMS_EDITLIST_PASTE_AT,
-				"Paste frames from buffer at frame into edit descision list",
+				"Paste clipboard before an EDL frame; position equal to frame count appends",
 				vj_event_el_paste_at,
 				1,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"EDL position",
+				"EDL insertion position (0..frame count)",
+				0,
+				NULL );
+	index_map_[VIMS_EDITLIST_MOVE_RANGE]			=	_new_event(
+				"%d %d %d",
+				VIMS_EDITLIST_MOVE_RANGE,
+				"Move an inclusive EDL frame range to an insertion boundary",
+				vj_event_el_move_range,
+				3,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Inclusive EDL start position",
+				0,
+				"Inclusive EDL end position",
+				0,
+				"EDL insertion boundary (0..frame count)",
 				0,
 				NULL );
 	index_map_[VIMS_EDITLIST_CUT]				=	_new_event(
 				"%d %d",
 				VIMS_EDITLIST_CUT,
-				"Cut frames from edit descision list to buffer",
+				"Cut an inclusive EDL frame range to the clipboard",
 				vj_event_el_cut,
 				2,
 				VIMS_REQUIRE_ALL_PARAMS,	
@@ -2956,7 +2975,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_EDITLIST_COPY]				=	_new_event(
 				"%d %d",
 				VIMS_EDITLIST_COPY,
-				"Copy frames from edit descision list to buffer",
+				"Copy an inclusive EDL frame range to the clipboard",
 				vj_event_el_copy,
 				2,
 				VIMS_REQUIRE_ALL_PARAMS,
@@ -2968,7 +2987,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_EDITLIST_CROP]				=	_new_event(
 				"%d %d",
 				VIMS_EDITLIST_CROP,
-				"Crop frames from edit descision list to buffer",
+				"Keep only an inclusive EDL frame range",
 				vj_event_el_crop,
 				2,
 				VIMS_REQUIRE_ALL_PARAMS,
@@ -2980,7 +2999,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_EDITLIST_DEL]				=	_new_event(
 				"%d %d",
 				VIMS_EDITLIST_DEL,
-				"Delete frames from editlist (no undo!)",
+				"Delete an inclusive EDL frame range (no undo!)",
 				vj_event_el_del,
 				2,	
 				VIMS_REQUIRE_ALL_PARAMS,
@@ -2996,9 +3015,9 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				vj_event_el_save_editlist,
 				3,
 				VIMS_LONG_PARAMS | VIMS_ALLOW_ANY,
-				"EDL start position (0=start position)",
+				"Inclusive EDL start position",
 				0,
-				"EDL end position (0=end position)",
+				"Inclusive EDL end position (-1=final frame)",
 				0,
 				"Filename",
 				NULL,

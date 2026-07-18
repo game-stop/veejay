@@ -481,7 +481,8 @@ typedef struct {
 	long rendered_frames;
 	long currently_processed_entry;
 	struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
-	uint64_t *save_list;	/* for editing purposes */
+	uint64_t *save_list;	/* EDL-local clipboard frame entries */
+	editlist *save_list_source;	/* owning EDL; raw file indices are not portable */
 	double spas;		/* seconds per audio sample */
 	int offline_ready;
 	int offline_record;

@@ -34,6 +34,13 @@
 #define EL_ENTRY(file,frame) \
     ((((uint64_t)(file) & EL_FILE_MASK) << EL_FRAME_BITS) | ((uint64_t)(frame) & EL_FRAME_MASK))
 
+/*
+ * EDL frame ranges are inclusive: [start, end].
+ * Valid frame indices are 0 .. total_frames.
+ * Paste destinations are insertion boundaries 0 .. video_frames;
+ * destination == video_frames appends after the final frame.
+ */
+
 #define VIDEO_MODE_PAL      0
 #define VIDEO_MODE_NTSC     1
 #define VIDEO_MODE_SECAM    2
@@ -57,9 +64,9 @@ typedef struct
     int audio_bits;
     int audio_bps;
 
-    long video_frames;
+    long video_frames;       /* frame count */
     long num_video_files;
-    uint64_t total_frames;
+    uint64_t total_frames;   /* last valid frame index: video_frames - 1 */
     long max_frame_size;
     int MJPG_chroma;
 

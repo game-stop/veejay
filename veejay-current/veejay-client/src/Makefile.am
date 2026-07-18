@@ -39,7 +39,7 @@ reloaded_SOURCES = \
     gtkvimspatternview.c \
     gtkvimshistoryview.c \
     gtkvimsview.c \
-    gtkvimsview.h \
+    gtkeditlistview.c \
     utils-gtk.c \
     vj-midi.c \
     $(reloaded_headers)

@@ -413,7 +413,7 @@ enum {
     VJ_MAX_VLOOPBACK_PIPES = 8,
 };
 
-#define MAX_SEQUENCES		100
+#define MAX_SEQUENCES		120
 #define VJ_SEQUENCE_BANKS	4
 #define MAX_SPEED		32
 #define SAMPLE_MAX_EFFECTS 	20

@@ -109,6 +109,102 @@ static guint gvr_sample_bank_view_signals[SIGNAL_LAST];
 
 G_DEFINE_TYPE(GvrSampleBankView, gvr_sample_bank_view, GTK_TYPE_DRAWING_AREA)
 
+
+typedef struct {
+    char family[128];
+    double points;
+} GvrSampleBankFontMetrics;
+
+static void gvr_sample_bank_font_metrics(GtkWidget *widget,
+                                         GvrSampleBankFontMetrics *metrics)
+{
+    GtkStyleContext *style = NULL;
+    PangoFontDescription *font = NULL;
+    const char *family;
+    int size;
+
+    g_strlcpy(metrics->family, "Sans", sizeof(metrics->family));
+    metrics->points = 10.0;
+
+    if(widget) {
+        style = gtk_widget_get_style_context(widget);
+        if(style)
+            gtk_style_context_get(style,
+                                  gtk_style_context_get_state(style),
+                                  "font",
+                                  &font,
+                                  NULL);
+    }
+
+    if(!font && widget) {
+        PangoContext *context = gtk_widget_get_pango_context(widget);
+        const PangoFontDescription *fallback =
+            context ? pango_context_get_font_description(context) : NULL;
+
+        if(fallback)
+            font = pango_font_description_copy(fallback);
+    }
+
+    if(!font)
+        return;
+
+    family = pango_font_description_get_family(font);
+    if(family && family[0])
+        g_strlcpy(metrics->family, family, sizeof(metrics->family));
+
+    size = pango_font_description_get_size(font);
+    if(size > 0) {
+        metrics->points = (double)size / PANGO_SCALE;
+        if(pango_font_description_get_size_is_absolute(font))
+            metrics->points *= 72.0 / 96.0;
+        metrics->points = CLAMP(metrics->points, 6.0, 32.0);
+    }
+
+    pango_font_description_free(font);
+}
+
+static double gvr_sample_bank_font_px(
+        const GvrSampleBankFontMetrics *metrics,
+        double scale)
+{
+    return MAX(7.0,
+               metrics->points *
+               (96.0 / 72.0) * scale);
+}
+
+static int gvr_sample_bank_footer_height(
+        const GvrSampleBankFontMetrics *metrics)
+{
+    const double title_font = gvr_sample_bank_font_px(metrics, 0.82);
+    const double meta_font = gvr_sample_bank_font_px(metrics, 0.76);
+
+    return MAX(36, (int)ceil(title_font + meta_font + 16.0));
+}
+
+static int gvr_sample_bank_cell_side(
+        const GvrSampleBankFontMetrics *metrics)
+{
+    return MAX(120, 84 + gvr_sample_bank_footer_height(metrics));
+}
+
+static void gvr_sample_bank_view_update_size_request(GtkWidget *widget)
+{
+    GvrSampleBankView *view;
+    GvrSampleBankFontMetrics metrics;
+
+    if(!GVR_IS_SAMPLE_BANK_VIEW(widget))
+        return;
+
+    view = GVR_SAMPLE_BANK_VIEW(widget);
+    gvr_sample_bank_font_metrics(widget, &metrics);
+
+    const int side = gvr_sample_bank_cell_side(&metrics);
+
+    gtk_widget_set_size_request(widget,
+                                view->columns * side,
+                                view->rows * side);
+}
+
 static int gvr_clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -179,12 +275,12 @@ static void gvr_sample_text_color(double r, double g, double b, double *tr, doub
     }
 }
 
-static double gvr_text_width(cairo_t *cr, const char *text, double size, cairo_font_weight_t weight)
+static double gvr_text_width(cairo_t *cr, const char *family, const char *text, double size, cairo_font_weight_t weight)
 {
     cairo_text_extents_t ext;
 
     cairo_save(cr);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, weight);
+    cairo_select_font_face(cr, family ? family : "Sans", CAIRO_FONT_SLANT_NORMAL, weight);
     cairo_set_font_size(cr, size);
     cairo_text_extents(cr, text ? text : "", &ext);
     cairo_restore(cr);
@@ -192,12 +288,12 @@ static double gvr_text_width(cairo_t *cr, const char *text, double size, cairo_f
     return ext.width;
 }
 
-static void gvr_draw_text_right(cairo_t *cr, const char *text, double right_x, double y, double size, cairo_font_weight_t weight)
+static void gvr_draw_text_right(cairo_t *cr, const char *family, const char *text, double right_x, double y, double size, cairo_font_weight_t weight)
 {
     cairo_text_extents_t ext;
 
     cairo_save(cr);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, weight);
+    cairo_select_font_face(cr, family ? family : "Sans", CAIRO_FONT_SLANT_NORMAL, weight);
     cairo_set_font_size(cr, size);
     cairo_text_extents(cr, text ? text : "", &ext);
     cairo_move_to(cr, right_x - ext.width, y);
@@ -206,6 +302,7 @@ static void gvr_draw_text_right(cairo_t *cr, const char *text, double right_x, d
 }
 
 static void gvr_draw_ellipsized_text(cairo_t *cr,
+                                     const char *family,
                                      const char *text,
                                      double x,
                                      double y,
@@ -223,7 +320,7 @@ static void gvr_draw_ellipsized_text(cairo_t *cr,
     g_strlcpy(buf, text, sizeof(buf));
 
     cairo_save(cr);
-    cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, weight);
+    cairo_select_font_face(cr, family ? family : "Sans", CAIRO_FONT_SLANT_NORMAL, weight);
     cairo_set_font_size(cr, size);
 
     cairo_text_extents(cr, buf, &ext);
@@ -267,13 +364,18 @@ static void gvr_sample_bank_view_layout(GvrSampleBankView *view, int width, int 
     const int base_rows = gvr_clampi(view->rows, 1, GVR_SAMPLE_BANK_SLOTS);
     const int grid_w = width - outer * 2;
     const int grid_h = height - outer * 2;
+    GvrSampleBankFontMetrics metrics;
     int columns = base_columns;
     int rows = base_rows;
+    int target_cell;
     int cell;
     int total_w;
     int total_h;
     int start_x;
     int start_y;
+
+    gvr_sample_bank_font_metrics(GTK_WIDGET(view), &metrics);
+    target_cell = gvr_sample_bank_cell_side(&metrics);
 
     view->header_rect.x = 0;
     view->header_rect.y = 0;
@@ -295,8 +397,8 @@ static void gvr_sample_bank_view_layout(GvrSampleBankView *view, int width, int 
     if(grid_w <= 2 || grid_h <= 2)
         return;
 
-    columns = grid_w / GVR_SAMPLE_BANK_DYNAMIC_CELL;
-    rows = grid_h / GVR_SAMPLE_BANK_DYNAMIC_CELL;
+    columns = grid_w / target_cell;
+    rows = grid_h / target_cell;
 
     if(columns < base_columns)
         columns = base_columns;
@@ -310,9 +412,10 @@ static void gvr_sample_bank_view_layout(GvrSampleBankView *view, int width, int 
 
     cell = (grid_w - inner * (columns - 1)) / columns;
     {
-        int cell_h = (grid_h - inner * (rows - 1)) / rows;
-        if(cell_h < cell)
-            cell = cell_h;
+        const int available_cell_h =
+            (grid_h - inner * (rows - 1)) / rows;
+        if(available_cell_h < cell)
+            cell = available_cell_h;
     }
 
     if(cell < 8)
@@ -416,11 +519,21 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
     GvrSampleBankView *view = GVR_SAMPLE_BANK_VIEW(widget);
     GtkAllocation allocation;
     int page;
+    GvrSampleBankFontMetrics font_metrics;
+    const char *font_family;
+    double title_font;
+    double meta_font;
+    int preferred_footer_h;
 
     if(!view->pages)
         return FALSE;
 
     gtk_widget_get_allocation(widget, &allocation);
+    gvr_sample_bank_font_metrics(widget, &font_metrics);
+    font_family = font_metrics.family;
+    title_font = gvr_sample_bank_font_px(&font_metrics, 0.82);
+    meta_font = gvr_sample_bank_font_px(&font_metrics, 0.76);
+    preferred_footer_h = gvr_sample_bank_footer_height(&font_metrics);
     gvr_sample_bank_view_layout(view, allocation.width, allocation.height);
 
     gvr_set_rgba(cr, 0.070, 0.075, 0.085, 1.0);
@@ -458,7 +571,11 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
 
         if(filled) {
             GdkRectangle img_area;
-            int footer_h = r->height > 72 ? 34 : 24;
+            int footer_h = r->height > 72 ?
+                preferred_footer_h :
+                MAX(26, (int)ceil(title_font + 14.0));
+
+            footer_h = MIN(footer_h, MAX(20, r->height - 12));
 
             gvr_sample_slot_color(cell->sample_type, &rr, &gg, &bb);
             gvr_sample_text_color(rr, gg, bb, &tr, &tg, &tb);
@@ -487,41 +604,48 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                 char sample_label[32];
                 const char *title = (cell->title && cell->title[0]) ? cell->title : NULL;
                 const char *timecode = (cell->timecode && cell->timecode[0]) ? cell->timecode : NULL;
-                double y1 = r->y + r->height - footer_h + 12;
-                double y2 = r->y + r->height - 7;
+                double footer_top = r->y + r->height - footer_h;
+                double y1 = footer_top + title_font + 4.0;
+                double y2 = r->y + r->height - 6.0;
                 double right_w;
                 double left_w;
 
                 snprintf(fallback_title, sizeof(fallback_title), "Sample %d", cell->sample_id);
-                snprintf(sample_label, sizeof(sample_label), "sample %d", cell->sample_id);
+                snprintf(sample_label, sizeof(sample_label),
+                         "%c%d",
+                         cell->sample_type == GVR_SB_TYPE_SAMPLE ? 'S' : 'T',
+                         cell->sample_id);
                 if(!title)
                     title = fallback_title;
 
-                right_w = gvr_text_width(cr, sample_label, 9.0, CAIRO_FONT_WEIGHT_NORMAL) + 8.0;
+                right_w = gvr_text_width(cr, font_family, sample_label, meta_font, CAIRO_FONT_WEIGHT_NORMAL) + 8.0;
                 left_w = r->width - 16.0 - right_w;
                 if(left_w < 20.0)
                     left_w = r->width - 16.0;
 
                 gvr_draw_ellipsized_text(cr,
+                                         font_family,
                                          title,
                                          r->x + 8,
                                          y1,
                                          r->width - 16,
-                                         10.0,
+                                         title_font,
                                          CAIRO_FONT_WEIGHT_BOLD);
                 if(timecode)
                     gvr_draw_ellipsized_text(cr,
+                                             "Monospace",
                                              timecode,
                                              r->x + 8,
                                              y2,
                                              left_w,
-                                             9.0,
+                                             meta_font,
                                              CAIRO_FONT_WEIGHT_NORMAL);
                 gvr_draw_text_right(cr,
+                                    font_family,
                                     sample_label,
                                     r->x + r->width - 8,
                                     y2,
-                                    9.0,
+                                    meta_font,
                                     CAIRO_FONT_WEIGHT_NORMAL);
             }
             else {
@@ -533,11 +657,13 @@ static gboolean gvr_sample_bank_view_draw(GtkWidget *widget, cairo_t *cr)
                     title = fallback_title;
 
                 gvr_draw_ellipsized_text(cr,
+                                         font_family,
                                          title,
                                          r->x + 8,
-                                         r->y + r->height - 7,
+                                         r->y + r->height - footer_h +
+                                             (footer_h + title_font * 0.65) * 0.5,
                                          r->width - 16,
-                                         10.0,
+                                         title_font,
                                          CAIRO_FONT_WEIGHT_BOLD);
             }
         }
@@ -925,12 +1051,22 @@ static void gvr_sample_bank_view_finalize(GObject *object)
     G_OBJECT_CLASS(gvr_sample_bank_view_parent_class)->finalize(object);
 }
 
+
+static void gvr_sample_bank_view_style_updated(GtkWidget *widget)
+{
+    GTK_WIDGET_CLASS(gvr_sample_bank_view_parent_class)->style_updated(widget);
+    gvr_sample_bank_view_update_size_request(widget);
+    gtk_widget_queue_resize(widget);
+    gtk_widget_queue_draw(widget);
+}
+
 static void gvr_sample_bank_view_class_init(GvrSampleBankViewClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
     GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
     object_class->finalize = gvr_sample_bank_view_finalize;
+    widget_class->style_updated = gvr_sample_bank_view_style_updated;
     widget_class->draw = gvr_sample_bank_view_draw;
     widget_class->button_press_event = gvr_sample_bank_view_button_press;
     widget_class->scroll_event = gvr_sample_bank_view_scroll;
@@ -1012,7 +1148,7 @@ static void gvr_sample_bank_view_init(GvrSampleBankView *view)
                           GDK_LEAVE_NOTIFY_MASK |
                           GDK_SCROLL_MASK |
                           GDK_SMOOTH_SCROLL_MASK);
-    gtk_widget_set_size_request(GTK_WIDGET(view), 720, 240);
+    gvr_sample_bank_view_update_size_request(GTK_WIDGET(view));
 }
 
 GtkWidget *gvr_sample_bank_view_new(void)
@@ -1038,7 +1174,8 @@ void gvr_sample_bank_view_set_layout(GtkWidget *widget, int columns, int rows)
 
     view->columns = columns;
     view->rows = rows;
-    gtk_widget_set_size_request(widget, columns * 120, rows * 120);
+    gvr_sample_bank_view_update_size_request(widget);
+    gtk_widget_queue_resize(widget);
     gtk_widget_queue_draw(widget);
 }
 

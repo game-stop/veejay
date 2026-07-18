@@ -56,6 +56,10 @@
 #include <veejaycore/mpegconsts.h>
 #include <veejaycore/mpegtimecode.h>
 #include <veejaycore/vims.h>
+
+#ifndef VIMS_EDITLIST_MOVE_RANGE
+#define VIMS_EDITLIST_MOVE_RANGE 454
+#endif
 #include <veejaycore/yuvconv.h>
 #include <libveejay/vj-event.h>
 #ifdef HAVE_JACK
@@ -142,6 +146,8 @@ static int vj_event_valid_mode(int mode) {
 
 /* define the function pointer to any event */
 typedef void (*vj_event)(void *ptr, const char format[], va_list ap);
+
+extern int veejay_edit_move(veejay_t *info, editlist *el, long start, long end, long destination);
 
 void vj_event_create_effect_bundle(veejay_t * v,char *buf, int key_id, int key_mod );
 
@@ -642,6 +648,7 @@ static void vj_sequence_touch_bank(sequencer_t *s, int bank)
 static void vj_sequence_load_bank(sequencer_t *s, int bank);
 static int vj_sequence_selected_duration(veejay_t *v);
 static void vj_event_release_beat_transport_for_source_switch(veejay_t *v);
+static void vj_event_rearm_sequence_transition(veejay_t *v);
 
 static int vj_sequence_pattern_payload_valid(const char *data, size_t data_len)
 {
@@ -1116,6 +1123,7 @@ struct {
     { VIMS_EDITLIST_ADD },
     { VIMS_EDITLIST_CUT },
     { VIMS_EDITLIST_CROP },
+    { VIMS_EDITLIST_MOVE_RANGE },
     { VIMS_EDITLIST_ADD_SAMPLE },
     { VIMS_EDITLIST_SAVE },
     { VIMS_EDITLIST_LOAD },
@@ -4581,62 +4589,63 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*) ptr;
-    if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v)) 
-    {
-        int args[2];
-        P_A(args,sizeof(args),NULL,0,format,ap);
+    veejay_t *v = (veejay_t*)ptr;
 
-        editlist *E = v->edit_list;
-        if( SAMPLE_PLAYING(v))
-            E = v->current_edit_list;
-
-        if(args[0] < 0)
-        {
-            args[0] = v->uc->sample_start;
-        }
-        if(args[1] == 0)
-        {
-            args[1] = E->total_frames;
-        }
-
-        int num_frames = E->total_frames;
-        
-
-        if(args[0] >= 0 && args[1] > 0 && args[0] <= args[1] && args[0] <= num_frames &&
-            args[1] <= num_frames ) 
-        {
-            editlist *el = veejay_edit_copy_to_new( v, E, args[0],args[1] );
-            if(!el)
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy EDL");
-                return;
-            }
-            int start = 0;
-            int end   = el->total_frames;
-
-            sample_info *skel = sample_skeleton_new(start, end );
-            if(skel)
-            {
-                skel->edit_list = el;
-                if(sample_store(skel,0)==0)
-                {
-                    veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
-                }
-        }
-        
-        }
-        else
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Invalid frame range given : %d - %d , range is %d - %d",
-                args[0],args[1], 1,num_frames);
-        }
-    }
-    else 
-    {
+    if(!PLAIN_PLAYING(v) && !SAMPLE_PLAYING(v)) {
         p_invalid_mode();
+        return;
     }
 
+    int args[2];
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    editlist *E = SAMPLE_PLAYING(v) ? v->current_edit_list : v->edit_list;
+    if(!E || E->is_empty || !E->frame_list || E->video_frames <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot create a sample from an empty EDL");
+        return;
+    }
+
+    if(args[0] < 0)
+        args[0] = v->uc->sample_start;
+    if(args[1] < 0)
+        args[1] = (int)E->total_frames;
+
+    if(args[0] < 0 || args[1] < args[0] ||
+       (uint64_t)args[1] >= (uint64_t)E->video_frames)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Invalid inclusive sample range %d - %d; valid range is 0 - %llu",
+                   args[0],
+                   args[1],
+                   (unsigned long long)E->total_frames);
+        return;
+    }
+
+    editlist *el = veejay_edit_copy_to_new(v, E, args[0], args[1]);
+    if(!el) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy EDL");
+        return;
+    }
+
+    sample_info *skel = sample_skeleton_new(0, (int)el->total_frames);
+    if(!skel) {
+        vj_el_free(el);
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a new sample");
+        return;
+    }
+
+    skel->edit_list = el;
+    if(sample_store(skel, 0) == 0) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Created new sample [%d] from inclusive EDL range %d-%d (%ld frames)",
+                   skel->sample_id,
+                   args[0],
+                   args[1],
+                   el->video_frames);
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to store new sample");
+    }
 }
 
 static int vj_event_lock(veejay_t *v) {
@@ -6970,10 +6979,45 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
     {
         veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
         deleted_sample = args[0];
-        int i;
-        for( i = 0; i < MAX_SEQUENCES ; i ++ )
-            if( v->seq->samples[i].sample_id == deleted_sample && v->seq->samples[i].type == 0 )
-                v->seq->samples[i].sample_id = 0;
+
+        if(v->seq) {
+            int sequence_changed = 0;
+
+            vj_sequence_store_active_bank(v->seq);
+
+            for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+                int bank_changed = 0;
+
+                for(int i = 0; i < MAX_SEQUENCES; i++) {
+                    seq_sample_t *entry = &v->seq->banks[bank].samples[i];
+
+                    if(entry->sample_id == deleted_sample && entry->type == 0) {
+                        entry->sample_id = 0;
+                        entry->type = 0;
+                        bank_changed = 1;
+                    }
+                }
+
+                if(bank_changed) {
+                    v->seq->banks[bank].size =
+                        vj_sequence_count_slots(v->seq->banks[bank].samples);
+                    v->seq->banks[bank].revision =
+                        vj_sequence_next_revision(v->seq->banks[bank].revision);
+                    sequence_changed = 1;
+                }
+            }
+
+            if(sequence_changed) {
+                v->seq->revision = vj_sequence_next_revision(v->seq->revision);
+
+                if(vj_sequence_bank_valid(v->seq->queued_bank) &&
+                   v->seq->banks[v->seq->queued_bank].size == 0)
+                    v->seq->queued_bank = -1;
+
+                vj_sequence_load_bank(v->seq, v->seq->active_bank);
+                vj_event_rearm_sequence_transition(v);
+            }
+        }
 
         sample_verify_delete( args[0] , 0 );
     }
@@ -7024,9 +7068,30 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
     sample_del_all(v->edit_list);
     vj_font_set_dict( v->font, NULL );
 
-    veejay_memset(v->seq->samples, 0, sizeof(int) * MAX_SEQUENCES );
-    v->seq->active = 0;
-    v->seq->size = 0;
+    if(v->seq) {
+        if(!vj_sequence_bank_valid(v->seq->active_bank))
+            v->seq->active_bank = 0;
+
+        veejay_memset(v->seq->samples, 0,
+                      sizeof(seq_sample_t) * MAX_SEQUENCES);
+
+        for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
+            veejay_memset(v->seq->banks[bank].samples, 0,
+                          sizeof(seq_sample_t) * MAX_SEQUENCES);
+            v->seq->banks[bank].size = 0;
+            v->seq->banks[bank].current = 0;
+            v->seq->banks[bank].revision =
+                vj_sequence_next_revision(v->seq->banks[bank].revision);
+        }
+
+        v->seq->active = 0;
+        v->seq->current = 0;
+        v->seq->size = 0;
+        v->seq->queued_bank = -1;
+        v->seq->selected_bank_mask = (1 << v->seq->active_bank);
+        v->seq->revision = vj_sequence_next_revision(v->seq->revision);
+        vj_event_rearm_sequence_transition(v);
+    }
 
     veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples");
 } 
@@ -9054,244 +9119,226 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
     }
 }
 
+static editlist *vj_event_el_edit_target(veejay_t *v, const char *operation)
+{
+    editlist *el = NULL;
+
+    if(SAMPLE_PLAYING(v)) {
+        if(!sample_usable_edl(v->uc->sample_id)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Cannot %s: this sample type has no editable EDL",
+                       operation);
+            return NULL;
+        }
+        el = sample_get_editlist(v->uc->sample_id);
+    }
+    else if(PLAIN_PLAYING(v)) {
+        el = v->edit_list;
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot %s the EDL in stream playback mode",
+                   operation);
+        return NULL;
+    }
+
+    if(!el) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot %s: no Edit List", operation);
+        return NULL;
+    }
+
+    return el;
+}
+
+static int vj_event_el_inclusive_range_valid(editlist *el,
+                                              int start,
+                                              int end,
+                                              const char *operation)
+{
+    if(!el || el->is_empty || !el->frame_list || el->video_frames <= 0 ||
+       start < 0 || end < start || (uint64_t)end >= (uint64_t)el->video_frames)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Invalid inclusive range for %s: %d-%d; valid range is 0-%llu",
+                   operation,
+                   start,
+                   end,
+                   (unsigned long long)((el && el->video_frames > 0) ?
+                                        el->video_frames - 1 : 0));
+        return 0;
+    }
+
+    return 1;
+}
+
+static void vj_event_el_sync_after_mutation(veejay_t *v, editlist *el)
+{
+    if(!v || !el)
+        return;
+
+    if(SAMPLE_PLAYING(v)) {
+        const int end = el->is_empty ? 0 : (int)el->total_frames;
+        sample_set_startframe(v->uc->sample_id, 0);
+        sample_set_endframe(v->uc->sample_id, end);
+        constrain_sample(v, v->uc->sample_id);
+    }
+}
+
 void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t *)ptr;
+    veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if( SAMPLE_PLAYING(v))
-    {
-        if( !sample_usable_edl( v->uc->sample_id ))
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
-            return;
-        }
-
-        editlist *el = sample_get_editlist( v->uc->sample_id );
-        if(!el)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
-            return;
-        }   
-        if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
-            return;
-        }
-
-        if(veejay_edit_cut( v,el, args[0], args[1] ))
-        {
-            veejay_msg(VEEJAY_MSG_INFO, "Cut frames %d-%d from sample %d into buffer",args[0],args[1],
-                v->uc->sample_id);
-        }
-
-        sample_set_startframe( v->uc->sample_id, 0 );
-        sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
-
-        constrain_sample( v, v->uc->sample_id );
-    }
-
-    if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot cut frames in this playback mode");
+    editlist *el = vj_event_el_edit_target(v, "cut");
+    if(!el || !vj_event_el_inclusive_range_valid(el, args[0], args[1], "cut"))
         return;
-    }
 
+    if(veejay_edit_cut(v, el, args[0], args[1])) {
+        vj_event_el_sync_after_mutation(v, el);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Cut inclusive EDL range %d-%d into the clipboard",
+                   args[0],
+                   args[1]);
+    }
 }
 
 void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if ( SAMPLE_PLAYING(v))
-    {
-                if( !sample_usable_edl( v->uc->sample_id ))
-                {
-                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
-                        return;
-                }
-
-        editlist *el = sample_get_editlist( v->uc->sample_id );
-        if(!el)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
-            return;
-        }
-        if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
-            return;
-        }
-    
-        if(veejay_edit_copy( v,el, args[0], args[1] ))
-        {
-            veejay_msg(VEEJAY_MSG_INFO, "Copy frames %d-%d from sample %d into buffer",args[0],args[1],
-                v->uc->sample_id);
-        }
-
-        sample_set_startframe( v->uc->sample_id, 0 );
-        sample_set_endframe(   v->uc->sample_id,sample_video_length(v->uc->sample_id));
-
-        constrain_sample( v, v->uc->sample_id );
-    }
-    if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy frames in this playback mode");
+    editlist *el = vj_event_el_edit_target(v, "copy");
+    if(!el || !vj_event_el_inclusive_range_valid(el, args[0], args[1], "copy"))
         return;
-    }
 
+    if(veejay_edit_copy(v, el, args[0], args[1])) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Copied inclusive EDL range %d-%d into the clipboard",
+                   args[0],
+                   args[1]);
+    }
 }
 
 void vj_event_el_del(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if ( SAMPLE_PLAYING(v))
-    {
-                if( !sample_usable_edl( v->uc->sample_id ))
-                {
-                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
-                        return;
-                }
-
-        editlist *el = sample_get_editlist( v->uc->sample_id );
-
-        if(!el)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
-            return;
-        }   
-        if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
-            return;
-        }
-
-        if(veejay_edit_delete( v,el, args[0], args[1] ))
-        {
-            veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %d-%d from EDL of sample %d",
-                v->uc->sample_id,args[0],args[1]);
-        }
-        sample_set_startframe( v->uc->sample_id, 0 );
-        sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
-
-        constrain_sample( v, v->uc->sample_id );
-
-    }
-
-    if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
+    editlist *el = vj_event_el_edit_target(v, "delete from");
+    if(!el || !vj_event_el_inclusive_range_valid(el, args[0], args[1], "delete"))
         return;
-    }
 
+    if(veejay_edit_delete(v, el, args[0], args[1])) {
+        vj_event_el_sync_after_mutation(v, el);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Deleted inclusive EDL range %d-%d",
+                   args[0],
+                   args[1]);
+    }
 }
 
-void vj_event_el_crop(void *ptr, const char format[], va_list ap) 
+void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
+    editlist *el = vj_event_el_edit_target(v, "crop");
+    if(!el || !vj_event_el_inclusive_range_valid(el, args[0], args[1], "crop"))
+        return;
+
+    const int keep_start = args[0];
+    const int keep_end = args[1];
+    int ok = 1;
+
+    if(keep_start > 0)
+        ok = veejay_edit_delete(v, el, 0, keep_start - 1);
+
+    const long retained_end = (long)keep_end - (long)keep_start;
+    if(ok && retained_end < (long)el->total_frames)
+        ok = veejay_edit_delete(v, el, retained_end + 1, (long)el->total_frames);
+
+    if(!ok) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to crop EDL to inclusive range %d-%d",
+                   keep_start,
+                   keep_end);
         return;
     }
 
-    if(SAMPLE_PLAYING(v))
-    {
-                if( !sample_usable_edl( v->uc->sample_id ))
-                {
-                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
-                        return;
-                }
-
-        editlist *el = sample_get_editlist( v->uc->sample_id);
-        if(!el)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL");
-            return;
-        }
-
-        if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
-            return;
-        }
-
-        if( args[1] <= args[0] )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Crop: start - end (start must be smaller then end)");
-            return;
-        }
-        int s2 =0;
-        int s1 = veejay_edit_delete(v,el, 0, args[0]);  
-        int res = 0;
-        if(s1)
-        {
-            args[1] -= args[0]; // after deleting the first part, move arg[1]
-            s2 = veejay_edit_delete(v, el,args[1], el->total_frames); 
-            if(s2)
-            {
-                veejay_set_frame(v,0);
-                veejay_msg(VEEJAY_MSG_INFO, "Delete frames 0- %d , %d - %d from sample %d", 0,args[0],args[1],
-                    el->total_frames, v->uc->sample_id);
-                res = 1;
-                sample_set_startframe( v->uc->sample_id, 0 );
-                sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
-                constrain_sample( v, v->uc->sample_id );
-            }
-
-        }
-        if(!res)
-            veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop %d - %d", args[0],args[1] );
-        
-    }
+    vj_event_el_sync_after_mutation(v, el);
+    veejay_set_frame(v, 0);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Cropped EDL to inclusive range %d-%d (%ld frames)",
+               keep_start,
+               keep_end,
+               el->video_frames);
 }
 
 void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
     int args[1];
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste frames in this playback mode");
+    editlist *el = vj_event_el_edit_target(v, "paste into");
+    if(!el)
+        return;
+
+    const long max_destination = el->is_empty ? 0 : el->video_frames;
+    if(args[0] < 0 || (long)args[0] > max_destination) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Paste position %d is outside insertion range 0-%ld",
+                   args[0],
+                   max_destination);
         return;
     }
 
-    if( SAMPLE_PLAYING(v))
-    {
-                if( !sample_usable_edl( v->uc->sample_id ))
-                {
-                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
-                        return;
-                }
+    if(veejay_edit_paste(v, el, args[0])) {
+        vj_event_el_sync_after_mutation(v, el);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Pasted EDL clipboard at insertion position %d",
+                   args[0]);
+    }
+}
 
-        editlist *el = sample_get_editlist( v->uc->sample_id );
-        if(!el)
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL");
-            return;
-        }
-        if( args[0] >= 0 && args[0] <= el->total_frames)
-        {       
-            if( veejay_edit_paste( v, el, args[0] ) ) 
-            {
-                veejay_msg(VEEJAY_MSG_INFO, "Pasted buffer at frame %d",args[0]);
-            }
-            sample_set_startframe( v->uc->sample_id, args[0] );
-            sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
-            constrain_sample( v, v->uc->sample_id );
-        }
+void vj_event_el_move_range(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[3];
+    long final_start;
+    long length;
 
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    editlist *el = vj_event_el_edit_target(v, "move within");
+    if(!el || !vj_event_el_inclusive_range_valid(el, args[0], args[1], "move"))
+        return;
+
+    if(args[2] < 0 || (long)args[2] > el->video_frames) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Move insertion boundary %d is outside range 0-%ld",
+                   args[2], el->video_frames);
+        return;
+    }
+
+    length = (long)args[1] - (long)args[0] + 1;
+    if(args[2] < args[0])
+        final_start = args[2];
+    else if(args[2] > args[1] + 1)
+        final_start = (long)args[2] - length;
+    else
+        final_start = args[0];
+
+    if(veejay_edit_move(v, el, args[0], args[1], args[2])) {
+        vj_event_el_sync_after_mutation(v, el);
+        veejay_set_frame(v, final_start);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Moved inclusive EDL range %d-%d to insertion boundary %d",
+                   args[0], args[1], args[2]);
     }
 }
 
@@ -9301,21 +9348,23 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
     char str[1024];
     int args[2];
 
-    P_A(args,sizeof(args),str,sizeof(str), format,ap);
-    if( STREAM_PLAYING(v) || PLAIN_PLAYING(v) )
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Wrong playback mode for saving EDL of sample");
+    P_A(args, sizeof(args), str, sizeof(str), format, ap);
+
+    if(STREAM_PLAYING(v)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot save an Edit List in stream playback mode");
         return;
     }
 
-    if( veejay_save_all(v, str,args[0],args[1]) )
-    {
-        veejay_msg(VEEJAY_MSG_INFO, "Saved EditList as %s",str);
+    if(!PLAIN_PLAYING(v) && !SAMPLE_PLAYING(v)) {
+        p_invalid_mode();
+        return;
     }
+
+    if(veejay_save_all(v, str, args[0], args[1]))
+        veejay_msg(VEEJAY_MSG_INFO, "Saved EditList as %s", str);
     else
-    {
-        veejay_msg(VEEJAY_MSG_ERROR,"Unable to save EditList as %s",str);
-    }
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to save EditList as %s", str);
 }
 
 void vj_event_el_load_editlist(void *ptr, const char format[], va_list ap)
@@ -15133,8 +15182,6 @@ static void vj_event_release_beat_transport_for_source_switch(veejay_t *v)
     (void)v;
 #endif
 }
-
-static void vj_event_rearm_sequence_transition(veejay_t *v);
 
 static void vj_event_clear_sequence_boundary_state(veejay_t *v)
 {

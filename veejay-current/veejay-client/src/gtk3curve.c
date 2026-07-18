@@ -83,9 +83,9 @@ static GtkDrawingAreaClass *gtk3_curve_parent_class = NULL;
                           GDK_SCROLL_MASK | \
                           GDK_SMOOTH_SCROLL_MASK)
 
-#define CURVE_X_LABEL_HEIGHT 18
-#define CURVE_X_NAV_HEIGHT   18
-#define CURVE_LEGEND_HEIGHT  24
+#define CURVE_X_LABEL_HEIGHT_MIN 18
+#define CURVE_X_NAV_HEIGHT_MIN   18
+#define CURVE_LEGEND_HEIGHT_MIN  24
 #define CURVE_LIVE_TRACE_Y_PAD 2.0
 
 #ifndef GTK3_CURVE_LIVE_TRACE_MAX
@@ -458,6 +458,75 @@ gtk3_curve_type_name(Gtk3CurveType type)
 }
 
 
+
+static double
+gtk3_curve_font_points(GtkWidget *widget)
+{
+  PangoContext *context;
+  const PangoFontDescription *font;
+  gint size;
+  gdouble points;
+
+  if (!widget)
+    return 10.0;
+
+  context = gtk_widget_get_pango_context(widget);
+  font = context ? pango_context_get_font_description(context) : NULL;
+  size = font ? pango_font_description_get_size(font) : 0;
+  if (size <= 0)
+    return 10.0;
+
+  points = (gdouble)size / PANGO_SCALE;
+  if (pango_font_description_get_size_is_absolute(font))
+    points *= 72.0 / 96.0;
+  return CLAMP(points, 6.0, 32.0);
+}
+
+static double
+gtk3_curve_font_px(GtkWidget *widget, gdouble scale)
+{
+  return MAX(7.0,
+             gtk3_curve_font_points(widget) *
+             (96.0 / 72.0) * scale);
+}
+
+static const char *
+gtk3_curve_font_family(GtkWidget *widget)
+{
+  PangoContext *context;
+  const PangoFontDescription *font;
+  const gchar *family;
+
+  if (!widget)
+    return "Sans";
+
+  context = gtk_widget_get_pango_context(widget);
+  font = context ? pango_context_get_font_description(context) : NULL;
+  family = font ? pango_font_description_get_family(font) : NULL;
+  return (family && family[0]) ? family : "Sans";
+}
+
+static gint
+gtk3_curve_x_label_height(GtkWidget *widget)
+{
+  return MAX(CURVE_X_LABEL_HEIGHT_MIN,
+             (gint)ceil(gtk3_curve_font_px(widget, 0.82) + 7.0));
+}
+
+static gint
+gtk3_curve_x_nav_height(GtkWidget *widget)
+{
+  return MAX(CURVE_X_NAV_HEIGHT_MIN,
+             (gint)ceil(gtk3_curve_font_px(widget, 0.82) + 7.0));
+}
+
+static gint
+gtk3_curve_legend_height(GtkWidget *widget)
+{
+  return MAX(CURVE_LEGEND_HEIGHT_MIN,
+             (gint)ceil(gtk3_curve_font_px(widget, 0.82) + 13.0));
+}
+
 static gint
 gtk3_curve_graph_width_from_allocation(gint allocation_width)
 {
@@ -465,12 +534,12 @@ gtk3_curve_graph_width_from_allocation(gint allocation_width)
 }
 
 static gint
-gtk3_curve_graph_height_from_allocation(gint allocation_height)
+gtk3_curve_graph_height_from_allocation(GtkWidget *widget, gint allocation_height)
 {
   return allocation_height - (RADIUS * 2)
-                           - CURVE_X_LABEL_HEIGHT
-                           - CURVE_X_NAV_HEIGHT
-                           - CURVE_LEGEND_HEIGHT;
+                           - gtk3_curve_x_label_height(widget)
+                           - gtk3_curve_x_nav_height(widget)
+                           - gtk3_curve_legend_height(widget);
 }
 
 static void
@@ -1203,14 +1272,14 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
 
   cairo_save(cr);
 
-  gdouble y = allocation_height - CURVE_LEGEND_HEIGHT;
+  gdouble y = allocation_height - gtk3_curve_legend_height(widget);
 
   cairo_set_source_rgba(cr,
                         priv->grid.red,
                         priv->grid.green,
                         priv->grid.blue,
                         priv->grid.alpha * 0.10);
-  cairo_rectangle(cr, 0.0, y, allocation_width, CURVE_LEGEND_HEIGHT);
+  cairo_rectangle(cr, 0.0, y, allocation_width, gtk3_curve_legend_height(widget));
   cairo_fill(cr);
 
   cairo_set_source_rgba(cr,
@@ -1222,10 +1291,10 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
   gtk3_curve_draw_line(cr, 0.0, y + 0.5, allocation_width, y + 0.5);
 
   cairo_select_font_face(cr,
-                         "Sans",
+                         gtk3_curve_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, 11.0);
+  cairo_set_font_size(cr, gtk3_curve_font_px(widget, 0.82));
 
   cairo_set_source_rgba(cr,
                         priv->grid.red,
@@ -1239,14 +1308,18 @@ gtk3_curve_draw_cursor_legend(GtkWidget *widget,
   cairo_text_extents(cr, left, &left_ext);
   cairo_text_extents(cr, right, &right_ext);
 
-  cairo_move_to(cr, 6.0, y + 16.0);
+  cairo_move_to(cr,
+                6.0,
+                y + (gtk3_curve_legend_height(widget) +
+                     gtk3_curve_font_px(widget, 0.82) * 0.65) * 0.5);
   cairo_show_text(cr, left);
 
   if (6.0 + left_ext.width + 20.0 <
       allocation_width - right_ext.width - 8.0) {
     cairo_move_to(cr,
                   allocation_width - right_ext.width - 8.0,
-                  y + 16.0);
+                  y + (gtk3_curve_legend_height(widget) +
+                       gtk3_curve_font_px(widget, 0.82) * 0.65) * 0.5);
     cairo_show_text(cr, right);
   }
 
@@ -1288,6 +1361,7 @@ gtk3_curve_style_updated (GtkWidget *widget)
   if (gtk_widget_get_realized (widget) &&
       gtk_widget_get_has_window (widget))
     {
+      gtk_widget_queue_resize (widget);
       gtk_widget_queue_draw (widget);
     }
   DEBUG_INFO("style_updated [E]\n");
@@ -2210,10 +2284,10 @@ gtk3_curve_draw_live_traces(GtkWidget *widget,
 
   cairo_save(cr);
   cairo_select_font_face(cr,
-                         "Sans",
+                         gtk3_curve_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, 9.5);
+  cairo_set_font_size(cr, gtk3_curve_font_px(widget, 0.72));
 
   {
     gchar labels[GTK3_CURVE_LIVE_TRACE_MAX + 1][GTK3_CURVE_LIVE_TRACE_LABEL];
@@ -2337,13 +2411,13 @@ gtk3_curve_x_nav_hit(GtkWidget *widget,
   gtk_widget_get_allocation(widget, &allocation);
 
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
-  height = gtk3_curve_graph_height_from_allocation(allocation.height);
+  height = gtk3_curve_graph_height_from_allocation(widget, allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
 
-  nav_y0 = RADIUS + height + CURVE_X_LABEL_HEIGHT;
-  nav_y1 = nav_y0 + CURVE_X_NAV_HEIGHT;
+  nav_y0 = RADIUS + height + gtk3_curve_x_label_height(widget);
+  nav_y1 = nav_y0 + gtk3_curve_x_nav_height(widget);
 
   if (ty < nav_y0 || ty >= nav_y1)
     return FALSE;
@@ -2422,8 +2496,8 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
   if (!has_left && !has_right)
     return;
 
-  nav_y = RADIUS + graph_height + CURVE_X_LABEL_HEIGHT;
-  nav_h = CURVE_X_NAV_HEIGHT;
+  nav_y = RADIUS + graph_height + gtk3_curve_x_label_height(widget);
+  nav_h = gtk3_curve_x_nav_height(widget);
   box_w = 24.0;
   box_h = nav_h - 3.0;
   left_x = RADIUS + 4.0;
@@ -2448,10 +2522,10 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
   gtk3_curve_draw_line(cr, 0.0, nav_y + 0.5, allocation_width, nav_y + 0.5);
 
   cairo_select_font_face(cr,
-                         "Sans",
+                         gtk3_curve_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_BOLD);
-  cairo_set_font_size(cr, 11.0);
+  cairo_set_font_size(cr, gtk3_curve_font_px(widget, 0.82));
 
   if (has_left) {
     cairo_set_source_rgba(cr,
@@ -2470,7 +2544,8 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
     cairo_text_extents(cr, "<", &ext);
     cairo_move_to(cr,
                   left_x + (box_w - ext.width) * 0.5 - ext.x_bearing,
-                  nav_y + 12.5);
+                  nav_y + (nav_h +
+                           gtk3_curve_font_px(widget, 0.82) * 0.65) * 0.5);
     cairo_show_text(cr, "<");
   }
 
@@ -2491,7 +2566,8 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
     cairo_text_extents(cr, ">", &ext);
     cairo_move_to(cr,
                   right_x + (box_w - ext.width) * 0.5 - ext.x_bearing,
-                  nav_y + 12.5);
+                  nav_y + (nav_h +
+                           gtk3_curve_font_px(widget, 0.82) * 0.65) * 0.5);
     cairo_show_text(cr, ">");
   }
 
@@ -2504,10 +2580,10 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
              priv->timeline_max_x);
 
   cairo_select_font_face(cr,
-                         "Sans",
+                         gtk3_curve_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, 10.5);
+  cairo_set_font_size(cr, gtk3_curve_font_px(widget, 0.78));
   cairo_text_extents(cr, view_text, &ext);
 
   if (ext.width < allocation_width - 72.0) {
@@ -2518,7 +2594,8 @@ gtk3_curve_draw_x_zoom_indicators(GtkWidget *widget,
                           priv->grid.alpha * 0.75);
     cairo_move_to(cr,
                   (allocation_width - ext.width) * 0.5,
-                  nav_y + 12.5);
+                  nav_y + (nav_h +
+                           gtk3_curve_font_px(widget, 0.78) * 0.65) * 0.5);
     cairo_show_text(cr, view_text);
   }
 
@@ -2564,10 +2641,10 @@ gtk3_curve_draw_labels(GtkWidget *widget,
                         priv->grid.alpha);
 
   cairo_select_font_face(cr,
-                         "Sans",
+                         gtk3_curve_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, 11);
+  cairo_set_font_size(cr, gtk3_curve_font_px(widget, 0.82));
 
   gfloat wm = graph_width;
   gfloat hm = graph_height;
@@ -2581,7 +2658,9 @@ gtk3_curve_draw_labels(GtkWidget *widget,
     gint step = gtk3_curve_live_trace_use_local_axis(priv) ?
                 gtk3_curve_nice_x_grid_step(frame_count, 0.0) :
                 gtk3_curve_visible_x_grid_step(priv, graph_width);
-    gdouble label_y = RADIUS + hm + 13.0;
+    gdouble label_y = RADIUS + hm +
+                      (gtk3_curve_x_label_height(widget) +
+                       gtk3_curve_font_px(widget, 0.82) * 0.65) * 0.5;
     gdouble last_label_right = -1000000.0;
 
     if (step <= 0)
@@ -3316,10 +3395,10 @@ gtk3_curve_draw_hover_label(GtkWidget *widget,
   cairo_save(cr);
 
   cairo_select_font_face(cr,
-                         "Sans",
+                         gtk3_curve_font_family(widget),
                          CAIRO_FONT_SLANT_NORMAL,
                          CAIRO_FONT_WEIGHT_NORMAL);
-  cairo_set_font_size(cr, 11.0);
+  cairo_set_font_size(cr, gtk3_curve_font_px(widget, 0.82));
 
   cairo_text_extents(cr, line1, &e1);
   cairo_text_extents(cr, line2, &e2);
@@ -3329,7 +3408,8 @@ gtk3_curve_draw_hover_label(GtkWidget *widget,
   text_w = MAX(text_w, e3.width);
 
   box_w = text_w + 14.0;
-  box_h = 48.0;
+  box_h = MAX(48.0,
+              gtk3_curve_font_px(widget, 0.82) * 3.0 + 15.0);
 
   box_x = px + 12.0;
   box_y = py - 26.0;
@@ -3375,14 +3455,19 @@ gtk3_curve_draw_hover_label(GtkWidget *widget,
                           legend_text.alpha);
   }
 
-  cairo_move_to(cr, box_x + 7.0, box_y + 14.0);
-  cairo_show_text(cr, line1);
+  {
+    gdouble line_step = gtk3_curve_font_px(widget, 0.82) + 4.0;
+    gdouble first_line = box_y + gtk3_curve_font_px(widget, 0.82) + 4.0;
 
-  cairo_move_to(cr, box_x + 7.0, box_y + 29.0);
-  cairo_show_text(cr, line2);
+    cairo_move_to(cr, box_x + 7.0, first_line);
+    cairo_show_text(cr, line1);
 
-  cairo_move_to(cr, box_x + 7.0, box_y + 44.0);
-  cairo_show_text(cr, line3);
+    cairo_move_to(cr, box_x + 7.0, first_line + line_step);
+    cairo_show_text(cr, line2);
+
+    cairo_move_to(cr, box_x + 7.0, first_line + line_step * 2.0);
+    cairo_show_text(cr, line3);
+  }
 
   cairo_restore(cr);
 }
@@ -3490,7 +3575,7 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
   gtk_widget_get_allocation(widget, &allocation);
 
   gint width  = gtk3_curve_graph_width_from_allocation(allocation.width);
-  gint height = gtk3_curve_graph_height_from_allocation(allocation.height);
+  gint height = gtk3_curve_graph_height_from_allocation(widget, allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
@@ -3811,7 +3896,7 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
   gtk_widget_get_allocation(widget, &allocation);
 
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
-  height = gtk3_curve_graph_height_from_allocation(allocation.height);
+  height = gtk3_curve_graph_height_from_allocation(widget, allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
@@ -3948,7 +4033,7 @@ gtk3_curve_button_release (GtkWidget        *widget,
   gtk_widget_get_allocation (widget, &allocation);
 
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
-  height = gtk3_curve_graph_height_from_allocation(allocation.height);
+  height = gtk3_curve_graph_height_from_allocation(widget, allocation.height);
 
   if ((width < 0) || (height < 0))
     return FALSE;
@@ -4016,7 +4101,7 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
   gtk_widget_get_allocation(widget, &allocation);
 
   width = gtk3_curve_graph_width_from_allocation(allocation.width);
-  height = gtk3_curve_graph_height_from_allocation(allocation.height);
+  height = gtk3_curve_graph_height_from_allocation(widget, allocation.height);
 
   if (width <= 1 || height <= 1)
     return FALSE;
@@ -4390,7 +4475,7 @@ gtk3_curve_set_curve_type(GtkWidget *widget, Gtk3CurveType new_type)
     return;
 
   gint width = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
-  gint height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
+  gint height = gtk3_curve_graph_height_from_allocation(widget, gtk_widget_get_allocated_height(widget));
 
   if (width <= 1 || height <= 1 || !gtk3_curve_has_curve_data(priv)) {
     priv->curve_data.curve_type = new_type;
@@ -4610,7 +4695,7 @@ gtk3_curve_set_vector(GtkWidget *widget, int veclen, gfloat vector[])
   priv->curve_data.curve_type = GTK3_CURVE_TYPE_FREE;
 
   width = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
-  height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
+  height = gtk3_curve_graph_height_from_allocation(widget, gtk_widget_get_allocated_height(widget));
 
   if (width <= 1)
     width = veclen;
@@ -5048,7 +5133,7 @@ gtk3_curve_set_range_internal(GtkWidget *widget,
 
     if (had_curve && range_changed) {
         gint width  = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
-        gint height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
+        gint height = gtk3_curve_graph_height_from_allocation(widget, gtk_widget_get_allocated_height(widget));
 
         if (width > 1 && height > 1) {
             if (rescale_cpoints &&
@@ -6053,7 +6138,7 @@ gtk3_curve_reset_vector(GtkWidget *widget)
   priv->curve_data.d_cpoints[1].y = priv->max_y;
 
   width = gtk3_curve_graph_width_from_allocation(gtk_widget_get_allocated_width(widget));
-  height = gtk3_curve_graph_height_from_allocation(gtk_widget_get_allocated_height(widget));
+  height = gtk3_curve_graph_height_from_allocation(widget, gtk_widget_get_allocated_height(widget));
 
   if (width <= 1 || height <= 1)
     return;

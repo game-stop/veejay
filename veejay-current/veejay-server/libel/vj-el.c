@@ -2401,6 +2401,7 @@ static editlist *vj_el_soft_clone_base(editlist *el)
 	clone->has_video = el->has_video;
 	clone->video_width = el->video_width;
 	clone->video_height = el->video_height;
+	clone->video_inter = el->video_inter;
 	clone->video_fps = el->video_fps;
 	clone->video_sar_width = el->video_sar_width;
 	clone->video_sar_height = el->video_sar_height;
@@ -2455,72 +2456,62 @@ editlist	*vj_el_soft_clone(editlist *el)
 
 editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
 {
+    if(!el || el->is_empty || !el->frame_list ||
+       n1 < 0 || n2 < n1 || (uint64_t)n2 >= (uint64_t)el->video_frames)
+    {
+        return NULL;
+    }
+
+    const uint64_t count = (uint64_t)(n2 - n1) + 1u;
+
+    if(count > (uint64_t)SIZE_MAX / sizeof(uint64_t))
+        return NULL;
+
     editlist *clone = vj_el_soft_clone_base(el);
-    if (!clone) {
+    if(!clone)
+        return NULL;
+
+    clone->frame_list = (uint64_t *)vj_calloc((size_t)count * sizeof(uint64_t));
+    if(!clone->frame_list) {
+        free(clone);
         return NULL;
     }
 
-    uint64_t nframe;
-    long len = n2 - n1;
     uint64_t k = 0;
-    
-	int idx = -1;
 
-    clone->frame_list = (uint64_t *)vj_calloc(sizeof(uint64_t) * (len + 1));
-    if (!clone->frame_list) {
-        free(clone);
-        return NULL;
+    for(long nframe = n1; nframe <= n2; nframe++) {
+        uint64_t entry = el->frame_list[nframe];
+        int file_idx = (int)N_EL_FILE(entry);
+
+        if(file_idx < 0 || file_idx >= MAX_EDIT_LIST_FILES ||
+           !el->video_file_list[file_idx])
+        {
+            vj_el_free(clone);
+            return NULL;
+        }
+
+        if(!clone->video_file_list[file_idx]) {
+            clone->video_file_list[file_idx] = vj_strdup(el->video_file_list[file_idx]);
+            if(!clone->video_file_list[file_idx]) {
+                vj_el_free(clone);
+                return NULL;
+            }
+
+            clone->lav_fd[file_idx] = el->lav_fd[file_idx];
+            clone->num_frames[file_idx] = el->num_frames[file_idx];
+            clone->max_frame_sizes[file_idx] = el->max_frame_sizes[file_idx];
+            clone->pixfmt[file_idx] = el->pixfmt[file_idx];
+            clone->decoders[file_idx] = el->decoders[file_idx];
+            clone->ctx[file_idx] = el->ctx[file_idx];
+        }
+
+        clone->frame_list[k++] = entry;
     }
 
-    long *file_frame_counts = (long *)vj_calloc(sizeof(long) * el->num_video_files);
-    if (!file_frame_counts) {
-        free(clone->frame_list);
-        free(clone);
-        return NULL;
-    }
-
-    for (nframe = n1; nframe <= n2; nframe++) {
-        uint64_t n = el->frame_list[nframe];
-        int file_idx = N_EL_FILE(n);
-		
-		idx = file_idx;
-/*
-        if (file_idx != last_file_idx) {
-            last_file_idx = file_idx;
-            idx++;
-        }
-*/
-        if (clone->video_file_list[idx] == NULL) {
-            clone->video_file_list[idx] = vj_strdup(el->video_file_list[file_idx]);
-        }
-        if (clone->lav_fd[idx] == NULL) {
-            clone->lav_fd[idx] = el->lav_fd[file_idx];
-        }
-
-        file_frame_counts[file_idx]++; //file_idx
-
-        if (clone->pixfmt[idx] == 0) {
-            clone->pixfmt[idx] = el->pixfmt[file_idx];
-        }
-        if (clone->decoders[idx] == NULL) {
-            clone->decoders[idx] = el->decoders[file_idx];
-        }
-        if (clone->ctx[idx] == NULL) {
-            clone->ctx[idx] = el->ctx[file_idx];
-        }
-
-        clone->frame_list[k++] = n;
-    }
-
-    for (int i = 0; i <= idx; i++) {
-        clone->num_frames[i] = file_frame_counts[N_EL_FILE(clone->frame_list[i])];
-    }
-
-    free(file_frame_counts);
-
-	clone->source_hash = editlist_source_hash(clone);
-    clone->video_frames = k;
-    clone->total_frames = k - 1;
+    clone->is_empty = 0;
+    clone->video_frames = (long)k;
+    clone->total_frames = k - 1u;
+    clone->source_hash = editlist_source_hash(clone);
 
     return clone;
 }

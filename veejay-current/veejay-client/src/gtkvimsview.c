@@ -19,11 +19,12 @@
 #include <config.h>
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
+#include <math.h>
 #include <string.h>
 #include "gtkvimsview.h"
 
-#define GVR_VIMS_ROW_HEIGHT 27
-#define GVR_VIMS_HEADER_HEIGHT 25
+#define GVR_VIMS_ROW_HEIGHT_MIN 27
+#define GVR_VIMS_HEADER_HEIGHT_MIN 25
 #define GVR_VIMS_ID_WIDTH 62
 #define GVR_VIMS_NAMESPACE_MIN_HEIGHT 120
 #define GVR_VIMS_ACTIONS_MIN_HEIGHT 96
@@ -149,6 +150,61 @@ static const guint gvr_vims_view_action_signals[GVR_VIMS_VIEW_N_ACTIONS] = {
 };
 
 G_DEFINE_TYPE(GvrVimsView, gvr_vims_view, GTK_TYPE_BOX)
+
+
+static double gvr_vims_font_points(GtkWidget *widget)
+{
+    PangoContext *context;
+    const PangoFontDescription *font;
+    int size;
+    double points;
+
+    if(!widget)
+        return 10.0;
+
+    context = gtk_widget_get_pango_context(widget);
+    font = context ? pango_context_get_font_description(context) : NULL;
+    size = font ? pango_font_description_get_size(font) : 0;
+    if(size <= 0)
+        return 10.0;
+
+    points = (double)size / PANGO_SCALE;
+    if(pango_font_description_get_size_is_absolute(font))
+        points *= 72.0 / 96.0;
+
+    return CLAMP(points, 6.0, 32.0);
+}
+
+static int gvr_vims_list_row_height(GvrVimsList *list)
+{
+    double pixels = gvr_vims_font_points(list ? list->area : NULL) * (96.0 / 72.0);
+    return MAX(GVR_VIMS_ROW_HEIGHT_MIN, (int)ceil(pixels + 12.0));
+}
+
+static int gvr_vims_list_header_height(GvrVimsList *list)
+{
+    double pixels = gvr_vims_font_points(list ? list->area : NULL) * (96.0 / 72.0);
+    return MAX(GVR_VIMS_HEADER_HEIGHT_MIN, (int)ceil(pixels + 10.0));
+}
+
+static PangoFontDescription *gvr_vims_font_description(GtkWidget *widget,
+                                                        gboolean monospace,
+                                                        double scale,
+                                                        PangoWeight weight)
+{
+    PangoContext *context = widget ? gtk_widget_get_pango_context(widget) : NULL;
+    const PangoFontDescription *base = context ? pango_context_get_font_description(context) : NULL;
+    PangoFontDescription *font = base ?
+        pango_font_description_copy(base) :
+        pango_font_description_from_string("Sans 10");
+    double points = gvr_vims_font_points(widget) * scale;
+
+    if(monospace)
+        pango_font_description_set_family(font, "Monospace");
+    pango_font_description_set_size(font, (int)lrint(points * PANGO_SCALE));
+    pango_font_description_set_weight(font, weight);
+    return font;
+}
 
 static void gvr_vims_namespace_entry_free(gpointer data)
 {
@@ -326,8 +382,8 @@ static int gvr_vims_list_visible_rows(GvrVimsList *list)
 {
     GtkAllocation allocation;
     gtk_widget_get_allocation(list->area, &allocation);
-    return MAX(1, (allocation.height - GVR_VIMS_HEADER_HEIGHT) /
-                  GVR_VIMS_ROW_HEIGHT);
+    return MAX(1, (allocation.height - gvr_vims_list_header_height(list)) /
+                  gvr_vims_list_row_height(list));
 }
 
 static void gvr_vims_list_update_adjustment(GvrVimsList *list)
@@ -379,11 +435,10 @@ static void gvr_vims_draw_text(GtkWidget *widget,
         return;
 
     layout = gtk_widget_create_pango_layout(widget, text ? text : "");
-    font = pango_font_description_new();
-    pango_font_description_set_family(font, "Sans");
-    pango_font_description_set_size(font, 10 * PANGO_SCALE);
-    pango_font_description_set_weight(font,
-                                      bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
+    font = gvr_vims_font_description(widget,
+                                     FALSE,
+                                     1.0,
+                                     bold ? PANGO_WEIGHT_BOLD : PANGO_WEIGHT_NORMAL);
     pango_layout_set_font_description(layout, font);
     pango_layout_set_width(layout, (int)(width * PANGO_SCALE));
     pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
@@ -416,7 +471,7 @@ static void gvr_vims_draw_namespace(GvrVimsList *list,
     const int visible = gvr_vims_list_visible_rows(list);
 
     cairo_set_source_rgb(cr, 0.105, 0.115, 0.135);
-    cairo_rectangle(cr, 0, 0, width, GVR_VIMS_HEADER_HEIGHT);
+    cairo_rectangle(cr, 0, 0, width, gvr_vims_list_header_height(list));
     cairo_fill(cr);
     cairo_set_source_rgb(cr, 0.82, 0.85, 0.90);
     gvr_vims_draw_text(widget, cr, "VIMS", 8, 4, GVR_VIMS_ID_WIDTH - 12, TRUE);
@@ -431,19 +486,19 @@ static void gvr_vims_draw_namespace(GvrVimsList *list,
         int index = -1;
         GvrVimsNamespaceEntry *entry =
             gvr_vims_list_entry_at_row(list, row, &index);
-        const double y = GVR_VIMS_HEADER_HEIGHT + row * GVR_VIMS_ROW_HEIGHT;
+        const double y = gvr_vims_list_header_height(list) + row * gvr_vims_list_row_height(list);
         char id[16];
 
         if(!entry || y >= height)
             break;
         if(index == list->selected_index) {
             cairo_set_source_rgba(cr, 0.36, 0.43, 0.55, 0.42);
-            cairo_rectangle(cr, 0, y, width, GVR_VIMS_ROW_HEIGHT);
+            cairo_rectangle(cr, 0, y, width, gvr_vims_list_row_height(list));
             cairo_fill(cr);
         }
         else if((row & 1) == 0) {
             cairo_set_source_rgba(cr, 0.12, 0.13, 0.15, 0.34);
-            cairo_rectangle(cr, 0, y, width, GVR_VIMS_ROW_HEIGHT);
+            cairo_rectangle(cr, 0, y, width, gvr_vims_list_row_height(list));
             cairo_fill(cr);
         }
 
@@ -513,7 +568,7 @@ static void gvr_vims_draw_actions(GvrVimsList *list,
                             &key_x);
 
     cairo_set_source_rgb(cr, 0.105, 0.115, 0.135);
-    cairo_rectangle(cr, 0, 0, width, GVR_VIMS_HEADER_HEIGHT);
+    cairo_rectangle(cr, 0, 0, width, gvr_vims_list_header_height(list));
     cairo_fill(cr);
     cairo_set_source_rgb(cr, 0.82, 0.85, 0.90);
     gvr_vims_draw_text(widget, cr, "VIMS", 8, 4, GVR_VIMS_ID_WIDTH - 12, TRUE);
@@ -538,19 +593,19 @@ static void gvr_vims_draw_actions(GvrVimsList *list,
         int index = -1;
         GvrVimsActionEntry *entry =
             gvr_vims_list_entry_at_row(list, row, &index);
-        const double y = GVR_VIMS_HEADER_HEIGHT + row * GVR_VIMS_ROW_HEIGHT;
+        const double y = gvr_vims_list_header_height(list) + row * gvr_vims_list_row_height(list);
         char id[16];
 
         if(!entry || y >= height)
             break;
         if(index == list->selected_index) {
             cairo_set_source_rgba(cr, 0.36, 0.43, 0.55, 0.42);
-            cairo_rectangle(cr, 0, y, width, GVR_VIMS_ROW_HEIGHT);
+            cairo_rectangle(cr, 0, y, width, gvr_vims_list_row_height(list));
             cairo_fill(cr);
         }
         else if((row & 1) == 0) {
             cairo_set_source_rgba(cr, 0.12, 0.13, 0.15, 0.34);
-            cairo_rectangle(cr, 0, y, width, GVR_VIMS_ROW_HEIGHT);
+            cairo_rectangle(cr, 0, y, width, gvr_vims_list_row_height(list));
             cairo_fill(cr);
         }
 
@@ -591,7 +646,7 @@ static void gvr_vims_draw_midi(GvrVimsList *list,
     const int visible = gvr_vims_list_visible_rows(list);
 
     cairo_set_source_rgb(cr, 0.105, 0.115, 0.135);
-    cairo_rectangle(cr, 0, 0, width, GVR_VIMS_HEADER_HEIGHT);
+    cairo_rectangle(cr, 0, 0, width, gvr_vims_list_header_height(list));
     cairo_fill(cr);
     cairo_set_source_rgb(cr, 0.82, 0.85, 0.90);
     gvr_vims_draw_text(widget, cr, "MIDI EVENT", type_x, 4,
@@ -616,7 +671,7 @@ static void gvr_vims_draw_midi(GvrVimsList *list,
                            cr,
                            "No learned MIDI mappings. Enable MIDI Learn from the main menu, move a control, then use a UI control.",
                            12,
-                           GVR_VIMS_HEADER_HEIGHT + 12,
+                           gvr_vims_list_header_height(list) + 12,
                            width - 24,
                            FALSE);
         return;
@@ -626,17 +681,17 @@ static void gvr_vims_draw_midi(GvrVimsList *list,
         int index = -1;
         GvrVimsMidiEntry *entry =
             gvr_vims_list_entry_at_row(list, row, &index);
-        const double y = GVR_VIMS_HEADER_HEIGHT + row * GVR_VIMS_ROW_HEIGHT;
+        const double y = gvr_vims_list_header_height(list) + row * gvr_vims_list_row_height(list);
         if(!entry || y >= height)
             break;
         if(index == list->selected_index) {
             cairo_set_source_rgba(cr, 0.36, 0.43, 0.55, 0.42);
-            cairo_rectangle(cr, 0, y, width, GVR_VIMS_ROW_HEIGHT);
+            cairo_rectangle(cr, 0, y, width, gvr_vims_list_row_height(list));
             cairo_fill(cr);
         }
         else if((row & 1) == 0) {
             cairo_set_source_rgba(cr, 0.12, 0.13, 0.15, 0.34);
-            cairo_rectangle(cr, 0, y, width, GVR_VIMS_ROW_HEIGHT);
+            cairo_rectangle(cr, 0, y, width, gvr_vims_list_row_height(list));
             cairo_fill(cr);
         }
 
@@ -945,9 +1000,9 @@ static gboolean gvr_vims_list_button_press(GtkWidget *widget,
     int row;
     int index = -1;
 
-    if(event->button != 1 || event->y < GVR_VIMS_HEADER_HEIGHT)
+    if(event->button != 1 || event->y < gvr_vims_list_header_height(list))
         return FALSE;
-    row = ((int)event->y - GVR_VIMS_HEADER_HEIGHT) / GVR_VIMS_ROW_HEIGHT;
+    row = ((int)event->y - gvr_vims_list_header_height(list)) / gvr_vims_list_row_height(list);
     if(!gvr_vims_list_entry_at_row(list, row, &index))
         return FALSE;
     gtk_widget_grab_focus(widget);
@@ -1048,11 +1103,11 @@ static gboolean gvr_vims_list_query_tooltip(GtkWidget *widget,
               : NULL;
     }
     else {
-        if(y < GVR_VIMS_HEADER_HEIGHT)
+        if(y < gvr_vims_list_header_height(list))
             return FALSE;
         entry = gvr_vims_list_entry_at_row(
             list,
-            (y - GVR_VIMS_HEADER_HEIGHT) / GVR_VIMS_ROW_HEIGHT,
+            (y - gvr_vims_list_header_height(list)) / gvr_vims_list_row_height(list),
             &index);
     }
     if(!entry)
@@ -1408,7 +1463,7 @@ static GtkWidget *gvr_vims_view_command_bar(GvrVimsView *view)
     gtk_widget_set_sensitive(view->command_entry, FALSE);
     gtk_box_pack_start(GTK_BOX(row), view->command_entry, TRUE, TRUE, 0);
     gvr_vims_view_apply_css(view->command_entry,
-                            "* { font-family: monospace; font-size: 11pt; }");
+                            "* { font-family: monospace; }");
     g_signal_connect(view->command_entry,
                      "changed",
                      G_CALLBACK(gvr_vims_view_command_changed),
@@ -1555,6 +1610,30 @@ static void gvr_vims_view_finalize(GObject *object)
     G_OBJECT_CLASS(gvr_vims_view_parent_class)->finalize(object);
 }
 
+
+static void gvr_vims_view_style_updated(GtkWidget *widget)
+{
+    GvrVimsView *view = GVR_VIMS_VIEW(widget);
+
+    GTK_WIDGET_CLASS(gvr_vims_view_parent_class)->style_updated(widget);
+
+    if(view->namespace_list.area && view->namespace_list.adjustment) {
+        gvr_vims_list_update_adjustment(&view->namespace_list);
+        gtk_widget_queue_resize(view->namespace_list.area);
+        gtk_widget_queue_draw(view->namespace_list.area);
+    }
+    if(view->action_list.area && view->action_list.adjustment) {
+        gvr_vims_list_update_adjustment(&view->action_list);
+        gtk_widget_queue_resize(view->action_list.area);
+        gtk_widget_queue_draw(view->action_list.area);
+    }
+    if(view->midi_list.area && view->midi_list.adjustment) {
+        gvr_vims_list_update_adjustment(&view->midi_list);
+        gtk_widget_queue_resize(view->midi_list.area);
+        gtk_widget_queue_draw(view->midi_list.area);
+    }
+}
+
 static void gvr_vims_view_class_init(GvrVimsViewClass *klass)
 {
     static const char *names[SIGNAL_LAST] = {
@@ -1577,7 +1656,9 @@ static void gvr_vims_view_class_init(GvrVimsViewClass *klass)
         "midi-unbind-requested"
     };
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
+    GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(klass);
 
+    widget_class->style_updated = gvr_vims_view_style_updated;
     object_class->finalize = gvr_vims_view_finalize;
     for(int i = 0; i < SIGNAL_LAST; i++)
         gvr_vims_view_signals[i] =
@@ -1611,8 +1692,6 @@ static void gvr_vims_view_init(GvrVimsView *view)
     gtk_widget_add_events(GTK_WIDGET(view), GDK_KEY_PRESS_MASK);
     gtk_style_context_add_class(gtk_widget_get_style_context(GTK_WIDGET(view)),
                                 "vims-history-view");
-    gvr_vims_view_apply_css(GTK_WIDGET(view),
-                            "* { font-size: 10.5pt; }");
 
     view->namespace_entries = g_ptr_array_new_with_free_func(
         gvr_vims_namespace_entry_free);
@@ -1757,14 +1836,10 @@ static void gvr_vims_view_init(GvrVimsView *view)
     gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(view->response_view), FALSE);
     gtk_text_view_set_monospace(GTK_TEXT_VIEW(view->response_view), TRUE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view->response_view), GTK_WRAP_NONE);
-    gvr_vims_view_apply_css(view->response_view,
-                            "* { font-family: monospace; font-size: 11pt; }");
 
     view->editor_view = gtk_text_view_new();
     gtk_text_view_set_monospace(GTK_TEXT_VIEW(view->editor_view), TRUE);
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view->editor_view), GTK_WRAP_NONE);
-    gvr_vims_view_apply_css(view->editor_view,
-                            "* { font-family: monospace; font-size: 11pt; }");
 
     view->workspace = gtk_notebook_new();
     gtk_notebook_set_scrollable(GTK_NOTEBOOK(view->workspace), TRUE);
