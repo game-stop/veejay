@@ -27,7 +27,7 @@
 #define GVR_PATTERN_ROW_HEIGHT 21
 #define GVR_PATTERN_HEADER_HEIGHT 0
 #define GVR_PATTERN_ALL_COLUMNS_MASK ((1u << GVR_VIMS_PATTERN_COLUMNS) - 1u)
-#define GVR_PATTERN_FRAME_WIDTH 72
+#define GVR_PATTERN_FRAME_WIDTH 96
 #define GVR_PATTERN_DEFAULT_FRAMES 256
 #define GVR_PATTERN_MAX_FRAMES 10000000
 #define GVR_PATTERN_LABEL_TEXT_MAX 14
@@ -112,6 +112,7 @@ typedef struct {
 struct _GvrVimsPatternView {
     GtkBox parent_instance;
 
+    GtkWidget *target_badge;
     GtkWidget *target_label;
     GtkWidget *step_spin;
     GtkWidget *learn_toggle;
@@ -575,10 +576,34 @@ static guint gvr_pattern_cell_recount_flags(GvrVimsPatternCell *cell)
     return summary.flags;
 }
 
+static void gvr_pattern_clear_fired_highlight(GvrVimsPatternView *view)
+{
+    if(!view)
+        return;
+
+    view->last_fired_bank = -1;
+    view->last_fired_slot = -1;
+    view->last_fired_frame = -1;
+    view->last_fired_mask = 0;
+}
+
+static void gvr_pattern_clear_fired_highlight_for(
+        GvrVimsPatternView *view,
+        int bank,
+        int slot)
+{
+    if(view &&
+       view->last_fired_bank == bank &&
+       view->last_fired_slot == slot)
+        gvr_pattern_clear_fired_highlight(view);
+}
+
 static void gvr_pattern_emit_changed(GvrVimsPatternView *view, int bank, int slot)
 {
     GvrVimsPatternCell *cell = gvr_pattern_cell(view, bank, slot);
     guint flags = gvr_pattern_cell_recount_flags(cell);
+
+    gvr_pattern_clear_fired_highlight_for(view, bank, slot);
 
     g_signal_emit(view,
                   gvr_vims_pattern_view_signals[SIGNAL_PATTERN_CHANGED],
@@ -3744,6 +3769,7 @@ static void gvr_pattern_move_row(GvrVimsPatternView *view,
 
 static void gvr_pattern_update_target_label(GvrVimsPatternView *view)
 {
+    const char *badge = NULL;
     char text[160];
     int outside_events = 0;
 
@@ -3760,6 +3786,8 @@ static void gvr_pattern_update_target_label(GvrVimsPatternView *view)
 
     if(!gvr_pattern_target_valid(view->selected_bank, view->selected_slot)) {
         char empty[96];
+
+        gtk_widget_hide(view->target_badge);
         g_snprintf(empty,
                    sizeof(empty),
                    "No VIMS pattern target   0 frames   rows ×%d",
@@ -3769,6 +3797,8 @@ static void gvr_pattern_update_target_label(GvrVimsPatternView *view)
     }
 
     if(view->selected_bank == GVR_VIMS_PATTERN_SEQUENCE_BANK) {
+        badge = "BANK PATTERN";
+
         if(!view->frame_count_known)
             g_snprintf(text,
                        sizeof(text),
@@ -3794,6 +3824,8 @@ static void gvr_pattern_update_target_label(GvrVimsPatternView *view)
         const char *kind = view->selected_bank == GVR_VIMS_PATTERN_SAMPLE_BANK ?
                            "Sample" : "Stream";
 
+        badge = "PATTERN";
+
         if(!view->frame_count_known)
             g_snprintf(text,
                        sizeof(text),
@@ -3817,43 +3849,50 @@ static void gvr_pattern_update_target_label(GvrVimsPatternView *view)
                        view->selected_sample_id,
                        gvr_pattern_effective_frame_count(view));
     }
-    else if(view->selected_sample_id > 0) {
-        if(!view->frame_count_known)
-            g_snprintf(text,
-                       sizeof(text),
-                       "B%d / %02d   %s %d   length unknown   %d-row workspace",
-                       view->selected_bank + 1,
-                       view->selected_slot + 1,
-                       view->selected_sample_type == 0 ? "Sample" : "Stream",
-                       view->selected_sample_id,
-                       gvr_pattern_effective_frame_count(view));
-        else if(outside_events > 0)
-            g_snprintf(text,
-                       sizeof(text),
-                       "B%d / %02d   %s %d   %d frames   %d events outside range",
-                       view->selected_bank + 1,
-                       view->selected_slot + 1,
-                       view->selected_sample_type == 0 ? "Sample" : "Stream",
-                       view->selected_sample_id,
-                       gvr_pattern_effective_frame_count(view),
-                       outside_events);
-        else
-            g_snprintf(text,
-                       sizeof(text),
-                       "B%d / %02d   %s %d   %d frames",
-                       view->selected_bank + 1,
-                       view->selected_slot + 1,
-                       view->selected_sample_type == 0 ? "Sample" : "Stream",
-                       view->selected_sample_id,
-                       gvr_pattern_effective_frame_count(view));
-    }
     else {
-        g_snprintf(text,
-                   sizeof(text),
-                   "B%d / %02d   empty",
-                   view->selected_bank + 1,
-                   view->selected_slot + 1);
+        badge = "SLOT PATTERN";
+
+        if(view->selected_sample_id > 0) {
+            if(!view->frame_count_known)
+                g_snprintf(text,
+                           sizeof(text),
+                           "B%d / %02d   %s %d   length unknown   %d-row workspace",
+                           view->selected_bank + 1,
+                           view->selected_slot + 1,
+                           view->selected_sample_type == 0 ? "Sample" : "Stream",
+                           view->selected_sample_id,
+                           gvr_pattern_effective_frame_count(view));
+            else if(outside_events > 0)
+                g_snprintf(text,
+                           sizeof(text),
+                           "B%d / %02d   %s %d   %d frames   %d events outside range",
+                           view->selected_bank + 1,
+                           view->selected_slot + 1,
+                           view->selected_sample_type == 0 ? "Sample" : "Stream",
+                           view->selected_sample_id,
+                           gvr_pattern_effective_frame_count(view),
+                           outside_events);
+            else
+                g_snprintf(text,
+                           sizeof(text),
+                           "B%d / %02d   %s %d   %d frames",
+                           view->selected_bank + 1,
+                           view->selected_slot + 1,
+                           view->selected_sample_type == 0 ? "Sample" : "Stream",
+                           view->selected_sample_id,
+                           gvr_pattern_effective_frame_count(view));
+        }
+        else {
+            g_snprintf(text,
+                       sizeof(text),
+                       "B%d / %02d   empty",
+                       view->selected_bank + 1,
+                       view->selected_slot + 1);
+        }
     }
+
+    gtk_label_set_text(GTK_LABEL(view->target_badge), badge);
+    gtk_widget_show(view->target_badge);
 
     {
         GvrVimsPatternCell *cell =
@@ -4085,7 +4124,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                 cairo_set_source_rgb(cr, 1.0, 0.68, 0.20);
                 gvr_pattern_draw_text(cr,
                                       hidden_text,
-                                      GVR_PATTERN_FRAME_WIDTH - 28.0,
+                                      GVR_PATTERN_FRAME_WIDTH - 30.0,
                                       y + 14.0,
                                       8.0,
                                       CAIRO_FONT_WEIGHT_BOLD);
@@ -4217,7 +4256,8 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
                                            event_width);
             }
 
-            if(view->selected_bank == view->last_fired_bank &&
+            if(event && event->message &&
+               view->selected_bank == view->last_fired_bank &&
                view->selected_slot == view->last_fired_slot &&
                frame == view->last_fired_frame &&
                (view->last_fired_mask & (1u << column)))
@@ -6124,6 +6164,16 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
                        0);
     gtk_widget_show(toolbar);
 
+    view->target_badge = gtk_label_new(NULL);
+    gtk_style_context_add_class(
+        gtk_widget_get_style_context(view->target_badge),
+        "vims-pattern-target-badge");
+    gtk_box_pack_start(GTK_BOX(toolbar),
+                       view->target_badge,
+                       FALSE,
+                       FALSE,
+                       1);
+
     view->target_label =
         gtk_label_new("No VIMS pattern target   0 frames");
     g_object_set(G_OBJECT(view->target_label),
@@ -6135,7 +6185,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
                        view->target_label,
                        TRUE,
                        TRUE,
-                       3);
+                       2);
     gtk_widget_show(view->target_label);
 
     label = gtk_label_new("Step");
@@ -6817,6 +6867,8 @@ void gvr_vims_pattern_view_select_cell(GtkWidget *widget,
 
     if(target_changed) {
         GvrVimsPatternPlaybackState *state;
+
+        gvr_pattern_clear_fired_highlight(view);
 
         if(view->inline_editing)
             gvr_pattern_inline_cancel(view);
@@ -7571,6 +7623,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
                                                 active);
 
     if(!active || !gvr_pattern_target_valid(bank, slot)) {
+        gvr_pattern_clear_fired_highlight_for(view, bank, slot);
         gvr_pattern_playback_remove(view, bank, slot);
         if(selected_target)
             gvr_vims_pattern_view_set_live_position(widget,
@@ -7588,6 +7641,10 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
     state = gvr_pattern_playback_state(view, bank, slot, TRUE);
     if(!state)
         return;
+
+    if(state->source_frame >= 0 &&
+       source_frame != state->source_frame)
+        gvr_pattern_clear_fired_highlight_for(view, bank, slot);
 
     if(selected_target && state->frame < 0)
         gvr_pattern_set_cursor(view,
@@ -7835,10 +7892,7 @@ void gvr_vims_pattern_view_stop_all_playback(GtkWidget *widget)
     view->live_bank = -1;
     view->live_slot = -1;
     view->live_frame = -1;
-    view->last_fired_bank = -1;
-    view->last_fired_slot = -1;
-    view->last_fired_frame = -1;
-    view->last_fired_mask = 0;
+    gvr_pattern_clear_fired_highlight(view);
     gtk_widget_queue_draw(view->area);
 }
 
