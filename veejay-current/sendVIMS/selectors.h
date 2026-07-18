@@ -288,6 +288,8 @@ SELECTOR("srt.update", 395);
 SELECTOR("srt.save", 396);
 SELECTOR("srt.load", 397);
 SELECTOR("srt.select", 398);
+SELECTOR("sequence.pattern.set", 278);
+SELECTOR("sequence.pattern.clear", 279);
 SELECTOR("play", 10);
 SELECTOR("forward", 10);
 SELECTOR("reverse", 11);
