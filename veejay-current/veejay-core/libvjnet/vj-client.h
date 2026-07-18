@@ -39,6 +39,8 @@ int	vj_client_link_can_write(vj_client *v, int s);
 int 	vj_client_link_can_read(vj_client *v,int s );
 
 int vj_client_connect( vj_client *v, char *host, char *group_name, int port_id );
+
+int vj_client_connect_cmd( vj_client *v, char *host, int port_id );
   
 void	vj_client_flush( vj_client *v, int delay );
 
@@ -50,9 +52,13 @@ int vj_client_read_no_wait( vj_client *v, int sock_type, uint8_t *dst, int bytes
 
 void	vj_client_close( vj_client *v );
 
+void	vj_client_shutdown( vj_client *v, int sock_type );
+
 int vj_client_send( vj_client *v, int sock_type,unsigned char *buf);
 
 int vj_client_send_buf( vj_client *v, int sock_type,unsigned char *buf, int len);
+
+int vj_client_send_long( vj_client *v, int sock_type,unsigned char *buf, int len);
 
 vj_client *vj_client_alloc(void);
 

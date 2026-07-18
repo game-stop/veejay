@@ -23,6 +23,8 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
 #include "cmd.h"
 #include <libvjmsg/vj-msg.h>
 #include <sys/types.h>
@@ -80,6 +82,81 @@ static int sock_connect(const char *name, int port) {
     veejay_msg(VEEJAY_MSG_DEBUG, "Established connection with %s:%d", name, port );
 
     freeaddrinfo(servinfo);
+
+    return sock_fd;
+}
+
+static int sock_connect_timeout(const char *name, int port, int timeout_ms)
+{
+    char service[6];
+    if(snprintf(service, sizeof(service), "%d", port) >= (int) sizeof(service)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid port %d", port);
+        return -1;
+    }
+
+    struct addrinfo hints;
+    struct addrinfo *servinfo = NULL;
+    struct addrinfo *p;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+
+    int gai = getaddrinfo(name, service, &hints, &servinfo);
+    if(gai != 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Failed to resolve %s:%d: %s", name, port, gai_strerror(gai));
+        return -1;
+    }
+
+    int sock_fd = -1;
+    for(p = servinfo; p != NULL; p = p->ai_next) {
+        sock_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if(sock_fd < 0)
+            continue;
+
+        int flags = fcntl(sock_fd, F_GETFL, 0);
+        if(flags < 0 || fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+            close(sock_fd);
+            sock_fd = -1;
+            continue;
+        }
+
+        int connected = 0;
+        if(connect(sock_fd, p->ai_addr, p->ai_addrlen) == 0) {
+            connected = 1;
+        }
+        else if(errno == EINPROGRESS) {
+            struct pollfd poll_fd;
+            poll_fd.fd = sock_fd;
+            poll_fd.events = POLLOUT;
+            poll_fd.revents = 0;
+
+            int poll_result;
+            do {
+                poll_result = poll(&poll_fd, 1, timeout_ms);
+            } while(poll_result < 0 && errno == EINTR);
+
+            if(poll_result > 0) {
+                int socket_error = 0;
+                socklen_t error_size = sizeof(socket_error);
+                if(getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, &socket_error, &error_size) == 0 && socket_error == 0)
+                    connected = 1;
+            }
+        }
+
+        if(connected) {
+            if(fcntl(sock_fd, F_SETFL, flags) == 0)
+                break;
+            connected = 0;
+        }
+
+        close(sock_fd);
+        sock_fd = -1;
+    }
+
+    freeaddrinfo(servinfo);
+
+    if(sock_fd >= 0)
+        veejay_msg(VEEJAY_MSG_DEBUG, "Established connection with %s:%d", name, port);
 
     return sock_fd;
 }
@@ -145,6 +222,38 @@ int			sock_t_wds_isset( vj_sock_t *s ) {
 
 int			sock_t_rds_isset( vj_sock_t *s ) {
 	return FD_ISSET( s->sock_fd, &(s->rds) );
+}
+
+int sock_t_connect_timeout(vj_sock_t *s, char *host, int port, int timeout_ms)
+{
+    s->sock_fd = sock_connect_timeout(host, port, timeout_ms);
+    if(s->sock_fd < 0)
+        return 0;
+
+    socklen_t tmp = sizeof(int);
+    if(getsockopt(s->sock_fd, SOL_SOCKET, SO_SNDBUF, (unsigned char*) &(s->send_size), &tmp) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for output: %s", strerror(errno));
+        sock_t_close(s);
+        return 0;
+    }
+    if(getsockopt(s->sock_fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(s->recv_size), &tmp) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to get buffer size for input: %s", strerror(errno));
+        sock_t_close(s);
+        return 0;
+    }
+
+#ifdef SO_NOSIGPIPE
+    int opt = 1;
+    if(setsockopt(s->sock_fd, SOL_SOCKET, SO_NOSIGPIPE, (void*) &opt, sizeof(int)) < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to set SO_NOSIGPIPE: %s", strerror(errno));
+        sock_t_close(s);
+        return 0;
+    }
+#endif
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Connected to host '%s' port %d, fd %d", host, port, s->sock_fd);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Receive buffer size is %d bytes, send buffer size is %d bytes", s->recv_size, s->send_size);
+    return 1;
 }
 
 int			sock_t_poll( vj_sock_t *s )

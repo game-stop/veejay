@@ -23,7 +23,7 @@
 #include <netinet/tcp.h>
 
 #define VJ_PORT 3490
-#define VJ_MAX_CONNECTIONS 8
+#define VJ_MAX_CONNECTIONS 64
 #define VJ_MAX_PENDING_MSG 128
 #define VJ_MAX_LISTEN_SOCKETS 16
 

@@ -40,6 +40,7 @@ void		sock_t_free(vj_sock_t *s);
 int		sock_t_wds_isset(vj_sock_t *s);
 int		sock_t_rds_isset(vj_sock_t *s);
 int		sock_t_connect( vj_sock_t *s, char *host, int port );
+int		sock_t_connect_timeout( vj_sock_t *s, char *host, int port, int timeout_ms );
 int		sock_t_poll( vj_sock_t *s );
 int		sock_t_recv( vj_sock_t *s, void *dst, int len );
 int		sock_t_send( vj_sock_t *s, unsigned char *buf, int len );

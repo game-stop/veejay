@@ -145,6 +145,35 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 	return error;
 }
 
+
+int vj_client_connect_cmd(vj_client *v, char *host, int port_id)
+{
+	if(!v || !host)
+		return 0;
+	if(port_id <= 0 || port_id > 65535) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid port number '%d'", port_id);
+		return 0;
+	}
+
+	if(!v->fd[0]) {
+		v->fd[0] = alloc_sock_t();
+		if(!v->fd[0])
+			return 0;
+	}
+	else {
+		sock_t_close(v->fd[0]);
+	}
+
+	v->fd[1] = NULL;
+	if(sock_t_connect_timeout(v->fd[0], host, port_id + VJ_CMD_PORT, 1000)) {
+		v->ports[0] = port_id + VJ_CMD_PORT;
+		v->ports[1] = -1;
+		return 1;
+	}
+
+	return 0;
+}
+
 int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 {
 	int error = 0;
@@ -342,10 +371,46 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len) 
 }
 
 #define HDR_LEN 5
+#define VJ_CLIENT_SHORT_PAYLOAD_MAX 999
+#define VJ_CLIENT_LONG_HEADER_LEN 9
+#define VJ_CLIENT_LONG_PAYLOAD_MAX 99999999
+
+int vj_client_send_long(vj_client *v, int sock_type,unsigned char *buf, int len) {
+	if(!v || !buf || len <= 0 || len > VJ_CLIENT_LONG_PAYLOAD_MAX) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid VIMS long-message length %d", len);
+		return -1;
+	}
+
+	int packet_len = len + VJ_CLIENT_LONG_HEADER_LEN;
+	unsigned char *packet = (unsigned char*) vj_malloc(sizeof(unsigned char) * packet_len);
+	if(!packet) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Out of memory");
+		return -1;
+	}
+
+	packet[0] = 'X';
+	snprintf((char*) packet + 1, VJ_CLIENT_LONG_HEADER_LEN, "%08d", len);
+	memcpy(packet + VJ_CLIENT_LONG_HEADER_LEN, buf, len);
+
+	int ret = vj_client_send_buf(v, sock_type, packet, packet_len);
+	free(packet);
+	return ret;
+}
 
 int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
-	
-	int len = strlen( (const char*)buf);
+	if(!v || !buf)
+		return -1;
+
+	size_t payload_len = strlen( (const char*)buf);
+	if(payload_len > VJ_CLIENT_SHORT_PAYLOAD_MAX) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+			"VIMS short message is %zu bytes; maximum is %d, use vj_client_send_long()",
+			payload_len,
+			VJ_CLIENT_SHORT_PAYLOAD_MAX);
+		return -1;
+	}
+
+	int len = (int)payload_len;
 	int ret = -1;
 	unsigned char *blob = (unsigned char*) vj_malloc(sizeof(unsigned char) * (len + HDR_LEN));
 	if(!blob) {
@@ -366,6 +431,17 @@ int vj_client_send(vj_client *v, int sock_type,unsigned char *buf) {
 	free(blob);
 
 	return ret;
+}
+
+
+void vj_client_shutdown(vj_client *v, int sock_type)
+{
+	if(!v || v->mcast || sock_type < 0 || sock_type > 1)
+		return;
+
+	vj_sock_t *sock = (vj_sock_t*) v->fd[sock_type];
+	if(sock && sock->sock_fd >= 0)
+		shutdown(sock->sock_fd, SHUT_RDWR);
 }
 
 void vj_client_close( vj_client *v )
