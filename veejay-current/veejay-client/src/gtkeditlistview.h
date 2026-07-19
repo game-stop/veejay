@@ -66,7 +66,8 @@ void gvr_edit_list_view_set_sample(GtkWidget *widget,
                                    double fps);
 void gvr_edit_list_view_set_segments(GtkWidget *widget,
                                      const GvrEditListSegment *segments,
-                                     guint count);
+                                     guint count,
+                                     guint source_file_count);
 void gvr_edit_list_view_set_playhead(GtkWidget *widget, int frame);
 void gvr_edit_list_view_set_selection(GtkWidget *widget,
                                       int in_frame,
@@ -117,6 +118,9 @@ gboolean gvr_edit_list_view_get_selected_segment(GtkWidget *widget,
  *
  * "separator-removed"
  *   void callback(GtkWidget *widget, int separator_id, gpointer user_data)
+ *
+ * "media-file-dropped"
+ *   void callback(GtkWidget *widget, const char *filename, gpointer user_data)
  */
 
 G_END_DECLS

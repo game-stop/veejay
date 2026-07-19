@@ -17,6 +17,7 @@
 #include <string.h>
 #include <pango/pangocairo.h>
 #include "gtkeditlistview.h"
+#include "gtkmediaview.h"
 #include "vj-api.h"
 
 typedef struct {
@@ -93,6 +94,7 @@ enum {
     SIGNAL_SEPARATOR_ADDED,
     SIGNAL_SEPARATOR_MOVED,
     SIGNAL_SEPARATOR_REMOVED,
+    SIGNAL_MEDIA_FILE_DROPPED,
     SIGNAL_LAST
 };
 
@@ -159,6 +161,7 @@ struct _GvrEditListView {
     guint selected_separator_id;
 
     int sample_id;
+    int source_file_count;
     int total_frames;
     double fps;
     int playhead;
@@ -237,6 +240,9 @@ static void gvr_edit_list_take_focus(GvrEditListView *view);
 
 G_DEFINE_TYPE(GvrEditListView, gvr_edit_list_view, GTK_TYPE_BOX)
 
+static GtkTargetEntry gvr_edit_list_media_drop_targets[] = {
+    { (gchar *)GVR_MEDIA_VIEW_DND_TARGET, GTK_TARGET_SAME_APP, 0 }
+};
 
 static double gvr_edit_list_font_points(GtkWidget *widget)
 {
@@ -676,13 +682,21 @@ static void gvr_edit_list_update_summary(GvrEditListView *view)
     gchar *selection;
 
     if(view->sample_id > 0) {
-        target = g_strdup_printf("Sample %d   %d frames · %s",
+        target = g_strdup_printf("Sample %d   %d source file%s · %u segment%s · %d frames · %s",
                                  view->sample_id,
+                                 view->source_file_count,
+                                 view->source_file_count == 1 ? "" : "s",
+                                 view->segments->len,
+                                 view->segments->len == 1 ? "" : "s",
                                  view->total_frames,
                                  duration);
     }
     else {
-        target = g_strdup_printf("Edit list   %d frames · %s",
+        target = g_strdup_printf("Edit list   %d source file%s · %u segment%s · %d frames · %s",
+                                 view->source_file_count,
+                                 view->source_file_count == 1 ? "" : "s",
+                                 view->segments->len,
+                                 view->segments->len == 1 ? "" : "s",
                                  view->total_frames,
                                  duration);
     }
@@ -4379,6 +4393,63 @@ static void gvr_edit_list_view_style_updated(GtkWidget *widget)
     }
 }
 
+static void gvr_edit_list_media_drag_data_received(GtkWidget *widget,
+                                                   GdkDragContext *context,
+                                                   gint x,
+                                                   gint y,
+                                                   GtkSelectionData *selection,
+                                                   guint info,
+                                                   guint time,
+                                                   gpointer user_data)
+{
+    GvrEditListView *view = GVR_EDIT_LIST_VIEW(user_data);
+    const guchar *data;
+    gint length;
+    gchar *filename = NULL;
+    gboolean accepted = FALSE;
+
+    (void)widget;
+    (void)x;
+    (void)y;
+    (void)info;
+
+    if(!view->editable)
+        goto done;
+
+    data = gtk_selection_data_get_data(selection);
+    length = gtk_selection_data_get_length(selection);
+    if(!data || length <= 0)
+        goto done;
+
+    filename = g_strndup((const gchar *)data, (gsize)length);
+    if(!filename || !filename[0] || !g_utf8_validate(filename, -1, NULL))
+        goto done;
+
+    g_signal_emit(view,
+                  gvr_edit_list_view_signals[SIGNAL_MEDIA_FILE_DROPPED],
+                  0,
+                  filename);
+    accepted = TRUE;
+
+done:
+    gtk_drag_finish(context, accepted, FALSE, time);
+    g_free(filename);
+}
+
+static void gvr_edit_list_register_media_drop(GtkWidget *widget,
+                                              GvrEditListView *view)
+{
+    gtk_drag_dest_set(widget,
+                      GTK_DEST_DEFAULT_ALL,
+                      gvr_edit_list_media_drop_targets,
+                      G_N_ELEMENTS(gvr_edit_list_media_drop_targets),
+                      GDK_ACTION_COPY);
+    g_signal_connect(widget,
+                     "drag-data-received",
+                     G_CALLBACK(gvr_edit_list_media_drag_data_received),
+                     view);
+}
+
 static void gvr_edit_list_view_class_init(GvrEditListViewClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS(klass);
@@ -4455,6 +4526,18 @@ static void gvr_edit_list_view_class_init(GvrEditListViewClass *klass)
                      G_TYPE_FROM_CLASS(klass), G_SIGNAL_RUN_FIRST, 0,
                      NULL, NULL, g_cclosure_marshal_VOID__INT,
                      G_TYPE_NONE, 1, G_TYPE_INT);
+
+    gvr_edit_list_view_signals[SIGNAL_MEDIA_FILE_DROPPED] =
+        g_signal_new("media-file-dropped",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_FIRST,
+                     0,
+                     NULL,
+                     NULL,
+                     g_cclosure_marshal_VOID__STRING,
+                     G_TYPE_NONE,
+                     1,
+                     G_TYPE_STRING);
 }
 
 static void gvr_edit_list_view_init(GvrEditListView *view)
@@ -4493,6 +4576,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     view->next_separator_id = 1;
     view->selected_separator_id = 0;
     view->sample_id = -1;
+    view->source_file_count = 0;
     view->total_frames = 0;
     view->fps = 25.0;
     view->playhead = 0;
@@ -4517,6 +4601,12 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
 
     view->target_label = gtk_label_new("No edit list");
     g_object_set(G_OBJECT(view->target_label), "xalign", 0.0f, NULL);
+    gtk_label_set_single_line_mode(GTK_LABEL(view->target_label), TRUE);
+    gtk_label_set_ellipsize(GTK_LABEL(view->target_label), PANGO_ELLIPSIZE_END);
+    gtk_widget_set_tooltip_text(
+        view->target_label,
+        "Source files are opened media files. Segments are timeline ranges; several "
+        "segments may reference the same source file.");
     gtk_widget_set_hexpand(view->target_label, TRUE);
     gtk_box_pack_start(GTK_BOX(toolbar), view->target_label, TRUE, TRUE, 3);
 
@@ -4847,12 +4937,18 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gtk_widget_set_can_focus(view->tree, TRUE);
     gvr_edit_list_add_class(view->tree, "edit-list-tree");
 
-    gvr_edit_list_append_text_column(view, "#", MODEL_INDEX, FALSE, 34);
-    gvr_edit_list_append_text_column(view, "Filename", MODEL_FILENAME, TRUE, 180);
-    gvr_edit_list_append_text_column(view, "EDL range", MODEL_EDL_RANGE, FALSE, 110);
-    gvr_edit_list_append_text_column(view, "File range", MODEL_FILE_RANGE, FALSE, 110);
+    gvr_edit_list_append_text_column(view, "Segment", MODEL_INDEX, FALSE, 68);
+    gvr_edit_list_append_text_column(view, "Source file", MODEL_FILENAME, TRUE, 180);
+    gvr_edit_list_append_text_column(view, "Timeline frames", MODEL_EDL_RANGE, FALSE, 118);
+    gvr_edit_list_append_text_column(view, "Source frames", MODEL_FILE_RANGE, FALSE, 112);
     gvr_edit_list_append_text_column(view, "Length", MODEL_LENGTH, FALSE, 68);
     gvr_edit_list_append_text_column(view, "Format", MODEL_FOURCC, FALSE, 58);
+
+    gtk_widget_set_tooltip_text(
+        view->tree,
+        "Each row is a timeline segment. Copy, paste, cut and move operations may "
+        "create several segments that all reference the same source file. Drag a "
+        "file from Backend Media here to append it to this Edit List.");
 
     selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(view->tree));
     gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
@@ -5006,6 +5102,11 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gtk_widget_show_all(scrolled);
     gtk_widget_show_all(rangebar);
 
+    gvr_edit_list_register_media_drop(GTK_WIDGET(view), view);
+    gvr_edit_list_register_media_drop(view->overview, view);
+    gvr_edit_list_register_media_drop(view->navigator, view);
+    gvr_edit_list_register_media_drop(view->tree, view);
+
     gvr_edit_list_update_summary(view);
     gvr_edit_list_update_range_labels(view);
     gvr_edit_list_update_clipboard_label(view);
@@ -5036,6 +5137,7 @@ void gvr_edit_list_view_clear(GtkWidget *widget)
     gtk_list_store_clear(view->store);
 
     view->sample_id = -1;
+    view->source_file_count = 0;
     view->total_frames = 0;
     view->playhead = 0;
     view->selection_active = FALSE;
@@ -5132,7 +5234,8 @@ void gvr_edit_list_view_set_sample(GtkWidget *widget,
 
 void gvr_edit_list_view_set_segments(GtkWidget *widget,
                                      const GvrEditListSegment *segments,
-                                     guint count)
+                                     guint count,
+                                     guint source_file_count)
 {
     GvrEditListView *view;
     int derived_total = 0;
@@ -5144,6 +5247,7 @@ void gvr_edit_list_view_set_segments(GtkWidget *widget,
 
     view = GVR_EDIT_LIST_VIEW(widget);
     preserve_segment = view->selected_segment;
+    view->source_file_count = (int)source_file_count;
 
     view->syncing_tree = TRUE;
     gtk_list_store_clear(view->store);

@@ -2292,3 +2292,69 @@ button.record-stop-button {
     padding-top: 0;
     padding-bottom: 0;
 }
+
+/* Backend Media custom widget --------------------------------------------- */
+.media-view {
+    background-color: @bg-color;
+    padding: 0;
+    margin: 0;
+}
+
+.media-view-toolbar {
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    padding: 2px;
+    margin: 0;
+}
+
+.media-view-title {
+    color: @text-color;
+    font-weight: bold;
+    padding-left: 3px;
+    padding-right: 4px;
+}
+
+.media-view-search {
+    min-height: 22px;
+    min-width: 120px;
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.media-view-toolbar button {
+    min-width: 24px;
+    min-height: 22px;
+    padding: 0 3px;
+}
+
+.media-view-tree {
+    background-color: @bg-color;
+    border: 1px solid @border-color;
+}
+
+.media-view-tree header button {
+    min-height: 20px;
+    padding: 2px 4px;
+    background-color: @raised-color;
+}
+
+.media-view-tree:selected {
+    background-color: @fill-color;
+}
+
+.media-view-status {
+    color: @text-muted;
+    background-color: @panel-color;
+    border: 1px solid @border-color;
+    padding: 2px 4px;
+    margin: 0;
+    font-size: 90%;
+}
+
+.edit-list-view:drop(active),
+.edit-list-overview:drop(active),
+.edit-list-navigator:drop(active),
+.edit-list-tree:drop(active) {
+    border-color: @slot-playing-color;
+    box-shadow: inset 0 0 0 1px @slot-playing-color;
+}

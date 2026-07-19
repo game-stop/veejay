@@ -70,6 +70,7 @@
 #include <src/gtksequencebankview.h>
 #include <src/gtkvimspatternview.h>
 #include <src/gtkvimshistoryview.h>
+#include <src/gtkmediaview.h>
 #include <src/gtkvimsview.h>
 #include <src/gtksamplebankview.h>
 #include <src/gtkeditlistview.h>
@@ -2033,6 +2034,7 @@ typedef struct
     GtkWidget   *vims_pattern_view;
     GtkWidget   *vims_history_view;
     GtkWidget   *vims_view;
+    GtkWidget   *media_view;
     GtkWidget   *edit_list_view;
     sample_bank_t   **sample_banks;
     sample_slot_t   *selected_slot;
@@ -2228,6 +2230,7 @@ static gint load_parameter_info(void);
 static void load_v4l_info(void);
 static void reload_editlist_contents(void);
 static void edit_list_mount_view(void);
+static void media_view_mount(void);
 static void edit_list_attach_to_playmode(int play_mode);
 static gboolean edit_list_playmode_is_editable(int play_mode);
 static void load_effectchain_info(void);
@@ -10262,26 +10265,6 @@ static void setup_tree_pixmap_column( const char *tree_name, int type, const cha
     gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
 }
 
-void server_files_selection_func (GtkTreeView *treeview,
-                                  GtkTreePath *path,
-                                  GtkTreeViewColumn *col,
-                                  gpointer user_data)
-{
-    GtkTreeModel *model;
-    GtkTreeIter iter;
-    model = gtk_tree_view_get_model(treeview);
-
-    if(gtk_tree_model_get_iter(model,&iter,path))
-    {
-        gchar *name = NULL;
-        gtk_tree_model_get(model, &iter, 0, &name, -1);
-
-        multi_vims(VIMS_EDITLIST_ADD_SAMPLE, "0 %s" , name );
-        vj_msg(VEEJAY_MSG_INFO, "Tried to open %s",name);
-        g_free(name);
-    }
-}
-
 void    generators_selection_func(GtkTreeView *treeview,
                                   GtkTreePath *path,
                                   GtkTreeViewColumn *col,
@@ -10314,18 +10297,6 @@ static void setup_generators(void)
     setup_tree_text_column( "generators", 0, "Filename",0 );
 
     g_signal_connect( tree, "row-activated", (GCallback) generators_selection_func, NULL);
-}
-
-static void setup_server_files(void)
-{
-    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "server_files");
-    GtkListStore *store = gtk_list_store_new( 1,  G_TYPE_STRING );
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-    g_object_unref( G_OBJECT( store ));
-
-    setup_tree_text_column( "server_files", 0, "Filename",0 );
-
-    g_signal_connect( tree, "row-activated", (GCallback) server_files_selection_func, NULL);
 }
 
 static void load_v4l_info(void)
@@ -15027,6 +14998,126 @@ static void edit_list_selection_changed(GtkWidget *widget,
     }
 }
 
+static gboolean media_view_parse_length(const char *buf,
+                                          int len,
+                                          int *offset,
+                                          int *value)
+{
+    int parsed = 0;
+
+    if(!buf || !offset || !value || *offset < 0 || *offset + 4 > len)
+        return FALSE;
+
+    for(int i = 0; i < 4; i++) {
+        unsigned char c = (unsigned char)buf[*offset + i];
+        if(c < '0' || c > '9')
+            return FALSE;
+        parsed = (parsed * 10) + (c - '0');
+    }
+
+    *offset += 4;
+    *value = parsed;
+    return TRUE;
+}
+
+static void media_view_refresh_requested(GtkWidget *widget,
+                                         gpointer user_data)
+{
+    gint len = 0;
+    gchar *reply;
+    int offset = 0;
+    gboolean valid = TRUE;
+
+    (void)user_data;
+
+    if(!GVR_IS_MEDIA_VIEW(widget))
+        return;
+
+    gvr_media_view_begin_update(widget);
+    single_vims(VIMS_WORKINGDIR);
+    reply = recv_vims(8, &len);
+
+    if(!reply) {
+        gvr_media_view_set_error(widget, "Unable to fetch backend media");
+        return;
+    }
+
+    if(len <= 0) {
+        free(reply);
+        gvr_media_view_end_update(widget);
+        return;
+    }
+
+    while(offset < len) {
+        int file_len = 0;
+        gchar *raw_name;
+        gchar *filename;
+
+        if(!media_view_parse_length(reply, len, &offset, &file_len) ||
+           offset + file_len > len)
+        {
+            valid = FALSE;
+            break;
+        }
+
+        if(file_len == 0)
+            continue;
+
+        raw_name = g_strndup(reply + offset, file_len);
+        offset += file_len;
+        filename = _utf8str(raw_name);
+        g_free(raw_name);
+
+        if(filename && filename[0])
+            gvr_media_view_append(widget, filename);
+        g_free(filename);
+    }
+
+    free(reply);
+
+    if(!valid || offset != len) {
+        gvr_media_view_clear(widget);
+        gvr_media_view_set_error(widget, "Malformed media-list reply from backend");
+        return;
+    }
+
+    gvr_media_view_end_update(widget);
+}
+
+static void media_view_file_activated(GtkWidget *widget,
+                                      const char *filename,
+                                      gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(!filename || !filename[0])
+        return;
+
+    multi_vims(VIMS_EDITLIST_ADD_SAMPLE, "0 %s", filename);
+    info->uc.reload_hint[HINT_EL] = 1;
+    info->uc.reload_hint[HINT_SLIST] = 1;
+    vj_msg(VEEJAY_MSG_INFO, "Add backend media '%s' as a sample", filename);
+}
+
+static void edit_list_media_file_dropped(GtkWidget *widget,
+                                         const char *filename,
+                                         gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(!info || !filename || !filename[0] ||
+       !edit_list_playmode_is_editable(info->status_tokens[PLAY_MODE]))
+        return;
+
+    multi_vims(VIMS_EDITLIST_ADD, "%s", filename);
+    info->uc.reload_hint[HINT_EL] = 1;
+    vj_msg(VEEJAY_MSG_INFO,
+           "Append backend media '%s' to the Edit List",
+           filename);
+}
+
 static void edit_list_mount_view(void)
 {
     GtkWidget *host;
@@ -15057,8 +15148,42 @@ static void edit_list_mount_view(void)
                      "selection-changed",
                      G_CALLBACK(edit_list_selection_changed),
                      NULL);
+    g_signal_connect(info->edit_list_view,
+                     "media-file-dropped",
+                     G_CALLBACK(edit_list_media_file_dropped),
+                     NULL);
 
     gvr_edit_list_view_set_editable(info->edit_list_view, FALSE);
+    gtk_widget_show_all(host);
+}
+
+static void media_view_mount(void)
+{
+    GtkWidget *host;
+
+    if(!info || !info->main_window || info->media_view)
+        return;
+
+    host = glade_xml_get_widget_(info->main_window, "media_view_host");
+    if(!host || !GTK_IS_BOX(host)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Media host widget not found");
+        return;
+    }
+
+    info->media_view = gvr_media_view_new();
+    gtk_widget_set_hexpand(info->media_view, TRUE);
+    gtk_widget_set_vexpand(info->media_view, TRUE);
+    gtk_box_pack_start(GTK_BOX(host), info->media_view, TRUE, TRUE, 0);
+
+    g_signal_connect(info->media_view,
+                     "refresh-requested",
+                     G_CALLBACK(media_view_refresh_requested),
+                     NULL);
+    g_signal_connect(info->media_view,
+                     "file-activated",
+                     G_CALLBACK(media_view_file_activated),
+                     NULL);
+
     gtk_widget_show_all(host);
 }
 
@@ -15138,7 +15263,7 @@ static void reload_editlist_contents(void)
     single_vims(VIMS_EDITLIST_LIST);
     eltext = recv_vims(6, &len);
     if(!eltext || len <= 0) {
-        gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0);
+        gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0, 0);
         gvr_edit_list_view_set_sample(info->edit_list_view,
                                       edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
                                       edit_list_total_frames_for_mode(
@@ -15156,7 +15281,7 @@ static void reload_editlist_contents(void)
     int num_files = (int)u;
 
     if(num_files <= 0) {
-        gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0);
+        gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0, 0);
         gvr_edit_list_view_set_sample(info->edit_list_view,
                                       edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
                                       edit_list_total_frames_for_mode(
@@ -15277,7 +15402,8 @@ static void reload_editlist_contents(void)
 
     gvr_edit_list_view_set_segments(info->edit_list_view,
                                     (const GvrEditListSegment *)segments->data,
-                                    segments->len);
+                                    segments->len,
+                                    (guint)num_files);
     gvr_edit_list_view_set_sample(info->edit_list_view,
                                   edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
                                   edit_list_total_frames_for_mode(
@@ -15292,7 +15418,7 @@ static void reload_editlist_contents(void)
 
 parse_fail:
     veejay_msg(VEEJAY_MSG_ERROR, "Unable to parse Edit List response");
-    gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0);
+    gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0, 0);
     gvr_edit_list_view_set_sample(info->edit_list_view,
                                   edit_list_source_id_for_mode(info->status_tokens[PLAY_MODE]),
                                   edit_list_total_frames_for_mode(
@@ -23162,12 +23288,12 @@ void vj_gui_init(const char *glade_file,
     setup_effectchain_info();
     setup_effectlist_info();
     edit_list_mount_view();
+    media_view_mount();
     setup_samplelist_info();
     setup_v4l_devices();
 	setup_colorselection();
     setup_rgbkey();
     setup_bundles();
-    setup_server_files();
     setup_generators();
 
     set_toggle_button( "button_252", vims_verbosity );
