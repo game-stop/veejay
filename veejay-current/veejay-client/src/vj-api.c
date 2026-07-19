@@ -16053,12 +16053,25 @@ char *format_selection_time(int start, int end)
     return format_time( pos, fps );
 }
 
-static gboolean update_cpumeter_timeout( gpointer data )
+static gboolean update_cpumeter_timeout(gpointer data)
 {
-    gdouble ms   = (gdouble)info->status_tokens[ELAPSED_TIME];
+    static gint64 next_update = 0;
+    gint64 now = g_get_monotonic_time();
+    gdouble ms;
+    gdouble fs;
+    gdouble lim;
 
-    gdouble fs = (gdouble) info->status_tokens[18] * 0.01;
-    gdouble lim  = (1.0f/fs)*1000.0;
+    (void)data;
+
+    if(next_update > now)
+        return TRUE;
+    next_update = now + 250000;
+
+    ms = (gdouble)info->status_tokens[ELAPSED_TIME];
+    fs = (gdouble)info->status_tokens[18] * 0.01;
+    if(fs <= 0.0)
+        fs = 25.0;
+    lim = (1.0 / fs) * 1000.0;
 
     if( ms < lim )
     {
@@ -16483,12 +16496,13 @@ static GtkWidget *playmode_notebook_tab_label(void)
 
 static void playmode_set_label_markup(GtkWidget *label, const gchar *markup)
 {
-    if(!GTK_IS_LABEL(label))
+    if(!GTK_IS_LABEL(label) || !markup)
+        return;
+
+    if(g_strcmp0(gtk_label_get_label(GTK_LABEL(label)), markup) == 0)
         return;
 
     gtk_label_set_markup(GTK_LABEL(label), markup);
-    gtk_widget_queue_resize(label);
-    gtk_widget_queue_draw(label);
 }
 
 static void set_pm_page_label(int type)
@@ -16519,7 +16533,8 @@ static void set_pm_page_label(int type)
     if(visible_mode != cached_mode)
         playmode_set_label_markup(visible_mode, ftitle);
 
-    if(GTK_IS_LABEL(source))
+    if(GTK_IS_LABEL(source) &&
+       g_strcmp0(gtk_label_get_text(GTK_LABEL(source)), tab_label) != 0)
         gtk_label_set_text(GTK_LABEL(source), tab_label);
 }
 
@@ -17798,7 +17813,6 @@ static void update_audio_beat_status_widgets(int *history, int force)
     if(!live_ready || stale_ticks >= AUDIO_BEAT_UI_STALE_TICKS)
         audio_beat_curve_live_stop();
 
-    timeline_update_compact_overlay();
 
 #undef AB_SET_LABEL
 #undef AB_SET_BAR
@@ -18863,7 +18877,6 @@ static void update_audio_sync_status_widgets(int *history, int force)
                                audio_sync_track_align_state_name(AS_CUR(AUDIO_SYNC_TRACK_ALIGN_STATE)));
 
     sample_audio_sync_status_sync_controls(history, force);
-    timeline_update_compact_overlay();
 
 #undef AS_SET_LABEL
 #undef AS_SET_BAR
@@ -18968,8 +18981,8 @@ static void update_globalinfo(int *history, int pm, int last_pm)
 
     update_label_i2(  widget_cache[ WIDGET_LABEL_CURFRAME ],info->status_frame ,1 );
 
-    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_CURTIME] ), current_time_ );
-    gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_MOUSEAT] ), mouse_at_time);
+    update_label_str2(widget_cache[WIDGET_LABEL_CURTIME], current_time_);
+    update_label_str2(widget_cache[WIDGET_LABEL_MOUSEAT], mouse_at_time);
 
     free(current_time_);
     free(mouse_at_time);

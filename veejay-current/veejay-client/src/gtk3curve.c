@@ -6548,7 +6548,7 @@ gtk3_curve_live_trace_clear(GtkWidget *widget)
   memset(&priv->live_trace_dot_color, 0, sizeof(priv->live_trace_dot_color));
   priv->live_trace_dot_label[0] = '\0';
 
-  if (gtk_widget_is_visible(widget))
+  if (gtk_widget_get_mapped(widget))
     gtk_widget_queue_draw(widget);
 }
 
@@ -6576,7 +6576,7 @@ gtk3_curve_live_trace_set_user_override(GtkWidget *widget, gboolean enabled)
 
   priv->live_trace_user_override = enabled;
 
-  if (gtk_widget_is_visible(widget))
+  if (gtk_widget_get_mapped(widget))
     gtk_widget_queue_draw(widget);
 }
 
@@ -6597,7 +6597,7 @@ gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled)
       priv->live_trace_local_max_x = (gfloat)(GTK3_CURVE_LIVE_TRACE_LEN - 1);
       priv->live_trace_view_min_x = priv->live_trace_local_min_x;
       priv->live_trace_view_max_x = priv->live_trace_local_max_x;
-      if (gtk_widget_is_visible(widget))
+      if (gtk_widget_get_mapped(widget))
         gtk_widget_queue_draw(widget);
     }
     return;
@@ -6613,7 +6613,7 @@ gtk3_curve_live_trace_set_enabled(GtkWidget *widget, gboolean enabled)
     priv->live_trace_view_max_x = priv->live_trace_local_max_x;
     gtk3_curve_live_trace_clear(widget);
   }
-  else if (gtk_widget_is_visible(widget))
+  else if (gtk_widget_get_mapped(widget))
     gtk_widget_queue_draw(widget);
 }
 
@@ -6650,8 +6650,6 @@ gtk3_curve_live_trace_set_domain(GtkWidget              *widget,
     priv->live_trace_view_max_x = max_x;
     gtk3_curve_live_trace_clear(widget);
   }
-  else if (gtk_widget_is_visible(widget))
-    gtk_widget_queue_draw(widget);
 }
 
 void
@@ -6738,7 +6736,7 @@ gtk3_curve_live_trace_push_at(GtkWidget   *widget,
   else
     priv->live_trace_label[trace][0] = '\0';
 
-  if (trace == GTK3_CURVE_LIVE_TRACE_MAX - 1 && gtk_widget_is_visible(widget))
+  if (trace == GTK3_CURVE_LIVE_TRACE_MAX - 1 && gtk_widget_get_mapped(widget))
     gtk_widget_queue_draw(widget);
 }
 
@@ -6788,14 +6786,19 @@ gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
 
   enabled = enabled ? TRUE : FALSE;
 
-  priv->live_trace_dot_enabled = enabled;
-
   if (!enabled) {
+    if (!priv->live_trace_dot_enabled &&
+        priv->live_trace_dot_label[0] == '\0')
+      return;
+
+    priv->live_trace_dot_enabled = FALSE;
     priv->live_trace_dot_label[0] = '\0';
-    if (gtk_widget_is_visible(widget))
+    if (gtk_widget_get_mapped(widget))
       gtk_widget_queue_draw(widget);
     return;
   }
+
+  priv->live_trace_dot_enabled = TRUE;
 
   {
     gfloat domain_min_x = gtk3_curve_live_domain_min_x(priv);
@@ -6846,7 +6849,7 @@ gtk3_curve_live_trace_set_dot(GtkWidget   *widget,
   else
     priv->live_trace_dot_label[0] = '\0';
 
-  if (gtk_widget_is_visible(widget))
+  if (gtk_widget_get_mapped(widget))
     gtk_widget_queue_draw(widget);
 }
 
@@ -6861,6 +6864,6 @@ gtk3_curve_set_position(GtkWidget *widget, gdouble pos)
 
   priv->current_position = pos;
 
-  if (gtk_widget_is_visible(widget))
+  if (gtk_widget_get_mapped(widget))
     gtk_widget_queue_draw(widget);
 }

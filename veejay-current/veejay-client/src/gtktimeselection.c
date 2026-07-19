@@ -1457,12 +1457,16 @@ void timeline_set_pos(GtkWidget *widget, gdouble pos)
   TimelineSelection *te = TIMELINE_SELECTION(widget);
   gint new_pos = timeline_clamp_playhead_i(te, (gint) llround(pos));
 
+  if ((gint)llround(te->frame_num) == new_pos)
+      return;
+
   te->frame_num = (gdouble) new_pos;
 
   //TL_EVT(te, "set_pos", "raw=%.3f clamped=%d in=%.3f out=%.3f selection=%d", pos, new_pos, te->in, te->out, te->has_selection);
   //TL_EVT(te, "emit", "pos_changed");
   g_signal_emit(te->widget, timeline_signals[POS_CHANGED], 0);
-  gtk_widget_queue_draw(GTK_WIDGET(te->widget));
+  if (gtk_widget_get_mapped(GTK_WIDGET(te->widget)))
+      gtk_widget_queue_draw(GTK_WIDGET(te->widget));
 }
 
 gdouble timeline_get_pos(TimelineSelection *te)
@@ -1640,13 +1644,12 @@ void timeline_set_audio_lane_loop(GtkWidget *widget, gboolean loop)
 
   te->audio_lane_loop_override_active = TRUE;
 
-  if (te->audio_lane_loop == next) {
-      gtk_widget_queue_draw(widget);
+  if (te->audio_lane_loop == next)
       return;
-  }
 
   te->audio_lane_loop = next;
-  gtk_widget_queue_draw(widget);
+  if (gtk_widget_get_mapped(widget))
+      gtk_widget_queue_draw(widget);
 }
 
 void timeline_clear_audio_lane(GtkWidget *widget)
@@ -1660,6 +1663,21 @@ void timeline_clear_audio_lane(GtkWidget *widget)
       te->audio_lane_status_hold--;
       return;
   }
+
+  if (!te->audio_lane_active &&
+      te->audio_lane_source == 0 &&
+      te->audio_lane_profile == 0 &&
+      te->audio_lane_mode == 0 &&
+      te->audio_lane_video_anchor == 0 &&
+      te->audio_lane_wav_anchor_ms == 0 &&
+      te->audio_lane_length_ms == 0 &&
+      !te->audio_lane_loop &&
+      !te->audio_lane_loop_override_active &&
+      !te->audio_lane_drag &&
+      !te->audio_lane_drag_anchor &&
+      !te->audio_lane_drag_wav &&
+      te->audio_lane_status_hold == 0)
+      return;
 
   te->audio_lane_active = FALSE;
   te->audio_lane_source = 0;
@@ -1681,7 +1699,8 @@ void timeline_clear_audio_lane(GtkWidget *widget)
   te->audio_lane_rect.y = 0;
   te->audio_lane_rect.width = 0;
   te->audio_lane_rect.height = 0;
-  gtk_widget_queue_draw(widget);
+  if (gtk_widget_get_mapped(widget))
+      gtk_widget_queue_draw(widget);
 }
 
 void timeline_set_audio_lane(GtkWidget *widget,

@@ -181,6 +181,7 @@ struct _GvrEditListView {
     gboolean syncing;
     gboolean syncing_tree;
     gboolean syncing_view;
+    gboolean playhead_visuals_dirty;
 
     double timeline_zoom;
     int timeline_view_start;
@@ -729,6 +730,27 @@ static void gvr_edit_list_update_summary(GvrEditListView *view)
     g_free(position);
     g_free(target);
     g_free(duration);
+}
+
+static void gvr_edit_list_update_playhead_summary(GvrEditListView *view)
+{
+    gchar *position;
+    gchar *playhead;
+
+    if(!view || !GTK_IS_LABEL(view->playhead_label))
+        return;
+
+    position = gvr_edit_list_format_time(view, view->playhead);
+    playhead = g_strdup_printf("Playhead %d · %s",
+                              view->playhead,
+                              position);
+
+    if(g_strcmp0(gtk_label_get_text(GTK_LABEL(view->playhead_label)),
+                 playhead) != 0)
+        gtk_label_set_text(GTK_LABEL(view->playhead_label), playhead);
+
+    g_free(playhead);
+    g_free(position);
 }
 
 static void gvr_edit_list_update_drag_summary(GvrEditListView *view,
@@ -2918,6 +2940,51 @@ static void gvr_edit_list_update_playing_rows(GvrEditListView *view)
                            -1);
         valid = gtk_tree_model_iter_next(model, &iter);
     }
+}
+
+static void gvr_edit_list_set_playing_row(GvrEditListView *view,
+                                          int position,
+                                          gboolean playing)
+{
+    GtkTreeIter iter;
+    gboolean current = FALSE;
+
+    if(!view || position < 0 ||
+       !gtk_tree_model_iter_nth_child(GTK_TREE_MODEL(view->store),
+                                      &iter,
+                                      NULL,
+                                      position))
+        return;
+
+    gtk_tree_model_get(GTK_TREE_MODEL(view->store),
+                       &iter,
+                       MODEL_PLAYING, &current,
+                       -1);
+    if(current == playing)
+        return;
+
+    gtk_list_store_set(view->store,
+                       &iter,
+                       MODEL_PLAYING, playing,
+                       -1);
+}
+
+static void gvr_edit_list_update_playing_rows_for_move(
+        GvrEditListView *view,
+        int old_frame,
+        int new_frame)
+{
+    int old_position = -1;
+    int new_position = -1;
+
+    gvr_edit_list_segment_at_frame(view, old_frame, &old_position);
+    gvr_edit_list_segment_at_frame(view, new_frame, &new_position);
+
+    if(old_position == new_position)
+        return;
+
+    gvr_edit_list_set_playing_row(view, old_position, FALSE);
+    gvr_edit_list_set_playing_row(view, new_position, TRUE);
 }
 
 static void gvr_edit_list_emit_seek(GvrEditListView *view, int frame)
@@ -5340,17 +5407,28 @@ void gvr_edit_list_view_set_playhead(GtkWidget *widget, int frame)
     GtkAllocation allocation;
     int old_frame;
     gboolean viewport_changed = FALSE;
+    gboolean full_refresh;
 
     if(!GVR_IS_EDIT_LIST_VIEW(widget))
         return;
 
     view = GVR_EDIT_LIST_VIEW(widget);
     frame = gvr_edit_list_clamp_frame(view, frame);
-    if(frame == view->playhead)
+
+    if(frame == view->playhead &&
+       (!view->playhead_visuals_dirty || !gtk_widget_get_mapped(widget)))
         return;
 
     old_frame = view->playhead;
     view->playhead = frame;
+
+    if(!gtk_widget_get_mapped(widget)) {
+        view->playhead_visuals_dirty = TRUE;
+        return;
+    }
+
+    full_refresh = view->playhead_visuals_dirty;
+    view->playhead_visuals_dirty = FALSE;
 
     if(view->timeline_zoom > 1.001 &&
        view->drag_mode == GVR_EDIT_LIST_DRAG_NONE &&
@@ -5364,10 +5442,14 @@ void gvr_edit_list_view_set_playhead(GtkWidget *widget, int frame)
         viewport_changed = TRUE;
     }
 
-    gvr_edit_list_update_playing_rows(view);
-    gvr_edit_list_update_summary(view);
+    if(full_refresh)
+        gvr_edit_list_update_playing_rows(view);
+    else
+        gvr_edit_list_update_playing_rows_for_move(view, old_frame, frame);
 
-    if(viewport_changed) {
+    gvr_edit_list_update_playhead_summary(view);
+
+    if(viewport_changed || full_refresh) {
         gvr_edit_list_queue_timeline_draw(view);
         return;
     }
@@ -5466,7 +5548,11 @@ void gvr_edit_list_view_set_editable(GtkWidget *widget, gboolean editable)
         return;
 
     view = GVR_EDIT_LIST_VIEW(widget);
-    view->editable = editable ? TRUE : FALSE;
+    editable = editable ? TRUE : FALSE;
+    if(view->editable == editable)
+        return;
+
+    view->editable = editable;
     gvr_edit_list_update_sensitivity(view);
 }
 
