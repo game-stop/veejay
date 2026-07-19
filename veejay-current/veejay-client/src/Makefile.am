@@ -41,6 +41,7 @@ reloaded_SOURCES = \
     gtkvimsview.c \
     gtkeditlistview.c \
     gtkmediaview.c \
+    gtkpreviewcache.c \
     utils-gtk.c \
     vj-midi.c \
     $(reloaded_headers)

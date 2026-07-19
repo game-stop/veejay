@@ -28,6 +28,8 @@
 #include "vj-api.h"
 #include "curve.h"
 
+extern void sample_preview_arm_plain_new_sample(void);
+
 #define AUDIO_MASTER_JACK_UI_VALUE 1
 
 #define AUDIO_MIX_MODE_FOLLOW 0
@@ -3517,6 +3519,7 @@ void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
+	sample_preview_arm_plain_new_sample();
 	multi_vims( VIMS_SAMPLE_NEW, "%d %d", info->sample[0],info->sample[1]);
 	vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d",
 		info->sample[0], info->sample[1]);
@@ -5880,6 +5883,76 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
     }
 }
 
+static	void	load_server_files(char *buf, int len)
+{
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window, "server_files");
+#ifdef STRICT_CHECKING
+	assert(tree != NULL);
+#endif
+	if(!buf || len <= 0 || !tree || !GTK_IS_TREE_VIEW(tree))
+		return;
+
+	GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+	if(!model || !GTK_IS_LIST_STORE(model))
+		return;
+
+	GtkListStore *store = GTK_LIST_STORE(model);
+	int i = 0;
+
+	while(i + 4 <= len) {
+		char header[5];
+		int filelen = 0;
+
+		memcpy(header, buf + i, 4);
+		header[4] = '\0';
+
+		if(sscanf(header, "%04d", &filelen) != 1 || filelen < 0)
+			break;
+
+		i += 4;
+		if(i + filelen > len)
+			break;
+
+		if(filelen > 0) {
+			char name[1024];
+			int copy_len = MIN(filelen, (int) sizeof(name) - 1);
+			GtkTreeIter iter;
+
+			memcpy(name, buf + i, copy_len);
+			name[copy_len] = '\0';
+
+			gchar *filename = _utf8str(name);
+			if(filename) {
+				gtk_list_store_append(store, &iter);
+				gtk_list_store_set(store, &iter, 0, filename, -1);
+				g_free(filename);
+			}
+		}
+
+		i += filelen;
+	}
+}
+
+
+void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
+{
+
+
+
+	single_vims(VIMS_WORKINGDIR);
+
+	gint len = 0;
+	gchar *test = recv_vims( 8, &len );
+
+	if(!test || len <= 0 ) {
+		return ;
+	}
+
+	reset_tree( "server_files");
+
+	load_server_files( test,len);
+free(test);
+}
 
 void on_button_offline_start_clicked(GtkWidget *widget, gpointer user_data)
 {

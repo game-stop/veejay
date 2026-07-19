@@ -71,6 +71,7 @@
 #include <src/gtkvimspatternview.h>
 #include <src/gtkvimshistoryview.h>
 #include <src/gtkmediaview.h>
+#include <src/gtkpreviewcache.h>
 #include <src/gtkvimsview.h>
 #include <src/gtksamplebankview.h>
 #include <src/gtkeditlistview.h>
@@ -117,6 +118,23 @@ static inline int ui_playmode_is_sample(int mode)
 static inline int ui_playmode_effective(int mode)
 {
     return ui_playmode_is_sample(mode) ? MODE_SAMPLE : mode;
+}
+
+static void ui_sample_inventory_counts(const int *status,
+                                       int mode,
+                                       int *sample_count,
+                                       int *stream_count)
+{
+    mode = ui_playmode_effective(mode);
+
+    if(mode == MODE_STREAM) {
+        *sample_count = status[SAMPLE_INV_COUNT];
+        *stream_count = status[SAMPLE_COUNT];
+    }
+    else {
+        *sample_count = status[SAMPLE_COUNT];
+        *stream_count = status[SAMPLE_INV_COUNT];
+    }
 }
 
 static inline int ui_audio_sync_mode_is_control_only(int mode)
@@ -1903,6 +1921,30 @@ typedef struct
     sample_slot_t **slot;
 } sample_bank_t;
 
+#define SAMPLE_PREVIEW_WIDTH 96
+#define SAMPLE_PREVIEW_HEIGHT 64
+#define SAMPLE_PREVIEW_LIVE_REFRESH_USEC (3 * G_USEC_PER_SEC)
+#define SAMPLE_PREVIEW_CACHE_REFRESH_USEC (30 * G_USEC_PER_SEC)
+#define SAMPLE_PREVIEW_PLAIN_NEW_TIMEOUT_USEC (10 * G_USEC_PER_SEC)
+
+static GvrPreviewCache *sample_preview_cache = NULL;
+static char sample_preview_editlist_hash[65];
+static char sample_preview_samplelist_hash[65];
+static gboolean sample_preview_have_editlist_hash = FALSE;
+static gboolean sample_preview_have_samplelist_hash = FALSE;
+static int sample_preview_live_id = -1;
+static int sample_preview_live_type = -1;
+static gint64 sample_preview_next_live_capture = 0;
+static gint64 sample_preview_next_cache_capture = 0;
+
+typedef struct {
+    int sample_id;
+    gint64 expires_at;
+    GdkPixbuf *tile;
+} sample_preview_plain_new_t;
+
+static GQueue *sample_preview_plain_new_queue = NULL;
+
 typedef struct
 {
     char *hostname;
@@ -2270,6 +2312,31 @@ static gboolean samplebank_locate_slot(sample_slot_t *slot, int *page, int *slot
 static void samplebank_update_offline_recorder_gadget(void);
 static void samplebank_update_page_label(void);
 static void samplebank_request_page_thumbnails(int page);
+static void samplebank_focus_new_sample(GHashTable *previous_ids,
+                                        gboolean inventory_was_ready);
+static void sample_preview_cache_connect(const char *host, int port);
+static void sample_preview_cache_disconnect(void);
+static void sample_preview_cache_set_editlist_payload(const char *data, int len);
+static void sample_preview_cache_set_samplelist_payload(const char *data, int len);
+static gboolean sample_preview_cache_sync_state(void);
+static void sample_preview_cache_apply_all(void);
+static void sample_preview_collect_slot(sample_slot_t *slot);
+static GdkPixbuf *sample_preview_make_tile(GdkPixbuf *source);
+static gboolean sample_preview_assign_tile(sample_slot_t *slot,
+                                           int page,
+                                           int slot_nr,
+                                           GdkPixbuf *tile,
+                                           gboolean persist);
+static void sample_preview_capture_live_frame(GdkPixbuf *pixbuf,
+                                              sample_slot_t *slot,
+                                              int sample_type,
+                                              int page,
+                                              int slot_nr);
+static void sample_preview_plain_new_capture_frame(GdkPixbuf *pixbuf);
+static void sample_preview_plain_new_bind_samples(GHashTable *previous_ids);
+static void sample_preview_plain_new_clear(void);
+static void sample_preview_cancel_requests(void);
+void sample_preview_arm_plain_new_sample(void);
 static void samplebank_store_title_override(int sample_id, int sample_type, const char *title);
 static const char *samplebank_lookup_title_override(int sample_id, int sample_type);
 static gboolean samplebank_title_is_default(int sample_id, int sample_type, const char *title);
@@ -5797,83 +5864,87 @@ void update_gui(void);
 
 int veejay_get_sample_image(int id, int type, int wid, int hei)
 {
-    multi_vims( VIMS_GET_SAMPLE_IMAGE, "%d %d %d %d", id, type, wid, hei );
-    uint8_t *data_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * (wid * hei * 3));
+    uint8_t *data_buffer = NULL;
+    gchar *data = NULL;
+    VJFrame *src1 = NULL;
+    VJFrame *dst1 = NULL;
+    GdkPixbuf *img = NULL;
+    GdkPixbuf *tile = NULL;
     int sample_id = 0;
-    int sample_type =0;
+    int sample_type = 0;
     int full_range = 0;
     gint bw = 0;
-    gchar *data = recv_vims_args( 13, &bw, &sample_id, &sample_type,&full_range );
-    if( data == NULL || bw <= 0 )
-    {
-        if( data_buffer )
-            free(data_buffer);
-        if( data )
-            free(data);
-        return 0;
-    }
+    int result = 0;
 
-    int expected_len = (wid * hei);
-    expected_len += (wid*hei/4);
-    expected_len += (wid*hei/4);
+    multi_vims(VIMS_GET_SAMPLE_IMAGE, "%d %d %d %d", id, type, wid, hei);
+    data_buffer = (uint8_t*)vj_malloc((size_t)wid * hei * 3);
+    data = recv_vims_args(13, &bw, &sample_id, &sample_type, &full_range);
+    if(!data_buffer || !data || bw <= 0)
+        goto cleanup;
 
-    if( bw != expected_len )
-    {
-        if(data_buffer)
-            free(data_buffer);
-        if( data )
-            free(data);
-        return 0;
-    }
+    int expected_len = wid * hei + (wid * hei / 4) + (wid * hei / 4);
+    if(bw != expected_len)
+        goto cleanup;
 
-    uint8_t *in = (uint8_t*)data;
-    uint8_t *out = data_buffer;
+    src1 = yuv_yuv_template((uint8_t*)data,
+                            (uint8_t*)data + (wid * hei),
+                            (uint8_t*)data + (wid * hei) + (wid * hei) / 4,
+                            wid,
+                            hei,
+                            full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P);
+    dst1 = yuv_rgb_template(data_buffer, wid, hei, PIX_FMT_RGB24);
+    if(!src1 || !dst1)
+        goto cleanup;
 
-    VJFrame *src1 = yuv_yuv_template( in, in + (wid * hei), in + (wid * hei) + (wid*hei)/4,wid,hei,(full_range ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P) );
-    VJFrame *dst1 = yuv_rgb_template( out, wid,hei,PIX_FMT_RGB24 );
+    yuv_convert_any_ac(src1, dst1);
 
-    yuv_convert_any_ac( src1, dst1 );
-
-    GdkPixbuf *img = gdk_pixbuf_new_from_data(out,
-                                              GDK_COLORSPACE_RGB,
-                                              FALSE,
-                                              8,
-                                              wid,
-                                              hei,
-                                              wid*3,
-                                              NULL,
-                                              NULL );
-
-    if( img == NULL )
-        return 0;
+    img = gdk_pixbuf_new_from_data(data_buffer,
+                                   GDK_COLORSPACE_RGB,
+                                   FALSE,
+                                   8,
+                                   wid,
+                                   hei,
+                                   wid * 3,
+                                   NULL,
+                                   NULL);
+    if(!img)
+        goto cleanup;
 
     int slot_num = -1;
     int bank_page = find_bank_by_sample_existing(sample_id, sample_type, &slot_num);
 
-    if(bank_page >= 0 && slot_num >= 0) {
-        sample_slot_t *slot = NULL;
-
-        if(info->sample_banks && bank_page < NUM_BANKS && info->sample_banks[bank_page])
-            slot = info->sample_banks[bank_page]->slot[slot_num];
+    if(bank_page >= 0 && bank_page < NUM_BANKS &&
+       slot_num >= 0 && slot_num < NUM_SAMPLES_PER_PAGE &&
+       info->sample_banks && info->sample_banks[bank_page]) {
+        sample_slot_t *slot = info->sample_banks[bank_page]->slot[slot_num];
 
         if(slot) {
-            samplebank_clear_slot_pixbuf(slot);
-            slot->pixbuf = gdk_pixbuf_copy(img);
+            tile = sample_preview_make_tile(img);
+            if(tile)
+                sample_preview_assign_tile(slot,
+                                           bank_page,
+                                           slot_num,
+                                           tile,
+                                           TRUE);
         }
-
-        if(info->sample_bank_view)
-            gvr_sample_bank_view_set_thumbnail(info->sample_bank_view, bank_page, slot_num, img);
     }
 
-    free(data_buffer);
-    free(data);
-    g_object_unref(img);
+    result = bw;
 
-    free(src1);
-    free(dst1);
-
-
-    return bw;
+cleanup:
+    if(tile)
+        g_object_unref(tile);
+    if(img)
+        g_object_unref(img);
+    if(src1)
+        free(src1);
+    if(dst1)
+        free(dst1);
+    if(data_buffer)
+        free(data_buffer);
+    if(data)
+        free(data);
+    return result;
 }
 
 static void record_audio_source_set_radio_local(GtkWidget *w, int active)
@@ -12848,10 +12919,180 @@ static void load_sequence_list(void)
     load_sequence_list_legacy();
 }
 
+static GHashTable *samplebank_snapshot_previews(void)
+{
+    GHashTable *snapshot;
+
+    if(disable_sample_image || !info || !info->sample_banks)
+        return NULL;
+
+    snapshot = g_hash_table_new_full(g_str_hash,
+                                     g_str_equal,
+                                     g_free,
+                                     g_object_unref);
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+            sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+            char key[64];
+
+            if(!slot || slot->sample_id <= 0 || !slot->pixbuf)
+                continue;
+
+            g_snprintf(key,
+                       sizeof(key),
+                       "%d:%d",
+                       slot->sample_id,
+                       slot->sample_type);
+            g_hash_table_replace(snapshot,
+                                 g_strdup(key),
+                                 g_object_ref(slot->pixbuf));
+        }
+    }
+
+    return snapshot;
+}
+
+static GHashTable *samplebank_snapshot_sample_ids(void)
+{
+    GHashTable *snapshot = g_hash_table_new(g_direct_hash, g_direct_equal);
+
+    if(!info || !info->sample_banks)
+        return snapshot;
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+            sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+
+            if(slot && slot->sample_type == 0 && slot->sample_id > 0)
+                g_hash_table_add(snapshot, GINT_TO_POINTER(slot->sample_id));
+        }
+    }
+
+    return snapshot;
+}
+
+static void samplebank_focus_new_sample(GHashTable *previous_ids,
+                                        gboolean inventory_was_ready)
+{
+    sample_slot_t *focus_slot = NULL;
+    int focus_page = -1;
+    int focus_slot_nr = -1;
+
+    if(!inventory_was_ready || !previous_ids || !info ||
+       !info->sample_banks || !info->sample_bank_view)
+        return;
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+            sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+
+            if(!slot || slot->sample_type != 0 || slot->sample_id <= 0)
+                continue;
+            if(g_hash_table_contains(previous_ids,
+                                     GINT_TO_POINTER(slot->sample_id)))
+                continue;
+
+            focus_slot = slot;
+            focus_page = page;
+            focus_slot_nr = slot_nr;
+        }
+    }
+
+    if(!focus_slot)
+        return;
+
+    gvr_sample_bank_view_reveal_slot(info->sample_bank_view,
+                                      focus_page,
+                                      focus_slot_nr);
+    samplebank_update_page_label();
+    samplebank_request_page_thumbnails(focus_page);
+
+    set_selection_of_slot_in_samplebank(FALSE);
+    info->selection_slot = focus_slot;
+    set_selection_of_slot_in_samplebank(TRUE);
+    samplebank_update_offline_recorder_gadget();
+
+    if(!focus_slot->pixbuf)
+        sample_preview_collect_slot(focus_slot);
+
+    gtk_widget_grab_focus(info->sample_bank_view);
+
+    vj_msg(VEEJAY_MSG_DEBUG,
+           "Focused newly added sample %d at bank %d slot %d",
+           focus_slot->sample_id,
+           focus_page + 1,
+           focus_slot_nr + 1);
+}
+
+static void samplebank_restore_previews(GHashTable *snapshot)
+{
+    gboolean cache_ready;
+
+    if(!snapshot || !info || !info->sample_banks)
+        return;
+
+    sample_preview_cache_sync_state();
+    cache_ready = sample_preview_cache &&
+                  gvr_preview_cache_get_state_hash(sample_preview_cache);
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+            sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+            GdkPixbuf *pixbuf;
+            char key[64];
+
+            if(!slot || slot->sample_id <= 0)
+                continue;
+
+            g_snprintf(key,
+                       sizeof(key),
+                       "%d:%d",
+                       slot->sample_id,
+                       slot->sample_type);
+            pixbuf = g_hash_table_lookup(snapshot, key);
+            if(!pixbuf)
+                continue;
+
+            samplebank_clear_slot_pixbuf(slot);
+            slot->pixbuf = g_object_ref(pixbuf);
+
+            if(cache_ready && slot->sample_type == 0) {
+                int absolute_slot = page * NUM_SAMPLES_PER_PAGE + slot_nr;
+                gvr_preview_cache_put(sample_preview_cache,
+                                      absolute_slot,
+                                      slot->pixbuf);
+            }
+
+            if(info->sample_bank_view)
+                gvr_sample_bank_view_set_thumbnail(info->sample_bank_view,
+                                                   page,
+                                                   slot_nr,
+                                                   slot->pixbuf);
+        }
+    }
+}
+
 static void load_samplelist_info(void)
 {
     gint offset = 0;
+    gboolean inventory_was_ready = samplebank_ready_ ? TRUE : FALSE;
+    GHashTable *preview_snapshot = samplebank_snapshot_previews();
+    GHashTable *sample_id_snapshot = samplebank_snapshot_sample_ids();
 
+    samplebank_ready_ = 0;
     reset_tree("cali_sourcetree");
     reset_tree("tree_sources");
     reset_samplebank();
@@ -12865,6 +13106,7 @@ static void load_samplelist_info(void)
     multi_vims(VIMS_SAMPLE_LIST, "%d", 0);
     gint fxlen = 0;
     gchar *fxtext = recv_vims(8, &fxlen);
+    sample_preview_cache_set_samplelist_payload(fxtext, fxlen);
 
     if(fxlen > 0 && fxtext != NULL)
     {
@@ -13006,10 +13248,19 @@ static void load_samplelist_info(void)
     if(fxtext)
         free(fxtext);
 
-    select_slot(info->status_tokens[PLAY_MODE]);
     samplebank_ready_ = 1;
+    samplebank_restore_previews(preview_snapshot);
+    if(preview_snapshot)
+        g_hash_table_destroy(preview_snapshot);
+
+    select_slot(info->status_tokens[PLAY_MODE]);
+    sample_preview_plain_new_bind_samples(sample_id_snapshot);
+    sample_preview_cache_apply_all();
+    samplebank_focus_new_sample(sample_id_snapshot,
+                                inventory_was_ready);
+    if(sample_id_snapshot)
+        g_hash_table_destroy(sample_id_snapshot);
     samplebank_update_page_label();
-    samplebank_request_page_thumbnails(samplebank_get_page());
     sequence_vims_sync_target();
 
 }
@@ -14926,6 +15177,7 @@ static void edit_list_action_requested(GtkWidget *widget,
 
         case GVR_EDIT_LIST_ACTION_NEW_SAMPLE:
             if(edit_list_action_has_selection(in_frame, out_frame)) {
+                sample_preview_arm_plain_new_sample();
                 multi_vims(VIMS_SAMPLE_NEW, "%d %d", in_frame, out_frame);
                 edit_list_action_log("Created sample from", in_frame, out_frame);
                 info->uc.reload_hint[HINT_SLIST] = 1;
@@ -15262,6 +15514,7 @@ static void reload_editlist_contents(void)
 
     single_vims(VIMS_EDITLIST_LIST);
     eltext = recv_vims(6, &len);
+    sample_preview_cache_set_editlist_payload(eltext, len);
     if(!eltext || len <= 0) {
         gvr_edit_list_view_set_segments(info->edit_list_view, NULL, 0, 0);
         gvr_edit_list_view_set_sample(info->edit_list_view,
@@ -18584,17 +18837,30 @@ static void update_globalinfo(int *history, int pm, int last_pm)
         select_slot( info->status_tokens[PLAY_MODE] );
     }
 
-    if( info->status_tokens[TOTAL_SLOTS] != history[TOTAL_SLOTS] && samplebank_ready_)
+    if(samplebank_ready_)
     {
-        int n_streams = 0;
-        if( pm == MODE_PLAIN || pm == MODE_SAMPLE ) {
-            n_streams = info->status_tokens[SAMPLE_INV_COUNT];
+        int sample_count = 0;
+        int stream_count = 0;
+        int old_sample_count = 0;
+        int old_stream_count = 0;
+
+        ui_sample_inventory_counts(info->status_tokens,
+                                   pm,
+                                   &sample_count,
+                                   &stream_count);
+        ui_sample_inventory_counts(history,
+                                   last_pm,
+                                   &old_sample_count,
+                                   &old_stream_count);
+
+        if(sample_count != old_sample_count ||
+           stream_count != old_stream_count) {
+            info->uc.reload_hint[HINT_SLIST] = 1;
+            update_spin_range2(widget_cache[WIDGET_BUFFEREDSTREAMID],
+                               1,
+                               stream_count,
+                               info->status_tokens[CURRENT_ID]);
         }
-        else {
-            n_streams = info->status_tokens[SAMPLE_COUNT];
-        }
-        info->uc.reload_hint[HINT_SLIST] = 1;
-        update_spin_range2( widget_cache[WIDGET_BUFFEREDSTREAMID], 1, n_streams, info->status_tokens[CURRENT_ID] );
     }
 
     if(source_changed || info->status_tokens[SAMPLE_LOOP_STAT_STOP] != history[SAMPLE_LOOP_STAT_STOP]) {
@@ -19928,32 +20194,40 @@ int vj_gui_sleep_time( void )
 
 int vj_img_cb(GdkPixbuf *img)
 {
-    if(!img || info->status_tokens[PLAY_MODE] == MODE_PLAIN)
+    sample_slot_t *slot;
+    int sample_id;
+    int sample_type;
+    int pm;
+    int page = -1;
+    int slot_nr = -1;
+
+    if(!img || !user_preview || !samplebank_ready_)
         return 0;
 
-    int sample_id = info->status_tokens[CURRENT_ID];
-    int pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
-    int sample_type = (pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE]);
-    sample_slot_t *slot = info->selected_slot;
+    pm = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
+    if(pm == MODE_PLAIN) {
+        sample_preview_plain_new_capture_frame(img);
+        return 0;
+    }
+
+    sample_id = info->status_tokens[CURRENT_ID];
+    sample_type = pm == MODE_SAMPLE ? 0 : info->status_tokens[STREAM_TYPE];
+    slot = info->selected_slot;
 
     if(!slot || slot->sample_id != sample_id || slot->sample_type != sample_type)
         slot = find_slot_by_sample(sample_id, sample_type);
-
     if(!slot)
         return 0;
 
-    int page = -1;
-    int slot_nr = -1;
-    if(samplebank_locate_slot(slot, &page, &slot_nr)) {
-        samplebank_clear_slot_pixbuf(slot);
-        slot->pixbuf = gdk_pixbuf_copy(img);
+    if(!samplebank_locate_slot(slot, &page, &slot_nr))
+        return slot->pixbuf ? 1 : 0;
 
-        if(info->sample_bank_view)
-            gvr_sample_bank_view_set_thumbnail(info->sample_bank_view, page, slot_nr, img);
-        return 1;
-    }
-
-    return 0;
+    sample_preview_capture_live_frame(img,
+                                      slot,
+                                      sample_type,
+                                      page,
+                                      slot_nr);
+    return slot->pixbuf ? 1 : 0;
 }
 
 void vj_gui_cb(int state, char *hostname, int port_num)
@@ -23507,6 +23781,8 @@ void gveejay_preview( int p )
     user_preview = p;
 
     if(!user_preview) {
+        sample_preview_cancel_requests();
+        sample_preview_plain_new_clear();
         preview_clear_live_pixbuf();
         if(widget_cache[WIDGET_IMAGEA]) {
             gtk_widget_set_size_request(widget_cache[WIDGET_IMAGEA], preview_base_w_, preview_base_h_);
@@ -23565,6 +23841,8 @@ int vj_gui_reconnect(char *hostname,char *group_name, int port_num)
     veejay_msg(VEEJAY_MSG_INFO,
                "Connection established with %s:%d (Track 0)",
                hostname,port_num);
+
+    sample_preview_cache_connect(hostname ? hostname : group_name, port_num);
 
     info->status_lock = 1;
     info->parameter_lock = 1;
@@ -23805,6 +24083,7 @@ static void vj_gui_disconnect_internal(int restart_schedule, int keep_multitrack
 {
     const int quitting = (info->watch.state == STATE_QUIT);
 
+    sample_preview_cache_disconnect();
     preview_clear_live_pixbuf();
     if(widget_cache[WIDGET_IMAGEA])
         gtk_widget_queue_draw(widget_cache[WIDGET_IMAGEA]);
@@ -25356,6 +25635,554 @@ static gboolean samplebank_slot_is_stream(sample_slot_t *slot)
     return slot && slot->sample_id > 0 && slot->sample_type != 0;
 }
 
+static void sample_preview_cancel_requests(void)
+{
+    sample_preview_live_id = -1;
+    sample_preview_live_type = -1;
+    sample_preview_next_live_capture = 0;
+    sample_preview_next_cache_capture = 0;
+}
+
+static void sample_preview_cache_disconnect(void)
+{
+    sample_preview_cancel_requests();
+    sample_preview_plain_new_clear();
+
+    if(sample_preview_cache) {
+        gvr_preview_cache_free(sample_preview_cache);
+        sample_preview_cache = NULL;
+    }
+
+    sample_preview_editlist_hash[0] = '\0';
+    sample_preview_samplelist_hash[0] = '\0';
+    sample_preview_have_editlist_hash = FALSE;
+    sample_preview_have_samplelist_hash = FALSE;
+}
+
+static void sample_preview_cache_connect(const char *host, int port)
+{
+    sample_preview_cache_disconnect();
+    sample_preview_cache = gvr_preview_cache_new(host,
+                                                 port,
+                                                 SAMPLE_PREVIEW_WIDTH,
+                                                 SAMPLE_PREVIEW_HEIGHT,
+                                                 NUM_BANKS * NUM_SAMPLES_PER_PAGE);
+
+    if(sample_preview_cache)
+        vj_msg(VEEJAY_MSG_INFO,
+               "Sample preview cache: %s",
+               gvr_preview_cache_get_directory(sample_preview_cache));
+}
+
+static void sample_preview_hash_payload(char hash[65],
+                                        gboolean *available,
+                                        const char *data,
+                                        int len)
+{
+    static const guchar empty = 0;
+    const guchar *bytes = data && len > 0 ? (const guchar *)data : &empty;
+    gsize size = data && len > 0 ? (gsize)len : 0;
+    char *digest = g_compute_checksum_for_data(G_CHECKSUM_SHA256, bytes, size);
+
+    if(digest) {
+        g_strlcpy(hash, digest, 65);
+        *available = TRUE;
+        g_free(digest);
+    }
+}
+
+static void sample_preview_clear_sample_pixbufs(void)
+{
+    if(!info || !info->sample_banks)
+        return;
+
+    if(info->sample_bank_view)
+        gvr_sample_bank_view_clear_all(info->sample_bank_view);
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+            sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+
+            if(!slot)
+                continue;
+
+            samplebank_clear_slot_pixbuf(slot);
+            if(info->sample_bank_view && slot->sample_id > 0)
+                gvr_sample_bank_view_set_slot(info->sample_bank_view,
+                                              page,
+                                              slot_nr,
+                                              slot->sample_id,
+                                              slot->sample_type,
+                                              slot->title,
+                                              slot->timecode);
+        }
+    }
+
+    if(info->selection_slot)
+        set_selection_of_slot_in_samplebank(TRUE);
+    select_slot(info->status_tokens[PLAY_MODE]);
+}
+
+static gboolean sample_preview_cache_sync_state(void)
+{
+    if(!sample_preview_cache ||
+       !sample_preview_have_editlist_hash ||
+       !sample_preview_have_samplelist_hash)
+        return FALSE;
+
+    return gvr_preview_cache_set_state(sample_preview_cache,
+                                       sample_preview_editlist_hash,
+                                       sample_preview_samplelist_hash);
+}
+
+static void sample_preview_cache_state_changed(gboolean clear_slot_images)
+{
+    sample_preview_cancel_requests();
+
+    if(clear_slot_images)
+        sample_preview_clear_sample_pixbufs();
+
+    if(samplebank_ready_)
+        sample_preview_cache_apply_all();
+}
+
+static void sample_preview_cache_set_editlist_payload(const char *data, int len)
+{
+    sample_preview_hash_payload(sample_preview_editlist_hash,
+                                &sample_preview_have_editlist_hash,
+                                data,
+                                len);
+    if(sample_preview_cache_sync_state())
+        sample_preview_cache_state_changed(FALSE);
+}
+
+static void sample_preview_cache_set_samplelist_payload(const char *data, int len)
+{
+    sample_preview_hash_payload(sample_preview_samplelist_hash,
+                                &sample_preview_have_samplelist_hash,
+                                data,
+                                len);
+    if(sample_preview_cache_sync_state())
+        sample_preview_cache_state_changed(TRUE);
+}
+
+static gboolean sample_preview_apply_cached_slot(int page, int slot_nr)
+{
+    sample_slot_t *slot;
+    GdkPixbuf *cached;
+    int absolute_slot;
+
+    if(!sample_preview_cache || !info || !info->sample_banks ||
+       page < 0 || page >= NUM_BANKS || !info->sample_banks[page] ||
+       slot_nr < 0 || slot_nr >= NUM_SAMPLES_PER_PAGE)
+        return FALSE;
+
+    slot = info->sample_banks[page]->slot[slot_nr];
+    if(!slot || slot->sample_id <= 0 || slot->sample_type != 0)
+        return FALSE;
+
+    if(slot->pixbuf)
+        return TRUE;
+
+    absolute_slot = page * NUM_SAMPLES_PER_PAGE + slot_nr;
+    cached = gvr_preview_cache_get(sample_preview_cache, absolute_slot);
+    if(!cached)
+        return FALSE;
+
+    slot->pixbuf = cached;
+    if(info->sample_bank_view)
+        gvr_sample_bank_view_set_thumbnail(info->sample_bank_view,
+                                           page,
+                                           slot_nr,
+                                           slot->pixbuf);
+    return TRUE;
+}
+
+static void sample_preview_collect_slot(sample_slot_t *slot)
+{
+    int page = -1;
+    int slot_nr = -1;
+
+    if(!samplebank_ready_ || !slot || slot->sample_id <= 0 ||
+       slot->sample_type != 0 || disable_sample_image ||
+       !gveejay_user_preview())
+        return;
+
+    if(!samplebank_locate_slot(slot, &page, &slot_nr))
+        return;
+
+    if(sample_preview_apply_cached_slot(page, slot_nr))
+        return;
+
+    veejay_get_sample_image(slot->sample_id,
+                            slot->sample_type,
+                            SAMPLE_PREVIEW_WIDTH,
+                            SAMPLE_PREVIEW_HEIGHT);
+}
+
+static GdkPixbuf *sample_preview_make_tile(GdkPixbuf *source)
+{
+    GdkPixbuf *tile;
+    GdkPixbuf *scaled;
+    int sw;
+    int sh;
+    int dw = SAMPLE_PREVIEW_WIDTH;
+    int dh = SAMPLE_PREVIEW_HEIGHT;
+    int x;
+    int y;
+
+    if(!source)
+        return NULL;
+
+    sw = gdk_pixbuf_get_width(source);
+    sh = gdk_pixbuf_get_height(source);
+    if(sw <= 0 || sh <= 0)
+        return NULL;
+
+    if((gint64)sw * SAMPLE_PREVIEW_HEIGHT >
+       (gint64)sh * SAMPLE_PREVIEW_WIDTH)
+        dh = MAX(1, (sh * SAMPLE_PREVIEW_WIDTH) / sw);
+    else
+        dw = MAX(1, (sw * SAMPLE_PREVIEW_HEIGHT) / sh);
+
+    scaled = gdk_pixbuf_scale_simple(source, dw, dh, GDK_INTERP_BILINEAR);
+    if(!scaled)
+        return NULL;
+
+    tile = gdk_pixbuf_new(GDK_COLORSPACE_RGB,
+                          FALSE,
+                          8,
+                          SAMPLE_PREVIEW_WIDTH,
+                          SAMPLE_PREVIEW_HEIGHT);
+    if(!tile) {
+        g_object_unref(scaled);
+        return NULL;
+    }
+
+    gdk_pixbuf_fill(tile, 0x101116ff);
+    x = (SAMPLE_PREVIEW_WIDTH - dw) / 2;
+    y = (SAMPLE_PREVIEW_HEIGHT - dh) / 2;
+    gdk_pixbuf_copy_area(scaled, 0, 0, dw, dh, tile, x, y);
+    g_object_unref(scaled);
+    return tile;
+}
+
+static gboolean sample_preview_assign_tile(sample_slot_t *slot,
+                                           int page,
+                                           int slot_nr,
+                                           GdkPixbuf *tile,
+                                           gboolean persist)
+{
+    GdkPixbuf *stored = NULL;
+    int absolute_slot;
+
+    if(!slot || !tile || page < 0 || page >= NUM_BANKS ||
+       slot_nr < 0 || slot_nr >= NUM_SAMPLES_PER_PAGE)
+        return FALSE;
+
+    absolute_slot = page * NUM_SAMPLES_PER_PAGE + slot_nr;
+    if(persist && slot->sample_type == 0 && sample_preview_cache) {
+        sample_preview_cache_sync_state();
+        if(gvr_preview_cache_get_state_hash(sample_preview_cache)) {
+            gvr_preview_cache_put(sample_preview_cache,
+                                  absolute_slot,
+                                  tile);
+            stored = gvr_preview_cache_get(sample_preview_cache,
+                                           absolute_slot);
+        }
+    }
+
+    samplebank_clear_slot_pixbuf(slot);
+    slot->pixbuf = stored ? stored : g_object_ref(tile);
+
+    if(info->sample_bank_view)
+        gvr_sample_bank_view_set_thumbnail(info->sample_bank_view,
+                                           page,
+                                           slot_nr,
+                                           slot->pixbuf);
+    return TRUE;
+}
+
+static void sample_preview_capture_live_frame(GdkPixbuf *pixbuf,
+                                              sample_slot_t *slot,
+                                              int sample_type,
+                                              int bank_page,
+                                              int slot_nr)
+{
+    GdkPixbuf *tile;
+    gint64 now;
+    int sample_id;
+    gboolean persist = FALSE;
+
+    if(!samplebank_ready_ || disable_sample_image || !user_preview ||
+       !pixbuf || !slot || bank_page < 0 || bank_page >= NUM_BANKS ||
+       slot_nr < 0 || slot_nr >= NUM_SAMPLES_PER_PAGE)
+        return;
+
+    sample_id = slot->sample_id;
+    if(sample_id <= 0)
+        return;
+
+    now = g_get_monotonic_time();
+    if(sample_preview_live_id != sample_id ||
+       sample_preview_live_type != sample_type) {
+        sample_preview_live_id = sample_id;
+        sample_preview_live_type = sample_type;
+        sample_preview_next_live_capture = 0;
+        sample_preview_next_cache_capture = 0;
+    }
+
+    if(sample_preview_next_live_capture > now)
+        return;
+
+    sample_preview_next_live_capture = now + SAMPLE_PREVIEW_LIVE_REFRESH_USEC;
+    tile = sample_preview_make_tile(pixbuf);
+    if(!tile)
+        return;
+
+    if(sample_type == 0 && sample_preview_cache &&
+       sample_preview_next_cache_capture <= now) {
+        persist = TRUE;
+        sample_preview_next_cache_capture =
+            now + SAMPLE_PREVIEW_CACHE_REFRESH_USEC;
+    }
+
+    sample_preview_assign_tile(slot,
+                               bank_page,
+                               slot_nr,
+                               tile,
+                               persist);
+    g_object_unref(tile);
+}
+
+static void sample_preview_plain_new_request_free(sample_preview_plain_new_t *request)
+{
+    if(!request)
+        return;
+
+    if(request->tile)
+        g_object_unref(request->tile);
+    g_free(request);
+}
+
+static void sample_preview_plain_new_prune_expired(void)
+{
+    GList *link;
+    gint64 now;
+
+    if(!sample_preview_plain_new_queue)
+        return;
+
+    now = g_get_monotonic_time();
+    link = sample_preview_plain_new_queue->head;
+    while(link) {
+        GList *next = link->next;
+        sample_preview_plain_new_t *request = link->data;
+
+        if(request->expires_at <= now) {
+            g_queue_delete_link(sample_preview_plain_new_queue, link);
+            sample_preview_plain_new_request_free(request);
+        }
+        link = next;
+    }
+
+    if(g_queue_is_empty(sample_preview_plain_new_queue)) {
+        g_queue_free(sample_preview_plain_new_queue);
+        sample_preview_plain_new_queue = NULL;
+    }
+}
+
+static void sample_preview_plain_new_clear(void)
+{
+    if(!sample_preview_plain_new_queue)
+        return;
+
+    while(!g_queue_is_empty(sample_preview_plain_new_queue))
+        sample_preview_plain_new_request_free(
+            g_queue_pop_head(sample_preview_plain_new_queue));
+
+    g_queue_free(sample_preview_plain_new_queue);
+    sample_preview_plain_new_queue = NULL;
+}
+
+void sample_preview_arm_plain_new_sample(void)
+{
+    sample_preview_plain_new_t *request;
+
+    if(!info || disable_sample_image || !user_preview ||
+       ui_playmode_effective(info->status_tokens[PLAY_MODE]) != MODE_PLAIN)
+        return;
+
+    sample_preview_plain_new_prune_expired();
+    if(!sample_preview_plain_new_queue)
+        sample_preview_plain_new_queue = g_queue_new();
+
+    request = g_new0(sample_preview_plain_new_t, 1);
+    request->sample_id = -1;
+    request->expires_at = g_get_monotonic_time() +
+                          SAMPLE_PREVIEW_PLAIN_NEW_TIMEOUT_USEC;
+    if(preview_has_live_frame_ && preview_live_pixbuf_)
+        request->tile = sample_preview_make_tile(preview_live_pixbuf_);
+    g_queue_push_tail(sample_preview_plain_new_queue, request);
+
+    while(g_queue_get_length(sample_preview_plain_new_queue) > 16)
+        sample_preview_plain_new_request_free(
+            g_queue_pop_head(sample_preview_plain_new_queue));
+}
+
+static gboolean sample_preview_plain_new_assign(int sample_id,
+                                                GdkPixbuf *tile)
+{
+    sample_slot_t *slot;
+    int page = -1;
+    int slot_nr = -1;
+
+    if(sample_id <= 0 || !tile || !samplebank_ready_)
+        return FALSE;
+
+    slot = find_slot_by_sample(sample_id, 0);
+    if(!slot || !samplebank_locate_slot(slot, &page, &slot_nr))
+        return FALSE;
+
+    return sample_preview_assign_tile(slot,
+                                      page,
+                                      slot_nr,
+                                      tile,
+                                      TRUE);
+}
+
+static void sample_preview_plain_new_apply_ready(void)
+{
+    GList *link;
+
+    if(!sample_preview_plain_new_queue)
+        return;
+
+    link = sample_preview_plain_new_queue->head;
+    while(link) {
+        GList *next = link->next;
+        sample_preview_plain_new_t *request = link->data;
+
+        if(request->sample_id > 0 && request->tile &&
+           sample_preview_plain_new_assign(request->sample_id,
+                                           request->tile)) {
+            g_queue_delete_link(sample_preview_plain_new_queue, link);
+            sample_preview_plain_new_request_free(request);
+        }
+        link = next;
+    }
+
+    if(g_queue_is_empty(sample_preview_plain_new_queue)) {
+        g_queue_free(sample_preview_plain_new_queue);
+        sample_preview_plain_new_queue = NULL;
+    }
+}
+
+static void sample_preview_plain_new_capture_frame(GdkPixbuf *pixbuf)
+{
+    GList *link;
+
+    sample_preview_plain_new_prune_expired();
+    if(!pixbuf || !sample_preview_plain_new_queue)
+        return;
+
+    for(link = sample_preview_plain_new_queue->head; link; link = link->next) {
+        sample_preview_plain_new_t *request = link->data;
+
+        if(!request->tile) {
+            request->tile = sample_preview_make_tile(pixbuf);
+            break;
+        }
+    }
+
+    sample_preview_plain_new_apply_ready();
+}
+
+static gboolean sample_preview_plain_new_has_sample_id(int sample_id)
+{
+    GList *link;
+
+    if(!sample_preview_plain_new_queue)
+        return FALSE;
+
+    for(link = sample_preview_plain_new_queue->head; link; link = link->next) {
+        sample_preview_plain_new_t *request = link->data;
+        if(request->sample_id == sample_id)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static sample_preview_plain_new_t *sample_preview_plain_new_next_unbound(void)
+{
+    GList *link;
+
+    if(!sample_preview_plain_new_queue)
+        return NULL;
+
+    for(link = sample_preview_plain_new_queue->head; link; link = link->next) {
+        sample_preview_plain_new_t *request = link->data;
+        if(request->sample_id <= 0)
+            return request;
+    }
+    return NULL;
+}
+
+static void sample_preview_plain_new_bind_samples(GHashTable *previous_ids)
+{
+    sample_preview_plain_new_prune_expired();
+    if(!sample_preview_plain_new_queue || !info || !info->sample_banks)
+        return;
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
+            sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
+            sample_preview_plain_new_t *request;
+
+            if(!slot || slot->sample_type != 0 || slot->sample_id <= 0)
+                continue;
+            if(previous_ids &&
+               g_hash_table_contains(previous_ids,
+                                     GINT_TO_POINTER(slot->sample_id)))
+                continue;
+            if(sample_preview_plain_new_has_sample_id(slot->sample_id))
+                continue;
+
+            request = sample_preview_plain_new_next_unbound();
+            if(!request)
+                goto done;
+            request->sample_id = slot->sample_id;
+            if(!request->tile && preview_has_live_frame_ && preview_live_pixbuf_)
+                request->tile = sample_preview_make_tile(preview_live_pixbuf_);
+        }
+    }
+
+done:
+    sample_preview_plain_new_apply_ready();
+}
+
+static void sample_preview_cache_apply_all(void)
+{
+    if(!samplebank_ready_ || disable_sample_image || !sample_preview_cache ||
+       !info || !info->sample_banks)
+        return;
+
+    sample_preview_cache_sync_state();
+
+    for(int page = 0; page < NUM_BANKS; page++) {
+        if(!info->sample_banks[page])
+            continue;
+        for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++)
+            sample_preview_apply_cached_slot(page, slot_nr);
+    }
+}
+
 static void samplebank_update_offline_recorder_gadget(void)
 {
     gboolean stream_selected = FALSE;
@@ -25390,7 +26217,8 @@ static void samplebank_update_page_label(void)
     first = page * NUM_SAMPLES_PER_PAGE + 1;
     last = first + NUM_SAMPLES_PER_PAGE - 1;
 
-    snprintf(text, sizeof(text), "Bank %d/%d · slots %d-%d", page + 1, NUM_BANKS, first, last);
+    snprintf(text, sizeof(text), "Bank %d/%d · slots %d-%d",
+             page + 1, NUM_BANKS, first, last);
     gtk_label_set_text(GTK_LABEL(w), text);
 }
 
@@ -25405,10 +26233,17 @@ static void samplebank_request_page_thumbnails(int page)
     for(int slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE; slot_nr++) {
         sample_slot_t *slot = info->sample_banks[page]->slot[slot_nr];
 
-        if(!slot || slot->sample_id <= 0 || !slot->pixbuf)
+        if(!slot || slot->sample_id <= 0)
             continue;
 
-        gvr_sample_bank_view_set_thumbnail(info->sample_bank_view, page, slot_nr, slot->pixbuf);
+        if(!slot->pixbuf && slot->sample_type == 0)
+            sample_preview_apply_cached_slot(page, slot_nr);
+
+        if(slot->pixbuf)
+            gvr_sample_bank_view_set_thumbnail(info->sample_bank_view,
+                                               page,
+                                               slot_nr,
+                                               slot->pixbuf);
     }
 }
 
@@ -25458,6 +26293,9 @@ static void samplebank_select_model_slot(int page, int slot_nr, gboolean activat
 
     if(!slot || slot->sample_id <= 0)
         return;
+
+    if(!mix && !activate)
+        sample_preview_collect_slot(slot);
 
     if(mix) {
         multi_vims(VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
