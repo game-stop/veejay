@@ -502,20 +502,6 @@ static void gvr_pattern_loop_clamp(GvrVimsPatternCell *cell,
     }
 }
 
-static int gvr_pattern_loop_map_frame(const GvrVimsPatternCell *cell,
-                                      int frame)
-{
-    gint64 length;
-    gint64 offset;
-
-    if(!gvr_pattern_loop_valid(cell) || frame <= cell->loop_end)
-        return frame;
-
-    length = (gint64)cell->loop_end - cell->loop_start + 1;
-    offset = (gint64)frame - cell->loop_start;
-    return cell->loop_start + (int)(offset % length);
-}
-
 static const char *gvr_pattern_learn_policy_name(int policy)
 {
     switch(policy) {
@@ -650,11 +636,8 @@ static void gvr_pattern_clear_fired_highlight_for(
 {
     if(view &&
        view->last_fired_bank == bank &&
-       view->last_fired_slot == slot) {
+       view->last_fired_slot == slot)
         gvr_pattern_clear_fired_highlight(view);
-        if(view->area && gtk_widget_get_mapped(view->area))
-            gtk_widget_queue_draw(view->area);
-    }
 }
 
 static void gvr_pattern_emit_changed(GvrVimsPatternView *view, int bank, int slot)
@@ -2616,31 +2599,22 @@ static void gvr_pattern_set_cursor_row(GvrVimsPatternView *view,
                                        int column)
 {
     const int display_rows = gvr_pattern_display_row_count(view);
-    int next_column = gvr_pattern_clampi(column,
-                                         0,
-                                         GVR_VIMS_PATTERN_COLUMNS - 1);
-    int next_row = display_rows > 0 ?
-                   gvr_pattern_clampi(row, 0, display_rows - 1) : 0;
 
-    if(view->selected_row == next_row &&
-       view->selected_column == next_column)
-        return;
-
-    view->selected_column = next_column;
+    view->selected_column = gvr_pattern_clampi(column,
+                                                0,
+                                                GVR_VIMS_PATTERN_COLUMNS - 1);
 
     if(display_rows <= 0) {
         view->selected_row = 0;
         gvr_pattern_update_adjustment(view);
-        if(view->area && gtk_widget_get_mapped(view->area))
-            gtk_widget_queue_draw(view->area);
+        gtk_widget_queue_draw(view->area);
         return;
     }
 
-    view->selected_row = next_row;
+    view->selected_row = gvr_pattern_clampi(row, 0, display_rows - 1);
     gvr_pattern_update_adjustment(view);
     gvr_pattern_scroll_to_cursor(view);
-    if(view->area && gtk_widget_get_mapped(view->area))
-        gtk_widget_queue_draw(view->area);
+    gtk_widget_queue_draw(view->area);
 }
 
 static void gvr_pattern_set_cursor(GvrVimsPatternView *view,
@@ -2658,13 +2632,12 @@ static int gvr_pattern_current_frame(GvrVimsPatternView *view)
 }
 
 static int gvr_pattern_follow_frame(GvrVimsPatternView *view,
-                                    GvrVimsPatternCell *cell,
                                     int live_frame)
 {
     int frame;
     int step;
 
-    frame = gvr_pattern_loop_map_frame(cell, MAX(0, live_frame));
+    frame = MAX(0, live_frame);
     frame = gvr_pattern_clampi(frame, 0, GVR_PATTERN_MAX_FRAMES - 1);
     step = gvr_pattern_edit_step(view);
 
@@ -4116,8 +4089,7 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
             view->live_slot == view->selected_slot &&
             gvr_pattern_frame_to_display_row(
                 view,
-                gvr_pattern_loop_map_frame(cell,
-                                           view->live_frame)) ==
+                view->live_frame) ==
             display_row;
         GvrVimsPatternRow *pattern_row =
             cell ? gvr_pattern_row_get(cell, frame, FALSE) : NULL;
@@ -5897,11 +5869,7 @@ static void gvr_pattern_follow_toggled(GtkToggleButton *button, gpointer user_da
        view->live_slot == view->selected_slot)
         gvr_pattern_set_cursor(
             view,
-            gvr_pattern_loop_map_frame(
-                gvr_pattern_cell_lookup(view,
-                                        view->live_bank,
-                                        view->live_slot),
-                view->live_frame),
+            view->live_frame,
             view->selected_column);
 }
 
@@ -5916,11 +5884,7 @@ static void gvr_pattern_learn_toggled(GtkToggleButton *button, gpointer user_dat
        view->live_slot == view->selected_slot)
         gvr_pattern_set_cursor(
             view,
-            gvr_pattern_loop_map_frame(
-                gvr_pattern_cell_lookup(view,
-                                        view->live_bank,
-                                        view->live_slot),
-                view->live_frame),
+            view->live_frame,
             view->selected_column);
 }
 
@@ -6331,7 +6295,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
         "vims-pattern-loop-toggle");
     gtk_widget_set_tooltip_text(
         view->loop_toggle,
-        "Enable or disable the stored VIMS pattern loop range for the current target. The media itself is not looped; the VIMS pattern repeats over playback.");
+        "Enable or disable the stored VIMS pattern loop range for the current target. Playback remains backend-authoritative; the editor follows the reported frame without remapping or seeking.");
     g_signal_connect(view->loop_toggle,
                      "toggled",
                      G_CALLBACK(gvr_pattern_loop_toggled),
@@ -7045,28 +7009,15 @@ void gvr_vims_pattern_view_set_live_position(GtkWidget *widget,
                                              gboolean active)
 {
     GvrVimsPatternView *view;
-    int next_frame;
-    gboolean next_active;
-    gboolean changed;
 
     if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
         return;
 
     view = GVR_VIMS_PATTERN_VIEW(widget);
-    next_frame = MAX(0, frame);
-    next_active = active ? TRUE : FALSE;
-    changed = view->live_bank != bank ||
-              view->live_slot != slot ||
-              view->live_frame != next_frame ||
-              view->live_active != next_active;
-
-    if(!changed)
-        return;
-
     view->live_bank = bank;
     view->live_slot = slot;
-    view->live_frame = next_frame;
-    view->live_active = next_active;
+    view->live_frame = MAX(0, frame);
+    view->live_active = active ? TRUE : FALSE;
 
     if(view->live_active &&
        bank == view->selected_bank &&
@@ -7075,10 +7026,9 @@ void gvr_vims_pattern_view_set_live_position(GtkWidget *widget,
         gvr_pattern_set_cursor(view,
                                gvr_pattern_follow_frame(
                                    view,
-                                   gvr_pattern_cell_lookup(view, bank, slot),
                                    view->live_frame),
                                view->selected_column);
-    else if(view->area && gtk_widget_get_mapped(view->area))
+    else
         gtk_widget_queue_draw(view->area);
 }
 
@@ -7388,7 +7338,7 @@ gboolean gvr_vims_pattern_view_capture_message(GtkWidget *widget,
        view->live_bank == view->selected_bank &&
        view->live_slot == view->selected_slot)
     {
-        frame = gvr_pattern_follow_frame(view, cell, live_frame);
+        frame = gvr_pattern_follow_frame(view, live_frame);
         gvr_pattern_set_cursor(view, frame, view->selected_column);
     }
     else {
@@ -7590,55 +7540,23 @@ gboolean gvr_vims_pattern_view_capture_message(GtkWidget *widget,
 }
 
 typedef struct {
-    GvrVimsPatternView *view;
     int from;
     int to;
-    gboolean reverse;
-    GvrVimsPatternRow *row;
-    guint mask;
+    GPtrArray *rows;
 } GvrPatternFireRange;
 
-static guint gvr_pattern_fired_mask(GvrVimsPatternView *view,
-                                    GvrVimsPatternRow *row)
-{
-    guint mask = 0;
-
-    if(!view || !row)
-        return 0;
-
-    for(int column = 0; column < GVR_VIMS_PATTERN_COLUMNS; column++) {
-        if((view->enabled_columns_mask & (1u << column)) &&
-           row->events[column].message)
-            mask |= 1u << column;
-    }
-
-    return mask;
-}
-
-static gboolean gvr_pattern_collect_fire_row(gpointer key,
-                                             gpointer value,
-                                             gpointer data)
+static gboolean gvr_pattern_collect_fire_rows(gpointer key, gpointer value, gpointer data)
 {
     GvrPatternFireRange *range = data;
-    GvrVimsPatternRow *row = value;
     int frame = GPOINTER_TO_INT(key) - 1;
-    guint mask;
 
     if(frame > range->to)
         return TRUE;
-    if(frame < range->from)
-        return FALSE;
 
-    mask = gvr_pattern_fired_mask(range->view, row);
-    if(!mask)
-        return FALSE;
+    if(frame >= range->from && frame <= range->to)
+        g_ptr_array_add(range->rows, value);
 
-    if(!range->reverse || !range->row) {
-        range->row = row;
-        range->mask = mask;
-    }
-
-    return range->reverse && range->row != NULL;
+    return FALSE;
 }
 
 static void gvr_pattern_fire_range(GvrVimsPatternView *view,
@@ -7649,71 +7567,61 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
                                    gboolean reverse)
 {
     GvrVimsPatternCell *cell = gvr_pattern_cell(view, bank, slot);
-    GvrVimsPatternRow *selected = NULL;
-    guint selected_mask = 0;
-    gint64 span;
+    GvrPatternFireRange range;
 
     if(!cell || !cell->rows || from > to)
         return;
 
-    span = (gint64)to - (gint64)from + 1;
-    if(span <= 4096) {
-        if(reverse) {
-            for(int frame = from; frame <= to; frame++) {
-                GvrVimsPatternRow *row =
-                    g_tree_lookup(cell->rows, GINT_TO_POINTER(frame + 1));
-                guint mask = gvr_pattern_fired_mask(view, row);
+    range.from = from;
+    range.to = to;
+    range.rows = g_ptr_array_new();
+    g_tree_foreach(cell->rows, gvr_pattern_collect_fire_rows, &range);
 
-                if(mask) {
-                    selected = row;
-                    selected_mask = mask;
-                    break;
+    if(reverse) {
+        for(int index = (int)range.rows->len - 1; index >= 0; index--) {
+            GvrVimsPatternRow *row = g_ptr_array_index(range.rows, index);
+            guint fired_mask = 0;
+
+            for(int column = 0; column < GVR_VIMS_PATTERN_COLUMNS; column++) {
+                if((view->enabled_columns_mask & (1u << column)) &&
+                   row->events[column].message)
+                {
+                    fired_mask |= 1u << column;
                 }
             }
-        }
-        else {
-            for(int frame = from; frame <= to; frame++) {
-                GvrVimsPatternRow *row =
-                    g_tree_lookup(cell->rows, GINT_TO_POINTER(frame + 1));
-                guint mask = gvr_pattern_fired_mask(view, row);
 
-                if(mask) {
-                    selected = row;
-                    selected_mask = mask;
-                }
+            if(fired_mask) {
+                view->last_fired_bank = bank;
+                view->last_fired_slot = slot;
+                view->last_fired_frame = row->frame;
+                view->last_fired_mask = fired_mask;
             }
         }
     }
     else {
-        GvrPatternFireRange range = {
-            view,
-            from,
-            to,
-            reverse ? TRUE : FALSE,
-            NULL,
-            0
-        };
+        for(guint index = 0; index < range.rows->len; index++) {
+            GvrVimsPatternRow *row = g_ptr_array_index(range.rows, index);
+            guint fired_mask = 0;
 
-        g_tree_foreach(cell->rows, gvr_pattern_collect_fire_row, &range);
-        selected = range.row;
-        selected_mask = range.mask;
+            for(int column = 0; column < GVR_VIMS_PATTERN_COLUMNS; column++) {
+                if((view->enabled_columns_mask & (1u << column)) &&
+                   row->events[column].message)
+                {
+                    fired_mask |= 1u << column;
+                }
+            }
+
+            if(fired_mask) {
+                view->last_fired_bank = bank;
+                view->last_fired_slot = slot;
+                view->last_fired_frame = row->frame;
+                view->last_fired_mask = fired_mask;
+            }
+        }
     }
 
-    if(!selected)
-        return;
-
-    if(view->last_fired_bank == bank &&
-       view->last_fired_slot == slot &&
-       view->last_fired_frame == selected->frame &&
-       view->last_fired_mask == selected_mask)
-        return;
-
-    view->last_fired_bank = bank;
-    view->last_fired_slot = slot;
-    view->last_fired_frame = selected->frame;
-    view->last_fired_mask = selected_mask;
-
-    if(view->area && gtk_widget_get_mapped(view->area))
+    g_ptr_array_free(range.rows, TRUE);
+    if(view->area)
         gtk_widget_queue_draw(view->area);
 }
 
@@ -7729,18 +7637,9 @@ void gvr_vims_pattern_view_set_transport(GtkWidget *widget,
         return;
 
     view = GVR_VIMS_PATTERN_VIEW(widget);
-    direction = direction < 0 ? -1 : direction > 0 ? 1 : 0;
-
-    if(view->transport_valid &&
-       view->transport_epoch == epoch &&
-       view->transport_direction == direction &&
-       view->transport_loop_type == loop_type &&
-       view->transport_loops_remaining == loops_remaining)
-        return;
-
     view->transport_valid = TRUE;
     view->transport_epoch = epoch;
-    view->transport_direction = direction;
+    view->transport_direction = direction < 0 ? -1 : direction > 0 ? 1 : 0;
     view->transport_loop_type = loop_type;
     view->transport_loops_remaining = loops_remaining;
 }
@@ -7754,12 +7653,10 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
 {
     GvrVimsPatternView *view;
     GvrVimsPatternPlaybackState *state;
-    GvrVimsPatternCell *cell;
     int frame;
     int source_delta;
     int mapped_delta;
     gboolean selected_target;
-    gboolean looped;
     gboolean transport_changed;
 
     if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
@@ -7793,9 +7690,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
         return;
     }
 
-    cell = gvr_pattern_cell(view, bank, slot);
-    frame = gvr_pattern_loop_map_frame(cell, source_frame);
-    looped = gvr_pattern_loop_valid(cell);
+    frame = source_frame;
 
     state = gvr_pattern_playback_state(view, bank, slot, TRUE);
     if(!state)
@@ -7875,40 +7770,6 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
         if(state->seeked_while_paused) {
             gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
         }
-        else if(looped && source_delta > 0 &&
-                source_delta <= max_linear_delta &&
-                frame < state->frame)
-        {
-            gvr_pattern_fire_range(view,
-                                   bank,
-                                   slot,
-                                   state->frame + 1,
-                                   cell->loop_end,
-                                   FALSE);
-            gvr_pattern_fire_range(view,
-                                   bank,
-                                   slot,
-                                   cell->loop_start,
-                                   frame,
-                                   FALSE);
-        }
-        else if(looped && source_delta < 0 &&
-                -source_delta <= max_linear_delta &&
-                frame > state->frame)
-        {
-            gvr_pattern_fire_range(view,
-                                   bank,
-                                   slot,
-                                   cell->loop_start,
-                                   state->frame - 1,
-                                   TRUE);
-            gvr_pattern_fire_range(view,
-                                   bank,
-                                   slot,
-                                   frame,
-                                   cell->loop_end,
-                                   TRUE);
-        }
         else if(mapped_delta > 0 && mapped_delta <= max_linear_delta) {
             gvr_pattern_fire_range(view,
                                    bank,
@@ -7951,41 +7812,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
     source_delta = source_frame - state->source_frame;
     mapped_delta = frame - state->frame;
 
-    if(looped && source_delta > 0 &&
-       source_delta <= max_linear_delta &&
-       frame < state->frame)
-    {
-        gvr_pattern_fire_range(view,
-                               bank,
-                               slot,
-                               state->frame + 1,
-                               cell->loop_end,
-                               FALSE);
-        gvr_pattern_fire_range(view,
-                               bank,
-                               slot,
-                               cell->loop_start,
-                               frame,
-                               FALSE);
-    }
-    else if(looped && source_delta < 0 &&
-            -source_delta <= max_linear_delta &&
-            frame > state->frame)
-    {
-        gvr_pattern_fire_range(view,
-                               bank,
-                               slot,
-                               cell->loop_start,
-                               state->frame - 1,
-                               TRUE);
-        gvr_pattern_fire_range(view,
-                               bank,
-                               slot,
-                               frame,
-                               cell->loop_end,
-                               TRUE);
-    }
-    else if(ABS(source_delta) <= max_linear_delta) {
+    if(ABS(source_delta) <= max_linear_delta) {
         if(mapped_delta > 0)
             gvr_pattern_fire_range(view,
                                    bank,
@@ -8046,20 +7873,13 @@ void gvr_vims_pattern_view_stop_all_playback(GtkWidget *widget)
         return;
 
     view = GVR_VIMS_PATTERN_VIEW(widget);
-
-    if(g_hash_table_size(view->playback_states) == 0 &&
-       !view->live_active &&
-       view->last_fired_bank < 0)
-        return;
-
     g_hash_table_remove_all(view->playback_states);
     view->live_active = FALSE;
     view->live_bank = -1;
     view->live_slot = -1;
     view->live_frame = -1;
     gvr_pattern_clear_fired_highlight(view);
-    if(view->area && gtk_widget_get_mapped(view->area))
-        gtk_widget_queue_draw(view->area);
+    gtk_widget_queue_draw(view->area);
 }
 
 void gvr_vims_pattern_view_clear_cell(GtkWidget *widget,
