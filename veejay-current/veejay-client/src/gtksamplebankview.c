@@ -110,6 +110,7 @@ static guint gvr_sample_bank_view_signals[SIGNAL_LAST];
 G_DEFINE_TYPE(GvrSampleBankView, gvr_sample_bank_view, GTK_TYPE_DRAWING_AREA)
 
 
+
 typedef struct {
     char family[128];
     double points;
@@ -341,19 +342,46 @@ static void gvr_draw_ellipsized_text(cairo_t *cr,
 }
 
 
+static void gvr_sample_bank_view_layout(GvrSampleBankView *view, int width, int height);
+
 static int gvr_sample_bank_view_visible_page_step(GvrSampleBankView *view)
 {
     int cells = view ? view->layout_cells : GVR_SAMPLE_BANK_SLOTS;
-    int pages;
+    int pages = cells / GVR_SAMPLE_BANK_SLOTS;
 
-    if(cells < GVR_SAMPLE_BANK_SLOTS)
-        cells = GVR_SAMPLE_BANK_SLOTS;
-
-    pages = cells / GVR_SAMPLE_BANK_SLOTS;
     if(pages < 1)
         pages = 1;
 
     return pages;
+}
+
+
+static int gvr_sample_bank_view_visible_page_count(GvrSampleBankView *view)
+{
+    GtkAllocation allocation;
+    int cells;
+    int count;
+
+    if(!view)
+        return 1;
+
+    gtk_widget_get_allocation(GTK_WIDGET(view), &allocation);
+    gvr_sample_bank_view_layout(view, allocation.width, allocation.height);
+    cells = MAX(view->layout_cells, 1);
+    count = (cells + GVR_SAMPLE_BANK_SLOTS - 1) / GVR_SAMPLE_BANK_SLOTS;
+
+    return MIN(count, MAX(1, view->page_count - view->current_page));
+}
+
+static gboolean gvr_sample_bank_view_page_is_visible(GvrSampleBankView *view, int page)
+{
+    int count;
+
+    if(!view || page < 0 || page >= view->page_count)
+        return FALSE;
+
+    count = gvr_sample_bank_view_visible_page_count(view);
+    return page >= view->current_page && page < view->current_page + count;
 }
 
 static void gvr_sample_bank_view_layout(GvrSampleBankView *view, int width, int height)
@@ -1226,27 +1254,47 @@ int gvr_sample_bank_view_get_current_page(GtkWidget *widget)
     return GVR_SAMPLE_BANK_VIEW(widget)->current_page;
 }
 
-static int gvr_sample_bank_view_reveal_page(GvrSampleBankView *view, int page)
+
+int gvr_sample_bank_view_get_visible_page_count(GtkWidget *widget)
+{
+    if(!GVR_IS_SAMPLE_BANK_VIEW(widget))
+        return 1;
+
+    return gvr_sample_bank_view_visible_page_count(GVR_SAMPLE_BANK_VIEW(widget));
+}
+
+static gboolean gvr_sample_bank_view_cell_is_visible(GvrSampleBankView *view,
+                                                       int page,
+                                                       int slot)
+{
+    for(int i = 0; i < view->layout_cells; i++)
+        if(view->cell_page[i] == page && view->cell_slot[i] == slot)
+            return TRUE;
+
+    return FALSE;
+}
+
+static int gvr_sample_bank_view_reveal_cell(GvrSampleBankView *view,
+                                            int page,
+                                            int slot)
 {
     GtkAllocation allocation;
     int step;
     int first;
-    int last;
     int max_first;
 
     if(!view)
         return 0;
 
     page = gvr_clampi(page, 0, view->page_count - 1);
+    slot = gvr_clampi(slot, 0, GVR_SAMPLE_BANK_SLOTS - 1);
     gtk_widget_get_allocation(GTK_WIDGET(view), &allocation);
     gvr_sample_bank_view_layout(view, allocation.width, allocation.height);
 
-    step = gvr_sample_bank_view_visible_page_step(view);
-    first = view->current_page;
-    last = MIN(view->page_count - 1, first + step - 1);
-    if(page >= first && page <= last)
-        return first;
+    if(gvr_sample_bank_view_cell_is_visible(view, page, slot))
+        return view->current_page;
 
+    step = gvr_sample_bank_view_visible_page_step(view);
     max_first = MAX(0, view->page_count - step);
     first = (page / step) * step;
     if(first > max_first)
@@ -1268,7 +1316,7 @@ void gvr_sample_bank_view_reveal_slot(GtkWidget *widget, int page, int slot)
         return;
 
     old_page = view->current_page;
-    view->current_page = gvr_sample_bank_view_reveal_page(view, page);
+    view->current_page = gvr_sample_bank_view_reveal_cell(view, page, slot);
     gtk_widget_queue_draw(widget);
 
     if(view->current_page != old_page)
@@ -1330,7 +1378,7 @@ void gvr_sample_bank_view_set_slot(GtkWidget *widget,
     }
 
     gvr_sample_bank_view_recount_page(view, page);
-    if(page == view->current_page)
+    if(gvr_sample_bank_view_page_is_visible(view, page))
         gtk_widget_queue_draw(widget);
 }
 
@@ -1360,7 +1408,7 @@ void gvr_sample_bank_view_clear_slot(GtkWidget *widget, int page, int slot)
     }
 
     gvr_sample_bank_view_recount_page(view, page);
-    if(page == view->current_page)
+    if(gvr_sample_bank_view_page_is_visible(view, page))
         gtk_widget_queue_draw(widget);
 }
 
@@ -1424,7 +1472,7 @@ void gvr_sample_bank_view_set_thumbnail(GtkWidget *widget, int page, int slot, G
         g_object_unref(cell->thumb);
     cell->thumb = copy;
 
-    if(page == view->current_page)
+    if(gvr_sample_bank_view_page_is_visible(view, page))
         gtk_widget_queue_draw(widget);
 }
 
@@ -1442,7 +1490,7 @@ void gvr_sample_bank_view_set_selected_slot(GtkWidget *widget, int page, int slo
     view->selected_page = page;
     view->selected_slot = slot;
     if(gvr_sample_bank_view_cell_valid(view, page, slot))
-        view->current_page = gvr_sample_bank_view_reveal_page(view, page);
+        view->current_page = gvr_sample_bank_view_reveal_cell(view, page, slot);
 
     gtk_widget_queue_draw(widget);
 

@@ -41,6 +41,7 @@ void gvr_sample_bank_view_set_page_count(GtkWidget *widget, int pages);
 int  gvr_sample_bank_view_get_page_count(GtkWidget *widget);
 void gvr_sample_bank_view_set_current_page(GtkWidget *widget, int page);
 int  gvr_sample_bank_view_get_current_page(GtkWidget *widget);
+int  gvr_sample_bank_view_get_visible_page_count(GtkWidget *widget);
 void gvr_sample_bank_view_reveal_slot(GtkWidget *widget, int page, int slot);
 void gvr_sample_bank_view_step_page(GtkWidget *widget, int delta);
 

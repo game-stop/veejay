@@ -424,6 +424,8 @@ void set_initial_curve(GtkWidget *curve,
 }
 
 #define KF_PACKED_HEADER_LEN       35
+#define KF_PACKET_MAX_VALUES       2000000
+#define KF_EFFECT_PARAMETER_LIMIT  16
 #define KF_PACKED_HEADER_SCAN_FMT  "key%2d%2d%8d%8d%2d%8d%2d"
 
 int set_points_in_curve_ext(GtkWidget *curve,
@@ -436,8 +438,6 @@ int set_points_in_curve_ext(GtkWidget *curve,
                             int *status,
                             double fps)
 {
-    (void) fx_entry;
-
     if (!curve || !blob || !curve_type || !shape || !status)
         return -1;
 
@@ -467,17 +467,21 @@ int set_points_in_curve_ext(GtkWidget *curve,
     if (n != 7)
         return -1;
 
-    if (start < 0 || end < start)
+    if (entry != fx_entry)
         return -1;
 
-    const int len = end - start + 1;
-
-    if (len <= 0)
+    if ((parameter_id != VJ_KF_PARAM_CHAIN_OPACITY &&
+         (parameter_id < 0 || parameter_id >= KF_EFFECT_PARAMETER_LIMIT)) ||
+        start < 0 || end < start || type < 0 || type > 99 ||
+        *shape < 0 || *status < 0 || *status > 99)
         return -1;
 
-    if (len > (INT_MAX - KF_PACKED_HEADER_LEN) / 4)
+    const int64_t len64 = (int64_t) end - (int64_t) start + 1;
+
+    if (len64 <= 0 || len64 > KF_PACKET_MAX_VALUES)
         return -1;
 
+    const int len = (int) len64;
     const int expected = KF_PACKED_HEADER_LEN + (4 * len);
 
     if (blen < expected)
@@ -496,13 +500,13 @@ int set_points_in_curve_ext(GtkWidget *curve,
     for (int k = 0; k < len; k++) {
         const unsigned char *ptr = in + (k * 4);
 
-        int value =
-            ((int) ptr[0]) |
-            ((int) ptr[1] << 8) |
-            ((int) ptr[2] << 16) |
-            ((int) ptr[3] << 24);
+        uint32_t raw =
+            ((uint32_t) ptr[0]) |
+            ((uint32_t) ptr[1] << 8) |
+            ((uint32_t) ptr[2] << 16) |
+            ((uint32_t) ptr[3] << 24);
 
-        vec[k] = (float) value;
+        vec[k] = (float) (int32_t) raw;
     }
 
     switch (type) {

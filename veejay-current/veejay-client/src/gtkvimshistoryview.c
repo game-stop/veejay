@@ -596,6 +596,7 @@ static gboolean gvr_vims_history_button_press(GtkWidget *widget,
                                  "activate",
                                  G_CALLBACK(gvr_vims_history_view_clear),
                                  view);
+        g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
         gtk_widget_show_all(menu);
         gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
         return TRUE;

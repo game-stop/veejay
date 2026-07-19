@@ -322,6 +322,7 @@ static gboolean gvr_media_view_button_press(GtkWidget *widget,
                          NULL);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), add_sample);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), copy_path);
+        g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
         gtk_widget_show_all(menu);
         gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
         g_free(filename);

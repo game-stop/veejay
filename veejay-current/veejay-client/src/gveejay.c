@@ -173,12 +173,22 @@ gint vj_gui_command_line (GApplication            *app,
           vj_gui_set_geom(geom_[0],geom_[1]);
         }
         g_free(arg_geometry);
+        arg_geometry = NULL;
     }
 
     if ( arg_host )
     {
-        strcpy( hostname, arg_host );
+        if(strlen(arg_host) >= sizeof(hostname)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "--host value is too long (maximum %zu characters)",
+                       sizeof(hostname) - 1);
+            g_free(arg_host);
+            arg_host = NULL;
+            return EXIT_FAILURE;
+        }
+        g_strlcpy(hostname, arg_host, sizeof(hostname));
         g_free(arg_host);
+        arg_host = NULL;
         if(verbosity) veejay_msg(VEEJAY_MSG_INFO, "Selected host: %s.", hostname);
         launcher ++;
     }
@@ -190,8 +200,17 @@ gint vj_gui_command_line (GApplication            *app,
 
     if ( arg_midifile )
     {
-        strcpy(midi_file, arg_midifile);
+        if(strlen(arg_midifile) >= sizeof(midi_file)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "--midi value is too long (maximum %zu characters)",
+                       sizeof(midi_file) - 1);
+            g_free(arg_midifile);
+            arg_midifile = NULL;
+            return EXIT_FAILURE;
+        }
+        g_strlcpy(midi_file, arg_midifile, sizeof(midi_file));
         g_free(arg_midifile);
+        arg_midifile = NULL;
         load_midi = 1;
     }
 
@@ -239,6 +258,7 @@ gint vj_gui_command_line (GApplication            *app,
     if( arg_style ) {
         vj_gui_set_stylesheet(arg_style,arg_smallaspossible);
         g_free(arg_style);
+        arg_style = NULL;
     } else {
         vj_gui_set_stylesheet(arg_style,arg_smallaspossible);
     }

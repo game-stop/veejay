@@ -4657,20 +4657,27 @@ gtk3_curve_get_property (GObject              *object,
 void
 gtk3_curve_set_vector(GtkWidget *widget, int veclen, gfloat vector[])
 {
-  Gtk3Curve *curve = GTK3_CURVE(widget);
-  Gtk3CurvePrivate *priv = curve->priv;
+  Gtk3Curve *curve;
+  Gtk3CurvePrivate *priv;
   Gtk3CurveType old_type;
   gfloat *new_frame_vector;
   gint width;
   gint height;
 
-  if (!widget || !vector || veclen <= 0)
+  g_return_if_fail(GTK3_IS_CURVE(widget));
+  g_return_if_fail(vector != NULL);
+  g_return_if_fail(veclen > 0);
+
+  if ((gsize)veclen > G_MAXSIZE / sizeof(gfloat))
     return;
+
+  curve = GTK3_CURVE(widget);
+  priv = curve->priv;
 
   DEBUG_INFO("set vector [S]\n");
   DEBUG_INFO("vector len [%d]\n", veclen);
 
-  new_frame_vector = g_malloc(sizeof(new_frame_vector[0]) * veclen);
+  new_frame_vector = g_try_malloc_n((gsize)veclen, sizeof(new_frame_vector[0]));
   if (!new_frame_vector)
     return;
 
@@ -4720,6 +4727,7 @@ gtk3_curve_set_vector(GtkWidget *widget, int veclen, gfloat vector[])
 
   DEBUG_INFO("set vector [E]\n");
 }
+
 
 static void
 gtk3_curve_interpolate(GtkWidget *widget, gint width, gint height)

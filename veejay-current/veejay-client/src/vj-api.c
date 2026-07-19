@@ -2312,6 +2312,9 @@ static gboolean samplebank_locate_slot(sample_slot_t *slot, int *page, int *slot
 static void samplebank_update_offline_recorder_gadget(void);
 static void samplebank_update_page_label(void);
 static void samplebank_request_page_thumbnails(int page);
+static void samplebank_request_visible_thumbnails(void);
+static void on_sample_bank_view_size_allocate(GtkWidget *widget, GtkAllocation *allocation, gpointer user_data);
+int samplebank_get_page(void);
 static void samplebank_focus_new_sample(GHashTable *previous_ids,
                                         gboolean inventory_was_ready);
 static void sample_preview_cache_connect(const char *host, int port);
@@ -2409,6 +2412,42 @@ static void connect_audio_mixer_override_signals(void)
             g_signal_connect(G_OBJECT(w), "toggled", G_CALLBACK(on_audio_mixer_route_toggled), NULL);
     }
 }
+
+static void samplebank_request_visible_thumbnails(void)
+{
+    if(!info || !info->sample_bank_view)
+        return;
+
+    int first = samplebank_get_page();
+    int count = gvr_sample_bank_view_get_visible_page_count(info->sample_bank_view);
+    for(int page = first; page < NUM_BANKS && page < first + count; page++)
+        samplebank_request_page_thumbnails(page);
+}
+
+#define SAMPLEBANK_VISIBLE_PAGE_COUNT_DATA "gvr-samplebank-visible-page-count"
+
+static void on_sample_bank_view_size_allocate(GtkWidget *widget,
+                                               GtkAllocation *allocation,
+                                               gpointer user_data)
+{
+    int count;
+    int previous;
+
+    (void)allocation;
+    (void)user_data;
+
+    count = gvr_sample_bank_view_get_visible_page_count(widget);
+    previous = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(widget),
+                                                SAMPLEBANK_VISIBLE_PAGE_COUNT_DATA)) - 1;
+    if(count == previous)
+        return;
+
+    g_object_set_data(G_OBJECT(widget),
+                      SAMPLEBANK_VISIBLE_PAGE_COUNT_DATA,
+                      GINT_TO_POINTER(count + 1));
+    samplebank_request_visible_thumbnails();
+}
+
 
 gboolean gveejay_idle(gpointer data)
 {
@@ -4940,6 +4979,10 @@ int _effect_get_np(int effect_id)
 
 int _effect_get_minmax(int effect_id, int *min, int *max, int index)
 {
+    if(!min || !max || effect_id < 0 || effect_id >= EFFECT_LIST_SIZE ||
+       index < 0 || index >= SAMPLE_MAX_PARAMETERS)
+        return 0;
+
     effect_constr *ec = info->effect_info[effect_id];
     if(ec != NULL && index < ec->num_arg) {
         *min = ec->min[index];
@@ -4978,13 +5021,10 @@ char *_effect_get_hint(int effect_id, int p, int v)
     if(p < 0 || p >= ec->num_arg || p >= SAMPLE_MAX_PARAMETERS)
         return FX_PARAMETER_VALUE_DEFAULT_HINT;
 
-    if(v < ec->min[p] || v > ec->max[p])
+    if(v < ec->min[p] || v > ec->max[p] || v < 0)
         return FX_PARAMETER_VALUE_DEFAULT_HINT;
 
-    if(ec->hints[p] == NULL)
-        return FX_PARAMETER_VALUE_DEFAULT_HINT;
-
-    if(ec->hints[p]->description == NULL)
+    if(ec->hints[p] == NULL || ec->hints[p]->description == NULL)
         return FX_PARAMETER_VALUE_DEFAULT_HINT;
 
     if(ec->hints[p]->description[v] == NULL)
@@ -5069,147 +5109,229 @@ static int ui_effect_param_has_beat_hint(int effect_id, int param)
     return 1;
 }
 
-effect_constr* _effect_new( char *effect_line )
+static int effect_parse_fixed_int(const char *src,
+                                  size_t available,
+                                  size_t width,
+                                  gboolean allow_sign,
+                                  int *value)
 {
-    effect_constr *ec;
+    char tmp[32];
+    char *end = NULL;
+    long parsed;
+    size_t i = 0;
+
+    if(!src || !value || width == 0 || width >= sizeof(tmp) || available < width)
+        return 0;
+
+    if(allow_sign && (src[0] == '-' || src[0] == '+')) {
+        if(width == 1)
+            return 0;
+        i = 1;
+    }
+
+    for(; i < width; i++)
+        if(!g_ascii_isdigit(src[i]))
+            return 0;
+
+    memcpy(tmp, src, width);
+    tmp[width] = '\0';
+    errno = 0;
+    parsed = strtol(tmp, &end, 10);
+    if(errno != 0 || end != tmp + width || parsed < INT_MIN || parsed > INT_MAX)
+        return 0;
+
+    *value = (int)parsed;
+    return 1;
+}
+
+void _effect_free(effect_constr *effect);
+
+effect_constr* _effect_new(const char *effect_line, size_t effect_len)
+{
+    effect_constr *ec = NULL;
+    size_t offset = 0;
     int descr_len = 0;
-    int p,q;
-    char len[4];
-    int offset  = 0;
 
-    veejay_memset(len,0,sizeof(len));
-
-    if(!effect_line) return NULL;
-
-    strncpy(len, effect_line, 3);
-    sscanf(len, "%03d", &descr_len);
-    if(descr_len <= 0) return NULL;
-
-    ec = vj_calloc( sizeof(effect_constr));
-    strncpy( ec->description, effect_line+3, descr_len );
-
-    if(sscanf(effect_line+(descr_len+3), "%03d%1d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb),&(ec->is_gen), &(ec->num_arg)) != 5 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "Error parsing FX");
-        free(ec);
+    if(!effect_line || effect_len < 11)
         return NULL;
+
+    if(!effect_parse_fixed_int(effect_line, effect_len, 3, FALSE, &descr_len) ||
+       descr_len <= 0 || (size_t)descr_len > effect_len - 3)
+        return NULL;
+
+    ec = vj_calloc(sizeof(effect_constr));
+    if(!ec)
+        return NULL;
+
+    {
+        size_t copy_len = MIN((size_t)descr_len, sizeof(ec->description) - 1);
+        memcpy(ec->description, effect_line + 3, copy_len);
+        ec->description[copy_len] = '\0';
     }
 
-    if(ec->num_arg < 0 || ec->num_arg > SAMPLE_MAX_PARAMETERS) {
-        veejay_msg(VEEJAY_MSG_ERROR, "FX '%s' has invalid argument count %d", ec->description, ec->num_arg);
-        free(ec);
-        return NULL;
-    }
+    offset = 3 + (size_t)descr_len;
+    if(effect_len - offset < 8 ||
+       !effect_parse_fixed_int(effect_line + offset, effect_len - offset, 3, FALSE, &ec->id) ||
+       !effect_parse_fixed_int(effect_line + offset + 3, effect_len - offset - 3, 1, FALSE, &ec->is_video) ||
+       !effect_parse_fixed_int(effect_line + offset + 4, effect_len - offset - 4, 1, FALSE, &ec->has_rgb) ||
+       !effect_parse_fixed_int(effect_line + offset + 5, effect_len - offset - 5, 1, FALSE, &ec->is_gen) ||
+       !effect_parse_fixed_int(effect_line + offset + 6, effect_len - offset - 6, 2, FALSE, &ec->num_arg))
+        goto malformed;
 
+    if(ec->id < 0 || ec->id >= EFFECT_LIST_SIZE ||
+       ec->num_arg < 0 || ec->num_arg > SAMPLE_MAX_PARAMETERS)
+        goto malformed;
+
+    offset += 8;
     ec->summary_version = 1;
 
+    if(effect_len - offset >= 2 &&
+       g_ascii_isdigit(effect_line[offset]) &&
+       g_ascii_isdigit(effect_line[offset + 1]))
     {
-        const int version_pos = descr_len + 3 + 8;
-        if(g_ascii_isdigit(effect_line[version_pos]) &&
-           g_ascii_isdigit(effect_line[version_pos + 1]))
-        {
-            int maybe_version = ((effect_line[version_pos] - '0') * 10) +
-                                (effect_line[version_pos + 1] - '0');
-
-            if(maybe_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS)
-                ec->summary_version = maybe_version;
+        int maybe_version = ((effect_line[offset] - '0') * 10) +
+                            (effect_line[offset + 1] - '0');
+        if(maybe_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS) {
+            ec->summary_version = maybe_version;
+            offset += 2;
         }
     }
 
-    for(p = 0; p < SAMPLE_MAX_PARAMETERS; p++)
+    for(int p = 0; p < SAMPLE_MAX_PARAMETERS; p++)
         ui_beat_hint_reset(&ec->beat_hints[p]);
 
-    offset = descr_len + (ec->summary_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS ? 13 : 11);
+    for(int p = 0; p < ec->num_arg; p++) {
+        int name_len = 0;
 
-    for(p=0; p < ec->num_arg; p++)
-    {
-        int len = 0;
-        int n = sscanf(effect_line+offset,"%06d%06d%06d%03d",
-            &(ec->min[p]), &(ec->max[p]),&(ec->defaults[p]),&len );
-        if( n != 4 )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX '%s' arguments", ec->description);
-            free(ec);
-            return NULL;
-        }
-        ec->param_description[p] = (char*) vj_calloc(sizeof(char) * (len+1) );
-        strncpy( ec->param_description[p], effect_line + offset + 6 + 6 + 6 + 3, len );
-        offset += 21 + len;
+        if(effect_len - offset < 21 ||
+           !effect_parse_fixed_int(effect_line + offset, effect_len - offset, 6, TRUE, &ec->min[p]) ||
+           !effect_parse_fixed_int(effect_line + offset + 6, effect_len - offset - 6, 6, TRUE, &ec->max[p]) ||
+           !effect_parse_fixed_int(effect_line + offset + 12, effect_len - offset - 12, 6, TRUE, &ec->defaults[p]) ||
+           !effect_parse_fixed_int(effect_line + offset + 18, effect_len - offset - 18, 3, FALSE, &name_len))
+            goto malformed;
 
-        if(ec->summary_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS)
-        {
-            if(!ui_beat_hint_parse(effect_line + offset, &ec->beat_hints[p]))
-            {
-                veejay_msg(VEEJAY_MSG_ERROR,
-                    "Parse error in FX '%s' beat hint for p%d", ec->description, p);
-                free(ec);
-                return NULL;
-            }
+        if(ec->min[p] > ec->max[p] || name_len < 0 ||
+           (size_t)name_len > effect_len - offset - 21)
+            goto malformed;
+
+        ec->param_description[p] = vj_calloc((size_t)name_len + 1);
+        if(!ec->param_description[p])
+            goto malformed;
+
+        memcpy(ec->param_description[p], effect_line + offset + 21, (size_t)name_len);
+        offset += 21 + (size_t)name_len;
+
+        if(ec->summary_version >= UI_VJE_SUMMARY_VERSION_WITH_BEAT_HINTS) {
+            char beat_hint[UI_VJE_SUMMARY_BEAT_HINT_WIDTH + 1];
+
+            if(effect_len - offset < UI_VJE_SUMMARY_BEAT_HINT_WIDTH)
+                goto malformed;
+
+            memcpy(beat_hint, effect_line + offset, UI_VJE_SUMMARY_BEAT_HINT_WIDTH);
+            beat_hint[UI_VJE_SUMMARY_BEAT_HINT_WIDTH] = '\0';
+            if(!ui_beat_hint_parse(beat_hint, &ec->beat_hints[p]))
+                goto malformed;
 
             offset += UI_VJE_SUMMARY_BEAT_HINT_WIDTH;
         }
     }
 
-    for(p=0; p < ec->num_arg; p++)
-    {
+    for(int p = 0; p < ec->num_arg; p++) {
         int hint_len = 0;
-        int n = sscanf( effect_line + offset, "%06d", &hint_len );
-        if( n != 1 )
-        {
-            veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX '%s' list hints", ec->description);
-            free(ec);
-            return NULL;
-        }
+        int64_t hint_count64;
+        size_t hint_count;
+        size_t hint_end;
+
+        if(effect_len - offset < 6 ||
+           !effect_parse_fixed_int(effect_line + offset, effect_len - offset, 6, FALSE, &hint_len))
+            goto malformed;
 
         offset += 6;
-
         if(hint_len == 0)
             continue;
+        if(hint_len < 0 || (size_t)hint_len > effect_len - offset)
+            goto malformed;
 
-        ec->hints[p] = (value_hint*) vj_calloc(sizeof(value_hint));
-        ec->hints[p]->description = (char**) vj_calloc(sizeof(char*) * (ec->max[p]+2) );
-        for(q = 0; q <= ec->max[p]; q ++ )
-        {
-            int value_hint = 0;
-            n = sscanf( effect_line + offset, "%03d", &value_hint );
-            if( n != 1) {
-                veejay_msg(VEEJAY_MSG_ERROR,"Parse error in FX list value hint");
-                free(ec);
-                return NULL;
-            }
+        hint_end = offset + (size_t)hint_len;
+        hint_count64 = (int64_t)ec->max[p] + 1;
+        if(hint_count64 <= 0 || (uint64_t)hint_count64 > SIZE_MAX - 1)
+            goto malformed;
+
+        hint_count = (size_t)hint_count64;
+        if(hint_count > (hint_end - offset) / 3)
+            goto malformed;
+
+        ec->hints[p] = vj_calloc(sizeof(value_hint));
+        if(!ec->hints[p])
+            goto malformed;
+
+        ec->hints[p]->description = vj_calloc((hint_count + 1) * sizeof(char *));
+        if(!ec->hints[p]->description)
+            goto malformed;
+
+        for(size_t q = 0; q < hint_count; q++) {
+            int value_hint_len = 0;
+
+            if(hint_end - offset < 3 ||
+               !effect_parse_fixed_int(effect_line + offset, hint_end - offset, 3, FALSE, &value_hint_len))
+                goto malformed;
 
             offset += 3;
-            ec->hints[p]->description[q] = (char*) vj_calloc(sizeof(char) * value_hint + 1 );
-            strncpy( ec->hints[p]->description[q], effect_line + offset, value_hint );
+            if(value_hint_len < 0 || (size_t)value_hint_len > hint_end - offset)
+                goto malformed;
 
-            offset += value_hint;
+            ec->hints[p]->description[q] = vj_calloc((size_t)value_hint_len + 1);
+            if(!ec->hints[p]->description[q])
+                goto malformed;
+
+            memcpy(ec->hints[p]->description[q], effect_line + offset, (size_t)value_hint_len);
+            offset += (size_t)value_hint_len;
         }
+
+        if(offset != hint_end)
+            goto malformed;
     }
+
+    if(offset != effect_len)
+        goto malformed;
 
     return ec;
+
+malformed:
+    veejay_msg(VEEJAY_MSG_ERROR, "Malformed effect summary record");
+    _effect_free(ec);
+    return NULL;
 }
 
-void _effect_free( effect_constr *effect )
+
+void _effect_free(effect_constr *effect)
 {
-    if(effect)
-    {
-        int p;
-        for( p = 0; p < effect->num_arg; p ++ ) {
-            free( effect->param_description[p] );
+    if(!effect)
+        return;
+
+    int num_args = effect->num_arg;
+    if(num_args < 0)
+        num_args = 0;
+    else if(num_args > SAMPLE_MAX_PARAMETERS)
+        num_args = SAMPLE_MAX_PARAMETERS;
+
+    for(int p = 0; p < num_args; p++)
+        free(effect->param_description[p]);
+
+    for(int p = 0; p < num_args; p++) {
+        if(!effect->hints[p])
+            continue;
+
+        if(effect->hints[p]->description) {
+            for(int q = 0; effect->hints[p]->description[q] != NULL; q++)
+                free(effect->hints[p]->description[q]);
+            free(effect->hints[p]->description);
         }
-            for( p = 0; p < effect->num_arg; p ++ ) {
-                if( effect->hints[p] == NULL )
-                    continue;
-                int q;
-                for( q = 0; effect->hints[p]->description[q] != NULL; q ++ ) {
-                    free( effect->hints[p]->description[q] );
-                }
-                free( effect->hints[p]->description );
-                free( effect->hints[p] );
-            }
 
-
-        free(effect);
+        free(effect->hints[p]);
     }
+
+    free(effect);
 }
 
 void _effect_reset(void)
@@ -8658,10 +8780,14 @@ static void update_curve_widget(GtkWidget *curve)
             curve_live_preview_user_override(status ? TRUE : FALSE);
         }
     }
-    else {
+
+    if(!blob || blen <= 0 || p < 0) {
         Gtk3CurveType ui_type = vj_kf_selected_curve_type_from_ui();
         int old_lock = info->status_lock;
         int fallback_value = chain_opacity ? info->status_tokens[CHAIN_FADE] : info->uc.entry_tokens[ENTRY_P0 + selected_parameter_id];
+
+        if(p < 0 && blob && blen > 0)
+            info->uc.reload_hint_checksums[HINT_KF] = -1;
 
         if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
            GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM])) {
@@ -12035,116 +12161,124 @@ void set_feedback_status(void)
 
 void load_effectlist_info(void)
 {
-    GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
-    GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
-    GtkWidget *tree3 = glade_xml_get_widget_( info->main_window, "tree_alphalist");
-    GtkListStore *store,*store2,*store3;
-    char line[4096];
-
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_effectlist");
+    GtkWidget *tree2 = glade_xml_get_widget_(info->main_window, "tree_effectmixlist");
+    GtkWidget *tree3 = glade_xml_get_widget_(info->main_window, "tree_alphalist");
+    GtkListStore *store;
+    GtkListStore *store2;
+    GtkListStore *store3;
+    effect_constr **parsed = NULL;
     GtkTreeIter iter;
-    gint i,offset=0;
-    gint fxlen = 0;
-    single_vims( VIMS_EFFECT_LIST );
-    gchar *fxtext = recv_vims(6,&fxlen);
+    int fxlen = 0;
+    size_t offset = 0;
+    int hi_id = 0;
+    gboolean valid = TRUE;
+
+    single_vims(VIMS_EFFECT_LIST);
+    gchar *fxtext = recv_vims(6, &fxlen);
+    if(!fxtext || fxlen <= 0) {
+        free(fxtext);
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to load effect list");
+        return;
+    }
+
+    parsed = vj_calloc(sizeof(effect_constr *) * EFFECT_LIST_SIZE);
+    if(!parsed) {
+        free(fxtext);
+        return;
+    }
+
+    while(offset < (size_t)fxlen) {
+        int record_len = 0;
+
+        if((size_t)fxlen - offset < 4 ||
+           !effect_parse_fixed_int(fxtext + offset, (size_t)fxlen - offset, 4, FALSE, &record_len)) {
+            valid = FALSE;
+            break;
+        }
+
+        offset += 4;
+        if(record_len <= 0 || (size_t)record_len > (size_t)fxlen - offset ||
+           memchr(fxtext + offset, '\0', (size_t)record_len) != NULL) {
+            valid = FALSE;
+            break;
+        }
+
+        effect_constr *ec = _effect_new(fxtext + offset, (size_t)record_len);
+        if(!ec || parsed[ec->id] != NULL) {
+            _effect_free(ec);
+            valid = FALSE;
+            break;
+        }
+
+        parsed[ec->id] = ec;
+        if(ec->id > hi_id)
+            hi_id = ec->id;
+        offset += (size_t)record_len;
+    }
+
+    if(!valid || offset != (size_t)fxlen) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Rejected malformed effect list at byte %zu of %d; keeping the current list",
+                   offset,
+                   fxlen);
+        for(int i = 0; i < EFFECT_LIST_SIZE; i++)
+            _effect_free(parsed[i]);
+        free(parsed);
+        free(fxtext);
+        return;
+    }
 
     _effect_reset();
-
     reset_fxtree();
+    for(int i = 0; i < EFFECT_LIST_SIZE; i++) {
+        info->effect_info[i] = parsed[i];
+        parsed[i] = NULL;
+    }
 
     store = fxlist_data.stores[0].list;
     store2 = fxlist_data.stores[1].list;
     store3 = fxlist_data.stores[2].list;
 
-    int ec_idx = 0;
-    int hi_id = 0;
-    while( offset < fxlen )
-    {
-        char tmp_len[5];
-        veejay_memset(tmp_len,0,sizeof(tmp_len));
-
-        strncpy(tmp_len, fxtext + offset, 4 );
-        int len = 0;
-        if( sscanf(tmp_len, "%4d", &len ) != 1 ) {
-            veejay_msg(0, "FX header length error");
-            exit(0);
-        }
-
-        offset += 4;
-
-        if(len > 0)
-        {
-            effect_constr *ec;
-            veejay_memset( line,0,sizeof(line));
-            memcpy( line, fxtext + offset, len );
-
-            int bad_len = strlen(line);
-            if( len != bad_len ) {
-                veejay_msg(0, "Expected %d bytes, only got %d", len, bad_len );
-                exit(0);
-            }
-
-            ec = _effect_new(line);
-            if( ec  ) {
-                info->effect_info[ec->id] = ec;
-                ec_idx ++;
-                if( hi_id < ec->id )
-                    hi_id = ec->id;
-            }
-        }
-
-        offset += len;
-    }
-
-    for( i = 0; i <= hi_id; i ++)
-    {
+    for(int i = 0; i <= hi_id; i++) {
         effect_constr *ec = info->effect_info[i];
-        if(ec == NULL)
+        if(!ec || ec->is_gen)
             continue;
-        if( ec->is_gen )
-            continue;
-        gchar *name = _utf8str( ec->description );
 
-        if( name != NULL)
-        {
-
-            if( strncasecmp( "alpha:" , ec->description, 6 ) == 0 )
-            {
-                gtk_list_store_append( store3, &iter );
-                int len = strlen( ec->description );
-                char *newName = vj_calloc( len );
-                veejay_memcpy(newName,ec->description+6, len-6 );
-                gtk_list_store_set( store3,&iter, FX_STRING, newName, -1 );
-                vevo_property_set( fx_list_, newName, VEVO_ATOM_TYPE_INT,1,&(ec->id));
-                free(newName);
-            }
-            else
-            {
-
-                if( ec->is_video )
-                {
-                    gtk_list_store_append( store2, &iter );
-                    gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
-                    vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
+        gchar *name = _utf8str(ec->description);
+        if(name) {
+            if(strncasecmp("alpha:", ec->description, 6) == 0) {
+                gtk_list_store_append(store3, &iter);
+                size_t name_len = strlen(ec->description);
+                char *new_name = vj_calloc(name_len + 1);
+                if(new_name) {
+                    memcpy(new_name, ec->description + 6, name_len >= 6 ? name_len - 6 : 0);
+                    gtk_list_store_set(store3, &iter, FX_STRING, new_name, -1);
+                    vevo_property_set(fx_list_, new_name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
+                    free(new_name);
                 }
-                else
-                {
-
-                    gtk_list_store_append( store, &iter );
-                    gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
-                    vevo_property_set( fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
-                }
+            } else if(ec->is_video) {
+                gtk_list_store_append(store2, &iter);
+                gtk_list_store_set(store2, &iter, FX_STRING, name, -1);
+                vevo_property_set(fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
+            } else {
+                gtk_list_store_append(store, &iter);
+                gtk_list_store_set(store, &iter, FX_STRING, name, -1);
+                vevo_property_set(fx_list_, name, VEVO_ATOM_TYPE_INT, 1, &(ec->id));
             }
         }
         g_free(name);
     }
 
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
-    gtk_tree_view_set_model( GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
+    gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(fxlist_data.stores[0].sorted));
+    gtk_tree_view_set_model(GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(fxlist_data.stores[1].sorted));
+    gtk_tree_view_set_model(GTK_TREE_VIEW(tree3), GTK_TREE_MODEL(fxlist_data.stores[2].sorted));
     favourite_fx_load();
-    free(fxtext);
 
+    free(parsed);
+    free(fxtext);
 }
+
 
 void on_effectlist_sources_row_activated(GtkTreeView *treeview,
                                          GtkTreePath *path,
@@ -12243,113 +12377,153 @@ void setup_samplelist_info(void)
 
 }
 
-static uint8_t *ref_trashcan[3] = { NULL,NULL,NULL };
-static GdkPixbuf *pix_trashcan[3] = { NULL,NULL,NULL };
+#define CALI_IMAGE_TYPE_COUNT 3
+#define CALI_IMAGE_MAX_BYTES (512u * 1024u * 1024u)
 
-void reset_cali_images( int type, char *wid_name )
+static uint8_t *ref_trashcan[CALI_IMAGE_TYPE_COUNT] = { NULL,NULL,NULL };
+static GdkPixbuf *pix_trashcan[CALI_IMAGE_TYPE_COUNT] = { NULL,NULL,NULL };
+
+void reset_cali_images(int type, char *wid_name)
 {
-    GtkWidget *dstImage = glade_xml_get_widget_( info->main_window, wid_name );
+    GtkWidget *dstImage;
 
-    if( pix_trashcan[type] != NULL ) {
-        g_object_unref( pix_trashcan[type] );
+    if(type < 0 || type >= CALI_IMAGE_TYPE_COUNT || !wid_name)
+        return;
+
+    dstImage = glade_xml_get_widget_(info->main_window, wid_name);
+    if(!dstImage || !GTK_IS_IMAGE(dstImage))
+        return;
+
+    gtk_image_clear(GTK_IMAGE(dstImage));
+
+    if(pix_trashcan[type]) {
+        g_object_unref(pix_trashcan[type]);
         pix_trashcan[type] = NULL;
     }
-    if( ref_trashcan[type] != NULL  ) {
-        free( ref_trashcan[type] );
+    if(ref_trashcan[type]) {
+        free(ref_trashcan[type]);
         ref_trashcan[type] = NULL;
     }
-    gtk_image_clear( GTK_IMAGE(dstImage) );
 }
+
 
 int get_and_draw_frame(int type, char *wid_name)
 {
-    GtkWidget *dstImage = glade_xml_get_widget_( info->main_window, wid_name );
-    if(dstImage == 0 ) {
-        veejay_msg(VEEJAY_MSG_ERROR, "No widget '%s'",wid_name);
-        return 0;
-    }
-
-    multi_vims( VIMS_CALI_IMAGE, "%d %d", cali_stream_id,type);
-
+    GtkWidget *dstImage;
+    gchar *buf = NULL;
+    uint8_t *out = NULL;
+    uint8_t *srcbuf = NULL;
+    VJFrame *src = NULL;
+    VJFrame *dst = NULL;
+    GdkPixbuf *pix = NULL;
     int bw = 0;
-    gchar *buf = recv_vims( 3, &bw );
-
-    if( bw <= 0 )
-    {
-        veejay_msg(VEEJAY_MSG_ERROR, "Unable to get calibration image.");
-        return 0;
-    }
-
+    int tlen = 0;
     int len = 0;
     int uvlen = 0;
     int w = 0;
     int h = 0;
-    int tlen = 0;
-    if( sscanf(buf,"%08d%06d%06d%06d%06d",&tlen, &len, &uvlen,&w,&h) != 5 ) {
-        free(buf);
-        veejay_msg(VEEJAY_MSG_ERROR,"Error reading calibration data header" );
+    int result = 0;
+
+    if(type < 0 || type >= CALI_IMAGE_TYPE_COUNT || !wid_name)
+        return 0;
+
+    dstImage = glade_xml_get_widget_(info->main_window, wid_name);
+    if(!dstImage || !GTK_IS_IMAGE(dstImage)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "No image widget '%s'", wid_name);
         return 0;
     }
 
-    uint8_t *out = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w*h*3));
-    uint8_t *srcbuf = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
-
-    int res = vj_client_read(info->client, V_CMD, srcbuf, tlen );
-    if( res <= 0 ) {
-        free(out);
-        free(srcbuf);
-        free(buf);
-        veejay_msg(VEEJAY_MSG_ERROR, "Error while receiving calibration image.");
-        return 0;
+    multi_vims(VIMS_CALI_IMAGE, "%d %d", cali_stream_id, type);
+    buf = recv_vims(3, &bw);
+    if(!buf || bw != 32) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to get calibration image header");
+        goto cleanup;
     }
 
-    VJFrame *src = yuv_yuv_template(srcbuf,
-                                    srcbuf,
-                                    srcbuf,
-                                    w,
-                                    h,
-                                    PIX_FMT_GRAY8 );
-
-    VJFrame *dst = yuv_rgb_template( out, w,h,PIX_FMT_BGR24 );
-
-    yuv_convert_any_ac( src,dst );
-
-    GdkPixbuf *pix = gdk_pixbuf_new_from_data(out,
-                                              GDK_COLORSPACE_RGB,
-                                              FALSE,
-                                              8,
-                                              w,
-                                              h,
-                                              w*3,
-                                              NULL,
-                                              NULL );
-
-    if( ref_trashcan[type] != NULL )
     {
-        free(ref_trashcan[type]);
-        ref_trashcan[type]=NULL;
+        char header[33];
+        memcpy(header, buf, 32);
+        header[32] = '\0';
+        if(sscanf(header, "%08d%06d%06d%06d%06d", &tlen, &len, &uvlen, &w, &h) != 5) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Error reading calibration data header");
+            goto cleanup;
+        }
     }
-    if( pix_trashcan[type] != NULL )
-    {
-        g_object_unref( pix_trashcan[type] );
-        pix_trashcan[type] = NULL;
+
+    if(tlen <= 0 || len <= 0 || uvlen != 0 || w <= 0 || h <= 0 ||
+       tlen != len || (size_t)tlen > CALI_IMAGE_MAX_BYTES ||
+       w > G_MAXINT / 3 || (size_t)w > G_MAXSIZE / (size_t)h) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid calibration image dimensions or payload lengths");
+        goto cleanup;
     }
 
-    gtk_image_set_from_pixbuf_( GTK_IMAGE( dstImage ), pix );
+    size_t pixels = (size_t)w * (size_t)h;
+    if(pixels > G_MAXSIZE / 3 || pixels > CALI_IMAGE_MAX_BYTES / 3 ||
+       (size_t)tlen < pixels) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Calibration image payload is inconsistent with its dimensions");
+        goto cleanup;
+    }
 
+    size_t out_bytes = pixels * 3;
+    out = vj_malloc(out_bytes);
+    srcbuf = vj_malloc((size_t)tlen);
+    if(!out || !srcbuf) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate calibration image buffers");
+        goto cleanup;
+    }
 
+    if(vj_client_read(info->client, V_CMD, srcbuf, tlen) != tlen) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Error while receiving calibration image");
+        goto cleanup;
+    }
 
-    free(src);
-    free(dst);
-    free(buf);
+    src = yuv_yuv_template(srcbuf, srcbuf, srcbuf, w, h, PIX_FMT_GRAY8);
+    dst = yuv_rgb_template(out, w, h, PIX_FMT_BGR24);
+    if(!src || !dst) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to create calibration image frame templates");
+        goto cleanup;
+    }
 
-    free(srcbuf);
+    yuv_convert_any_ac(src, dst);
+    pix = gdk_pixbuf_new_from_data(out,
+                                   GDK_COLORSPACE_RGB,
+                                   FALSE,
+                                   8,
+                                   w,
+                                   h,
+                                   w * 3,
+                                   NULL,
+                                   NULL);
+    if(!pix) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to create calibration image pixbuf");
+        goto cleanup;
+    }
 
+    uint8_t *old_ref = ref_trashcan[type];
+    GdkPixbuf *old_pix = pix_trashcan[type];
+
+    gtk_image_set_from_pixbuf_(GTK_IMAGE(dstImage), pix);
     ref_trashcan[type] = out;
     pix_trashcan[type] = pix;
+    out = NULL;
+    pix = NULL;
 
-    return 1;
+    if(old_pix)
+        g_object_unref(old_pix);
+    free(old_ref);
+    result = 1;
+
+cleanup:
+    if(pix)
+        g_object_unref(pix);
+    free(src);
+    free(dst);
+    free(srcbuf);
+    free(out);
+    free(buf);
+    return result;
 }
+
 
 static void select_slot(int pm)
 {
@@ -13015,7 +13189,7 @@ static void samplebank_focus_new_sample(GHashTable *previous_ids,
                                       focus_page,
                                       focus_slot_nr);
     samplebank_update_page_label();
-    samplebank_request_page_thumbnails(focus_page);
+    samplebank_request_visible_thumbnails();
 
     set_selection_of_slot_in_samplebank(FALSE);
     info->selection_slot = focus_slot;
@@ -14862,81 +15036,116 @@ static void reload_bundles(void)
 static void reload_vimslist(void)
 {
     gint len = 0;
-    gint offset = 0;
+    size_t offset = 0;
+    vims_t *parsed = NULL;
 
     if(!info->vims_view)
         return;
 
     single_vims(VIMS_VIMS_LIST);
     gchar *eltext = recv_vims(5, &len);
-    gvr_vims_view_clear_namespace(info->vims_view);
-
-    if(len == 0 || eltext == NULL)
-    {
-#ifdef STRICT_CHECKING
-        assert(eltext != NULL && len > 0);
-#endif
+    if(!eltext || len <= 0) {
+        free(eltext);
         return;
     }
 
-    while(offset < len)
-    {
-        char *format = NULL;
-        char *descr = NULL;
-        char *line = strndup(eltext + offset, 12);
-        int val[4];
+    parsed = vj_calloc(sizeof(vims_t) * VIMS_MAX);
+    if(!parsed) {
+        free(eltext);
+        return;
+    }
 
-        if(sscanf(line, "%04d%02d%03d%03d",
-                  &val[0], &val[1], &val[2], &val[3]) != 4)
-            veejay_msg(0, "Expected exactly 4 tokens: [%s]", line);
-        if(val[0] < 0 || val[0] > 1024)
-            veejay_msg(0, "Invalid ID at position %d", offset);
-        if(val[1] < 0 || val[1] > 99)
-            veejay_msg(0, "Invalid number of arguments at position %d", offset);
-        if(val[2] < 0 || val[2] > 999)
-            veejay_msg(0, "Invalid format length at position %d", offset);
-        if(val[3] < 0 || val[3] > 999)
-            veejay_msg(0, "Invalid name length at position %d", offset);
+    while(offset < (size_t)len) {
+        int event_id = 0;
+        int params = 0;
+        int format_len = 0;
+        int descr_len = 0;
+
+        if((size_t)len - offset < 12 ||
+           !effect_parse_fixed_int(eltext + offset, (size_t)len - offset, 4, FALSE, &event_id) ||
+           !effect_parse_fixed_int(eltext + offset + 4, (size_t)len - offset - 4, 2, FALSE, &params) ||
+           !effect_parse_fixed_int(eltext + offset + 6, (size_t)len - offset - 6, 3, FALSE, &format_len) ||
+           !effect_parse_fixed_int(eltext + offset + 9, (size_t)len - offset - 9, 3, FALSE, &descr_len))
+            goto malformed;
 
         offset += 12;
-        if(val[2] > 0)
-        {
-            format = strndup(eltext + offset, val[2]);
-            offset += val[2];
-        }
-        if(val[3] > 0)
-        {
-            descr = strndup(eltext + offset, val[3]);
-            offset += val[3];
+        if(event_id <= 0 || event_id >= VIMS_MAX || params < 0 || params > 99 ||
+           format_len < 0 || descr_len < 0 || parsed[event_id].event_id != 0 ||
+           (size_t)format_len > (size_t)len - offset ||
+           (size_t)descr_len > (size_t)len - offset - (size_t)format_len)
+            goto malformed;
+
+        parsed[event_id].event_id = event_id;
+        parsed[event_id].params = params;
+
+        if(format_len > 0) {
+            parsed[event_id].format = strndup(eltext + offset, (size_t)format_len);
+            if(!parsed[event_id].format)
+                goto malformed;
+            offset += (size_t)format_len;
         }
 
-        if(vj_event_list[val[0]].format)
-            free(vj_event_list[val[0]].format);
-        if(vj_event_list[val[0]].descr)
-            free(vj_event_list[val[0]].descr);
+        if(descr_len > 0) {
+            parsed[event_id].descr = strndup(eltext + offset, (size_t)descr_len);
+            if(!parsed[event_id].descr)
+                goto malformed;
+            offset += (size_t)descr_len;
+        }
+    }
 
-        vj_event_list[val[0]].event_id = val[0];
-        vj_event_list[val[0]].params = val[1];
-        vj_event_list[val[0]].format = format;
-        vj_event_list[val[0]].descr = descr;
+    if(offset != (size_t)len)
+        goto malformed;
+
+    gvr_vims_view_clear_namespace(info->vims_view);
+    for(int i = 0; i < VIMS_MAX; i++) {
+        free(vj_event_list[i].format);
+        free(vj_event_list[i].descr);
+        memset(&vj_event_list[i], 0, sizeof(vj_event_list[i]));
+
+        if(parsed[i].event_id <= 0)
+            continue;
+
+        vj_event_list[i].event_id = parsed[i].event_id;
+        vj_event_list[i].params = parsed[i].params;
+        vj_event_list[i].format = parsed[i].format;
+        vj_event_list[i].descr = parsed[i].descr;
+        parsed[i].format = NULL;
+        parsed[i].descr = NULL;
 
         gvr_vims_view_append_namespace(info->vims_view,
-                                       val[0],
-                                       descr ? descr : "",
-                                       format ? format : "",
-                                       val[1]);
-        free(line);
+                                       vj_event_list[i].event_id,
+                                       vj_event_list[i].descr ? vj_event_list[i].descr : "",
+                                       vj_event_list[i].format ? vj_event_list[i].format : "",
+                                       vj_event_list[i].params);
     }
 
     if(info->vims_pattern_view)
-        gvr_vims_pattern_view_set_description_lookup(
-            info->vims_pattern_view,
-            sequence_vims_description_lookup,
-            NULL,
-            NULL);
+        gvr_vims_pattern_view_set_description_lookup(info->vims_pattern_view,
+                                                      sequence_vims_description_lookup,
+                                                      NULL,
+                                                      NULL);
 
+    for(int i = 0; i < VIMS_MAX; i++) {
+        free(parsed[i].format);
+        free(parsed[i].descr);
+    }
+    free(parsed);
+    free(eltext);
+    return;
+
+malformed:
+    veejay_msg(VEEJAY_MSG_ERROR,
+               "Rejected malformed VIMS registry at byte %zu of %d; keeping the current registry",
+               offset,
+               len);
+    for(int i = 0; i < VIMS_MAX; i++) {
+        free(parsed[i].format);
+        free(parsed[i].descr);
+    }
+    free(parsed);
     free(eltext);
 }
+
 
 
 
@@ -16045,18 +16254,42 @@ int veejay_update_multitrack( void *ptr )
         return 0;
     }
 
-    info->status_lock = 1;
-    info->uc.playmode = ui_playmode_effective(info->status_tokens[PLAY_MODE]);
-    update_gui();
-    info->prev_mode = info->status_tokens[ PLAY_MODE ];
-
     int pm = info->status_tokens[PLAY_MODE];
+    int previous_pm = info->prev_mode;
+    int *previous_history = NULL;
+    gboolean skip_switched_source_preview = FALSE;
+
 #ifdef STRICT_CHECKING
-    assert( pm >= 0 && pm < 4 );
+    assert(pm >= 0 && pm < 4);
 #endif
+
+    if(previous_pm >= 0 && previous_pm < 4)
+        previous_history = info->history_tokens[previous_pm];
+
+    if(ui_playmode_effective(pm) == MODE_SAMPLE ||
+       ui_playmode_effective(pm) == MODE_STREAM)
+    {
+        skip_switched_source_preview =
+            previous_history == NULL ||
+            previous_pm != pm ||
+            previous_history[CURRENT_ID] != info->status_tokens[CURRENT_ID] ||
+            (ui_playmode_effective(pm) == MODE_STREAM &&
+             previous_history[STREAM_TYPE] != info->status_tokens[STREAM_TYPE]);
+    }
+
+    if(skip_switched_source_preview)
+        sample_preview_cancel_requests();
+
+    info->status_lock = 1;
+    info->uc.playmode = ui_playmode_effective(pm);
+    update_gui();
+    info->prev_mode = pm;
+
     int *history = info->history_tokens[pm];
 
-    veejay_memcpy( history, info->status_tokens, sizeof(int) * VJ_STATUS_ARRAY_SIZE );
+    veejay_memcpy(history,
+                  info->status_tokens,
+                  sizeof(int) * VJ_STATUS_ARRAY_SIZE);
 
     for( i = 0; i < s->tracks ; i ++ )
     {
@@ -16082,10 +16315,8 @@ int veejay_update_multitrack( void *ptr )
                     gtk_widget_queue_draw(maintrack);
                 }
 
-                if( history[PLAY_MODE] == info->status_tokens[PLAY_MODE] &&
-                    history[CURRENT_ID] == info->status_tokens[CURRENT_ID] ) {
-                    vj_img_cb( s->img_list[i] );
-                }
+                if(!skip_switched_source_preview)
+                    vj_img_cb(s->img_list[i]);
             }
 
             multitrack_update_sequence_image( info->mt, i, s->img_list[i] );
@@ -23476,6 +23707,7 @@ void vj_gui_init(const char *glade_file,
         gvr_sample_bank_view_set_page_count(info->sample_bank_view, NUM_BANKS);
         samplebank_update_page_label();
         g_signal_connect(G_OBJECT(info->sample_bank_view), "page-selected", G_CALLBACK(on_sample_bank_view_page_selected), NULL);
+        g_signal_connect(G_OBJECT(info->sample_bank_view), "size-allocate", G_CALLBACK(on_sample_bank_view_size_allocate), NULL);
         g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-selected", G_CALLBACK(on_sample_bank_view_slot_selected), NULL);
         g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-activated", G_CALLBACK(on_sample_bank_view_slot_activated), NULL);
         g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-mix-requested", G_CALLBACK(on_sample_bank_view_slot_mix_requested), NULL);
@@ -26254,7 +26486,7 @@ void samplebank_goto_page(int page)
 
     gvr_sample_bank_view_set_current_page(info->sample_bank_view, page);
     samplebank_update_page_label();
-    samplebank_request_page_thumbnails(samplebank_get_page());
+    samplebank_request_visible_thumbnails();
 }
 
 void samplebank_step_page(int delta)
@@ -26264,7 +26496,7 @@ void samplebank_step_page(int delta)
 
     gvr_sample_bank_view_step_page(info->sample_bank_view, delta);
     samplebank_update_page_label();
-    samplebank_request_page_thumbnails(samplebank_get_page());
+    samplebank_request_visible_thumbnails();
 }
 
 int samplebank_get_page(void)
@@ -26281,7 +26513,7 @@ static void on_sample_bank_view_page_selected(GtkWidget *widget, gint page, gpoi
     (void)user_data;
 
     samplebank_update_page_label();
-    samplebank_request_page_thumbnails(page);
+    samplebank_request_visible_thumbnails();
 }
 
 static void samplebank_select_model_slot(int page, int slot_nr, gboolean activate, gboolean mix)

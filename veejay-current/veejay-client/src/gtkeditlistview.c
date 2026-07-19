@@ -3203,6 +3203,7 @@ static gboolean gvr_edit_list_overview_context_menu(GvrEditListView *view,
     g_signal_connect(item, "activate", G_CALLBACK(gvr_edit_list_region_menu_clear), view);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
 
+    g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
     gtk_widget_show_all(menu);
     gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
     return TRUE;
@@ -4020,6 +4021,7 @@ static gboolean gvr_edit_list_tree_button_press(GtkWidget *widget,
                                           view);
     gtk_widget_set_sensitive(item, gvr_edit_list_selection_valid(view));
 
+    g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
     gtk_widget_show_all(menu);
     gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
     return TRUE;

@@ -20,6 +20,8 @@
 #include <ctype.h>
 #include <math.h>
 #include <string.h>
+#include <stdint.h>
+#include <limits.h>
 #include <veejaycore/vj-msg.h>
 #include <gtktimeselection.h>
 #include <gtk3curve.h>
@@ -6673,6 +6675,7 @@ void on_curve_clear_parameter_clicked(GtkWidget *widget, gpointer user_data)
 
 #define KF_STORE_HEADER_LEN 44
 #define KF_STORE_HEADER_BUFSZ (KF_STORE_HEADER_LEN + 1)
+#define KF_STORE_MAX_VALUES 2000000
 
 #define KF_PACKED_HEADER_SCAN_FMT  "key%2d%2d%8d%8d%2d%8d%2d"
 #define KF_STORE_HEADER_FMT        "K%08dkey%02d%02d%08d%08d%02d%08d%02d"
@@ -6681,6 +6684,9 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 {
     (void) widget;
     (void) user_data;
+
+    float *data = NULL;
+    unsigned char *buf = NULL;
 
     if (info->status_lock)
         return;
@@ -6692,6 +6698,12 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     if (param < 0) {
         vj_msg(VEEJAY_MSG_INFO, "No parameter selected for animation");
+        return;
+    }
+
+    if (!chain_opacity && param >= SAMPLE_MAX_PARAMETERS) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Invalid FX animation parameter %d", param);
         return;
     }
 
@@ -6709,8 +6721,8 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
     }
 
     int start = get_nums("curve_spinstart");
-    int end   = get_nums("curve_spinend");
-	int shape = gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]));
+    int end = get_nums("curve_spinend");
+    int shape = gtk_combo_box_get_active(GTK_COMBO_BOX(widget_cache[WIDGET_CURVE_COMBO_ANIMATION]));
 
     if (start == end) {
         vj_msg(VEEJAY_MSG_ERROR,
@@ -6724,21 +6736,33 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
         end = t;
     }
 
-    const int length = end - start + 1;
-
-    if (length <= 0) {
-        vj_msg(VEEJAY_MSG_INFO, "Length of animation is 0");
+    if (start < 0 || end < 0 || start > 99999999 || end > 99999999 ||
+        kf_entry > 99 || param > 99 || shape < 0 || shape > 99999999) {
+        vj_msg(VEEJAY_MSG_ERROR,
+               "Animation range or target is outside the VIMS keyframe packet limits");
         return;
     }
 
+    const int64_t length64 = (int64_t)end - (int64_t)start + 1;
+    const size_t payload_base = 3u + 2u + 2u + 8u + 8u + 2u + 8u + 2u;
+
+    if (length64 <= 0 || length64 > KF_STORE_MAX_VALUES ||
+        (uint64_t)length64 > (99999999u - payload_base) / 4u) {
+        vj_msg(VEEJAY_MSG_ERROR, "Animation range is too large to encode");
+        return;
+    }
+
+    const int length = (int)length64;
+    const size_t payload_size = payload_base + ((size_t)length * 4u);
+    const size_t bufsize = 9u + payload_size;
+
     Gtk3CurveType type = curve_selected_type();
     int status = 1;
-
     int min = 0;
     int max = 0;
     curve_param_minmax(curve_fx_id, param, &min, &max);
 
-    float *data = (float *) vj_calloc(sizeof(float) * length);
+    data = (float *)vj_calloc((size_t)length * sizeof(float));
     if (!data) {
         vj_msg(VEEJAY_MSG_ERROR,
                "Unable to allocate animation buffer for %d points", length);
@@ -6747,48 +6771,39 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
 
     get_points_from_curve(info->curve, length, data);
 
-    const int payload = 3 + 2 + 2 + 8 + 8 + 2 + 8 + 2 + (4 * length);
-    const int tr_len = 9;
-    const size_t bufsize = (size_t) tr_len + (size_t) payload;
-
-    unsigned char *buf = (unsigned char *) vj_malloc(bufsize);
+    buf = (unsigned char *)vj_malloc(bufsize);
     if (!buf) {
         vj_msg(VEEJAY_MSG_ERROR,
                "Unable to allocate VIMS animation packet of %zu bytes", bufsize);
-        free(data);
-        return;
+        goto cleanup;
     }
 
-	char header[KF_STORE_HEADER_BUFSZ];
+    char header[KF_STORE_HEADER_BUFSZ];
+    int hdr_len = snprintf(header,
+                           sizeof(header),
+                           KF_STORE_HEADER_FMT,
+                           (int)payload_size,
+                           kf_entry,
+                           param,
+                           start,
+                           end,
+                           (int)type,
+                           shape,
+                           status);
 
-	int hdr_len = snprintf(header,
-                       sizeof(header),
-                       KF_STORE_HEADER_FMT,
-                       payload,
-                       kf_entry,
-                       param,
-                       start,
-                       end,
-                       (int) type,
-                       shape,
-                       status);
+    if (hdr_len != KF_STORE_HEADER_LEN) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[FX Anim] invalid keyframe store header length %d expected %d",
+                   hdr_len,
+                   KF_STORE_HEADER_LEN);
+        goto cleanup;
+    }
 
-	if (hdr_len != KF_STORE_HEADER_LEN) {
-		veejay_msg(VEEJAY_MSG_ERROR,
-				"[FX Anim] invalid keyframe store header length %d expected %d",
-				hdr_len,
-				KF_STORE_HEADER_LEN);
-		return;
-	}
-
-    memcpy(buf, header, (size_t) hdr_len);
+    memcpy(buf, header, (size_t)hdr_len);
 
     unsigned char *ptr = buf + hdr_len;
-
     for (int k = 0; k < length; k++) {
-        int pval = (int) data[k];
-        pval = clamp_int_to_range(pval, min, max);
-
+        int pval = clamp_int_to_range((int)data[k], min, max);
         put_le32(ptr, pval);
         ptr += 4;
     }
@@ -6822,9 +6837,11 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
     curve_live_preview_user_override(TRUE);
     info->uc.reload_hint[HINT_KF] = 1;
 
+cleanup:
     free(buf);
     free(data);
 }
+
 
 void on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 {
