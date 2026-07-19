@@ -1276,6 +1276,9 @@ typedef struct {
     int tick_transport_changed;
     int tick_transport_cutoff_frame;
     int tick_transport_reverse;
+    int tick_transport_rebase;
+    int tick_transport_mode;
+    int tick_transport_source_id;
     int tick_dedup_count;
     int tick_dedup_ids[VJ_PATTERN_TICK_DEDUP_MAX];
     const char *tick_dedup_messages[VJ_PATTERN_TICK_DEDUP_MAX];
@@ -1881,17 +1884,223 @@ static int vj_pattern_loop_valid(const vj_pattern_target_t *target)
            target->loop_end >= target->loop_start;
 }
 
-static int vj_pattern_map_frame(const vj_pattern_target_t *target, int frame)
+static int vj_pattern_map_bounds(int loop_start,
+                                 int loop_end,
+                                 int frame,
+                                 int direction)
 {
-    long long length;
-    long long offset;
+    const long long length = (long long)loop_end - loop_start + 1LL;
 
-    if(!vj_pattern_loop_valid(target) || frame <= target->loop_end)
+    if(loop_start < 0 || loop_end < loop_start || length <= 0)
+        return frame;
+    if(frame >= loop_start && frame <= loop_end)
+        return frame;
+    if(direction == 0)
         return frame;
 
-    length = (long long)target->loop_end - target->loop_start + 1LL;
-    offset = (long long)frame - target->loop_start;
-    return target->loop_start + (int)(offset % length);
+    if(direction < 0) {
+        if(frame > loop_end)
+            return loop_end;
+
+        const long long overshoot = (long long)loop_start - 1LL - frame;
+        return loop_end - (int)(overshoot % length);
+    }
+
+    if(frame < loop_start)
+        return loop_start;
+
+    const long long overshoot = (long long)frame - loop_end - 1LL;
+    return loop_start + (int)(overshoot % length);
+}
+
+static int vj_pattern_map_frame(const vj_pattern_target_t *target,
+                                int frame,
+                                int direction)
+{
+    if(!vj_pattern_loop_valid(target))
+        return frame;
+
+    return vj_pattern_map_bounds(target->loop_start,
+                                 target->loop_end,
+                                 frame,
+                                 direction);
+}
+
+static const vj_pattern_target_t *vj_pattern_transport_loop_target(
+        vj_pattern_runtime_t *runtime,
+        sequencer_t *seq,
+        int source_bank,
+        int source_id)
+{
+    vj_pattern_target_t *target;
+
+    if(!runtime || !seq)
+        return NULL;
+
+    if(seq->active &&
+       seq->active_bank >= 0 && seq->active_bank < VJ_SEQUENCE_BANKS &&
+       seq->current >= 0 && seq->current < MAX_SEQUENCES)
+    {
+        target = vj_pattern_target_find(runtime,
+                                        seq->active_bank,
+                                        seq->current,
+                                        0);
+        if(vj_pattern_loop_valid(target))
+            return target;
+    }
+
+    target = vj_pattern_target_find(runtime, source_bank, source_id, 0);
+    return vj_pattern_loop_valid(target) ? target : NULL;
+}
+
+static void vj_pattern_state_rebase(vj_pattern_runtime_t *runtime,
+                                    vj_pattern_playback_state_t *state,
+                                    int source_frame,
+                                    unsigned int epoch,
+                                    int direction)
+{
+    vj_pattern_target_t *target;
+
+    if(!runtime || !state || !state->active)
+        return;
+
+    target = vj_pattern_target_find(runtime, state->bank, state->slot, 0);
+    state->source_frame = source_frame;
+    state->frame = vj_pattern_map_frame(target, source_frame, direction);
+    state->transport_valid = 1;
+    state->transport_epoch = epoch;
+    state->direction = direction;
+    state->paused = direction == 0;
+    state->seeked_while_paused = 0;
+}
+
+static int vj_pattern_apply_transport_loop(veejay_t *info,
+                                           vj_pattern_runtime_t *runtime,
+                                           unsigned int *epoch)
+{
+    video_playback_setup *settings;
+    sequencer_t *seq;
+    const vj_pattern_target_t *target;
+    int source_bank;
+    int source_id;
+    int source_start;
+    int source_end;
+    int signed_speed;
+    int direction;
+    int local_frame;
+    int loop_start;
+    int loop_end;
+    int mapped_frame;
+    long long absolute_frame;
+
+    if(!info || !info->settings || !info->uc || !info->seq || !runtime)
+        return 0;
+
+    settings = info->settings;
+    seq = info->seq;
+    source_id = info->uc->sample_id;
+    signed_speed = settings->current_playback_speed;
+    source_start = 0;
+    source_end = -1;
+
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
+       source_id > 0 && sample_exists(source_id))
+    {
+        int loop_type = 0;
+
+        if(sample_get_short_info(source_id,
+                                 &source_start,
+                                 &source_end,
+                                 &loop_type,
+                                 &signed_speed) != 0)
+            return 0;
+        source_bank = VJ_PATTERN_BANK_SAMPLE;
+    }
+    else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+            source_id > 0 && vj_tag_exists(source_id) &&
+            vj_tag_buffer_active(source_id))
+    {
+        source_end = vj_tag_get_buffer_duration(source_id) - 1;
+        source_bank = VJ_PATTERN_BANK_STREAM;
+    }
+    else {
+        return 0;
+    }
+
+    direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
+    if(direction == 0 || source_end < source_start)
+        return 0;
+
+    target = vj_pattern_transport_loop_target(runtime,
+                                              seq,
+                                              source_bank,
+                                              source_id);
+    if(!target)
+        return 0;
+
+    loop_start = target->loop_start;
+    loop_end = target->loop_end;
+    if(loop_start < 0)
+        loop_start = 0;
+
+    const int local_last = source_end - source_start;
+    if(loop_start > local_last)
+        return 0;
+    if(loop_end > local_last)
+        loop_end = local_last;
+    if(loop_end < loop_start)
+        return 0;
+
+    absolute_frame = atomic_load_long_long(&settings->current_frame_num);
+    if(absolute_frame < INT_MIN || absolute_frame > INT_MAX)
+        return 0;
+
+    local_frame = (int)absolute_frame - source_start;
+    mapped_frame = vj_pattern_map_bounds(loop_start,
+                                         loop_end,
+                                         local_frame,
+                                         direction);
+    if(mapped_frame == local_frame)
+        return 0;
+
+    if(!veejay_set_frame(info, source_start + mapped_frame))
+        return 0;
+
+    const unsigned int new_epoch = (unsigned int)veejay_transport_epoch_get(info);
+    runtime->transport_valid = 1;
+    runtime->transport_epoch = new_epoch;
+
+    vj_pattern_state_rebase(runtime,
+                            &runtime->source_state,
+                            mapped_frame,
+                            new_epoch,
+                            direction);
+    vj_pattern_state_rebase(runtime,
+                            &runtime->cell_state,
+                            mapped_frame,
+                            new_epoch,
+                            direction);
+    if(runtime->bank_state.active) {
+        runtime->bank_state.transport_valid = 1;
+        runtime->bank_state.transport_epoch = new_epoch;
+    }
+
+    if(epoch)
+        *epoch = new_epoch;
+
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[PATTERN] transport loop bank=%d slot=%d source=%d frame=%d -> %d direction=%d bounds=%d..%d",
+               target->bank,
+               target->slot,
+               source_id,
+               local_frame,
+               mapped_frame,
+               direction,
+               loop_start,
+               loop_end);
+#endif
+    return 1;
 }
 
 static int vj_pattern_command_changes_transport(int id)
@@ -2101,6 +2310,7 @@ typedef struct {
     int playback_mode;
     int source_id;
     int speed;
+    long long frame;
 } vj_pattern_transport_snapshot_t;
 
 static void vj_pattern_transport_snapshot(veejay_t *info,
@@ -2118,8 +2328,10 @@ static void vj_pattern_transport_snapshot(veejay_t *info,
         snapshot->playback_mode = info->uc->playback_mode;
         snapshot->source_id = info->uc->sample_id;
     }
-    if(info->settings)
+    if(info->settings) {
         snapshot->speed = info->settings->current_playback_speed;
+        snapshot->frame = atomic_load_long_long(&info->settings->current_frame_num);
+    }
 
     if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
        info->uc->sample_id > 0 && sample_exists(info->uc->sample_id))
@@ -2146,7 +2358,8 @@ static int vj_pattern_transport_snapshot_changed(
            (before->epoch != after->epoch ||
             before->playback_mode != after->playback_mode ||
             before->source_id != after->source_id ||
-            before->speed != after->speed);
+            before->speed != after->speed ||
+            before->frame != after->frame);
 }
 
 static int vj_pattern_fire_row(veejay_t *info,
@@ -2179,6 +2392,13 @@ static int vj_pattern_fire_row(veejay_t *info,
     runtime->tick_transport_changed = 1;
     runtime->tick_transport_cutoff_frame = frame;
     runtime->tick_transport_reverse = reverse ? 1 : 0;
+    runtime->tick_transport_rebase =
+        target->bank != VJ_PATTERN_BANK_SEQUENCE &&
+        before.playback_mode == after.playback_mode &&
+        before.source_id == after.source_id &&
+        before.frame == after.frame;
+    runtime->tick_transport_mode = after.playback_mode;
+    runtime->tick_transport_source_id = after.source_id;
     return 1;
 }
 
@@ -2246,6 +2466,97 @@ static void vj_pattern_fire_range(veejay_t *info,
     }
 }
 
+static int vj_pattern_apply_transport_cutoff(veejay_t *info,
+                                             vj_pattern_runtime_t *runtime,
+                                             unsigned int *epoch)
+{
+    video_playback_setup *settings;
+    int source_start = 0;
+    int source_end = -1;
+    int signed_speed;
+    int direction;
+    int cutoff;
+    long long target_frame;
+
+    if(!info || !info->settings || !info->uc || !runtime ||
+       !runtime->tick_transport_changed || !runtime->tick_transport_rebase)
+        return 0;
+
+    if(info->uc->playback_mode != runtime->tick_transport_mode ||
+       info->uc->sample_id != runtime->tick_transport_source_id)
+        return 0;
+
+    settings = info->settings;
+    signed_speed = settings->current_playback_speed;
+
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
+       info->uc->sample_id > 0 && sample_exists(info->uc->sample_id))
+    {
+        int loop_type = 0;
+
+        if(sample_get_short_info(info->uc->sample_id,
+                                 &source_start,
+                                 &source_end,
+                                 &loop_type,
+                                 &signed_speed) != 0)
+            return 0;
+    }
+    else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+            info->uc->sample_id > 0 && vj_tag_exists(info->uc->sample_id) &&
+            vj_tag_buffer_active(info->uc->sample_id))
+    {
+        source_end = vj_tag_get_buffer_duration(info->uc->sample_id) - 1;
+    }
+    else {
+        return 0;
+    }
+
+    if(source_end < source_start)
+        return 0;
+
+    cutoff = runtime->tick_transport_cutoff_frame;
+    if(cutoff < 0)
+        cutoff = 0;
+    if(cutoff > source_end - source_start)
+        cutoff = source_end - source_start;
+
+    target_frame = (long long)source_start + cutoff;
+    if(atomic_load_long_long(&settings->current_frame_num) != target_frame &&
+       !veejay_set_frame(info, (long)target_frame))
+        return 0;
+
+    const unsigned int new_epoch = (unsigned int)veejay_transport_epoch_get(info);
+    direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
+    runtime->transport_valid = 1;
+    runtime->transport_epoch = new_epoch;
+
+    vj_pattern_state_rebase(runtime,
+                            &runtime->source_state,
+                            cutoff,
+                            new_epoch,
+                            direction);
+    vj_pattern_state_rebase(runtime,
+                            &runtime->cell_state,
+                            cutoff,
+                            new_epoch,
+                            direction);
+    if(runtime->bank_state.active) {
+        runtime->bank_state.transport_valid = 1;
+        runtime->bank_state.transport_epoch = new_epoch;
+    }
+
+    if(epoch)
+        *epoch = new_epoch;
+
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[PATTERN] transport command cutoff frame=%d direction=%d",
+               cutoff,
+               direction);
+#endif
+    return 1;
+}
+
 static void vj_pattern_process_target(veejay_t *info,
                                       vj_pattern_runtime_t *runtime,
                                       vj_pattern_playback_state_t *state,
@@ -2284,7 +2595,7 @@ static void vj_pattern_process_target(veejay_t *info,
     if(source_frame < 0)
         source_frame = 0;
     target = vj_pattern_target_find(runtime, bank, slot, 0);
-    frame = vj_pattern_map_frame(target, source_frame);
+    frame = vj_pattern_map_frame(target, source_frame, direction);
     looped = vj_pattern_loop_valid(target);
 
     transport_changed = state->transport_valid &&
@@ -2585,6 +2896,9 @@ static void vj_pattern_backend_tick(veejay_t *info)
     runtime->tick_transport_changed = 0;
     runtime->tick_transport_cutoff_frame = -1;
     runtime->tick_transport_reverse = 0;
+    runtime->tick_transport_rebase = 0;
+    runtime->tick_transport_mode = 0;
+    runtime->tick_transport_source_id = 0;
     runtime->tick_dedup_count = 0;
 
     epoch = (unsigned int)veejay_transport_epoch_get(info);
@@ -2597,7 +2911,7 @@ static void vj_pattern_backend_tick(veejay_t *info)
     signed_speed = settings->current_playback_speed;
     speed = abs(signed_speed);
     direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
-    max_linear_delta = speed > 0 ? INT_MAX : 0;
+    max_linear_delta = speed > 0 ? speed : 0;
     mode = info->uc->playback_mode;
     source_id = info->uc->sample_id;
 
@@ -2609,9 +2923,9 @@ static void vj_pattern_backend_tick(veejay_t *info)
         if(sample_get_short_info(source_id, &start, &end, &loop_type, &sample_speed) != 0)
             return;
         signed_speed = sample_speed;
-        local_frame = (int)(atomic_load_long_long(&settings->current_frame_num) - start);
-        if(local_frame < 0)
-            local_frame = 0;
+        const long long local =
+            atomic_load_long_long(&settings->current_frame_num) - start;
+        local_frame = local < 0 ? 0 : local > INT_MAX ? INT_MAX : (int)local;
         loops_remaining = sample_get_loops(source_id);
         source_bank = VJ_PATTERN_BANK_SAMPLE;
     }
@@ -2638,7 +2952,7 @@ static void vj_pattern_backend_tick(veejay_t *info)
 
     speed = abs(signed_speed);
     direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
-    max_linear_delta = speed > 0 ? INT_MAX : 0;
+    max_linear_delta = speed > 0 ? speed : 0;
 
     vj_pattern_process_target(info, runtime, &runtime->source_state,
                               source_bank, source_id, local_frame, 1,
@@ -2658,6 +2972,9 @@ static void vj_pattern_backend_tick(veejay_t *info)
                                   bank, slot, local_frame, 1,
                                   max_linear_delta, epoch, direction,
                                   loop_type, loops_remaining);
+
+        vj_pattern_apply_transport_cutoff(info, runtime, &epoch);
+        vj_pattern_apply_transport_loop(info, runtime, &epoch);
 
         if(!runtime->tick_transport_changed &&
            vj_pattern_sequence_layout(info, bank, slot,
@@ -2695,6 +3012,9 @@ static void vj_pattern_backend_tick(veejay_t *info)
         }
         return;
     }
+
+    vj_pattern_apply_transport_cutoff(info, runtime, &epoch);
+    vj_pattern_apply_transport_loop(info, runtime, &epoch);
 
     vj_pattern_process_target(info, runtime, &runtime->cell_state,
                               0, -1, 0, 0, 0,
