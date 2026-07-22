@@ -1187,8 +1187,7 @@ static vj_beat_param_hint_t vje_beat_hint_sanitize(vj_beat_param_hint_t h)
         h.flags |= VJ_BEAT_F_REJECT;
 
     if(h.klass == VJ_BEAT_SELECTOR ||
-       h.klass == VJ_BEAT_RESET ||
-       h.klass == VJ_BEAT_ALPHA_OR_OPACITY)
+       h.klass == VJ_BEAT_RESET)
         h.flags |= VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL;
 
     if(h.flags & VJ_BEAT_F_REJECT) {

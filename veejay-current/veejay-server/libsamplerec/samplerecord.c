@@ -43,11 +43,18 @@ void	sample_record_free(void)
 
 int sample_get_encoded_file(int sample_id, char *description)
 {
-    sample_info *si;
-    si = sample_get(sample_id);
-    if (!si)
-	return -1;
-    sprintf(description, "%s", si->encoder_destination	 );
+    sample_info *si = sample_get(sample_id);
+
+    if(!description)
+        return -1;
+
+    description[0] = '\0';
+
+    if(!si || !si->encoder_destination || !si->encoder_destination[0] ||
+       si->encoder_total_frames_recorded <= 0)
+        return -1;
+
+    sprintf(description, "%s", si->encoder_destination);
     return 1;
 }
 
@@ -323,6 +330,9 @@ int sample_stop_encoder(int s1) {
    sample_info *si = sample_get(s1);
    if(!si) return 0;
 
+    if(!si->encoder_active && !si->encoder && !si->encoder_file)
+        return 0;
+
 	if( si->encoder) {
 		vj_avcodec_stop( si->encoder, si->encoder_format );
 		si->encoder = NULL;
@@ -332,8 +342,10 @@ int sample_stop_encoder(int s1) {
    	  lav_close((lav_file_t*)si->encoder_file);
 	  si->encoder_file = NULL;
 	}
-
-    veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
+    if(si->encoder_destination && si->encoder_destination[0])
+        veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
+    else
+        veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder");
     si->encoder_active = 0;
     si->encoder_file = NULL;
     si->encoder = NULL;

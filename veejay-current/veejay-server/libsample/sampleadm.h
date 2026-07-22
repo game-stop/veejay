@@ -397,7 +397,7 @@ extern int sample_set_chain_channel(int s1, int position, int channel);
 extern int sample_get_long_info(int sample_id, int *start, int *end, int *loop, int *speed, int *cur_sfd, int *max_sfd);
 
 extern int sample_chain_sprint_status(int s1,int tags,int sample_count,int cache,int sa,
-    int ca, int r, int f, int m, int t,int sr,int curfps,
+    int ca, int r, int f, int m, int t,int record_sample_id,int curfps,
     uint32_t lo, uint32_t hi, int macro,char *s, int feedback, int global_fx, int vims_mirror );
 
 extern int sample_set_render_entry(int s1, int entry);

@@ -65,7 +65,6 @@ typedef enum
     VJ_AUDIO_CTRL_SCRATCH_SIGNED = 19
 } vj_audio_beat_signal_t;
 
-#define VJ_AUDIO_BEAT_AUTO_MAX_TARGETS 24
 #define VJ_AUDIO_BEAT_AUTO_AMOUNT_UI_MAX 100
 #define VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX 300
 

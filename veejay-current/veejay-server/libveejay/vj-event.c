@@ -4685,10 +4685,11 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
     }
 
     int state = vj_event_lock(v);
-
-    vj_sdl_set_fullscreen(v->sdl, args[0]);
-
+    int applied = vj_sdl_set_fullscreen(v->sdl, args[0]);
     vj_event_unlock(v, state);
+
+    if(!applied)
+        return;
 
     v->settings->full_screen = args[0];
 
@@ -4709,24 +4710,33 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
     int x  = args[2];
     int y  = args[3];
 
-    if( w < 0 || w > 4096 || h < 0 || h > 4096)
+    if(w < 0 || w > 4096 || h < 0 || h > 4096 ||
+       ((w == 0) != (h == 0)))
     {
-        veejay_msg(VEEJAY_MSG_ERROR, "Invalid arguments '%d %d %d %d'", w,h,x,y );
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Invalid SDL window geometry '%d %d %d %d'",
+                   w, h, x, y);
         return;
     }
 
-    if (v->video_out != 0 && v->video_out != 2) {
-        return; 
+    if(v->video_out != 0 && v->video_out != 2) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "SDL window geometry ignored: active video output is not SDL");
+        return;
     }
-    
-    if (v->sdl == NULL) {
+
+    if(v->sdl == NULL) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "SDL window geometry ignored: SDL output is not initialized");
         return;
     }
 
     int state = vj_event_lock(v);
 
-    
-    vj_sdl_set_window_size(v->sdl, w,h,x,y);
+    if(!vj_sdl_set_window_size(v->sdl, w, h, x, y))
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to apply SDL window geometry '%d %d %d %d'",
+                   w, h, x, y);
 
     vj_event_unlock(v,state);
 }
@@ -6623,10 +6633,25 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 {
     char tmp[255];
     veejay_t *v = (veejay_t *)ptr;
+    video_playback_setup *s = v->settings;
     int args[2];
     int result = 0;
+    int record_sample_id = v->uc->sample_id;
     char prefix[SAMPLE_MAX_DESCR_LEN];
     P_A(args,sizeof(args),NULL,0,format,ap);
+
+    if(s->sample_record && s->sample_record_id > 0 && sample_encoder_active(s->sample_record_id))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING, "Sample recorder is already active for sample %d", s->sample_record_id);
+        return;
+    }
+
+    if(s->sample_record)
+    {
+        s->sample_record = 0;
+        s->sample_record_id = 0;
+        s->sample_record_switch = 0;
+    }
 
     if( !SAMPLE_PLAYING(v))
     {
@@ -6652,7 +6677,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 
     if( !v->seq->active )
     {
-        sample_get_description(v->uc->sample_id, prefix );
+        sample_get_description(record_sample_id, prefix );
     }
     else
     {
@@ -6677,7 +6702,7 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     {
         if(!v->seq->active )
         {
-            args[0] = sample_get_longest(v->uc->sample_id);
+            args[0] = sample_get_longest(record_sample_id);
         }
         else
         {
@@ -6696,14 +6721,14 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
         return;
     }
 
-    if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
+    if( sample_init_encoder(record_sample_id, tmp, format_, v->effect_frame1, v->current_edit_list, args[0]) == 1)
     {
-        video_playback_setup *s = v->settings;
 #ifdef HAVE_JACK
         vj_perform_record_audio_source_reset(v);
 #endif
         if(v->recording)
             atomic_store_int(&v->recording->video.valid, 0);
+        s->sample_record_id = record_sample_id;
         s->sample_record_switch = args[1];
         result = 1;
         if(v->use_osd)
@@ -6727,90 +6752,100 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
     }
     else
     {
-        if( STREAM_PLAYING(v) && !vj_tag_exists(v->uc->sample_id) )
+        if( STREAM_PLAYING(v) && !vj_tag_exists(record_sample_id) )
             veejay_msg(VEEJAY_MSG_ERROR,"issue #60: You need a sample which identifier matches that of the current playing stream... ");
 
         veejay_msg(VEEJAY_MSG_ERROR,"Unable to start sample recorder");
-        sample_stop_encoder( v->uc->sample_id );
+        sample_reset_encoder(record_sample_id);
         result = 0;
-        v->settings->sample_record = 0;
+        s->sample_record = 0;
+        s->sample_record_id = 0;
+        s->sample_record_switch = 0;
         v->seq->rec_id = 0;
         return;
     }   
 
     if(result == 1)
     {
-        v->settings->sample_record = 1;
-        v->settings->sample_record_switch = args[1];
+        s->sample_record = 1;
+        s->sample_record_switch = args[1];
     }
 
     if( v->seq->active )
     {
-        v->seq->rec_id = v->uc->sample_id;
+        v->seq->rec_id = record_sample_id;
     }
     else
     {
-        veejay_set_frame(v, sample_get_resume(v->uc->sample_id));
+        veejay_set_frame(v, sample_get_resume(record_sample_id));
     }
 }
 
 void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap) 
 {
-    char avi_file[1024];
+    char avi_file[1024] = { 0 };
     veejay_t *v = (veejay_t*)ptr;
-    
-    if( SAMPLE_PLAYING(v) || v->seq->rec_id ) 
+    video_playback_setup *s = v->settings;
+    int stop_sample = s->sample_record_id;
+    int play_now = s->sample_record_switch;
+    int ns = 0;
+    int frames = 0;
+
+    if(stop_sample <= 0 && v->seq->rec_id > 0)
+        stop_sample = v->seq->rec_id;
+
+    if(!s->sample_record || stop_sample <= 0 || !sample_encoder_active(stop_sample))
     {
-        video_playback_setup *s = v->settings;
-        int stop_sample = v->uc->sample_id;
+        veejay_msg(VEEJAY_MSG_WARNING, "Sample recorder is not active");
+        s->sample_record = 0;
+        s->sample_record_id = 0;
+        s->sample_record_switch = 0;
+        v->seq->rec_id = 0;
+        return;
+    }
 
-        if(v->seq->rec_id )
-            stop_sample = v->seq->rec_id;
+    frames = sample_get_encoded_frames(stop_sample);
 
-        if( sample_stop_encoder( stop_sample ) == 1 ) 
+    if(sample_stop_encoder(stop_sample) != 1)
+    {
+        veejay_msg(VEEJAY_MSG_WARNING, "Sample recorder was not active for sample %d", stop_sample);
+        s->sample_record = 0;
+        s->sample_record_id = 0;
+        s->sample_record_switch = 0;
+        v->seq->rec_id = 0;
+        return;
+    }
+
+    if(sample_get_encoded_file(stop_sample, avi_file) <= 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Sample recorder %d has no completed output file", stop_sample);
+    }
+    else
+    {
+        ns = veejay_edit_addmovie_sample(v, avi_file, 0);
+        if(ns > 0)
         {
-            v->settings->sample_record = 0;
-            v->seq->rec_id = 0;
-            if( sample_get_encoded_file( stop_sample, avi_file) <= 0 )
-            {
-                veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file '%s' to sample %d", avi_file, stop_sample);
-            }
-            else
-            {
-                // add to new sample
-                int ns = veejay_edit_addmovie_sample(v,avi_file,0 );
-                if(ns > 0) {
-                    veejay_msg(VEEJAY_MSG_INFO, "Loaded file '%s' to new sample %d",avi_file, ns);
-                    veejay_msg(VEEJAY_MSG_INFO,
-                               "[REC] sample stop id=%d frames=%d file=%s",
-                               stop_sample,
-                               sample_get_encoded_frames(stop_sample),
-                               avi_file);
-                }
-                if(ns <= 0 )
-                    veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EDL",avi_file);
-            
-        
-                sample_reset_encoder( stop_sample );
-                s->sample_record = 0;   
-                s->sample_record_id = 0;
-                if(s->sample_record_switch) 
-                {
-                    s->sample_record_switch = 0;
-                    if( ns > 0 )
-                        veejay_change_playback_mode( v,VJ_PLAYBACK_MODE_SAMPLE, ns );
-                }
-            }
+            veejay_msg(VEEJAY_MSG_INFO, "Loaded file '%s' to new sample %d", avi_file, ns);
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[REC] sample stop id=%d frames=%d file=%s",
+                       stop_sample,
+                       frames,
+                       avi_file);
         }
         else
         {
-            veejay_msg(VEEJAY_MSG_ERROR, "Sample recorder was never started for sample %d",stop_sample);
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EDL", avi_file);
         }
     }
-    else 
-    {
-        p_invalid_mode();
-    }
+
+    sample_reset_encoder(stop_sample);
+    s->sample_record = 0;
+    s->sample_record_id = 0;
+    s->sample_record_switch = 0;
+    v->seq->rec_id = 0;
+
+    if(play_now && ns > 0)
+        veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, ns);
 }
 
 void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
@@ -10144,6 +10179,20 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
         return;
     }
 
+    if(v->settings->tag_record && v->settings->tag_record_id > 0 &&
+       vj_tag_encoder_active(v->settings->tag_record_id))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING, "Stream recorder is already active for stream %d", v->settings->tag_record_id);
+        return;
+    }
+
+    if(v->settings->tag_record)
+    {
+        v->settings->tag_record = 0;
+        v->settings->tag_record_id = 0;
+        v->settings->tag_record_switch = 0;
+    }
+
     char tmp[255];
     char prefix[1024];
     if(args[0] <= 0) 
@@ -10187,6 +10236,8 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
             vj_tag_stop_encoder(v->uc->sample_id);
         }
         v->settings->tag_record = 0;
+        v->settings->tag_record_id = 0;
+        v->settings->tag_record_switch = 0;
         return;
     } 
 
@@ -10207,6 +10258,7 @@ static void _vj_event_tag_record( veejay_t *v , int *args )
     if(v->recording)
         atomic_store_int(&v->recording->video.valid, 0);
     v->settings->tag_record = 1;
+    v->settings->tag_record_id = v->uc->sample_id;
 #ifdef HAVE_JACK
     veejay_msg(VEEJAY_MSG_INFO,
                "[REC] stream start id=%d frames=%d format=%s audio=%s policy=%s autoplay=%d",
@@ -10237,49 +10289,62 @@ void vj_event_tag_rec_start(void *ptr, const char format[], va_list ap)
 
 void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap) 
 {
-    char avi_file[1024];
+    char avi_file[1024] = { 0 };
     veejay_t *v = (veejay_t *)ptr;
     video_playback_setup *s = v->settings;
+    int stream_id = s->tag_record_id;
+    int play_now = s->tag_record_switch;
+    int frames = 0;
+    int ns = 0;
 
-    if( STREAM_PLAYING(v)  && v->settings->tag_record) 
+    if(!s->tag_record || stream_id <= 0 || !vj_tag_encoder_active(stream_id))
     {
-        int play_now = s->tag_record_switch;
-        if(!vj_tag_stop_encoder( v->uc->sample_id))
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Wasnt recording anyway");
-            return;
-        }
-        
-        vj_tag_get_encoded_file(v->uc->sample_id, avi_file); 
+        veejay_msg(VEEJAY_MSG_WARNING, "Stream recorder is not active");
+        s->tag_record = 0;
+        s->tag_record_id = 0;
+        s->tag_record_switch = 0;
+        return;
+    }
 
-        // create new sample 
-        int ns = veejay_edit_addmovie_sample( v,avi_file, 0 );
+    frames = vj_tag_get_encoded_frames(stream_id);
+
+    if(!vj_tag_stop_encoder(stream_id))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING, "Stream recorder was not active for stream %d", stream_id);
+        s->tag_record = 0;
+        s->tag_record_id = 0;
+        s->tag_record_switch = 0;
+        return;
+    }
+
+    if(!vj_tag_get_encoded_file(stream_id, avi_file))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Stream recorder %d has no completed output file", stream_id);
+    }
+    else
+    {
+        ns = veejay_edit_addmovie_sample(v, avi_file, 0);
         if(ns > 0)
-        {
-            int len = vj_tag_get_encoded_frames(v->uc->sample_id) - 1;
-            veejay_msg(VEEJAY_MSG_INFO,"Added file %s (%d frames) to EditList as sample %d",
-                avi_file, len ,ns); 
-        }       
+            veejay_msg(VEEJAY_MSG_INFO, "Added file %s (%d frames) to EditList as sample %d", avi_file, frames, ns);
         else
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList",avi_file);
-        }
+            veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList", avi_file);
 
         veejay_msg(VEEJAY_MSG_INFO,
                    "[REC] stream stop id=%d frames=%d file=%s",
-                   v->uc->sample_id,
-                   vj_tag_get_encoded_frames(v->uc->sample_id),
+                   stream_id,
+                   frames,
                    avi_file);
-        vj_tag_reset_encoder( v->uc->sample_id);
-        s->tag_record = 0;
-        s->tag_record_switch = 0;
+    }
 
-        if(play_now) 
-        {
-            int last_id = sample_highest_valid_id();
-            veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now", last_id );
-            veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, last_id );
-        }
+    vj_tag_reset_encoder(stream_id);
+    s->tag_record = 0;
+    s->tag_record_id = 0;
+    s->tag_record_switch = 0;
+
+    if(play_now && ns > 0)
+    {
+        veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now", ns);
+        veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, ns);
     }
 }
 

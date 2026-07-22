@@ -264,14 +264,14 @@ static void Usage(char *progname)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "Audio:\n");
-    fprintf(stderr, "  -a/--audio [0|1]             Enable or disable audio playback output (default: 1)\n");
+    fprintf(stderr, "  -a/--audio <0|1>             Enable or disable audio playback output (default: 1)\n");
     fprintf(stderr, "                                -a 0 disables source/media playback audio; clock and external input services can remain available\n");
     fprintf(stderr, "     --audio-muted             Start with all audio playback output muted\n");
     fprintf(stderr, "                                JACK input, sync and beat services remain available\n");
-    fprintf(stderr, "     --audio-sync-thread [0|1] Enable or disable the audio sync/control thread\n");
-    fprintf(stderr, "     --no-audio-sync-thread    Disable the audio sync/control thread\n");
-    fprintf(stderr, "     --audio-beat-thread [0|1] Enable or disable the audio beat detector thread\n");
-    fprintf(stderr, "     --no-audio-beat-thread    Disable the audio beat detector thread\n");
+    fprintf(stderr, "     --audio-sync-thread <0|1> Allow or suppress the lazy audio sync/control worker\n");
+    fprintf(stderr, "     --no-audio-sync-thread    Suppress sync/capture services (beat analysis then has no input provider)\n");
+    fprintf(stderr, "     --audio-beat-thread <0|1> Allow or suppress the lazy audio beat detector worker\n");
+    fprintf(stderr, "     --no-audio-beat-thread    Suppress the audio beat detector worker\n");
     fprintf(stderr, "     --pace-correction <ms>    Audio pace correction offset in milliseconds (>= 0)\n");
     fprintf(stderr, "  -r/--audiorate <num>         Set dummy/sample audio rate (default: 48000 Hz)\n");
     fprintf(stderr, "     --audio-channels <num>    Set dummy/sample audio channel count\n");

@@ -1218,7 +1218,7 @@ static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p, vjp
 static void vj_perform_sample_complete_buffers(veejay_t * info, performer_t *p, vjp_kf *effect_info, int *h, VJFrame *f0, VJFrame *f2, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si);
 static void vj_perform_apply_first(veejay_t *info, performer_t *p, vjp_kf *todo_info, VJFrame **frames, sample_eff_chain *entry, int e, int c, long long n_frames, void *ptr, int playmode, int *alpha_a_valid, int *alpha_b_valid);
 static int vj_perform_render_sample_frame(veejay_t *info, performer_t *p, uint8_t *frame[4], int sample, int type);
-static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
+static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4], int stream_id);
 static int vj_perform_record_commit_single(veejay_t *info);
 static void vj_perform_end_transition(veejay_t *info, int mode, int sample);
 static int vj_perform_format_changed_rgb(performer_t *p, VJFrame *frame);
@@ -4348,12 +4348,11 @@ void vj_perform_audio_stop(veejay_t * info)
     if(!info)
         return;
 
-    if (info->audio == AUDIO_PLAY) {
 #ifdef HAVE_JACK
+    if(vj_jack_is_running())
         vj_jack_stop();
 #endif
-        info->audio = NO_AUDIO;
-    }
+    info->audio = NO_AUDIO;
 }
 
 void vj_perform_get_primary_frame(veejay_t * info, uint8_t **frame)
@@ -7765,7 +7764,7 @@ static int vj_perform_render_offline_tag_frame(veejay_t *info)
                                info->pixel_format);
 }
 
-static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
+static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4], int stream_id)
 {
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *p = g->A;
@@ -7774,7 +7773,7 @@ static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4])
     if(info->audio == AUDIO_PLAY)
         audio_len = vj_perform_record_audio_frame(info, p);
 
-    return vj_tag_record_frame(info->uc->sample_id,
+    return vj_tag_record_frame(stream_id,
                                frame,
                                audio_len > 0 ? p->audio_rec_buffer : NULL,
                                audio_len,
@@ -7877,6 +7876,8 @@ static int vj_perform_record_offline_commit_single(veejay_t *info)
 static int vj_perform_record_commit_single(veejay_t *info)
 {
     char filename[1024];
+    int sample_id = info->settings->sample_record_id;
+    int stream_id = info->settings->tag_record_id;
 
     if( info->seq->active && info->seq->rec_id ) {
             int id = 0;
@@ -7897,9 +7898,9 @@ static int vj_perform_record_commit_single(veejay_t *info)
             return id;
     }
     else {
-        if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+        if(sample_id > 0)
         {
-            if(sample_get_encoded_file(info->uc->sample_id, filename))
+            if(sample_get_encoded_file(sample_id, filename))
             {
                 int df = vj_event_get_video_format();
                 int id = 0;
@@ -7919,9 +7920,8 @@ static int vj_perform_record_commit_single(veejay_t *info)
             }
         }
 
-        if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
+        if(stream_id > 0)
         {
-            int stream_id = info->uc->sample_id;
             if(vj_tag_get_encoded_file(stream_id, filename))
             {
                 int df = vj_event_get_video_format();
@@ -8066,11 +8066,13 @@ void vj_perform_record_stop(veejay_t *info)
  if(info->recording)
      atomic_store_int(&info->recording->video.valid, 0);
 
- if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE || ( info->seq->active && info->seq->rec_id > 0 ))
+ if(settings->sample_record || info->seq->rec_id > 0)
  {
-     int rec_sample = (info->seq->rec_id > 0 ? info->seq->rec_id : info->uc->sample_id);
-     sample_reset_encoder(rec_sample);
-     sample_reset_autosplit(rec_sample);
+     int rec_sample = (settings->sample_record_id > 0 ? settings->sample_record_id : info->seq->rec_id);
+     if(rec_sample > 0) {
+        sample_reset_encoder(rec_sample);
+        sample_reset_autosplit(rec_sample);
+     }
      if( settings->sample_record && settings->sample_record_switch)
      {
         settings->sample_record_switch = 0;
@@ -8085,20 +8087,24 @@ void vj_perform_record_stop(veejay_t *info)
         }
      }
      settings->sample_record = 0;
+     settings->sample_record_id = 0;
      settings->sample_record_switch =0;
      settings->render_list = 0;
 
      info->seq->rec_id = 0;
 
  }
- else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
+ else if(settings->tag_record)
  {
-    int stream_id = info->uc->sample_id;
+    int stream_id = settings->tag_record_id;
     int play = settings->tag_record_switch;
-    vj_tag_reset_encoder(stream_id);
-    vj_tag_reset_autosplit(stream_id);
+    if(stream_id > 0) {
+        vj_tag_reset_encoder(stream_id);
+        vj_tag_reset_autosplit(stream_id);
+    }
 
     settings->tag_record = 0;
+    settings->tag_record_id = 0;
     settings->tag_record_switch = 0;
 
     if(play)
@@ -8234,7 +8240,7 @@ void vj_perform_record_offline_tag_frame(veejay_t *info)
 void vj_perform_record_tag_frame(veejay_t *info) {
     uint8_t *frame[4];
     int res = 1;
-    int stream_id = info->uc->sample_id;
+    int stream_id = info->settings->tag_record_id;
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *p = g->A;
 
@@ -8245,7 +8251,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
         frame[3] = NULL;
     }
 
-    res = vj_perform_render_tag_frame(info, frame);
+    res = vj_perform_render_tag_frame(info, frame, stream_id);
     if(info->recording)
         __sync_add_and_fetch(&info->recording->video_records, 1);
 
@@ -16568,10 +16574,10 @@ static  void    vj_perform_record_frame( veejay_t *info )
     }
     else {
 
-        if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG && info->settings->tag_record )
+        if(info->settings->tag_record && info->settings->tag_record_id > 0)
             vj_perform_record_tag_frame(info);
-        else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE && info->settings->sample_record )
-            vj_perform_record_sample_frame(info, info->uc->sample_id,0 );
+        else if(info->settings->sample_record && info->settings->sample_record_id > 0)
+            vj_perform_record_sample_frame(info, info->settings->sample_record_id, 0);
     }
 }
 

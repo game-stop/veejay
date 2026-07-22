@@ -495,6 +495,7 @@ typedef struct {
 	int full_screen;
 	int tag_record_switch;
 	int tag_record;
+	int tag_record_id;
 	int dct_method;
 	subsample_mode_t sample_mode;
 	int unicast_link_id;
@@ -744,6 +745,11 @@ typedef struct veejay_t
 
 void veejay_transport_epoch_bump(veejay_t *info);
 int veejay_transport_epoch_get(veejay_t *info);
+
+#ifdef HAVE_JACK
+void veejay_audio_sync_thread_set_enabled(int enabled);
+void veejay_audio_beat_thread_set_enabled(int enabled);
+#endif
 
 
 typedef struct {

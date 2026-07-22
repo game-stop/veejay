@@ -2454,17 +2454,17 @@ void		vj_init_vevo_events(void)
 	index_map_[VIMS_RESIZE_SDL_SCREEN]			=	_new_event(
 				"%d %d %d %d",
 				VIMS_RESIZE_SDL_SCREEN,
-				"(OUT) Resize SDL video window",
+				"(OUT) Resize/show SDL video window, or hide it with 0 0",
 				vj_event_set_screen_size,
 				4,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Width",
+				"Width (0 with height 0 hides window)",
 				0,
-				"Height",
+				"Height (0 with width 0 hides window)",
 				0,
-				"X offset",
+				"X position (-1 keeps current)",
 				-1,
-				"Y offset",
+				"Y position (-1 keeps current)",
 				-1,
 				NULL );
 #endif

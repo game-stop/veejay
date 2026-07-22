@@ -107,6 +107,8 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
     vjsdl->height = frame->height;
     vjsdl->sw_scale_width = 0;
     vjsdl->sw_scale_height = 0;
+    vjsdl->x = -1;
+    vjsdl->y = -1;
     vjsdl->borderless = borderless;
 
     memset(&templ, 0, sizeof(sws_template));
@@ -178,9 +180,9 @@ void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height
     if (scaled_height > 0)
         vjsdl->sw_scale_height = scaled_height;
 
-    if( x >= 0 )
+    if(x != -1)
         vjsdl->x = x;
-    if( y >= 0 )
+    if(y != -1)
         vjsdl->y = y;
 
     fs_flags = fs ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
@@ -197,8 +199,8 @@ void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height
             SDL_SetWindowSize(vjsdl->screen, vjsdl->sw_scale_width, vjsdl->sw_scale_height);
 
         SDL_SetWindowPosition(vjsdl->screen,
-                              (vjsdl->x >= 0 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
-                              (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED));
+                              (vjsdl->x != -1 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
+                              (vjsdl->y != -1 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED));
     }
 
     if(vjsdl->renderer)
@@ -212,11 +214,15 @@ void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height
 void vj_sdl_get_position( void *ptr, int *x, int *y )
 {
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-    if(!vjsdl) {
+
+    if(!vjsdl || !vjsdl->screen) {
         if(x) *x = 0;
         if(y) *y = 0;
         return;
     }
+
+    if(!vjsdl->fs)
+        SDL_GetWindowPosition(vjsdl->screen, &vjsdl->x, &vjsdl->y);
 
     if(x) *x = vjsdl->x;
     if(y) *y = vjsdl->y;
@@ -281,10 +287,10 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 		vjsdl->sw_scale_width = scaled_width;
 	if (scaled_height)
 		vjsdl->sw_scale_height = scaled_height;
-    if( x >= 0 ) {
+    if(x != -1) {
         vjsdl->x = x;
     }
-    if( y >=0 ) {
+    if(y != -1) {
         vjsdl->y = y;
     }
 
@@ -301,8 +307,8 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     int flags = (fs ? SDL_WINDOW_FULLSCREEN : (vjsdl->borderless ? SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS: SDL_WINDOW_OPENGL ));
 
 	vjsdl->screen = SDL_CreateWindow(vjsdl->caption, 
-            (vjsdl->x >= 0 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
-            (vjsdl->y >= 0 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED),
+            (vjsdl->x != -1 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
+            (vjsdl->y != -1 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED),
             vjsdl->sw_scale_width, vjsdl->sw_scale_height, flags );
 
     if(!vjsdl->screen)
@@ -310,6 +316,8 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 		veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to create SDL window: %s", SDL_GetError());
 		return 0;
     }
+
+    SDL_GetWindowPosition(vjsdl->screen, &vjsdl->x, &vjsdl->y);
 
     // Iterate through available driver and try in order of priority
     char *sdl_driver = getenv("VEEJAY_SDL_DRIVER");
@@ -435,37 +443,92 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 	return 1;
 }
 
-void vj_sdl_set_fullscreen(void *ptr, int enabled) {
+int vj_sdl_set_fullscreen(void *ptr, int enabled) {
     uint32_t flags = enabled ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
     vj_sdl *vjsdl = (vj_sdl*) ptr;
 
     if(!vjsdl || !vjsdl->screen)
-        return;
+        return 0;
 
     if (SDL_SetWindowFullscreen(vjsdl->screen, flags) == 0) {
         vjsdl->fs = enabled;
-            
-        if(enabled)
-            vj_sdl_grab( vjsdl, 0 );
-    } else {
-        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Fullscreen failed: %s", SDL_GetError());
+
+        if(enabled) {
+            vj_sdl_grab(vjsdl, 0);
+        }
+        else if(vjsdl->sw_scale_width > 0 && vjsdl->sw_scale_height > 0) {
+            vj_sdl_set_window_size(vjsdl,
+                                   vjsdl->sw_scale_width,
+                                   vjsdl->sw_scale_height,
+                                   vjsdl->x,
+                                   vjsdl->y);
+        }
+        return 1;
     }
+
+    veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Fullscreen failed: %s", SDL_GetError());
+    return 0;
 }
 
-void vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y) {
+int vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y)
+{
     vj_sdl *vjsdl = (vj_sdl*) ptr;
-    if (!vjsdl || !vjsdl->screen) return;
+    int actual_w;
+    int actual_h;
 
-    SDL_SetWindowSize(vjsdl->screen, w, h);
-    SDL_SetWindowPosition(vjsdl->screen, x, y);
+    if(!vjsdl || !vjsdl->screen)
+        return 0;
 
-    if(vjsdl->renderer)
-        SDL_RenderSetLogicalSize(vjsdl->renderer, vjsdl->width, vjsdl->height);
+    if(w == 0 && h == 0) {
+        SDL_HideWindow(vjsdl->screen);
+        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL video window hidden");
+        return 1;
+    }
+
+    if(w <= 0 || h <= 0)
+        return 0;
 
     vjsdl->sw_scale_width = w;
     vjsdl->sw_scale_height = h;
-    
-    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Window resized to %dx%d", w, h);
+
+    if(!vjsdl->fs && (x == -1 || y == -1))
+        SDL_GetWindowPosition(vjsdl->screen, &vjsdl->x, &vjsdl->y);
+
+    if(x != -1)
+        vjsdl->x = x;
+    if(y != -1)
+        vjsdl->y = y;
+
+    if(!vjsdl->fs) {
+        SDL_SetWindowSize(vjsdl->screen, w, h);
+        SDL_SetWindowPosition(vjsdl->screen, vjsdl->x, vjsdl->y);
+    }
+
+    if(vjsdl->renderer &&
+       SDL_RenderSetLogicalSize(vjsdl->renderer, vjsdl->width, vjsdl->height) != 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] Unable to retain logical video size: %s",
+                   SDL_GetError());
+        return 0;
+    }
+
+    if(!(SDL_GetWindowFlags(vjsdl->screen) & SDL_WINDOW_SHOWN))
+        SDL_ShowWindow(vjsdl->screen);
+
+    if(!vjsdl->fs) {
+        SDL_GetWindowSize(vjsdl->screen, &actual_w, &actual_h);
+        SDL_GetWindowPosition(vjsdl->screen, &vjsdl->x, &vjsdl->y);
+        vjsdl->sw_scale_width = actual_w;
+        vjsdl->sw_scale_height = actual_h;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[DISPLAY] SDL video window %s at %dx%d, position x=%d, y=%d",
+               vjsdl->fs ? "geometry queued while fullscreen" : "resized",
+               vjsdl->sw_scale_width, vjsdl->sw_scale_height,
+               vjsdl->x, vjsdl->y);
+    return 1;
 }
 
 void    vj_sdl_enable_screensaver(void)

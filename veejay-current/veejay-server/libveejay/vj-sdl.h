@@ -34,7 +34,7 @@ void vj_sdl_free(void *ptr);
 uint8_t* vj_sdl_get_buffer( void *ptr, int index );
 void vj_sdl_enable_screensaver();
 void vj_sdl_preroll(void *ptr, int frame_count);
-void vj_sdl_set_fullscreen(void *ptr, int enabled);
-void vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y);
+int vj_sdl_set_fullscreen(void *ptr, int enabled);
+int vj_sdl_set_window_size(void *ptr, int w, int h, int x, int y);
 #endif
 #endif

@@ -1308,7 +1308,7 @@ static struct
     {"Filter the effects list by any string"},
     {"Shift + Mouse left: Toggle selected FX,\nControl + Mouse left: Toggle selected FX animation,\nDrag a filled row onto another slot to swap or move the complete live FX entry,\nDrop an FX from an effect list onto a slot to insert or replace it"},
 
-    {"Enable or disable the audio beat detector. It analyses Original video audio when that source is selected, or the selected JACK/WAV external provider."},
+    {"Enable or disable the audio beat detector. It analyses Original video audio or the selected JACK/WAV provider independently of audible playback, so analysis can continue while output is muted or disabled."},
     {"Action performed on beat hits: none, Auto FX modulation, Break Beat with Auto FX, or pure Break Beat transport scratching."},
     {"Number of JACK input channels analysed by the beat detector when JACK is the selected beat source."},
     {"Beat trigger sensitivity. Lower values trigger more easily; higher values require stronger transients."},
@@ -9874,6 +9874,14 @@ static void update_current_slot(int *history, int pm, int last_pm) {
             update_slider_value2(widget_cache[WIDGET_SLOW_SLIDER], info->status_tokens[FRAME_DUP], 0);
         }
 
+        if(source_changed || sample_bounds_changed || marker_start_changed || marker_end_changed ||
+           history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP] ||
+           history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] ||
+           history[FRAME_DUP] != info->status_tokens[FRAME_DUP])
+        {
+            sample_record_sync_from_status(source_changed || marker_start_changed || marker_end_changed);
+        }
+
         if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ||
                     (int) gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget_cache[WIDGET_SPIN_SAMPLESTART])) != info->status_tokens[SAMPLE_START]))
         {
@@ -15931,6 +15939,95 @@ static gboolean update_stream_record_timeout(gpointer data)
     return TRUE;
 }
 
+static void recorder_progress_sync(const char *name, int active, int recorded, int total)
+{
+    GtkWidget *w = glade_xml_get_widget_(info->main_window, name);
+    char text[64];
+    gdouble fraction = 0.0;
+
+    if(!w || !GTK_IS_PROGRESS_BAR(w))
+        return;
+
+    if(active && total > 0)
+        fraction = CLAMP((gdouble)recorded / (gdouble)total, 0.0, 1.0);
+
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(w), fraction);
+
+    if(active) {
+        if(total > 0)
+            snprintf(text, sizeof(text), "%d / %d frames", recorded, total);
+        else
+            snprintf(text, sizeof(text), "%d frames", recorded);
+    }
+    else {
+        snprintf(text, sizeof(text), "Ready");
+    }
+
+    gtk_progress_bar_set_text(GTK_PROGRESS_BAR(w), text);
+}
+
+static void recorder_widgets_sync_from_status(int pm)
+{
+    int active;
+    int total;
+    int recorded;
+    GtkWidget *start;
+    GtkWidget *stop;
+    char text[96];
+
+    if(pm != MODE_SAMPLE && pm != MODE_STREAM)
+        return;
+
+    active = info->status_tokens[STREAM_RECORDING] > 0;
+    total = MAX(0, info->status_tokens[STREAM_DURATION]);
+    recorded = MAX(0, info->status_tokens[STREAM_RECORDED]);
+
+    if(pm == MODE_SAMPLE)
+    {
+        start = glade_xml_get_widget_(info->main_window, "button_sample_recordstart");
+        stop = glade_xml_get_widget_(info->main_window, "button_sample_recordstop");
+
+        if(active)
+            snprintf(text, sizeof(text), "Recording sample: %d / %d frames", recorded, total);
+        else
+            snprintf(text, sizeof(text), "Ready to record the playing sample.");
+
+        update_label_str("sample_record_ready_label", text);
+        if(start)
+            gtk_widget_set_sensitive(start, !active && info->status_tokens[CURRENT_ID] > 0);
+        if(stop)
+            gtk_widget_set_sensitive(stop, active);
+
+        recorder_progress_sync("samplerecord_progress", active, recorded, total);
+        if(is_button_toggled("seqactive"))
+            recorder_progress_sync("rec_seq_progress", active, recorded, total);
+
+        if(!active)
+            info->uc.recording[MODE_SAMPLE] = 0;
+    }
+    else
+    {
+        start = glade_xml_get_widget_(info->main_window, "button_stream_recordstart");
+        stop = glade_xml_get_widget_(info->main_window, "button_stream_recordstop");
+
+        if(active)
+            snprintf(text, sizeof(text), "Recording stream: %d / %d frames", recorded, total);
+        else
+            snprintf(text, sizeof(text), "Ready to record the playing stream.");
+
+        update_label_str("stream_record_ready_label", text);
+        if(start)
+            gtk_widget_set_sensitive(start, !active && info->status_tokens[CURRENT_ID] > 0);
+        if(stop)
+            gtk_widget_set_sensitive(stop, active);
+
+        recorder_progress_sync("streamrecord_progress", active, recorded, total);
+
+        if(!active)
+            info->uc.recording[MODE_STREAM] = 0;
+    }
+}
+
 static void init_recorder(int total_frames, gint mode)
 {
     if(mode == MODE_STREAM)
@@ -16629,9 +16726,29 @@ static void audio_beat_status_update_action_sensitivity(int action)
     audio_beat_status_update_monitor_latency_sensitivity(action);
 }
 
+static int audio_sync_status_has_external_provider(void)
+{
+    const int mode = info->status_tokens[AUDIO_SYNC_MODE];
+    const int source = info->status_tokens[AUDIO_SYNC_SOURCE];
+
+    if(!ui_audio_sync_mode_uses_external_provider(mode))
+        return 0;
+
+    if(source != VJ_AUDIO_SYNC_SOURCE_JACK &&
+       source != VJ_AUDIO_SYNC_SOURCE_WAV_FILE)
+        return 0;
+
+    return info->status_tokens[AUDIO_SYNC_ENABLED] ||
+           info->status_tokens[AUDIO_SYNC_OPEN] ||
+           info->status_tokens[AUDIO_SYNC_BRIDGE_ACTIVE];
+}
+
 static int audio_beat_status_action_allowed_for_record_source(int record_source, int action)
 {
     action = audio_beat_status_action_sanitize(action);
+
+    if(audio_sync_status_has_external_provider())
+        return (action == 0 || action == 2 || action == 3 || action == 4);
 
     switch(record_source) {
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
@@ -17725,37 +17842,7 @@ static const char *audio_sync_current_sample_route_name(void)
 
 static int audio_sync_ui_enabled_from_status(void)
 {
-    const int mode = info->status_tokens[AUDIO_SYNC_MODE];
-    const int record_source = info->status_tokens[RECORD_AUDIO_SOURCE];
-    int active;
-
-    if(record_source != VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
-        return 0;
-
-    if(mode == 0)
-        return 0;
-
-    if(!ui_audio_sync_mode_uses_external_provider(mode))
-        return 0;
-
-    active = info->status_tokens[AUDIO_SYNC_ENABLED] ? 1 : 0;
-
-    if(!active)
-        active = info->status_tokens[AUDIO_SYNC_BRIDGE_ACTIVE] ? 1 : 0;
-
-    if(!active &&
-       (mode == VJ_AUDIO_SYNC_MODE_LIVE_EXTERNAL ||
-        mode == VJ_AUDIO_SYNC_MODE_TRACK_ALIGN ||
-        mode == VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW ||
-        mode == VJ_AUDIO_SYNC_MODE_MONITOR ||
-        mode == VJ_AUDIO_SYNC_MODE_MONITOR_TRICKPLAY ||
-        mode == VJ_AUDIO_SYNC_MODE_TEMPO_BRIDGE) &&
-       info->status_tokens[AUDIO_SYNC_OPEN])
-    {
-        active = 1;
-    }
-
-    return active;
+    return audio_sync_status_has_external_provider();
 }
 
 static int audio_mixer_mode_from_ui_local(void)
@@ -17857,7 +17944,8 @@ static void audio_sync_update_mode_sensitivity(int mode, int source, int target_
                               source == VJ_AUDIO_SYNC_SOURCE_PUSH &&
                               (record_source == VJ_RECORD_AUDIO_SOURCE_ORIGINAL ||
                                record_source == VJ_RECORD_AUDIO_SOURCE_AUTO);
-    const int external_master = ((record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) ||
+    const int external_master = (audio_sync_status_has_external_provider() ||
+                                 (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK) ||
                                  ui_external_master);
     const int external_provider_mode = external_master &&
                                        ui_audio_sync_mode_uses_external_provider(selected_mode) &&
@@ -18054,6 +18142,9 @@ static int audio_input_selector_from_status(void)
 {
     const int record_source = info->status_tokens[RECORD_AUDIO_SOURCE];
     const int sync_source = info->status_tokens[AUDIO_SYNC_SOURCE];
+
+    if(audio_sync_status_has_external_provider())
+        return (sync_source == VJ_AUDIO_SYNC_SOURCE_WAV_FILE) ? 2 : 1;
 
     switch(record_source) {
         case VJ_RECORD_AUDIO_SOURCE_BEAT_JACK:
@@ -18418,16 +18509,16 @@ static void update_audio_sync_status_widgets(int *history, int force)
        AS_CHANGED(RECORD_AUDIO_SOURCE))
     {
         audio_beat_set_toggle(WIDGET_AUDIO_SYNC_ENABLE_TOGGLE,
-                              AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
-                                  ? audio_sync_ui_enabled_from_status()
-                                  : 0);
+                              audio_sync_ui_enabled_from_status());
     }
 
     if(AS_CHANGED(AUDIO_SYNC_MODE) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE)) {
         int mode = AS_CUR(AUDIO_SYNC_MODE);
         int record_source = AS_CUR(RECORD_AUDIO_SOURCE);
         int sample_owns_audio_source = audio_sync_current_sample_has_own_audio_source();
-        int external_master = !sample_owns_audio_source && (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK);
+        int external_master = !sample_owns_audio_source &&
+                              (record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK ||
+                               audio_sync_status_has_external_provider());
         int ui_input = audio_input_selector_ui_active_local();
         int ui_external = (ui_input == 1 || ui_input == 2);
         int ui_mode = audio_sync_mode_ui_local(mode);
@@ -18460,7 +18551,8 @@ static void update_audio_sync_status_widgets(int *history, int force)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "WAV file");
         else if(ui_input == 1)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "JACK");
-        else if(record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
+        else if(audio_sync_status_has_external_provider() ||
+                record_source == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, audio_sync_source_name(source));
         else if(record_source == VJ_RECORD_AUDIO_SOURCE_SILENCE)
             audio_beat_set_label_s(WIDGET_AUDIO_SYNC_SOURCE_VALUE, "Silence");
@@ -18515,8 +18607,8 @@ static void update_audio_sync_status_widgets(int *history, int force)
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_ENABLED_VALUE,
                                audio_sync_current_sample_has_own_audio_source()
                                    ? "sample"
-                                   : (AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
-                                      ? (AS_CUR(AUDIO_SYNC_ENABLED) ? "external" : "off")
+                                   : (audio_sync_status_has_external_provider()
+                                      ? "external"
                                       : (audio_sync_status_is_internal_push_analysis() ? "internal beat" : "off")));
 
     if(AS_CHANGED(AUDIO_SYNC_OPEN) || AS_CHANGED(AUDIO_SYNC_SOURCE) || AS_CHANGED(RECORD_AUDIO_SOURCE) ||
@@ -18524,8 +18616,8 @@ static void update_audio_sync_status_widgets(int *history, int force)
         audio_beat_set_label_s(WIDGET_AUDIO_SYNC_OPEN_VALUE,
                                audio_sync_current_sample_has_own_audio_source()
                                    ? "sample route"
-                                   : (AS_CUR(RECORD_AUDIO_SOURCE) == VJ_RECORD_AUDIO_SOURCE_BEAT_JACK
-                                      ? (AS_CUR(AUDIO_SYNC_OPEN) ? "open" : "closed")
+                                   : (audio_sync_status_has_external_provider()
+                                      ? (AS_CUR(AUDIO_SYNC_OPEN) ? "open" : "starting")
                                       : (audio_sync_status_is_internal_push_analysis() ? "internal" : "n/a")));
 
     if(AS_CHANGED(AUDIO_SYNC_RUNNING))
@@ -18897,8 +18989,7 @@ static void update_globalinfo(int *history, int pm, int last_pm)
     {
         if(pm == MODE_SAMPLE || pm == MODE_STREAM)
         {
-            if( history[CURRENT_ID] == info->status_tokens[CURRENT_ID] )
-                info->uc.reload_hint[HINT_RECORDING] = 1;
+            info->uc.reload_hint[HINT_RECORDING] = 1;
             if( info->status_tokens[STREAM_RECORDING])
                 vj_msg(VEEJAY_MSG_INFO, "Veejay is recording");
             else
@@ -19901,6 +19992,7 @@ void update_gui(void)
     update_audio_sync_status_widgets(history, last_pm < 0);
 
     update_globalinfo(history, pm, last_pm);
+    recorder_widgets_sync_from_status(pm);
     update_stream_trickplay_status(history, last_pm < 0);
     if(pm == MODE_SAMPLE || pm == MODE_PLAIN)
         ui_transport_controls_set_sensitive(1);

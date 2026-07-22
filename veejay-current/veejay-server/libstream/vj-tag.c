@@ -2305,6 +2305,9 @@ int vj_tag_stop_encoder(int t1) {
         return 0;
    }
 
+    if(!tag->encoder_active && !tag->encoder && !tag->encoder_file)
+        return 0;
+
     vj_tag_close_encoder_resources(tag);
 
     return 1;
@@ -2329,7 +2332,15 @@ void vj_tag_reset_encoder(int t1)
 int vj_tag_get_encoded_file(int t1, char *description)
 {
     vj_tag *tag = vj_tag_get(t1);
-    if(!tag) return 0;
+
+    if(!description)
+        return 0;
+
+    description[0] = '\0';
+
+    if(!tag || !tag->encoder_destination[0] || tag->encoder_total_frames_recorded <= 0)
+        return 0;
+
     sprintf(description, "%s", tag->encoder_destination );
     return 1;
 }
@@ -3716,7 +3727,7 @@ TAG_HAVE_FRAME:
 }
 
 int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa, int ca, int pfps,
-    int frame,int mode,int ts,int seq_rec, int curfps, uint32_t lo, uint32_t hi, int macro, char *str,
+    int frame,int mode,int ts,int record_sample_id, int record_tag_id, int curfps, uint32_t lo, uint32_t hi, int macro, char *str,
     int feedback, int global_fx, int vims_mirror )
 {
     vj_tag *tag;
@@ -3726,12 +3737,33 @@ int vj_tag_sprint_status( int tag_id,int tag_count, int samples,int cache,int sa
 
     int e_a, e_d, e_s;
     //@ issue #60
-    if( sa && seq_rec)
+    if(record_sample_id > 0)
     {
-        sample_info *rs = sample_get( seq_rec );
-        e_a = rs->encoder_active;
-        e_d = rs->encoder_frames_to_record;
-        e_s = rs->encoder_total_frames_recorded;
+        sample_info *rs = sample_get(record_sample_id);
+        if(rs) {
+            e_a = rs->encoder_active;
+            e_d = rs->encoder_frames_to_record;
+            e_s = rs->encoder_total_frames_recorded;
+        }
+        else {
+            e_a = 0;
+            e_d = 0;
+            e_s = 0;
+        }
+    }
+    else if(record_tag_id > 0)
+    {
+        vj_tag *rt = vj_tag_get(record_tag_id);
+        if(rt) {
+            e_a = rt->encoder_active;
+            e_d = rt->encoder_frames_to_record;
+            e_s = rt->encoder_total_frames_recorded;
+        }
+        else {
+            e_a = 0;
+            e_d = 0;
+            e_s = 0;
+        }
     }
     else
     {

@@ -3231,7 +3231,7 @@ int sample_set_editlist(int s1, editlist *edl)
 }
 
 int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int sa,int ca, 
-    int pfps, int frame, int mode,int total_slots, int seq_rec,int curfps, 
+    int pfps, int frame, int mode,int total_slots, int record_sample_id,int curfps,
     uint32_t lo, uint32_t hi,int macro,char *str, int feedback, int global_fx, int vims_mirror )
 {
     sample_info *sample;
@@ -3242,12 +3242,19 @@ int sample_chain_sprint_status( int s1,int tags,int sample_count,int cache,int s
         return -1;
     }
     int e_a, e_d, e_s;
-    if( sa && seq_rec)
+    if(record_sample_id > 0)
     {
-        sample_info *rs = sample_get( seq_rec );
-        e_a = rs->encoder_active;
-        e_d = rs->encoder_frames_to_record;
-        e_s = rs->encoder_total_frames_recorded;
+        sample_info *rs = sample_get(record_sample_id);
+        if(rs) {
+            e_a = rs->encoder_active;
+            e_d = rs->encoder_frames_to_record;
+            e_s = rs->encoder_total_frames_recorded;
+        }
+        else {
+            e_a = 0;
+            e_d = 0;
+            e_s = 0;
+        }
     }
     else
     {

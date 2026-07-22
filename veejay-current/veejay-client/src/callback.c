@@ -224,6 +224,7 @@ static gboolean framerate_flush_pending_cb(gpointer data)
 static inline int sample_calctime(int nframes);
 static int sample_calctime_selection();
 static int sample_calctime_mulloop();
+static void sample_record_sync_from_status(gboolean marker_context_changed);
 
 static gboolean timeline_marker_mode_is_sample(void);
 static gboolean timeline_marker_can_send(void);
@@ -5147,6 +5148,7 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		nframes,
 		autoplay );
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_STREAM_REC_START, nframes, autoplay );
+	update_label_str("stream_record_ready_label", "Starting stream recording...");
 
 	char *time1 = format_time( nframes,info->el.fps );
 	if(format)
@@ -5163,7 +5165,8 @@ void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_STREAM_REC_STOP );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_STREAM_REC_STOP );
-	vj_msg(VEEJAY_MSG_INFO, "Stream record stop");
+	update_label_str("stream_record_ready_label", "Stopping stream recording...");
+	vj_msg(VEEJAY_MSG_INFO, "Stream record stop requested");
 }
 
 void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data)
@@ -5214,6 +5217,9 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *format = (gchar*) gtk_combo_box_text_get_active_text(combo);
 	gint n_frames = 0;
 	gint display_frames = 0;
+	gboolean use_selection = is_button_toggled("sample_markerloop") &&
+		info->status_tokens[SAMPLE_MARKER_START] >= 0 &&
+		info->status_tokens[SAMPLE_MARKER_END] > info->status_tokens[SAMPLE_MARKER_START];
 
 	if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) ||
 	   info->status_tokens[CURRENT_ID] <= 0) {
@@ -5224,24 +5230,29 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 	gint dur_val = get_nums( "spin_sampleduration" );
 
-	if( is_button_toggled( "sample_mulloop" ) )
+	if(use_selection)
+	{
+		n_frames = sample_calctime_selection();
+	}
+	else if( is_button_toggled( "sample_mulloop" ) )
 	{
 		int base = sample_calctime_mulloop();
-		n_frames = base * dur_val;
-        multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
+		long long total = (long long)base * (long long)dur_val;
+		n_frames = (total > INT_MAX) ? INT_MAX : (int)total;
 	}
 	else if( is_button_toggled( "sample_mulframes" ))
 	{
 		n_frames = dur_val;
 	}
-    else if ( is_button_toggled("sample_markerloop" ))
-    {
-        n_frames = 0;
-        display_frames = sample_calctime_selection();
-    }
 
-    if(display_frames <= 0)
-        display_frames = n_frames;
+	if(display_frames <= 0)
+		display_frames = n_frames;
+
+	if(n_frames <= 1) {
+		vj_msg(VEEJAY_MSG_WARNING, "Sample recorder needs at least 2 output frames");
+		g_free(format);
+		return;
+	}
 
 	if(format != NULL)
 	{
@@ -5255,6 +5266,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		autoplay );
 
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SAMPLE_REC_START, n_frames, autoplay );
+	update_label_str("sample_record_ready_label", "Starting sample recording...");
 
 	char *time1 = format_time(display_frames,info->el.fps);
 	if( autoplay ) {
@@ -5270,53 +5282,105 @@ void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SAMPLE_REC_STOP );
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_SAMPLE_REC_STOP );
-	vj_msg(VEEJAY_MSG_INFO, "Stopped sample recording");
+	update_label_str("sample_record_ready_label", "Stopping sample recording...");
+	vj_msg(VEEJAY_MSG_INFO, "Sample record stop requested");
 }
 
 static inline int sample_calctime (int nframes)
 {
-    if( info->status_tokens[SAMPLE_LOOP] == 2 )
-        nframes *= 2;
-    if( info->status_tokens[FRAME_DUP] > 0 )
-        nframes *= info->status_tokens[FRAME_DUP];
-    int speed = info->status_tokens[SAMPLE_SPEED];
-    if( speed == 0 )
-       speed = 1;
-    nframes = nframes / abs(speed);
+    long long frames = nframes;
+    int speed = abs(info->status_tokens[SAMPLE_SPEED]);
 
-    return nframes;
+    if(frames < 1)
+        frames = 1;
+    if(info->status_tokens[SAMPLE_LOOP] == 2)
+        frames *= 2;
+    if(info->status_tokens[FRAME_DUP] > 0)
+        frames *= info->status_tokens[FRAME_DUP];
+    if(speed == 0)
+        speed = 1;
+
+    frames = (frames + speed - 1) / speed;
+    if(frames > INT_MAX)
+        frames = INT_MAX;
+
+    return (int)frames;
 }
 
 static int sample_calctime_selection(void)
 {
-    int n_frames = info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START];
-    if (n_frames == 0 )
-        n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+    int start = info->status_tokens[SAMPLE_MARKER_START];
+    int end = info->status_tokens[SAMPLE_MARKER_END];
+    int n_frames;
+
+    if(start >= 0 && end > start)
+        n_frames = end - start + 1;
+    else
+        n_frames = abs(info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START]) + 1;
 
     return sample_calctime(n_frames);
 }
 
 static int sample_calctime_mulloop(void)
 {
-    int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+    int n_frames = abs(info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START]) + 1;
 
     return sample_calctime(n_frames);
+}
+
+void on_spin_sampleduration_value_changed(GtkWidget *widget, gpointer user_data);
+
+static void sample_record_sync_from_status(gboolean marker_context_changed)
+{
+    GtkWidget *selection = glade_xml_get_widget_(info->main_window, "sample_markerloop");
+    GtkWidget *frames = glade_xml_get_widget_(info->main_window, "sample_mulframes");
+    GtkWidget *loops = glade_xml_get_widget_(info->main_window, "sample_mulloop");
+    gboolean marker_active = info->status_tokens[SAMPLE_MARKER_START] >= 0 &&
+        info->status_tokens[SAMPLE_MARKER_END] > info->status_tokens[SAMPLE_MARKER_START];
+    gboolean use_selection;
+
+    if(!selection)
+        return;
+
+    gtk_widget_set_sensitive(selection, marker_active);
+
+    if(marker_context_changed) {
+        int old_lock = info->status_lock;
+        info->status_lock = 1;
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(selection), marker_active);
+        info->status_lock = old_lock;
+    }
+    else if(!marker_active && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(selection))) {
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(selection), FALSE);
+    }
+
+    use_selection = marker_active && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(selection));
+
+    if(frames)
+        gtk_widget_set_sensitive(frames, !use_selection);
+    if(loops)
+        gtk_widget_set_sensitive(loops, !use_selection);
+    gtk_widget_set_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION], !use_selection);
+
+    on_spin_sampleduration_value_changed(widget_cache[WIDGET_SPIN_SAMPLEDURATION], NULL);
 }
 
 void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data)
 {
     int n_frames = 0;
+	int marker_active = info->status_tokens[SAMPLE_MARKER_START] >= 0 &&
+		info->status_tokens[SAMPLE_MARKER_END] > info->status_tokens[SAMPLE_MARKER_START];
 
-	if( is_button_toggled( "sample_mulloop" )) {
-		n_frames = sample_calctime_mulloop();
-        n_frames *= get_nums( "spin_sampleduration" );
+	if(marker_active && is_button_toggled("sample_markerloop")) {
+		n_frames = sample_calctime_selection();
+	}
+	else if( is_button_toggled( "sample_mulloop" )) {
+		long long total = (long long)sample_calctime_mulloop() *
+			(long long)get_nums("spin_sampleduration");
+		n_frames = (total > INT_MAX) ? INT_MAX : (int)total;
     }
 	else if ( is_button_toggled( "sample_mulframes" ) ) {
 		n_frames = get_nums( "spin_sampleduration" );
-    }
-    else if ( is_button_toggled( "sample_markerloop" ) )
-    {
-        n_frames = sample_calctime_selection();
     }
 
 	char *time = format_time( n_frames,info->el.fps );
@@ -5351,15 +5415,9 @@ void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_sample_markerloop_clicked(GtkWidget *w, gpointer user_data)
 {
-    if( gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == FALSE ) {
-        return;
-    }
-    if(gtk_widget_is_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION])) {
-        gtk_widget_set_sensitive(widget_cache[WIDGET_SPIN_SAMPLEDURATION], FALSE );
-    }
-
-    update_spin_range( "spin_sampleduration", 0, 1000000, 0 );
-    on_spin_sampleduration_value_changed(widget_cache[WIDGET_SPIN_SAMPLEDURATION], NULL);
+    (void)w;
+    (void)user_data;
+    sample_record_sync_from_status(FALSE);
 }
 
 
@@ -5631,20 +5689,29 @@ void	on_priout_height_value_changed(GtkWidget *widget, gpointer user_data)
 	if( is_button_toggled( "priout_ratio" ))
 		atom_aspect_ratio( "priout_width", 0 );
 }
-void	on_priout_apply_clicked(GtkWidget *widget, gpointer user_data)
+static void request_sdl_window_geometry(void)
 {
-	gint width = get_nums( "priout_width" );
-	gint height = get_nums( "priout_height" );
-	gint x = get_nums("priout_x" );
-	gint y = get_nums("priout_y" );
+	gint width = get_nums("priout_width");
+	gint height = get_nums("priout_height");
+	gint x = get_nums("priout_x");
+	gint y = get_nums("priout_y");
 
-	if( width > 0 && height > 0 )
-	{
-		multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
-			width,height,x , y );
-		vj_msg(VEEJAY_MSG_INFO, "Resize Video Window to %dx%d", width,height);
+	if(width <= 0 || height <= 0) {
+		vj_msg(VEEJAY_MSG_ERROR, "SDL video window size must be greater than zero");
+		return;
 	}
 
+	multi_vims(VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d", width, height, x, y);
+	vj_msg(VEEJAY_MSG_INFO,
+	       "Requested SDL video window %dx%d at %d,%d",
+	       width, height, x, y);
+}
+
+void	on_priout_apply_clicked(GtkWidget *widget, gpointer user_data)
+{
+	(void)widget;
+	(void)user_data;
+	request_sdl_window_geometry();
 }
 
 
@@ -6213,17 +6280,9 @@ gboolean on_video_options_delete_event(GtkWidget *widget, GdkEvent *event, gpoin
 void on_video_options_apply_clicked         (GtkButton       *button,
 					     gpointer         user_data)
 {
-	gint width = get_nums( "priout_width" );
-	gint height = get_nums( "priout_height" );
-	gint x = get_nums("priout_x" );
-	gint y = get_nums("priout_y" );
-
-	if( width > 0 && height > 0 )
-	{
-		multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
-			width,height,x , y );
-		vj_msg(VEEJAY_MSG_INFO, "Resize Video Window to %dx%d", width,height);
-	}
+	(void)button;
+	(void)user_data;
+	request_sdl_window_geometry();
 }
 
 void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data)
@@ -7939,9 +7998,10 @@ void	on_generators_close_clicked(GtkWidget *w, gpointer user_data)
 
 void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
-			0,0,0,0 );
-
+	(void)w;
+	(void)user_data;
+	multi_vims(VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d", 0, 0, -1, -1);
+	vj_msg(VEEJAY_MSG_INFO, "Hide SDL video window");
 }
 
 

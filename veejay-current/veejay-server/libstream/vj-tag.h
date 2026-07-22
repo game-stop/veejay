@@ -342,7 +342,7 @@ int 	vj_tag_enable(int t1);
 int 	vj_tag_disable(int t1);
 
 int		vj_tag_sprint_status(int tag_id, int tags,int sample_count, int cache,int sa, int ca, 
-    int r, int f, int m, int t,int seq_rec_id, int curfps, uint32_t lo, uint32_t hi, int macro,char *str,
+    int r, int f, int m, int t,int record_sample_id, int record_tag_id, int curfps, uint32_t lo, uint32_t hi, int macro,char *str,
     int feedback, int global_fx, int vims_mirror );
 
 uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
