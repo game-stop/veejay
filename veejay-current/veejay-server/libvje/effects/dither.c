@@ -71,11 +71,13 @@ vj_effect *dither_init(int w, int h)
 
     vje_build_value_hint_list(ve->hints, ve->limits[1][1], 1, "Static", "Random");
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, 2,                  18,                 4,  14, 3200, 8600, 2400, 22,
-        VJ_BEAT_SELECTOR,  VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,  0,    0,    0,    0,    -1000
-    );
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_GRID_SIZE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_REBUILDS_STATE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 2, (w > 24 ? 24 : (w > 2 ? w - 1 : 2)), 54, 84, 0, 900, 0, 1, 800, VJ_BEAT_COST_MODERATE, 52, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }

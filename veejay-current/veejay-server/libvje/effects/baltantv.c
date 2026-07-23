@@ -67,21 +67,16 @@ vj_effect *baltantv_init(int w, int h)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Stride", "Temporal Taps", "Decay", "Feedback", "Chroma Persistence");
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-
-        VJ_BEAT_OFF, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* Stride */
-        VJ_BEAT_OFF, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* Temporal Taps */
-
-        VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_LOG,
-            96, 235, 140, 220, 900, 3600, 0, 72,                  /* Decay */
-
-        VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS,
-            32, 220, 80, 190, 600, 2400, 0, 70,                   /* Feedback */
-
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS,
-            16, 220, 48, 180, 700, 2800, 0, 58                    /* Chroma Persistence */
-    );
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 2, 24, 82, 100, 0, 260, 0, 1, 80, VJ_BEAT_COST_MODERATE, 92, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 2, 8, 58, 90, 100, 760, 0, 1, 180, VJ_BEAT_COST_MODERATE, 58, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 72, 255, 72, 100, 80, 820, 0, 1, 0, VJ_BEAT_COST_CHEAP, 74, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_FLUX, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 24, 244, 92, 100, 0, 320, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 16, 244, 70, 100, 0, 440, 0, 1, 0, VJ_BEAT_COST_CHEAP, 68, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }

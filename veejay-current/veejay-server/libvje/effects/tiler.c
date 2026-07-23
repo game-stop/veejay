@@ -136,14 +136,20 @@ vj_effect *tiler_init(int w, int h)
         "Opacity"
     );
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_GRID_SIZE,        VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                                2,     max_tiles, 10, 42,  700, 2800, 0, 76,
-        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                                                        0,     1000,      8, 34, 1000, 3600, 0, 46,
-        VJ_BEAT_GEOMETRY_PHASE,   VJ_BEAT_F_CONTINUOUS,                                                        0,     1000,      8, 34, 1000, 3600, 0, 46,
-        VJ_BEAT_SIGNED_SPEED,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS,        -1000, 1000,     12, 48,  800, 3200, 0, 68,
-        VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                              80,    255,      14, 56,  500, 2200, 0, 92
-    );
+    int tiles_hi = max_tiles < 24 ? max_tiles : 24;
+    if(tiles_hi < 2)
+        tiles_hi = 2;
+
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_GRID_SIZE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 2, tiles_hi, 86, 100, 10, 480, 0, 1, 80, VJ_BEAT_COST_CHEAP, 92, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_RATE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_LINEAR, 0, 1000, 76, 100, 0, 240, 0, 1, 0, VJ_BEAT_COST_CHEAP, 78, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_GEOMETRY_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_BAND_BALANCE, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_LINEAR, 0, 1000, 66, 92, 40, 520, 0, 2, 0, VJ_BEAT_COST_CHEAP, 66, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SIGNED_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_LINEAR, -700, 700, 88, 100, 0, 320, 0, 2, 0, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 64, 255, 70, 94, 220, 1400, 0, 1, 0, VJ_BEAT_COST_CHEAP, 72, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }

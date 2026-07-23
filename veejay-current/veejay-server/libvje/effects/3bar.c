@@ -88,14 +88,16 @@ vj_effect *bar_init(int width, int height)
     ve->parallel = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Divider", "Top Y", "Bot Y", "Top X", "Bot X");
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_GRID_SIZE, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,             4, 4, 4, 4, 0, 0, 0, 0,
-        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,     1, bar_max_i(8,  height / 48 + 1),  6,  30, 1200, 3600, 0, 34,
-        VJ_BEAT_SPEED,     VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,     1, bar_max_i(10, height / 40 + 1),  7,  34, 1200, 3600, 0, 38,
-        VJ_BEAT_FLOW,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,     2, bar_max_i(14, width / 36 + 1),  10,  52,  900, 3200, 0, 62,
-        VJ_BEAT_FLOW,      VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,     2, bar_max_i(18, width / 30 + 1),  12,  60,  900, 3200, 0, 68
-    );
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_GRID_SIZE, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 0, bar_max_i(10, height / 48 + 1), 72, 100, 0, 220, 0, 1, 0, VJ_BEAT_COST_CHEAP, 74, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, bar_max_i(12, height / 42 + 1), 74, 100, 0, 240, 0, 1, 0, VJ_BEAT_COST_CHEAP, 72, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 1, bar_max_i(22, width / 24 + 1), 88, 100, 0, 180, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 1, bar_max_i(28, width / 20 + 1), 90, 100, 0, 200, 0, 1, 0, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }

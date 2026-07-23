@@ -76,12 +76,14 @@ vj_effect *gammacompr_init(int w, int h)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Gamma Compression", "White Threshold", "Black Threshold");
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                     1700, 4700, 14, 54,  800, 3000, 0,    82,
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 128,  252,  12, 46, 1000, 3600, 0,    62,
-        VJ_BEAT_DETAIL,   VJ_BEAT_F_CONTINUOUS,                                                0,    96,   10, 38, 1200, 4200, 0,    48
-    );
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS | VJ_BEAT_F_REBUILDS_STATE, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 1700, 4700, 76, 98, 60, 1100, 0, 10, 160, VJ_BEAT_COST_MODERATE, 88, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_PUNCH, 128, 252, 72, 100, 0, 560, 0, 1, 0, VJ_BEAT_COST_CHEAP, 82, 1, 1, VJ_BEAT_GROUP_ASCENDING, 8),
+            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_LOW_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 96, 58, 88, 40, 900, 0, 1, 0, VJ_BEAT_COST_CHEAP, 64, 1, 0, VJ_BEAT_GROUP_ASCENDING, 8)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }

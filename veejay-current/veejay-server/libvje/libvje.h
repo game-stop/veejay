@@ -27,6 +27,7 @@
 
 
 vj_beat_param_hint_t *vje_build_beat_hint_list(int num_params, ...);
+vj_beat_param_hint_t *vje_build_beat_hint_list_v2(int num_params, const vj_beat_param_hint_t *hints);
 
 // set/get pixel value ranges
 unsigned int get_pixel_range_min_UV(); 

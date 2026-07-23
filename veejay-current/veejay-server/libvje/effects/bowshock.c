@@ -283,22 +283,24 @@ vj_effect *bowshock_init(int w, int h)
         "Chroma Push"
     );
     
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,                              VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0,   0,   0,    0,    0,    -1000,
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       48,                 168,                18,  66,  700,  2400, 0,    86,
-        VJ_BEAT_TRIGGER,       VJ_BEAT_F_IMPULSE,                                                     0,                  100,                96,  100, 1,    85,   18,   230,
-        VJ_BEAT_KICK,          VJ_BEAT_F_IMPULSE,                                                     0,                  100,                92,  100, 1,    105,  22,   220,
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE,                            12,                 76,                 5,   16,  3600, 9000, 2600, 20,
-        VJ_BEAT_SPEED,         VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       16,                 82,                 14,  56,  850,  3200, 0,    80,
-        VJ_BEAT_WARP,          VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS,                       54,                 150,                16,  64,  750,  2600, 0,    88,
-        VJ_BEAT_TURBULENCE,    VJ_BEAT_F_CONTINUOUS,                                                  22,                 116,                12,  48,  1200, 3800, 0,    66,
-        VJ_BEAT_DRIFT,         VJ_BEAT_F_CONTINUOUS,                                                  8,                  78,                 9,   34,  1500, 4600, 0,    48,
-        VJ_BEAT_GLOW,          VJ_BEAT_F_CONTINUOUS,                                                  34,                 154,                14,  52,  760,  2600, 0,    76,
-        VJ_BEAT_SNARE,         VJ_BEAT_F_IMPULSE,                                                     0,                  92,                 88,  100, 1,    90,   18,   205,
-        VJ_BEAT_HAT,           VJ_BEAT_F_CONTINUOUS,                                                  18,                 148,                12,  42,  260,  1500, 36,   62,
-        VJ_BEAT_COLOR_AMOUNT,  VJ_BEAT_F_CONTINUOUS,                                                  8,                  98,                 10,  42,  760,  2800, 0,    60
-    );
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_WARP, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 48, 168, 34, 82, 30, 520, 0, 0, 0, VJ_BEAT_COST_CHEAP, 90, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_TRIGGER, VJ_BEAT_F_IMPULSE, VJ_BEAT_SRC_BEAT_PULSE, VJ_BEAT_OP_IMPULSE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 100, 100, 100, 0, 90, 18, 1, 0, VJ_BEAT_COST_CHEAP, 240, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_KICK, VJ_BEAT_F_IMPULSE, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_IMPULSE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 100, 94, 100, 0, 110, 22, 1, 0, VJ_BEAT_COST_CHEAP, 225, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE, VJ_BEAT_SRC_PHRASE, VJ_BEAT_OP_SAMPLE_HOLD, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 12, 76, 24, 58, 0, 0, 2600, 2, 1200, VJ_BEAT_COST_MODERATE, 38, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 16, 82, 30, 72, 100, 900, 0, 0, 0, VJ_BEAT_COST_CHEAP, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_WARP, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_MID_ACTIVITY, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 54, 150, 30, 74, 80, 700, 0, 0, 0, VJ_BEAT_COST_CHEAP, 88, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_FLUX, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SQUARE, 22, 116, 24, 62, 120, 900, 0, 0, 0, VJ_BEAT_COST_CHEAP, 72, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_DRIFT, VJ_BEAT_F_PHRASE_ONLY, VJ_BEAT_SRC_PHRASE, VJ_BEAT_OP_SAMPLE_HOLD, VJ_BEAT_POLARITY_ALTERNATE, VJ_BEAT_CURVE_SMOOTHSTEP, 8, 78, 20, 60, 0, 0, 1600, 1, 900, VJ_BEAT_COST_MODERATE, 52, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 34, 154, 28, 68, 70, 650, 0, 0, 0, VJ_BEAT_COST_CHEAP, 78, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SNARE, VJ_BEAT_F_IMPULSE, VJ_BEAT_SRC_SNARE_PULSE, VJ_BEAT_OP_IMPULSE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 92, 96, 100, 0, 95, 18, 1, 0, VJ_BEAT_COST_CHEAP, 210, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_HAT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 18, 148, 22, 54, 20, 260, 36, 0, 0, VJ_BEAT_COST_CHEAP, 68, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_BAND_BALANCE, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_BIPOLAR, VJ_BEAT_CURVE_SMOOTHSTEP, 8, 98, 18, 52, 120, 850, 0, 0, 0, VJ_BEAT_COST_CHEAP, 62, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }

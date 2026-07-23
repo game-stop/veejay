@@ -45,12 +45,15 @@ vj_effect *colormap_init(int w, int h)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Red", "Green", "Blue");
 
-        ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS, 12,  238, 12, 50,  900, 3000, 0,    76,
-        VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS, 16,  230, 10, 42, 1100, 3400, 0,    62,
-        VJ_BEAT_COLOR_PHASE,  VJ_BEAT_F_CONTINUOUS, 12,  238, 12, 50,  900, 3000, 0,    76
-    );
+        
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 16, 238, 78, 100, 0, 520, 0, 1, 0, VJ_BEAT_COST_CHEAP, 88, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_MID_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 16, 230, 64, 94, 80, 900, 0, 1, 0, VJ_BEAT_COST_CHEAP, 76, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 16, 238, 78, 100, 0, 520, 0, 1, 0, VJ_BEAT_COST_CHEAP, 88, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }

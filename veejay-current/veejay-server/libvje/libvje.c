@@ -1164,22 +1164,52 @@ static vj_beat_param_hint_t vje_beat_hint_default(void)
 {
     vj_beat_param_hint_t h;
 
+    memset(&h, 0, sizeof(h));
+    h.version = VJ_BEAT_HINT_VERSION_1;
     h.klass = VJ_BEAT_OFF;
     h.flags = VJ_BEAT_F_REJECT;
+    h.source = VJ_BEAT_SRC_NONE;
+    h.operator_type = VJ_BEAT_OP_NONE;
+    h.polarity = VJ_BEAT_POLARITY_POSITIVE;
+    h.curve = VJ_BEAT_CURVE_SMOOTHSTEP;
     h.soft_min = VJ_BEAT_SOFT_UNSET;
     h.soft_max = VJ_BEAT_SOFT_UNSET;
-    h.normal_depth_pct = 0;
-    h.climax_depth_pct = 0;
-    h.attack_ms = 0;
-    h.release_ms = 0;
-    h.hold_ms = 0;
-    h.priority = 0;
+    h.cost = VJ_BEAT_COST_STRUCTURAL;
 
     return h;
 }
 
+static int vje_beat_source_is_event_clocked(int source)
+{
+    switch(source)
+    {
+        case VJ_BEAT_SRC_CANDIDATE_PULSE:
+        case VJ_BEAT_SRC_BEAT_PULSE:
+        case VJ_BEAT_SRC_BEAT_GATE:
+        case VJ_BEAT_SRC_BEAT_TOGGLE:
+        case VJ_BEAT_SRC_BEAT_PHASE:
+        case VJ_BEAT_SRC_KICK_PULSE:
+        case VJ_BEAT_SRC_SNARE_PULSE:
+        case VJ_BEAT_SRC_HAT_PULSE:
+        case VJ_BEAT_SRC_BPM:
+        case VJ_BEAT_SRC_GROOVE:
+        case VJ_BEAT_SRC_PHRASE:
+        case VJ_BEAT_SRC_CLIMAX:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 static vj_beat_param_hint_t vje_beat_hint_sanitize(vj_beat_param_hint_t h)
 {
+    if(h.version == 0)
+        h.version = VJ_BEAT_HINT_VERSION_1;
+
+    if(h.version < VJ_BEAT_HINT_VERSION_1 ||
+       h.version > VJ_BEAT_HINT_VERSION_2)
+        return vje_beat_hint_default();
+
     if(h.klass < VJ_BEAT_OFF || h.klass > VJ_BEAT_LAST)
         return vje_beat_hint_default();
 
@@ -1190,12 +1220,67 @@ static vj_beat_param_hint_t vje_beat_hint_sanitize(vj_beat_param_hint_t h)
        h.klass == VJ_BEAT_RESET)
         h.flags |= VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL;
 
+    if(h.version == VJ_BEAT_HINT_VERSION_1) {
+        h.source = VJ_BEAT_SRC_NONE;
+        h.operator_type = VJ_BEAT_OP_NONE;
+        h.polarity = VJ_BEAT_POLARITY_POSITIVE;
+        h.curve = (h.flags & VJ_BEAT_F_LOG) ? VJ_BEAT_CURVE_LOG :
+                  ((h.flags & VJ_BEAT_F_SQUARED) ? VJ_BEAT_CURVE_SQUARE :
+                                                   VJ_BEAT_CURVE_SMOOTHSTEP);
+        h.step = (h.flags & VJ_BEAT_F_DISCRETE) ? 1 : 0;
+        h.update_ms = 0;
+        h.cost = (h.flags & VJ_BEAT_F_REBUILDS_STATE) ? VJ_BEAT_COST_EXPENSIVE :
+                                                        VJ_BEAT_COST_CHEAP;
+        h.group_id = 0;
+        h.group_order = 0;
+        h.group_relation = VJ_BEAT_GROUP_NONE;
+        h.group_margin = 0;
+    } else {
+        if(h.source < VJ_BEAT_SRC_NONE || h.source > VJ_BEAT_SRC_LAST ||
+           h.operator_type < VJ_BEAT_OP_NONE || h.operator_type > VJ_BEAT_OP_LAST)
+            h.flags |= VJ_BEAT_F_REJECT;
+
+        if(h.polarity < VJ_BEAT_POLARITY_POSITIVE ||
+           h.polarity > VJ_BEAT_POLARITY_LAST)
+            h.polarity = VJ_BEAT_POLARITY_POSITIVE;
+
+        if(h.curve < VJ_BEAT_CURVE_LINEAR || h.curve > VJ_BEAT_CURVE_LAST)
+            h.curve = VJ_BEAT_CURVE_SMOOTHSTEP;
+
+        h.step = vje_clampi_local(h.step, 0, 1000000);
+        h.update_ms = vje_clampi_local(h.update_ms, 0, 60000);
+        h.cost = vje_clampi_local(h.cost, VJ_BEAT_COST_CHEAP, VJ_BEAT_COST_STRUCTURAL);
+        h.group_id = vje_clampi_local(h.group_id, 0, 255);
+        h.group_order = vje_clampi_local(h.group_order, 0, 255);
+        h.group_relation = vje_clampi_local(h.group_relation, VJ_BEAT_GROUP_NONE, VJ_BEAT_GROUP_LAST);
+        h.group_margin = vje_clampi_local(h.group_margin, 0, 1000000);
+
+        if(!(h.flags & VJ_BEAT_F_REJECT) &&
+           (h.source == VJ_BEAT_SRC_NONE || h.operator_type == VJ_BEAT_OP_NONE))
+            h.flags |= VJ_BEAT_F_REJECT;
+
+        if(!(h.flags & VJ_BEAT_F_REJECT) &&
+           (h.operator_type == VJ_BEAT_OP_SAMPLE_HOLD ||
+            h.operator_type == VJ_BEAT_OP_TOGGLE) &&
+           !vje_beat_source_is_event_clocked(h.source))
+            h.flags |= VJ_BEAT_F_REJECT;
+
+        if(!(h.flags & VJ_BEAT_F_REJECT) &&
+           h.operator_type == VJ_BEAT_OP_BEAT_TIME &&
+           h.source != VJ_BEAT_SRC_BPM)
+            h.flags |= VJ_BEAT_F_REJECT;
+
+        if(h.cost == VJ_BEAT_COST_STRUCTURAL)
+            h.flags |= VJ_BEAT_F_STRUCTURAL;
+    }
+
     if(h.flags & VJ_BEAT_F_REJECT) {
         h.normal_depth_pct = 0;
         h.climax_depth_pct = 0;
         h.attack_ms = 0;
         h.release_ms = 0;
         h.hold_ms = 0;
+        h.update_ms = 0;
     } else {
         h.normal_depth_pct = vje_clampi_local(h.normal_depth_pct, 0, 100);
         h.climax_depth_pct = vje_clampi_local(h.climax_depth_pct, 0, 100);
@@ -1218,9 +1303,8 @@ static vj_beat_param_hint_t vje_beat_hint_sanitize(vj_beat_param_hint_t h)
        h.release_ms < h.attack_ms)
         h.release_ms = h.attack_ms;
 
-    if((h.flags & VJ_BEAT_F_REBUILDS_STATE) &&
-       h.hold_ms < 250)
-        h.hold_ms = 250;
+    if((h.flags & VJ_BEAT_F_REBUILDS_STATE) && h.update_ms < 250)
+        h.update_ms = 250;
 
     return h;
 }
@@ -1242,8 +1326,9 @@ vj_beat_param_hint_t *vje_build_beat_hint_list(int num_params, ...)
     va_start(ap, num_params);
 
     for(int i = 0; i < num_params; i++) {
-        vj_beat_param_hint_t h;
+        vj_beat_param_hint_t h = vje_beat_hint_default();
 
+        h.version = VJ_BEAT_HINT_VERSION_1;
         h.klass = va_arg(ap, int);
         h.flags = (uint32_t) va_arg(ap, unsigned int);
         h.soft_min = va_arg(ap, int);
@@ -1263,17 +1348,42 @@ vj_beat_param_hint_t *vje_build_beat_hint_list(int num_params, ...)
     return hints;
 }
 
+vj_beat_param_hint_t *vje_build_beat_hint_list_v2(int num_params,
+                                                   const vj_beat_param_hint_t *source)
+{
+    vj_beat_param_hint_t *hints;
+
+    if(num_params <= 0 || !source)
+        return NULL;
+
+    hints = (vj_beat_param_hint_t *)
+        vj_calloc(sizeof(vj_beat_param_hint_t) * (size_t) num_params);
+
+    if(!hints)
+        return NULL;
+
+    for(int i = 0; i < num_params; i++) {
+        vj_beat_param_hint_t h = source[i];
+
+        h.version = VJ_BEAT_HINT_VERSION_2;
+        hints[i] = vje_beat_hint_sanitize(h);
+    }
+
+    return hints;
+}
+
 static const vj_beat_param_hint_t vje_beat_hint_reject_default = {
-    VJ_BEAT_OFF,
-    VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
-    VJ_BEAT_SOFT_UNSET,
-    VJ_BEAT_SOFT_UNSET,
-    0,
-    0,
-    0,
-    0,
-    0,
-    -1000
+    .version = VJ_BEAT_HINT_VERSION_2,
+    .klass = VJ_BEAT_OFF,
+    .flags = VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL,
+    .source = VJ_BEAT_SRC_NONE,
+    .operator_type = VJ_BEAT_OP_NONE,
+    .polarity = VJ_BEAT_POLARITY_POSITIVE,
+    .curve = VJ_BEAT_CURVE_SMOOTHSTEP,
+    .soft_min = VJ_BEAT_SOFT_UNSET,
+    .soft_max = VJ_BEAT_SOFT_UNSET,
+    .cost = VJ_BEAT_COST_STRUCTURAL,
+    .priority = -1000
 };
 
 static const vj_beat_param_hint_t *vje_effect_get_beat_hint(const vj_effect *ve,

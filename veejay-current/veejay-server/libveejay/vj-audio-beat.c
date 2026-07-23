@@ -145,18 +145,6 @@ static inline int ab_action_uses_auto_fx(int action)
 #endif
 
 
-#ifndef VEEJAY_AUDIO_BEAT_ARM_BLOCKS
-#define VEEJAY_AUDIO_BEAT_ARM_BLOCKS 10
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_ADAPT_WARMUP_BLOCKS
-#define VEEJAY_AUDIO_BEAT_ADAPT_WARMUP_BLOCKS 32
-#endif
-
-#ifndef VEEJAY_AUDIO_BEAT_SETTLE_BLOCKS
-#define VEEJAY_AUDIO_BEAT_SETTLE_BLOCKS 18
-#endif
-
 #ifndef VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS
 #define VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS 0.0135
 #endif
@@ -207,24 +195,54 @@ enum
     AB_HIT_SCRATCH = 5
 };
 
+typedef struct
+{
+    double kick_class_min;
+    double snare_class_min;
+    double hat_class_min;
+    double full_kick_min;
+    double full_snare_min;
+    double kick_onset_min;
+    double snare_onset_min;
+    double kick_band_min;
+    double snare_band_sum_min;
+    double onset_rise_min;
+    double onset_flux_min;
+} ab_classifier_policy_t;
+
+static const ab_classifier_policy_t ab_classifier_policy = {
+    .kick_class_min = 0.38,
+    .snare_class_min = 0.42,
+    .hat_class_min = 0.45,
+    .full_kick_min = 0.32,
+    .full_snare_min = 0.36,
+    .kick_onset_min = 0.42,
+    .snare_onset_min = 0.46,
+    .kick_band_min = 0.32,
+    .snare_band_sum_min = 0.58,
+    .onset_rise_min = 0.12,
+    .onset_flux_min = 0.12
+};
+
 static int ab_classify_hit(double kick_score, double snare_score, double hat_score)
 {
-    if(kick_score >= 0.38 &&
+    if(kick_score >= ab_classifier_policy.kick_class_min &&
        kick_score >= snare_score * 1.05 &&
        kick_score >= hat_score * 1.15)
         return AB_HIT_KICK;
 
-    if(snare_score >= 0.42 &&
+    if(snare_score >= ab_classifier_policy.snare_class_min &&
        snare_score >= kick_score * 0.90 &&
        snare_score >= hat_score * 0.90)
         return AB_HIT_SNARE;
 
-    if(hat_score >= 0.45 &&
+    if(hat_score >= ab_classifier_policy.hat_class_min &&
        hat_score > kick_score &&
        hat_score > snare_score)
         return AB_HIT_HAT;
 
-    if(kick_score >= 0.32 || snare_score >= 0.36)
+    if(kick_score >= ab_classifier_policy.full_kick_min ||
+       snare_score >= ab_classifier_policy.full_snare_min)
         return AB_HIT_FULL;
 
     return AB_HIT_NONE;
@@ -366,25 +384,54 @@ typedef struct
     double slow_flux;
     double envelope;
     double beat_period_ms;
-    double last_sample;
+    double last_sample[2];
     double last_log_energy;
+    double analysis_elapsed_ms;
+    double analysis_confidence;
+    double source_confidence;
+    double tempo_confidence;
+    double event_confidence;
+    double candidate_confidence;
+    double detector_beat_confidence;
+    double accepted_confidence;
+    double candidate_strength;
+    double detector_beat_strength;
+    double accepted_strength;
+    double detector_beat_kick;
+    double detector_beat_snare;
+    double detector_beat_hat;
+    double noise_floor;
+    double source_snr;
+    double block_ms;
+    uint32_t analysis_seq;
+    long analysis_publish_ms;
+    int analysis_action_mode;
+    int analysis_action_seq;
+    long last_candidate_ms;
+    int candidate_seq;
+    int last_candidate_kind;
+    long detector_last_beat_ms;
+    int detector_beat_seq;
+    int detector_beat_kind;
+    int detector_beat_toggle_state;
 
     double rise_mean;
     double rise_var;
     double flux_mean;
     double flux_var;
-    double onset_mean;
-    double onset_var;
     double onset_smooth;
 
-    double band_low_lp;
-    double band_mid_lp;
+    double band_low_lp[2];
+    double band_mid_lp[2];
     double band_low_env;
     double band_mid_env;
     double band_high_env;
     double band_low_slow;
     double band_mid_slow;
     double band_high_slow;
+    double band_low_onset;
+    double band_mid_onset;
+    double band_high_onset;
 
     long last_hit_ms;
     long tempo_last_hit_ms;
@@ -420,7 +467,6 @@ typedef struct
     double last_scratch_score;
     int last_scratch_candidate_raw;
     int last_scratch_dominant;
-    int last_scratch_candidate;
     int last_scratch_reject;
     int last_scratch_gesture_dir;
     long last_scratch_gesture_ms;
@@ -434,7 +480,6 @@ typedef struct
     double scratch_last_amount;
     int scratch_dir;
     int last_hit_kind;
-    int blocks_seen;
 
     int filter_sample_rate;
     float filter_low_alpha;
@@ -470,7 +515,14 @@ typedef enum
     AB_AUTO_LANE_BEAT_TIME,
     AB_AUTO_LANE_BINARY_IMPULSE,
     AB_AUTO_LANE_CONTINUOUS_IMPULSE,
-    AB_AUTO_LANE_WRAP
+    AB_AUTO_LANE_WRAP,
+    AB_AUTO_LANE_MAP_RANGE,
+    AB_AUTO_LANE_OFFSET_BASE,
+    AB_AUTO_LANE_SCALE_BASE,
+    AB_AUTO_LANE_GATE,
+    AB_AUTO_LANE_TOGGLE,
+    AB_AUTO_LANE_RATE,
+    AB_AUTO_LANE_SAMPLE_HOLD
 } ab_auto_lane_operator_t;
 
 typedef enum
@@ -508,10 +560,15 @@ typedef enum
 
 typedef struct
 {
+    int hint_version;
     int role;
     int source_profile;
+    int source;
+    int direct_source;
     int operator_type;
     int polarity;
+    int polarity_mode;
+    int curve;
     int direction;
     int amount_pct;
     int score;
@@ -524,6 +581,13 @@ typedef struct
     int attack_ms;
     int release_ms;
     int hold_ms;
+    int step;
+    int update_ms;
+    int cost;
+    int group_id;
+    int group_order;
+    int group_relation;
+    int group_margin;
     int discrete;
     int curve_mixable;
     int can_overdrive_safe;
@@ -605,6 +669,12 @@ typedef struct
     int mod_initialized;
     long last_slew_ms;
     long last_change_ms;
+    int last_source_seq;
+    float last_source_value;
+    float held_signal;
+    int toggle_state;
+    float rate_phase;
+    long last_rate_ms;
 } ab_auto_target_t;
 
 typedef struct
@@ -645,6 +715,7 @@ static float ab_auto_groove_level = 0.0f;
 static float ab_auto_phrase_level = 0.0f;
 static long ab_auto_groove_last_ms = 0;
 static int ab_auto_groove_last_hit_seq = 0;
+static int ab_auto_snapshot_reset_seq = -1;
 static long ab_auto_last_apply_ms = 0;
 static long ab_auto_signature_last_check_ms = 0;
 static int ab_auto_signature_last_chain_len = -1;
@@ -654,6 +725,7 @@ static long ab_auto_debug_last_apply_ms = 0;
 static int ab_auto_signature = 0;
 static int ab_auto_target_count = 0;
 static int ab_auto_active = 0;
+static volatile int ab_auto_runtime_pending = 0;
 static ab_auto_target_t *ab_auto_targets = NULL;
 static int ab_auto_target_capacity = 0;
 static volatile int ab_kick_q15 = 0;
@@ -664,6 +736,11 @@ static volatile int ab_scratch_q15 = 0;
 static volatile int ab_scratch_velocity_q15 = 0;
 static volatile int ab_scratch_burst_q15 = 0;
 static volatile int ab_scratch_dir = 1;
+static vj_audio_beat_snapshot_observer_func ab_snapshot_observer = NULL;
+static void *ab_snapshot_observer_ctx = NULL;
+static volatile int ab_snapshot_observer_lock = 0;
+static volatile int ab_snapshot_observer_active = 0;
+
 static volatile int ab_scratch_visual_env_q15 = 0;
 static volatile int ab_scratch_visual_dir = 0;
 static volatile long ab_scratch_visual_last_ms = 0;
@@ -1236,10 +1313,15 @@ static volatile int ab_breakbeat_hit_queue_read = 0;
 static volatile int ab_breakbeat_hit_queue_write = 0;
 static volatile int ab_breakbeat_hit_queue_lock = 0;
 
+static inline int ab_valid_period_ms(double period);
+static int ab_audio_beat_fill_snapshot_unlocked(vj_audio_beat_shared_t *s,
+                                                 vj_audio_beat_snapshot_t *dst);
+static void ab_audio_beat_emit_snapshot_observer(vj_audio_beat_shared_t *s);
 int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot_t *dst);
 static void ab_breakbeat_hit_queue_clear(void);
 static void ab_breakbeat_hit_queue_push(vj_audio_beat_shared_t *s,
                                         const vj_audio_beat_thread_t *t,
+                                        int breakbeat_mode,
                                         int seq,
                                         long hit_ms,
                                         long publish_ms,
@@ -1305,6 +1387,103 @@ static inline int ab_add_i(volatile int *p, int v)
 static inline long ab_add_l(volatile long *p, long v)
 {
     return atomic_add_fetch_long(p, v);
+}
+
+static int ab_capture_action_mode(vj_audio_beat_shared_t *s, int *seq_out)
+{
+    int seq_before;
+    int seq_after;
+    int action;
+
+    if(!s)
+    {
+        if(seq_out)
+            *seq_out = 0;
+        return VJ_AUDIO_BEAT_ACTION_NONE;
+    }
+
+    for(;;)
+    {
+        seq_before = __atomic_load_n(&s->action_seq, __ATOMIC_ACQUIRE);
+        if(seq_before & 1)
+        {
+            sched_yield();
+            continue;
+        }
+
+        action = __atomic_load_n(&s->action_mode, __ATOMIC_ACQUIRE);
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+        seq_after = __atomic_load_n(&s->action_seq, __ATOMIC_ACQUIRE);
+
+        if(seq_before == seq_after && !(seq_after & 1))
+            break;
+    }
+
+    if(seq_out)
+        *seq_out = seq_after;
+
+    return action;
+}
+
+static void ab_publish_action_mode(vj_audio_beat_shared_t *s, int action)
+{
+    int seq;
+
+    if(!s)
+        return;
+
+    while(__sync_lock_test_and_set(&s->action_write_lock, 1))
+        sched_yield();
+
+    seq = __atomic_load_n(&s->action_seq, __ATOMIC_RELAXED);
+    if(seq < 0 || seq >= INT_MAX - 2)
+        seq = 0;
+    else if(seq & 1)
+        seq++;
+
+    __atomic_store_n(&s->action_seq, seq + 1, __ATOMIC_RELEASE);
+    __atomic_store_n(&s->action_mode, action, __ATOMIC_RELEASE);
+    __atomic_store_n(&s->action_seq, seq + 2, __ATOMIC_RELEASE);
+
+    __sync_lock_release(&s->action_write_lock);
+}
+
+static inline void ab_snapshot_publish_begin(vj_audio_beat_shared_t *s)
+{
+    int seq;
+
+    if(!s)
+        return;
+
+    while(__sync_lock_test_and_set(&s->snapshot_write_lock, 1))
+        sched_yield();
+
+    seq = ab_load_i(&s->snapshot_seq);
+    if(seq < 0 || seq >= INT_MAX - 2)
+        seq = 0;
+    else if(seq & 1)
+        seq++;
+
+    __atomic_store_n(&s->snapshot_seq, seq + 1, __ATOMIC_SEQ_CST);
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+}
+
+static inline void ab_snapshot_publish_end(vj_audio_beat_shared_t *s)
+{
+    int seq;
+
+    if(!s)
+        return;
+
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+    seq = __atomic_load_n(&s->snapshot_seq, __ATOMIC_SEQ_CST);
+    if(seq < 0 || seq >= INT_MAX - 1)
+        seq = 1;
+    else if(!(seq & 1))
+        seq++;
+
+    __atomic_store_n(&s->snapshot_seq, seq + 1, __ATOMIC_SEQ_CST);
+    __sync_lock_release(&s->snapshot_write_lock);
 }
 
 static long ab_now_ms(void)
@@ -1593,6 +1772,74 @@ static inline double ab_filter_alpha(double cutoff_hz, double sample_rate)
     return a < 0.00001 ? 0.00001 : (a > 1.0 ? 1.0 : a);
 }
 
+#ifndef VEEJAY_AUDIO_BEAT_REFERENCE_BLOCK_MS
+#define VEEJAY_AUDIO_BEAT_REFERENCE_BLOCK_MS 8.0
+#endif
+
+#ifndef VEEJAY_AUDIO_BEAT_WARMUP_MS
+#define VEEJAY_AUDIO_BEAT_WARMUP_MS 400.0
+#endif
+
+#ifndef VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN
+#define VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN 0.00010
+#endif
+#ifndef VEEJAY_AUDIO_BEAT_ADAPTIVE_AUDIBLE_RMS
+#define VEEJAY_AUDIO_BEAT_ADAPTIVE_AUDIBLE_RMS 0.00250
+#endif
+#ifndef VEEJAY_AUDIO_BEAT_ADAPTIVE_SNR_MIN
+#define VEEJAY_AUDIO_BEAT_ADAPTIVE_SNR_MIN 1.30
+#endif
+
+static inline double ab_alpha_for_dt(double reference_alpha, double dt_ms)
+{
+    double blocks;
+
+    if(reference_alpha <= 0.0)
+        return 0.0;
+    if(reference_alpha >= 1.0)
+        return 1.0;
+
+    if(dt_ms <= 0.0)
+        dt_ms = VEEJAY_AUDIO_BEAT_REFERENCE_BLOCK_MS;
+
+    blocks = dt_ms / VEEJAY_AUDIO_BEAT_REFERENCE_BLOCK_MS;
+    return 1.0 - pow(1.0 - reference_alpha, blocks);
+}
+
+typedef struct
+{
+    double threshold_norm;
+    double onset_sigma;
+    double soft_onset_sigma;
+    double min_hit_level;
+    double first_hit_level;
+    double level_ratio_gate;
+    double flux_ratio_gate;
+} ab_detector_sensitivity_t;
+
+static inline ab_detector_sensitivity_t ab_detector_sensitivity_compile(int threshold)
+{
+    ab_detector_sensitivity_t p;
+
+    if(threshold < VEEJAY_AUDIO_BEAT_THRESHOLD_MIN)
+        threshold = VEEJAY_AUDIO_BEAT_THRESHOLD_MIN;
+    else if(threshold > VEEJAY_AUDIO_BEAT_THRESHOLD_MAX)
+        threshold = VEEJAY_AUDIO_BEAT_THRESHOLD_MAX;
+
+    p.threshold_norm = ((double)threshold - 30.0) / 370.0;
+    p.onset_sigma = ab_threshold_to_sigma(threshold);
+    p.soft_onset_sigma = p.onset_sigma * (0.42 + p.threshold_norm * 0.10);
+    p.min_hit_level = 0.0075 + ((double)threshold * 0.000030);
+    if(p.min_hit_level < VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS)
+        p.min_hit_level = VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS;
+    p.first_hit_level = VEEJAY_AUDIO_BEAT_FIRST_HIT_MIN_RMS;
+    p.level_ratio_gate = 1.08 + (p.threshold_norm * 0.24);
+    p.flux_ratio_gate = 1.12 + (p.threshold_norm * 0.52);
+
+    return p;
+}
+
+
 static inline void ab_prepare_analysis_filters(vj_audio_beat_thread_t *t)
 {
     if(!t)
@@ -1826,6 +2073,7 @@ static void ab_breakbeat_hit_queue_clear(void)
 
 static void ab_breakbeat_hit_queue_push(vj_audio_beat_shared_t *s,
                                         const vj_audio_beat_thread_t *t,
+                                        int breakbeat_mode,
                                         int seq,
                                         long hit_ms,
                                         long publish_ms,
@@ -1835,7 +2083,7 @@ static void ab_breakbeat_hit_queue_push(vj_audio_beat_shared_t *s,
     int w;
     int n;
 
-    if(!s || !t || seq <= 0 || !ab_action_is_breakbeat(ab_load_i(&s->action_mode)))
+    if(!s || !t || seq <= 0 || !breakbeat_mode)
         return;
 
     memset(&ev, 0, sizeof(ev));
@@ -1845,13 +2093,19 @@ static void ab_breakbeat_hit_queue_push(vj_audio_beat_shared_t *s,
     ev.publish_ms = publish_ms > 0 ? publish_ms : ev.hit_ms;
     ev.block_ms = block_ms > 0 ? block_ms : 0;
 
-    if(!vj_audio_beat_get_snapshot(s, &ev.snap))
+    if(!ab_audio_beat_fill_snapshot_unlocked(s, &ev.snap))
+    {
         memset(&ev.snap, 0, sizeof(ev.snap));
+        ev.snap.version = VJ_AUDIO_BEAT_SNAPSHOT_VERSION;
+    }
 
     ev.snap.hit_seq = seq;
     ev.snap.last_hit_ms = ev.hit_ms;
     ev.snap.beat_age_ms = ev.publish_ms >= ev.hit_ms ? ev.publish_ms - ev.hit_ms : 0;
     ev.snap.hit_kind = t->last_hit_kind;
+    ev.snap.accepted_kind = t->last_hit_kind;
+    if(ab_valid_period_ms(t->body_period_ms))
+        ev.snap.bpm = (float)(60000.0 / t->body_period_ms);
     ev.snap.level = ab_from_q15(t->pub_level_q15 == INT_MIN ? 0 : t->pub_level_q15);
     ev.snap.envelope = ab_from_q15(t->pub_envelope_q15 == INT_MIN ? 0 : t->pub_envelope_q15);
     ev.snap.flux = ab_from_q15(t->pub_flux_q15 == INT_MIN ? 0 : t->pub_flux_q15);
@@ -2023,7 +2277,7 @@ static void ab_log_config(vj_audio_beat_shared_t *s, const char *reason)
     if(!s)
         return;
 
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
 
     veejay_msg(VEEJAY_MSG_INFO,
                "[AUDIO-BEAT] config%s%s hold=%dms cooldown=%dms threshold=%d scratch=%d source_loss_pause=%d monitor_latency=%d heard_latency=%dms input_channels=%d action=%s(%d) pulse=%dms gate=%dms auto_mode=%d auto_amount=%d enabled=%d open=%d running=%d",
@@ -2106,6 +2360,8 @@ void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
     atomic_store_int(&ab_monitor_latency_ms, VJ_AUDIO_BEAT_MONITOR_LATENCY_DEFAULT_MS);
 
     ab_store_i(&s->action_mode, VJ_AUDIO_BEAT_ACTION_AUTO_FX);
+    ab_store_i(&s->action_seq, 0);
+    ab_store_i(&s->action_write_lock, 0);
     ab_store_i(&s->pulse_ms, 180);
     ab_store_i(&s->gate_ms, 90);
 
@@ -2115,6 +2371,7 @@ void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
     ab_auto_signature = 0;
     ab_auto_target_count = 0;
     ab_auto_active = 0;
+    ab_store_i(&ab_auto_runtime_pending, 0);
     ab_auto_climax_level = 0.0f;
     ab_auto_climax_last_ms = 0;
     ab_auto_climax_last_hit_seq = 0;
@@ -2122,6 +2379,7 @@ void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
     ab_auto_phrase_level = 0.0f;
     ab_auto_groove_last_ms = 0;
     ab_auto_groove_last_hit_seq = 0;
+    ab_auto_snapshot_reset_seq = -1;
     ab_auto_last_apply_ms = 0;
     ab_auto_signature_last_check_ms = 0;
     ab_auto_signature_last_chain_len = -1;
@@ -2146,6 +2404,43 @@ void vj_audio_beat_init(vj_audio_beat_shared_t *s, int input_channels)
     ab_store_i(&ab_band_balance_q15, 0);
     ab_store_i(&s->beat_toggle_q15, 0);
     ab_store_i(&s->bpm_q8, 0);
+    ab_store_i(&s->snapshot_seq, 0);
+    ab_store_i(&s->snapshot_write_lock, 0);
+    ab_store_i(&s->analysis_seq, 0);
+    ab_store_i(&s->analysis_reset_seq, 0);
+    ab_store_i(&s->analysis_action_mode, VJ_AUDIO_BEAT_ACTION_AUTO_FX);
+    ab_store_i(&s->analysis_action_seq, 0);
+    ab_store_l(&s->snapshot_publish_ms, 0);
+    ab_store_i(&s->candidate_seq, 0);
+    ab_store_i(&s->candidate_kind, AB_HIT_NONE);
+    ab_store_l(&s->last_candidate_ms, 0);
+    ab_store_i(&s->detector_beat_seq, 0);
+    ab_store_i(&s->detector_beat_kind, AB_HIT_NONE);
+    ab_store_l(&s->detector_last_beat_ms, 0);
+    ab_store_i(&s->detector_beat_toggle_q15, 0);
+    ab_store_l(&s->tempo_anchor_ms, 0);
+    ab_store_i(&s->analysis_confidence_q15, 0);
+    ab_store_i(&s->source_confidence_q15, 0);
+    ab_store_i(&s->tempo_confidence_q15, 0);
+    ab_store_i(&s->event_confidence_q15, 0);
+    ab_store_i(&s->candidate_confidence_q15, 0);
+    ab_store_i(&s->detector_beat_confidence_q15, 0);
+    ab_store_i(&s->accepted_confidence_q15, 0);
+    ab_store_i(&s->candidate_strength_q15, 0);
+    ab_store_i(&s->detector_beat_strength_q15, 0);
+    ab_store_i(&s->accepted_strength_q15, 0);
+    ab_store_i(&s->detector_beat_kick_q15, 0);
+    ab_store_i(&s->detector_beat_snare_q15, 0);
+    ab_store_i(&s->detector_beat_hat_q15, 0);
+    ab_store_i(&s->low_onset_q15, 0);
+    ab_store_i(&s->mid_onset_q15, 0);
+    ab_store_i(&s->high_onset_q15, 0);
+    ab_store_i(&s->noise_floor_q15, 0);
+    ab_store_i(&s->source_snr_q8, 0);
+    ab_store_i(&s->activity_q15, 0);
+    ab_store_i(&s->onset_q15, 0);
+    ab_store_i(&s->block_ms_q16, 0);
+    ab_store_l(&s->analysis_ms, 0);
 
     ab_store_i(&ab_kick_q15, 0);
     ab_store_i(&ab_snare_q15, 0);
@@ -2187,26 +2482,57 @@ static void ab_thread_reset(vj_audio_beat_thread_t *t)
     t->slow_flux = 0.0;
     t->envelope = 0.0;
     t->beat_period_ms = 0.0;
-    t->last_sample = 0.0;
+    t->last_sample[0] = 0.0;
+    t->last_sample[1] = 0.0;
     t->last_log_energy = 0.0;
+    t->analysis_elapsed_ms = 0.0;
+    t->analysis_confidence = 0.0;
+    t->source_confidence = 0.0;
+    t->tempo_confidence = 0.0;
+    t->event_confidence = 0.0;
+    t->candidate_confidence = 0.0;
+    t->detector_beat_confidence = 0.0;
+    t->accepted_confidence = 0.0;
+    t->candidate_strength = 0.0;
+    t->detector_beat_strength = 0.0;
+    t->accepted_strength = 0.0;
+    t->detector_beat_kick = 0.0;
+    t->detector_beat_snare = 0.0;
+    t->detector_beat_hat = 0.0;
+    t->noise_floor = 0.000001;
+    t->source_snr = 0.0;
+    t->block_ms = 0.0;
+    t->analysis_seq = 0;
+    t->analysis_publish_ms = 0;
+    t->analysis_action_mode = VJ_AUDIO_BEAT_ACTION_AUTO_FX;
+    t->analysis_action_seq = 0;
+    t->last_candidate_ms = 0;
+    t->candidate_seq = 0;
+    t->last_candidate_kind = AB_HIT_NONE;
+    t->detector_last_beat_ms = 0;
+    t->detector_beat_seq = 0;
+    t->detector_beat_kind = AB_HIT_NONE;
+    t->detector_beat_toggle_state = 0;
     t->rise_mean = 0.0;
     t->rise_var = 0.010;
     t->flux_mean = 0.0;
     t->flux_var = 0.010;
-    t->onset_mean = 0.0;
-    t->onset_var = 0.250;
     t->onset_smooth = 0.0;
-    t->band_low_lp = 0.0;
-    t->band_mid_lp = 0.0;
+    t->band_low_lp[0] = 0.0;
+    t->band_low_lp[1] = 0.0;
+    t->band_mid_lp[0] = 0.0;
+    t->band_mid_lp[1] = 0.0;
     t->band_low_env = 0.0;
     t->band_mid_env = 0.0;
     t->band_high_env = 0.0;
     t->band_low_slow = 0.000001;
     t->band_mid_slow = 0.000001;
     t->band_high_slow = 0.000001;
+    t->band_low_onset = 0.0;
+    t->band_mid_onset = 0.0;
+    t->band_high_onset = 0.0;
     t->last_hit_ms = 0;
     t->tempo_last_hit_ms = 0;
-    t->blocks_seen = 0;
     t->last_interval_ms = 0;
     t->tempo_fast_count = 0;
     t->tempo_slow_count = 0;
@@ -2239,7 +2565,6 @@ static void ab_thread_reset(vj_audio_beat_thread_t *t)
     t->last_scratch_score = 0.0;
     t->last_scratch_candidate_raw = 0;
     t->last_scratch_dominant = 0;
-    t->last_scratch_candidate = 0;
     t->last_scratch_reject = AB_SCRATCH_REJECT_NONE;
     t->last_scratch_gesture_dir = 0;
     t->last_scratch_gesture_ms = 0;
@@ -2267,6 +2592,10 @@ static void ab_thread_reset(vj_audio_beat_thread_t *t)
 
 static void ab_clear_published_control(vj_audio_beat_shared_t *s)
 {
+    if(!s)
+        return;
+
+    ab_snapshot_publish_begin(s);
     ab_store_i(&s->level_q15, 0);
     ab_store_i(&s->envelope_q15, 0);
     ab_store_i(&s->transient_q8, 0);
@@ -2287,8 +2616,48 @@ static void ab_clear_published_control(vj_audio_beat_shared_t *s)
     ab_store_i(&ab_last_hit_kind, AB_HIT_NONE);
     ab_store_i(&s->beat_toggle_q15, 0);
     ab_store_i(&s->bpm_q8, 0);
+    ab_store_i(&s->analysis_seq, 0);
+    ab_store_i(&s->analysis_reset_seq, ab_load_i(&s->reset_seq));
+    {
+        int action_seq = 0;
+        int action = ab_capture_action_mode(s, &action_seq);
+        ab_store_i(&s->analysis_action_mode, action);
+        ab_store_i(&s->analysis_action_seq, action_seq);
+    }
+    ab_store_l(&s->snapshot_publish_ms, 0);
+    ab_store_i(&s->candidate_seq, 0);
+    ab_store_i(&s->candidate_kind, AB_HIT_NONE);
+    ab_store_l(&s->last_candidate_ms, 0);
+    ab_store_i(&s->detector_beat_seq, 0);
+    ab_store_i(&s->detector_beat_kind, AB_HIT_NONE);
+    ab_store_l(&s->detector_last_beat_ms, 0);
+    ab_store_i(&s->detector_beat_toggle_q15, 0);
+    ab_store_l(&s->tempo_anchor_ms, 0);
+    ab_store_i(&s->analysis_confidence_q15, 0);
+    ab_store_i(&s->source_confidence_q15, 0);
+    ab_store_i(&s->tempo_confidence_q15, 0);
+    ab_store_i(&s->event_confidence_q15, 0);
+    ab_store_i(&s->candidate_confidence_q15, 0);
+    ab_store_i(&s->detector_beat_confidence_q15, 0);
+    ab_store_i(&s->accepted_confidence_q15, 0);
+    ab_store_i(&s->candidate_strength_q15, 0);
+    ab_store_i(&s->detector_beat_strength_q15, 0);
+    ab_store_i(&s->accepted_strength_q15, 0);
+    ab_store_i(&s->detector_beat_kick_q15, 0);
+    ab_store_i(&s->detector_beat_snare_q15, 0);
+    ab_store_i(&s->detector_beat_hat_q15, 0);
+    ab_store_i(&s->low_onset_q15, 0);
+    ab_store_i(&s->mid_onset_q15, 0);
+    ab_store_i(&s->high_onset_q15, 0);
+    ab_store_i(&s->noise_floor_q15, 0);
+    ab_store_i(&s->source_snr_q8, 0);
+    ab_store_i(&s->activity_q15, 0);
+    ab_store_i(&s->onset_q15, 0);
+    ab_store_i(&s->block_ms_q16, 0);
+    ab_store_l(&s->analysis_ms, 0);
     ab_store_l(&s->last_hit_ms, 0);
     ab_store_l(&s->hold_until_ms, 0);
+    ab_snapshot_publish_end(s);
 }
 
 static int ab_thread_prepare_buffer(vj_audio_beat_thread_t *t)
@@ -3030,6 +3399,45 @@ static int ab_configure_from_sync(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     return 1;
 }
 
+static const char *ab_update_dynamic_bpm(vj_audio_beat_shared_t *s,
+                                         vj_audio_beat_thread_t *t,
+                                         long interval,
+                                         int hit_kind,
+                                         double hit_confidence,
+                                         int *advance_anchor);
+
+static long ab_detector_beat_cooldown_ms(vj_audio_beat_shared_t *s,
+                                          const vj_audio_beat_thread_t *t)
+{
+    long configured;
+
+    if(!s)
+        return 180L;
+
+    configured = (long)ab_load_i(&s->cooldown_ms);
+    if(configured < 40L)
+        configured = 40L;
+    else if(configured > 2000L)
+        configured = 2000L;
+
+    if(t && ab_valid_period_ms(t->beat_period_ms))
+    {
+        double period = t->beat_period_ms;
+        double factor = period < 360.0 ? 0.52 : (period > 760.0 ? 0.64 : 0.58);
+        long tempo_guard = (long)(period * factor + 0.5);
+
+        if(tempo_guard < 190L)
+            tempo_guard = 190L;
+        else if(tempo_guard > 1250L)
+            tempo_guard = 1250L;
+
+        if(configured < tempo_guard)
+            configured = tempo_guard;
+    }
+
+    return configured;
+}
+
 static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t, const uint8_t *data, int bytes)
 {
     int frames;
@@ -3037,12 +3445,9 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     int hit_candidate;
     double energy;
     double flux;
-    double last;
     double low_sum;
     double mid_sum;
     double high_sum;
-    double low_a;
-    double mid_a;
     double bass_norm;
     double mid_norm;
     double high_norm;
@@ -3075,7 +3480,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     long now_ms;
     int audible;
     int coherent_onset;
-    int armed;
     int settled;
     int first_hit_ready;
     int absolute_onset;
@@ -3111,6 +3515,10 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     int dense_body_onset;
     int kick_onset;
     int snare_onset;
+    int neutral_candidate;
+    int neutral_kind;
+    double event_strength;
+    ab_detector_sensitivity_t sensitivity;
 
     if(!s || !t || !data || bytes <= 0 || t->bytes_per_frame <= 0 || t->channels <= 0)
         return 0;
@@ -3122,119 +3530,145 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
 
     ab_analysis_luts_init();
     ab_prepare_analysis_filters(t);
+    t->analysis_action_mode = ab_capture_action_mode(s, &t->analysis_action_seq);
 
     {
         const int bpf = t->bytes_per_frame;
-        const int ch = t->channels;
+        const int sample_bytes = t->bits_per_channel == 16 ? 2 : 1;
+        int ch = t->channels > 2 ? 2 : t->channels;
         const float inv_frames = 1.0f / (float)frames;
-        const float inv_ch = ch > 0 ? 1.0f / (float)ch : 1.0f;
+
+        if(ch * sample_bytes > bpf)
+            ch = bpf / sample_bytes;
+        if(ch < 1)
+            return 0;
+
+        const float inv_ch = 1.0f / (float)ch;
         const float low_af = t->filter_low_alpha;
         const float mid_af = t->filter_mid_alpha;
         const uint8_t *p = data;
-        float energy_f = 0.0f;
-        float flux_f = 0.0f;
-        float low_sum_f = 0.0f;
-        float mid_sum_f = 0.0f;
-        float high_sum_f = 0.0f;
-        float last_f = (float)t->last_sample;
-        float low_lp = (float)t->band_low_lp;
-        float mid_lp = (float)t->band_mid_lp;
+        float energy_ch[2] = { 0.0f, 0.0f };
+        float flux_ch[2] = { 0.0f, 0.0f };
+        float low_sum_ch[2] = { 0.0f, 0.0f };
+        float mid_sum_ch[2] = { 0.0f, 0.0f };
+        float high_sum_ch[2] = { 0.0f, 0.0f };
+        float last_ch[2] = { (float)t->last_sample[0], (float)t->last_sample[1] };
+        float low_lp_ch[2] = { (float)t->band_low_lp[0], (float)t->band_low_lp[1] };
+        float mid_lp_ch[2] = { (float)t->band_mid_lp[0], (float)t->band_mid_lp[1] };
 
         if(t->bits_per_channel == 16)
         {
-            if(ch == 2 && bpf >= 4)
+            for(int i = 0; i < frames; i++, p += bpf)
             {
-                for(int i = 0; i < frames; i++, p += bpf)
+                for(int cidx = 0; cidx < ch; cidx++)
                 {
-                    float mono = (ab_lut_s16(p) + ab_lut_s16(p + 2)) * 0.5f;
-                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
-                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
-                }
-            }
-            else if(ch == 1 && bpf >= 2)
-            {
-                for(int i = 0; i < frames; i++, p += bpf)
-                {
-                    float mono = ab_lut_s16(p);
-                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
-                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
-                }
-            }
-            else
-            {
-                for(int i = 0; i < frames; i++, p += bpf)
-                {
-                    float mono = 0.0f;
-
-                    for(int c = 0; c < ch; c++)
-                        mono += ab_lut_s16(p + (c * 2));
-
-                    mono *= inv_ch;
-                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
-                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                    float sample = ab_lut_s16(p + (cidx * 2));
+                    ab_accum_mono_sample(sample,
+                                         &last_ch[cidx],
+                                         low_af,
+                                         mid_af,
+                                         &low_lp_ch[cidx],
+                                         &mid_lp_ch[cidx],
+                                         &energy_ch[cidx],
+                                         &flux_ch[cidx],
+                                         &low_sum_ch[cidx],
+                                         &mid_sum_ch[cidx],
+                                         &high_sum_ch[cidx]);
                 }
             }
         }
         else
         {
-            if(ch == 2 && bpf >= 2)
+            for(int i = 0; i < frames; i++, p += bpf)
             {
-                for(int i = 0; i < frames; i++, p += bpf)
+                for(int cidx = 0; cidx < ch; cidx++)
                 {
-                    float mono = (ab_lut_u8(p) + ab_lut_u8(p + 1)) * 0.5f;
-                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
-                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
-                }
-            }
-            else if(ch == 1 && bpf >= 1)
-            {
-                for(int i = 0; i < frames; i++, p += bpf)
-                {
-                    float mono = ab_lut_u8(p);
-                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
-                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
-                }
-            }
-            else
-            {
-                for(int i = 0; i < frames; i++, p += bpf)
-                {
-                    float mono = 0.0f;
-
-                    for(int c = 0; c < ch; c++)
-                        mono += ab_lut_u8(p + c);
-
-                    mono *= inv_ch;
-                    ab_accum_mono_sample(mono, &last_f, low_af, mid_af, &low_lp, &mid_lp,
-                                         &energy_f, &flux_f, &low_sum_f, &mid_sum_f, &high_sum_f);
+                    float sample = ab_lut_u8(p + cidx);
+                    ab_accum_mono_sample(sample,
+                                         &last_ch[cidx],
+                                         low_af,
+                                         mid_af,
+                                         &low_lp_ch[cidx],
+                                         &mid_lp_ch[cidx],
+                                         &energy_ch[cidx],
+                                         &flux_ch[cidx],
+                                         &low_sum_ch[cidx],
+                                         &mid_sum_ch[cidx],
+                                         &high_sum_ch[cidx]);
                 }
             }
         }
 
-        t->band_low_lp = (double)low_lp;
-        t->band_mid_lp = (double)mid_lp;
-        last = (double)last_f;
-        energy = (double)(energy_f * inv_frames);
-        flux = (double)(flux_f * inv_frames);
-        low_sum = (double)(low_sum_f * inv_frames);
-        mid_sum = (double)(mid_sum_f * inv_frames);
-        high_sum = (double)(high_sum_f * inv_frames);
-        low_a = (double)low_af;
-        mid_a = (double)mid_af;
-        (void)low_a;
-        (void)mid_a;
+        energy = 0.0;
+        flux = 0.0;
+        low_sum = 0.0;
+        mid_sum = 0.0;
+        high_sum = 0.0;
+
+        for(int cidx = 0; cidx < ch; cidx++)
+        {
+            t->last_sample[cidx] = (double)last_ch[cidx];
+            t->band_low_lp[cidx] = (double)low_lp_ch[cidx];
+            t->band_mid_lp[cidx] = (double)mid_lp_ch[cidx];
+            energy += (double)energy_ch[cidx];
+            flux += (double)flux_ch[cidx];
+            low_sum += (double)low_sum_ch[cidx];
+            mid_sum += (double)mid_sum_ch[cidx];
+            high_sum += (double)high_sum_ch[cidx];
+        }
+
+        energy *= (double)(inv_frames * inv_ch);
+        flux *= (double)(inv_frames * inv_ch);
+        low_sum *= (double)(inv_frames * inv_ch);
+        mid_sum *= (double)(inv_frames * inv_ch);
+        high_sum *= (double)(inv_frames * inv_ch);
     }
 
-    t->last_sample = last;
-    t->blocks_seen++;
+    t->block_ms = ((double)frames * 1000.0) / (double)t->sample_rate;
+    if(t->block_ms < 0.1)
+        t->block_ms = 0.1;
+    t->analysis_elapsed_ms += t->block_ms;
+    t->analysis_confidence = ab_clampd(t->analysis_elapsed_ms / VEEJAY_AUDIO_BEAT_WARMUP_MS, 0.0, 1.0);
+    t->analysis_seq++;
+    t->analysis_publish_ms = ab_now_ms();
+    now_ms = t->analysis_publish_ms;
 
-    t->band_low_env = t->band_low_env * 0.72 + sqrt(low_sum) * 0.28;
-    t->band_mid_env = t->band_mid_env * 0.68 + sqrt(mid_sum) * 0.32;
-    t->band_high_env = t->band_high_env * 0.62 + sqrt(high_sum) * 0.38;
+    {
+        double low_target = sqrt(low_sum);
+        double mid_target = sqrt(mid_sum);
+        double high_target = sqrt(high_sum);
+        double low_prev = t->band_low_env;
+        double mid_prev = t->band_mid_env;
+        double high_prev = t->band_high_env;
+        double low_env_a = ab_alpha_for_dt(0.28, t->block_ms);
+        double mid_env_a = ab_alpha_for_dt(0.32, t->block_ms);
+        double high_env_a = ab_alpha_for_dt(0.38, t->block_ms);
+        double slow_a = ab_alpha_for_dt(0.008, t->block_ms);
+        double low_onset_raw;
+        double mid_onset_raw;
+        double high_onset_raw;
+        double onset_attack = ab_alpha_for_dt(0.62, t->block_ms);
+        double onset_release = ab_alpha_for_dt(0.16, t->block_ms);
 
-    t->band_low_slow = t->band_low_slow * 0.992 + t->band_low_env * 0.008;
-    t->band_mid_slow = t->band_mid_slow * 0.992 + t->band_mid_env * 0.008;
-    t->band_high_slow = t->band_high_slow * 0.992 + t->band_high_env * 0.008;
+        t->band_low_env += low_env_a * (low_target - t->band_low_env);
+        t->band_mid_env += mid_env_a * (mid_target - t->band_mid_env);
+        t->band_high_env += high_env_a * (high_target - t->band_high_env);
+
+        low_onset_raw = ab_clampd((low_target - low_prev) / (t->band_low_slow * 0.80 + 0.00035), 0.0, 1.0);
+        mid_onset_raw = ab_clampd((mid_target - mid_prev) / (t->band_mid_slow * 0.80 + 0.00035), 0.0, 1.0);
+        high_onset_raw = ab_clampd((high_target - high_prev) / (t->band_high_slow * 0.80 + 0.00035), 0.0, 1.0);
+
+        t->band_low_onset += (low_onset_raw > t->band_low_onset ? onset_attack : onset_release) *
+                             (low_onset_raw - t->band_low_onset);
+        t->band_mid_onset += (mid_onset_raw > t->band_mid_onset ? onset_attack : onset_release) *
+                             (mid_onset_raw - t->band_mid_onset);
+        t->band_high_onset += (high_onset_raw > t->band_high_onset ? onset_attack : onset_release) *
+                              (high_onset_raw - t->band_high_onset);
+
+        t->band_low_slow += slow_a * (t->band_low_env - t->band_low_slow);
+        t->band_mid_slow += slow_a * (t->band_mid_env - t->band_mid_slow);
+        t->band_high_slow += slow_a * (t->band_high_env - t->band_high_slow);
+    }
 
     bass_norm = ab_soft_ratio_unit(t->band_low_env,  t->band_low_slow,  1.055, 1.08);
     mid_norm  = ab_soft_ratio_unit(t->band_mid_env,  t->band_mid_slow,  1.070, 1.02);
@@ -3245,7 +3679,7 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     block_level = sqrt(energy);
     log_energy = log(energy + 1.0e-12);
 
-    if(t->blocks_seen <= 1 || t->last_log_energy == 0.0)
+    if(t->last_log_energy == 0.0)
     {
         t->last_log_energy = log_energy;
         t->fast_energy = energy;
@@ -3261,23 +3695,64 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
         ab_publish_i_cached(&ab_band_mid_q15, &t->pub_band_mid_q15, ab_q15(mid_norm));
         ab_publish_i_cached(&ab_band_high_q15, &t->pub_band_high_q15, ab_q15(high_norm));
         ab_publish_i_cached(&ab_band_balance_q15, &t->pub_band_balance_q15, ab_q15(band_balance));
+        t->noise_floor = block_level;
+        if(t->noise_floor < VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN)
+            t->noise_floor = VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN;
+        t->source_snr = block_level / (t->noise_floor + 0.000001);
+        t->source_confidence = ab_clampd(block_level /
+                                             (VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS * 2.0),
+                                             0.0,
+                                             1.0);
+        t->tempo_confidence = 0.0;
+        t->event_confidence = 0.0;
+
         ab_publish_i_cached(&s->transient_norm_q15, &t->pub_transient_norm_q15, 0);
         ab_publish_i_cached(&s->transient_q8, &t->pub_transient_q8, 0);
-        ab_source_activity_note(ab_now_ms(),
+        ab_store_i(&s->candidate_seq, t->candidate_seq);
+        ab_store_i(&s->candidate_kind, t->last_candidate_kind);
+        ab_store_l(&s->last_candidate_ms, t->last_candidate_ms);
+        ab_store_i(&s->detector_beat_seq, t->detector_beat_seq);
+        ab_store_i(&s->detector_beat_kind, t->detector_beat_kind);
+        ab_store_l(&s->detector_last_beat_ms, t->detector_last_beat_ms);
+        ab_store_i(&s->detector_beat_toggle_q15, t->detector_beat_toggle_state);
+        ab_store_i(&s->analysis_confidence_q15, ab_q15(t->analysis_confidence));
+        ab_store_i(&s->source_confidence_q15, ab_q15(t->source_confidence));
+        ab_store_i(&s->tempo_confidence_q15, 0);
+        ab_store_i(&s->event_confidence_q15, 0);
+        ab_store_i(&s->candidate_confidence_q15, 0);
+        ab_store_i(&s->detector_beat_confidence_q15, 0);
+        ab_store_i(&s->accepted_confidence_q15, 0);
+        ab_store_i(&s->candidate_strength_q15, 0);
+        ab_store_i(&s->detector_beat_strength_q15, 0);
+        ab_store_i(&s->accepted_strength_q15, 0);
+        ab_store_i(&s->detector_beat_kick_q15, 0);
+        ab_store_i(&s->detector_beat_snare_q15, 0);
+        ab_store_i(&s->detector_beat_hat_q15, 0);
+        ab_store_i(&s->low_onset_q15, ab_q15(t->band_low_onset));
+        ab_store_i(&s->mid_onset_q15, ab_q15(t->band_mid_onset));
+        ab_store_i(&s->high_onset_q15, ab_q15(t->band_high_onset));
+        ab_store_i(&s->noise_floor_q15, ab_q15(t->noise_floor));
+        ab_store_i(&s->source_snr_q8, (int)(ab_clampd(t->source_snr, 0.0, 16.0) * 256.0 + 0.5));
+        ab_store_i(&s->activity_q15, 0);
+        ab_store_i(&s->onset_q15, 0);
+        ab_store_i(&s->block_ms_q16, (int)(t->block_ms * 65536.0 + 0.5));
+        ab_store_l(&s->analysis_ms, (long)(t->analysis_elapsed_ms + 0.5));
+        ab_store_i(&s->analysis_seq, (int)t->analysis_seq);
+        ab_store_i(&s->analysis_reset_seq, t->last_reset_seq);
+        ab_store_i(&s->analysis_action_mode, t->analysis_action_mode);
+        ab_store_i(&s->analysis_action_seq, t->analysis_action_seq);
+        ab_store_l(&s->snapshot_publish_ms, t->analysis_publish_ms);
+        ab_source_activity_note(now_ms,
                                 block_level,
                                 VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS,
                                 t->envelope,
                                 0.0);
-
 
         return 0;
     }
 
 
     threshold = ab_load_i(&s->threshold);
-
-    if(threshold < 1)
-        threshold = 1;
 
     energy_rise = log_energy > t->last_log_energy
         ? log_energy - t->last_log_energy
@@ -3297,45 +3772,93 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
         flux_z = 0.0;
 
     onset_z = (rise_z * 0.45) + (flux_z * 0.55);
-    onset_threshold_z = ab_threshold_to_sigma(threshold);
+    sensitivity = ab_detector_sensitivity_compile(threshold);
+    onset_threshold_z = sensitivity.onset_sigma;
+    threshold_norm = sensitivity.threshold_norm;
 
-    threshold_norm = ((double)threshold - 30.0) / 370.0;
+    {
+        double fast_energy_a = ab_alpha_for_dt(0.45, t->block_ms);
+        double slow_energy_a = ab_alpha_for_dt(0.008, t->block_ms);
+        double fast_flux_a = ab_alpha_for_dt(0.50, t->block_ms);
+        double slow_flux_a = ab_alpha_for_dt(0.015, t->block_ms);
 
-    if(threshold_norm < 0.0)
-        threshold_norm = 0.0;
-    else if(threshold_norm > 1.0)
-        threshold_norm = 1.0;
-
-    t->fast_energy = t->fast_energy * 0.55 + energy * 0.45;
-    t->slow_energy = t->slow_energy * 0.992 + energy * 0.008;
-    t->fast_flux = t->fast_flux * 0.50 + flux * 0.50;
-    t->slow_flux = t->slow_flux * 0.985 + flux * 0.015;
+        t->fast_energy += fast_energy_a * (energy - t->fast_energy);
+        t->slow_energy += slow_energy_a * (energy - t->slow_energy);
+        t->fast_flux += fast_flux_a * (flux - t->fast_flux);
+        t->slow_flux += slow_flux_a * (flux - t->slow_flux);
+    }
 
     level = sqrt(t->fast_energy);
 
     level_ratio = level / (sqrt(t->slow_energy) + 0.000001);
     flux_ratio_abs = t->fast_flux / (t->slow_flux + 0.000001);
 
-    abs_level_gate = 1.08 + (threshold_norm * 0.24);
-    abs_flux_gate = 1.12 + (threshold_norm * 0.52);
+    abs_level_gate = sensitivity.level_ratio_gate;
+    abs_flux_gate = sensitivity.flux_ratio_gate;
 
-    t->envelope = level > t->envelope
-        ? (t->envelope * 0.35 + level * 0.65)
-        : (t->envelope * 0.94 + level * 0.06);
+    {
+        double envelope_a = ab_alpha_for_dt(level > t->envelope ? 0.65 : 0.06, t->block_ms);
+        double onset_a = ab_alpha_for_dt(onset_z > t->onset_smooth ? 0.75 : 0.12, t->block_ms);
 
-    t->onset_smooth = onset_z > t->onset_smooth
-        ? (t->onset_smooth * 0.25 + onset_z * 0.75)
-        : (t->onset_smooth * 0.88 + onset_z * 0.12);
+        t->envelope += envelope_a * (level - t->envelope);
+        t->onset_smooth += onset_a * (onset_z - t->onset_smooth);
+    }
 
-    min_hit_level = 0.0075 + ((double)threshold * 0.000030);
+    min_hit_level = sensitivity.min_hit_level;
 
-    if(min_hit_level < VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS)
-        min_hit_level = VEEJAY_AUDIO_BEAT_MIN_RELIABLE_RMS;
+    {
+        double floor_target = block_level;
+        double floor_alpha;
+        double absolute_confidence;
+        double snr_confidence;
+        double relative_confidence;
+        double source_target;
 
-    audible = block_level >= min_hit_level;
+        if(t->noise_floor < VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN)
+            t->noise_floor = VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN;
 
-    now_ms = ab_now_ms();
-    beat_age_ms = t->last_hit_ms > 0 ? (double)(now_ms - t->last_hit_ms) : 0.0;
+        floor_alpha = ab_alpha_for_dt(floor_target < t->noise_floor ? 0.18 : 0.0035,
+                                      t->block_ms);
+        t->noise_floor += floor_alpha * (floor_target - t->noise_floor);
+        if(t->noise_floor < VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN)
+            t->noise_floor = VEEJAY_AUDIO_BEAT_NOISE_FLOOR_MIN;
+
+        t->source_snr = block_level / (t->noise_floor + 0.000001);
+        absolute_confidence = ab_clampd((block_level - min_hit_level * 0.20) /
+                                            (min_hit_level * 2.80 + 0.000001),
+                                            0.0,
+                                            1.0);
+        snr_confidence = ab_clampd((t->source_snr - 1.0) / 2.25, 0.0, 1.0);
+        relative_confidence = ab_clampd((level_ratio - 1.0) / 0.32, 0.0, 1.0);
+        {
+            double flux_relative = ab_clampd((flux_ratio_abs - 1.0) / 0.55, 0.0, 1.0);
+            if(flux_relative > relative_confidence)
+                relative_confidence = flux_relative;
+        }
+
+        source_target = absolute_confidence;
+        if(snr_confidence > source_target)
+            source_target = snr_confidence;
+        if(relative_confidence > source_target)
+            source_target = relative_confidence;
+        source_target *= 0.25 + t->analysis_confidence * 0.75;
+
+        t->source_confidence += ab_alpha_for_dt(source_target > t->source_confidence ? 0.34 : 0.08,
+                                                t->block_ms) *
+                                (source_target - t->source_confidence);
+    }
+
+    audible = block_level >= VEEJAY_AUDIO_BEAT_ADAPTIVE_AUDIBLE_RMS &&
+              (block_level >= min_hit_level ||
+               t->source_snr >= VEEJAY_AUDIO_BEAT_ADAPTIVE_SNR_MIN ||
+               t->source_confidence >= 0.46 ||
+               (t->source_confidence >= 0.34 && onset_z >= onset_threshold_z));
+
+    beat_age_ms = t->tempo_last_hit_ms > 0
+        ? (double)(now_ms - t->tempo_last_hit_ms)
+        : (t->detector_last_beat_ms > 0
+            ? (double)(now_ms - t->detector_last_beat_ms)
+            : 0.0);
     expected_period_ms = t->beat_period_ms;
 
     tempo_known = expected_period_ms >= (double)VEEJAY_AUDIO_BEAT_MIN_PERIOD_MS &&
@@ -3373,19 +3896,19 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
         groove_late_ms = 0.0;
     }
 
-    armed = t->blocks_seen > VEEJAY_AUDIO_BEAT_ARM_BLOCKS &&
-            t->blocks_seen > VEEJAY_AUDIO_BEAT_ADAPT_WARMUP_BLOCKS;
+    settled = t->analysis_confidence >= 1.0;
 
-    settled = armed &&
-              (t->last_hit_ms > 0 ||
-               t->blocks_seen > (VEEJAY_AUDIO_BEAT_ADAPT_WARMUP_BLOCKS +
-                                 VEEJAY_AUDIO_BEAT_SETTLE_BLOCKS));
+    first_hit_ready = t->candidate_seq > 0 ||
+                      block_level >= sensitivity.first_hit_level ||
+                      (t->source_confidence >= 0.52 &&
+                       t->source_snr >= 1.55 &&
+                       (onset_z >= onset_threshold_z + 0.75 ||
+                        (rise_z >= 0.42 && flux_z >= 0.34))) ||
+                      (t->source_confidence >= 0.70 &&
+                       onset_z >= onset_threshold_z + 1.10 &&
+                       rise_z >= 0.50 && flux_z >= 0.40);
 
-    first_hit_ready = t->last_hit_ms > 0 ||
-                      block_level >= VEEJAY_AUDIO_BEAT_FIRST_HIT_MIN_RMS;
-
-
-    soft_onset_z = onset_threshold_z * (0.42 + threshold_norm * 0.10);
+    soft_onset_z = sensitivity.soft_onset_sigma;
 
     transient_norm = ab_clampd(onset_z / (onset_threshold_z * 2.0), 0.0, 1.0);
     flux_norm = ab_clampd(flux_z / 6.0, 0.0, 1.0);
@@ -3432,11 +3955,13 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
 
     scratch_raw = ab_clampd(scratch_raw, 0.0, 1.0);
 
-    t->scratch_env = scratch_raw > t->scratch_env
-        ? (t->scratch_env * 0.38 + scratch_raw * 0.62)
-        : (t->scratch_env * 0.86 + scratch_raw * 0.14);
+    {
+        double scratch_a = ab_alpha_for_dt(scratch_raw > t->scratch_env ? 0.62 : 0.14, t->block_ms);
+        double scratch_slow_a = ab_alpha_for_dt(0.012, t->block_ms);
 
-    t->scratch_slow = t->scratch_slow * 0.988 + t->scratch_env * 0.012;
+        t->scratch_env += scratch_a * (scratch_raw - t->scratch_env);
+        t->scratch_slow += scratch_slow_a * (t->scratch_env - t->scratch_slow);
+    }
 
     scratch_rise = t->scratch_env - t->scratch_slow;
     if(scratch_rise < 0.0)
@@ -3445,9 +3970,10 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     scratch_burst = scratch_rise * 2.10 + flux_z * 0.055 + flux_ratio_abs * 0.015;
     scratch_burst = ab_clampd(scratch_burst, 0.0, 1.0);
 
-    t->scratch_burst_env = scratch_burst > t->scratch_burst_env
-        ? (t->scratch_burst_env * 0.42 + scratch_burst * 0.58)
-        : (t->scratch_burst_env * 0.82 + scratch_burst * 0.18);
+    {
+        double burst_a = ab_alpha_for_dt(scratch_burst > t->scratch_burst_env ? 0.58 : 0.18, t->block_ms);
+        t->scratch_burst_env += burst_a * (scratch_burst - t->scratch_burst_env);
+    }
 
     scratch_amount = ab_clampd(t->scratch_env * 0.72 + t->scratch_burst_env * 0.28, 0.0, 1.0);
     scratch_velocity = ab_clampd((flux_norm * 0.46 + flux_boost * 0.22 + high_norm * 0.18 + mid_norm * 0.10 + scratch_burst * 0.18), 0.0, 1.0);
@@ -3464,7 +3990,7 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     if(scratch_turn_since_ms < 0)
         scratch_turn_since_ms = 0;
 
-    breakbeat_mode = ab_action_is_breakbeat(ab_load_i(&s->action_mode));
+    breakbeat_mode = ab_action_is_breakbeat(t->analysis_action_mode);
 
     scratch_turn_edge =
         breakbeat_mode &&
@@ -3574,14 +4100,15 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
     hat_score = ab_clampd(hat_score, 0.0, 1.0);
 
     kick_onset =
-        kick_score >= 0.42 &&
-        bass_norm >= 0.32 &&
-        (rise_z >= 0.12 || flux_z >= 0.12);
+        kick_score >= ab_classifier_policy.kick_onset_min &&
+        bass_norm >= ab_classifier_policy.kick_band_min &&
+        (rise_z >= ab_classifier_policy.onset_rise_min ||
+         flux_z >= ab_classifier_policy.onset_flux_min);
 
     snare_onset =
-        snare_score >= 0.46 &&
-        (mid_norm + high_norm) >= 0.58 &&
-        (flux_z >= 0.18 || rise_z >= 0.12);
+        snare_score >= ab_classifier_policy.snare_onset_min &&
+        (mid_norm + high_norm) >= ab_classifier_policy.snare_band_sum_min &&
+        (flux_z >= 0.18 || rise_z >= ab_classifier_policy.onset_rise_min);
 
     scratch_decision = ab_breakbeat_scratch_decide(t,
                                                      now_ms,
@@ -3609,7 +4136,6 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
 
     t->last_scratch_candidate_raw = scratch_candidate_raw ? 1 : 0;
     t->last_scratch_dominant = scratch_dominant ? 1 : 0;
-    t->last_scratch_candidate = scratch_candidate ? 1 : 0;
     t->last_scratch_reject = scratch_reject;
 
     /*
@@ -3705,32 +4231,171 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
 
     if(!settled)
     {
-        bass_norm = 0.0;
-        mid_norm = 0.0;
-        high_norm = 0.0;
-        band_balance = 0.0;
-        transient_norm = 0.0;
-        flux_norm = 0.0;
-        kick_score = 0.0;
-        snare_score = 0.0;
-        hat_score = 0.0;
-        broadband_norm = 0.0;
-        scratch_amount = 0.0;
-        scratch_velocity = 0.0;
-        scratch_burst = 0.0;
-        scratch_turn_score = 0.0;
         scratch_turn_edge = 0;
         t->last_scratch_turn_edge = 0;
         scratch_candidate_raw = 0;
         scratch_candidate = 0;
         scratch_dominant = 0;
         scratch_reject = AB_SCRATCH_REJECT_RAW;
-        dense_onset = 0;
         dense_body_onset = 0;
         kick_onset = 0;
         snare_onset = 0;
         groove_onset = 0;
     }
+
+    if(tempo_known)
+    {
+        double tempo_target = 0.35;
+        double tempo_age_beats = t->tempo_last_hit_ms > 0
+            ? (double)(now_ms - t->tempo_last_hit_ms) / expected_period_ms
+            : 999.0;
+
+        if(t->last_interval_ms > 0 && expected_period_ms > 1.0)
+        {
+            double rel = fabs((double)t->last_interval_ms - expected_period_ms) / expected_period_ms;
+            tempo_target = ab_clampd(1.0 - rel * 1.5, 0.25, 1.0);
+        }
+
+        if(tempo_age_beats > 2.0)
+        {
+            double freshness = 1.0 - ((tempo_age_beats - 2.0) * 0.25);
+            tempo_target *= ab_clampd(freshness, 0.0, 1.0);
+        }
+
+        t->tempo_confidence += ab_alpha_for_dt(tempo_target > t->tempo_confidence ? 0.04 : 0.025,
+                                               t->block_ms) *
+                               (tempo_target - t->tempo_confidence);
+    }
+    else
+    {
+        t->tempo_confidence += ab_alpha_for_dt(0.02, t->block_ms) *
+                               (0.0 - t->tempo_confidence);
+    }
+
+    t->event_confidence = ab_clampd(fmax(fmax(kick_score, snare_score),
+                                          fmax(hat_score, scratch_amount)) * 0.62 +
+                                          transient_norm * 0.24 +
+                                          flux_norm * 0.14,
+                                          0.0,
+                                          1.0);
+    event_strength = ab_clampd(t->event_confidence * 0.58 +
+                               transient_norm * 0.22 +
+                               ab_clampd(t->onset_smooth / (onset_threshold_z * 1.6), 0.0, 1.0) * 0.20,
+                               0.0,
+                               1.0);
+
+    neutral_candidate = settled && first_hit_ready && audible &&
+                        (coherent_onset || dense_body_onset);
+    neutral_kind = neutral_candidate ? ab_classify_hit(kick_score, snare_score, hat_score) : AB_HIT_NONE;
+    if(neutral_candidate && neutral_kind == AB_HIT_NONE)
+        neutral_kind = AB_HIT_FULL;
+
+    if(neutral_candidate)
+    {
+        long candidate_gap = tempo_known ? (long)(expected_period_ms * 0.28 + 0.5) : 120L;
+
+        if(candidate_gap < 70L)
+            candidate_gap = 70L;
+        else if(candidate_gap > 420L)
+            candidate_gap = 420L;
+
+        if(t->last_candidate_ms <= 0 || now_ms - t->last_candidate_ms >= candidate_gap)
+        {
+            long beat_cooldown = ab_detector_beat_cooldown_ms(s, t);
+
+            t->last_candidate_ms = now_ms;
+            t->last_candidate_kind = neutral_kind;
+            t->candidate_confidence = t->event_confidence;
+            t->candidate_strength = event_strength;
+            t->candidate_seq++;
+
+            if(t->detector_last_beat_ms <= 0 ||
+               now_ms - t->detector_last_beat_ms >= beat_cooldown)
+            {
+                t->detector_last_beat_ms = now_ms;
+                t->detector_beat_kind = neutral_kind;
+                t->detector_beat_confidence = t->event_confidence;
+                t->detector_beat_strength = event_strength;
+                t->detector_beat_kick = kick_score;
+                t->detector_beat_snare = snare_score;
+                t->detector_beat_hat = hat_score;
+                t->detector_beat_seq++;
+                t->detector_beat_toggle_state = t->detector_beat_toggle_state > 0 ? 0 : 32767;
+
+                if(neutral_kind != AB_HIT_HAT && neutral_kind != AB_HIT_SCRATCH)
+                {
+                    long tempo_prev = t->tempo_last_hit_ms;
+                    int advance_anchor = tempo_prev <= 0 ? 1 : 0;
+
+                    if(tempo_prev > 0)
+                    {
+                        long interval = now_ms - tempo_prev;
+
+                        if(interval > VEEJAY_AUDIO_BEAT_MAX_PERIOD_MS)
+                        {
+                            advance_anchor = 1;
+                            t->tempo_fast_count = 0;
+                            t->tempo_slow_count = 0;
+                        }
+                        else
+                        {
+                            (void)ab_update_dynamic_bpm(s,
+                                                        t,
+                                                        interval,
+                                                        neutral_kind,
+                                                        t->event_confidence,
+                                                        &advance_anchor);
+                        }
+                    }
+
+                    if(advance_anchor)
+                    {
+                        t->tempo_last_hit_ms = now_ms;
+                        ab_store_l(&s->tempo_anchor_ms, now_ms);
+                    }
+
+                    if(ab_valid_period_ms(t->beat_period_ms) && t->tempo_confidence < 0.25)
+                        t->tempo_confidence = 0.25;
+                }
+            }
+        }
+    }
+
+    ab_store_i(&s->candidate_seq, t->candidate_seq);
+    ab_store_i(&s->candidate_kind, t->last_candidate_kind);
+    ab_store_l(&s->last_candidate_ms, t->last_candidate_ms);
+    ab_store_i(&s->detector_beat_seq, t->detector_beat_seq);
+    ab_store_i(&s->detector_beat_kind, t->detector_beat_kind);
+    ab_store_l(&s->detector_last_beat_ms, t->detector_last_beat_ms);
+    ab_store_i(&s->detector_beat_toggle_q15, t->detector_beat_toggle_state);
+    ab_store_i(&s->analysis_confidence_q15, ab_q15(t->analysis_confidence));
+    ab_store_i(&s->source_confidence_q15, ab_q15(t->source_confidence));
+    ab_store_i(&s->tempo_confidence_q15, ab_q15(t->tempo_confidence));
+    ab_store_i(&s->event_confidence_q15, ab_q15(t->event_confidence));
+    ab_store_i(&s->candidate_confidence_q15, ab_q15(t->candidate_confidence));
+    ab_store_i(&s->detector_beat_confidence_q15, ab_q15(t->detector_beat_confidence));
+    ab_store_i(&s->accepted_confidence_q15, ab_q15(t->accepted_confidence));
+    ab_store_i(&s->candidate_strength_q15, ab_q15(t->candidate_strength));
+    ab_store_i(&s->detector_beat_strength_q15, ab_q15(t->detector_beat_strength));
+    ab_store_i(&s->accepted_strength_q15, ab_q15(t->accepted_strength));
+    ab_store_i(&s->detector_beat_kick_q15, ab_q15(t->detector_beat_kick));
+    ab_store_i(&s->detector_beat_snare_q15, ab_q15(t->detector_beat_snare));
+    ab_store_i(&s->detector_beat_hat_q15, ab_q15(t->detector_beat_hat));
+    ab_store_i(&s->low_onset_q15, ab_q15(t->band_low_onset));
+    ab_store_i(&s->mid_onset_q15, ab_q15(t->band_mid_onset));
+    ab_store_i(&s->high_onset_q15, ab_q15(t->band_high_onset));
+    ab_store_i(&s->noise_floor_q15, ab_q15(t->noise_floor));
+    ab_store_i(&s->source_snr_q8, (int)(ab_clampd(t->source_snr, 0.0, 16.0) * 256.0 + 0.5));
+    ab_store_i(&s->activity_q15, ab_q15(broadband_norm));
+    ab_store_i(&s->onset_q15,
+               ab_q15(ab_clampd(t->onset_smooth / (onset_threshold_z * 2.0), 0.0, 1.0)));
+    ab_store_i(&s->block_ms_q16, (int)(t->block_ms * 65536.0 + 0.5));
+    ab_store_l(&s->analysis_ms, (long)(t->analysis_elapsed_ms + 0.5));
+    ab_store_i(&s->analysis_seq, (int)t->analysis_seq);
+    ab_store_i(&s->analysis_reset_seq, t->last_reset_seq);
+    ab_store_i(&s->analysis_action_mode, t->analysis_action_mode);
+    ab_store_i(&s->analysis_action_seq, t->analysis_action_seq);
+    ab_store_l(&s->snapshot_publish_ms, t->analysis_publish_ms);
 
     ab_publish_i_cached(&s->level_q15, &t->pub_level_q15, ab_q15(level));
     ab_publish_i_cached(&s->envelope_q15, &t->pub_envelope_q15, ab_q15(t->envelope));
@@ -3778,28 +4443,27 @@ static int ab_analyse_block(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t
             ? ab_classify_hit(kick_score, snare_score, hat_score)
             : AB_HIT_NONE;
 
-        if(hit_candidate && dense_body_onset && t->last_hit_kind == AB_HIT_NONE)
+        if(hit_candidate && t->last_hit_kind == AB_HIT_NONE)
             t->last_hit_kind = AB_HIT_FULL;
     }
 
 
     stat_alpha = !settled ? 0.055 :
-                 (hit_candidate ? 0.0015 :
-                 ((absolute_onset || tempo_onset || dense_body_onset || scratch_candidate) ? 0.0060 : 0.018));
+                 (neutral_candidate ? 0.0015 :
+                 ((absolute_onset || tempo_onset || dense_body_onset) ? 0.0060 : 0.018));
+    stat_alpha = ab_alpha_for_dt(stat_alpha, t->block_ms);
 
     ab_ewstat_update(&t->rise_mean, &t->rise_var, energy_rise, stat_alpha);
     ab_ewstat_update(&t->flux_mean, &t->flux_var, flux_feature, stat_alpha);
-    ab_ewstat_update(&t->onset_mean, &t->onset_var, onset_z, stat_alpha);
 
 
     return hit_candidate;
 }
 
 
-static long ab_effective_cooldown_ms(vj_audio_beat_shared_t *s, const vj_audio_beat_thread_t *t)
+static long ab_effective_cooldown_ms(vj_audio_beat_shared_t *s, const vj_audio_beat_thread_t *t, int action)
 {
     long configured;
-    int action;
 
     if(!s)
         return 180L;
@@ -3810,8 +4474,6 @@ static long ab_effective_cooldown_ms(vj_audio_beat_shared_t *s, const vj_audio_b
         configured = 40L;
     else if(configured > 2000L)
         configured = 2000L;
-
-    action = ab_load_i(&s->action_mode);
 
     if(ab_action_is_breakbeat(action))
     {
@@ -4539,19 +5201,6 @@ typedef struct
     double period_after;
 } ab_body_period_update_t;
 
-static inline void ab_breakbeat_publish_body_period(vj_audio_beat_shared_t *s,
-                                                    vj_audio_beat_thread_t *t)
-{
-    if(!ab_action_is_breakbeat(ab_load_i(&s->action_mode)) ||
-       !ab_valid_period_ms(t->body_period_ms))
-        return;
-
-    t->beat_period_ms = t->body_period_ms;
-    ab_publish_i_cached(&s->bpm_q8,
-                        &t->pub_bpm_q8,
-                        (int)((60000.0 / t->beat_period_ms) * 256.0 + 0.5));
-}
-
 static inline void ab_breakbeat_clear_body_cold_state(vj_audio_beat_thread_t *t)
 {
     t->body_cold_probe_ms = 0;
@@ -4718,8 +5367,7 @@ static void ab_breakbeat_note_accepted_body(vj_audio_beat_shared_t *s,
     if(!s || !t || !ab_is_body_hit(hit_kind) || hit_ms <= 0)
         return;
 
-    if(ab_breakbeat_seed_body_period_from_cold_meter(t))
-        ab_breakbeat_publish_body_period(s, t);
+    (void)ab_breakbeat_seed_body_period_from_cold_meter(t);
 
     if(t->body_last_hit_ms > 0)
     {
@@ -4727,8 +5375,7 @@ static void ab_breakbeat_note_accepted_body(vj_audio_beat_shared_t *s,
                                                         hit_ms - t->body_last_hit_ms,
                                                         hit_score);
 
-        if(period_update.publish)
-            ab_breakbeat_publish_body_period(s, t);
+        (void)period_update.publish;
     }
 
     if(ab_valid_period_ms(t->body_period_ms))
@@ -4769,7 +5416,7 @@ static ab_breakbeat_detector_decision_t ab_breakbeat_detector_decision_prepare(v
 
     memset(&d, 0, sizeof(d));
 
-    d.cooldown_ms = ab_effective_cooldown_ms(s, t);
+    d.cooldown_ms = ab_effective_cooldown_ms(s, t, t->analysis_action_mode);
     d.block_ms = 0;
     d.hit_ms = now_ms;
 
@@ -4797,7 +5444,7 @@ static ab_breakbeat_detector_decision_t ab_breakbeat_detector_decision_prepare(v
 
     d.hit_kind = t->last_hit_kind;
     d.scratch_hit = d.hit_kind == AB_HIT_SCRATCH;
-    d.breakbeat_mode = ab_action_is_breakbeat(ab_load_i(&s->action_mode));
+    d.breakbeat_mode = ab_action_is_breakbeat(t->analysis_action_mode);
     d.body_hit = ab_is_body_hit(d.hit_kind);
     d.body_since_ms = (t->body_last_hit_ms > 0 && d.hit_ms >= t->body_last_hit_ms) ? d.hit_ms - t->body_last_hit_ms : 2147483647L;
     d.candidate_since_ms = d.body_hit && d.breakbeat_mode ? d.body_since_ms : d.since_last_ms;
@@ -4985,30 +5632,15 @@ static void ab_breakbeat_detector_accept(vj_audio_beat_shared_t *s,
                                          const ab_breakbeat_detector_decision_t *d,
                                          long now_ms)
 {
-    long tempo_prev;
-    long interval;
-    int advance_tempo_anchor;
     int hit_seq;
+    int action_seq;
 
-    tempo_prev = t->tempo_last_hit_ms;
-    interval = tempo_prev > 0 ? d->hit_ms - tempo_prev : 0;
-    if(interval < 0)
-        interval = 0;
+    if(!s || !t || !d)
+        return;
 
-    advance_tempo_anchor = tempo_prev <= 0 ? 1 : 0;
-
-    if(!d->scratch_hit && (!d->breakbeat_mode || (d->body_hit && !d->body_accent_hit)))
-    {
-        if(tempo_prev > 0)
-            (void) ab_update_dynamic_bpm(s, t, interval, d->hit_kind, d->hit_confidence, &advance_tempo_anchor);
-
-        if(advance_tempo_anchor)
-            t->tempo_last_hit_ms = d->hit_ms;
-    }
-    else
-    {
-        advance_tempo_anchor = 0;
-    }
+    action_seq = __atomic_load_n(&s->action_seq, __ATOMIC_ACQUIRE);
+    if((action_seq & 1) || action_seq != t->analysis_action_seq)
+        return;
 
     if(d->breakbeat_mode &&
        !d->scratch_hit &&
@@ -5018,6 +5650,8 @@ static void ab_breakbeat_detector_accept(vj_audio_beat_shared_t *s,
     t->last_hit_ms = d->hit_ms;
     t->last_accept_score = d->hit_confidence;
     t->last_accept_level = d->hit_level;
+    t->accepted_confidence = d->hit_confidence;
+    t->accepted_strength = ab_clampd(d->hit_confidence * 0.72 + d->hit_level * 0.28, 0.0, 1.0);
 
     if(d->breakbeat_mode && d->body_hit)
     {
@@ -5035,16 +5669,23 @@ static void ab_breakbeat_detector_accept(vj_audio_beat_shared_t *s,
 
     t->beat_toggle_state = t->beat_toggle_state > 0 ? 0 : 32767;
     ab_store_i(&s->beat_toggle_q15, t->beat_toggle_state);
+    ab_store_i(&s->accepted_confidence_q15, ab_q15(t->accepted_confidence));
+    ab_store_i(&s->accepted_strength_q15, ab_q15(t->accepted_strength));
 
-    ab_breakbeat_hit_queue_push(s, t, hit_seq, d->hit_ms, now_ms, d->block_ms);
+    ab_breakbeat_hit_queue_push(s, t, d->breakbeat_mode, hit_seq, d->hit_ms, now_ms, d->block_ms);
 }
 
-static void ab_breakbeat_process_detector_hit(vj_audio_beat_shared_t *s,
+static void ab_process_detector_hit(vj_audio_beat_shared_t *s,
                                               vj_audio_beat_thread_t *t,
                                               int got_bytes,
                                               long now_ms)
 {
     ab_breakbeat_detector_decision_t d;
+    int action_seq;
+
+    action_seq = __atomic_load_n(&s->action_seq, __ATOMIC_ACQUIRE);
+    if((action_seq & 1) || action_seq != t->analysis_action_seq)
+        return;
 
     d = ab_breakbeat_detector_decision_prepare(s, t, got_bytes, now_ms);
 
@@ -5257,6 +5898,7 @@ void *vj_audio_beat_thread(void *arg)
 
             ab_add_l(&s->reads, 1);
 
+            ab_snapshot_publish_begin(s);
             hit = ab_analyse_block(s, &t, t.buffer, got);
             now = ab_now_ms();
 
@@ -5337,12 +5979,15 @@ void *vj_audio_beat_thread(void *arg)
 
         ab_add_l(&s->reads, 1);
 
+        ab_snapshot_publish_begin(s);
         hit = ab_analyse_block(s, &t, t.buffer, got);
         now = ab_now_ms();
 
 beat_process_hit:
         if(hit)
-            ab_breakbeat_process_detector_hit(s, &t, got, now);
+            ab_process_detector_hit(s, &t, got, now);
+        ab_snapshot_publish_end(s);
+        ab_audio_beat_emit_snapshot_observer(s);
 
         /*
          * If there is still legacy JACK backlog, yield deliberately.
@@ -8022,7 +8667,7 @@ int vj_audio_beat_release_transport(veejay_t *v, vj_audio_beat_shared_t *s)
     if(!s)
         return 0;
 
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
     was_paused = ab_load_i(&s->paused_by_beat);
     was_breakbeat_active = ab_breakbeat_state.active;
     hold_until = ab_load_l(&s->hold_until_ms);
@@ -8087,7 +8732,7 @@ void vj_audio_beat_user_transport_override(veejay_t *v, vj_audio_beat_shared_t *
     if(!s)
         return;
 
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
     was_paused = ab_load_i(&s->paused_by_beat);
     was_breakbeat_active = ab_breakbeat_state.active;
     manual_pause_active = ab_breakbeat_user_pause_override_active();
@@ -8690,7 +9335,7 @@ int vj_audio_beat_resume_if_due(veejay_t *v, vj_audio_beat_shared_t *s)
 
     now = ab_now_ms();
     enabled = ab_load_i(&s->enabled);
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
 
     if(ab_breakbeat_state.active && (!enabled || !ab_action_is_breakbeat(action)))
     {
@@ -8820,7 +9465,7 @@ int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s)
 
     now = ab_now_ms();
     enabled = ab_load_i(&s->enabled);
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
 
     if(ab_breakbeat_state.active && !ab_action_is_breakbeat(action))
     {
@@ -9220,13 +9865,13 @@ void vj_audio_beat_set_action(vj_audio_beat_shared_t *s, int action)
         return;
 
     action = ab_normalize_action(action);
-    old_action = ab_load_i(&s->action_mode);
+    old_action = ab_capture_action_mode(s, NULL);
     hit_seq = ab_load_i(&s->hit_seq);
 
     if(old_action == action)
         return;
 
-    ab_store_i(&s->action_mode, action);
+    ab_publish_action_mode(s, action);
     ab_store_i(&s->consumed_seq, hit_seq);
 
     if(ab_action_is_breakbeat(old_action) &&
@@ -9240,7 +9885,7 @@ void vj_audio_beat_set_action(vj_audio_beat_shared_t *s, int action)
                    ab_action_name(action), action);
 #endif
     }
-    else if(ab_action_is_breakbeat(old_action) ||
+    else if(ab_action_is_breakbeat(old_action) !=
             ab_action_is_breakbeat(action))
     {
         ab_breakbeat_reset_state();
@@ -9263,7 +9908,7 @@ void vj_audio_beat_set_action_for_transport(veejay_t *v,
         return;
 
     new_action = ab_normalize_action(action);
-    old_action = ab_load_i(&s->action_mode);
+    old_action = ab_capture_action_mode(s, NULL);
 
     if(old_action != new_action)
         vj_audio_beat_release_transport(v, s);
@@ -9322,14 +9967,21 @@ long vj_audio_beat_get_hits(vj_audio_beat_shared_t *s)
     return ab_load_l(&s->hits);
 }
 
-int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot_t *dst)
+static int ab_audio_beat_fill_snapshot_unlocked(vj_audio_beat_shared_t *s,
+                                                 vj_audio_beat_snapshot_t *dst)
 {
     long now;
     long last;
     long age;
     int pulse_ms;
     int gate_ms;
+    int candidate_pulse_ms;
+    int candidate_gate_ms;
+    int detected_pulse_ms;
+    int detected_gate_ms;
     int hit_kind;
+    int candidate_kind;
+    int beat_kind;
     float bpm;
     float pulse;
 
@@ -9341,43 +9993,130 @@ int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot
     now = ab_now_ms();
     last = ab_load_l(&s->last_hit_ms);
     age = last > 0 ? now - last : 2147483647L;
+    if(age < 0)
+        age = 0;
 
     bpm = (float)ab_load_i(&s->bpm_q8) * (1.0f / 256.0f);
     hit_kind = ab_load_i(&ab_last_hit_kind);
+    candidate_kind = ab_load_i(&s->candidate_kind);
+    beat_kind = ab_load_i(&s->detector_beat_kind);
 
     pulse_ms = (int)ab_effective_snapshot_window_ms(ab_load_i(&s->pulse_ms), bpm, hit_kind, 0);
     gate_ms = (int)ab_effective_snapshot_window_ms(ab_load_i(&s->gate_ms), bpm, hit_kind, 1);
+    candidate_pulse_ms = (int)ab_effective_snapshot_window_ms(ab_load_i(&s->pulse_ms), bpm, candidate_kind, 0);
+    candidate_gate_ms = (int)ab_effective_snapshot_window_ms(ab_load_i(&s->gate_ms), bpm, candidate_kind, 1);
+    detected_pulse_ms = (int)ab_effective_snapshot_window_ms(ab_load_i(&s->pulse_ms), bpm, beat_kind, 0);
+    detected_gate_ms = (int)ab_effective_snapshot_window_ms(ab_load_i(&s->gate_ms), bpm, beat_kind, 1);
 
     pulse = age >= 0 && age < pulse_ms
         ? 1.0f - ((float)age / (float)pulse_ms)
         : 0.0f;
 
+    dst->version = VJ_AUDIO_BEAT_SNAPSHOT_VERSION;
+    dst->publish_seq = (uint32_t)ab_load_i(&s->snapshot_seq);
+    dst->analysis_seq = (uint32_t)ab_load_i(&s->analysis_seq);
+    dst->action_seq = (uint32_t)ab_load_i(&s->analysis_action_seq);
+
+    dst->reset_seq = ab_load_i(&s->analysis_reset_seq);
+    dst->action_mode = ab_load_i(&s->analysis_action_mode);
     dst->enabled = ab_load_i(&s->enabled);
     dst->open = ab_load_i(&s->open);
     dst->channels = ab_load_i(&s->channels);
     dst->sample_rate = ab_load_i(&s->sample_rate);
     dst->hit_seq = ab_load_i(&s->hit_seq);
+    dst->beat_seq = ab_load_i(&s->detector_beat_seq);
+    dst->candidate_seq = ab_load_i(&s->candidate_seq);
 
     dst->hits = ab_load_l(&s->hits);
     dst->last_hit_ms = last;
     dst->beat_age_ms = age;
+    dst->last_candidate_ms = ab_load_l(&s->last_candidate_ms);
+    dst->candidate_age_ms = dst->last_candidate_ms > 0 ? now - dst->last_candidate_ms : 2147483647L;
+    if(dst->candidate_age_ms < 0)
+        dst->candidate_age_ms = 0;
+    dst->last_beat_ms = ab_load_l(&s->detector_last_beat_ms);
+    dst->detected_beat_age_ms = dst->last_beat_ms > 0 ? now - dst->last_beat_ms : 2147483647L;
+    if(dst->detected_beat_age_ms < 0)
+        dst->detected_beat_age_ms = 0;
+    dst->tempo_anchor_ms = ab_load_l(&s->tempo_anchor_ms);
+    dst->analysis_ms = ab_load_l(&s->analysis_ms);
+    dst->published_ms = ab_load_l(&s->snapshot_publish_ms);
+    dst->snapshot_ms = now;
+
+    dst->block_ms = (float)ab_load_i(&s->block_ms_q16) * (1.0f / 65536.0f);
+    dst->analysis_confidence = ab_from_q15(ab_load_i(&s->analysis_confidence_q15));
+    dst->source_confidence = ab_from_q15(ab_load_i(&s->source_confidence_q15));
+    dst->tempo_confidence = ab_from_q15(ab_load_i(&s->tempo_confidence_q15));
+    dst->event_confidence = ab_from_q15(ab_load_i(&s->event_confidence_q15));
+    dst->candidate_confidence = ab_from_q15(ab_load_i(&s->candidate_confidence_q15));
+    dst->beat_confidence = ab_from_q15(ab_load_i(&s->detector_beat_confidence_q15));
+    dst->accepted_confidence = ab_from_q15(ab_load_i(&s->accepted_confidence_q15));
 
     dst->level = ab_from_q15(ab_load_i(&s->level_q15));
+    dst->activity = ab_from_q15(ab_load_i(&s->activity_q15));
     dst->envelope = ab_from_q15(ab_load_i(&s->envelope_q15));
+    dst->onset = ab_from_q15(ab_load_i(&s->onset_q15));
     dst->transient = ab_from_q15(ab_load_i(&s->transient_norm_q15));
     dst->flux = ab_from_q15(ab_load_i(&s->flux_q15));
     dst->bass = ab_from_q15(ab_load_i(&ab_band_low_q15));
     dst->mid = ab_from_q15(ab_load_i(&ab_band_mid_q15));
     dst->high = ab_from_q15(ab_load_i(&ab_band_high_q15));
+    dst->low_activity = dst->bass;
+    dst->mid_activity = dst->mid;
+    dst->high_activity = dst->high;
+    dst->low_onset = ab_from_q15(ab_load_i(&s->low_onset_q15));
+    dst->mid_onset = ab_from_q15(ab_load_i(&s->mid_onset_q15));
+    dst->high_onset = ab_from_q15(ab_load_i(&s->high_onset_q15));
     dst->band_balance = ab_from_q15(ab_load_i(&ab_band_balance_q15));
     dst->beat_pulse = pulse;
     dst->beat_gate = age >= 0 && age < gate_ms ? 1.0f : 0.0f;
     dst->beat_toggle = ab_from_q15(ab_load_i(&s->beat_toggle_q15));
+    dst->candidate_pulse = dst->candidate_age_ms >= 0 && dst->candidate_age_ms < candidate_pulse_ms
+        ? 1.0f - ((float)dst->candidate_age_ms / (float)candidate_pulse_ms)
+        : 0.0f;
+    dst->candidate_gate = dst->candidate_age_ms >= 0 && dst->candidate_age_ms < candidate_gate_ms ? 1.0f : 0.0f;
+    dst->detected_beat_pulse = dst->detected_beat_age_ms >= 0 && dst->detected_beat_age_ms < detected_pulse_ms
+        ? 1.0f - ((float)dst->detected_beat_age_ms / (float)detected_pulse_ms)
+        : 0.0f;
+    dst->detected_beat_gate = dst->detected_beat_age_ms >= 0 && dst->detected_beat_age_ms < detected_gate_ms ? 1.0f : 0.0f;
+    dst->detected_beat_toggle = ab_from_q15(ab_load_i(&s->detector_beat_toggle_q15));
     dst->bpm = bpm;
     dst->kick = ab_from_q15(ab_load_i(&ab_kick_q15));
     dst->snare = ab_from_q15(ab_load_i(&ab_snare_q15));
     dst->hat = ab_from_q15(ab_load_i(&ab_hat_q15));
+    dst->scratch = ab_from_q15(ab_load_i(&ab_scratch_q15));
+    dst->scratch_velocity = ab_from_q15(ab_load_i(&ab_scratch_velocity_q15));
+    dst->scratch_burst = ab_from_q15(ab_load_i(&ab_scratch_burst_q15));
+    dst->scratch_direction = ab_load_i(&ab_scratch_dir) < 0 ? -1 : 1;
+    dst->scratch_signed = dst->scratch * (float)dst->scratch_direction;
+    dst->candidate_strength = ab_from_q15(ab_load_i(&s->candidate_strength_q15));
+    dst->beat_strength = ab_from_q15(ab_load_i(&s->detector_beat_strength_q15));
+    dst->accepted_strength = ab_from_q15(ab_load_i(&s->accepted_strength_q15));
+    dst->beat_kick = ab_from_q15(ab_load_i(&s->detector_beat_kick_q15));
+    dst->beat_snare = ab_from_q15(ab_load_i(&s->detector_beat_snare_q15));
+    dst->beat_hat = ab_from_q15(ab_load_i(&s->detector_beat_hat_q15));
+    dst->noise_floor = ab_from_q15(ab_load_i(&s->noise_floor_q15));
+    dst->source_snr = (float)ab_load_i(&s->source_snr_q8) * (1.0f / 256.0f);
+    dst->candidate_kind = candidate_kind;
+    dst->beat_kind = beat_kind;
+    dst->accepted_kind = hit_kind;
     dst->hit_kind = hit_kind;
+
+    if(dst->bpm > 1.0f && dst->tempo_anchor_ms > 0)
+    {
+        double beat_ms = 60000.0 / (double)dst->bpm;
+        long tempo_age = now - dst->tempo_anchor_ms;
+        double phase_age;
+
+        if(tempo_age < 0)
+            tempo_age = 0;
+        phase_age = fmod((double)tempo_age, beat_ms);
+        dst->beat_phase = (float)ab_clampd(phase_age / beat_ms, 0.0, 1.0);
+    }
+    else
+    {
+        dst->beat_phase = 0.0f;
+    }
 
     {
         double beat_ms = dst->bpm > 1.0f ? 60000.0 / (double)dst->bpm : (double)(pulse_ms * 4);
@@ -9397,8 +10136,10 @@ int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot
         else if(trail_window > 4200.0)
             trail_window = 4200.0;
 
-        trail = (last > 0 && age >= 0 && (double)age < trail_window)
-            ? 1.0 - ((double)age / trail_window)
+        trail = (dst->last_beat_ms > 0 &&
+                 dst->detected_beat_age_ms >= 0 &&
+                 (double)dst->detected_beat_age_ms < trail_window)
+            ? 1.0 - ((double)dst->detected_beat_age_ms / trail_window)
             : 0.0;
 
         if(dst->bpm > 1.0f)
@@ -9407,37 +10148,125 @@ int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot
             density = 0.0;
 
         density = ab_clampd(density, 0.0, 1.0);
-        density = density * 0.42 +
-                  (double)dst->beat_gate * 0.16 +
-                  (double)dst->beat_pulse * 0.16 +
-                  (double)(dst->kick + dst->snare) * 0.10 +
-                  (double)dst->flux * 0.08 +
-                  (double)dst->envelope * 0.08;
+        density = density * 0.34 +
+                  (double)dst->activity * 0.22 +
+                  (double)dst->detected_beat_gate * 0.12 +
+                  (double)dst->detected_beat_pulse * 0.12 +
+                  (double)(dst->kick + dst->snare) * 0.08 +
+                  (double)dst->flux * 0.06 +
+                  (double)dst->envelope * 0.06;
 
         dst->beat_trail_length = (float)ab_clampd(trail, 0.0, 1.0);
         dst->beat_density = (float)ab_clampd(density, 0.0, 1.0);
     }
 
-    if(ab_action_is_breakbeat(ab_load_i(&s->action_mode)))
+    return 1;
+}
+
+#ifndef VEEJAY_AUDIO_BEAT_SNAPSHOT_READ_TIMEOUT_MS
+#define VEEJAY_AUDIO_BEAT_SNAPSHOT_READ_TIMEOUT_MS 12L
+#endif
+
+int vj_audio_beat_get_snapshot(vj_audio_beat_shared_t *s, vj_audio_beat_snapshot_t *dst)
+{
+    int seq_before;
+    int seq_after;
+    long deadline_ms;
+
+    if(!s || !dst)
+        return 0;
+
+    deadline_ms = ab_now_ms() + VEEJAY_AUDIO_BEAT_SNAPSHOT_READ_TIMEOUT_MS;
+
+    for(;;)
     {
-        float scratch_env = ab_scratch_visual_env_now(now);
-
-        if(scratch_env > 0.001f)
+        seq_before = __atomic_load_n(&s->snapshot_seq, __ATOMIC_ACQUIRE);
+        if(seq_before & 1)
         {
-            float scratch_density = scratch_env * 0.82f;
-
-            if(dst->beat_pulse < scratch_env)
-                dst->beat_pulse = scratch_env;
-            if(dst->beat_trail_length < scratch_env)
-                dst->beat_trail_length = scratch_env;
-            if(dst->beat_density < scratch_density)
-                dst->beat_density = scratch_density;
-            if(scratch_env > 0.055f)
-                dst->beat_gate = 1.0f;
+            if(ab_now_ms() >= deadline_ms)
+                break;
+            sched_yield();
+            continue;
         }
+
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+        if(!ab_audio_beat_fill_snapshot_unlocked(s, dst))
+            return 0;
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+
+        seq_after = __atomic_load_n(&s->snapshot_seq, __ATOMIC_ACQUIRE);
+        if(seq_before == seq_after && !(seq_after & 1))
+        {
+            dst->publish_seq = (uint32_t)seq_after;
+            return 1;
+        }
+
+        if(ab_now_ms() >= deadline_ms)
+            break;
+
+        sched_yield();
     }
 
-    return 1;
+    memset(dst, 0, sizeof(*dst));
+    dst->version = VJ_AUDIO_BEAT_SNAPSHOT_VERSION;
+    return 0;
+}
+
+static inline void ab_snapshot_observer_lock_enter(void)
+{
+    while(__atomic_exchange_n(&ab_snapshot_observer_lock, 1, __ATOMIC_ACQUIRE) != 0)
+        sched_yield();
+}
+
+static inline void ab_snapshot_observer_lock_leave(void)
+{
+    __atomic_store_n(&ab_snapshot_observer_lock, 0, __ATOMIC_RELEASE);
+}
+
+void vj_audio_beat_set_snapshot_observer(vj_audio_beat_snapshot_observer_func observer,
+                                         void *ctx)
+{
+    ab_snapshot_observer_lock_enter();
+
+    ab_snapshot_observer = NULL;
+    ab_snapshot_observer_ctx = NULL;
+
+    while(ab_snapshot_observer_active > 0)
+    {
+        ab_snapshot_observer_lock_leave();
+        sched_yield();
+        ab_snapshot_observer_lock_enter();
+    }
+
+    ab_snapshot_observer_ctx = ctx;
+    ab_snapshot_observer = observer;
+    ab_snapshot_observer_lock_leave();
+}
+
+static void ab_audio_beat_emit_snapshot_observer(vj_audio_beat_shared_t *s)
+{
+    vj_audio_beat_snapshot_observer_func observer;
+    void *ctx;
+    vj_audio_beat_snapshot_t snapshot;
+
+    if(!vj_audio_beat_get_snapshot(s, &snapshot))
+        return;
+
+    ab_snapshot_observer_lock_enter();
+    observer = ab_snapshot_observer;
+    ctx = ab_snapshot_observer_ctx;
+    if(observer)
+        ab_snapshot_observer_active++;
+    ab_snapshot_observer_lock_leave();
+
+    if(!observer)
+        return;
+
+    observer(&snapshot, ctx);
+
+    ab_snapshot_observer_lock_enter();
+    ab_snapshot_observer_active--;
+    ab_snapshot_observer_lock_leave();
 }
 
 float vj_audio_beat_get_signal(vj_audio_beat_shared_t *s, int signal)
@@ -9462,13 +10291,13 @@ float vj_audio_beat_get_signal(vj_audio_beat_shared_t *s, int signal)
             return snap.flux;
 
         case VJ_AUDIO_CTRL_BEAT_PULSE:
-            return snap.beat_pulse;
+            return snap.detected_beat_pulse;
 
         case VJ_AUDIO_CTRL_BEAT_GATE:
-            return snap.beat_gate;
+            return snap.detected_beat_gate;
 
         case VJ_AUDIO_CTRL_BEAT_TOGGLE:
-            return snap.beat_toggle;
+            return snap.detected_beat_toggle;
 
         case VJ_AUDIO_CTRL_BPM:
             return snap.bpm > 0.0f ? (float)ab_clampd((double)(snap.bpm / 240.0f), 0.0, 1.0) : 0.0f;
@@ -9508,6 +10337,72 @@ float vj_audio_beat_get_signal(vj_audio_beat_shared_t *s, int signal)
 
         case VJ_AUDIO_CTRL_SCRATCH_SIGNED:
             return ab_scratch_visual_signed_signal(ab_now_ms());
+
+        case VJ_AUDIO_CTRL_ACTIVITY:
+            return snap.activity;
+
+        case VJ_AUDIO_CTRL_ONSET:
+            return snap.onset;
+
+        case VJ_AUDIO_CTRL_ANALYSIS_CONFIDENCE:
+            return snap.analysis_confidence;
+
+        case VJ_AUDIO_CTRL_SOURCE_CONFIDENCE:
+            return snap.source_confidence;
+
+        case VJ_AUDIO_CTRL_TEMPO_CONFIDENCE:
+            return snap.tempo_confidence;
+
+        case VJ_AUDIO_CTRL_EVENT_CONFIDENCE:
+            return snap.event_confidence;
+
+        case VJ_AUDIO_CTRL_BEAT_PHASE:
+            return snap.beat_phase;
+
+        case VJ_AUDIO_CTRL_SCRATCH_VELOCITY:
+            return snap.scratch_velocity;
+
+        case VJ_AUDIO_CTRL_SCRATCH_BURST:
+            return snap.scratch_burst;
+
+        case VJ_AUDIO_CTRL_SCRATCH_ACTIVITY:
+            return snap.scratch;
+
+        case VJ_AUDIO_CTRL_CANDIDATE_CONFIDENCE:
+            return snap.candidate_confidence;
+
+        case VJ_AUDIO_CTRL_BEAT_CONFIDENCE:
+            return snap.beat_confidence;
+
+        case VJ_AUDIO_CTRL_ACCEPTED_CONFIDENCE:
+            return snap.accepted_confidence;
+
+        case VJ_AUDIO_CTRL_LOW_ONSET:
+            return snap.low_onset;
+
+        case VJ_AUDIO_CTRL_MID_ONSET:
+            return snap.mid_onset;
+
+        case VJ_AUDIO_CTRL_HIGH_ONSET:
+            return snap.high_onset;
+
+        case VJ_AUDIO_CTRL_CANDIDATE_STRENGTH:
+            return snap.candidate_strength;
+
+        case VJ_AUDIO_CTRL_DETECTED_BEAT_STRENGTH:
+            return snap.beat_strength;
+
+        case VJ_AUDIO_CTRL_ACCEPTED_STRENGTH:
+            return snap.accepted_strength;
+
+        case VJ_AUDIO_CTRL_DETECTED_BEAT_KICK:
+            return snap.beat_kick;
+
+        case VJ_AUDIO_CTRL_DETECTED_BEAT_SNARE:
+            return snap.beat_snare;
+
+        case VJ_AUDIO_CTRL_DETECTED_BEAT_HAT:
+            return snap.beat_hat;
 
         default:
             return 0.0f;
@@ -10106,12 +11001,17 @@ static void ab_auto_lane_set_role_defaults(ab_auto_lane_t *lane, int role, int h
     memset(lane, 0, sizeof(*lane));
     rp = ab_auto_role_profile(role);
 
+    lane->hint_version = VJ_BEAT_HINT_VERSION_1;
     lane->role = role;
     lane->source_profile = AB_AUTO_SOURCE_ROLE;
+    lane->source = VJ_BEAT_SRC_NONE;
+    lane->direct_source = 0;
     lane->operator_type = role == VJ_AUDIO_BEAT_AUTO_ROLE_TRIGGER
         ? AB_AUTO_LANE_BINARY_IMPULSE
         : (role == VJ_AUDIO_BEAT_AUTO_ROLE_BEAT_TIME ? AB_AUTO_LANE_BEAT_TIME : AB_AUTO_LANE_CONTINUOUS);
     lane->polarity = 1;
+    lane->polarity_mode = VJ_BEAT_POLARITY_POSITIVE;
+    lane->curve = VJ_BEAT_CURVE_SMOOTHSTEP;
     lane->direction = 1;
     lane->safe_min = hard_min;
     lane->safe_max = hard_max;
@@ -10152,6 +11052,13 @@ static void ab_auto_lane_set_role_defaults(ab_auto_lane_t *lane, int role, int h
     lane->value_deadband_divisor = rp->value_deadband_divisor;
     lane->value_deadband_max = rp->value_deadband_max;
     lane->trigger_threshold = 0.55f;
+    lane->step = 0;
+    lane->update_ms = 0;
+    lane->cost = VJ_BEAT_COST_CHEAP;
+    lane->group_id = 0;
+    lane->group_order = 0;
+    lane->group_relation = VJ_BEAT_GROUP_NONE;
+    lane->group_margin = 0;
 
     if(lane->operator_type == AB_AUTO_LANE_BINARY_IMPULSE)
         lane->overdrive_signal_scale = 0.34f;
@@ -10312,6 +11219,125 @@ static void ab_auto_lane_apply_hint_policy(ab_auto_lane_t *lane, int policy)
     }
 }
 
+static int ab_auto_v2_operator(int operator_type)
+{
+    switch(operator_type)
+    {
+        case VJ_BEAT_OP_MAP_RANGE:   return AB_AUTO_LANE_MAP_RANGE;
+        case VJ_BEAT_OP_OFFSET_BASE: return AB_AUTO_LANE_OFFSET_BASE;
+        case VJ_BEAT_OP_SCALE_BASE:  return AB_AUTO_LANE_SCALE_BASE;
+        case VJ_BEAT_OP_IMPULSE:     return AB_AUTO_LANE_CONTINUOUS_IMPULSE;
+        case VJ_BEAT_OP_GATE:        return AB_AUTO_LANE_GATE;
+        case VJ_BEAT_OP_TOGGLE:      return AB_AUTO_LANE_TOGGLE;
+        case VJ_BEAT_OP_WRAP:        return AB_AUTO_LANE_WRAP;
+        case VJ_BEAT_OP_RATE:        return AB_AUTO_LANE_RATE;
+        case VJ_BEAT_OP_SAMPLE_HOLD: return AB_AUTO_LANE_SAMPLE_HOLD;
+        case VJ_BEAT_OP_BEAT_TIME:   return AB_AUTO_LANE_BEAT_TIME;
+        default:                     return AB_AUTO_LANE_CONTINUOUS;
+    }
+}
+
+static int ab_auto_compile_hint_v2(int hard_min,
+                                   int hard_max,
+                                   int soft_min,
+                                   int soft_max,
+                                   const vj_beat_param_hint_t *hint,
+                                   ab_auto_lane_t *lane)
+{
+    const ab_auto_hint_profile_t *hp;
+    int role;
+
+    if(!hint || !lane || hint->version < VJ_BEAT_HINT_VERSION_2)
+        return 0;
+
+    if(hint->klass <= VJ_BEAT_OFF || hint->klass > VJ_BEAT_LAST ||
+       (hint->flags & VJ_BEAT_F_REJECT) ||
+       hint->source <= VJ_BEAT_SRC_NONE || hint->source > VJ_BEAT_SRC_LAST ||
+       hint->operator_type <= VJ_BEAT_OP_NONE || hint->operator_type > VJ_BEAT_OP_LAST ||
+       hint->cost >= VJ_BEAT_COST_STRUCTURAL)
+        return 0;
+
+    hp = &ab_auto_hint_profiles[hint->klass];
+    role = hp->valid ? hp->role : VJ_AUDIO_BEAT_AUTO_ROLE_NONE;
+    ab_auto_lane_set_role_defaults(lane, role, hard_min, hard_max);
+
+    lane->hint_version = VJ_BEAT_HINT_VERSION_2;
+    lane->flags = hint->flags;
+    lane->source_profile = AB_AUTO_SOURCE_ROLE;
+    lane->source = hint->source;
+    lane->direct_source = 1;
+    lane->operator_type = ab_auto_v2_operator(hint->operator_type);
+    lane->polarity_mode = hint->polarity;
+    lane->polarity = hint->polarity == VJ_BEAT_POLARITY_NEGATIVE ? -1 : 1;
+    lane->direction = lane->polarity;
+    lane->curve = hint->curve;
+    lane->amount_pct = 100;
+    lane->score = (hp->valid ? hp->score : 120) + hint->priority - hint->cost * 18;
+    lane->safe_min = hard_min;
+    lane->safe_max = hard_max;
+
+    if(soft_min != VJ_BEAT_SOFT_UNSET && soft_min > lane->safe_min)
+        lane->safe_min = soft_min;
+    if(soft_max != VJ_BEAT_SOFT_UNSET && soft_max < lane->safe_max)
+        lane->safe_max = soft_max;
+
+    lane->authored_depth = 1;
+    lane->normal_depth = ab_auto_clampf01((float)hint->normal_depth_pct * 0.01f);
+    lane->climax_depth = ab_auto_clampf01((float)hint->climax_depth_pct * 0.01f);
+    if(lane->climax_depth < lane->normal_depth)
+        lane->climax_depth = lane->normal_depth;
+
+    lane->attack_ms = hint->attack_ms;
+    lane->release_ms = hint->release_ms;
+    lane->hold_ms = hint->hold_ms;
+    lane->step = hint->step;
+    lane->update_ms = hint->update_ms;
+    lane->cost = hint->cost;
+    lane->group_id = hint->group_id;
+    lane->group_order = hint->group_order;
+    lane->group_relation = hint->group_relation;
+    lane->group_margin = hint->group_margin;
+    lane->discrete = hint->step > 0 || (hint->flags & VJ_BEAT_F_DISCRETE);
+    lane->curve_mixable = hint->cost <= VJ_BEAT_COST_MODERATE &&
+                          lane->operator_type != AB_AUTO_LANE_GATE &&
+                          lane->operator_type != AB_AUTO_LANE_TOGGLE &&
+                          lane->operator_type != AB_AUTO_LANE_SAMPLE_HOLD;
+    lane->can_overdrive_safe = hint->cost == VJ_BEAT_COST_CHEAP &&
+                               !(hint->flags & (VJ_BEAT_F_STRUCTURAL | VJ_BEAT_F_REBUILDS_STATE));
+
+    lane->signal_floor = 0.0f;
+    lane->signal_gain = 1.0f;
+    lane->signal_deadband = 0.0f;
+    lane->restraint_scale = 0.0f;
+    lane->hat_restraint = 0;
+    lane->geometry_limits = 0;
+    lane->role_hold = lane->operator_type == AB_AUTO_LANE_SAMPLE_HOLD;
+    lane->drive_linear_mix = 1.0f;
+    lane->drive_floor_scale = 0.0f;
+    lane->depth_cap_base = 1.0f;
+    lane->depth_cap_macro = 0.0f;
+    lane->drive_cap_base = 1.0f;
+    lane->drive_cap_macro = 0.0f;
+    lane->min_depth_base = 0.0f;
+    lane->min_depth_global = 0.0f;
+    lane->min_depth_macro = 0.0f;
+    lane->quiet_ceiling_base = 1.0f;
+    lane->quiet_ceiling_global = 0.0f;
+    lane->quiet_loosen_scale = 0.0f;
+    lane->visible_base = 0;
+    lane->visible_signal_scale = 0;
+    lane->visible_macro_scale = 0;
+    lane->visible_threshold = 0.0f;
+    lane->nudge_low = 0;
+    lane->nudge_high = 0;
+    lane->value_deadband_divisor = 0;
+    lane->value_deadband_max = 0;
+    lane->trigger_threshold = 0.08f;
+    lane->overdrive_signal_scale = hint->cost == VJ_BEAT_COST_CHEAP ? 0.70f : 0.25f;
+
+    return lane->score > 0;
+}
+
 static int ab_auto_compile_hint(
     int hard_min,
     int hard_max,
@@ -10324,6 +11350,9 @@ static int ab_auto_compile_hint(
     const ab_auto_hint_profile_t *hp;
     if(!hint || !lane)
         return 0;
+
+    if(hint->version >= VJ_BEAT_HINT_VERSION_2)
+        return ab_auto_compile_hint_v2(hard_min, hard_max, soft_min, soft_max, hint, lane);
 
     if(hint->klass <= VJ_BEAT_OFF || hint->klass > VJ_BEAT_LAST)
         return 0;
@@ -10457,6 +11486,7 @@ static void ab_auto_compile_legacy_lane(
         return;
 
     ab_auto_lane_set_role_defaults(lane, role, hard_min, hard_max);
+    lane->hint_version = VJ_BEAT_HINT_VERSION_1;
     lane->amount_pct = amount_pct;
     lane->score = score;
     lane->polarity = invert ? -1 : 1;
@@ -10848,6 +11878,23 @@ static int ab_auto_role_allowed(int mode, int role)
     return 0;
 }
 
+static int ab_auto_cost_allowed(int mode, int cost)
+{
+    if(cost < VJ_BEAT_COST_CHEAP)
+        cost = VJ_BEAT_COST_CHEAP;
+
+    if(mode == VJ_AUDIO_BEAT_AUTO_PRIMARY)
+        return cost <= VJ_BEAT_COST_CHEAP;
+    if(mode == VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION)
+        return cost <= VJ_BEAT_COST_MODERATE;
+    if(mode == VJ_AUDIO_BEAT_AUTO_PRIMARY_MOTION_MEMORY)
+        return cost <= VJ_BEAT_COST_EXPENSIVE;
+    if(mode == VJ_AUDIO_BEAT_AUTO_CHAOS)
+        return cost < VJ_BEAT_COST_STRUCTURAL;
+
+    return 0;
+}
+
 static int ab_auto_role_quota(int role)
 {
     switch(role)
@@ -11147,6 +12194,12 @@ static void ab_auto_target_forget_runtime(ab_auto_target_t *t)
     t->mod_initialized = 0;
     t->last_slew_ms = 0;
     t->last_change_ms = 0;
+    t->last_source_seq = -1;
+    t->last_source_value = 0.0f;
+    t->held_signal = 0.0f;
+    t->toggle_state = 0;
+    t->rate_phase = 0.0f;
+    t->last_rate_ms = 0;
 }
 
 static int ab_auto_chain_signature(
@@ -11190,9 +12243,12 @@ static int ab_auto_insert_candidate(ab_auto_target_t *dst, int *count, int max_c
     if(!dst || !count || !cand || !cand->valid || max_count <= 0)
         return 0;
 
-    quota = ab_auto_role_quota(cand->lane.role);
+    quota = cand->lane.hint_version >= VJ_BEAT_HINT_VERSION_2
+        ? max_count
+        : ab_auto_role_quota(cand->lane.role);
 
-    if(ab_auto_effective_mode() == VJ_AUDIO_BEAT_AUTO_CHAOS)
+    if(cand->lane.hint_version < VJ_BEAT_HINT_VERSION_2 &&
+       ab_auto_effective_mode() == VJ_AUDIO_BEAT_AUTO_CHAOS)
     {
         if(cand->lane.role == VJ_AUDIO_BEAT_AUTO_ROLE_GEOMETRY ||
            cand->lane.role == VJ_AUDIO_BEAT_AUTO_ROLE_THRESHOLD ||
@@ -11457,6 +12513,17 @@ static void ab_auto_resolve_lane_direction(ab_auto_target_t *cand)
         return;
 
     direction = cand->lane.polarity < 0 ? -1 : 1;
+
+    if(cand->lane.hint_version >= VJ_BEAT_HINT_VERSION_2)
+    {
+        if(cand->lane.polarity_mode == VJ_BEAT_POLARITY_NEGATIVE)
+            direction = -1;
+        else
+            direction = 1;
+
+        cand->lane.direction = direction;
+        return;
+    }
 
     if(cand->lane.polarity > 0 &&
        cand->lane.role != VJ_AUDIO_BEAT_AUTO_ROLE_AMOUNT &&
@@ -11771,7 +12838,7 @@ static int ab_auto_rebuild_map(void *ctx, int chain_len, vj_audio_beat_get_fx_id
             if(!m)
                 continue;
 
-            if(!ab_auto_role_allowed(mode, m->lane.role))
+            if(!ab_auto_cost_allowed(mode, m->lane.cost))
                 continue;
 
             if(!ab_auto_entry_beat_param_enabled(entry, p))
@@ -11813,7 +12880,8 @@ static int ab_auto_rebuild_map(void *ctx, int chain_len, vj_audio_beat_get_fx_id
                 best_seed_rank = rank;
             }
 
-            ab_auto_insert_candidate(chosen, &count, max_targets, &cand);
+            if(ab_auto_role_allowed(mode, m->lane.role))
+                ab_auto_insert_candidate(chosen, &count, max_targets, &cand);
         }
 
         if(best_seed.valid)
@@ -11860,32 +12928,118 @@ static float ab_auto_mix3(float a, float b, float c)
 }
 
 
+static inline int ab_auto_snapshot_event_seq(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return 0;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->beat_seq;
+
+    return snap->hit_seq;
+}
+
+static inline int ab_auto_snapshot_event_kind(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return AB_HIT_NONE;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->beat_kind;
+
+    return snap->hit_kind;
+}
+
+static inline long ab_auto_snapshot_event_age_ms(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return 2147483647L;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->detected_beat_age_ms;
+
+    return snap->beat_age_ms;
+}
+
+static inline float ab_auto_snapshot_event_pulse(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return 0.0f;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->detected_beat_pulse;
+
+    return snap->beat_pulse;
+}
+
+static inline float ab_auto_snapshot_event_gate(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return 0.0f;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->detected_beat_gate;
+
+    return snap->beat_gate;
+}
+
+static inline float ab_auto_snapshot_event_toggle(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return 0.0f;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->detected_beat_toggle;
+
+    return snap->beat_toggle;
+}
+
+static inline float ab_auto_snapshot_analysis_confidence(const vj_audio_beat_snapshot_t *snap)
+{
+    if(!snap)
+        return 0.0f;
+
+    if(snap->version < VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return 1.0f;
+
+    return snap->analysis_confidence;
+}
+
 static float ab_auto_activity_gate(const vj_audio_beat_snapshot_t *snap)
 {
     float body;
     float v;
+    float confidence;
+    float pulse;
+    float gate;
 
     if(!snap)
         return 0.0f;
 
-    body = snap->level * 3.20f +
-           snap->envelope * 2.60f +
-           snap->transient * 0.90f +
-           snap->flux * 0.80f +
-           snap->kick * 1.10f +
-           snap->snare * 0.95f +
-           snap->hat * 0.70f +
-           snap->beat_pulse * 1.10f +
-           snap->beat_gate * 1.20f;
+    confidence = ab_auto_snapshot_analysis_confidence(snap);
+    pulse = ab_auto_snapshot_event_pulse(snap);
+    gate = ab_auto_snapshot_event_gate(snap);
+
+    body = snap->level * 2.40f +
+           snap->envelope * 2.10f +
+           snap->activity * 1.80f +
+           snap->onset * 0.90f +
+           snap->transient * 0.70f +
+           snap->flux * 0.70f +
+           snap->kick * 0.90f +
+           snap->snare * 0.82f +
+           snap->hat * 0.60f +
+           pulse * 1.05f +
+           gate * 1.10f;
 
     v = (body - 0.050f) * 1.42f;
 
     if(v <= 0.0f)
         return 0.0f;
     if(v >= 1.0f)
-        return 1.0f;
+        return confidence;
 
-    return v * v * (3.0f - 2.0f * v);
+    return v * v * (3.0f - 2.0f * v) * confidence;
 }
 
 static float ab_auto_low_activity_keep(const ab_auto_lane_t *lane,
@@ -11950,7 +13104,13 @@ static float ab_auto_beat_phase(const vj_audio_beat_snapshot_t *snap)
     float age;
     int loops;
 
-    if(!snap || snap->bpm <= 1.0f || snap->beat_age_ms < 0)
+    if(!snap || snap->bpm <= 1.0f)
+        return 0.0f;
+
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return snap->beat_phase;
+
+    if(snap->beat_age_ms < 0)
         return 0.0f;
 
     beat_ms = ab_auto_beat_ms_from_snapshot(snap);
@@ -12009,7 +13169,16 @@ static float ab_auto_musical_pulse(const vj_audio_beat_snapshot_t *snap)
     phase = ab_auto_beat_phase(snap);
     down = ab_auto_phase_hit(phase, 0.0f, 0.34f);
     off = ab_auto_phase_hit(phase, 0.50f, 0.20f);
-    pulse = snap->beat_pulse;
+    pulse = ab_auto_snapshot_event_pulse(snap);
+
+    {
+        float tempo_confidence = snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION
+            ? ab_auto_clampf01(snap->tempo_confidence)
+            : 1.0f;
+
+        down *= tempo_confidence;
+        off *= tempo_confidence;
+    }
 
     if(down * 0.62f > pulse)
         pulse = down * 0.62f;
@@ -12043,6 +13212,9 @@ static float ab_auto_subdivision_pulse(const vj_audio_beat_snapshot_t *snap)
         if(c > v) v = c;
     }
 
+    if(snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        v *= ab_auto_clampf01(snap->tempo_confidence);
+
     return v;
 }
 
@@ -12061,12 +13233,16 @@ typedef struct
     float tempo_slow;
     float restraint;
     float activity;
+    float climax;
 } ab_auto_frame_signal_t;
 
 static void ab_auto_build_frame_signal(const vj_audio_beat_snapshot_t *snap,
                                        float climax,
                                        ab_auto_frame_signal_t *fs)
 {
+    float analysis_confidence;
+    float tempo_confidence;
+
     if(!fs)
         return;
 
@@ -12075,12 +13251,22 @@ static void ab_auto_build_frame_signal(const vj_audio_beat_snapshot_t *snap,
     if(!snap)
         return;
 
+    analysis_confidence = ab_auto_snapshot_analysis_confidence(snap);
+    tempo_confidence = snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION
+        ? snap->tempo_confidence
+        : 1.0f;
+
     fs->groove = ab_auto_groove_level;
     fs->phrase = ab_auto_phrase_level;
+    fs->climax = ab_auto_clampf01(climax);
     fs->musical = ab_auto_musical_pulse(snap);
     fs->subdiv = ab_auto_subdivision_pulse(snap);
 
-    fs->trigger = snap->beat_gate > snap->beat_pulse ? snap->beat_gate : snap->beat_pulse;
+    {
+        float gate = ab_auto_snapshot_event_gate(snap);
+        float pulse = ab_auto_snapshot_event_pulse(snap);
+        fs->trigger = gate > pulse ? gate : pulse;
+    }
     fs->trigger = fs->trigger < 0.0f ? 0.0f : (fs->trigger > 1.0f ? 1.0f : fs->trigger);
 
     fs->hit = fs->trigger;
@@ -12172,6 +13358,17 @@ static void ab_auto_build_frame_signal(const vj_audio_beat_snapshot_t *snap,
 
     if(fs->activity > 1.0f)
         fs->activity = 1.0f;
+
+    fs->musical *= analysis_confidence;
+    fs->subdiv *= analysis_confidence;
+    fs->hit *= analysis_confidence;
+    fs->trigger *= analysis_confidence;
+    fs->drum *= analysis_confidence;
+    fs->body *= analysis_confidence;
+    fs->density *= analysis_confidence;
+    fs->tempo_fast *= tempo_confidence;
+    fs->tempo_slow *= tempo_confidence;
+    fs->restraint *= tempo_confidence;
 }
 
 static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap,
@@ -12196,7 +13393,7 @@ static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap,
             return trigger;
 
         case VJ_AUDIO_BEAT_AUTO_ROLE_AMOUNT:
-            return ab_auto_mix3(snap->beat_pulse * 0.22f + musical * 0.14f + snap->kick * 0.18f,
+            return ab_auto_mix3(ab_auto_snapshot_event_pulse(snap) * 0.22f + musical * 0.14f + snap->kick * 0.18f,
                                 snap->bass * 0.20f + snap->transient * 0.12f + body * 0.14f,
                                 groove * 0.18f + phrase * 0.08f + density * 0.14f);
 
@@ -12237,7 +13434,7 @@ static float ab_auto_signal_for_role(const vj_audio_beat_snapshot_t *snap,
 
         case VJ_AUDIO_BEAT_AUTO_ROLE_COLOR:
             return ab_auto_mix3(snap->high * 0.24f + snap->mid * 0.12f,
-                                snap->beat_toggle * 0.10f + musical * 0.12f,
+                                ab_auto_snapshot_event_toggle(snap) * 0.10f + musical * 0.12f,
                                 groove * 0.16f + phrase * 0.18f);
 
         case VJ_AUDIO_BEAT_AUTO_ROLE_SOURCE:
@@ -12275,7 +13472,7 @@ static float ab_auto_impulse_lane_signal(const vj_audio_beat_snapshot_t *snap,
     if(!snap || !lane)
         return 0.0f;
 
-    gate = snap->beat_gate;
+    gate = ab_auto_snapshot_event_gate(snap);
 
     if(gate <= 0.0f)
         return 0.0f;
@@ -12286,8 +13483,8 @@ static float ab_auto_impulse_lane_signal(const vj_audio_beat_snapshot_t *snap,
     switch(lane->source_profile)
     {
         case AB_AUTO_SOURCE_KICK:
-            if(snap->hit_kind != AB_HIT_KICK &&
-               snap->hit_kind != AB_HIT_FULL)
+            if(ab_auto_snapshot_event_kind(snap) != AB_HIT_KICK &&
+               ab_auto_snapshot_event_kind(snap) != AB_HIT_FULL)
                 return 0.0f;
 
             v = snap->kick;
@@ -12300,8 +13497,8 @@ static float ab_auto_impulse_lane_signal(const vj_audio_beat_snapshot_t *snap,
             break;
 
         case AB_AUTO_SOURCE_SNARE:
-            if(snap->hit_kind != AB_HIT_SNARE &&
-               snap->hit_kind != AB_HIT_FULL)
+            if(ab_auto_snapshot_event_kind(snap) != AB_HIT_SNARE &&
+               ab_auto_snapshot_event_kind(snap) != AB_HIT_FULL)
                 return 0.0f;
 
             v = snap->snare;
@@ -12317,7 +13514,7 @@ static float ab_auto_impulse_lane_signal(const vj_audio_beat_snapshot_t *snap,
             break;
 
         case AB_AUTO_SOURCE_HAT:
-            if(snap->hit_kind != AB_HIT_HAT)
+            if(ab_auto_snapshot_event_kind(snap) != AB_HIT_HAT)
                 return 0.0f;
 
             v = snap->hat;
@@ -12351,8 +13548,154 @@ static float ab_auto_impulse_lane_signal(const vj_audio_beat_snapshot_t *snap,
 }
 #endif
 
+static float ab_auto_v2_source_value(const vj_audio_beat_snapshot_t *snap,
+                                          const ab_auto_frame_signal_t *fs,
+                                          const ab_auto_lane_t *lane,
+                                          float *confidence,
+                                          int *source_seq,
+                                          float *source_sign)
+{
+    float v = 0.0f;
+    float conf;
+    int seq;
+    float sign = 1.0f;
+
+    if(!snap || !lane)
+        return 0.0f;
+
+    conf = snap->analysis_confidence * snap->source_confidence;
+    seq = -1;
+
+    switch(lane->source)
+    {
+        case VJ_BEAT_SRC_LEVEL:          v = snap->level; break;
+        case VJ_BEAT_SRC_ENVELOPE:       v = snap->envelope; break;
+        case VJ_BEAT_SRC_ACTIVITY:       v = snap->activity; break;
+        case VJ_BEAT_SRC_ONSET:          v = snap->onset; break;
+        case VJ_BEAT_SRC_TRANSIENT:      v = snap->transient; break;
+        case VJ_BEAT_SRC_FLUX:           v = snap->flux; break;
+        case VJ_BEAT_SRC_LOW_ACTIVITY:   v = snap->low_activity; break;
+        case VJ_BEAT_SRC_MID_ACTIVITY:   v = snap->mid_activity; break;
+        case VJ_BEAT_SRC_HIGH_ACTIVITY:  v = snap->high_activity; break;
+        case VJ_BEAT_SRC_LOW_ONSET:      v = snap->low_onset; break;
+        case VJ_BEAT_SRC_MID_ONSET:      v = snap->mid_onset; break;
+        case VJ_BEAT_SRC_HIGH_ONSET:     v = snap->high_onset; break;
+        case VJ_BEAT_SRC_BAND_BALANCE:   v = snap->band_balance; break;
+
+        case VJ_BEAT_SRC_CANDIDATE_PULSE:
+            v = snap->candidate_pulse * snap->candidate_strength;
+            conf = snap->candidate_confidence;
+            seq = snap->candidate_seq;
+            break;
+
+        case VJ_BEAT_SRC_BEAT_PULSE:
+            v = snap->detected_beat_pulse * snap->beat_strength;
+            conf = snap->beat_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_BEAT_GATE:
+            v = snap->detected_beat_gate * snap->beat_strength;
+            conf = snap->beat_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_BEAT_TOGGLE:
+            v = snap->detected_beat_toggle;
+            conf = snap->beat_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_BEAT_PHASE:
+            v = snap->beat_phase;
+            conf = snap->tempo_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_KICK_PULSE:
+            v = snap->detected_beat_pulse * snap->beat_kick;
+            conf = snap->beat_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_SNARE_PULSE:
+            v = snap->detected_beat_pulse * snap->beat_snare;
+            conf = snap->beat_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_HAT_PULSE:
+            v = snap->detected_beat_pulse * snap->beat_hat;
+            conf = snap->beat_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_SCRATCH_ACTIVITY:
+            v = snap->scratch;
+            break;
+
+        case VJ_BEAT_SRC_SCRATCH_VELOCITY:
+            v = snap->scratch_velocity;
+            break;
+
+        case VJ_BEAT_SRC_SCRATCH_BURST:
+            v = snap->scratch_burst;
+            break;
+
+        case VJ_BEAT_SRC_SCRATCH_SIGNED:
+            v = snap->scratch_signed < 0.0f ? -snap->scratch_signed : snap->scratch_signed;
+            sign = snap->scratch_signed < 0.0f ? -1.0f : 1.0f;
+            break;
+
+        case VJ_BEAT_SRC_BPM:
+            v = snap->bpm > 0.0f ? snap->bpm * (1.0f / 240.0f) : 0.0f;
+            conf = snap->tempo_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_GROOVE:
+            v = fs ? fs->groove : 0.0f;
+            conf = snap->beat_confidence * snap->tempo_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_PHRASE:
+            v = fs ? fs->phrase : 0.0f;
+            conf = snap->beat_confidence * (0.35f + snap->tempo_confidence * 0.65f);
+            seq = snap->beat_seq;
+            break;
+
+        case VJ_BEAT_SRC_CLIMAX:
+            v = fs ? fs->climax : 0.0f;
+            conf = snap->analysis_confidence * snap->source_confidence;
+            seq = snap->beat_seq;
+            break;
+
+        default:
+            v = 0.0f;
+            conf = 0.0f;
+            break;
+    }
+
+    if(v < 0.0f)
+        v = 0.0f;
+    else if(v > 1.0f)
+        v = 1.0f;
+
+    conf = ab_auto_clampf01(conf);
+
+    if(confidence)
+        *confidence = conf;
+    if(source_seq)
+        *source_seq = seq;
+    if(source_sign)
+        *source_sign = sign;
+
+    return v;
+}
+
 static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
-                                       const ab_auto_target_t *t,
+                                       ab_auto_target_t *t,
                                        float climax,
                                        const ab_auto_frame_signal_t *fs)
 {
@@ -12375,6 +13718,53 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
 
     lane = &t->lane;
     climax = ab_auto_clampf01(climax);
+
+    if(lane->direct_source)
+    {
+        float confidence = 0.0f;
+        float source_sign = 1.0f;
+        int source_seq = -1;
+        int new_source_event;
+        float source_value;
+
+        v = ab_auto_v2_source_value(snap, fs, lane, &confidence, &source_seq, &source_sign);
+        source_value = v * confidence;
+        new_source_event = source_seq >= 0
+            ? source_seq != t->last_source_seq
+            : source_value >= lane->trigger_threshold &&
+              t->last_source_value < lane->trigger_threshold;
+
+        if(lane->operator_type == AB_AUTO_LANE_CONTINUOUS_IMPULSE)
+        {
+            v = new_source_event && source_value >= lane->trigger_threshold ? 1.0f : 0.0f;
+            confidence = 1.0f;
+        }
+        else if(lane->operator_type == AB_AUTO_LANE_TOGGLE)
+        {
+            if(new_source_event && source_value >= lane->trigger_threshold)
+                t->toggle_state = t->toggle_state ? 0 : 1;
+            v = t->toggle_state ? 1.0f : 0.0f;
+            confidence = 1.0f;
+        }
+        else if(lane->operator_type == AB_AUTO_LANE_SAMPLE_HOLD)
+        {
+            if(new_source_event && source_value >= 0.02f)
+                t->held_signal = source_value;
+            v = t->held_signal;
+            confidence = 1.0f;
+        }
+
+        if(source_seq >= 0)
+            t->last_source_seq = source_seq;
+        t->last_source_value = source_value;
+
+        if(lane->polarity_mode == VJ_BEAT_POLARITY_SOURCE_SIGN)
+            t->lane.direction = source_sign < 0.0f ? -1 : 1;
+        else if(lane->polarity_mode == VJ_BEAT_POLARITY_ALTERNATE)
+            t->lane.direction = snap->detected_beat_toggle >= 0.5f ? 1 : -1;
+
+        return ab_auto_clampf01(v * confidence);
+    }
 
     if(lane->source_profile == AB_AUTO_SOURCE_ROLE)
     {
@@ -12470,7 +13860,7 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
                 break;
 
             case AB_AUTO_SOURCE_INTENSITY:
-                v = ab_auto_mix3(snap->beat_pulse * 0.20f + musical * 0.14f + body * 0.18f,
+                v = ab_auto_mix3(ab_auto_snapshot_event_pulse(snap) * 0.20f + musical * 0.14f + body * 0.18f,
                                  snap->bass * 0.18f + snap->mid * 0.12f + snap->high * 0.10f + snap->transient * 0.12f,
                                  groove * 0.16f + phrase * 0.08f + density * 0.18f);
                 break;
@@ -12489,7 +13879,7 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
 
             case AB_AUTO_SOURCE_KICK:
                 v = ab_auto_mix3(snap->kick * 0.84f,
-                                 snap->bass * 0.10f + snap->beat_pulse * 0.08f,
+                                 snap->bass * 0.10f + ab_auto_snapshot_event_pulse(snap) * 0.08f,
                                  snap->transient * 0.08f + drum * 0.06f);
                 break;
 
@@ -12555,7 +13945,12 @@ static float ab_auto_signal_for_target(const vj_audio_beat_snapshot_t *snap,
        lane->operator_type != AB_AUTO_LANE_BEAT_TIME)
     {
         float activity = fs ? fs->activity : ab_auto_activity_gate(snap);
-        float keep = ab_auto_low_activity_keep(lane, groove, phrase, climax, activity, snap->beat_age_ms);
+        float keep = ab_auto_low_activity_keep(lane,
+                                               groove,
+                                               phrase,
+                                               climax,
+                                               activity,
+                                               ab_auto_snapshot_event_age_ms(snap));
         float gate = activity + keep;
 
         if(gate > 1.0f)
@@ -12666,7 +14061,8 @@ static int ab_auto_compute_beat_time_value(const ab_auto_target_t *t, const vj_a
     double frames_d;
     int value;
 
-    if(!t || !t->valid || !snap || snap->bpm <= 1.0f)
+    if(!t || !t->valid || !snap || snap->bpm <= 1.0f ||
+       snap->tempo_confidence < 0.25f)
         return t ? t->base_value : 0;
 
     fps = ab_auto_get_video_fps();
@@ -12695,6 +14091,35 @@ static int ab_auto_compute_beat_time_value(const ab_auto_target_t *t, const vj_a
 
 
 
+static float ab_auto_apply_v2_curve(float v, int curve)
+{
+    v = ab_auto_clampf01(v);
+
+    switch(curve)
+    {
+        case VJ_BEAT_CURVE_LINEAR:
+            return v;
+        case VJ_BEAT_CURVE_SMOOTHSTEP:
+            return v * v * (3.0f - 2.0f * v);
+        case VJ_BEAT_CURVE_EASE_IN:
+        case VJ_BEAT_CURVE_SQUARE:
+            return v * v;
+        case VJ_BEAT_CURVE_EASE_OUT:
+            return v * (2.0f - v);
+        case VJ_BEAT_CURVE_SQRT:
+            return sqrtf(v);
+        case VJ_BEAT_CURVE_LOG:
+            return log1pf(v * 7.0f) * (1.0f / 2.07944154168f);
+        case VJ_BEAT_CURVE_PUNCH:
+        {
+            float p = v * (2.0f - v);
+            return p * (1.18f - p * 0.18f);
+        }
+        default:
+            return v;
+    }
+}
+
 static float ab_auto_expand_signal(float v, const ab_auto_lane_t *lane)
 {
     float floor;
@@ -12702,6 +14127,9 @@ static float ab_auto_expand_signal(float v, const ab_auto_lane_t *lane)
 
     if(!lane)
         return 0.0f;
+
+    if(lane->hint_version >= VJ_BEAT_HINT_VERSION_2)
+        return ab_auto_apply_v2_curve(v, lane->curve);
 
     v = ab_auto_clampf01(v);
     floor = lane->signal_floor;
@@ -12724,7 +14152,6 @@ static float ab_auto_expand_signal(float v, const ab_auto_lane_t *lane)
 
     return v * v * (3.0f - 2.0f * v);
 }
-
 
 static float ab_auto_slew_signal(ab_auto_target_t *t, float raw, long now)
 {
@@ -12888,11 +14315,15 @@ static int ab_auto_value_deadband(const ab_auto_target_t *t)
         return dead;
     }
 
+    if(t->lane.value_deadband_divisor <= 0)
+        return 1;
+
     dead = span / t->lane.value_deadband_divisor;
 
     if(dead < 1)
         dead = 1;
-    else if(dead > t->lane.value_deadband_max)
+    else if(t->lane.value_deadband_max > 0 &&
+            dead > t->lane.value_deadband_max)
         dead = t->lane.value_deadband_max;
 
     return dead;
@@ -12914,12 +14345,17 @@ static int ab_auto_quantize_discrete_value(const ab_auto_target_t *t, int value,
     if(!t || !t->lane.discrete)
         return value;
 
-    step = (hi - lo) / 32;
+    step = t->lane.step;
 
-    if(step < 1)
-        step = 1;
-    else if(step > 16)
-        step = 16;
+    if(step <= 0)
+    {
+        step = (hi - lo) / 32;
+
+        if(step < 1)
+            step = 1;
+        else if(step > 16)
+            step = 16;
+    }
 
     delta = value - t->base_value;
 
@@ -13059,7 +14495,8 @@ static int ab_auto_release_targets_to_base(
     void *ctx,
     vj_audio_beat_get_fx_id_func get_fx_id,
     vj_audio_beat_get_fx_arg_func get_arg,
-    vj_audio_beat_set_fx_arg_func set_arg
+    vj_audio_beat_set_fx_arg_func set_arg,
+    vj_audio_beat_get_fx_entry_func get_entry
 )
 {
     int changed = 0;
@@ -13075,8 +14512,17 @@ static int ab_auto_release_targets_to_base(
         if(!t->valid)
             continue;
 
-        if(get_fx_id(ctx, t->chain_pos) != t->effect_id)
+        if(get_entry)
+        {
+            sample_eff_chain *entry = get_entry(ctx, t->chain_pos);
+
+            if(!entry || entry != t->entry_ptr || entry->effect_id != t->effect_id)
+                continue;
+        }
+        else if(get_fx_id(ctx, t->chain_pos) != t->effect_id)
+        {
             continue;
+        }
 
         current = get_arg(ctx, t->chain_pos, t->param_nr);
 
@@ -13101,15 +14547,38 @@ static int ab_auto_release_targets_to_base(
     return changed;
 }
 
+static void ab_auto_sync_snapshot_epoch(const vj_audio_beat_snapshot_t *snap, long now)
+{
+    int event_seq;
+
+    if(!snap || snap->version < VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        return;
+
+    if(ab_auto_snapshot_reset_seq == snap->reset_seq)
+        return;
+
+    event_seq = ab_auto_snapshot_event_seq(snap);
+    ab_auto_snapshot_reset_seq = snap->reset_seq;
+    ab_auto_climax_level = 0.0f;
+    ab_auto_climax_last_ms = now;
+    ab_auto_climax_last_hit_seq = event_seq;
+    ab_auto_groove_level = 0.0f;
+    ab_auto_phrase_level = 0.0f;
+    ab_auto_groove_last_ms = now;
+    ab_auto_groove_last_hit_seq = event_seq;
+}
+
 static void ab_auto_clear_macro_state_for_resume(const vj_audio_beat_snapshot_t *snap, long now)
 {
     ab_auto_climax_level = 0.0f;
     ab_auto_climax_last_ms = now;
-    ab_auto_climax_last_hit_seq = snap ? snap->hit_seq : 0;
+    ab_auto_climax_last_hit_seq = ab_auto_snapshot_event_seq(snap);
     ab_auto_groove_level = 0.0f;
     ab_auto_phrase_level = 0.0f;
     ab_auto_groove_last_ms = now;
-    ab_auto_groove_last_hit_seq = snap ? snap->hit_seq : 0;
+    ab_auto_groove_last_hit_seq = ab_auto_snapshot_event_seq(snap);
+    if(snap && snap->version >= VJ_AUDIO_BEAT_SNAPSHOT_VERSION)
+        ab_auto_snapshot_reset_seq = snap->reset_seq;
     ab_auto_resume_guard_until_ms = now + ab_auto_resume_guard_ms();
     ab_auto_resume_guard_active = 1;
 }
@@ -13123,16 +14592,20 @@ static float ab_auto_update_groove(const vj_audio_beat_snapshot_t *snap)
     float body;
     float target;
     float alpha;
+    float confidence;
+    int event_seq;
 
     if(!snap)
         return 0.0f;
 
     now = ab_now_ms();
+    event_seq = ab_auto_snapshot_event_seq(snap);
+    confidence = ab_auto_snapshot_analysis_confidence(snap);
 
     if(ab_auto_groove_last_ms <= 0)
     {
         ab_auto_groove_last_ms = now;
-        ab_auto_groove_last_hit_seq = snap->hit_seq;
+        ab_auto_groove_last_hit_seq = event_seq;
     }
 
     dt = (float)(now - ab_auto_groove_last_ms) * 0.001f;
@@ -13147,7 +14620,7 @@ static float ab_auto_update_groove(const vj_audio_beat_snapshot_t *snap)
     musical = ab_auto_musical_pulse(snap);
     subdiv = ab_auto_subdivision_pulse(snap);
 
-    body = snap->envelope * 0.26f +
+    body = (snap->envelope * 0.26f +
            snap->level * 0.12f +
            snap->bass * 0.20f +
            snap->mid * 0.18f +
@@ -13155,7 +14628,7 @@ static float ab_auto_update_groove(const vj_audio_beat_snapshot_t *snap)
            snap->flux * 0.08f +
            snap->transient * 0.10f +
            musical * 0.20f +
-           subdiv * 0.08f;
+           subdiv * 0.08f) * confidence;
 
     target = (body - 0.075f) * (1.0f / 0.74f);
 
@@ -13173,16 +14646,16 @@ static float ab_auto_update_groove(const vj_audio_beat_snapshot_t *snap)
 
     ab_auto_groove_level += (target - ab_auto_groove_level) * alpha;
 
-    if(snap->hit_seq != ab_auto_groove_last_hit_seq)
+    if(event_seq != ab_auto_groove_last_hit_seq)
     {
         float impact = snap->bass * 0.38f + snap->transient * 0.30f + musical * 0.28f + snap->mid * 0.12f;
         float add = 0.018f + impact * 0.090f;
 
-        if((snap->hit_seq & 3) == 1)
+        if((event_seq & 3) == 1)
             add += 0.030f;
 
         ab_auto_phrase_level += add;
-        ab_auto_groove_last_hit_seq = snap->hit_seq;
+        ab_auto_groove_last_hit_seq = event_seq;
     }
 
     {
@@ -13224,16 +14697,24 @@ static float ab_auto_update_climax(const vj_audio_beat_snapshot_t *snap)
     float alpha;
     float age_penalty = 0.0f;
     float beat_ms = 600.0f;
+    float event_pulse;
+    float confidence;
+    long event_age_ms;
+    int event_seq;
 
     if(!snap)
         return 0.0f;
 
     now = ab_now_ms();
+    event_seq = ab_auto_snapshot_event_seq(snap);
+    event_age_ms = ab_auto_snapshot_event_age_ms(snap);
+    event_pulse = ab_auto_snapshot_event_pulse(snap);
+    confidence = ab_auto_snapshot_analysis_confidence(snap);
 
     if(ab_auto_climax_last_ms <= 0)
     {
         ab_auto_climax_last_ms = now;
-        ab_auto_climax_last_hit_seq = snap->hit_seq;
+        ab_auto_climax_last_hit_seq = event_seq;
     }
 
     dt = (float)(now - ab_auto_climax_last_ms) * 0.001f;
@@ -13257,7 +14738,7 @@ static float ab_auto_update_climax(const vj_audio_beat_snapshot_t *snap)
     if(high > 1.0f) high = 1.0f;
     if(transient > 1.0f) transient = 1.0f;
 
-    body = bass * 0.26f + mid * 0.18f + high * 0.12f + snap->level * 0.10f + snap->envelope * 0.20f + snap->flux * 0.10f + transient * 0.14f + groove * 0.18f + phrase * 0.16f;
+    body = (bass * 0.26f + mid * 0.18f + high * 0.12f + snap->level * 0.10f + snap->envelope * 0.20f + snap->flux * 0.10f + transient * 0.14f + groove * 0.18f + phrase * 0.16f) * confidence;
 
     target = (body - 0.30f) * (1.0f / 0.70f);
 
@@ -13268,16 +14749,16 @@ static float ab_auto_update_climax(const vj_audio_beat_snapshot_t *snap)
 
     target *= 0.70f;
 
-    if(snap->hit_seq != ab_auto_climax_last_hit_seq)
+    if(event_seq != ab_auto_climax_last_hit_seq)
     {
-        float impact = ab_auto_maxf(transient, ab_auto_maxf(bass, snap->beat_pulse));
+        float impact = ab_auto_maxf(transient, ab_auto_maxf(bass, event_pulse));
         float add = 0.030f + 0.105f * impact + 0.035f * phrase;
 
-        if(snap->beat_age_ms >= 0 && snap->beat_age_ms < 80)
+        if(event_age_ms >= 0 && event_age_ms < 80)
             add *= 1.08f;
 
         ab_auto_climax_level += add;
-        ab_auto_climax_last_hit_seq = snap->hit_seq;
+        ab_auto_climax_last_hit_seq = event_seq;
     }
 
     if(snap->bpm > 1.0f)
@@ -13290,9 +14771,9 @@ static float ab_auto_update_climax(const vj_audio_beat_snapshot_t *snap)
             beat_ms = 1600.0f;
     }
 
-    if(snap->beat_age_ms > (long)(beat_ms * 1.35f))
+    if(event_age_ms > (long)(beat_ms * 1.35f))
         age_penalty = 0.20f;
-    if(snap->beat_age_ms > (long)(beat_ms * 2.25f))
+    if(event_age_ms > (long)(beat_ms * 2.25f))
         age_penalty = 0.48f;
 
     alpha = target > ab_auto_climax_level ? (0.55f * dt) : (0.16f * dt);
@@ -13363,7 +14844,183 @@ static int ab_auto_min_visible_delta(const ab_auto_target_t *t, int span, float 
     return n;
 }
 
-static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int global_amount, float climax)
+static int ab_auto_compute_value_v2(ab_auto_target_t *t,
+                                    float signal,
+                                    int global_amount,
+                                    float climax)
+{
+    const ab_auto_lane_t *lane;
+    int hard_lo;
+    int hard_hi;
+    int lo;
+    int hi;
+    int span;
+    int direction;
+    int value;
+    float depth;
+    float amount_scale;
+    float signed_drive;
+    float target;
+
+    if(!t || !t->valid)
+        return 0;
+
+    lane = &t->lane;
+    hard_lo = t->min_value;
+    hard_hi = t->max_value;
+    lo = lane->safe_min;
+    hi = lane->safe_max;
+
+    if(lo < hard_lo) lo = hard_lo;
+    if(hi > hard_hi) hi = hard_hi;
+
+    if(lane->flags & (VJ_BEAT_F_NO_ZERO_CROSS | VJ_BEAT_F_SIGN_LOCK))
+    {
+        if(t->base_value >= 0 && lo < 0)
+            lo = 0;
+        else if(t->base_value < 0 && hi > 0)
+            hi = 0;
+    }
+
+    if(hi <= lo)
+        return t->base_value;
+
+    if(global_amount < 0)
+        global_amount = 0;
+    else if(global_amount > VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX)
+        global_amount = VJ_AUDIO_BEAT_AUTO_AMOUNT_MAX;
+
+    if(global_amount > 100 && lane->can_overdrive_safe &&
+       ab_auto_effective_mode() == VJ_AUDIO_BEAT_AUTO_CHAOS)
+    {
+        float expand = (float)(global_amount - 100) * (1.0f / 200.0f);
+        int dlo = lo - hard_lo;
+        int dhi = hard_hi - hi;
+
+        lo -= (int)((float)dlo * expand + 0.5f);
+        hi += (int)((float)dhi * expand + 0.5f);
+        if(lo < hard_lo) lo = hard_lo;
+        if(hi > hard_hi) hi = hard_hi;
+    }
+
+    span = hi - lo;
+    if(span <= 0)
+        return t->base_value;
+
+    signal = ab_auto_clampf01(signal);
+    climax = ab_auto_clampf01(climax);
+    amount_scale = (float)global_amount * 0.01f;
+    depth = lane->normal_depth + (lane->climax_depth - lane->normal_depth) * climax;
+    depth *= amount_scale;
+    if(depth > 1.0f) depth = 1.0f;
+    if(depth < 0.0f) depth = 0.0f;
+
+    direction = lane->direction < 0 ? -1 : 1;
+    signed_drive = signal * (float)direction;
+
+    if(lane->polarity_mode == VJ_BEAT_POLARITY_BIPOLAR)
+        signed_drive = signal * 2.0f - 1.0f;
+    else if(lane->polarity_mode == VJ_BEAT_POLARITY_NEGATIVE)
+        signed_drive = -signal;
+
+    switch(lane->operator_type)
+    {
+        case AB_AUTO_LANE_MAP_RANGE:
+            target = (float)lo + signal * (float)span;
+            if(direction < 0)
+                target = (float)hi - signal * (float)span;
+            value = t->base_value + (int)((target - (float)t->base_value) * depth +
+                                          ((target >= (float)t->base_value) ? 0.5f : -0.5f));
+            break;
+
+        case AB_AUTO_LANE_SCALE_BASE:
+        {
+            float capacity = (float)(t->base_value != 0 ? ab_auto_absi(t->base_value) : span);
+            target = (float)t->base_value + capacity * signed_drive * depth;
+            value = (int)(target + (target >= 0.0f ? 0.5f : -0.5f));
+            break;
+        }
+
+        case AB_AUTO_LANE_GATE:
+            value = signal >= lane->trigger_threshold
+                ? (direction < 0 ? lo : hi)
+                : t->base_value;
+            break;
+
+        case AB_AUTO_LANE_TOGGLE:
+            value = signal >= 0.5f ? hi : lo;
+            if(direction < 0)
+                value = signal >= 0.5f ? lo : hi;
+            break;
+
+        case AB_AUTO_LANE_WRAP:
+        {
+            float phase = signal;
+            if(direction < 0)
+                phase = 1.0f - phase;
+            target = (float)lo + phase * (float)span;
+            value = t->base_value + (int)((target - (float)t->base_value) * depth +
+                                          ((target >= (float)t->base_value) ? 0.5f : -0.5f));
+            break;
+        }
+
+        case AB_AUTO_LANE_RATE:
+        {
+            long now = ab_now_ms();
+            float dt;
+            float cycle = (float)span + 1.0f;
+
+            if(t->last_rate_ms <= 0)
+            {
+                t->rate_phase = (float)t->base_value;
+                t->last_rate_ms = now;
+            }
+
+            dt = (float)(now - t->last_rate_ms) * 0.001f;
+            if(dt < 0.0f) dt = 0.0f;
+            if(dt > 0.25f) dt = 0.25f;
+            t->last_rate_ms = now;
+            t->rate_phase += signed_drive * depth * (float)span * dt;
+
+            while(t->rate_phase < (float)lo)
+                t->rate_phase += cycle;
+            while(t->rate_phase > (float)hi)
+                t->rate_phase -= cycle;
+
+            value = (int)(t->rate_phase + 0.5f);
+            break;
+        }
+
+        case AB_AUTO_LANE_CONTINUOUS_IMPULSE:
+        case AB_AUTO_LANE_SAMPLE_HOLD:
+        case AB_AUTO_LANE_OFFSET_BASE:
+        case AB_AUTO_LANE_CONTINUOUS:
+        default:
+        {
+            int capacity = signed_drive < 0.0f
+                ? t->base_value - lo
+                : hi - t->base_value;
+            float magnitude = signed_drive < 0.0f ? -signed_drive : signed_drive;
+
+            if(capacity < 0)
+                capacity = 0;
+            target = (float)t->base_value +
+                     (signed_drive < 0.0f ? -1.0f : 1.0f) *
+                     (float)capacity * magnitude * depth;
+            value = (int)(target + (target >= 0.0f ? 0.5f : -0.5f));
+            break;
+        }
+    }
+
+    if(value < lo) value = lo;
+    if(value > hi) value = hi;
+    if(value < hard_lo) value = hard_lo;
+    if(value > hard_hi) value = hard_hi;
+
+    return ab_auto_quantize_discrete_value(t, value, lo, hi);
+}
+
+static int ab_auto_compute_value(ab_auto_target_t *t, float signal, int global_amount, float climax)
 {
     const ab_auto_lane_t *lane;
     int lo;
@@ -13392,6 +15049,9 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
         return 0;
 
     lane = &t->lane;
+
+    if(lane->hint_version >= VJ_BEAT_HINT_VERSION_2)
+        return ab_auto_compute_value_v2(t, signal, global_amount, climax);
 
     if(global_amount < 0)
         global_amount = 0;
@@ -13869,11 +15529,102 @@ static int ab_auto_compute_value(const ab_auto_target_t *t, float signal, int gl
     return ab_auto_apply_global_amount_value(t, value, global_amount, lo, hi);
 }
 
+static int ab_auto_apply_group_relation(const ab_auto_target_t *t, int value)
+{
+    const ab_auto_lane_t *lane;
+
+    if(!t || !t->valid)
+        return value;
+
+    lane = &t->lane;
+    if(lane->hint_version < VJ_BEAT_HINT_VERSION_2 ||
+       lane->group_id <= 0 || lane->group_relation == VJ_BEAT_GROUP_NONE)
+        return value;
+
+    if(lane->group_relation == VJ_BEAT_GROUP_SUM_LIMIT)
+    {
+        int sum = value;
+        int limit = lane->group_margin;
+
+        if(limit <= 0)
+            return value;
+
+        for(int i = 0; i < ab_auto_target_count; i++)
+        {
+            const ab_auto_target_t *o = &ab_auto_targets[i];
+            if(o == t || !o->valid || o->entry_ptr != t->entry_ptr ||
+               o->lane.group_id != lane->group_id)
+                continue;
+            sum += o->last_value;
+        }
+
+        if(sum > limit)
+            value -= sum - limit;
+    }
+    else if(lane->group_relation == VJ_BEAT_GROUP_MUTEX)
+    {
+        for(int i = 0; i < ab_auto_target_count; i++)
+        {
+            const ab_auto_target_t *o = &ab_auto_targets[i];
+            if(o == t || !o->valid || o->entry_ptr != t->entry_ptr ||
+               o->lane.group_id != lane->group_id)
+                continue;
+            if(o->last_value != o->base_value && o->score > t->score)
+                return t->base_value;
+        }
+    }
+    else
+    {
+        int lower = t->min_value;
+        int upper = t->max_value;
+        int margin = lane->group_margin;
+
+        if(margin < 0)
+            margin = 0;
+
+        for(int i = 0; i < ab_auto_target_count; i++)
+        {
+            const ab_auto_target_t *o = &ab_auto_targets[i];
+            int ov;
+
+            if(o == t || !o->valid || o->entry_ptr != t->entry_ptr ||
+               o->lane.group_id != lane->group_id)
+                continue;
+
+            ov = o->last_value;
+            if(lane->group_relation == VJ_BEAT_GROUP_ASCENDING)
+            {
+                if(o->lane.group_order < lane->group_order && ov + margin > lower)
+                    lower = ov + margin;
+                else if(o->lane.group_order > lane->group_order && ov - margin < upper)
+                    upper = ov - margin;
+            }
+            else if(lane->group_relation == VJ_BEAT_GROUP_DESCENDING)
+            {
+                if(o->lane.group_order < lane->group_order && ov - margin < upper)
+                    upper = ov - margin;
+                else if(o->lane.group_order > lane->group_order && ov + margin > lower)
+                    lower = ov + margin;
+            }
+        }
+
+        if(lower > upper)
+            return t->base_value;
+        if(value < lower) value = lower;
+        if(value > upper) value = upper;
+    }
+
+    if(value < t->min_value) value = t->min_value;
+    if(value > t->max_value) value = t->max_value;
+    return value;
+}
+
 static void ab_auto_clear_runtime_state(int mark_dirty)
 {
     ab_auto_signature = 0;
     ab_auto_target_count = 0;
     ab_auto_active = 0;
+    ab_store_i(&ab_auto_runtime_pending, 0);
 
     ab_auto_climax_level = 0.0f;
     ab_auto_climax_last_ms = 0;
@@ -13883,6 +15634,7 @@ static void ab_auto_clear_runtime_state(int mark_dirty)
     ab_auto_phrase_level = 0.0f;
     ab_auto_groove_last_ms = 0;
     ab_auto_groove_last_hit_seq = 0;
+    ab_auto_snapshot_reset_seq = -1;
 
     ab_auto_last_apply_ms = 0;
     ab_auto_signature_last_check_ms = 0;
@@ -13902,13 +15654,14 @@ static int ab_auto_release_and_clear(
     void *ctx,
     vj_audio_beat_get_fx_id_func get_fx_id,
     vj_audio_beat_get_fx_arg_func get_arg,
-    vj_audio_beat_set_fx_arg_func set_arg
+    vj_audio_beat_set_fx_arg_func set_arg,
+    vj_audio_beat_get_fx_entry_func get_entry
 )
 {
     int released = 0;
 
     if(ab_auto_target_count > 0)
-        released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
+        released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
     ab_auto_clear_runtime_state(1);
     return released;
@@ -13951,6 +15704,25 @@ void vj_audio_beat_auto_mark_dirty(vj_audio_beat_shared_t *s)
     ab_store_i(&ab_auto_dirty, 1);
 }
 
+int vj_audio_beat_auto_requires_render_pass(vj_audio_beat_shared_t *s)
+{
+    int has_runtime = ab_load_i(&ab_auto_runtime_pending);
+
+    if(has_runtime)
+        return 1;
+
+    if(!s ||
+       !ab_load_i(&s->initialized) ||
+       !ab_load_i(&s->enabled) ||
+       !ab_load_i(&s->running))
+        return 0;
+
+    if(!ab_action_uses_auto_fx(ab_capture_action_mode(s, NULL)))
+        return 0;
+
+    return ab_load_i(&ab_auto_mode) > VJ_AUDIO_BEAT_AUTO_OFF;
+}
+
 int vj_audio_beat_auto_apply_chain_ex(
     vj_audio_beat_shared_t *s,
     void *ctx,
@@ -13979,32 +15751,33 @@ int vj_audio_beat_auto_apply_chain_ex(
 
     now = ab_now_ms();
 
-    if(!ab_load_i(&s->initialized))
-        return 0;
+    if(!ab_load_i(&s->initialized) ||
+       !ab_load_i(&s->enabled) ||
+       !ab_load_i(&s->running))
+        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
-    if(!ab_load_i(&s->enabled))
-        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
-
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
     paused = ab_load_i(&s->paused_by_beat);
 
     if(!ab_action_uses_auto_fx(action))
-        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
+        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
     mode = ab_load_i(&ab_auto_mode);
 
     if(mode <= VJ_AUDIO_BEAT_AUTO_OFF)
-        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg);
+        return ab_auto_release_and_clear(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
     if(!vj_audio_beat_get_snapshot(s, &snap))
         return 0;
+
+    ab_auto_sync_snapshot_epoch(&snap, now);
 
     {
         const int transport_modulation = ab_action_is_breakbeat(action);
 
         if(paused && !transport_modulation)
         {
-            int released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
+            int released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
             ab_auto_clear_macro_state_for_resume(&snap, now);
             return released;
@@ -14018,7 +15791,7 @@ int vj_audio_beat_auto_apply_chain_ex(
 
             if(!transport_modulation && gap > gap_threshold)
             {
-                int released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
+                int released = ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
                 ab_auto_clear_macro_state_for_resume(&snap, now);
                 return released;
@@ -14030,7 +15803,7 @@ int vj_audio_beat_auto_apply_chain_ex(
             if(ab_auto_resume_guard_active && now >= ab_auto_resume_guard_until_ms)
             {
                 ab_auto_resume_guard_active = 0;
-                ab_auto_climax_last_hit_seq = snap.hit_seq;
+                ab_auto_climax_last_hit_seq = ab_auto_snapshot_event_seq(&snap);
             }
         }
     }
@@ -14054,13 +15827,14 @@ int vj_audio_beat_auto_apply_chain_ex(
         int signature_changed = sig != ab_auto_signature;
 
         if(ab_auto_target_count > 0)
-            changed += ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg);
+            changed += ab_auto_release_targets_to_base(ctx, get_fx_id, get_arg, set_arg, get_entry);
 
         if(signature_changed && ab_auto_signature != 0)
             ab_auto_trim_macro_state_on_map_change();
 
         ab_auto_signature = sig;
         ab_auto_rebuild_map(ctx, chain_len, get_fx_id, get_arg, get_entry);
+        ab_store_i(&ab_auto_runtime_pending, ab_auto_target_count > 0);
     }
 
     amount = ab_load_i(&ab_auto_amount);
@@ -14184,6 +15958,8 @@ int vj_audio_beat_auto_apply_chain_ex(
                 value = t->base_value;
         }
 
+        value = ab_auto_apply_group_relation(t, value);
+
         if(value != current)
         {
             int deadband = ab_auto_value_deadband(t);
@@ -14199,11 +15975,12 @@ int vj_audio_beat_auto_apply_chain_ex(
                 int cur_dist = ab_auto_absi(current - t->base_value);
                 int new_dist = ab_auto_absi(value - t->base_value);
                 int release_toward_base = new_dist < cur_dist;
-                int fresh_hit_override = snap.beat_age_ms >= 0 && snap.beat_age_ms <= 120L && frame_sig.activity >= 0.45f;
+                long event_age_ms = ab_auto_snapshot_event_age_ms(&snap);
+                int fresh_hit_override = event_age_ms >= 0 && event_age_ms <= 120L && frame_sig.activity >= 0.45f;
 
                 hold_ok = 0;
 
-                if(release_toward_base && (frame_sig.activity < 0.18f || snap.beat_age_ms > 260L))
+                if(release_toward_base && (frame_sig.activity < 0.18f || event_age_ms > 260L))
                     hold_ok = 1;
                 else if(fresh_hit_override && diff >= deadband)
                     hold_ok = 1;
@@ -14211,6 +15988,11 @@ int vj_audio_beat_auto_apply_chain_ex(
 
             deadband_ok = value == t->base_value || current == t->base_value || diff >= deadband;
             valid_value = vje_is_param_value_valid(t->effect_id, t->param_nr, value);
+
+            if(value != t->base_value && t->lane.update_ms > 0 &&
+               t->last_change_ms > 0 &&
+               (now - t->last_change_ms) < (long)t->lane.update_ms)
+                hold_ok = 0;
 
             if(hold_ok && deadband_ok && valid_value)
             {
@@ -14286,10 +16068,12 @@ int vj_audio_beat_auto_modulate_args(
     if(!s || !entry || !args || effect_id <= 0 || n_params <= 0)
         return 0;
 
-    if(!ab_load_i(&s->initialized) || !ab_load_i(&s->enabled))
+    if(!ab_load_i(&s->initialized) ||
+       !ab_load_i(&s->enabled) ||
+       !ab_load_i(&s->running))
         return 0;
 
-    action = ab_load_i(&s->action_mode);
+    action = ab_capture_action_mode(s, NULL);
     if(!ab_action_uses_auto_fx(action))
         return 0;
 
@@ -14303,8 +16087,10 @@ int vj_audio_beat_auto_modulate_args(
     if(!vj_audio_beat_get_snapshot(s, &snap))
         return 0;
 
-    amount = ab_load_i(&ab_auto_amount);
     now = ab_now_ms();
+    ab_auto_sync_snapshot_epoch(&snap, now);
+
+    amount = ab_load_i(&ab_auto_amount);
 
     ab_auto_build_frame_signal(&snap, ab_auto_climax_level, &frame_sig);
 
@@ -14392,21 +16178,26 @@ int vj_audio_beat_auto_modulate_args(
                 value = current_base;
         }
 
+        value = ab_auto_apply_group_relation(t, value);
+
         if(value < t->min_value)
             value = t->min_value;
         else if(value > t->max_value)
             value = t->max_value;
 
         if(value != args[t->param_nr] &&
+           (value == current_base || t->lane.update_ms <= 0 ||
+            t->last_change_ms <= 0 ||
+            (now - t->last_change_ms) >= (long)t->lane.update_ms) &&
            vje_is_param_value_valid(effect_id, t->param_nr, value))
         {
             args[t->param_nr] = value;
             changed++;
+            t->last_change_ms = now;
         }
 
         t->last_value = args[t->param_nr];
         t->active = signal > 0.002f ? 1 : 0;
-        t->last_change_ms = now;
     }
 
     if(changed > 0)
@@ -14420,7 +16211,7 @@ int vj_audio_beat_get_action(vj_audio_beat_shared_t *s)
     if(!s)
         return VJ_AUDIO_BEAT_ACTION_NONE;
 
-    return ab_load_i(&s->action_mode);
+    return ab_capture_action_mode(s, NULL);
 }
 
 #endif

@@ -263,12 +263,29 @@ typedef struct vj_audio_beat_shared_t
     volatile int resume_speed;
 
     volatile int action_mode;
+    volatile int action_seq;
+    volatile int action_write_lock;
     volatile int pulse_ms;
     volatile int gate_ms;
 
     volatile int reset_seq;
     volatile int consumed_seq;
     volatile int hit_seq;
+    volatile int snapshot_seq;
+    volatile int snapshot_write_lock;
+    volatile int analysis_seq;
+    volatile int analysis_reset_seq;
+    volatile int analysis_action_mode;
+    volatile int analysis_action_seq;
+    volatile long snapshot_publish_ms;
+    volatile int candidate_seq;
+    volatile int candidate_kind;
+    volatile long last_candidate_ms;
+    volatile int detector_beat_seq;
+    volatile int detector_beat_kind;
+    volatile long detector_last_beat_ms;
+    volatile int detector_beat_toggle_q15;
+    volatile long tempo_anchor_ms;
 
     volatile int channels;
     volatile int bytes_per_frame;
@@ -282,6 +299,29 @@ typedef struct vj_audio_beat_shared_t
     volatile int flux_q15;
     volatile int beat_toggle_q15;
     volatile int bpm_q8;
+
+    volatile int analysis_confidence_q15;
+    volatile int source_confidence_q15;
+    volatile int tempo_confidence_q15;
+    volatile int event_confidence_q15;
+    volatile int candidate_confidence_q15;
+    volatile int detector_beat_confidence_q15;
+    volatile int accepted_confidence_q15;
+    volatile int candidate_strength_q15;
+    volatile int detector_beat_strength_q15;
+    volatile int accepted_strength_q15;
+    volatile int detector_beat_kick_q15;
+    volatile int detector_beat_snare_q15;
+    volatile int detector_beat_hat_q15;
+    volatile int low_onset_q15;
+    volatile int mid_onset_q15;
+    volatile int high_onset_q15;
+    volatile int noise_floor_q15;
+    volatile int source_snr_q8;
+    volatile int activity_q15;
+    volatile int onset_q15;
+    volatile int block_ms_q16;
+    volatile long analysis_ms;
 
     volatile long last_hit_ms;
     volatile long hold_until_ms;
@@ -745,11 +785,6 @@ typedef struct veejay_t
 
 void veejay_transport_epoch_bump(veejay_t *info);
 int veejay_transport_epoch_get(veejay_t *info);
-
-#ifdef HAVE_JACK
-void veejay_audio_sync_thread_set_enabled(int enabled);
-void veejay_audio_beat_thread_set_enabled(int enabled);
-#endif
 
 
 typedef struct {

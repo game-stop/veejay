@@ -50,14 +50,17 @@ vj_effect *colflash_init(int w, int h)
     ve->rgb_conv = 1;
     ve->param_description = vje_build_param_list(ve->num_params, "Frametime", "Red", "Green", "Blue", "Delay");
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_SPEED,        VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_INVERTED | VJ_BEAT_F_NO_ZERO_CROSS, 2,   18,  4,  14, 3000, 8200, 2200, 22,
-        VJ_BEAT_KICK,         VJ_BEAT_F_IMPULSE,                                                                     0,   255, 90, 100, 1,    220,  32,   220,
-        VJ_BEAT_SNARE,        VJ_BEAT_F_IMPULSE,                                                                     0,   255, 76, 100, 1,    300,  42,   180,
-        VJ_BEAT_HAT,          VJ_BEAT_F_IMPULSE,                                                                     0,   255, 64, 96,  1,    180,  28,   150,
-        VJ_BEAT_INERTIA,      VJ_BEAT_F_PHRASE_ONLY | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS,                  1,   7,   4,  14, 3000, 8200, 2200, 18
-    );
+    
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_BPM, VJ_BEAT_OP_BEAT_TIME, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, 2, 30, 100, 100, 0, 0, 0, 1, 180, VJ_BEAT_COST_CHEAP, 90, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 92, 100, 0, 260, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 88, 100, 0, 300, 0, 1, 80, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_HAT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 84, 100, 0, 220, 0, 1, 80, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_INERTIA, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 1, 6, 78, 100, 0, 300, 0, 1, 120, VJ_BEAT_COST_CHEAP, 86, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }

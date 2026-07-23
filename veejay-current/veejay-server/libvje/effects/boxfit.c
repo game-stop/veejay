@@ -60,13 +60,15 @@ vj_effect *boxfit_init(int w, int h)
     ve->sub_format = 1;
     ve->param_description = vje_build_param_list(ve->num_params, "Min Size", "Max Size", "Sensitivity", "Borders");
 
-    ve->beat_hints = vje_build_beat_hint_list(
-        ve->num_params,
-        VJ_BEAT_GRID_SIZE,     VJ_BEAT_F_DISCRETE,    2,                  boxfit_clampi(w / 12, 4, min_hi), 2,  18, 700,  2400, 0, 74,
-        VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_DISCRETE,    8,                  boxfit_clampi(w / 4,  8, max_hi), 4,  30, 900,  3200, 0, 82,
-        VJ_BEAT_DETAIL,        VJ_BEAT_F_CONTINUOUS,  24,                 240,                         14, 56, 600,  2600, 0, 90,
-        VJ_BEAT_SELECTOR,      VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, -1000
-    );
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_GRID_SIZE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 2, min_hi, 72, 96, 40, 520, 0, 2, 90, VJ_BEAT_COST_MODERATE, 78, 1, 0, VJ_BEAT_GROUP_ASCENDING, 2),
+            VJ_BEAT_HINT_V2(VJ_BEAT_WINDOW_RADIUS, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 4, max_hi, 78, 100, 28, 620, 0, 4, 90, VJ_BEAT_COST_MODERATE, 88, 1, 1, VJ_BEAT_GROUP_ASCENDING, 2),
+            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 32, 240, 84, 100, 22, 420, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
     return ve;
 }
 
