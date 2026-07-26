@@ -17,10 +17,11 @@ Veejay server and can connect to, control, and disconnect from that server
 while Veejay continues to run.
 .PP
 Reloaded is intended for live video performance, sample-bank operation,
-stream control, four-bank sequence editing, tracker-style VIMS pattern
-editing, effect-chain editing, FX animation, MIDI learning, VIMS messaging,
-preview management, recording, audio beat detection, external audio
-synchronisation, and per-sample audio routing.
+stream control, four-bank sequence editing, tracker-style Pattern editing,
+Edit List operation, MultiTrack Edit control of several VeeJay instances,
+effect-chain editing, FX animation, MIDI learning, VIMS messaging, preview
+management, recording, audio beat detection, external audio synchronisation,
+and per-sample audio routing.
 .PP
 The interface is status-driven. Many controls are refreshed from backend status
 messages. When a button, list entry, toggle, slider, or curve returns to a
@@ -84,10 +85,11 @@ CPU usage on GTK 3.22.30 and newer builds. This option is available only when
 Reloaded was built against a GTK version that supports it.
 .SH USER INTERFACE OVERVIEW
 The main window is arranged around a live preview, transport controls, a
-sample bank, the sequence play grid, effect controls, audio controls, status
-indicators, and several notebook panels. The exact panel visibility depends on
-the current play mode, selected sample or stream, backend status, compile-time
-features, and command-line layout options.
+sample bank, the Sequence Editor, Pattern Editor, Edit List, MultiTrack Edit,
+effect controls, audio controls, status indicators, and several notebook
+panels. The exact panel visibility depends on the current play mode, selected
+sample or stream, backend status, compile-time features, and command-line
+layout options.
 .PP
 The top-level menus expose file loading and saving, sample actions, stream
 creation, MIDI learning, preferences, video settings, image calibration, VIMS
@@ -106,8 +108,10 @@ Preview quality uses the levels full, half, quarter, and one eighth. The
 preview panel also exposes greyscale and alpha-only preview modes, preview
 speed, preview scale, and preview dimensions where available.
 .PP
-In multitrack mode, preview toggling is routed through the multitrack preview
-manager so the visible preview reflects the selected track and master track.
+In MultiTrack Edit, each video track has an independent preview toggle. The
+Switch control changes which connected VeeJay instance is operated by the main
+Reloaded controls; it does not change the project-master clock or the on-air
+A/B bus.
 .SH TRANSPORT AND TIMELINE
 The transport controls provide forward playback, backward playback, stop,
 previous and next frame, previous and next second, and jump-to-start or
@@ -146,6 +150,111 @@ Move the playhead by about two seconds.
 The speed slider controls playback speed. The slow-motion slider divides the
 current frame rate by the selected multiplier. Ctrl-clicking these sliders
 resets them to neutral.
+.SH EDIT LIST
+The Edit List page is a visual editor for the current edit decision list. It
+shows the source files opened by the backend, the timeline segments that
+reference them, the current playhead, an inclusive frame selection, separators,
+and locally named regions.
+.PP
+A source file and a timeline segment are not the same object. Cut, copy, paste,
+move, crop, and trim operations may split the timeline into several segments
+that continue to reference the same source file.
+.SS FILE AND RANGE OPERATIONS
+.TP
+.B Append
+Append a video file, or append it and request creation of a sample.
+.TP
+.B Save
+Save the complete Edit List or only the selected frame range.
+.TP
+.B Cut, Copy, and Paste
+Use the Edit List clipboard. Paste can target the playhead, selection start,
+after the selection, or an explicitly entered frame. Ctrl+V pastes at the
+playhead.
+.TP
+.B Delete
+Remove the selected frames without copying them.
+.TP
+.B Crop
+Keep only the selected frame range.
+.TP
+.B New Sample
+Create a sample from the selected frame range.
+.PP
+The In and Out controls edit an inclusive selection and show both frame numbers
+and timecodes. Select All covers the complete Edit List. The clipboard status
+reports whether the stored range was copied or cut and how many frames it
+contains.
+.SS VISUAL TIMELINE
+The timeline draws source segments, cut boundaries, separators, named regions,
+the playhead, and the current selection. A navigator below it shows the whole
+Edit List and the visible zoom window.
+.TP
+.B Left click or drag in a clip
+Click to seek, or drag to create a frame selection.
+.TP
+.B Drag a selection handle
+Resize the In or Out boundary.
+.TP
+.B Drag inside the selected range
+Move the selected range. Hold Ctrl while dragging to copy it instead.
+.TP
+.B Drag a segment edge
+Remove material from the head or tail of that segment. This is a destructive
+Edit List operation, not a non-destructive slip edit.
+.TP
+.B Left drag on the ruler
+Scrub the playhead.
+.TP
+.B Middle drag
+Pan a zoomed timeline.
+.TP
+.B Double click a segment
+Select that segment. Shift extends the current selection and Ctrl also zooms
+to the segment.
+.TP
+.B Right click
+Open actions for seeking, selecting or zooming to a segment, editing the
+selection, pasting, separators, and named regions.
+.PP
+Snap aligns edits to cuts, separators, and the playhead. Hold Alt while dragging
+to bypass snapping. The Fit, Sel, Frame, zoom buttons, zoom slider, mouse wheel,
+navigator, and horizontal scrollbar control the visible timeline range. Ctrl
+plus the mouse wheel zooms around the pointer; the wheel alone pans.
+.SS SEPARATORS AND REGIONS
+M+ or the \fBM\fR key adds a separator at the playhead. Separators can be moved,
+renamed, removed, and reached with Alt+Left or Alt+Right. The interval between
+two separators can be named as a region, selected, or fitted to the timeline.
+Separator and region names are Reloaded-side navigation metadata and are not
+written into the backend Edit List.
+.SS EDIT LIST KEYBOARD CONTROLS
+.TP
+.B Left and Right
+Seek by one frame. Shift seeks by ten frames; Ctrl seeks by approximately one
+second.
+.TP
+.B Up and Down, Page Up and Page Down
+Seek to the previous or next edit boundary. Shift extends the selection.
+.TP
+.B I or left bracket, O or right bracket
+Set the inclusive In or Out boundary at the playhead.
+.TP
+.B Ctrl + C, Ctrl + X, Ctrl + V, Ctrl + A
+Copy, cut, paste at the playhead, or select all.
+.TP
+.B M, S, F
+Add a separator, toggle Snap, or fit the selection; when no selection exists,
+F fits the complete Edit List.
+.TP
+.B Ctrl + plus, Ctrl + minus, Ctrl + 0, Ctrl + 1
+Zoom in, zoom out, fit the complete Edit List, or zoom to frame level.
+.TP
+.B Delete or Backspace
+Delete the selected range, or remove the selected separator when there is no
+frame selection.
+.TP
+.B Escape
+Cancel a drag, then clear the selection and separator selection.
 .SH SAMPLE BANK
 The sample bank provides quick access to samples and streams. Each page has
 12 slots. The grid expands to use the available area, keeps the cells square,
@@ -193,9 +302,9 @@ gain, RGB balance, automatic white balance, sharpness, backlight compensation,
 automatic gain, automatic hue, temperature, flips, exposure, black level, and
 whiteness. Unsupported camera controls may be hidden or insensitive.
 .SH SEQUENCE EDITOR
-The Sequence page provides four banks of one hundred slots arranged as four
-10 by 10 grids. A slot can contain a sample or stream. Slot colour identifies
-the source type and the source id is printed in the cell.
+The Sequence Editor provides four banks of one hundred and twenty slots, each
+arranged as a 12 by 10 grid. A slot can contain a sample or stream. Slot colour
+identifies the source type and the source id is printed in the cell.
 .PP
 The selected bank, active playback bank, and queued bank are separate states.
 The active bank has the active outline, a queued bank has the queue outline,
@@ -266,9 +375,10 @@ Delete that slot, including its cell-specific VIMS pattern overlay.
 Move or swap it with another slot in the same bank.
 .TP
 .B Right click a slot or selection
-Open the slot menu. For a populated slot, \fBAdd Command > HOLD\fR inserts a
-Hold Frame event at that slot's start position on the complete bank Pattern
-timeline. The menu also provides assign, delete, copy, cut, paste,
+Open the slot menu. For a populated slot, \fBAdd Command\fR can insert
+\fBHOLD\fR, \fBSTOP\fR, \fBFORWARD\fR, \fBREVERSE\fR, the current
+\fBSPEED\fR, or the current \fBSLOW\fR value into that slot's Slot Pattern at
+frame 0. The menu also provides assign, delete, copy, cut, paste,
 copy-selected-to-bank, whole-bank copy and paste, clear-bank, and refresh
 operations.
 .TP
@@ -307,38 +417,49 @@ The recording row below the grids starts Play Grid and records its output to a
 new sample. Stopping sequence recording does not stop Play Grid; playback must
 be stopped separately. The progress control reports the current recording
 progress.
-.SH VIMS PATTERN EDITOR
-The Pattern page is a tracker-style editor for frame-accurate VIMS automation.
-Each row represents a source frame and contains eight event tracks, \fBV1\fR
-through \fBV8\fR. Events on the same row execute from V1 to V8.
-.PP
-Patterns can be attached to an individual sequence slot, a sample, a stream,
-or a complete sequence bank. During sequence playback Reloaded can run the
-source pattern, the current slot pattern, and the whole-bank pattern together.
-Outside Play Grid, the selected sample or stream pattern follows that source.
-.SS DISPLAY AND TARGETS
-The target line identifies the current bank, slot, sample, stream, or
-whole-bank target. It also reports the available frame count, edit step,
-pattern loop, and current learning policy.
-.PP
-Common commands use compact labels such as \fBHOLD\fR, \fBSPEED\fR,
-\fBSLOW\fR, \fBFX\fR, \fBBEAT\fR, \fBSYNC\fR, and \fBMIX\fR. Other allowed
-commands are abbreviated from the VIMS descriptions advertised by the
-backend. A cell tooltip shows the VIMS id, backend description, and complete
-raw command.
+.SH PATTERN EDITOR
+The Pattern Editor is a tracker-style editor for frame-accurate VIMS
+automation. It is a separate editor from the Sequence Editor. Each displayed
+row represents a timeline frame of the current Pattern target and contains
+eight event tracks, \fBV1\fR through \fBV8\fR. Events on the same frame execute
+from V1 to V8.
+.SS PATTERN TARGETS
+The Pattern Editor works with three stored Pattern scopes:
 .TP
-.B Step
-Display and edit every Nth frame. For example, Step 4 shows frames 0, 4, 8,
-12, and so on. Insert, pull, cursor advancement, and learned-event advancement
-use the same step.
+.B Source Pattern
+Attached to a sample or stream and follows that source wherever it is used.
+.TP
+.B Slot Pattern
+Attached only to one populated Sequence Editor slot.
+.TP
+.B Bank Pattern
+Attached to the complete timeline of one sequence bank.
 .PP
-An orange marker indicates events hidden between two displayed rows by the
-current Step value. Right-click the marker to reveal the hidden frame or
-quantize its events to a visible row.
+Outside Play Grid, selecting a sample or stream opens its Source Pattern.
+During sequence playback, Reloaded can execute a source Pattern, the current
+slot Pattern, and the Bank Pattern together. The target badge identifies
+\fBPATTERN\fR, \fBSLOT PATTERN\fR, or \fBBANK PATTERN\fR and the target line
+shows the source or bank, available frames, row Step, loop range, and Learn
+placement policy.
+.PP
+The Sequence Editor mirrors Pattern scope with corner markers and badges. A
+cyan upper-left marker denotes a Source Pattern, a magenta upper-right marker
+denotes a Slot Pattern, and an amber dot denotes a Hold Frame event. Larger
+cells may show \fBS\fR, \fBC\fR, or \fBS+C\fR. A bank with automation shows
+\fBSEQ\fR or \fBSEQ H\fR.
+.SS ROW STEP AND HIDDEN EVENTS
+\fBStep\fR displays and edits every Nth frame. Step 4 therefore shows frames 0,
+4, 8, 12, and so on. Row insertion, row pulling, cursor advancement, and Learn
+advancement use the same interval.
+.PP
+An orange marker reports events stored between two visible stepped rows.
+Ctrl-click the frame column on such a marker to switch to Step 1 and reveal the
+first hidden event. The right-click menu can reveal hidden events or quantize
+them to visible Step rows.
 .SS PATTERN LOOP
 .TP
 .B Loop
-Enable or disable the stored pattern loop for the current target.
+Enable or disable the stored Pattern loop for the current target.
 .TP
 .B Loop Sel
 Set and enable the loop from the selected row range, or from the current row
@@ -347,91 +468,94 @@ when no block is selected.
 .B No Loop
 Remove the stored loop range.
 .PP
-The pattern loop repeats VIMS events over the selected frame range. It does
-not change the media loop mode or loop the video itself.
+Pattern looping repeats automation over the stored frame range. It does not
+change the sample or stream loop mode and does not remap the backend-reported
+playhead. Playback status remains backend-authoritative.
 .SS EVENT TRACKS
-The V1 through V8 track switches mute or enable individual event tracks.
-Ctrl-click a track switch to solo it. Shift-click a track switch to enable all
-tracks. Muted tracks remain stored but do not fire.
-.SS LEARNING VIMS
-Enable \fBCapture\fR to learn user-triggered, pattern-safe VIMS commands at
-the current pattern position. Supported buttons, toggles, spin controls,
-sliders, transport controls, FX controls, audio controls, and other UI actions
-are captured whether they use a single-argument or formatted VIMS sender.
-The pattern safety filter rejects the reserved VIMS range 400 through 499,
-query and readback commands, sequencer control commands, macro and bundle
-automation, source or play-mode switches, sample and stream lifecycle actions,
-timeline or project-structure edits, recording and calibration commands,
-FX-chain structure and keyframe edits, and global UI or engine configuration.
-Rejected commands are reported in the log.
-.PP
-The learning policy chooses where each captured command is placed:
+The V1 through V8 switches mute or enable individual event tracks. Ctrl-click
+a switch to solo that track. Shift-click a switch to enable all tracks. Muted
+events remain stored but do not execute.
+.SS LEARN AND FOLLOW
+Enable \fBCapture\fR in the Learn row to capture user-triggered, pattern-safe
+VIMS commands at the current Pattern cursor. The placement policy controls how
+successive commands are written:
 .TP
 .B Column lock
-Keep using the selected V track. If that cell contains a different VIMS id,
-search downward for the next empty cell or matching id, then advance down the
-same track.
+Keep using the selected V track. If the cell contains another VIMS id, search
+downward for an empty cell or matching id, then continue down that track.
 .TP
 .B Next free
-Use the first empty track on the current row, then continue on the next row
-when all eight tracks are occupied.
+Use the first empty track on the row, then advance when all eight tracks are
+occupied.
 .TP
 .B Replace match
 Replace the same VIMS id on the current row. When no match exists, use the
-first empty track, then the selected track.
+first empty track and then the selected track.
 .TP
 .B Overwrite
 Replace the selected cell and advance down the selected track.
 .TP
 .B Layer
 Advance across V1 through V8 and wrap to V1 on the next row.
-.TP
-.B Follow
-Follow the live playback row. While Capture is active, learned events control
-the edit cursor so repeated slider and button actions are placed according to
-the selected learning policy.
-.SS EDITING COMMANDS
-When the complete sequence-bank timeline is selected, right-click a Pattern
-cell and choose \fBAdd Command > HOLD\fR to insert a Hold Frame command at
-that frame and V track. The same command is available from a populated
-sequencer cell and is placed at that slot's start frame on the bank timeline.
-The duration comes from the existing Hold Frames control. This submenu is not
-shown for sample, stream, or per-slot Pattern targets.
 .PP
+\fBFollow\fR keeps the cursor on the live playback row. While Capture is active,
+Learn owns cursor advancement so repeated slider, toggle, and button actions
+are placed according to the selected policy.
+.PP
+The safety filter rejects query and readback commands, the reserved VIMS range
+400 through 499, sequencer control, macro and bundle automation, source and
+play-mode changes, sample and stream lifecycle commands, Edit List and project
+structure edits, recording and calibration, FX-chain structure and keyframe
+editing, and global UI or engine configuration. Rejected commands are reported
+in the log.
+.SS ENTERING AND EDITING EVENTS
 Double-click a cell, press \fBF2\fR or \fBEnter\fR, or begin typing a numeric
 VIMS id to open the inline command editor. Commands use the normal
-\fIselector:arguments;\fR syntax and one command is stored per cell.
+\fIselector:arguments;\fR syntax and one command is stored per cell. Tooltips
+show the VIMS id, backend description, and complete raw command.
+.PP
+For a Bank Pattern, the \fBAdd Command\fR submenu provides \fBHOLD\fR,
+\fBSTOP\fR, \fBFORWARD\fR, \fBREVERSE\fR, \fBSPEED (current value)\fR, and
+\fBSLOW (current value)\fR at the selected project frame and V track. A
+populated Sequence Editor slot exposes the same command set for its own Slot
+Pattern, where the command is inserted at frame 0.
 .TP
 .B Copy, Cut, and Paste
-Operate on the selected rectangular block. Paste mode can be
-\fBReplace\fR, \fBMerge\fR, or \fBInsert\fR.
+Operate on the selected rectangular tracker block. Replace clears destination
+cells corresponding to empty clipboard cells, Merge writes only copied events,
+and Insert first opens enough rows before pasting.
 .TP
 .B Ins
-Insert one stepped row and move later events forward.
+Insert one stepped row and push later events forward.
 .TP
 .B Pull
 Delete one stepped row and pull later events backward.
 .TP
 .B Del
-Clear the current event or selected block without moving later rows.
+Clear the current event or selected block without shifting later rows.
 .TP
 .B Clear Row
-Clear all eight tracks on the current row.
+Clear all eight tracks on the current row, or the selected block.
 .TP
 .B Clear Pattern
-Clear the complete pattern for the current target.
+Remove the complete Pattern from the current target.
 .TP
 .B Undo and Redo
-Restore or reapply pattern edits. The editor keeps up to 64 snapshots for the
-current target and resets that history when the target changes or is reloaded.
+Restore or reapply Pattern edits. Up to 64 snapshots are kept for the current
+target. The local history is reset when the target changes or is reloaded.
+.SS PATTERN TRANSPORT
+When both Follow and Capture are off, clicking a row seeks the selected source
+to that frame. Dragging through rows updates the cursor and transport requests.
+Ctrl-click forces the transport request where the active mode permits it.
+Unseekable targets remain backend-authoritative.
 .SS PATTERN KEYBOARD CONTROLS
 .TP
 .B Cursor keys
-Move by one displayed row or one event track. Shift extends the block
-selection.
+Move by one displayed row or event track. Shift extends the block selection.
+Vertical movement also seeks when Follow and Capture are off.
 .TP
 .B Page Up, Page Down, Home, End
-Move through the pattern. Shift extends the selection.
+Move through the Pattern. Shift extends the selection.
 .TP
 .B Tab and Shift + Tab
 Move between V1 through V8.
@@ -452,36 +576,122 @@ Copy, cut, or paste the selected block.
 Undo or redo.
 .TP
 .B Ctrl + L, Ctrl + Shift + L
-Set the pattern loop from the selection, or clear the loop.
+Set the Pattern loop from the selection, or clear it.
 .TP
 .B Ctrl + Enter
-Seek the current source to the selected pattern row.
+Seek to the selected frame without starting playback.
 .TP
 .B Shift + Enter
-Seek to the selected row and start forward playback.
+Seek to the selected frame and start forward playback.
 .TP
 .B Escape
 Cancel inline editing or clear the current block selection.
-.SS HISTORY, PLAYBACK, AND PERSISTENCE
-The VIMS History lists pattern-safe commands newest first. Repeated
-consecutive commands are collapsed into one row with a use count. Drag a row
-onto a visible V1 through V8 cell, or double-click it or press Enter to place
-it at the current Pattern cursor. Right-click a history row to copy its raw
-command or clear the local history.
-.PP
-The editor follows forward and reverse playback and handles seeks without
-replaying the complete skipped range.
+.SS VIMS HISTORY AND PERSISTENCE
+VIMS History lists pattern-safe commands newest first. Consecutive repeats are
+collapsed into one row with a use count. Double-click a row or press Enter to
+place it at the current Pattern cursor. Drag it onto a visible V1 through V8
+cell for explicit placement. Right-click a history row to copy its raw command
+or clear the local history.
 .PP
 Pattern changes are automatically serialised and stored through the backend.
-The document includes sequence-cell patterns, whole-bank patterns, sample and
-stream patterns, enabled tracks, learning policy, paste mode, and loop ranges.
-It is reloaded when Reloaded reconnects or refreshes the sequence state.
+The saved document contains Slot Patterns, Bank Patterns, sample and stream
+Source Patterns, enabled tracks, Learn policy, paste mode, and loop ranges. It
+is reloaded when Reloaded reconnects or refreshes sequence state.
+.SH MULTITRACK EDIT
+MultiTrack Edit presents several connected VeeJay instances as aligned video
+tracks. It combines connection topology, per-instance status and previews, a
+shared project timeline, track VIMS events, drift information, and an A/B
+switcher. It does not merge the instances into one Reloaded process; each lane
+continues to represent a separate backend connection.
+.SS CONNECTION ROLES AND VIDEO TRACKS
+The topology strip identifies whether Reloaded is connected to a master output,
+a preview/editor instance with an upstream master, a standalone instance, or a
+backend that does not report its upstream role. It also reports VIMS forwarding
+state where available.
 .PP
-The Sequence editor mirrors Pattern state with source and cell corner markers,
-an amber Hold Frame dot, and \fBS\fR, \fBC\fR, and \fBS+C\fR labels where
-space permits. Complete bank patterns show \fBSEQ\fR or \fBSEQ H\fR badges.
-Automated slots therefore remain visible even when the Pattern page is not
-open.
+Each video-track header shows its host and port, source type and id, frame and
+length, speed, frame rate, loop mode, FX state, mute state, active sequence bank
+and slot, and clock drift. The lane preview is independent from on-air output.
+.TP
+.B Click a video-track header
+Select the video track for timeline and track operations.
+.TP
+.B Eye button
+Enable or disable only that lane's preview.
+.TP
+.B Switch button
+Move the main Reloaded controls to that connected VeeJay instance. The fixed
+project-master timeline and current A/B output remain unchanged.
+.PP
+The project master is the sequence clock and dry compositor source. It is
+distinct from the instance currently controlled by the main Reloaded panels and
+from VeeJay's command-line master-output role.
+.SS PROJECT TIMELINE
+The timeline displays the active Sequence Bank as project clips on the project
+master and aligned source activity on the follower lanes. During direct sample
+or Pattern playback, repeated material is drawn according to its loop type;
+ping-pong direction and random or normal repeats are indicated visually.
+Follower lanes also show their current source phase.
+.PP
+Live streams are represented as live timeline sources. When a stream exposes a
+trick-play buffer, the filled part of the buffer, total capacity, and current
+buffer position are shown. An unbuffered live stream is not presented as a
+finite, freely seekable clip.
+.TP
+.B Left click or drag the timeline
+Select the lane under the pointer and move the playhead. On release, seek the
+active transport when the backend marks that mode as seekable. Buffered stream
+seeks are mapped into the filled trick-play region. When seeking is unavailable,
+the timeline reports the reason and leaves playback backend-authoritative.
+.TP
+.B Mouse wheel
+Pan the visible project range.
+.TP
+.B Ctrl + mouse wheel
+Zoom around the pointer.
+.TP
+.B Minus, plus, Fit, zoom slider
+Zoom out, zoom in, fit the complete project, or choose a zoom level.
+.TP
+.B Project navigator
+Click the overview strip to centre the visible timeline window. The horizontal
+scrollbar pans a zoomed project.
+.SS TRACK VIMS EVENTS
+Drag a pattern-safe command from VIMS History onto a connected video-track lane
+to place a VIMS event at that project frame. Events are labelled on the lane;
+several events at the same frame are kept in execution order.
+.SS A/B SWITCHER
+Bus A is fixed to the Video 1 project master and dry compositor source. Select
+a connected non-master lane as Bus B. Bus labels and the ON AIR status identify
+the currently visible source.
+.TP
+.B Dissolve
+Blend from the on-air bus to the other assigned bus.
+.TP
+.B Shape Wipe
+Use a backend-advertised transition shape. Selecting this operator opens a
+thumbnail grid rather than a numeric pull-down. A random-shape entry is
+available, and Ctrl+F searches shapes by name or number.
+.TP
+.B Frames
+Set the TAKE duration from 1 through 1500 rendered output frames. Reloaded also
+shows the duration in seconds using the project frame rate.
+.TP
+.B CUT
+Switch immediately to the other assigned bus.
+.TP
+.B TAKE
+Run the selected transition operator for the configured duration.
+.PP
+Transition controls are disabled while a transition is active. The progress
+bar reports source, destination, operator, and completion percentage. While Bus
+B is on air, switch back to Bus A before assigning another Bus B source.
+.SS DRIFT LOCK
+Drift Lock preserves each follower's relative phase against the project-master
+clock. Small accumulated timing errors are nudged without forcing all sources
+to the same start frame. Same-rate lanes report drift in frames; mixed-rate
+lanes report milliseconds. Lane status indicates good, warning, or large drift
+and whether correction is active.
 .SH EFFECTS AND FX CHAIN
 The FX panel exposes the current effect chain and four effect lists: the main
 image/video list, mixing effects, Alpha / Matte effects, and the user-managed
@@ -852,8 +1062,11 @@ and progress controls are placed in the recording row below the sequence
 grids. Stopping the recording leaves Play Grid running until it is stopped
 separately.
 .SH MEDIA AND STREAM CREATION
-The Media panel lists Veejay's working directory. Double-clicking a row adds it
-as a sample.
+The Backend Media panel lists media files advertised by VeeJay. It shows the
+file name, type, and backend location, provides text filtering and refresh, and
+reports the number of available files. Double-clicking a row creates a sample.
+Drag a row into the Edit List timeline or segment list to append that file to
+the current Edit List.
 .PP
 The stream menu and input-stream dialog can create or open live input streams,
 YUV4MPEG streams, FFmpeg/AVFormat streams, solid streams, generators, and
@@ -891,8 +1104,9 @@ The VIMS History is a local, pattern-safe command log of up to 512 entries. It
 displays the VIMS id, a compact label, description, raw command, and repeat
 count. It is ordered newest first. Double-click a row or press Enter to insert
 it at the current Pattern cursor. Drag it to a visible Pattern cell for
-explicit placement. Right-click to copy the raw command or clear the history;
-the Clear button also removes all local history rows.
+explicit placement, or onto a connected MultiTrack Edit lane to create a track
+event at that project frame. Right-click to copy the raw command or clear the
+local history.
 .PP
 Macro controls can record, play, stop or reset VIMS-driven UI actions, delay
 the start of recording, select and clear macro banks, clear all recorded
