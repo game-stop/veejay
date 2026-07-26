@@ -56,6 +56,46 @@ static int gvr_vims_history_last_integer(const char *message, int fallback)
     return result;
 }
 
+static int gvr_vims_history_integer_argument(const char *message,
+                                             int index,
+                                             int fallback)
+{
+    const char *p;
+    int current = 0;
+
+    if(!message || index < 0)
+        return fallback;
+
+    p = strchr(message, ':');
+    if(!p)
+        return fallback;
+    p++;
+
+    while(*p && *p != ';') {
+        char *end = NULL;
+        long value;
+
+        while(*p && *p != ';' && g_ascii_isspace(*p))
+            p++;
+        if(!*p || *p == ';')
+            break;
+
+        value = strtol(p, &end, 10);
+        if(end == p) {
+            while(*p && *p != ';' && !g_ascii_isspace(*p))
+                p++;
+            continue;
+        }
+
+        if(current == index)
+            return (int)value;
+        current++;
+        p = end;
+    }
+
+    return fallback;
+}
+
 static void gvr_vims_history_format_label(int id,
                                           const char *message,
                                           char *label,
@@ -63,6 +103,14 @@ static void gvr_vims_history_format_label(int id,
 {
     int value = gvr_vims_history_last_integer(message, 0);
 
+    if(id == VIMS_VIDEO_TRANSITION_TAKE) {
+        int duration = gvr_vims_history_integer_argument(message, 1, 0);
+        if(duration <= 0)
+            g_strlcpy(label, "CUT", label_size);
+        else
+            g_snprintf(label, label_size, "TAKE %d", duration);
+        return;
+    }
     if(id == VIMS_SAMPLE_HOLD_FRAME) {
         g_snprintf(label, label_size, "HOLD %d", value);
         return;
@@ -117,6 +165,10 @@ static void gvr_vims_history_format_label(int id,
     }
     if(id == VIMS_VIDEO_GOTO_END) {
         g_strlcpy(label, "JUMP END", label_size);
+        return;
+    }
+    if(id == VIMS_VIDEO_SET_FRAME) {
+        g_snprintf(label, label_size, "FRAME %d", value);
         return;
     }
     if(id == VIMS_STREAM_BUFFER_SKIP_FRAME) {
@@ -598,7 +650,9 @@ static gboolean gvr_vims_history_button_press(GtkWidget *widget,
                                  view);
         g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
         gtk_widget_show_all(menu);
-        gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
+        gtk_menu_popup(GTK_MENU(menu),
+                       NULL, NULL, NULL, NULL,
+                       event->button, event->time);
         return TRUE;
     }
 

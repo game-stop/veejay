@@ -3221,7 +3221,8 @@ void vj_perform_setup_transition(veejay_t *info,
     int transition_shape = (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_shape(sample_id) : vj_tag_get_transition_shape(sample_id);
 
     if (transition_shape == -1) {
-        transition_shape = (int)(((double)shapewipe_get_num_shapes(settings->transition.ptr)) * rand() / RAND_MAX);
+        int shape_count = shapewipe_get_shape_count(settings->transition.ptr);
+        transition_shape = shape_count > 0 ? rand() % shape_count : 0;
     }
 
     int speed =
@@ -7136,6 +7137,386 @@ static void vj_perform_global_chain_sync(veejay_t *info, global_chain_t *g_chain
 }
 
 
+static sample_eff_chain *vj_perform_multitrack_layer_entry(veejay_t *info,
+                                                            int layer)
+{
+    if(!info || !info->multitrack_chain || layer < 0 || layer > 1)
+        return NULL;
+    return info->multitrack_chain->fx_chain[layer];
+}
+
+static int vj_perform_multitrack_opacity_effect_id(video_playback_setup *settings)
+{
+    int effect_id = settings ?
+        atomic_load_int(&settings->multitrack_opacity_effect_id) : -1;
+
+    if(effect_id > 0 && vje_is_valid(effect_id) &&
+       vje_get_num_params(effect_id) >= 1)
+        return effect_id;
+
+    for(effect_id = 1; effect_id < 4096; effect_id++) {
+        const char *description;
+
+        if(!vje_is_valid(effect_id) || vje_get_num_params(effect_id) < 1)
+            continue;
+
+        description = vje_get_description(effect_id);
+        if(description && strcmp(description, "Normal Overlay") == 0) {
+            if(settings)
+                atomic_store_int(&settings->multitrack_opacity_effect_id,
+                                 effect_id);
+            return effect_id;
+        }
+    }
+
+    return -1;
+}
+
+static void vj_perform_multitrack_set_layer(veejay_t *info,
+                                             int layer,
+                                             int stream_id,
+                                             int opacity,
+                                             int enabled,
+                                             int opacity_effect_id)
+{
+    sample_eff_chain *entry = vj_perform_multitrack_layer_entry(info, layer);
+    video_playback_setup *settings;
+    int num_params;
+
+    if(!entry || !info->settings || opacity_effect_id <= 0 ||
+       !vje_is_valid(opacity_effect_id))
+        return;
+
+    settings = info->settings;
+    if(opacity < 0)
+        opacity = 0;
+    else if(opacity > 255)
+        opacity = 255;
+
+    if(entry->effect_id != opacity_effect_id) {
+        if(entry->fx_instance)
+            vjert_del_fx(entry, 0, layer, 0);
+        entry->effect_id = opacity_effect_id;
+
+        num_params = vje_get_num_params(opacity_effect_id);
+        if(num_params > SAMPLE_MAX_PARAMETERS)
+            num_params = SAMPLE_MAX_PARAMETERS;
+        for(int i = 0; i < num_params; i++)
+            entry->arg[i] = vje_get_param_default(opacity_effect_id, i);
+    }
+
+    entry->arg[0] = opacity;
+    entry->beat_param_mask = 0;
+    entry->kf_status = 0;
+    entry->kf_type = 0;
+    entry->e_flag = enabled ? 1 : 0;
+    if(enabled) {
+        entry->source_type = VJ_TAG_TYPE_NET;
+        entry->channel = stream_id;
+    }
+    else {
+        entry->source_type = VJ_TAG_TYPE_NONE;
+        entry->channel = 0;
+    }
+
+    if(layer == 0) {
+        atomic_store_int(&settings->multitrack_layer0_stream_id,
+                         enabled ? stream_id : 0);
+        atomic_store_int(&settings->multitrack_layer0_opacity, opacity);
+    }
+    else {
+        atomic_store_int(&settings->multitrack_layer1_stream_id,
+                         enabled ? stream_id : 0);
+        atomic_store_int(&settings->multitrack_layer1_opacity, opacity);
+    }
+}
+
+static void vj_perform_multitrack_normalize_program(veejay_t *info)
+{
+    video_playback_setup *settings;
+    int program_stream_id;
+    int program_layer;
+    int opacity_effect_id;
+
+    if(!info || !info->settings || !info->multitrack_chain)
+        return;
+
+    settings = info->settings;
+    opacity_effect_id = vj_perform_multitrack_opacity_effect_id(settings);
+    if(opacity_effect_id <= 0) {
+        info->multitrack_chain->enabled = 0;
+        return;
+    }
+
+    program_stream_id = atomic_load_int(&settings->multitrack_program_stream_id);
+    program_layer = atomic_load_int(&settings->multitrack_program_layer);
+
+    if(program_layer == 0 && program_stream_id > 0 &&
+       vj_tag_exists(program_stream_id)) {
+        vj_perform_multitrack_set_layer(info, 0, program_stream_id, 255, 1,
+                                        opacity_effect_id);
+        vj_perform_multitrack_set_layer(info, 1, 0, 0, 0,
+                                        opacity_effect_id);
+        info->multitrack_chain->enabled = 1;
+    }
+    else if(program_layer == 1 && program_stream_id > 0 &&
+            vj_tag_exists(program_stream_id)) {
+        vj_perform_multitrack_set_layer(info, 0, 0, 0, 0,
+                                        opacity_effect_id);
+        vj_perform_multitrack_set_layer(info, 1, program_stream_id, 255, 1,
+                                        opacity_effect_id);
+        info->multitrack_chain->enabled = 1;
+    }
+    else {
+        vj_perform_multitrack_set_layer(info, 0, 0, 0, 0,
+                                        opacity_effect_id);
+        vj_perform_multitrack_set_layer(info, 1, 0, 0, 0,
+                                        opacity_effect_id);
+        atomic_store_int(&settings->multitrack_program_stream_id, 0);
+        atomic_store_int(&settings->multitrack_program_layer, -1);
+        info->multitrack_chain->enabled = 0;
+    }
+}
+
+static void vj_perform_multitrack_transition_finish(veejay_t *info)
+{
+    video_playback_setup *settings = info->settings;
+    int target_stream_id =
+        atomic_load_int(&settings->multitrack_transition_target_stream_id);
+    int target_layer =
+        atomic_load_int(&settings->multitrack_transition_target_layer);
+    int previous_stream_id =
+        atomic_load_int(&settings->multitrack_transition_from_stream_id);
+    int opacity_effect_id =
+        vj_perform_multitrack_opacity_effect_id(settings);
+
+    if(opacity_effect_id <= 0) {
+        atomic_store_int(&settings->multitrack_transition_active, 0);
+        info->multitrack_chain->enabled = 0;
+        return;
+    }
+
+    if(target_layer == 0 && target_stream_id > 0 &&
+       vj_tag_exists(target_stream_id)) {
+        vj_perform_multitrack_set_layer(info, 0, target_stream_id, 255, 1,
+                                        opacity_effect_id);
+        vj_perform_multitrack_set_layer(info, 1, 0, 0, 0,
+                                        opacity_effect_id);
+        info->multitrack_chain->enabled = 1;
+    }
+    else if(target_layer == 1 && target_stream_id > 0 &&
+            vj_tag_exists(target_stream_id)) {
+        vj_perform_multitrack_set_layer(info, 0, 0, 0, 0,
+                                        opacity_effect_id);
+        vj_perform_multitrack_set_layer(info, 1, target_stream_id, 255, 1,
+                                        opacity_effect_id);
+        info->multitrack_chain->enabled = 1;
+    }
+    else {
+        target_stream_id = 0;
+        target_layer = -1;
+        vj_perform_multitrack_set_layer(info, 0, 0, 0, 0,
+                                        opacity_effect_id);
+        vj_perform_multitrack_set_layer(info, 1, 0, 0, 0,
+                                        opacity_effect_id);
+        info->multitrack_chain->enabled = 0;
+    }
+
+    if(previous_stream_id > 0 && !vj_tag_exists(previous_stream_id))
+        previous_stream_id = 0;
+
+    atomic_store_int(&settings->multitrack_program_stream_id,
+                     target_stream_id);
+    atomic_store_int(&settings->multitrack_program_layer, target_layer);
+    atomic_store_int(&settings->multitrack_preview_stream_id,
+                     previous_stream_id);
+    atomic_store_int(&settings->multitrack_transition_active, 0);
+    atomic_store_int(&settings->multitrack_transition_elapsed, 0);
+    atomic_store_int(&settings->multitrack_transition_progress, 255);
+    atomic_store_int(&settings->multitrack_transition_layer, -1);
+    atomic_store_int(&settings->multitrack_transition_target_layer, -1);
+    atomic_store_int(&settings->multitrack_transition_effect_id,
+                     opacity_effect_id);
+    atomic_store_int(&settings->multitrack_transition_method,
+                     VJ_MULTITRACK_TRANSITION_DISSOLVE);
+    atomic_store_int(&settings->multitrack_transition_direction, 0);
+}
+
+static void vj_perform_multitrack_transition_tick(veejay_t *info)
+{
+    video_playback_setup *settings;
+    sample_eff_chain *entry;
+    int layer;
+    int target_stream_id;
+    int from_stream_id;
+    int effect_id;
+    int method;
+    int duration;
+    int elapsed;
+    int start_value;
+    int target_value;
+    int value;
+    int value_max;
+    int progress;
+    long long numerator;
+
+    if(!info || !info->settings || !info->multitrack_chain)
+        return;
+
+    settings = info->settings;
+    if(!atomic_load_int(&settings->multitrack_transition_active)) {
+        int program_stream_id =
+            atomic_load_int(&settings->multitrack_program_stream_id);
+        int program_layer =
+            atomic_load_int(&settings->multitrack_program_layer);
+
+        if(program_stream_id > 0 &&
+           (program_layer < 0 || program_layer > 1 ||
+            !vj_tag_exists(program_stream_id))) {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "On-air unicast stream %d disappeared; returning to the master output",
+                       program_stream_id);
+            atomic_store_int(&settings->multitrack_preview_stream_id, 0);
+            vj_perform_multitrack_normalize_program(info);
+        }
+        return;
+    }
+
+    layer = atomic_load_int(&settings->multitrack_transition_layer);
+    target_stream_id =
+        atomic_load_int(&settings->multitrack_transition_target_stream_id);
+    from_stream_id =
+        atomic_load_int(&settings->multitrack_transition_from_stream_id);
+    effect_id = atomic_load_int(&settings->multitrack_transition_effect_id);
+    method = atomic_load_int(&settings->multitrack_transition_method);
+    if(method != VJ_MULTITRACK_TRANSITION_SHAPE_WIPE)
+        method = VJ_MULTITRACK_TRANSITION_DISSOLVE;
+    entry = vj_perform_multitrack_layer_entry(info, layer);
+
+    if(target_stream_id > 0 && !vj_tag_exists(target_stream_id)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Target unicast stream %d disappeared; cancelling the transition",
+                   target_stream_id);
+        atomic_store_int(&settings->multitrack_transition_active, 0);
+        atomic_store_int(&settings->multitrack_transition_progress, 0);
+        atomic_store_int(&settings->multitrack_transition_layer, -1);
+        atomic_store_int(&settings->multitrack_transition_target_layer, -1);
+        atomic_store_int(&settings->multitrack_preview_stream_id, 0);
+        vj_perform_multitrack_normalize_program(info);
+        return;
+    }
+
+    if(from_stream_id > 0 && !vj_tag_exists(from_stream_id)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "On-air unicast stream %d disappeared during TAKE; completing to the target source",
+                   from_stream_id);
+        vj_perform_multitrack_transition_finish(info);
+        return;
+    }
+
+    if(layer < 0 || layer > 1 || !entry || effect_id <= 0 ||
+       entry->effect_id != effect_id) {
+        atomic_store_int(&settings->multitrack_transition_active, 0);
+        atomic_store_int(&settings->multitrack_transition_progress, 0);
+        atomic_store_int(&settings->multitrack_transition_layer, -1);
+        atomic_store_int(&settings->multitrack_transition_target_layer, -1);
+        atomic_store_int(&settings->multitrack_preview_stream_id, 0);
+        vj_perform_multitrack_normalize_program(info);
+        return;
+    }
+
+    duration = atomic_load_int(&settings->multitrack_transition_duration);
+    elapsed = atomic_load_int(&settings->multitrack_transition_elapsed) + 1;
+    start_value =
+        atomic_load_int(&settings->multitrack_transition_start_opacity);
+    target_value =
+        atomic_load_int(&settings->multitrack_transition_target_opacity);
+    value_max = method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE ? 256 : 255;
+
+    if(duration <= 1 || elapsed >= duration) {
+        value = target_value;
+        progress = 255;
+        elapsed = duration > 0 ? duration : 1;
+    }
+    else {
+        numerator = (long long)(target_value - start_value) * elapsed;
+        numerator += numerator >= 0 ? duration / 2 : -(duration / 2);
+        value = start_value + (int)(numerator / duration);
+        progress = (int)(((long long)elapsed * 255 + duration / 2) / duration);
+    }
+
+    if(value < 0)
+        value = 0;
+    else if(value > value_max)
+        value = value_max;
+    if(progress < 0)
+        progress = 0;
+    else if(progress > 255)
+        progress = 255;
+
+    if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+        entry->arg[1] = value;
+    }
+    else {
+        entry->arg[0] = value;
+        if(layer == 0)
+            atomic_store_int(&settings->multitrack_layer0_opacity, value);
+        else
+            atomic_store_int(&settings->multitrack_layer1_opacity, value);
+    }
+
+    atomic_store_int(&settings->multitrack_transition_progress, progress);
+    atomic_store_int(&settings->multitrack_transition_elapsed, elapsed);
+
+    if(progress >= 255 || value == target_value || elapsed >= duration)
+        vj_perform_multitrack_transition_finish(info);
+}
+
+static void vj_perform_multitrack_render(veejay_t *info,
+                                          performer_t *p,
+                                          vjp_kf *effect_info,
+                                          int *hint444,
+                                          VJFrame *f0,
+                                          VJFrame *f1,
+                                          int source_id,
+                                          int source_mode,
+                                          vjp_kf *setup)
+{
+    VJFrame *frames[2] = { f0, f1 };
+    int saved_fade_entry;
+
+    if(!info || !p || !info->multitrack_chain ||
+       !info->multitrack_chain->enabled)
+        return;
+
+    saved_fade_entry = p->pvar_.fade_entry;
+    p->pvar_.fade_entry = -1;
+    setup->ref = source_id;
+    for(int layer = 0; layer < 2; layer++) {
+        sample_eff_chain *entry = info->multitrack_chain->fx_chain[layer];
+
+        if(!entry || !entry->e_flag || entry->effect_id <= 0)
+            continue;
+
+        frames[1]->data[0] = p->frame_buffer[layer]->Y;
+        frames[1]->data[1] = p->frame_buffer[layer]->Cb;
+        frames[1]->data[2] = p->frame_buffer[layer]->Cr;
+        frames[1]->data[3] = p->frame_buffer[layer]->alpha;
+
+        if(source_mode == VJ_PLAYBACK_MODE_TAG)
+            vj_perform_tag_render_chain_entry(info, p, effect_info,
+                                              source_id, source_mode,
+                                              entry, layer, frames, 0);
+        else
+            vj_perform_render_chain_entry(info, p, effect_info,
+                                          source_id, source_mode,
+                                          entry, layer, frames, 0);
+    }
+
+    *hint444 = frames[0]->ssm;
+    p->pvar_.fade_entry = saved_fade_entry;
+}
+
 static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, vjp_kf *effect_info, int *hint444,
     VJFrame *f0, VJFrame *f1, int sample_id, int pm, vjp_kf *setup, sample_eff_chain **chain, sample_info *si)
 {
@@ -7144,7 +7525,6 @@ static void vj_perform_sample_complete_buffers(veejay_t * info,performer_t *p, v
     frames[0] = f0;
     frames[1] = f1;
     setup->ref = sample_id;
-
 
     if(p->pvar_.fader_active || p->pvar_.fade_value > 0 || p->pvar_.fade_alpha ) {
         if( p->pvar_.fade_entry == -1 ) {
@@ -7175,7 +7555,6 @@ static void vj_perform_tag_complete_buffers(veejay_t * info, performer_t *p,vjp_
     frames[0] = f0;
     frames[1] = f1;
     setup->ref = sample_id;
-
 
     if( p->pvar_.fader_active || p->pvar_.fade_value >0 || p->pvar_.fade_alpha) {
         if( p->pvar_.fade_entry == -1 ) {
@@ -16991,7 +17370,11 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
                 }
             }
 
-            vj_perform_finish_chain( info,p,a,sample_id,source_type );
+            vj_perform_finish_chain(info, p, a, sample_id, source_type);
+
+            vj_perform_multitrack_transition_tick(info);
+            vj_perform_multitrack_render(info, p, effect_info, &is444,
+                                         a, b, sample_id, source_type, setup);
 
             break;
 
@@ -17000,7 +17383,9 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
             if( info->settings->offline_record )
                 p->pvar_.enc_active = 1;
 
-
+            vj_perform_multitrack_transition_tick(info);
+            vj_perform_multitrack_render(info, p, effect_info, &is444,
+                                         a, b, sample_id, source_type, setup);
             break;
         case VJ_PLAYBACK_MODE_TAG:
 
@@ -17060,7 +17445,11 @@ void vj_perform_render_video_frames(veejay_t *info, performer_t *p, vjp_kf *effe
                 }
             }
 
-            vj_perform_finish_chain( info,p,a,sample_id,source_type );
+            vj_perform_finish_chain(info, p, a, sample_id, source_type);
+
+            vj_perform_multitrack_transition_tick(info);
+            vj_perform_multitrack_render(info, p, effect_info, &is444,
+                                         a, b, sample_id, source_type, setup);
 
             break;
         default:

@@ -26,5 +26,6 @@ int shapewipe_ready(void *ptr, int w, int h);
 void shapewipe_free(void *ptr);
 void shapewipe_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
 int shapewipe_get_num_shapes(void *ptr);
+int shapewipe_get_shape_count(void *ptr);
 int shapewipe_process( void *ptr, VJFrame *frame, VJFrame *frame2,double timecode, int shape, int threshold, int direction, int automatic);
 #endif

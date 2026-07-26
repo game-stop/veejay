@@ -2358,3 +2358,228 @@ button.record-stop-button {
     border-color: @slot-playing-color;
     box-shadow: inset 0 0 0 1px @slot-playing-color;
 }
+
+/* Multi-instance sequence timeline */
+.multi-track-edit {
+    background-color: @bg-color;
+    border: 1px solid @border-color;
+    padding: 3px;
+}
+
+.multi-track-summary,
+.multi-track-controls,
+.multi-track-ruler-spacer {
+    background-color: @panel-color;
+    border-bottom: 1px solid @border-color;
+    padding: 3px 5px;
+}
+
+.multi-track-header {
+    background-color: @panel-color;
+    border-bottom: 1px solid @border-color;
+    border-right: 1px solid @border-color;
+}
+
+.multi-track-header:hover {
+    background-color: @hover-color;
+}
+
+.multi-track-header.multi-track-selected {
+    background-color: @fill-color;
+    border-left: 3px solid @knob-color;
+}
+
+.multi-track-header.multi-track-master {
+    background-color: #3a321d;
+    border-left: 4px solid @warn-color;
+    border-top: 1px solid @warn-color;
+}
+
+.multi-track-header.multi-track-master.multi-track-selected {
+    background-color: #464024;
+    border-left-color: @warn-color;
+}
+
+.multi-track-header.multi-track-current {
+    background-color: @slot-playing-bg;
+    border-right: 3px solid @slot-playing-color;
+}
+
+.multi-track-header.multi-track-master.multi-track-current {
+    background-color: #46301a;
+    border-left: 4px solid @warn-color;
+    border-right: 3px solid @slot-playing-color;
+}
+
+.multi-track-status {
+    color: @text-muted;
+    font-size: 88%;
+}
+
+
+button.multi-track-preview-toggle {
+    padding: 0;
+    margin: 0;
+}
+
+button.multi-track-preview-toggle:checked {
+    color: @text-color;
+}
+
+button.multi-track-switch {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    margin: 0;
+    border-radius: 1px;
+}
+
+button.multi-track-switch:disabled {
+    background-color: @slot-playing-bg;
+    border-color: @slot-playing-color;
+    color: @text-color;
+}
+
+/* A/B transition bus */
+.multi-track-transition-root {
+    background-color: shade(@panel-color, 0.90);
+    border: 1px solid @border-color;
+    border-radius: 3px;
+    padding: 4px 6px 3px 6px;
+}
+
+.multi-track-transition-bar {
+    min-height: 30px;
+}
+
+.multi-track-transition-title {
+    color: @text-muted;
+    font-weight: bold;
+    letter-spacing: 0.7px;
+    padding-right: 4px;
+}
+
+.multi-track-transition-a,
+.multi-track-transition-b,
+.multi-track-transition-method {
+    border: 1px solid @border-color;
+    border-radius: 3px;
+    padding: 3px 7px;
+    font-weight: bold;
+}
+
+.multi-track-transition-a {
+    background-color: #27445d;
+    border-color: #4d86ae;
+}
+
+.multi-track-transition-b {
+    background-color: #56362a;
+    border-color: #b36c4e;
+}
+
+.multi-track-transition-method {
+    background-color: shade(@panel-color, 1.12);
+    color: @text-muted;
+    font-weight: normal;
+}
+
+.multi-track-transition-time,
+.multi-track-transition-status {
+    color: @text-muted;
+    font-size: 88%;
+}
+
+.multi-track-transition-status {
+    padding-left: 3px;
+}
+
+button.multi-track-transition-take {
+    min-width: 68px;
+    min-height: 27px;
+    padding: 2px 8px;
+    background-color: #8d3d25;
+    border-color: #d66c45;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+button.multi-track-transition-take:hover {
+    background-color: #a94b2d;
+}
+
+button.multi-track-transition-cut {
+    min-width: 54px;
+    min-height: 27px;
+    padding: 2px 6px;
+    font-weight: bold;
+}
+
+.multi-track-transition-progress {
+    min-height: 20px;
+    border-radius: 3px;
+}
+
+.multi-track-transition-progress progress {
+    background-color: #b36c4e;
+}
+
+.multi-track-transition-progress.multi-track-transition-active {
+    border-color: @slot-playing-color;
+    box-shadow: inset 0 0 0 1px alpha(@slot-playing-color, 0.45);
+}
+
+.multi-track-lane-actions {
+    margin: 1px 0 0 0;
+    padding: 0;
+}
+
+button.multi-track-role-a,
+button.multi-track-role-b,
+button.multi-track-preview-toggle {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+    margin: 0;
+    border-radius: 1px;
+    font-weight: bold;
+}
+
+button.multi-track-role-a:checked {
+    background-color: #27445d;
+    border-color: #4d86ae;
+    color: #ffffff;
+}
+
+button.multi-track-role-b:checked {
+    background-color: #56362a;
+    border-color: #b36c4e;
+    color: #ffffff;
+}
+
+button.multi-track-preview-toggle image,
+button.multi-track-switch image {
+    min-width: 14px;
+    min-height: 14px;
+}
+
+.multi-track-drift-good {
+    color: #81c784;
+}
+
+.multi-track-drift-warn {
+    color: #e6b85c;
+}
+
+.multi-track-drift-bad {
+    color: #ef7d6c;
+}
+
+.multi-track-transition-controls {
+    padding: 2px 4px 3px 4px;
+    min-height: 26px;
+}
+
+.multi-track-transition-controls > label {
+    opacity: 0.82;
+}

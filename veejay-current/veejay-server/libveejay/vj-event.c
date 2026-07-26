@@ -34,6 +34,7 @@
 #endif
 #include <stdarg.h>
 #include <signal.h>
+#include <time.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/hash.h>
 #include <libvje/vje.h>
@@ -650,6 +651,7 @@ static int vj_sequence_selected_duration(veejay_t *v);
 static void vj_event_release_beat_transport_for_source_switch(veejay_t *v);
 static void vj_event_rearm_sequence_transition(veejay_t *v);
 
+
 static int vj_sequence_pattern_payload_valid(const char *data, size_t data_len)
 {
     if(!data)
@@ -1134,6 +1136,9 @@ struct {
 #endif
     { VIMS_BUNDLE_FILE },
     { VIMS_BUNDLE_SAVE },
+    { VIMS_VIDEO_SYNC_START },
+    { VIMS_VIDEO_TRANSITION_TAKE },
+    { VIMS_VIDEO_SYNC_ADJUST },
 
     { VIMS_AUDIO_SYNC_STATUS },
     { VIMS_AUDIO_SYNC_MODE },
@@ -4761,9 +4766,24 @@ static void vj_event_audio_beat_user_transport_override(veejay_t *v, int request
 #endif
 }
 
+static int vj_event_sync_start_cancel(veejay_t *v)
+{
+    if(!v || !v->settings)
+        return 0;
+    return atomic_exchange_int(&v->settings->sync_start_armed, 0);
+}
+
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
 {
     veejay_t *v = (veejay_t*) ptr;
+    int canceled_sync_start = vj_event_sync_start_cancel(v);
+
+    if(canceled_sync_start && v && v->settings &&
+       v->settings->current_playback_speed == 0) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Canceled synchronized playback start; video remains paused");
+        return;
+    }
 
     if(STREAM_PLAYING(v))
     {
@@ -4843,6 +4863,14 @@ void vj_event_set_freeze(void *ptr, const char format[], va_list ap)
 void vj_event_play_stop_all(void *ptr, const char format[], va_list ap) 
 {
     veejay_t *v = (veejay_t*) ptr;
+    int canceled_sync_start = vj_event_sync_start_cancel(v);
+
+    if(canceled_sync_start && v && v->settings &&
+       v->settings->current_playback_speed == 0) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Canceled synchronized playback start; video remains paused");
+        return;
+    }
 
     if(STREAM_PLAYING(v))
     {
@@ -4934,6 +4962,8 @@ void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
     if (!v->settings)
         return;
 
+    vj_event_sync_start_cancel(v);
+
     if (STREAM_PLAYING(v))
     {
         if(!vj_event_stream_buffer_require(v))
@@ -4998,6 +5028,8 @@ void vj_event_play_forward(void *ptr, const char format[], va_list ap)
     if (!v->settings)
         return;
 
+    vj_event_sync_start_cancel(v);
+
     if (STREAM_PLAYING(v))
     {
         if(!vj_event_stream_buffer_require(v))
@@ -5050,6 +5082,7 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
+    vj_event_sync_start_cancel(v);
 
     if(STREAM_PLAYING(v))
     {
@@ -5103,6 +5136,7 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
 {
     int args[2];
     veejay_t *v = (veejay_t*) ptr;
+    vj_event_sync_start_cancel(v);
 
     if(STREAM_PLAYING(v))
     {
@@ -5186,6 +5220,7 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
+    vj_event_sync_start_cancel(v);
 
     if(STREAM_PLAYING(v))
     {
@@ -5221,6 +5256,7 @@ void vj_event_set_frame_percentage(void *ptr, const char format[], va_list ap)
 {
     int args[1];
     veejay_t *v = (veejay_t*) ptr;
+    vj_event_sync_start_cancel(v);
 
     P_A(args,sizeof(args),NULL,0,format,ap);
 
@@ -5545,6 +5581,7 @@ void vj_event_sample_end(void *ptr, const char format[], va_list ap)
 void vj_event_goto_end(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
+    vj_event_sync_start_cancel(v);
     if(STREAM_PLAYING(v))
     {
         if(!vj_event_stream_buffer_require(v))
@@ -5575,9 +5612,8 @@ void vj_event_goto_end(void *ptr, const char format[], va_list ap)
     }
 }
 
-void vj_event_goto_start(void *ptr, const char format[], va_list ap)
+static void vj_event_goto_start_now(veejay_t *v)
 {
-    veejay_t *v = (veejay_t*) ptr;
     if(STREAM_PLAYING(v))
     {
         if(!vj_event_stream_buffer_require(v))
@@ -5588,20 +5624,620 @@ void vj_event_goto_start(void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_INFO, "Buffered stream goto oldest frame");
         return;
     }
-    if( SAMPLE_PLAYING(v))
+    if(SAMPLE_PLAYING(v))
     {
         long target_frame = sample_get_startFrame(v->uc->sample_id);
         veejay_set_frame(v, target_frame);
 #ifdef HAVE_JACK
         vj_event_sample_audio_sync_seek_rearm_current(v, target_frame, "goto-start");
 #endif
-        veejay_msg(VEEJAY_MSG_INFO, "Goto sample's starting position"); 
+        veejay_msg(VEEJAY_MSG_INFO, "Goto sample's starting position");
     }
-    if ( PLAIN_PLAYING(v))
+    if(PLAIN_PLAYING(v))
     {
-        veejay_set_frame(v,0);
+        veejay_set_frame(v, 0);
         veejay_msg(VEEJAY_MSG_INFO, "Goto first frame of edit decision list");
     }
+}
+
+void vj_event_goto_start(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    (void)format;
+    (void)ap;
+    vj_event_sync_start_cancel(v);
+    vj_event_goto_start_now(v);
+}
+
+static int vj_event_multitrack_effect_id(const char *name, int min_params)
+{
+    if(!name)
+        return -1;
+
+    for(int effect_id = 1; effect_id < 4096; effect_id++) {
+        const char *description;
+
+        if(!vje_is_valid(effect_id) ||
+           vje_get_num_params(effect_id) < min_params)
+            continue;
+
+        description = vje_get_description(effect_id);
+        if(description && strcmp(description, name) == 0)
+            return effect_id;
+    }
+
+    return -1;
+}
+
+static int vj_event_multitrack_opacity_effect_id(void)
+{
+    static int opacity_effect_id = -1;
+
+    if(opacity_effect_id > 0 && vje_is_valid(opacity_effect_id))
+        return opacity_effect_id;
+
+    opacity_effect_id = vj_event_multitrack_effect_id("Normal Overlay", 1);
+    return opacity_effect_id;
+}
+
+static int vj_event_multitrack_shape_effect_id(void)
+{
+    static int shape_effect_id = -1;
+
+    if(shape_effect_id > 0 && vje_is_valid(shape_effect_id))
+        return shape_effect_id;
+
+    shape_effect_id = vj_event_multitrack_effect_id("Shape Wipe", 4);
+    return shape_effect_id;
+}
+
+static sample_eff_chain *vj_event_multitrack_layer_entry(veejay_t *v,
+                                                          int layer)
+{
+    if(!v || !v->multitrack_chain || layer < 0 || layer > 1)
+        return NULL;
+    return v->multitrack_chain->fx_chain[layer];
+}
+
+static int vj_event_multitrack_configure_effect_layer(veejay_t *v,
+                                                       int layer,
+                                                       int stream_id,
+                                                       int effect_id,
+                                                       const int *args,
+                                                       int n_args,
+                                                       int enabled,
+                                                       int opacity_state)
+{
+    sample_eff_chain *entry = vj_event_multitrack_layer_entry(v, layer);
+    int num_params;
+
+    if(!entry || effect_id <= 0 || !vje_is_valid(effect_id))
+        return 0;
+
+    if(entry->effect_id != effect_id) {
+        if(entry->fx_instance)
+            vjert_del_fx(entry, 0, layer, 0);
+        entry->effect_id = effect_id;
+    }
+
+    num_params = vje_get_num_params(effect_id);
+    if(num_params > SAMPLE_MAX_PARAMETERS)
+        num_params = SAMPLE_MAX_PARAMETERS;
+    for(int i = 0; i < num_params; i++)
+        entry->arg[i] = vje_get_param_default(effect_id, i);
+    if(args) {
+        if(n_args > num_params)
+            n_args = num_params;
+        for(int i = 0; i < n_args; i++)
+            entry->arg[i] = args[i];
+    }
+
+    entry->beat_param_mask = 0;
+    entry->kf_status = 0;
+    entry->kf_type = 0;
+    entry->e_flag = enabled ? 1 : 0;
+
+    if(enabled) {
+        entry->source_type = VJ_TAG_TYPE_NET;
+        entry->channel = stream_id;
+    }
+    else {
+        entry->source_type = VJ_TAG_TYPE_NONE;
+        entry->channel = 0;
+    }
+
+    opacity_state = opacity_state < 0 ? 0 :
+                    (opacity_state > 255 ? 255 : opacity_state);
+    if(layer == 0) {
+        atomic_store_int(&v->settings->multitrack_layer0_stream_id,
+                         enabled ? stream_id : 0);
+        atomic_store_int(&v->settings->multitrack_layer0_opacity,
+                         opacity_state);
+    }
+    else {
+        atomic_store_int(&v->settings->multitrack_layer1_stream_id,
+                         enabled ? stream_id : 0);
+        atomic_store_int(&v->settings->multitrack_layer1_opacity,
+                         opacity_state);
+    }
+
+    return 1;
+}
+
+static int vj_event_multitrack_configure_opacity_layer(veejay_t *v,
+                                                        int layer,
+                                                        int stream_id,
+                                                        int opacity,
+                                                        int enabled,
+                                                        int opacity_effect_id)
+{
+    int args[1] = { opacity };
+
+    return vj_event_multitrack_configure_effect_layer(v,
+                                                       layer,
+                                                       stream_id,
+                                                       opacity_effect_id,
+                                                       args,
+                                                       1,
+                                                       enabled,
+                                                       opacity);
+}
+
+static int vj_event_multitrack_configure_shape_layer(veejay_t *v,
+                                                      int layer,
+                                                      int stream_id,
+                                                      int shape,
+                                                      int threshold,
+                                                      int direction,
+                                                      int shape_effect_id)
+{
+    int args[8] = {
+        shape,
+        threshold,
+        direction ? 1 : 0,
+        0,
+        0,
+        0,
+        0,
+        0
+    };
+
+    return vj_event_multitrack_configure_effect_layer(v,
+                                                       layer,
+                                                       stream_id,
+                                                       shape_effect_id,
+                                                       args,
+                                                       8,
+                                                       1,
+                                                       255);
+}
+
+static void vj_event_multitrack_finish_cut(veejay_t *v,
+                                           int target_stream_id,
+                                           int target_layer,
+                                           int previous_stream_id,
+                                           int opacity_effect_id)
+{
+    video_playback_setup *settings = v->settings;
+
+    if(target_layer == 0) {
+        vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                    target_stream_id,
+                                                    255, 1,
+                                                    opacity_effect_id);
+        vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                    0, 0, 0,
+                                                    opacity_effect_id);
+        v->multitrack_chain->enabled = 1;
+    }
+    else if(target_layer == 1) {
+        vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                    0, 0, 0,
+                                                    opacity_effect_id);
+        vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                    target_stream_id,
+                                                    255, 1,
+                                                    opacity_effect_id);
+        v->multitrack_chain->enabled = 1;
+    }
+    else {
+        vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                    0, 0, 0,
+                                                    opacity_effect_id);
+        vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                    0, 0, 0,
+                                                    opacity_effect_id);
+        v->multitrack_chain->enabled = 0;
+        target_stream_id = 0;
+        target_layer = -1;
+    }
+
+    atomic_store_int(&settings->multitrack_transition_active, 0);
+    atomic_store_int(&settings->multitrack_transition_elapsed, 0);
+    atomic_store_int(&settings->multitrack_transition_progress, 255);
+    atomic_store_int(&settings->multitrack_transition_layer, -1);
+    atomic_store_int(&settings->multitrack_transition_target_layer, -1);
+    atomic_store_int(&settings->multitrack_program_stream_id,
+                     target_stream_id);
+    atomic_store_int(&settings->multitrack_program_layer, target_layer);
+    if(previous_stream_id > 0 && !vj_tag_exists(previous_stream_id))
+        previous_stream_id = 0;
+    atomic_store_int(&settings->multitrack_preview_stream_id,
+                     previous_stream_id);
+    atomic_store_int(&settings->multitrack_transition_target_stream_id,
+                     target_stream_id);
+}
+
+void vj_event_multitrack_transition_take(void *ptr,
+                                         const char format[],
+                                         va_list ap)
+{
+    veejay_t *v = (veejay_t *)ptr;
+    video_playback_setup *settings;
+    int args[4] = { 0, 0, VJ_MULTITRACK_TRANSITION_DISSOLVE, 0 };
+    int target_stream_id;
+    int duration;
+    int method;
+    int shape;
+    int opacity_effect_id;
+    int shape_effect_id = -1;
+    int transition_effect_id;
+    int program_stream_id;
+    int program_layer;
+    int target_layer = -1;
+    int transition_layer = -1;
+    int transition_direction = 1;
+    int start_value = 0;
+    int target_value = 0;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(!v || !v->settings || !v->multitrack_chain)
+        return;
+
+    settings = v->settings;
+    target_stream_id = args[0];
+    duration = args[1];
+    method = args[2];
+    shape = args[3];
+
+    if(method != VJ_MULTITRACK_TRANSITION_SHAPE_WIPE)
+        method = VJ_MULTITRACK_TRANSITION_DISSOLVE;
+    if(target_stream_id < 0)
+        target_stream_id = 0;
+    if(target_stream_id > 0) {
+        if(!vj_tag_exists(target_stream_id) ||
+           vj_tag_get_type(target_stream_id) != VJ_TAG_TYPE_NET) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Cannot take target source: stream %d is not a unicast network source",
+                       target_stream_id);
+            return;
+        }
+    }
+
+    if(atomic_load_int(&settings->multitrack_transition_active)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot start another A/B transition while one is active");
+        return;
+    }
+
+    opacity_effect_id = vj_event_multitrack_opacity_effect_id();
+    if(opacity_effect_id <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot transition: the Normal Overlay effect is unavailable");
+        return;
+    }
+
+    if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+        int max_shape;
+
+        shape_effect_id = vj_event_multitrack_shape_effect_id();
+        if(shape_effect_id <= 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Cannot transition: the Shape Wipe effect is unavailable");
+            return;
+        }
+
+        max_shape = (int)vje_get_param_max_limit(shape_effect_id, 0);
+        if(max_shape < 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Cannot transition: no Shape Wipe masks are available");
+            return;
+        }
+        if(shape < 0)
+            shape = rand() % (max_shape + 1);
+        else if(shape > max_shape)
+            shape = max_shape;
+    }
+    else {
+        shape = 0;
+    }
+
+    duration = duration < 0 ? 0 : (duration > 36000 ? 36000 : duration);
+    program_stream_id = atomic_load_int(&settings->multitrack_program_stream_id);
+    program_layer = atomic_load_int(&settings->multitrack_program_layer);
+    if(program_layer < -1 || program_layer > 1) {
+        program_layer = -1;
+        program_stream_id = 0;
+    }
+
+    if(target_stream_id == program_stream_id)
+        return;
+
+    atomic_store_int(&settings->multitrack_opacity_effect_id,
+                     opacity_effect_id);
+    atomic_store_int(&settings->multitrack_transition_method, method);
+    atomic_store_int(&settings->multitrack_transition_shape, shape);
+
+    if(duration <= 1) {
+        if(target_stream_id <= 0)
+            target_layer = -1;
+        else if(program_layer == 0)
+            target_layer = 1;
+        else
+            target_layer = 0;
+
+        vj_event_multitrack_finish_cut(v,
+                                       target_stream_id,
+                                       target_layer,
+                                       program_stream_id,
+                                       opacity_effect_id);
+        v->uc->chain_changed = 1;
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Cut on-air output from %s to %s",
+                   program_stream_id > 0 ? "unicast source" : "master",
+                   target_stream_id > 0 ? "unicast source" : "master");
+        return;
+    }
+
+    transition_effect_id = method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE ?
+                           shape_effect_id : opacity_effect_id;
+
+    if(program_layer < 0) {
+        if(target_stream_id <= 0)
+            return;
+        target_layer = 0;
+        transition_layer = 0;
+        transition_direction = 1;
+        vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                    0, 0, 0,
+                                                    opacity_effect_id);
+        if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+            start_value = 0;
+            target_value = 256;
+            if(!vj_event_multitrack_configure_shape_layer(v, 0,
+                                                          target_stream_id,
+                                                          shape,
+                                                          start_value,
+                                                          transition_direction,
+                                                          shape_effect_id))
+                return;
+        }
+        else {
+            start_value = 0;
+            target_value = 255;
+            if(!vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                            target_stream_id,
+                                                            start_value, 1,
+                                                            opacity_effect_id))
+                return;
+        }
+    }
+    else if(program_layer == 0) {
+        if(target_stream_id <= 0) {
+            target_layer = -1;
+            transition_layer = 0;
+            transition_direction = 0;
+            vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                        0, 0, 0,
+                                                        opacity_effect_id);
+            if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+                start_value = 0;
+                target_value = 256;
+                if(!vj_event_multitrack_configure_shape_layer(v, 0,
+                                                              program_stream_id,
+                                                              shape,
+                                                              start_value,
+                                                              transition_direction,
+                                                              shape_effect_id))
+                    return;
+            }
+            else {
+                start_value = atomic_load_int(
+                    &settings->multitrack_layer0_opacity);
+                target_value = 0;
+                if(!vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                                program_stream_id,
+                                                                start_value, 1,
+                                                                opacity_effect_id))
+                    return;
+            }
+        }
+        else {
+            target_layer = 1;
+            transition_layer = 1;
+            transition_direction = 1;
+            if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+                start_value = 0;
+                target_value = 256;
+                if(!vj_event_multitrack_configure_shape_layer(v, 1,
+                                                              target_stream_id,
+                                                              shape,
+                                                              start_value,
+                                                              transition_direction,
+                                                              shape_effect_id))
+                    return;
+            }
+            else {
+                start_value = 0;
+                target_value = 255;
+                if(!vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                                target_stream_id,
+                                                                start_value, 1,
+                                                                opacity_effect_id))
+                    return;
+            }
+        }
+    }
+    else {
+        if(target_stream_id <= 0) {
+            target_layer = -1;
+            transition_layer = 1;
+            transition_direction = 0;
+            vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                        0, 0, 0,
+                                                        opacity_effect_id);
+            if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+                start_value = 0;
+                target_value = 256;
+                if(!vj_event_multitrack_configure_shape_layer(v, 1,
+                                                              program_stream_id,
+                                                              shape,
+                                                              start_value,
+                                                              transition_direction,
+                                                              shape_effect_id))
+                    return;
+            }
+            else {
+                start_value = atomic_load_int(
+                    &settings->multitrack_layer1_opacity);
+                target_value = 0;
+                if(!vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                                program_stream_id,
+                                                                start_value, 1,
+                                                                opacity_effect_id))
+                    return;
+            }
+        }
+        else {
+            target_layer = 0;
+            transition_layer = 1;
+            transition_direction = 0;
+            if(!vj_event_multitrack_configure_opacity_layer(v, 0,
+                                                            target_stream_id,
+                                                            255, 1,
+                                                            opacity_effect_id))
+                return;
+            if(method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE) {
+                start_value = 0;
+                target_value = 256;
+                if(!vj_event_multitrack_configure_shape_layer(v, 1,
+                                                              program_stream_id,
+                                                              shape,
+                                                              start_value,
+                                                              transition_direction,
+                                                              shape_effect_id))
+                    return;
+            }
+            else {
+                start_value = atomic_load_int(
+                    &settings->multitrack_layer1_opacity);
+                target_value = 0;
+                if(!vj_event_multitrack_configure_opacity_layer(v, 1,
+                                                                program_stream_id,
+                                                                start_value, 1,
+                                                                opacity_effect_id))
+                    return;
+            }
+        }
+    }
+
+    v->multitrack_chain->enabled = 1;
+    atomic_store_int(&settings->multitrack_transition_effect_id,
+                     transition_effect_id);
+    atomic_store_int(&settings->multitrack_transition_direction,
+                     transition_direction);
+    atomic_store_int(&settings->multitrack_transition_duration, duration);
+    atomic_store_int(&settings->multitrack_transition_elapsed, 0);
+    atomic_store_int(&settings->multitrack_transition_start_opacity,
+                     start_value);
+    atomic_store_int(&settings->multitrack_transition_target_opacity,
+                     target_value);
+    atomic_store_int(&settings->multitrack_transition_progress, 0);
+    atomic_store_int(&settings->multitrack_transition_layer,
+                     transition_layer);
+    atomic_store_int(&settings->multitrack_transition_target_layer,
+                     target_layer);
+    atomic_store_int(&settings->multitrack_transition_from_stream_id,
+                     program_stream_id);
+    atomic_store_int(&settings->multitrack_transition_target_stream_id,
+                     target_stream_id);
+    atomic_store_int(&settings->multitrack_preview_stream_id,
+                     target_stream_id);
+    atomic_store_int(&settings->multitrack_transition_active, 1);
+
+    v->uc->chain_changed = 1;
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Transitioning on-air output from %s to %s using %s%s",
+               program_stream_id > 0 ? "unicast source" : "master",
+               target_stream_id > 0 ? "unicast source" : "master",
+               method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE ?
+                   "Shape Wipe" : "Dissolve",
+               method == VJ_MULTITRACK_TRANSITION_SHAPE_WIPE ?
+                   " mask" : "");
+}
+
+void vj_event_play_sync_adjust(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t *)ptr;
+    int args[1];
+    int adjustment;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+    if(!v || !v->settings)
+        return;
+
+    adjustment = args[0];
+    if(adjustment < -4)
+        adjustment = -4;
+    else if(adjustment > 4)
+        adjustment = 4;
+
+    atomic_store_int(&v->settings->sync_adjust_frames, adjustment);
+}
+
+void vj_event_play_sync_start(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    video_playback_setup *settings;
+    int args[2];
+    long long target_us;
+    struct timespec now;
+    long long now_us;
+
+    if(!v || !v->settings)
+        return;
+
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+    if(args[0] <= 0 || args[1] < 0 || args[1] >= 1000000) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Invalid synchronized start timestamp %d.%06d",
+                   args[0],
+                   args[1]);
+        return;
+    }
+
+    settings = v->settings;
+    target_us = ((long long)args[0] * 1000000LL) + args[1];
+    clock_gettime(CLOCK_REALTIME, &now);
+    now_us = ((long long)now.tv_sec * 1000000LL) +
+             ((long long)now.tv_nsec / 1000LL);
+
+    if(target_us <= now_us)
+        target_us = now_us + 1000LL;
+
+    settings->previous_playback_speed = 1;
+    veejay_set_speed(v, 0, 0);
+    vj_event_goto_start_now(v);
+
+    atomic_store_long_long(&settings->sync_start_realtime_us, target_us);
+    atomic_store_int(&settings->sync_start_speed, 1);
+    atomic_store_int(&settings->sync_start_armed, 1);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Synchronized playback start armed for %d.%06d",
+               args[0],
+               args[1]);
 }
 
 void    vj_event_sample_rand_start( void *ptr, const char format[], va_list ap)
@@ -9682,6 +10318,45 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Video4Linux stream ");
 }
 
+static int vj_event_unicast_host_matches(const char *a, const char *b)
+{
+    const int a_loopback = a &&
+        (strcasecmp(a, "localhost") == 0 ||
+         strcmp(a, "127.0.0.1") == 0 ||
+         strcmp(a, "::1") == 0);
+    const int b_loopback = b &&
+        (strcasecmp(b, "localhost") == 0 ||
+         strcmp(b, "127.0.0.1") == 0 ||
+         strcmp(b, "::1") == 0);
+
+    if(!a || !b)
+        return 0;
+    return strcasecmp(a, b) == 0 || (a_loopback && b_loopback);
+}
+
+static int vj_event_find_unicast_stream(const char *hostname, int port)
+{
+    int highest;
+
+    if(!hostname || !hostname[0] || port <= 0)
+        return 0;
+
+    highest = vj_tag_highest();
+    for(int id = 1; id <= highest; id++) {
+        vj_tag *tag;
+
+        if(!vj_tag_exists(id) || vj_tag_get_type(id) != VJ_TAG_TYPE_NET)
+            continue;
+
+        tag = vj_tag_get(id);
+        if(tag && tag->video_channel == port &&
+           vj_event_unicast_host_matches(tag->source_name, hostname))
+            return id;
+    }
+
+    return 0;
+}
+
 void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -9698,6 +10373,16 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
             veejay_msg(0, "Try another port number, I am listening on this one");
             return;
         }
+    }
+
+    int existing_id = vj_event_find_unicast_stream(str, args[0]);
+    if(existing_id > 0) {
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Reusing existing unicast stream %d for %s:%d",
+                   existing_id,
+                   str,
+                   args[0]);
+        return;
     }
     
     int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, args[0],0);
@@ -12676,8 +13361,13 @@ void vj_event_send_track_list(void *ptr, const char format[], va_list ap)
                 vj_tag *tag = vj_tag_get(i);
                 if (tag->source_type == VJ_TAG_TYPE_NET)
                 {
-                    char space[270];
-                    snprintf(space, sizeof(space), "%s %d", tag->descr, tag->id);
+                    char space[320];
+                    snprintf(space,
+                             sizeof(space),
+                             "%s %d %d",
+                             tag->source_name,
+                             tag->video_channel,
+                             tag->id);
                     q = FORMAT_MSG(q, space);
                 }
             }
@@ -13552,9 +14242,18 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
     if (SAMPLE_PLAYING(v))
         n_frames = sample_max_video_length(v->uc->sample_id);
 
+    const int has_upstream_master =
+        !v->is_master &&
+        v->master_origin &&
+        v->master_origin[0] != '\0' &&
+        v->master_origin_port > 0;
+    const char *upstream_host = has_upstream_master ? v->master_origin : "-";
+    const char *samplelist_path =
+        v->action_file[1][0] != '\0' ? v->action_file[1] : "-";
+
     char info_msg[2048];
     snprintf(info_msg, sizeof(info_msg),
-             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d %d",
+             "%d %d %d %d %f %d %d %ld %d %ld %ld %d %d %d %s %d %d %d %d %.255s",
              el->video_width,
              el->video_height,
              el->video_inter,
@@ -13569,9 +14268,12 @@ void vj_event_send_video_information(void *ptr, const char format[], va_list ap)
              v->audio,
              v->settings->use_vims_mcast,
              atomic_load_int(&settings->transition.global_state),
-             v->action_file[1],
+             samplelist_path,
              atomic_load_int(&settings->audio_beat.enabled) ? 1 : 0,
-             v->is_master ? 1 : 0
+             v->is_master ? 1 : 0,
+             has_upstream_master,
+             has_upstream_master ? v->master_origin_port : 0,
+             upstream_host
             );
 
     char *s_print_buf = get_print_buf(strlen(info_msg) + 5);

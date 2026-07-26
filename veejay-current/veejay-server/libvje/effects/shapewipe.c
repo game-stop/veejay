@@ -405,14 +405,16 @@ static void shape_wipe_musical(shape_t *s,
     }
 }
 
-int shapewipe_get_num_shapes(void *ptr)
+int shapewipe_get_shape_count(void *ptr)
 {
     shape_t *s = (shape_t*)ptr;
+    return s && s->shapeidx > 0 ? s->shapeidx : 0;
+}
 
-    if(!s || s->shapeidx <= 0)
-        return 0;
-
-    return s->shapeidx - 1;
+int shapewipe_get_num_shapes(void *ptr)
+{
+    int count = shapewipe_get_shape_count(ptr);
+    return count > 0 ? count - 1 : 0;
 }
 
 int shapewipe_ready(void *ptr, int w, int h)

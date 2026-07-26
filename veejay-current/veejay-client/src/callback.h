@@ -94,4 +94,6 @@ void on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data );
 void on_timeline_cleared ( GtkWidget *widget, gpointer user_data );
 void on_timeline_audio_offset_changed ( GtkWidget *widget, gpointer user_data );
 
+
+void on_transition_shape_selected(GtkWidget *widget, gint shape, gpointer user_data);
 #endif

@@ -160,10 +160,10 @@ struct _GvrVimsPatternView {
     int selection_anchor_row;
     int selection_anchor_column;
     gboolean drag_selecting;
-    int last_fired_bank;
-    int last_fired_slot;
-    int last_fired_frame;
-    guint last_fired_mask;
+    int last_played_bank;
+    int last_played_slot;
+    int last_played_frame;
+    guint last_played_mask;
     int live_bank;
     int live_slot;
     int live_frame;
@@ -184,7 +184,6 @@ struct _GvrVimsPatternViewClass {
 };
 
 enum {
-    SIGNAL_VIMS_FIRE,
     SIGNAL_PATTERN_CHANGED,
     SIGNAL_TRANSPORT_REQUEST,
     SIGNAL_COMMAND_REQUESTED,
@@ -618,26 +617,26 @@ static guint gvr_pattern_cell_recount_flags(GvrVimsPatternCell *cell)
     return summary.flags;
 }
 
-static void gvr_pattern_clear_fired_highlight(GvrVimsPatternView *view)
+static void gvr_pattern_clear_playback_highlight(GvrVimsPatternView *view)
 {
     if(!view)
         return;
 
-    view->last_fired_bank = -1;
-    view->last_fired_slot = -1;
-    view->last_fired_frame = -1;
-    view->last_fired_mask = 0;
+    view->last_played_bank = -1;
+    view->last_played_slot = -1;
+    view->last_played_frame = -1;
+    view->last_played_mask = 0;
 }
 
-static void gvr_pattern_clear_fired_highlight_for(
+static void gvr_pattern_clear_playback_highlight_for(
         GvrVimsPatternView *view,
         int bank,
         int slot)
 {
     if(view &&
-       view->last_fired_bank == bank &&
-       view->last_fired_slot == slot)
-        gvr_pattern_clear_fired_highlight(view);
+       view->last_played_bank == bank &&
+       view->last_played_slot == slot)
+        gvr_pattern_clear_playback_highlight(view);
 }
 
 static void gvr_pattern_emit_changed(GvrVimsPatternView *view, int bank, int slot)
@@ -645,7 +644,7 @@ static void gvr_pattern_emit_changed(GvrVimsPatternView *view, int bank, int slo
     GvrVimsPatternCell *cell = gvr_pattern_cell(view, bank, slot);
     guint flags = gvr_pattern_cell_recount_flags(cell);
 
-    gvr_pattern_clear_fired_highlight_for(view, bank, slot);
+    gvr_pattern_clear_playback_highlight_for(view, bank, slot);
 
     g_signal_emit(view,
                   gvr_vims_pattern_view_signals[SIGNAL_PATTERN_CHANGED],
@@ -4309,10 +4308,10 @@ static gboolean gvr_vims_pattern_view_draw(GtkWidget *widget,
             }
 
             if(event && event->message &&
-               view->selected_bank == view->last_fired_bank &&
-               view->selected_slot == view->last_fired_slot &&
-               frame == view->last_fired_frame &&
-               (view->last_fired_mask & (1u << column)))
+               view->selected_bank == view->last_played_bank &&
+               view->selected_slot == view->last_played_slot &&
+               frame == view->last_played_frame &&
+               (view->last_played_mask & (1u << column)))
             {
                 cairo_set_source_rgba(cr, 0.36, 0.93, 0.74, 0.96);
                 cairo_set_line_width(cr, 2.0);
@@ -5124,8 +5123,9 @@ static gboolean gvr_pattern_area_button_press(GtkWidget *widget,
                          "deactivate",
                          G_CALLBACK(gvr_pattern_menu_deactivate),
                          NULL);
-        gtk_menu_popup_at_pointer(GTK_MENU(menu),
-                                  (GdkEvent *)event);
+        gtk_menu_popup(GTK_MENU(menu),
+                       NULL, NULL, NULL, NULL,
+                       event->button, event->time);
         return TRUE;
     }
 
@@ -6044,17 +6044,6 @@ static void gvr_vims_pattern_view_class_init(GvrVimsPatternViewClass *klass)
     widget_class->style_updated = gvr_vims_pattern_view_style_updated;
     object_class->finalize = gvr_vims_pattern_view_finalize;
 
-    gvr_vims_pattern_view_signals[SIGNAL_VIMS_FIRE] =
-        g_signal_new("vims-fire",
-                     G_TYPE_FROM_CLASS(klass),
-                     G_SIGNAL_RUN_FIRST,
-                     0,
-                     NULL, NULL,
-                     g_cclosure_marshal_VOID__STRING,
-                     G_TYPE_NONE,
-                     1,
-                     G_TYPE_STRING);
-
     gvr_vims_pattern_view_signals[SIGNAL_PATTERN_CHANGED] =
         g_signal_new("pattern-changed",
                      G_TYPE_FROM_CLASS(klass),
@@ -6147,10 +6136,10 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     view->selection_anchor_row = 0;
     view->selection_anchor_column = 0;
     view->drag_selecting = FALSE;
-    view->last_fired_bank = -1;
-    view->last_fired_slot = -1;
-    view->last_fired_frame = -1;
-    view->last_fired_mask = 0;
+    view->last_played_bank = -1;
+    view->last_played_slot = -1;
+    view->last_played_frame = -1;
+    view->last_played_mask = 0;
     view->live_bank = -1;
     view->live_slot = -1;
     view->live_frame = -1;
@@ -6334,8 +6323,8 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_widget_show(editbar);
 
     view->command_entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(
-        GTK_ENTRY(view->command_entry),
+    gtk_widget_set_tooltip_text(
+        view->command_entry,
         "VIMS command, e.g. 123:arguments;");
     gtk_entry_set_width_chars(
         GTK_ENTRY(view->command_entry),
@@ -6927,7 +6916,7 @@ void gvr_vims_pattern_view_select_cell(GtkWidget *widget,
     if(target_changed) {
         GvrVimsPatternPlaybackState *state;
 
-        gvr_pattern_clear_fired_highlight(view);
+        gvr_pattern_clear_playback_highlight(view);
 
         if(view->inline_editing)
             gvr_pattern_inline_cancel(view);
@@ -7543,11 +7532,11 @@ typedef struct {
     int from;
     int to;
     GPtrArray *rows;
-} GvrPatternFireRange;
+} GvrPatternHighlightRange;
 
-static gboolean gvr_pattern_collect_fire_rows(gpointer key, gpointer value, gpointer data)
+static gboolean gvr_pattern_collect_highlight_rows(gpointer key, gpointer value, gpointer data)
 {
-    GvrPatternFireRange *range = data;
+    GvrPatternHighlightRange *range = data;
     int frame = GPOINTER_TO_INT(key) - 1;
 
     if(frame > range->to)
@@ -7559,7 +7548,7 @@ static gboolean gvr_pattern_collect_fire_rows(gpointer key, gpointer value, gpoi
     return FALSE;
 }
 
-static void gvr_pattern_fire_range(GvrVimsPatternView *view,
+static void gvr_pattern_mark_played_range(GvrVimsPatternView *view,
                                    int bank,
                                    int slot,
                                    int from,
@@ -7567,7 +7556,7 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
                                    gboolean reverse)
 {
     GvrVimsPatternCell *cell = gvr_pattern_cell(view, bank, slot);
-    GvrPatternFireRange range;
+    GvrPatternHighlightRange range;
 
     if(!cell || !cell->rows || from > to)
         return;
@@ -7575,7 +7564,7 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
     range.from = from;
     range.to = to;
     range.rows = g_ptr_array_new();
-    g_tree_foreach(cell->rows, gvr_pattern_collect_fire_rows, &range);
+    g_tree_foreach(cell->rows, gvr_pattern_collect_highlight_rows, &range);
 
     if(reverse) {
         for(int index = (int)range.rows->len - 1; index >= 0; index--) {
@@ -7591,10 +7580,10 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
             }
 
             if(fired_mask) {
-                view->last_fired_bank = bank;
-                view->last_fired_slot = slot;
-                view->last_fired_frame = row->frame;
-                view->last_fired_mask = fired_mask;
+                view->last_played_bank = bank;
+                view->last_played_slot = slot;
+                view->last_played_frame = row->frame;
+                view->last_played_mask = fired_mask;
             }
         }
     }
@@ -7612,10 +7601,10 @@ static void gvr_pattern_fire_range(GvrVimsPatternView *view,
             }
 
             if(fired_mask) {
-                view->last_fired_bank = bank;
-                view->last_fired_slot = slot;
-                view->last_fired_frame = row->frame;
-                view->last_fired_mask = fired_mask;
+                view->last_played_bank = bank;
+                view->last_played_slot = slot;
+                view->last_played_frame = row->frame;
+                view->last_played_mask = fired_mask;
             }
         }
     }
@@ -7679,7 +7668,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
                                                 active);
 
     if(!active || !gvr_pattern_target_valid(bank, slot)) {
-        gvr_pattern_clear_fired_highlight_for(view, bank, slot);
+        gvr_pattern_clear_playback_highlight_for(view, bank, slot);
         gvr_pattern_playback_remove(view, bank, slot);
         if(selected_target)
             gvr_vims_pattern_view_set_live_position(widget,
@@ -7698,7 +7687,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
 
     if(state->source_frame >= 0 &&
        source_frame != state->source_frame)
-        gvr_pattern_clear_fired_highlight_for(view, bank, slot);
+        gvr_pattern_clear_playback_highlight_for(view, bank, slot);
 
     if(selected_target && state->frame < 0)
         gvr_pattern_set_cursor(view,
@@ -7724,7 +7713,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
         }
         else {
             if(moved || paused_seek)
-                gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
+                gvr_pattern_mark_played_range(view, bank, slot, frame, frame, FALSE);
             state->paused = FALSE;
             state->seeked_while_paused = FALSE;
         }
@@ -7768,10 +7757,10 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
         mapped_delta = frame - state->frame;
 
         if(state->seeked_while_paused) {
-            gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
+            gvr_pattern_mark_played_range(view, bank, slot, frame, frame, FALSE);
         }
         else if(mapped_delta > 0 && mapped_delta <= max_linear_delta) {
-            gvr_pattern_fire_range(view,
+            gvr_pattern_mark_played_range(view,
                                    bank,
                                    slot,
                                    state->frame + 1,
@@ -7779,7 +7768,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
                                    FALSE);
         }
         else if(mapped_delta < 0 && -mapped_delta <= max_linear_delta) {
-            gvr_pattern_fire_range(view,
+            gvr_pattern_mark_played_range(view,
                                    bank,
                                    slot,
                                    frame,
@@ -7787,7 +7776,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
                                    TRUE);
         }
         else if(mapped_delta != 0) {
-            gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
+            gvr_pattern_mark_played_range(view, bank, slot, frame, frame, FALSE);
         }
 
         state->frame = frame;
@@ -7798,7 +7787,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
     }
 
     if(state->frame < 0 || state->source_frame < 0) {
-        gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
+        gvr_pattern_mark_played_range(view, bank, slot, frame, frame, FALSE);
         state->frame = frame;
         state->source_frame = source_frame;
         state->paused = FALSE;
@@ -7814,14 +7803,14 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
 
     if(ABS(source_delta) <= max_linear_delta) {
         if(mapped_delta > 0)
-            gvr_pattern_fire_range(view,
+            gvr_pattern_mark_played_range(view,
                                    bank,
                                    slot,
                                    state->frame + 1,
                                    frame,
                                    FALSE);
         else if(mapped_delta < 0)
-            gvr_pattern_fire_range(view,
+            gvr_pattern_mark_played_range(view,
                                    bank,
                                    slot,
                                    frame,
@@ -7829,7 +7818,7 @@ void gvr_vims_pattern_view_update_playback(GtkWidget *widget,
                                    TRUE);
     }
     else {
-        gvr_pattern_fire_range(view, bank, slot, frame, frame, FALSE);
+        gvr_pattern_mark_played_range(view, bank, slot, frame, frame, FALSE);
     }
 
     state->frame = frame;
@@ -7878,7 +7867,7 @@ void gvr_vims_pattern_view_stop_all_playback(GtkWidget *widget)
     view->live_bank = -1;
     view->live_slot = -1;
     view->live_frame = -1;
-    gvr_pattern_clear_fired_highlight(view);
+    gvr_pattern_clear_playback_highlight(view);
     gtk_widget_queue_draw(view->area);
 }
 

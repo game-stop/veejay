@@ -14843,12 +14843,15 @@
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="hexpand">True</property>
+                                        <property name="vexpand">True</property>
                                         <property name="label-xalign">0</property>
                                         <style><class name="property-card"/></style>
                                         <child>
                                           <object class="GtkGrid" id="sample_transition_grid">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="hexpand">True</property>
+                                            <property name="vexpand">True</property>
                                             <property name="margin-left">8</property>
                                             <property name="margin-right">8</property>
                                             <property name="margin-top">8</property>
@@ -14862,32 +14865,11 @@
                                                 <property name="can-focus">True</property>
                                                 <property name="receives-default">False</property>
                                                 <property name="halign">start</property>
+                                                <property name="valign">center</property>
                                                 <property name="draw-indicator">True</property>
                                                 <signal name="toggled" handler="on_transition_active_toggled" swapped="no"/>
                                               </object>
-                                              <packing><property name="left-attach">0</property><property name="top-attach">0</property><property name="width">2</property></packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkLabel" id="transition_shape_label">
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">False</property>
-                                                <property name="label" translatable="yes">Shape</property>
-                                                <property name="width-chars">14</property>
-                                                <property name="xalign">0</property>
-                                                <style><class name="property-label"/></style>
-                                              </object>
-                                              <packing><property name="left-attach">0</property><property name="top-attach">1</property></packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkSpinButton" id="transition_shape">
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">True</property>
-                                                <property name="halign">start</property>
-                                                <property name="width-chars">7</property>
-                                                <property name="adjustment">transition_shape_adj</property>
-                                                <signal name="value-changed" handler="on_transition_shape_value_changed" swapped="no"/>
-                                              </object>
-                                              <packing><property name="left-attach">1</property><property name="top-attach">1</property></packing>
+                                              <packing><property name="left-attach">0</property><property name="top-attach">0</property><property name="width">4</property></packing>
                                             </child>
                                             <child>
                                               <object class="GtkLabel" id="transition_length_label">
@@ -14896,21 +14878,54 @@
                                                 <property name="label" translatable="yes">Length (frames)</property>
                                                 <property name="width-chars">14</property>
                                                 <property name="xalign">0</property>
+                                                <property name="halign">start</property>
+                                                <property name="valign">center</property>
                                                 <style><class name="property-label"/></style>
                                               </object>
-                                              <packing><property name="left-attach">2</property><property name="top-attach">1</property></packing>
+                                              <packing><property name="left-attach">0</property><property name="top-attach">1</property></packing>
                                             </child>
                                             <child>
                                               <object class="GtkSpinButton" id="transition_length">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">True</property>
-                                                <property name="hexpand">True</property>
-                                                <property name="halign">fill</property>
+                                                <property name="hexpand">False</property>
+                                                <property name="vexpand">False</property>
+                                                <property name="halign">start</property>
+                                                <property name="valign">center</property>
                                                 <property name="width-chars">8</property>
+                                                <property name="max-width-chars">8</property>
                                                 <property name="adjustment">transition_sample_length_adj</property>
                                                 <signal name="value-changed" handler="on_transition_length_value_changed" swapped="no"/>
                                               </object>
-                                              <packing><property name="left-attach">3</property><property name="top-attach">1</property></packing>
+                                              <packing><property name="left-attach">1</property><property name="top-attach">1</property></packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkLabel" id="transition_shape_label">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">False</property>
+                                                <property name="label" translatable="yes">Shape</property>
+                                                <property name="width-chars">14</property>
+                                                <property name="xalign">0</property>
+                                                <property name="halign">start</property>
+                                                <property name="valign">start</property>
+                                                <property name="margin-top">4</property>
+                                                <style><class name="property-label"/></style>
+                                              </object>
+                                              <packing><property name="left-attach">0</property><property name="top-attach">2</property></packing>
+                                            </child>
+                                            <child>
+                                              <object class="GtkSpinButton" id="transition_shape">
+                                                <property name="visible">True</property>
+                                                <property name="can-focus">True</property>
+                                                <property name="hexpand">True</property>
+                                                <property name="vexpand">True</property>
+                                                <property name="halign">fill</property>
+                                                <property name="valign">fill</property>
+                                                <property name="width-chars">7</property>
+                                                <property name="adjustment">transition_shape_adj</property>
+                                                <signal name="value-changed" handler="on_transition_shape_value_changed" swapped="no"/>
+                                              </object>
+                                              <packing><property name="left-attach">1</property><property name="top-attach">2</property><property name="width">3</property></packing>
                                             </child>
                                             <child>
                                               <object class="GtkLabel" id="sample_transition_hint">
@@ -14921,7 +14936,7 @@
                                                 <property name="label" translatable="yes">The transition is used when playback hands off from this sample to the next source.</property>
                                                 <style><class name="property-hint"/></style>
                                               </object>
-                                              <packing><property name="left-attach">0</property><property name="top-attach">2</property><property name="width">4</property></packing>
+                                              <packing><property name="left-attach">0</property><property name="top-attach">3</property><property name="width">4</property></packing>
                                             </child>
                                           </object>
                                         </child>

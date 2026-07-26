@@ -27,6 +27,10 @@ reloaded_SOURCES = \
     keyboard.c \
     sequence.c \
     multitrack.c \
+    gtkmultitrackedit.c \
+    gtkmultitrackedit.h \
+    gtkshapeselector.c \
+    gtkshapeselector.h \
     vj-api.c \
     mjpeg_logging.c \
     mpegconsts.c \

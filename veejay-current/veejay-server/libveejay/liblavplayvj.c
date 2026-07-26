@@ -338,6 +338,14 @@ static inline long long monotonic_now_ms(void)
     return ((long long)ts.tv_sec * 1000LL) + ((long long)ts.tv_nsec / 1000000LL);
 }
 
+static inline long long realtime_now_us(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return ((long long)ts.tv_sec * 1000000LL) +
+           ((long long)ts.tv_nsec / 1000LL);
+}
+
 static inline int vj_clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : ((v > hi) ? hi : v);
@@ -1555,6 +1563,8 @@ static int vj_pattern_command_allowed(int id)
     static const int engine_ids[] = {
         VIMS_FULLSCREEN, VIMS_RESIZE_SDL_SCREEN, VIMS_DEBUG_LEVEL,
         VIMS_BEZERK, VIMS_MESSAGE_FORWARDING, VIMS_SYNC_CORRECTION,
+        VIMS_VIDEO_SYNC_START, VIMS_VIDEO_TRANSITION_TAKE,
+        VIMS_VIDEO_SYNC_ADJUST,
         VIMS_PROMOTION, VIMS_QUIT, VIMS_CLOSE, VIMS_SUSPEND,
         VIMS_OSD, VIMS_PREVIEW_BW
     };
@@ -1563,6 +1573,10 @@ static int vj_pattern_command_allowed(int id)
        (id >= 400 && id < 500) ||
        (id >= VIMS_BUNDLE_START && id <= VIMS_BUNDLE_END))
         return 0;
+
+    if(id == VIMS_VIDEO_TRANSITION_TAKE)
+        return vj_event_exists(id);
+
     if(!vj_event_exists(id))
         return 0;
     if(vj_pattern_id_in_list(id, sequencer_ids, sizeof(sequencer_ids) / sizeof(sequencer_ids[0])) ||
@@ -1809,6 +1823,15 @@ static int vj_pattern_compile_document(sequencer_t *seq,
                                          message_len,
                                          vims_id))
             {
+#ifdef HAVE_DEBUG_VIMS_PATTERN
+                veejay_msg(VEEJAY_MSG_DEBUG,
+                           "[PATTERN] rejected VIMS %d at target %d/%d frame %d column %d",
+                           vims_id,
+                           bank,
+                           slot,
+                           frame,
+                           column + 1);
+#endif
                 free(message_data);
                 rejected++;
                 continue;
@@ -3331,7 +3354,68 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
     return 1;
 }
 
+static int veejay_sync_adjusted_increment(veejay_t *info, int speed)
+{
+    int adjustment;
 
+    if(!info || !info->settings)
+        return speed;
+
+    adjustment = atomic_exchange_int(&info->settings->sync_adjust_frames, 0);
+    if(adjustment < -4)
+        adjustment = -4;
+    else if(adjustment > 4)
+        adjustment = 4;
+
+    return speed + adjustment;
+}
+
+static void veejay_sync_start_tick(veejay_t *info)
+{
+    video_playback_setup *settings;
+    long long target_us;
+    int speed;
+
+    if(!info || !info->settings)
+        return;
+
+    settings = info->settings;
+    if(!atomic_load_int(&settings->sync_start_armed))
+        return;
+
+    target_us = atomic_load_long_long(&settings->sync_start_realtime_us);
+    if(target_us <= 0)
+        return;
+
+    {
+        long long remaining_us = target_us - realtime_now_us();
+        if(remaining_us > 50000LL)
+            return;
+        if(remaining_us > 0) {
+            struct timespec deadline;
+            deadline.tv_sec = (time_t)(target_us / 1000000LL);
+            deadline.tv_nsec = (long)((target_us % 1000000LL) * 1000LL);
+            while(clock_nanosleep(CLOCK_REALTIME,
+                                  TIMER_ABSTIME,
+                                  &deadline,
+                                  NULL) == EINTR)
+                ;
+        }
+    }
+
+    if(!atomic_exchange_int(&settings->sync_start_armed, 0))
+        return;
+
+    speed = atomic_load_int(&settings->sync_start_speed);
+    if(speed == 0)
+        speed = 1;
+
+    veejay_set_speed(info, speed, 0);
+    veejay_transport_epoch_bump(info);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Synchronized playback started at speed %d",
+               speed);
+}
 
 int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
 {
@@ -3538,6 +3622,13 @@ int veejay_free(veejay_t * info)
 			free(info->global_chain->fx_chain[i]);
 		}
 		free(info->global_chain);
+	}
+
+	if(info->multitrack_chain) {
+		for( int i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+			free(info->multitrack_chain->fx_chain[i]);
+		}
+		free(info->multitrack_chain);
 	}
 	
     if( info->settings->transition.ptr ) {
@@ -5243,6 +5334,29 @@ static char *veejay_pipe_append_alpha_status(veejay_t *info, char *ptr)
     return ptr;
 }
 
+static char *veejay_pipe_append_multitrack_status(veejay_t *info, char *ptr)
+{
+    video_playback_setup *settings = info ? info->settings : NULL;
+
+    if(!settings) {
+        for(int i = 0; i < VJ_MULTITRACK_STATUS_TOKENS; i++)
+            ptr = vj_sprintf(ptr, 0);
+        return ptr;
+    }
+
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_transition_active));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_transition_progress));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_program_stream_id));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_preview_stream_id));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_program_layer));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_transition_layer));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_layer0_entry));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_layer1_entry));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_layer0_opacity));
+    ptr = vj_sprintf(ptr, atomic_load_int(&settings->multitrack_layer1_opacity));
+    return ptr;
+}
+
 static char *veejay_pipe_append_audio_beat_config_status(veejay_t *info, char *ptr)
 {
 #ifdef HAVE_JACK
@@ -5440,7 +5554,8 @@ static void veejay_pipe_write_status(veejay_t * info)
                  VJ_AUDIO_MIXER_STATUS_TOKENS +
                  VJ_STREAM_TRICKPLAY_STATUS_TOKENS +
                  VJ_STATUS_SAMPLE_AUDIO_SYNC_TOKENS +
-                 VJ_ALPHA_STATUS_TOKENS) *
+                 VJ_ALPHA_STATUS_TOKENS +
+                 VJ_MULTITRACK_STATUS_TOKENS) *
         (size_t)VJ_INT_FIELD_MAX;
     const int base_tokens = veejay_pipe_status_token_count(info->status_what);
     static int status_packet_warned = 0;
@@ -5467,6 +5582,7 @@ static void veejay_pipe_write_status(veejay_t * info)
     ptr = veejay_pipe_append_stream_trickplay_status(info, ptr);
     ptr = veejay_pipe_append_sample_audio_sync_status(info, ptr);
     ptr = veejay_pipe_append_alpha_status(info, ptr);
+    ptr = veejay_pipe_append_multitrack_status(info, ptr);
     ptr = veejay_pipe_pad_status_tokens(info->status_what, ptr, VIMS_STATUS_TOKENS);
 
     *ptr = '\0';
@@ -8548,13 +8664,13 @@ void *veejay_audio_producer_thread(void *arg)
                 slow_video_phase += runtime_rate;
                 int guard = 0;
                 while (slow_video_phase >= 1.0 && guard < 32) {
-                    vj_perform_inc_frame(info, settings->current_playback_speed);
+                    vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, settings->current_playback_speed));
                     slow_video_phase -= 1.0;
                     guard++;
                 }
             } else {
                 slow_video_phase = 0.0;
-                vj_perform_inc_frame(info, settings->current_playback_speed);
+                vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, settings->current_playback_speed));
             }
 
 				loop_count++;
@@ -8654,7 +8770,7 @@ void *veejay_audio_producer_thread(void *arg)
 				vj_runtime_publish_audio_clocks(settings, now, now);
 			}
 
-			vj_perform_inc_frame(info, settings->current_playback_speed);
+			vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, settings->current_playback_speed));
 			loop_count++;
 
 		}
@@ -9567,6 +9683,7 @@ static void *veejay_producer_thread_loop(void *ptr)
 	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
 
 		veejay_consume_events(info);
+        veejay_sync_start_tick(info);
 
 #ifdef HAVE_JACK
         {
@@ -9910,6 +10027,11 @@ veejay_t *veejay_malloc()
 	info->settings->color_vibrance = 98;
     info->settings->clear_alpha = 0;
     info->settings->alpha_value = 0;
+    info->settings->multitrack_transition_layer = -1;
+    info->settings->multitrack_transition_target_layer = -1;
+    info->settings->multitrack_program_layer = -1;
+    info->settings->multitrack_layer0_entry = 0;
+    info->settings->multitrack_layer1_entry = 1;
 	
 	veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
@@ -9929,6 +10051,18 @@ veejay_t *veejay_malloc()
 			return NULL;
 		info->global_chain->fx_chain[i]->effect_id = -1;
 		info->global_chain->fx_chain[i]->beat_param_mask = SAMPLE_BEAT_PARAM_MASK_ALL;
+	}
+
+	info->multitrack_chain = (global_chain_t*) vj_calloc(sizeof(global_chain_t));
+	if(!info->multitrack_chain)
+		return NULL;
+
+	for( int i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
+		info->multitrack_chain->fx_chain[i] = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain));
+		if(!info->multitrack_chain->fx_chain[i])
+			return NULL;
+		info->multitrack_chain->fx_chain[i]->effect_id = -1;
+		info->multitrack_chain->fx_chain[i]->beat_param_mask = 0;
 	}
 
 	if (!(info->uc)) 

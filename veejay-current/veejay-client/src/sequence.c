@@ -19,6 +19,7 @@
 
 #include <config.h>
 #include <stdint.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <libavutil/avutil.h>
@@ -61,6 +62,7 @@ typedef struct
 	char *hostname;
 	int   port_num;
 	vj_client *fd;
+	vj_client *ui_fd;
 	vj_client *preview_fd;
 	uint8_t *data_buffer;
 	uint8_t *tmp_buffer;
@@ -78,6 +80,9 @@ typedef struct
 	int	height;
 	int	prevmode;
 	int	need_track_list;
+	int need_sequence_timeline;
+	int sequence_timeline_bank;
+	gvr_sequence_timeline_t sequence_timeline;
 	char 	*queue[__MAX_TRACKS];
 	int	n_queued;
 	int	is_master;
@@ -251,6 +256,12 @@ static	void	gvr_close_connection( veejay_track_t *v )
             vj_client_close(v->fd);
             vj_client_free(v->fd);
             v->fd = NULL;
+        }
+
+        if(v->ui_fd) {
+            vj_client_close(v->ui_fd);
+            vj_client_free(v->ui_fd);
+            v->ui_fd = NULL;
         }
 
         if(v->preview_pixbuf) {
@@ -473,6 +484,204 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 	}
 
     return result;
+}
+
+
+static int gvr_read_framed_reply(veejay_track_t *v,
+                                 int vims_id,
+                                 const char *arguments,
+                                 int header_len,
+                                 unsigned char **body,
+                                 int *body_len)
+{
+    unsigned char command[64];
+    unsigned char header[16];
+    int sent;
+    int got;
+    int length = 0;
+
+    if(body)
+        *body = NULL;
+    if(body_len)
+        *body_len = 0;
+    if(!v || !v->fd || !body || !body_len || header_len <= 0 || header_len >= (int)sizeof(header))
+        return 0;
+
+    if(arguments && arguments[0])
+        snprintf((char *)command, sizeof(command), "%03d:%s;", vims_id, arguments);
+    else
+        snprintf((char *)command, sizeof(command), "%03d:;", vims_id);
+
+    sent = vj_client_send(v->fd, V_CMD, command);
+    if(sent <= 0)
+        return 0;
+
+    got = 0;
+    while(got < header_len) {
+        int n = vj_client_read(v->fd, V_CMD, header + got, header_len - got);
+        if(n <= 0)
+            return 0;
+        got += n;
+    }
+
+    header[header_len] = '\0';
+    if(sscanf((char *)header, "%d", &length) != 1 || length <= 0 || length > 1024 * 1024)
+        return 0;
+
+    *body = (unsigned char *)vj_calloc((size_t)length + 1u);
+    if(!*body)
+        return 0;
+
+    got = 0;
+    while(got < length) {
+        int n = vj_client_read(v->fd, V_CMD, *body + got, length - got);
+        if(n <= 0) {
+            free(*body);
+            *body = NULL;
+            return 0;
+        }
+        got += n;
+    }
+
+    (*body)[length] = '\0';
+    *body_len = length;
+    return 1;
+}
+
+static int gvr_parse_fixed_int(const unsigned char *text, int width, long long *value)
+{
+    char buffer[32];
+    char *end = NULL;
+    long long parsed;
+
+    if(!text || !value || width <= 0 || width >= (int)sizeof(buffer))
+        return 0;
+
+    memcpy(buffer, text, (size_t)width);
+    buffer[width] = '\0';
+    parsed = strtoll(buffer, &end, 10);
+    if(end != buffer + width)
+        return 0;
+
+    *value = parsed;
+    return 1;
+}
+
+static int gvr_fetch_sequence_timeline(veejay_track_t *v, int bank)
+{
+    unsigned char *body = NULL;
+    int body_len = 0;
+    char arguments[16];
+    long long value;
+    int reply_bank;
+    unsigned int revision;
+    int finite;
+    long long total;
+    int entries;
+    int offset;
+    gvr_sequence_timeline_t parsed;
+
+    if(!v || bank < 0 || bank >= 4)
+        return 0;
+
+    snprintf(arguments, sizeof(arguments), "%d", bank);
+    if(!gvr_read_framed_reply(v,
+                              VIMS_SEQUENCE_TIMELINE,
+                              arguments,
+                              VJ_SEQUENCE_TIMELINE_REPLY_PREFIX_LENGTH,
+                              &body,
+                              &body_len))
+        return 0;
+
+    if(body_len < VJ_SEQUENCE_TIMELINE_HEADER_LENGTH ||
+       !gvr_parse_fixed_int(body, 2, &value)) {
+        free(body);
+        return 0;
+    }
+    reply_bank = (int)value;
+
+    if(!gvr_parse_fixed_int(body + 2, 10, &value) || value < 0 || value > UINT_MAX) {
+        free(body);
+        return 0;
+    }
+    revision = (unsigned int)value;
+
+    if(!gvr_parse_fixed_int(body + 12, 1, &value) || (value != 0 && value != 1)) {
+        free(body);
+        return 0;
+    }
+    finite = value != 0;
+
+    if(!gvr_parse_fixed_int(body + 13, 12, &total) ||
+       !gvr_parse_fixed_int(body + 25, 3, &value)) {
+        free(body);
+        return 0;
+    }
+    entries = (int)value;
+
+    if(reply_bank != bank || entries < 0 || entries > GVR_SEQUENCE_TIMELINE_MAX_SLOTS ||
+       body_len != VJ_SEQUENCE_TIMELINE_HEADER_LENGTH + entries * VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH) {
+        free(body);
+        return 0;
+    }
+
+    memset(&parsed, 0, sizeof(parsed));
+    parsed.valid = 1;
+    parsed.finite = finite;
+    parsed.bank = bank;
+    parsed.revision = revision;
+    parsed.total_frames = finite && total > 0 ? (total > INT_MAX ? INT_MAX : (int)total) : 0;
+    parsed.count = 0;
+    offset = VJ_SEQUENCE_TIMELINE_HEADER_LENGTH;
+
+    for(int i = 0; i < entries; i++) {
+        long long slot;
+        long long sample_id;
+        long long sample_type;
+        long long start;
+        long long length;
+        gvr_sequence_timeline_clip_t *clip;
+
+        if(!gvr_parse_fixed_int(body + offset, 3, &slot) ||
+           !gvr_parse_fixed_int(body + offset + 3, 5, &sample_id) ||
+           !gvr_parse_fixed_int(body + offset + 8, 2, &sample_type) ||
+           !gvr_parse_fixed_int(body + offset + 10, 12, &start) ||
+           !gvr_parse_fixed_int(body + offset + 22, 12, &length)) {
+            free(body);
+            return 0;
+        }
+
+        if(slot < 0 || slot >= GVR_SEQUENCE_TIMELINE_MAX_SLOTS ||
+           sample_id <= 0 || sample_id > INT_MAX || sample_type < 0 || sample_type > INT_MAX) {
+            free(body);
+            return 0;
+        }
+
+        offset += VJ_SEQUENCE_TIMELINE_ENTRY_LENGTH;
+        if(start < 0 || length <= 0) {
+            parsed.finite = 0;
+            continue;
+        }
+        if(start > INT_MAX || length > INT_MAX || start > INT_MAX - length + 1) {
+            free(body);
+            return 0;
+        }
+
+        clip = &parsed.clips[parsed.count++];
+        clip->slot = (int)slot;
+        clip->sample_id = (int)sample_id;
+        clip->sample_type = (int)sample_type;
+        clip->project_in = (int)start;
+        clip->project_out = (int)(start + length - 1);
+        if(clip->project_out == INT_MAX)
+            parsed.total_frames = INT_MAX;
+        else if(clip->project_out + 1 > parsed.total_frames)
+            parsed.total_frames = clip->project_out + 1;
+    }
+
+    free(body);
+    v->sequence_timeline = parsed;
+    return 1;
 }
 
 
@@ -943,6 +1152,7 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *new_tr
 	vt->hostname = strdup(hostname);
 	vt->port_num  = port_num;
 	vt->active   = 1;
+	vt->sequence_timeline_bank = -1;
 
 	if(!vt->preview_fd || !vt->hostname)
 	{
@@ -1025,6 +1235,31 @@ static	void	gvr_multivvv_queue_vims( veejay_track_t *v, int vims_id, int val1,in
 		v->queue[ v->n_queued ] = strdup( message );
 		v->n_queued ++;
 	}
+}
+
+static void gvr_multivvvv_queue_vims(veejay_track_t *v, int vims_id,
+                                      int val1, int val2, int val3, int val4)
+{
+    char message[128];
+
+    snprintf(message, sizeof(message), "%03d:%d %d %d %d;",
+             vims_id, val1, val2, val3, val4);
+
+    if(v->n_queued < __MAX_TRACKS)
+        v->queue[v->n_queued++] = strdup(message);
+}
+
+static void gvr_multivvvvv_queue_vims(veejay_track_t *v, int vims_id,
+                                            int val1, int val2, int val3,
+                                            int val4, int val5)
+{
+	char message[128];
+
+	snprintf(message, sizeof(message), "%03d:%d %d %d %d %d;",
+	         vims_id, val1, val2, val3, val4, val5);
+
+	if(v->n_queued < __MAX_TRACKS)
+		v->queue[v->n_queued++] = strdup(message);
 }
 
 static	void	gvr_multiv_queue_vims( veejay_track_t *v, int vims_id, int val1,int val2 )
@@ -1114,6 +1349,31 @@ void		gvr_need_track_list( void *preview, int track_id )
 		v->need_track_list = 1;
 }
 
+
+void gvr_need_sequence_timeline(void *preview, int track_id, int bank)
+{
+    veejay_preview_t *vp = (veejay_preview_t*)preview;
+    veejay_track_t *v = gvr_track_ptr(vp, track_id);
+
+    if(!v || bank < 0 || bank >= 4)
+        return;
+
+    v->sequence_timeline_bank = bank;
+    v->need_sequence_timeline = 1;
+}
+
+int gvr_get_sequence_timeline(void *preview, int track_id, gvr_sequence_timeline_t *timeline)
+{
+    veejay_preview_t *vp = (veejay_preview_t*)preview;
+    veejay_track_t *v = gvr_track_ptr(vp, track_id);
+
+    if(!v || !timeline || !v->sequence_timeline.valid)
+        return 0;
+
+    *timeline = v->sequence_timeline;
+    return 1;
+}
+
 void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int val2 )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
@@ -1156,6 +1416,113 @@ void		gvr_queue_mmmvims( void *preview, int track_id, int vims_id, int val1,int 
 		if( v && v->active)
 			gvr_multivvv_queue_vims( v, vims_id,val1,val2,val3 );
 	}
+}
+
+void gvr_queue_mmmmvims(void *preview, int track_id, int vims_id,
+                         int val1, int val2, int val3, int val4)
+{
+    veejay_preview_t *vp = (veejay_preview_t*)preview;
+
+    if(!vp)
+        return;
+
+    if(track_id == -1)
+    {
+        for(int i = 0; i < vp->n_tracks; i++)
+            if(vp->tracks[i] && vp->tracks[i]->active)
+                gvr_multivvvv_queue_vims(vp->tracks[i], vims_id,
+                                         val1, val2, val3, val4);
+    }
+    else
+    {
+        veejay_track_t *v = gvr_track_ptr(vp, track_id);
+        if(v && v->active)
+            gvr_multivvvv_queue_vims(v, vims_id,
+                                     val1, val2, val3, val4);
+    }
+}
+
+void gvr_queue_mmmmmvims(void *preview, int track_id, int vims_id,
+                         int val1, int val2, int val3, int val4, int val5)
+{
+	veejay_preview_t *vp = (veejay_preview_t*)preview;
+
+	if(!vp)
+		return;
+
+	if(track_id == -1)
+	{
+		for(int i = 0; i < vp->n_tracks; i++)
+			if(vp->tracks[i] && vp->tracks[i]->active)
+				gvr_multivvvvv_queue_vims(vp->tracks[i], vims_id,
+				                            val1, val2, val3, val4, val5);
+	}
+	else
+	{
+		veejay_track_t *v = gvr_track_ptr(vp, track_id);
+		if(v && v->active)
+			gvr_multivvvvv_queue_vims(v, vims_id,
+			                            val1, val2, val3, val4, val5);
+	}
+}
+
+int gvr_track_prepare_ui_client(void *preview, int track_num)
+{
+    veejay_preview_t *vp = (veejay_preview_t*) preview;
+    veejay_track_t *v = gvr_track_ptr(vp, track_num);
+    vj_client *client;
+
+    if(!v || !v->active)
+        return 0;
+    if(v->ui_fd)
+        return 1;
+
+    client = vj_client_alloc();
+    if(!client)
+        return 0;
+    if(!vj_client_connect(client, v->hostname, NULL, v->port_num)) {
+        vj_client_free(client);
+        return 0;
+    }
+
+    v->ui_fd = client;
+    return 1;
+}
+
+void *gvr_track_take_ui_client(void *preview, int track_num)
+{
+    veejay_preview_t *vp = (veejay_preview_t*) preview;
+    veejay_track_t *v = gvr_track_ptr(vp, track_num);
+    vj_client *client;
+
+    if(!v)
+        return NULL;
+
+    client = v->ui_fd;
+    v->ui_fd = NULL;
+    return client;
+}
+
+void gvr_track_store_ui_client(void *preview, int track_num, void *client_ptr)
+{
+    veejay_preview_t *vp = (veejay_preview_t*) preview;
+    veejay_track_t *v = gvr_track_ptr(vp, track_num);
+    vj_client *client = (vj_client*) client_ptr;
+
+    if(!v) {
+        if(client) {
+            vj_client_close(client);
+            vj_client_free(client);
+        }
+        return;
+    }
+
+    if(v->ui_fd && v->ui_fd != client) {
+        vj_client_close(v->ui_fd);
+        vj_client_free(v->ui_fd);
+    }
+
+    v->ui_fd = client;
 }
 
 void		gvr_track_disconnect( void *preview, int track_num )
@@ -1404,82 +1771,80 @@ sync_info	*gvr_sync( void *preview, void *caller_data )
 
 static	void	gvr_parse_track_list( veejay_preview_t *vp, veejay_track_t *v, unsigned char *tmp, int len )
 {
-	int i = 0;
-	int items = 0;
+	int offset = 0;
 	unsigned char *ptr = tmp;
 
 	if(!vp || !v || !tmp || len <= 0)
 		return;
 
-	for(i = 0; i < __MAX_TRACKS; i++)
+	for(int i = 0; i < __MAX_TRACKS; i++)
 		v->track_list[i] = -1;
 	v->track_items = 0;
 
-	char **z = vj_calloc( sizeof( char * ) * vp->n_tracks );
-	if(!z)
-		return;
-
-	i = 0;
-	while( i + 3 <= len )
+	while(offset + 3 <= len)
 	{
-		int k;
-		char k_str[4];
-		veejay_memset(k_str, 0, sizeof(k_str));
-		memcpy(k_str, ptr, 3);
-		k = atoi(k_str);
-		ptr += 3;
-		i += 3;
+		char length_text[4];
+		int item_length;
+		char *item;
+		char hostname[255];
+		int port = 0;
+		int stream_id = 0;
 
-		if( k <= 0 || i + k > len )
+		veejay_memset(length_text, 0, sizeof(length_text));
+		memcpy(length_text, ptr, 3);
+		item_length = atoi(length_text);
+		ptr += 3;
+		offset += 3;
+
+		if(item_length <= 0 || offset + item_length > len)
 			break;
 
-		if(items < vp->n_tracks)
-		{
-			z[items] = strndup( (char*) ptr, k );
-			items ++;
-		}
+		item = strndup((char*)ptr, item_length);
+		ptr += item_length;
+		offset += item_length;
+		if(!item)
+			continue;
 
-		ptr += k;
-		i += k;
-	}
-
-	for( i = 0; i < items ; i ++ )
-	{
-		int k;
-		int in_track = -1;
-		for( k = 0; k < vp->n_tracks ; k ++ )
+		veejay_memset(hostname, 0, sizeof(hostname));
+		if(sscanf(item, "%254s %d %d", hostname, &port, &stream_id) == 3 &&
+		   stream_id > 0)
 		{
-			veejay_track_t *t = vp->tracks[k];
-			if(t)
+			for(int track = 0; track < vp->n_tracks && track < __MAX_TRACKS; track++)
 			{
-				char hostname[255];
-				int  port = 0;
-				int  stream_id = 0;
-				veejay_memset(hostname,0,255 );
-				if( sscanf( (char*) z[i], "%254s %d %d", hostname, &port, &stream_id ) == 3 )
+				veejay_track_t *source = vp->tracks[track];
+				if(source && gvr_host_matches(hostname, source->hostname) &&
+				   port == source->port_num)
 				{
-					if( gvr_host_matches(hostname, t->hostname) && port == t->port_num )
-						in_track = k;
+					if(v->track_list[track] <= 0)
+						v->track_items++;
+					v->track_list[track] = stream_id;
+					break;
 				}
 			}
 		}
 
-		v->track_list[i] = in_track;
-		free( z[i] );
+		free(item);
 	}
-	v->track_items = items;
-
-	free( z );
 }
 
-int		gvr_get_stream_id( void  *data, int id )
+int gvr_get_stream_id_for(void *data, int destination_track, int source_track)
 {
-	veejay_preview_t *vp = (veejay_preview_t*) data;
-	veejay_track_t *v = gvr_track_ptr(vp, id);
+	veejay_preview_t *vp = (veejay_preview_t*)data;
+	veejay_track_t *v;
 
-	if(v)
-		return v->track_list[id];
+	if(!vp || destination_track < 0 || destination_track >= __MAX_TRACKS ||
+	   source_track < 0 || source_track >= __MAX_TRACKS)
+		return 0;
+
+	v = gvr_track_ptr(vp, destination_track);
+	if(v && v->track_list[source_track] > 0)
+		return v->track_list[source_track];
 	return 0;
+}
+
+int gvr_get_stream_id(void *data, int id)
+{
+	return gvr_get_stream_id_for(data, 0, id);
 }
 
 static	void	gvr_parse_queue( veejay_track_t *v )
@@ -1496,28 +1861,37 @@ static	void	gvr_parse_queue( veejay_track_t *v )
 	}
 	v->n_queued = 0;
 }
-static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num )
+static int gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num )
 {
-	(void) track_num;
-	int score = 0;
-	if( v->need_track_list || v->n_queued > 0 )
-	{
-		if( v->need_track_list )
-		{
-			int bw = 0;
-			unsigned char *tmp = vims_track_list( v, 5, &bw );
-			gvr_parse_track_list( vp, v, tmp, bw );
-			v->need_track_list = 0;
-		}
-		if( v->n_queued > 0 )
-		{
-			gvr_parse_queue( v );
-		}
-		score ++;
-	}
+    (void) track_num;
+    int score = 0;
 
-	gvr_preview_request_frame(v);
-	return score + 1;
+    /* A stream-create command must be processed before the track-list query
+     * that resolves the resulting stream ID. */
+    if(v->n_queued > 0) {
+        gvr_parse_queue(v);
+        score++;
+    }
+
+    if(v->need_track_list) {
+        int bw = 0;
+        unsigned char *tmp = vims_track_list(v, 5, &bw);
+        if(tmp && bw > 0) {
+            gvr_parse_track_list(vp, v, tmp, bw);
+            v->need_track_list = 0;
+        }
+        free(tmp);
+        score++;
+    }
+
+    if(v->need_sequence_timeline) {
+        if(gvr_fetch_sequence_timeline(v, v->sequence_timeline_bank))
+            v->need_sequence_timeline = 0;
+        score++;
+    }
+
+    gvr_preview_request_frame(v);
+    return score + 1;
 }
 
 static int gvr_veejay_grabber_step( void *data, void *caller_data )

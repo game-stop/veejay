@@ -19,6 +19,26 @@
 
 #ifndef PREVIEWH
 #define PREVIEWH
+
+#define GVR_SEQUENCE_TIMELINE_MAX_SLOTS 120
+
+typedef struct {
+    int slot;
+    int sample_id;
+    int sample_type;
+    int project_in;
+    int project_out;
+} gvr_sequence_timeline_clip_t;
+
+typedef struct {
+    int valid;
+    int finite;
+    int bank;
+    unsigned int revision;
+    int total_frames;
+    unsigned int count;
+    gvr_sequence_timeline_clip_t clips[GVR_SEQUENCE_TIMELINE_MAX_SLOTS];
+} gvr_sequence_timeline_t;
 typedef struct
 {
 	int tracks;
@@ -34,13 +54,21 @@ int		gvr_track_connect( void *preview, char *hostname, int port_num, int *track_
 void		gvr_track_disconnect( void *preview, int track_num );
 int		gvr_track_configure( void *preview, int track_num, int w, int h);
 int		gvr_track_toggle_preview( void *preview, int track_num, int status );
+int         gvr_track_prepare_ui_client(void *preview, int track_num);
+void       *gvr_track_take_ui_client(void *preview, int track_num);
+void        gvr_track_store_ui_client(void *preview, int track_num, void *client);
 void		gvr_need_track_list( void *preview, int track_id );
+void        gvr_need_sequence_timeline(void *preview, int track_id, int bank);
+int         gvr_get_sequence_timeline(void *preview, int track_id, gvr_sequence_timeline_t *timeline);
 
 int		gvr_get_stream_id( void  *data, int id );
+int         gvr_get_stream_id_for(void *data, int destination_track, int source_track);
 void		gvr_set_master( void *preview, int master_track );
 //format and queue vims messages from extern
 
 void		gvr_queue_mmmvims( void *preview, int track_id, int vims_id, int val1,int val2, int val3 );
+void        gvr_queue_mmmmvims(void *preview, int track_id, int vims_id, int val1, int val2, int val3, int val4);
+void        gvr_queue_mmmmmvims(void *preview, int track_id, int vims_id, int val1, int val2, int val3, int val4, int val5);
 void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int val2 );
 void		gvr_queue_mvims( void *preview, int track_id, int vims_id, int val );
 void		gvr_queue_vims( void *preview, int track_id, int vims_id );

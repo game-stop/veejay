@@ -871,14 +871,14 @@ static gboolean gvr_vims_view_find(GvrVimsView *view,
 
 static void gvr_vims_view_open_find(GvrVimsView *view)
 {
-    gtk_revealer_set_reveal_child(GTK_REVEALER(view->search_revealer), TRUE);
+    gtk_widget_show(view->search_revealer);
     gtk_widget_grab_focus(view->search_entry);
     gtk_editable_select_region(GTK_EDITABLE(view->search_entry), 0, -1);
 }
 
 static void gvr_vims_view_close_find(GvrVimsView *view)
 {
-    gtk_revealer_set_reveal_child(GTK_REVEALER(view->search_revealer), FALSE);
+    gtk_widget_hide(view->search_revealer);
     if(view->namespace_list.selected_index >= 0)
         gtk_widget_grab_focus(view->namespace_list.area);
     else if(view->action_list.selected_index >= 0)
@@ -973,7 +973,7 @@ static gboolean gvr_vims_view_key_press(GtkWidget *widget,
         return TRUE;
     }
     if(event->keyval == GDK_KEY_Escape &&
-       gtk_revealer_get_reveal_child(GTK_REVEALER(view->search_revealer))) {
+       gtk_widget_get_visible(view->search_revealer)) {
         gvr_vims_view_close_find(view);
         return TRUE;
     }
@@ -1026,12 +1026,7 @@ static gboolean gvr_vims_list_scroll(GtkWidget *widget,
     else if(event->direction == GDK_SCROLL_DOWN)
         delta = 3.0;
     else if(event->direction == GDK_SCROLL_SMOOTH) {
-        double delta_x = 0.0;
-        double delta_y = 0.0;
-        if(gdk_event_get_scroll_deltas((GdkEvent *)event,
-                                       &delta_x,
-                                       &delta_y))
-            delta = delta_y;
+        delta = event->delta_y;
     }
     gtk_adjustment_set_value(list->adjustment, value + delta);
     return TRUE;
@@ -1290,7 +1285,7 @@ static GtkWidget *gvr_vims_view_toolbar(GvrVimsView *view,
 
     gtk_label_set_markup(GTK_LABEL(label), markup);
     g_free(markup);
-    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    g_object_set(label, "xalign", 0.0f, NULL);
     gtk_widget_set_hexpand(label, TRUE);
     gtk_box_pack_start(GTK_BOX(box), label, TRUE, TRUE, 4);
     gtk_style_context_add_class(gtk_widget_get_style_context(box),
@@ -1305,21 +1300,23 @@ static GtkWidget *gvr_vims_view_search_bar(GvrVimsView *view)
     GtkWidget *label = gtk_label_new("Find");
     GtkWidget *button;
 
-    gtk_widget_set_margin_start(box, 4);
-    gtk_widget_set_margin_end(box, 4);
-    gtk_widget_set_margin_top(box, 2);
-    gtk_widget_set_margin_bottom(box, 2);
-    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    g_object_set(box,
+                 "margin-left", 4,
+                 "margin-right", 4,
+                 "margin-top", 2,
+                 "margin-bottom", 2,
+                 NULL);
+    g_object_set(label, "xalign", 0.0f, NULL);
     gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 0);
 
-    view->search_entry = gtk_search_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(view->search_entry),
-                                   "VIMS number or description");
+    view->search_entry = gtk_entry_new();
+    gtk_widget_set_tooltip_text(view->search_entry,
+                                "VIMS number or description");
     gtk_widget_set_hexpand(view->search_entry, TRUE);
     gtk_box_pack_start(GTK_BOX(box), view->search_entry, TRUE, TRUE, 0);
 
     view->search_status = gtk_label_new("Type an event ID or description");
-    gtk_label_set_xalign(GTK_LABEL(view->search_status), 1.0f);
+    g_object_set(view->search_status, "xalign", 1.0f, NULL);
     gtk_widget_set_size_request(view->search_status, 104, -1);
     gtk_box_pack_start(GTK_BOX(box), view->search_status, FALSE, FALSE, 2);
 
@@ -1357,7 +1354,7 @@ static GtkWidget *gvr_vims_view_search_bar(GvrVimsView *view)
                      view);
 
     g_signal_connect(view->search_entry,
-                     "search-changed",
+                     "changed",
                      G_CALLBACK(gvr_vims_view_search_changed),
                      view);
     g_signal_connect(view->search_entry,
@@ -1449,16 +1446,18 @@ static GtkWidget *gvr_vims_view_command_bar(GvrVimsView *view)
     GtkWidget *label = gtk_label_new("Command row");
     GtkWidget *button;
 
-    gtk_widget_set_margin_start(box, 4);
-    gtk_widget_set_margin_end(box, 4);
-    gtk_widget_set_margin_top(box, 2);
-    gtk_widget_set_margin_bottom(box, 2);
-    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    g_object_set(box,
+                 "margin-left", 4,
+                 "margin-right", 4,
+                 "margin-top", 2,
+                 "margin-bottom", 2,
+                 NULL);
+    g_object_set(label, "xalign", 0.0f, NULL);
     gtk_box_pack_start(GTK_BOX(row), label, FALSE, FALSE, 0);
 
     view->command_entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(view->command_entry),
-                                   "Select a VIMS event");
+    gtk_widget_set_tooltip_text(view->command_entry,
+                                "Select a VIMS event");
     gtk_widget_set_hexpand(view->command_entry, TRUE);
     gtk_widget_set_sensitive(view->command_entry, FALSE);
     gtk_box_pack_start(GTK_BOX(row), view->command_entry, TRUE, TRUE, 0);
@@ -1507,7 +1506,7 @@ static GtkWidget *gvr_vims_view_command_bar(GvrVimsView *view)
 
     view->command_hint = gtk_label_new(
         "Select an event to create a pattern-ready VIMS row.");
-    gtk_label_set_xalign(GTK_LABEL(view->command_hint), 0.0f);
+    g_object_set(view->command_hint, "xalign", 0.0f, NULL);
     gtk_label_set_ellipsize(GTK_LABEL(view->command_hint), PANGO_ELLIPSIZE_END);
     gtk_style_context_add_class(gtk_widget_get_style_context(view->command_hint),
                                 "dim-label");
@@ -1726,10 +1725,9 @@ static void gvr_vims_view_init(GvrVimsView *view)
     gtk_box_pack_end(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(view), toolbar, FALSE, FALSE, 0);
 
-    view->search_revealer = gtk_revealer_new();
-    gtk_revealer_set_transition_type(GTK_REVEALER(view->search_revealer),
-                                     GTK_REVEALER_TRANSITION_TYPE_SLIDE_DOWN);
-    gtk_revealer_set_reveal_child(GTK_REVEALER(view->search_revealer), FALSE);
+    view->search_revealer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_set_no_show_all(view->search_revealer, TRUE);
+    gtk_widget_hide(view->search_revealer);
     search_bar = gvr_vims_view_search_bar(view);
     gtk_container_add(GTK_CONTAINER(view->search_revealer), search_bar);
     gtk_box_pack_start(GTK_BOX(view), view->search_revealer, FALSE, FALSE, 0);
@@ -1834,11 +1832,13 @@ static void gvr_vims_view_init(GvrVimsView *view)
     view->response_view = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(view->response_view), FALSE);
     gtk_text_view_set_cursor_visible(GTK_TEXT_VIEW(view->response_view), FALSE);
-    gtk_text_view_set_monospace(GTK_TEXT_VIEW(view->response_view), TRUE);
+    gvr_vims_view_apply_css(view->response_view,
+                            "* { font-family: monospace; }");
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view->response_view), GTK_WRAP_NONE);
 
     view->editor_view = gtk_text_view_new();
-    gtk_text_view_set_monospace(GTK_TEXT_VIEW(view->editor_view), TRUE);
+    gvr_vims_view_apply_css(view->editor_view,
+                            "* { font-family: monospace; }");
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view->editor_view), GTK_WRAP_NONE);
 
     view->workspace = gtk_notebook_new();
@@ -1858,7 +1858,6 @@ static void gvr_vims_view_init(GvrVimsView *view)
                              gtk_label_new("Bundle Editor"));
 
     view->lower_paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
-    gtk_paned_set_wide_handle(GTK_PANED(view->lower_paned), TRUE);
     gtk_paned_pack1(GTK_PANED(view->lower_paned),
                     view->registry_notebook,
                     TRUE,
@@ -1870,7 +1869,6 @@ static void gvr_vims_view_init(GvrVimsView *view)
     gtk_paned_set_position(GTK_PANED(view->lower_paned), 190);
 
     view->main_paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
-    gtk_paned_set_wide_handle(GTK_PANED(view->main_paned), TRUE);
     gtk_paned_pack1(GTK_PANED(view->main_paned),
                     namespace_section,
                     TRUE,

@@ -457,6 +457,34 @@ typedef struct {
 	volatile long long fps_epoch_frame;
 	volatile int fps_generation;
 	volatile int transport_epoch;
+	volatile int sync_start_armed;
+	volatile long long sync_start_realtime_us;
+	volatile int sync_start_speed;
+	volatile int sync_adjust_frames;
+	volatile int multitrack_transition_active;
+	volatile int multitrack_transition_effect_id;
+	volatile int multitrack_opacity_effect_id;
+	volatile int multitrack_transition_method;
+	volatile int multitrack_transition_shape;
+	volatile int multitrack_transition_direction;
+	volatile int multitrack_transition_duration;
+	volatile int multitrack_transition_elapsed;
+	volatile int multitrack_transition_start_opacity;
+	volatile int multitrack_transition_target_opacity;
+	volatile int multitrack_transition_progress;
+	volatile int multitrack_transition_layer;
+	volatile int multitrack_transition_target_layer;
+	volatile int multitrack_transition_from_stream_id;
+	volatile int multitrack_transition_target_stream_id;
+	volatile int multitrack_program_stream_id;
+	volatile int multitrack_preview_stream_id;
+	volatile int multitrack_program_layer;
+	volatile int multitrack_layer0_entry;
+	volatile int multitrack_layer1_entry;
+	volatile int multitrack_layer0_stream_id;
+	volatile int multitrack_layer1_stream_id;
+	volatile int multitrack_layer0_opacity;
+	volatile int multitrack_layer1_opacity;
 	volatile double runtime_playback_rate;
 	volatile long long anchor_frame;
 #ifdef HAVE_JACK
@@ -781,6 +809,7 @@ typedef struct veejay_t
 	int log_suppression;
     void *performer;
 	global_chain_t *global_chain;
+	global_chain_t *multitrack_chain;
 } veejay_t;
 
 void veejay_transport_epoch_bump(veejay_t *info);

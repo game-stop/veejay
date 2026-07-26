@@ -2974,17 +2974,25 @@ static void gvr_edit_list_update_playing_rows_for_move(
         int old_frame,
         int new_frame)
 {
-    int old_position = -1;
-    int new_position = -1;
+    guint old_position = 0;
+    guint new_position = 0;
+    gboolean old_valid;
+    gboolean new_valid;
 
-    gvr_edit_list_segment_at_frame(view, old_frame, &old_position);
-    gvr_edit_list_segment_at_frame(view, new_frame, &new_position);
+    old_valid = gvr_edit_list_segment_at_frame(view,
+                                                old_frame,
+                                                &old_position) != NULL;
+    new_valid = gvr_edit_list_segment_at_frame(view,
+                                                new_frame,
+                                                &new_position) != NULL;
 
-    if(old_position == new_position)
+    if(old_valid && new_valid && old_position == new_position)
         return;
 
-    gvr_edit_list_set_playing_row(view, old_position, FALSE);
-    gvr_edit_list_set_playing_row(view, new_position, TRUE);
+    if(old_valid)
+        gvr_edit_list_set_playing_row(view, (int)old_position, FALSE);
+    if(new_valid)
+        gvr_edit_list_set_playing_row(view, (int)new_position, TRUE);
 }
 
 static void gvr_edit_list_emit_seek(GvrEditListView *view, int frame)

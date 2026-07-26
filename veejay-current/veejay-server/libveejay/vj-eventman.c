@@ -135,6 +135,9 @@ void vj_event_audio_beat_monitor_latency(void *ptr, const char format[], va_list
 void vj_event_audio_beat_fx_param(void *ptr, const char format[], va_list ap);
 void vj_event_audio_mix_mode(void *ptr, const char format[], va_list ap);
 void vj_event_audio_mix_crossfade(void *ptr, const char format[], va_list ap);
+void vj_event_play_sync_start(void *ptr, const char format[], va_list ap);
+void vj_event_multitrack_transition_take(void *ptr, const char format[], va_list ap);
+void vj_event_play_sync_adjust(void *ptr, const char format[], va_list ap);
 
 
 
@@ -765,6 +768,47 @@ void		vj_init_vevo_events(void)
 				0,	
 				VIMS_ALLOW_ANY,
 				NULL );
+
+    index_map_[VIMS_VIDEO_SYNC_START] = _new_event(
+                "%d %d",
+                VIMS_VIDEO_SYNC_START,
+                "Arm synchronized playback start",
+                vj_event_play_sync_start,
+                2,
+                VIMS_REQUIRE_ALL_PARAMS,
+                "Unix epoch seconds",
+                0,
+                "Microseconds within the second",
+                0,
+                NULL );
+
+    index_map_[VIMS_VIDEO_TRANSITION_TAKE] = _new_event(
+                "%d %d %d %d",
+                VIMS_VIDEO_TRANSITION_TAKE,
+                "Transition the persistent A/B compositor output to a master or unicast video source",
+                vj_event_multitrack_transition_take,
+                4,
+                VIMS_ALLOW_ANY,
+                "Target unicast stream ID (0=master dry output)",
+                0,
+                "Duration in rendered frames (0=cut)",
+                25,
+                "Transition method (0=dissolve, 1=shape wipe)",
+                VJ_MULTITRACK_TRANSITION_DISSOLVE,
+                "Shape Wipe index (-1=random)",
+                0,
+                NULL );
+
+    index_map_[VIMS_VIDEO_SYNC_ADJUST] = _new_event(
+                "%d",
+                VIMS_VIDEO_SYNC_ADJUST,
+                "Apply one bounded frame correction on the next playback step",
+                vj_event_play_sync_adjust,
+                1,
+                VIMS_REQUIRE_ALL_PARAMS,
+                "Signed frame adjustment [-4,4]",
+                0,
+                NULL );
 
 	index_map_[VIMS_VIDEO_SET_FREEZE]    =   _new_event(
 				NULL,

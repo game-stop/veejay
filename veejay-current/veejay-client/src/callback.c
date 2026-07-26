@@ -29,6 +29,7 @@
 #include "callback.h"
 #include "vj-api.h"
 #include "curve.h"
+#include "gtkshapeselector.h"
 
 extern void sample_preview_arm_plain_new_sample(void);
 
@@ -8962,18 +8963,42 @@ on_transition_length_value_changed( GtkWidget *widget, gpointer user_data)
 }
 
 void
-on_transition_shape_value_changed( GtkWidget *widget, gpointer user_data)
+on_transition_shape_value_changed(GtkWidget *widget, gpointer user_data)
 {
+    int shape;
+    (void)user_data;
+
     if(info->status_lock)
         return;
 
-    int shape = (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+    if(GVR_IS_SHAPE_SELECTOR(widget))
+        shape = gvr_shape_selector_get_active(widget);
+    else if(GTK_IS_SPIN_BUTTON(widget))
+        shape = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widget));
+    else
+        return;
 
     set_transition(
-            info->status_tokens[ SAMPLE_TRANSITION_ACTIVE ],
+            info->status_tokens[SAMPLE_TRANSITION_ACTIVE],
             shape,
-            info->status_tokens[ SAMPLE_TRANSITION_LENGTH ]
-            );
+            info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
+    vj_msg(VEEJAY_MSG_INFO, "Transition shape requested: %d", shape);
+}
+
+void on_transition_shape_selected(GtkWidget *widget,
+                                  gint shape,
+                                  gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    if(info->status_lock)
+        return;
+
+    set_transition(
+            info->status_tokens[SAMPLE_TRANSITION_ACTIVE],
+            shape,
+            info->status_tokens[SAMPLE_TRANSITION_LENGTH]);
     vj_msg(VEEJAY_MSG_INFO, "Transition shape requested: %d", shape);
 }
 

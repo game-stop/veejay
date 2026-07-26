@@ -324,7 +324,9 @@ static gboolean gvr_media_view_button_press(GtkWidget *widget,
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), copy_path);
         g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
         gtk_widget_show_all(menu);
-        gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
+        gtk_menu_popup(GTK_MENU(menu),
+                       NULL, NULL, NULL, NULL,
+                       event->button, event->time);
         g_free(filename);
     }
 
@@ -415,15 +417,14 @@ static void gvr_media_view_init(GvrMediaView *view)
     gvr_media_view_add_class(title, "media-view-title");
     gtk_box_pack_start(GTK_BOX(toolbar), title, FALSE, FALSE, 4);
 
-    view->search_entry = gtk_search_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(view->search_entry),
-                                   "Filter media files");
+    view->search_entry = gtk_entry_new();
+    gtk_widget_set_tooltip_text(view->search_entry,
+                                "Filter media files");
     gtk_widget_set_hexpand(view->search_entry, TRUE);
     gvr_media_view_add_class(view->search_entry, "media-view-search");
     gtk_box_pack_start(GTK_BOX(toolbar), view->search_entry, TRUE, TRUE, 0);
 
-    view->refresh_button = gtk_button_new_from_icon_name("view-refresh",
-                                                         GTK_ICON_SIZE_BUTTON);
+    view->refresh_button = gtk_button_new_with_label("Refresh");
     gtk_widget_set_tooltip_text(view->refresh_button,
                                 "Fetch video files from VeeJay's working directory");
     gtk_box_pack_end(GTK_BOX(toolbar), view->refresh_button, FALSE, FALSE, 0);
