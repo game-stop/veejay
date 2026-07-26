@@ -54,6 +54,7 @@
 #include <veejaycore/defs.h>
 #include <veejaycore/vj-client.h>
 #include <veejaycore/vjmem.h>
+#include <veejaycore/vims.h>
 
 #ifndef V_CMD
 #define V_CMD 0
@@ -75,7 +76,7 @@
 #define AVJ_DEFAULT_STATE   "eidolon.life"
 #define AVJ_VERSION         24
 #define AVJ_STATUS_FEATURES  48
-#define AVJ_STATUS_TOKEN_CAP 160
+#define AVJ_STATUS_TOKEN_CAP VIMS_STATUS_TOKENS
 #define AVJ_IMMUNE_CAP       96
 #define AVJ_PAIR_IMMUNE_CAP 192
 #define AVJ_GESTURE_CAP      64
