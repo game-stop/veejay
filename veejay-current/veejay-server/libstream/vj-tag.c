@@ -4188,7 +4188,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
             if( subs )
             {
                 char tmp[512];
-                sprintf(tmp, "%s-SUB-s%d.srt", sampleFile, id ); //FIXME or DELETEME
+                snprintf(tmp, sizeof(tmp), "%s-SUB-s%d.srt", sampleFile, id);
                 vj_font_set_dict( font, tag->dict );
                 vj_font_load_srt( font, tmp );
                 vj_font_xml_unpack( doc,subs, font );
