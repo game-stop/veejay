@@ -703,7 +703,7 @@ static inline void cf_compute_one_safe(chronorain_t *c,
     int ad = diff < 0 ? -diff : diff;
 
     int event_strength = c->event_lut[ad];
-    int event_for_adapt = event_strength;
+    uint8_t event_for_adapt = (uint8_t) event_strength;
 
     int on_src;
     int off_src;
@@ -1006,7 +1006,7 @@ static void NAME(chronorain_t *c,                                               
                 int ad = diff < 0 ? -diff : diff;                                     \
                                                                                       \
                 int event_strength = EVENT[ad];                                       \
-                int event_for_adapt = event_strength;                                 \
+                uint8_t event_for_adapt = (uint8_t) event_strength;                                 \
                                                                                       \
                 int dx = 0;                                                           \
                 int xshift = 0;                                                       \
@@ -1185,7 +1185,7 @@ static void cf_render_const_pure(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
             {
-                int cev = CHROMA[ev];
+                int cev = CHROMA[(uint8_t) ev];
                 U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, cev);
                 V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, cev);
             }
@@ -1262,7 +1262,7 @@ static void cf_render_const_bleed(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
             {
-                int cev = CHROMA[ev];
+                int cev = CHROMA[(uint8_t) ev];
                 U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
                 V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
             }
@@ -1355,7 +1355,7 @@ static void cf_render_source(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
             {
-                int cev = CHROMA[ev];
+                int cev = CHROMA[(uint8_t) ev];
                 U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
                 V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
             }

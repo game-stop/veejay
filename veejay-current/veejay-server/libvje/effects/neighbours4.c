@@ -146,10 +146,19 @@ static void nb4_create_circle(nb4_t *n, int radius, int depth)
         }
     }
 
-    for(int i = 0; i < depth; i++) {
-        const int k = ((i * count) + (depth >> 1)) / depth;
+    if(count > 0) {
+        const int last = count - 1;
 
-        n->points[i] = candidates[k < count ? k : count - 1];
+        for(int i = 0; i < depth; i++) {
+            const int k = ((i * count) + (depth >> 1)) / depth;
+            n->points[i] = candidates[k < count ? k : last];
+        }
+    }
+    else {
+        for(int i = 0; i < depth; i++) {
+            n->points[i].x = 0;
+            n->points[i].y = 0;
+        }
     }
 
     n->last_radius = radius;

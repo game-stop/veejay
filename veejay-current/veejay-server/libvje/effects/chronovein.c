@@ -433,7 +433,7 @@ static inline void cv_compute_one_safe(chronovein_t *c,
     int ad = diff < 0 ? -diff : diff;
 
     int event_strength = c->event_lut[ad];
-    int event_for_adapt = event_strength;
+    uint8_t event_for_adapt = (uint8_t) event_strength;
 
     int base = c->decay_lut[F[pos]];
     int out_pol = P[pos];
@@ -641,7 +641,7 @@ static void cv_compute(chronovein_t *c,
             int ad = diff < 0 ? -diff : diff;
 
             int event_strength = EVENT[ad];
-            int event_for_adapt = event_strength;
+            uint8_t event_for_adapt = (uint8_t) event_strength;
 
             int gx = cv_absi((int) Y[pos - 1] - (int) Y[pos + 1]);
             int gy = cv_absi((int) Y[pos - w] - (int) Y[pos + w]);

@@ -1453,7 +1453,10 @@ static void vj_perform_sample_tick_reset(performer_global_t *g) {
 }
 
 static long long vj_perform_sample_already_ticked(performer_global_t *g, int target_id, int chain_id) {
-    for( int i = 0; i <= chain_id && i < SAMPLE_MAX_EFFECTS; i ++ ) {
+    if(chain_id < 0 || chain_id >= SAMPLE_MAX_EFFECTS)
+        return -1;
+
+    for( int i = 0; i <= chain_id; i ++ ) {
         if(g->played_sample_ids[i]==target_id) {
             return g->played_sample_positions[i];
         }
@@ -1462,6 +1465,9 @@ static long long vj_perform_sample_already_ticked(performer_global_t *g, int tar
 }
 
 static void vj_perform_sample_ticked(performer_global_t *g, int target_id, int chain_id, long long pos) {
+    if(chain_id < 0 || chain_id >= SAMPLE_MAX_EFFECTS)
+        return;
+
     g->played_sample_ids[chain_id] = target_id;
     g->played_sample_positions[chain_id] = pos;
 }

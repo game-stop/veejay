@@ -1488,15 +1488,7 @@ void veejay_blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int 
     uint8_t temp[2][4096];
     uint8_t *a = temp[0], *b = temp[1];
     if (radius) {
-
-		for (int i = 0; i < w; i++) a[i] = src[i*srcStep];
-
-		for (int i = 0; i < radius; i++) {
-			a[-i + radius] = a[i];
-			a[w + i] = a[w - 1 - i];
-		}
-
-		veejay_blur(a, src, w, radius, 1, srcStep);
+        veejay_blur(a, src, w, radius, 1, srcStep);
 
 		for (; power > 2; power--) {
 			veejay_blur(b, a, w, radius, 1, 1);

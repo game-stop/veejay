@@ -671,7 +671,7 @@ static void NAME(chronofold_t *c, VJFrame *frame)                               
             c->ref_y[pos] = cf_blend_fast_u8(                                       \
                 (uint8_t) ref,                                                      \
                 cy,                                                                 \
-                c->adapt_lut[event_strength]);                                      \
+                c->adapt_lut[(uint8_t) event_strength]);                                      \
         }                                                                           \
     }                                                                               \
 }
@@ -766,7 +766,7 @@ static void NAME(chronofold_t *c, VJFrame *frame, int color_mode)               
             c->ref_y[pos] = cf_blend_fast_u8(                                       \
                 (uint8_t) ref,                                                      \
                 cy,                                                                 \
-                c->adapt_lut[event_strength]);                                      \
+                c->adapt_lut[(uint8_t) event_strength]);                                      \
         }                                                                           \
     }                                                                               \
 }
