@@ -2039,15 +2039,14 @@ static void gvr_edit_list_rename_separator(GvrEditListView *view, guint id)
     GtkWidget *entry;
     GtkWidget *content;
     GtkWindow *parent = NULL;
+    GtkWidget *toplevel;
 
     if(!separator)
         return;
 
-    if(gtk_widget_get_toplevel(GTK_WIDGET(view)) &&
-       GTK_IS_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view))))
-    {
-        parent = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view)));
-    }
+    toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
+    if(GTK_IS_WINDOW(toplevel))
+        parent = GTK_WINDOW(toplevel);
 
     dialog = gtk_dialog_new_with_buttons("Rename Separator",
                                          parent,
@@ -2082,14 +2081,15 @@ static void gvr_edit_list_name_region(GvrEditListView *view, int frame)
     GtkWidget *entry;
     GtkWidget *content;
     GtkWindow *parent = NULL;
+    GtkWidget *toplevel;
 
     if(!gvr_edit_list_region_pair_at_frame(view, frame, &start, &end))
         return;
 
     region = gvr_edit_list_region_by_pair(view, start->id, end->id, NULL);
-    if(gtk_widget_get_toplevel(GTK_WIDGET(view)) &&
-       GTK_IS_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view))))
-        parent = GTK_WINDOW(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+    toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
+    if(GTK_IS_WINDOW(toplevel))
+        parent = GTK_WINDOW(toplevel);
 
     dialog = gtk_dialog_new_with_buttons(region ? "Rename Region" : "Name Region",
                                          parent,

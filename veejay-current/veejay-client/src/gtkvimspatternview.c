@@ -1019,8 +1019,11 @@ static gboolean gvr_pattern_last_argument_text(const char *message,
         return FALSE;
 
     length = MIN(length, text_size - 1);
-    memcpy(text, start, length);
-    text[length] = '\0';
+    g_snprintf(text,
+               text_size,
+               "%.*s",
+               (int)MIN(length, (gsize)G_MAXINT),
+               start);
     return TRUE;
 }
 
@@ -1437,8 +1440,11 @@ static gboolean gvr_pattern_format_description_label(
             if(used == 0 && base_limit > 0) {
                 const gsize copy_length =
                     MIN(piece_length, base_limit);
-                memcpy(base, piece, copy_length);
-                base[copy_length] = '\0';
+                g_snprintf(base,
+                           sizeof(base),
+                           "%.*s",
+                           (int)copy_length,
+                           piece);
             }
             break;
         }

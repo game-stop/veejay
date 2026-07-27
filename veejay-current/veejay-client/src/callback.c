@@ -64,9 +64,11 @@ static void curve_live_preview_user_override(gboolean enabled)
 {
     curve_live_preview_user_override_state = enabled ? TRUE : FALSE;
 
-    if(info && info->curve && GTK3_IS_CURVE(info->curve)) {
-        gtk3_curve_live_trace_set_user_override(info->curve, enabled);
-        gtk_widget_queue_draw(info->curve);
+    if(info) {
+        if(GTK3_IS_CURVE(info->curve)) {
+            gtk3_curve_live_trace_set_user_override(info->curve, enabled);
+            gtk_widget_queue_draw(info->curve);
+        }
     }
 }
 
@@ -498,7 +500,7 @@ void	on_subrender_toggled(GtkWidget *widget, gpointer user_data)
 
     int enabled = 0;
 
-    if(widget && GTK_IS_TOGGLE_BUTTON(widget)) {
+    if(GTK_IS_TOGGLE_BUTTON(widget)) {
         enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
     }
     else {
@@ -804,9 +806,9 @@ static int volume_widget_int_value(GtkWidget *widget)
 {
     int value = 100;
 
-    if(widget && GTK_IS_RANGE(widget))
+    if(GTK_IS_RANGE(widget))
         value = (int)(gtk_range_get_value(GTK_RANGE(widget)) + 0.5);
-    else if(widget && GTK_IS_SPIN_BUTTON(widget))
+    else if(GTK_IS_SPIN_BUTTON(widget))
         value = (int)(gtk_spin_button_get_value(GTK_SPIN_BUTTON(widget)) + 0.5);
 
     return ui_clampi(value, 0, 100);
@@ -820,9 +822,9 @@ static void volume_set_adjustment_guarded(int scale_id, int spin_id, int volume)
 
     volume = ui_clampi(volume, 0, 100);
 
-    if(w && GTK_IS_RANGE(w))
+    if(GTK_IS_RANGE(w))
         adj = gtk_range_get_adjustment(GTK_RANGE(w));
-    else if(widget_cache[spin_id] && GTK_IS_SPIN_BUTTON(widget_cache[spin_id]))
+    else if(GTK_IS_SPIN_BUTTON(widget_cache[spin_id]))
         adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(widget_cache[spin_id]));
 
     if(!adj)
@@ -950,12 +952,18 @@ static int audio_mixer_mode_from_ui(void)
     if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(override)))
         return AUDIO_MIX_MODE_FOLLOW;
 
-    if(original && GTK_IS_TOGGLE_BUTTON(original) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(original)))
-        return AUDIO_MIX_MODE_ORIGINAL;
-    if(external && GTK_IS_TOGGLE_BUTTON(external) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(external)))
-        return AUDIO_MIX_MODE_JACK;
-    if(mix && GTK_IS_TOGGLE_BUTTON(mix) && gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(mix)))
-        return AUDIO_MIX_MODE_ORIGINAL_JACK;
+    if(GTK_IS_TOGGLE_BUTTON(original)) {
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(original)))
+            return AUDIO_MIX_MODE_ORIGINAL;
+    }
+    if(GTK_IS_TOGGLE_BUTTON(external)) {
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(external)))
+            return AUDIO_MIX_MODE_JACK;
+    }
+    if(GTK_IS_TOGGLE_BUTTON(mix)) {
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(mix)))
+            return AUDIO_MIX_MODE_ORIGINAL_JACK;
+    }
 
     return AUDIO_MIX_MODE_ORIGINAL_JACK;
 }
@@ -1008,24 +1016,32 @@ static void audio_mixer_set_mode_guarded(int mode)
     info->status_lock = 1;
 
 
-    if(override && GTK_IS_TOGGLE_BUTTON(override))
+    if(GTK_IS_TOGGLE_BUTTON(override))
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(override), mode != AUDIO_MIX_MODE_FOLLOW);
 
-    if(mode == AUDIO_MIX_MODE_ORIGINAL && original && GTK_IS_TOGGLE_BUTTON(original))
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(original), TRUE);
-    else if(mode == AUDIO_MIX_MODE_JACK && external && GTK_IS_TOGGLE_BUTTON(external))
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(external), TRUE);
-    else if(mode == AUDIO_MIX_MODE_ORIGINAL_JACK && mix && GTK_IS_TOGGLE_BUTTON(mix))
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mix), TRUE);
+    switch(mode) {
+        case AUDIO_MIX_MODE_ORIGINAL:
+            if(GTK_IS_TOGGLE_BUTTON(original))
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(original), TRUE);
+            break;
+        case AUDIO_MIX_MODE_JACK:
+            if(GTK_IS_TOGGLE_BUTTON(external))
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(external), TRUE);
+            break;
+        case AUDIO_MIX_MODE_ORIGINAL_JACK:
+        case AUDIO_MIX_MODE_FOLLOW:
+            if(GTK_IS_TOGGLE_BUTTON(mix))
+                gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mix), TRUE);
+            break;
+        default:
+            break;
+    }
 
-    if(mode == AUDIO_MIX_MODE_FOLLOW && mix && GTK_IS_TOGGLE_BUTTON(mix))
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(mix), TRUE);
-
-    if(original && GTK_IS_WIDGET(original))
+    if(GTK_IS_WIDGET(original))
         gtk_widget_set_sensitive(original, mode != AUDIO_MIX_MODE_FOLLOW);
-    if(external && GTK_IS_WIDGET(external))
+    if(GTK_IS_WIDGET(external))
         gtk_widget_set_sensitive(external, mode != AUDIO_MIX_MODE_FOLLOW);
-    if(mix && GTK_IS_WIDGET(mix))
+    if(GTK_IS_WIDGET(mix))
         gtk_widget_set_sensitive(mix, mode != AUDIO_MIX_MODE_FOLLOW);
 
     info->status_lock = old_lock;
@@ -1266,7 +1282,7 @@ static void audio_beat_set_label_text(int widget_id, const char *text)
 {
     GtkWidget *w = widget_cache[widget_id];
 
-    if(w && GTK_IS_LABEL(w))
+    if(GTK_IS_LABEL(w))
         gtk_label_set_text(GTK_LABEL(w), text);
 }
 
@@ -1947,8 +1963,10 @@ static int audio_sync_channels_from_ui(void)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_CHANNELS_SPIN];
     int ch = 2;
 
-    if(w && GTK_IS_SPIN_BUTTON(w) && gtk_widget_get_sensitive(w))
-        ch = (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+    if(GTK_IS_SPIN_BUTTON(w)) {
+        if(gtk_widget_get_sensitive(w))
+            ch = (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
+    }
 
     return ui_clampi(ch, 1, 2);
 }
@@ -1968,7 +1986,7 @@ static int audio_sync_bpm_x10_from_ui(void)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_TARGET_BPM_SPIN];
     double bpm = 128.0;
 
-    if(w && GTK_IS_SPIN_BUTTON(w))
+    if(GTK_IS_SPIN_BUTTON(w))
         bpm = gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
 
     bpm = ui_clampd(bpm, 40.0, 240.0);
@@ -2084,11 +2102,11 @@ static void audio_sync_set_target_controls_guarded(int bpm_x10, int phase, int c
 
     info->status_lock = 1;
 
-    if(bpm_w && GTK_IS_SPIN_BUTTON(bpm_w) && bpm_x10 > 0)
+    if(GTK_IS_SPIN_BUTTON(bpm_w) && bpm_x10 > 0)
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(bpm_w), ((gdouble)bpm_x10) / 10.0);
-    if(phase_w && GTK_IS_SPIN_BUTTON(phase_w))
+    if(GTK_IS_SPIN_BUTTON(phase_w))
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(phase_w), (gdouble)ui_clampi(phase, 0, 100));
-    if(conf_w && GTK_IS_SPIN_BUTTON(conf_w))
+    if(GTK_IS_SPIN_BUTTON(conf_w))
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(conf_w), (gdouble)ui_clampi(confidence, 0, 100));
 
     info->status_lock = old_lock;
@@ -2220,7 +2238,7 @@ static int sample_audio_sync_source_from_ui(void)
     GtkWidget *w = audio_sync_named_widget("sample_audio_sync_source_combo");
     int active;
 
-    if(w && GTK_IS_COMBO_BOX_TEXT(w)) {
+    if(GTK_IS_COMBO_BOX_TEXT(w)) {
         gchar *label = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w));
         if(label) {
             int source = sample_audio_sync_source_from_label(label, SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE);
@@ -2595,7 +2613,7 @@ void on_sample_audio_sync_clear_button_clicked(GtkWidget *widget, gpointer user_
         GtkWidget *combo = audio_sync_named_widget("sample_audio_sync_source_combo");
         int old_lock = info->status_lock;
         info->status_lock = 1;
-        if(combo && GTK_IS_COMBO_BOX(combo))
+        if(GTK_IS_COMBO_BOX(combo))
             gtk_combo_box_set_active(GTK_COMBO_BOX(combo), 0);
         info->status_lock = old_lock;
     }
@@ -3136,7 +3154,7 @@ void on_audio_sync_source_combo_changed(GtkWidget *widget, gpointer user_data)
     if(mode == 0)
         return;
 
-    if(widget && GTK_IS_COMBO_BOX(widget))
+    if(GTK_IS_COMBO_BOX(widget))
         active = gtk_combo_box_get_active(GTK_COMBO_BOX(widget));
 
     if(!audio_sync_mode_supports_wav(mode)) {
@@ -3399,9 +3417,10 @@ void on_audio_sync_jack_button_clicked(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    if(widget && GTK_IS_TOGGLE_BUTTON(widget) &&
-       !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
-        return;
+    if(GTK_IS_TOGGLE_BUTTON(widget)) {
+        if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+            return;
+    }
 
     if(!audio_global_source_controls_allowed()) {
         vj_msg(VEEJAY_MSG_INFO,
@@ -3431,9 +3450,10 @@ void on_audio_sync_wav_button_clicked(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    if(widget && GTK_IS_TOGGLE_BUTTON(widget) &&
-       !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
-        return;
+    if(GTK_IS_TOGGLE_BUTTON(widget)) {
+        if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
+            return;
+    }
 
     if(!audio_global_source_controls_allowed()) {
         audio_sync_set_master_wav_options_visible(1);
@@ -4898,7 +4918,7 @@ static int v4l_widget_value_65535(GtkWidget *widget)
 {
     int value = 0;
 
-    if(widget && GTK_IS_RANGE(widget))
+    if(GTK_IS_RANGE(widget))
         value = (int)(gtk_range_get_value(GTK_RANGE(widget)) + 0.5);
 
     return ui_clampi(value, 0, 65535);
@@ -6744,8 +6764,10 @@ static Gtk3CurveType curve_selected_type(void)
     if (is_button_toggled("curve_typelinear"))
         return GTK3_CURVE_TYPE_LINEAR;
 
-    if (info && info->curve && GTK3_IS_CURVE(info->curve))
-        return gtk3_curve_get_curve_type(info->curve);
+    if (info) {
+        if(GTK3_IS_CURVE(info->curve))
+            return gtk3_curve_get_curve_type(info->curve);
+    }
 
     return GTK3_CURVE_TYPE_LINEAR;
 }
@@ -6925,8 +6947,7 @@ void on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data)
     {
         int old_lock = info->status_lock;
         info->status_lock = 1;
-        if(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM] &&
-           GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))
+        if(GTK_IS_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]))
             gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget_cache[WIDGET_CURVE_TOGGLEENTRY_PARAM]), TRUE);
         info->status_lock = old_lock;
     }
@@ -7036,14 +7057,14 @@ void update_curve_shape(void)
         steps = 1;
 
     int seed = 0;
-    if (shape_seed_spin && GTK_IS_SPIN_BUTTON(shape_seed_spin)) {
+    if (GTK_IS_SPIN_BUTTON(shape_seed_spin)) {
         seed = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shape_seed_spin));
         if (seed < 0)
             seed = 0;
     }
 
     int detail = 8;
-    if (shape_detail_spin && GTK_IS_SPIN_BUTTON(shape_detail_spin)) {
+    if (GTK_IS_SPIN_BUTTON(shape_detail_spin)) {
         detail = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(shape_detail_spin));
         if (detail < 1)
             detail = 1;
@@ -7188,7 +7209,7 @@ void on_curve_button_animation_shuffle_clicked(GtkWidget *widget, gpointer user_
     }
 
     GtkWidget *shape_combo = widget_cache[ WIDGET_CURVE_ANIMATION_LIST ];
-    int selected_shape = shape_combo && GTK_IS_COMBO_BOX(shape_combo)
+    int selected_shape = GTK_IS_COMBO_BOX(shape_combo)
         ? gtk_combo_box_get_active(GTK_COMBO_BOX(shape_combo))
         : -1;
 
@@ -7722,7 +7743,7 @@ void on_timeline_audio_offset_changed(GtkWidget *widget, gpointer user_data)
         wav_anchor_ms = 0;
 
     spin = audio_sync_named_widget("sample_audio_sync_wav_anchor_ms");
-    if(spin && GTK_IS_SPIN_BUTTON(spin)) {
+    if(GTK_IS_SPIN_BUTTON(spin)) {
         old_lock = info->status_lock;
         info->status_lock = 1;
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(spin), (gdouble) wav_anchor_ms);
@@ -8220,13 +8241,12 @@ void alpha_composite_sync_from_status(int enabled, int alpha_value)
 
     info->status_lock = 1;
 
-    if(init && GTK_IS_TOGGLE_BUTTON(init) &&
-       gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(init)) != enabled)
-    {
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(init), enabled);
+    if(GTK_IS_TOGGLE_BUTTON(init)) {
+        if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(init)) != enabled)
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(init), enabled);
     }
 
-    if(fill && GTK_IS_TOGGLE_BUTTON(fill)) {
+    if(GTK_IS_TOGGLE_BUTTON(fill)) {
         int opaque = (alpha_value >= 128);
         if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(fill)) != opaque)
             gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(fill), opaque);
@@ -8490,14 +8510,13 @@ static void fx_chain_select_clicked_entry(GtkTreeView *view, GtkTreePath *path, 
     info->uc.selected_chain_entry = entry;
     update_label_i2(widget_cache[WIDGET_LABEL_FXENTRY], entry, 0);
 
-    if(widget_cache[WIDGET_BUTTON_FX_ENTRY] &&
-       GTK_IS_SPIN_BUTTON(widget_cache[WIDGET_BUTTON_FX_ENTRY]) &&
-       get_nums2(widget_cache[WIDGET_BUTTON_FX_ENTRY]) != entry)
-    {
-        int old_lock = info->status_lock;
-        info->status_lock = 1;
-        update_spin_value2(widget_cache[WIDGET_BUTTON_FX_ENTRY], entry);
-        info->status_lock = old_lock;
+    if(GTK_IS_SPIN_BUTTON(widget_cache[WIDGET_BUTTON_FX_ENTRY])) {
+        if(get_nums2(widget_cache[WIDGET_BUTTON_FX_ENTRY]) != entry) {
+            int old_lock = info->status_lock;
+            info->status_lock = 1;
+            update_spin_value2(widget_cache[WIDGET_BUTTON_FX_ENTRY], entry);
+            info->status_lock = old_lock;
+        }
     }
 }
 
@@ -9145,7 +9164,7 @@ void    on_subrender_entry_toggle_toggled(GtkWidget *w, gpointer data)
 
     int enabled = 0;
 
-    if(w && GTK_IS_TOGGLE_BUTTON(w))
+    if(GTK_IS_TOGGLE_BUTTON(w))
         enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
     else
         enabled = is_button_toggled( "subrender_entry_toggle" ) ? 1 : 0;

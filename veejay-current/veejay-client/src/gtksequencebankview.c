@@ -1986,6 +1986,10 @@ static gboolean gvr_sequence_bank_view_button_press(GtkWidget *widget, GdkEventB
         return TRUE;
     }
 
+    if(bank < 0 || bank >= GVR_SEQUENCE_BANKS ||
+       slot < 0 || slot >= GVR_SEQUENCE_SLOTS)
+        return FALSE;
+
     if(event->button == 3) {
         if(bank != view->selected_bank ||
            !gvr_sequence_bank_view_slot_in_selection(view, bank, slot))

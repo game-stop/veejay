@@ -665,11 +665,11 @@ static gboolean gvr_shape_search_accel(GtkAccelGroup *accel_group,
 
 static void gvr_shape_search_accel_detach(GvrShapeSelector *selector)
 {
-    if(selector->search_accel_group &&
-       selector->search_accel_window &&
-       GTK_IS_WINDOW(selector->search_accel_window))
-        gtk_window_remove_accel_group(GTK_WINDOW(selector->search_accel_window),
-                                      selector->search_accel_group);
+    if(selector->search_accel_group) {
+        if(GTK_IS_WINDOW(selector->search_accel_window))
+            gtk_window_remove_accel_group(GTK_WINDOW(selector->search_accel_window),
+                                          selector->search_accel_group);
+    }
 
     g_clear_object(&selector->search_accel_group);
     selector->search_accel_window = NULL;
