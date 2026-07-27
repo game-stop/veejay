@@ -2448,7 +2448,9 @@ static void check_cpu_governor_advice(void) {
     }
 
     if (fgets(governor, sizeof(governor), f)) {
-        governor[strcspn(governor, "\n")] = 0;
+        char *newline = strchr(governor, '\n');
+        if(newline)
+            *newline = '\0';
 
         veejay_msg(VEEJAY_MSG_INFO, "Current CPU scaling governor: [%s]", governor);
 

@@ -5691,10 +5691,12 @@ static void avj_randomize_gene(avj_t *a, avj_gene_t *g, int dbi)
 static void avj_set_org_chain_len(avj_t *a, avj_org_t *o, int len)
 {
     int i;
+    int old_len;
     if (!o) return;
     avj_clamp_chain_bounds(a);
     len = avj_clampi(len, a->min_chain, a->max_chain);
-    for (i = o->chain_len; i < len && i < AVJ_MAX_CHAIN; i++) {
+    old_len = avj_clampi(o->chain_len, 0, AVJ_MAX_CHAIN);
+    for (i = old_len; i < len && i < AVJ_MAX_CHAIN; i++) {
         int dbi = avj_choose_fx_for_slot(a, o, i, len, -1);
         if (dbi < 0) dbi = avj_choose_fx(a);
         if (dbi < 0) dbi = 0;

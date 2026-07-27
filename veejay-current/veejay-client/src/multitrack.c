@@ -831,7 +831,7 @@ static void multitrack_drift_reset_all_phases(multitracker_t *mt)
 
 static void multitrack_drift_clear_track(multitracker_t *mt, int track)
 {
-    if(!mt || track < 0 || track >= MAX_TRACKS)
+    if(!mt || track < 0 || track >= MAX_TRACKS || track >= __MAX_TRACKS)
         return;
 
     multitrack_drift_reset_phase(mt, track);
@@ -2956,6 +2956,10 @@ static void multitrack_update_direct_track_timeline(multitracker_t *mt,
                                                      int track,
                                                      const int *status)
 {
+    if(!mt || !status || track < 0 || track >= MAX_TRACKS ||
+       track >= __MAX_TRACKS)
+        return;
+
     GvrMultiTrackClip clip;
     char title[64];
     const int play_mode = status[PLAY_MODE];

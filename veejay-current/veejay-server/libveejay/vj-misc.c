@@ -460,31 +460,32 @@ char *vj_read_file_to_buffer(const char *path, size_t *out_size)
     }
 
     long size = ftell(f);
-    if (size < 0) {
+    if(size < 0 || (uintmax_t)size > (uintmax_t)(SIZE_MAX - 1u)) {
         fclose(f);
         return NULL;
     }
 
+    size_t file_size = (size_t)size;
     rewind(f);
 
-    char *buffer = vj_malloc((size_t)size + 1);
+    char *buffer = vj_malloc(file_size + 1u);
     if (!buffer) {
         fclose(f);
         return NULL;
     }
 
-    size_t read_size = fread(buffer, 1, (size_t)size, f);
+    size_t read_size = fread(buffer, 1, file_size, f);
     fclose(f);
 
-    if (read_size != (size_t)size) {
+    if(read_size != file_size) {
         free(buffer);
         return NULL;
     }
 
-    buffer[size] = '\0';
+    buffer[file_size] = '\0';
 
-    if (out_size)
-        *out_size = (size_t)size;
+    if(out_size)
+        *out_size = file_size;
 
     return buffer;
 }

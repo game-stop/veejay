@@ -1388,8 +1388,7 @@ static inline char *format_msg_safe(char *dst, size_t dst_max, const char *str)
 
     vj_event_write_u03(dst, len);
 
-    memcpy(dst + 3, str, len);
-    dst[3 + len] = '\0';
+    snprintf(dst + 3, dst_max - 3, "%.*s", (int)len, str);
 
     return dst + 3 + len;
 }

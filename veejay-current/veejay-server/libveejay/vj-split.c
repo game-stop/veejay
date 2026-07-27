@@ -932,12 +932,12 @@ static char *get_self(void)
         return NULL;
 
     ssize_t n = readlink("/proc/self/exe", path, 1023);
-    if(n == -1) {
+    if(n < 0 || n >= 1024) {
         free(path);
         return NULL;
     }
 
-    path[n] = '\0';
+    path[(size_t)n] = '\0';
     return path;
 }
 

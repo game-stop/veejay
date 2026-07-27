@@ -643,7 +643,7 @@ static inline void cf_compute_one_safe(chronocortex_t *c,
     int ad = diff < 0 ? -diff : diff;
 
     int event_strength = c->event_lut[ad];
-    uint8_t event_for_adapt = (uint8_t) event_strength;
+    const int event_for_adapt = cf_clampi(event_strength, 0, 255);
 
     int on_pos = cf_index_clamped(w, h, x - dx_on, y - dy_on);
     int off_pos = cf_index_clamped(w, h, x - dx_off, y - dy_off);
@@ -731,7 +731,7 @@ static inline void cf_compute_one_direct(chronocortex_t *c,
     int ad = diff < 0 ? -diff : diff;
 
     int event_strength = c->event_lut[ad];
-    uint8_t event_for_adapt = (uint8_t) event_strength;
+    const int event_for_adapt = cf_clampi(event_strength, 0, 255);
 
     int on_base = c->decay_lut[c->on_y[on_pos]];
     int off_base = c->decay_lut[c->off_y[off_pos]];

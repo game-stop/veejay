@@ -963,6 +963,9 @@ static int vj_server_socket_consume(vj_server *vje, int sock_fd, int link_id, ch
         return -1;
     }
 
+    if(n > (ssize_t)buf_size)
+        n = (ssize_t)buf_size;
+
     if( vje->logfd ) {
         vj_server_log_msg( vje, link_id, buffer, (int) n );
     }

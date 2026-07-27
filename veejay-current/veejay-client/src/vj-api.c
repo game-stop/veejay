@@ -15261,10 +15261,16 @@ static void reload_vimslist(void)
         int val[4];
 
         if(sscanf(line, "%04d%02d%03d%03d",
-                  &val[0], &val[1], &val[2], &val[3]) != 4)
+                  &val[0], &val[1], &val[2], &val[3]) != 4) {
             veejay_msg(0, "Expected exactly 4 tokens: [%s]", line);
-        if(val[0] < 0 || val[0] > 1024)
+            free(line);
+            break;
+        }
+        if(val[0] < 0 || val[0] >= VIMS_MAX) {
             veejay_msg(0, "Invalid ID at position %d", offset);
+            free(line);
+            break;
+        }
         if(val[1] < 0 || val[1] > 99)
             veejay_msg(0, "Invalid number of arguments at position %d", offset);
         if(val[2] < 0 || val[2] > 999)
@@ -16434,12 +16440,14 @@ static void init_recorder(int total_frames, gint mode)
     if(mode == MODE_STREAM)
     {
         info->streamrecording = g_timeout_add(300, update_stream_record_timeout, (gpointer*) info );
+        info->uc.recording[MODE_STREAM] = 1;
+        return;
     }
     if(mode == MODE_SAMPLE)
     {
         info->samplerecording = g_timeout_add(300, update_sample_record_timeout, (gpointer*) info );
+        info->uc.recording[MODE_SAMPLE] = 1;
     }
-    info->uc.recording[mode] = 1;
 }
 
 static char glade_path[1024];
