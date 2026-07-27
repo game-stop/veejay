@@ -80,26 +80,27 @@ static int default_timeout_sec = 10;
 #define RECV_SIZE 4096 
 #define MSG_POOL_SIZE (VJ_MAX_PENDING_MSG * 1024)
 
-static	void	printbuf( FILE *f, uint8_t *buf , int len )
+static void printbuf(FILE *f, const uint8_t *buf, int len)
 {
-	int i;
-	for( i = 0; i < len ; i ++ ) {
-		if( (i%32) == 0 ) {
-			fprintf(f, "\n");
-		}
-		fprintf(f, "%02x ", buf[i]);
-	}
-	fprintf(f, "\ntext:");
-	for( i = 0; i < len ; i ++ ) {
-		if( (i%32) == 0 ) {
-			fprintf(f, "\n");
-		}
-		fprintf(f, "%c", buf[i]);
-	}
+    if(!f || !buf || len <= 0)
+        return;
 
+    const uint8_t *p = buf;
+    for(int i = 0; i < len; i++, p++) {
+        if((i % 32) == 0)
+            fprintf(f, "\n");
+        fprintf(f, "%02x ", (unsigned int)*p);
+    }
 
+    fprintf(f, "\ntext:");
+    p = buf;
+    for(int i = 0; i < len; i++, p++) {
+        if((i % 32) == 0)
+            fprintf(f, "\n");
+        fprintf(f, "%c", (int)*p);
+    }
 
-	fprintf(f, "\n-------\n");
+    fprintf(f, "\n-------\n");
 }
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);

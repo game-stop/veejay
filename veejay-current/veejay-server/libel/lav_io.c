@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <stdint.h>
 #include <veejaycore/defs.h>
 #include <libel/lav_io.h>
@@ -1068,29 +1069,41 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
 
     int ret = 0;
 
-    /* open file, check if file is a file */
+    /*
+     * Pin the pathname to one opened object. All format probes reopen this
+     * descriptor through /proc/self/fd, so replacing filename after this
+     * point cannot redirect the operation to another file.
+     */
     struct stat s;
-    if( stat(filename, &s ) != 0 )
+    int source_fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+    if (source_fd < 0)
     {
-        if(lav_fd) free(lav_fd);
-        veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Invalid file '%s'. %s",filename, strerror(errno));
+        free(lav_fd);
+        veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Invalid file '%s'. %s",
+                   filename, strerror(errno));
         return NULL;
     }
 
-    if(!S_ISREG( s.st_mode) )
+    if (fstat(source_fd, &s) != 0)
     {
-        // check if its some weird stuff we wanna play
-        if (S_ISCHR(s.st_mode) || S_ISBLK(s.st_mode)) {
-            int fd2 = open(filename, O_RDONLY);
-            if (fd2 < 0) {
-                veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Cannot read from this character or block device");
-                if(lav_fd) free(lav_fd);
-                return NULL;
-            }
-            close(fd2);
-        }
-
+        int saved_errno = errno;
+        close(source_fd);
+        free(lav_fd);
+        veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Cannot inspect file '%s'. %s",
+                   filename, strerror(saved_errno));
+        return NULL;
     }
+
+    if (!S_ISREG(s.st_mode) && !S_ISCHR(s.st_mode) && !S_ISBLK(s.st_mode))
+    {
+        close(source_fd);
+        free(lav_fd);
+        veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Unsupported file type '%s'", filename);
+        return NULL;
+    }
+
+    char source_path[64];
+    snprintf(source_path, sizeof(source_path), "/proc/self/fd/%d", source_fd);
       
 
 #ifdef USE_GDK_PIXBUF
@@ -1101,20 +1114,27 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
 
     if( is_picture ) {
 #ifdef USE_GDK_PIXBUF
-		lav_fd->picture = vj_picture_open( (const char*) filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
+		lav_fd->picture = vj_picture_open(source_path, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv));
 		if(lav_fd->picture)
 		{
 			lav_fd->format = 'x';
 			lav_fd->bogus_len = (int) output_fps;
 			video_comp = pict;
 			veejay_msg(VEEJAY_MSG_INFO,"[lavio] File %s is of type image", filename);
+            close(source_fd);
 			return lav_fd;
 		}
 #endif
     }
     
     
-    lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
+    lav_fd->avi_fd = AVI_open_input_file(source_path, 1, mmap_size);
+    if (lav_fd->avi_fd)
+    {
+        close(source_fd);
+        source_fd = -1;
+    }
+
     if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
     {
        veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Empty AVI file: ", filename);
@@ -1154,20 +1174,24 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
     else if( AVI_errno==AVI_ERR_NO_AVI || (!lav_fd->avi_fd && !ret) )
     {
 #ifdef HAVE_LIBQUICKTIME
-        if(quicktime_check_sig(filename))
+        if(quicktime_check_sig(source_path))
         {
             veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Opening as quicktime file");
             quicktime_pasp_t pasp;
             int nfields, detail;
-            lav_fd->qt_fd = quicktime_open(filename,1,0);
+            lav_fd->qt_fd = quicktime_open(source_path, 1, 0);
             video_format = 'q'; /* for error messages */
             if (!lav_fd->qt_fd)
             {
+                close(source_fd);
                 veejay_msg(VEEJAY_MSG_ERROR, "[lavio] Unable to open as quicktime file");
                 free(lav_fd);
                 return NULL;
             }
-            
+
+            close(source_fd);
+            source_fd = -1;
+
 			lav_fd->avi_fd = NULL;
             lav_fd->format = 'q';
             video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
@@ -1234,9 +1258,11 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
         if(!alt)
         {
             ret = 0;
-            lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
+            lav_fd->dv_fd = rawdv_open_input_file(source_path, mmap_size);
             if(lav_fd->dv_fd > 0)
             {
+                close(source_fd);
+                source_fd = -1;
                 lav_fd->MJPG_chroma = rawdv_sampling( lav_fd->dv_fd );
                 video_comp = rawdv_video_compressor( lav_fd->dv_fd );
                 lav_fd->format = 'b'; 
@@ -1252,6 +1278,8 @@ lav_file_t *lav_open_input_file(char *filename, size_t mmap_size)
 
     if(ret == 0 || video_comp == NULL || alt == 0)
     {
+        if (source_fd >= 0)
+            close(source_fd);
         veejay_msg(VEEJAY_MSG_WARNING, "[lavio] Unable to open %s: unsupported or unrecognized video format", filename);
         goto ERREXIT;
 	/*lav_fd->rawio = raw_io_open( filename, output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv));

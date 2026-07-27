@@ -405,7 +405,7 @@ static void waterripple_simulate(ripple_tv *rip, int loopnum, int decay)
         return;
 
     loopnum = clampi(loopnum, 1, 16);
-    decay = clampi(decay, 1, 32);
+    decay = clampi(decay, 1, 31);
 
     for(int n = 0; n < loopnum; n++) {
 #pragma omp for schedule(static)
@@ -577,7 +577,7 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
-    const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 32);
+    const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
     const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
     const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
 
@@ -600,7 +600,7 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
         effective_loopnum++;
 
     int effective_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
-    effective_decay = clampi(effective_decay, 1, 32);
+    effective_decay = clampi(effective_decay, 1, 31);
 
 #pragma omp parallel num_threads(rip->n_threads)
     {

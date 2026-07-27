@@ -131,7 +131,7 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int spill_kill_arg = args[P_SPILL_KILL];
     const int mode_arg = args[P_MODE];
 
-    int iy, iu, iv;
+    int iy = 0, iu = 128, iv = 128;
 
     _rgb2yuv(args[P_RED], args[P_GREEN], args[P_BLUE], iy, iu, iv);
 

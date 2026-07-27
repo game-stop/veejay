@@ -2787,7 +2787,6 @@ static void timeline_draw_beat_grid(TimelineSelection *te,
     gdouble stride_frames;
     gdouble phase;
     gdouble first;
-    gdouble f;
     gdouble ruler_y;
     gdouble tick_top;
     gdouble tick_mid;
@@ -2840,7 +2839,11 @@ static void timeline_draw_beat_grid(TimelineSelection *te,
     cairo_line_to(cr, width, ruler_y);
     cairo_stroke(cr);
 
-    for (f = first; f < (gdouble) nframes; f += stride_frames) {
+    for (gint tick = 0; ; tick++) {
+        const gdouble f = first + ((gdouble)tick * stride_frames);
+        if (f >= (gdouble)nframes)
+            break;
+
         gdouble x = timeline_snap_line_x(timeline_frame_boundary_to_x(te, f, width), width);
         gint beat_index = (gint) floor((f / beat_frames) + 0.5);
         gboolean downbeat = ((beat_index % 4) == 0);

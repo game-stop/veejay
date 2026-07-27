@@ -172,7 +172,7 @@ static int vj_event_random_inclusive(int maximum)
         return 0;
 
     const uint32_t bound = (uint32_t)maximum + 1u;
-    const uint32_t threshold = (uint32_t)(-bound) % bound;
+    const uint32_t threshold = (UINT32_MAX - bound + 1u) % bound;
     uint32_t value;
 
     do {
@@ -1475,9 +1475,14 @@ static inline char *format_msg_safe(char *dst, size_t dst_max, const char *str)
 
     vj_event_write_u03(dst, len);
 
-    snprintf(dst + 3, dst_max - 3, "%.*s", (int)len, str);
+    size_t copied = 0;
+    while(copied < len && str[copied] != '\0') {
+        dst[3 + copied] = str[copied];
+        copied++;
+    }
+    dst[3 + copied] = '\0';
 
-    return dst + 3 + len;
+    return dst + 3 + copied;
 }
 
 static inline char *append_msg(char *dst, const char *str)
@@ -3144,11 +3149,11 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
     if( event.type == SDL_KEYDOWN || event.type == SDL_KEYUP ) {    
         SDL_Keymod mod = key->keysym.mod;
     
-        if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT )) // could use direct KMOD_SHIFT ?
+        if(mod & KMOD_SHIFT)
             vims_mod |= VIMS_MOD_SHIFT;
-        if( (mod & KMOD_LALT) || (mod & KMOD_ALT) ) // ONLY LEFT SHIFT !!!
+        if(mod & KMOD_ALT)
             vims_mod |= VIMS_MOD_ALT;
-        if( (mod & KMOD_CTRL) || (mod & KMOD_CTRL) ) // Both CTRL (but not explicit l & r)
+        if(mod & KMOD_CTRL)
             vims_mod |= VIMS_MOD_CTRL;
         if( (mod & KMOD_CAPS) ) {
             vims_mod = VIMS_MOD_CAPSLOCK; // FIXME change to |= or not ???

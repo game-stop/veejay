@@ -183,8 +183,22 @@ struct _GvrMultiTrackEdit {
     int timeline_view_start;
     int hover_track;
     int hover_frame;
+    int focused_track;
+    gboolean follow_playhead;
+    gboolean follow_live_edge;
     gboolean syncing_preview_toggle;
     gboolean syncing_drift_toggle;
+
+    gboolean source_drag_active;
+    int source_drag_track;
+    int source_drag_kind;
+    int source_drag_slot;
+    int source_drag_frame;
+
+    int pending_source_track;
+    int pending_source_id;
+    int pending_source_type;
+    int pending_source_kind;
 
     gboolean geometry_dirty;
     int cached_effective_total;
@@ -207,7 +221,11 @@ enum {
     SIGNAL_PREVIEW_TOGGLED,
     SIGNAL_TRANSITION_SOURCE_SELECTED,
     SIGNAL_SEEK_REQUESTED,
-    SIGNAL_EVENT_DROPPED,
+    SIGNAL_SOURCE_PLAY_REQUESTED,
+    SIGNAL_SEQUENCE_SOURCE_INSERT_REQUESTED,
+    SIGNAL_REVEAL_SEQUENCE_SLOT_REQUESTED,
+    SIGNAL_REVEAL_SOURCE_REQUESTED,
+    SIGNAL_RESYNC_REQUESTED,
     SIGNAL_TRANSITION_REQUESTED,
     SIGNAL_DRIFT_LOCK_TOGGLED,
     SIGNAL_LAST
@@ -218,8 +236,7 @@ static guint gvr_multi_track_edit_signals[SIGNAL_LAST];
 G_DEFINE_TYPE(GvrMultiTrackEdit, gvr_multi_track_edit, GTK_TYPE_BOX)
 
 static GtkTargetEntry gvr_multi_track_edit_drop_targets[] = {
-    { (gchar *)GVR_MULTI_TRACK_VIMS_DND_TARGET, GTK_TARGET_SAME_APP, 0 },
-    { (gchar *)"text/plain", 0, 1 }
+    { (gchar *)GVR_MULTI_TRACK_SOURCE_DND_TARGET, GTK_TARGET_SAME_APP, 0 }
 };
 
 static int gvr_mt_clampi(int value, int lo, int hi)
@@ -285,6 +302,7 @@ static PangoFontDescription *gvr_mt_font(GtkWidget *widget,
 }
 
 static void gvr_mt_draw_context_end(GvrMultiTrackEdit *view);
+static int gvr_mt_sequence_insertion_frame(GvrMultiTrackEdit *view, int insertion_slot);
 
 static void gvr_mt_draw_context_begin(GvrMultiTrackEdit *view, cairo_t *cr)
 {
@@ -1092,6 +1110,113 @@ static int gvr_mt_x_to_frame(GvrMultiTrackEdit *view,
     return gvr_mt_clampi(frame, 0, gvr_mt_effective_total(view) - 1);
 }
 
+static int gvr_mt_visible_track_count(GvrMultiTrackEdit *view)
+{
+    return view && view->focused_track >= 0 ? 1 :
+        (view ? view->max_tracks : 0);
+}
+
+static int gvr_mt_track_y(GvrMultiTrackEdit *view, int track)
+{
+    if(!view || track < 0 || track >= view->max_tracks)
+        return -1;
+    if(view->focused_track >= 0)
+        return track == view->focused_track ? GVR_MT_RULER_HEIGHT : -1;
+    return GVR_MT_RULER_HEIGHT + track * GVR_MT_LANE_HEIGHT;
+}
+
+static int gvr_mt_track_at_y(GvrMultiTrackEdit *view, double y)
+{
+    int track;
+
+    if(!view || y < GVR_MT_RULER_HEIGHT)
+        return -1;
+    if(view->focused_track >= 0)
+        return y < GVR_MT_RULER_HEIGHT + GVR_MT_LANE_HEIGHT ?
+            view->focused_track : -1;
+    track = (int)((y - GVR_MT_RULER_HEIGHT) / GVR_MT_LANE_HEIGHT);
+    return track >= 0 && track < view->max_tracks ? track : -1;
+}
+
+static void gvr_mt_update_focus_layout(GvrMultiTrackEdit *view)
+{
+    if(!view)
+        return;
+
+    for(int track = 0; track < view->max_tracks; track++) {
+        if(!view->lanes[track].row_event)
+            continue;
+        if(view->focused_track < 0 || track == view->focused_track)
+            gtk_widget_show(view->lanes[track].row_event);
+        else
+            gtk_widget_hide(view->lanes[track].row_event);
+    }
+
+    if(view->timeline_area)
+        gtk_widget_set_size_request(
+            view->timeline_area,
+            640,
+            GVR_MT_RULER_HEIGHT +
+            gvr_mt_visible_track_count(view) * GVR_MT_LANE_HEIGHT);
+    gvr_mt_queue_draw(view);
+}
+
+static void gvr_mt_center_frame(GvrMultiTrackEdit *view, int frame)
+{
+    if(!view)
+        return;
+    view->timeline_view_start = frame - gvr_mt_visible_frames(view) / 2;
+    gvr_mt_update_pan(view);
+    gvr_mt_queue_draw(view);
+}
+
+static void gvr_mt_follow_transport(GvrMultiTrackEdit *view)
+{
+    int displayed;
+    int visible;
+    int left_margin;
+    int right_margin;
+
+    if(!view || !view->playhead_active)
+        return;
+
+    displayed = gvr_mt_display_playhead(view);
+    visible = gvr_mt_visible_frames(view);
+    if(visible <= 1)
+        return;
+
+    if(view->follow_live_edge && gvr_mt_direct_stream_active(view)) {
+        view->timeline_view_start =
+            MAX(0, gvr_mt_effective_total(view) - visible);
+        gvr_mt_update_pan(view);
+        return;
+    }
+    if(!view->follow_playhead)
+        return;
+
+    left_margin = view->timeline_view_start + visible / 5;
+    right_margin = view->timeline_view_start + (visible * 4) / 5;
+    if(displayed < left_margin)
+        view->timeline_view_start = displayed - visible / 5;
+    else if(displayed > right_margin)
+        view->timeline_view_start = displayed - (visible * 4) / 5;
+    else
+        return;
+    gvr_mt_update_pan(view);
+}
+
+static void gvr_mt_zoom_to_range(GvrMultiTrackEdit *view, int first, int last)
+{
+    const int total = gvr_mt_effective_total(view);
+    const int span = MAX(1, last - first + 1);
+    const double zoom = CLAMP((double)total * 0.80 / (double)span,
+                              GVR_MT_ZOOM_MIN,
+                              GVR_MT_ZOOM_MAX);
+
+    gtk_range_set_value(GTK_RANGE(view->zoom_scale), zoom);
+    gvr_mt_center_frame(view, first + span / 2);
+}
+
 static void gvr_mt_source_color(int sample_type, GdkRGBA *color)
 {
     static const GdkRGBA palette[] = {
@@ -1599,9 +1724,11 @@ static void gvr_mt_draw_loop_continuation(GvrMultiTrackEdit *view,
     cairo_clip(cr);
     cairo_set_source_rgba(cr, color.red, color.green, color.blue, 0.34);
     cairo_set_line_width(cr, 1.0);
-    for(double x = x1 - GVR_MT_LANE_HEIGHT;
-        x < x2 + GVR_MT_LANE_HEIGHT;
-        x += 14.0) {
+    const double hatch_start = x1 - GVR_MT_LANE_HEIGHT;
+    const double hatch_span = (x2 - x1) + (2.0 * GVR_MT_LANE_HEIGHT);
+    const int hatch_count = MAX(0, (int)ceil(hatch_span / 14.0));
+    for(int hatch = 0; hatch < hatch_count; hatch++) {
+        const double x = hatch_start + ((double)hatch * 14.0);
         cairo_move_to(cr, x, lane_y + GVR_MT_LANE_HEIGHT - 8.0);
         cairo_line_to(cr, x + GVR_MT_LANE_HEIGHT - 16.0, lane_y + 8.0);
     }
@@ -1800,7 +1927,10 @@ static gboolean gvr_mt_timeline_draw(GtkWidget *widget,
 
     for(int track = 0; track < view->max_tracks; track++) {
         GvrMultiTrackLane *lane = &view->lanes[track];
-        const int y = GVR_MT_RULER_HEIGHT + track * GVR_MT_LANE_HEIGHT;
+        const int y = gvr_mt_track_y(view, track);
+
+        if(y < 0)
+            continue;
 
         if(track & 1)
             cairo_set_source_rgba(cr,
@@ -1836,6 +1966,12 @@ static gboolean gvr_mt_timeline_draw(GtkWidget *widget,
                                   accent.green,
                                   accent.blue,
                                   0.16);
+            cairo_rectangle(cr, 0, y, allocation.width, GVR_MT_LANE_HEIGHT);
+            cairo_fill(cr);
+        }
+
+        if(track == view->hover_track && !view->source_drag_active) {
+            cairo_set_source_rgba(cr, 0.72, 0.78, 0.90, 0.07);
             cairo_rectangle(cr, 0, y, allocation.width, GVR_MT_LANE_HEIGHT);
             cairo_fill(cr);
         }
@@ -1988,6 +2124,67 @@ static gboolean gvr_mt_timeline_draw(GtkWidget *widget,
                               g_ptr_array_index(lane->events, i));
     }
 
+    if(view->hover_frame >= 0 && view->hover_track >= 0 &&
+       !view->source_drag_active && !view->seek_dragging) {
+        const double hover_x = floor(gvr_mt_frame_to_x(
+            view, view->hover_frame, allocation.width)) + 0.5;
+        cairo_set_source_rgba(cr, 0.78, 0.82, 0.90, 0.22);
+        cairo_set_line_width(cr, 1.0);
+        cairo_move_to(cr, hover_x, GVR_MT_RULER_HEIGHT);
+        cairo_line_to(cr, hover_x,
+                      GVR_MT_RULER_HEIGHT +
+                      gvr_mt_visible_track_count(view) * GVR_MT_LANE_HEIGHT);
+        cairo_stroke(cr);
+    }
+
+    if(view->pending_source_track >= 0 &&
+       view->pending_source_track < view->max_tracks) {
+        const int pending_y = gvr_mt_track_y(view, view->pending_source_track);
+        if(pending_y >= 0) {
+            GdkRGBA pending_text = { 0.72, 0.88, 1.0, 1.0 };
+            char pending_label[96];
+            cairo_set_source_rgba(cr, 0.42, 0.72, 0.95, 0.85);
+            cairo_set_line_width(cr, 2.0);
+            cairo_rectangle(cr, 2.0, pending_y + 2.0,
+                            MAX(1.0, allocation.width - 4.0),
+                            GVR_MT_LANE_HEIGHT - 4.0);
+            cairo_stroke(cr);
+            if(view->pending_source_kind == 2)
+                g_strlcpy(pending_label,
+                          "Waiting for sequence refresh…",
+                          sizeof(pending_label));
+            else
+                g_snprintf(pending_label, sizeof(pending_label),
+                           "Switching to %s %d…",
+                           view->pending_source_type == 0 ? "Sample" : "Stream",
+                           view->pending_source_id);
+            gvr_mt_draw_text(view, cr, pending_label, 10, pending_y + 62,
+                             allocation.width - 20, 0.75,
+                             PANGO_WEIGHT_BOLD, &pending_text);
+        }
+    }
+
+    if(view->source_drag_active &&
+       view->source_drag_track >= 0 &&
+       view->source_drag_track < view->max_tracks) {
+        const int y = gvr_mt_track_y(view, view->source_drag_track);
+        cairo_set_source_rgba(cr, 0.35, 0.72, 0.95, 0.20);
+        cairo_rectangle(cr, 0, y, allocation.width, GVR_MT_LANE_HEIGHT);
+        cairo_fill(cr);
+
+        if(view->source_drag_kind == 2) {
+            const int insert_frame =
+                gvr_mt_sequence_insertion_frame(view, view->source_drag_slot);
+            const double insert_x = floor(gvr_mt_frame_to_x(
+                view, insert_frame, allocation.width)) + 0.5;
+            cairo_set_source_rgba(cr, 0.45, 0.88, 1.0, 1.0);
+            cairo_set_line_width(cr, 3.0);
+            cairo_move_to(cr, insert_x, y + 4);
+            cairo_line_to(cr, insert_x, y + GVR_MT_LANE_HEIGHT - 4);
+            cairo_stroke(cr);
+        }
+    }
+
     if(view->playhead_active) {
         const double x = floor(gvr_mt_frame_to_x(view,
                                                  gvr_mt_display_playhead(view),
@@ -1998,7 +2195,7 @@ static gboolean gvr_mt_timeline_draw(GtkWidget *widget,
         cairo_line_to(cr,
                       x,
                       GVR_MT_RULER_HEIGHT +
-                      view->max_tracks * GVR_MT_LANE_HEIGHT);
+                      gvr_mt_visible_track_count(view) * GVR_MT_LANE_HEIGHT);
         cairo_stroke(cr);
     }
 
@@ -2232,6 +2429,294 @@ static void gvr_mt_drift_toggled(GtkToggleButton *button, gpointer user_data)
                   enabled);
 }
 
+typedef enum {
+    GVR_MT_MENU_FOLLOW_PLAYHEAD = 1,
+    GVR_MT_MENU_CENTER_PLAYHEAD,
+    GVR_MT_MENU_FIT_PROJECT,
+    GVR_MT_MENU_ZOOM_CLIP,
+    GVR_MT_MENU_SEEK_CLIP,
+    GVR_MT_MENU_REVEAL_SLOT,
+    GVR_MT_MENU_REVEAL_SOURCE,
+    GVR_MT_MENU_FOCUS_TRACK,
+    GVR_MT_MENU_SHOW_ALL,
+    GVR_MT_MENU_RESYNC_TRACK,
+    GVR_MT_MENU_BUFFER_START,
+    GVR_MT_MENU_LIVE_EDGE,
+    GVR_MT_MENU_FOLLOW_LIVE,
+    GVR_MT_MENU_ZOOM_CURRENT_SLOT
+} GvrMtMenuAction;
+
+typedef struct {
+    GvrMultiTrackEdit *view;
+    GvrMtMenuAction action;
+    int track;
+    int frame;
+    int slot;
+    int sample_id;
+    int sample_type;
+    int clip_in;
+    int clip_out;
+} GvrMtMenuData;
+
+static void gvr_mt_menu_data_free(gpointer data, GClosure *closure)
+{
+    (void)closure;
+    g_free(data);
+}
+
+static void gvr_mt_context_action(GtkMenuItem *item, gpointer user_data)
+{
+    GvrMtMenuData *data = user_data;
+    GvrMultiTrackEdit *view = data->view;
+    GvrMultiTrackLane *lane =
+        data->track >= 0 && data->track < view->max_tracks ?
+            &view->lanes[data->track] : NULL;
+
+    switch(data->action) {
+        case GVR_MT_MENU_FOLLOW_PLAYHEAD:
+            view->follow_playhead =
+                gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(item));
+            if(view->follow_playhead)
+                gvr_mt_follow_transport(view);
+            break;
+        case GVR_MT_MENU_CENTER_PLAYHEAD:
+            if(view->playhead_active)
+                gvr_mt_center_frame(view, gvr_mt_display_playhead(view));
+            break;
+        case GVR_MT_MENU_FIT_PROJECT:
+            view->timeline_view_start = 0;
+            gtk_range_set_value(GTK_RANGE(view->zoom_scale),
+                                GVR_MT_ZOOM_MIN);
+            gvr_mt_update_pan(view);
+            gvr_mt_queue_draw(view);
+            break;
+        case GVR_MT_MENU_ZOOM_CLIP:
+            gvr_mt_zoom_to_range(view, data->clip_in, data->clip_out);
+            break;
+        case GVR_MT_MENU_SEEK_CLIP:
+            if(view->transport_seekable)
+                g_signal_emit(view,
+                              gvr_multi_track_edit_signals[SIGNAL_SEEK_REQUESTED],
+                              0,
+                              data->clip_in);
+            break;
+        case GVR_MT_MENU_REVEAL_SLOT:
+            g_signal_emit(view,
+                          gvr_multi_track_edit_signals[SIGNAL_REVEAL_SEQUENCE_SLOT_REQUESTED],
+                          0,
+                          lane ? lane->sequence_bank : view->bank,
+                          data->slot);
+            break;
+        case GVR_MT_MENU_REVEAL_SOURCE:
+            g_signal_emit(view,
+                          gvr_multi_track_edit_signals[SIGNAL_REVEAL_SOURCE_REQUESTED],
+                          0,
+                          data->sample_id,
+                          data->sample_type);
+            break;
+        case GVR_MT_MENU_FOCUS_TRACK:
+            view->focused_track = data->track;
+            gvr_mt_update_focus_layout(view);
+            break;
+        case GVR_MT_MENU_SHOW_ALL:
+            view->focused_track = -1;
+            gvr_mt_update_focus_layout(view);
+            break;
+        case GVR_MT_MENU_RESYNC_TRACK:
+            g_signal_emit(view,
+                          gvr_multi_track_edit_signals[SIGNAL_RESYNC_REQUESTED],
+                          0,
+                          data->track);
+            break;
+        case GVR_MT_MENU_BUFFER_START:
+            g_signal_emit(view,
+                          gvr_multi_track_edit_signals[SIGNAL_SEEK_REQUESTED],
+                          0, 0);
+            break;
+        case GVR_MT_MENU_LIVE_EDGE:
+            if(lane && lane->stream_buffer_filled > 0)
+                g_signal_emit(view,
+                              gvr_multi_track_edit_signals[SIGNAL_SEEK_REQUESTED],
+                              0, lane->stream_buffer_filled - 1);
+            break;
+        case GVR_MT_MENU_FOLLOW_LIVE:
+            view->follow_live_edge =
+                gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(item));
+            if(view->follow_live_edge && lane && lane->stream_buffer_filled > 0) {
+                g_signal_emit(view,
+                              gvr_multi_track_edit_signals[SIGNAL_SEEK_REQUESTED],
+                              0, lane->stream_buffer_filled - 1);
+                gvr_mt_follow_transport(view);
+            }
+            break;
+        case GVR_MT_MENU_ZOOM_CURRENT_SLOT:
+            if(view->master_clips) {
+                for(guint i = 0; i < view->master_clips->len; i++) {
+                    GvrMultiTrackMasterClip *clip =
+                        &g_array_index(view->master_clips,
+                                       GvrMultiTrackMasterClip, i);
+                    if(clip->slot == (lane ? lane->sequence_slot : view->playhead_slot)) {
+                        gvr_mt_zoom_to_range(view,
+                                             clip->project_in,
+                                             clip->project_out);
+                        break;
+                    }
+                }
+            }
+            break;
+    }
+}
+
+static GtkWidget *gvr_mt_context_item(GtkWidget *menu,
+                                      const char *label,
+                                      gboolean check,
+                                      gboolean active,
+                                      GvrMultiTrackEdit *view,
+                                      GvrMtMenuAction action,
+                                      int track,
+                                      int frame,
+                                      const GvrMultiTrackMasterClip *clip)
+{
+    GtkWidget *item = check ?
+        gtk_check_menu_item_new_with_label(label) :
+        gtk_menu_item_new_with_label(label);
+    GvrMtMenuData *data = g_new0(GvrMtMenuData, 1);
+
+    data->view = view;
+    data->action = action;
+    data->track = track;
+    data->frame = frame;
+    if(clip) {
+        data->slot = clip->slot;
+        data->sample_id = clip->sample_id;
+        data->sample_type = clip->sample_type;
+        data->clip_in = clip->project_in;
+        data->clip_out = clip->project_out;
+    }
+    else if(track >= 0 && track < view->max_tracks) {
+        data->sample_id = view->lanes[track].source_id;
+        data->sample_type = view->lanes[track].source_type;
+    }
+
+    if(check)
+        gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), active);
+    g_signal_connect_data(item,
+                          "activate",
+                          G_CALLBACK(gvr_mt_context_action),
+                          data,
+                          gvr_mt_menu_data_free,
+                          0);
+    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
+    return item;
+}
+
+static GvrMultiTrackMasterClip *gvr_mt_master_clip_at(GvrMultiTrackEdit *view,
+                                                       int track,
+                                                       int frame)
+{
+    if(!view || track < 0 || track >= view->max_tracks ||
+       track != view->project_master_track ||
+       !view->lanes[track].sequence_active || !view->master_clips)
+        return NULL;
+
+    for(guint i = 0; i < view->master_clips->len; i++) {
+        GvrMultiTrackMasterClip *clip =
+            &g_array_index(view->master_clips, GvrMultiTrackMasterClip, i);
+        if(frame >= clip->project_in && frame <= clip->project_out)
+            return clip;
+    }
+    return NULL;
+}
+
+static void gvr_mt_show_context_menu(GvrMultiTrackEdit *view,
+                                     GdkEventButton *event,
+                                     int track,
+                                     int frame)
+{
+    GtkWidget *menu = gtk_menu_new();
+    GvrMultiTrackMasterClip *clip =
+        track >= 0 ? gvr_mt_master_clip_at(view, track, frame) : NULL;
+    GvrMultiTrackLane *lane =
+        track >= 0 && track < view->max_tracks ? &view->lanes[track] : NULL;
+
+    gvr_mt_context_item(menu, "Follow Playhead", TRUE,
+                        view->follow_playhead, view,
+                        GVR_MT_MENU_FOLLOW_PLAYHEAD, track, frame, NULL);
+    gvr_mt_context_item(menu, "Center Playhead", FALSE, FALSE, view,
+                        GVR_MT_MENU_CENTER_PLAYHEAD, track, frame, NULL);
+    gvr_mt_context_item(menu, "Fit Project", FALSE, FALSE, view,
+                        GVR_MT_MENU_FIT_PROJECT, track, frame, NULL);
+
+    if(clip) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu),
+                              gtk_separator_menu_item_new());
+        gvr_mt_context_item(menu, "Zoom to Clip", FALSE, FALSE, view,
+                            GVR_MT_MENU_ZOOM_CLIP, track, frame, clip);
+        if(lane && clip->slot == lane->sequence_slot)
+            gvr_mt_context_item(menu, "Seek to Clip Start", FALSE, FALSE, view,
+                                GVR_MT_MENU_SEEK_CLIP, track, frame, clip);
+        if(lane && lane->current_control)
+            gvr_mt_context_item(menu, "Reveal Slot in Sequence Editor", FALSE, FALSE, view,
+                                GVR_MT_MENU_REVEAL_SLOT, track, frame, clip);
+        gvr_mt_context_item(menu, "Reveal Source in Sample Bank", FALSE, FALSE, view,
+                            GVR_MT_MENU_REVEAL_SOURCE, track, frame, clip);
+    }
+    else if(lane && lane->sequence_active &&
+            track == view->project_master_track) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu),
+                              gtk_separator_menu_item_new());
+        gvr_mt_context_item(menu, "Zoom to Current Slot", FALSE, FALSE, view,
+                            GVR_MT_MENU_ZOOM_CURRENT_SLOT, track, frame, NULL);
+    }
+    else if(lane && lane->source_id > 0) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu),
+                              gtk_separator_menu_item_new());
+        gvr_mt_context_item(menu, "Reveal Current Source in Sample Bank", FALSE, FALSE, view,
+                            GVR_MT_MENU_REVEAL_SOURCE, track, frame, NULL);
+    }
+
+    if(lane && track == view->project_master_track &&
+       !lane->sequence_active && lane->play_mode == MODE_STREAM &&
+       lane->stream_buffer_enabled && lane->stream_buffer_filled > 0) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu),
+                              gtk_separator_menu_item_new());
+        gvr_mt_context_item(menu, "Jump to Buffer Start", FALSE, FALSE, view,
+                            GVR_MT_MENU_BUFFER_START, track, frame, NULL);
+        gvr_mt_context_item(menu, "Jump to Live Edge", FALSE, FALSE, view,
+                            GVR_MT_MENU_LIVE_EDGE, track, frame, NULL);
+        gvr_mt_context_item(menu, "Follow Live Edge", TRUE,
+                            view->follow_live_edge, view,
+                            GVR_MT_MENU_FOLLOW_LIVE, track, frame, NULL);
+    }
+
+    if(lane) {
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu),
+                              gtk_separator_menu_item_new());
+        if(view->focused_track < 0)
+            gvr_mt_context_item(menu, "Focus This Track", FALSE, FALSE, view,
+                                GVR_MT_MENU_FOCUS_TRACK, track, frame, NULL);
+        else
+            gvr_mt_context_item(menu, "Show All Tracks", FALSE, FALSE, view,
+                                GVR_MT_MENU_SHOW_ALL, track, frame, NULL);
+        if(track != view->project_master_track)
+            gvr_mt_context_item(menu, "Resynchronise This Track", FALSE, FALSE, view,
+                                GVR_MT_MENU_RESYNC_TRACK, track, frame, NULL);
+    }
+
+    g_signal_connect_swapped(menu,
+                             "selection-done",
+                             G_CALLBACK(gtk_widget_destroy),
+                             menu);
+    gtk_widget_show_all(menu);
+    gtk_menu_popup(GTK_MENU(menu),
+                   NULL,
+                   NULL,
+                   NULL,
+                   NULL,
+                   event->button,
+                   event->time);
+}
+
 static gboolean gvr_mt_timeline_button_press(GtkWidget *widget,
                                              GdkEventButton *event,
                                              gpointer user_data)
@@ -2244,12 +2729,19 @@ static gboolean gvr_mt_timeline_button_press(GtkWidget *widget,
     gtk_widget_grab_focus(widget);
     gtk_widget_get_allocation(widget, &allocation);
 
+    if(event->button == 3) {
+        track = gvr_mt_track_at_y(view, event->y);
+        frame = gvr_mt_x_to_frame(view, event->x, allocation.width);
+        if(track >= 0)
+            gvr_mt_select_track(view, track, TRUE);
+        gvr_mt_show_context_menu(view, event, track, frame);
+        return TRUE;
+    }
     if(event->button != 1)
         return FALSE;
 
     if(event->y >= GVR_MT_RULER_HEIGHT) {
-        track = (int)((event->y - GVR_MT_RULER_HEIGHT) /
-                      GVR_MT_LANE_HEIGHT);
+        track = gvr_mt_track_at_y(view, event->y);
         if(track >= 0 && track < view->max_tracks)
             gvr_mt_select_track(view, track, TRUE);
     }
@@ -2321,8 +2813,7 @@ static gboolean gvr_mt_timeline_motion(GtkWidget *widget,
 
     gtk_widget_get_allocation(widget, &allocation);
     view->hover_frame = gvr_mt_x_to_frame(view, event->x, allocation.width);
-    view->hover_track = event->y >= GVR_MT_RULER_HEIGHT ?
-        (int)((event->y - GVR_MT_RULER_HEIGHT) / GVR_MT_LANE_HEIGHT) : -1;
+    view->hover_track = gvr_mt_track_at_y(view, event->y);
 
     if(view->seek_dragging && (event->state & GDK_BUTTON1_MASK)) {
         int frame = view->hover_frame;
@@ -2343,6 +2834,19 @@ static gboolean gvr_mt_timeline_motion(GtkWidget *widget,
     return FALSE;
 }
 
+static gboolean gvr_mt_timeline_leave(GtkWidget *widget,
+                                      GdkEventCrossing *event,
+                                      gpointer user_data)
+{
+    GvrMultiTrackEdit *view = GVR_MULTI_TRACK_EDIT(user_data);
+    (void)widget;
+    (void)event;
+    view->hover_track = -1;
+    view->hover_frame = -1;
+    gvr_mt_queue_timeline_draw(view);
+    return FALSE;
+}
+
 static gboolean gvr_mt_query_tooltip(GtkWidget *widget,
                                      gint x,
                                      gint y,
@@ -2360,8 +2864,7 @@ static gboolean gvr_mt_query_tooltip(GtkWidget *widget,
     (void)keyboard_mode;
     gtk_widget_get_allocation(widget, &allocation);
     frame = gvr_mt_x_to_frame(view, x, allocation.width);
-    track = y >= GVR_MT_RULER_HEIGHT ?
-        (y - GVR_MT_RULER_HEIGHT) / GVR_MT_LANE_HEIGHT : -1;
+    track = gvr_mt_track_at_y(view, y);
     gvr_mt_timecode(view, frame, timecode, sizeof(timecode));
 
     if(track >= 0 && track < view->max_tracks) {
@@ -2373,7 +2876,9 @@ static gboolean gvr_mt_query_tooltip(GtkWidget *widget,
                    frame,
                    timecode,
                    lane->connected ?
-                       "Drop a VIMS command here to place a track event." :
+                       (lane->sequence_active ?
+                            "Drop a sample or stream to insert it into the active sequence." :
+                            "Drop a sample or stream to start it on this video lane.") :
                        "This track is not connected.");
     }
     else
@@ -2391,42 +2896,101 @@ static gboolean gvr_mt_timeline_scroll(GtkWidget *widget,
     GvrMultiTrackEdit *view = GVR_MULTI_TRACK_EDIT(user_data);
     GtkAllocation allocation;
     const gboolean zoom = (event->state & GDK_CONTROL_MASK) != 0;
+    double dx = 0.0;
+    double dy = 0.0;
+    int direction = 0;
 
     gtk_widget_get_allocation(widget, &allocation);
+    if(event->direction == GDK_SCROLL_SMOOTH) {
+        dx = event->delta_x;
+        dy = event->delta_y;
+        direction = fabs(dx) > fabs(dy) ? (dx > 0.0 ? 1 : -1) :
+                                         (dy > 0.0 ? 1 : -1);
+    }
+    else if(event->direction == GDK_SCROLL_UP ||
+            event->direction == GDK_SCROLL_LEFT)
+        direction = -1;
+    else if(event->direction == GDK_SCROLL_DOWN ||
+            event->direction == GDK_SCROLL_RIGHT)
+        direction = 1;
+    else
+        return FALSE;
 
     if(zoom) {
         const int anchor = gvr_mt_x_to_frame(view, event->x, allocation.width);
         double value = view->timeline_zoom;
-
-        if(event->direction == GDK_SCROLL_UP)
-            value *= 1.25;
-        else if(event->direction == GDK_SCROLL_DOWN)
-            value /= 1.25;
-        else
-            return FALSE;
-
+        value *= direction < 0 ? 1.25 : (1.0 / 1.25);
         value = CLAMP(value, GVR_MT_ZOOM_MIN, GVR_MT_ZOOM_MAX);
         gtk_range_set_value(GTK_RANGE(view->zoom_scale), value);
         view->timeline_view_start = anchor -
             (int)((event->x / MAX(1.0, (double)allocation.width)) *
                   gvr_mt_visible_frames(view));
-        gvr_mt_update_pan(view);
-        gvr_mt_queue_draw(view);
-        return TRUE;
     }
-
-    if(event->direction == GDK_SCROLL_LEFT ||
-       event->direction == GDK_SCROLL_UP)
-        view->timeline_view_start -= MAX(1, gvr_mt_visible_frames(view) / 12);
-    else if(event->direction == GDK_SCROLL_RIGHT ||
-            event->direction == GDK_SCROLL_DOWN)
-        view->timeline_view_start += MAX(1, gvr_mt_visible_frames(view) / 12);
-    else
-        return FALSE;
+    else {
+        const int step = MAX(1, gvr_mt_visible_frames(view) / 12);
+        const double scale = event->direction == GDK_SCROLL_SMOOTH ?
+            MAX(0.25, MIN(4.0, fabs(dx) > fabs(dy) ? fabs(dx) : fabs(dy))) : 1.0;
+        view->timeline_view_start +=
+            direction * MAX(1, (int)floor(step * scale + 0.5));
+    }
 
     gvr_mt_update_pan(view);
     gvr_mt_queue_draw(view);
     return TRUE;
+}
+
+static gboolean gvr_mt_timeline_key_press(GtkWidget *widget,
+                                          GdkEventKey *event,
+                                          gpointer user_data)
+{
+    GvrMultiTrackEdit *view = GVR_MULTI_TRACK_EDIT(user_data);
+    const int pan_step = MAX(1, gvr_mt_visible_frames(view) /
+                                ((event->state & GDK_SHIFT_MASK) ? 2 : 12));
+    double zoom;
+
+    (void)widget;
+    switch(event->keyval) {
+        case GDK_KEY_plus:
+        case GDK_KEY_equal:
+        case GDK_KEY_KP_Add:
+            zoom = gtk_range_get_value(GTK_RANGE(view->zoom_scale));
+            gtk_range_set_value(GTK_RANGE(view->zoom_scale),
+                                MIN(GVR_MT_ZOOM_MAX, zoom * 1.25));
+            return TRUE;
+        case GDK_KEY_minus:
+        case GDK_KEY_KP_Subtract:
+            zoom = gtk_range_get_value(GTK_RANGE(view->zoom_scale));
+            gtk_range_set_value(GTK_RANGE(view->zoom_scale),
+                                MAX(GVR_MT_ZOOM_MIN, zoom / 1.25));
+            return TRUE;
+        case GDK_KEY_0:
+        case GDK_KEY_KP_0:
+            view->timeline_view_start = 0;
+            gtk_range_set_value(GTK_RANGE(view->zoom_scale),
+                                GVR_MT_ZOOM_MIN);
+            gvr_mt_update_pan(view);
+            gvr_mt_queue_draw(view);
+            return TRUE;
+        case GDK_KEY_Home:
+        case GDK_KEY_KP_Home:
+            if(view->playhead_active)
+                gvr_mt_center_frame(view, gvr_mt_display_playhead(view));
+            return TRUE;
+        case GDK_KEY_Left:
+        case GDK_KEY_KP_Left:
+            view->timeline_view_start -= pan_step;
+            gvr_mt_update_pan(view);
+            gvr_mt_queue_draw(view);
+            return TRUE;
+        case GDK_KEY_Right:
+        case GDK_KEY_KP_Right:
+            view->timeline_view_start += pan_step;
+            gvr_mt_update_pan(view);
+            gvr_mt_queue_draw(view);
+            return TRUE;
+        default:
+            return FALSE;
+    }
 }
 
 static gboolean gvr_mt_navigator_button(GtkWidget *widget,
@@ -2498,125 +3062,196 @@ static void gvr_mt_zoom_fit(GtkButton *button, gpointer user_data)
     gvr_mt_queue_draw(view);
 }
 
-static int gvr_mt_message_id(const char *message)
+static int gvr_mt_sequence_insertion_slot(GvrMultiTrackEdit *view,
+                                          int frame)
 {
-    char *end = NULL;
-    long id;
+    GvrMultiTrackMasterClip *last;
 
-    if(!message)
-        return -1;
-    while(g_ascii_isspace(*message))
-        message++;
-    id = strtol(message, &end, 10);
-    if(end == message || *end != ':' || id < 0 || id > 9999)
-        return -1;
-    return (int)id;
-}
-
-static int gvr_mt_message_arguments(const char *message,
-                                    int *values,
-                                    int max_values)
-{
-    const char *cursor;
-    int count = 0;
-
-    if(!message || !values || max_values <= 0)
+    if(!view || !view->master_clips || view->master_clips->len == 0)
         return 0;
-    cursor = strchr(message, ':');
-    if(!cursor)
-        return 0;
-    cursor++;
 
-    while(*cursor && *cursor != ';' && count < max_values) {
-        char *end = NULL;
-        long value;
+    for(guint i = 0; i < view->master_clips->len; i++) {
+        GvrMultiTrackMasterClip *clip =
+            &g_array_index(view->master_clips, GvrMultiTrackMasterClip, i);
+        const int midpoint = clip->project_in +
+            MAX(0, clip->project_out - clip->project_in) / 2;
 
-        while(g_ascii_isspace(*cursor))
-            cursor++;
-        if(!*cursor || *cursor == ';')
-            break;
-
-        value = strtol(cursor, &end, 10);
-        if(end == cursor) {
-            while(*cursor && *cursor != ';' && !g_ascii_isspace(*cursor))
-                cursor++;
-            continue;
+        if(frame <= clip->project_out) {
+            if(frame <= midpoint)
+                return MAX(0, clip->slot);
+            if(i + 1 < view->master_clips->len) {
+                GvrMultiTrackMasterClip *next =
+                    &g_array_index(view->master_clips,
+                                   GvrMultiTrackMasterClip,
+                                   i + 1);
+                return MAX(0, next->slot);
+            }
+            return MAX(0, clip->slot + 1);
         }
-
-        values[count++] = (int)value;
-        cursor = end;
     }
 
-    return count;
+    last = &g_array_index(view->master_clips,
+                          GvrMultiTrackMasterClip,
+                          view->master_clips->len - 1);
+    return MAX(0, last->slot + 1);
 }
 
-static gchar *gvr_mt_message_label(const char *message, int *vims_id)
+static int gvr_mt_sequence_insertion_frame(GvrMultiTrackEdit *view,
+                                           int insertion_slot)
 {
-    int values[8];
-    int count;
-    int id = gvr_mt_message_id(message);
-    int first;
-    int last;
+    if(!view || !view->master_clips || view->master_clips->len == 0)
+        return 0;
 
-    if(vims_id)
-        *vims_id = id;
-    count = gvr_mt_message_arguments(message, values, G_N_ELEMENTS(values));
-    first = count > 0 ? values[0] : 0;
-    last = count > 0 ? values[count - 1] : 0;
+    for(guint i = 0; i < view->master_clips->len; i++) {
+        GvrMultiTrackMasterClip *clip =
+            &g_array_index(view->master_clips, GvrMultiTrackMasterClip, i);
+        if(clip->slot >= insertion_slot)
+            return clip->project_in;
+    }
 
-    switch(id) {
-        case VIMS_SAMPLE_SELECT:
-            return g_strdup_printf("SAMPLE %d", first);
-        case VIMS_SELECT_ID:
-            return g_strdup_printf("SLOT %d", first);
-        case VIMS_VIDEO_SET_FRAME:
-            return g_strdup_printf("FRAME %d", first);
-        case VIMS_VIDEO_SET_SPEED:
-        case VIMS_VIDEO_SET_SPEEDK:
-            return g_strdup_printf("SPEED %d", last);
-        case VIMS_VIDEO_PLAY_FORWARD:
-            return g_strdup("FWD");
-        case VIMS_VIDEO_PLAY_BACKWARD:
-            return g_strdup("REV");
-        case VIMS_VIDEO_PLAY_STOP:
-            return g_strdup("STOP");
-        case VIMS_VIDEO_PLAY_STOP_ALL:
-            return g_strdup("STOP ALL");
-        case VIMS_SAMPLE_HOLD_FRAME:
-            return g_strdup_printf("HOLD %d", last);
-        default:
-            return id >= 0 ?
-                g_strdup_printf("VIMS %03d", id) :
-                g_strdup("VIMS");
+    {
+        GvrMultiTrackMasterClip *last =
+            &g_array_index(view->master_clips,
+                           GvrMultiTrackMasterClip,
+                           view->master_clips->len - 1);
+        return last->project_out + 1;
     }
 }
 
-static void gvr_mt_add_dropped_event(GvrMultiTrackEdit *view,
-                                     int track,
-                                     int frame,
-                                     const char *message)
+static gboolean gvr_mt_source_drop_target(GvrMultiTrackEdit *view,
+                                          int x,
+                                          int y,
+                                          int width,
+                                          int *track_out,
+                                          int *kind_out,
+                                          int *slot_out,
+                                          int *frame_out)
 {
+    const int track = gvr_mt_track_at_y(view, y);
     GvrMultiTrackLane *lane;
-    GvrMultiTrackEventData *event;
-    int order = 0;
+    int frame;
 
-    if(!view || track < 0 || track >= view->max_tracks || !message)
-        return;
-
+    if(!view || track < 0 || track >= view->max_tracks)
+        return FALSE;
     lane = &view->lanes[track];
-    for(guint i = 0; i < lane->events->len; i++) {
-        GvrMultiTrackEventData *existing = g_ptr_array_index(lane->events, i);
-        if(existing->project_frame == frame)
-            order = MAX(order, existing->order + 1);
+    if(!lane->connected)
+        return FALSE;
+
+    frame = gvr_mt_x_to_frame(view, x, width);
+    if(lane->sequence_active) {
+        if(track != view->project_master_track || !lane->current_control)
+            return FALSE;
+        if(track_out)
+            *track_out = track;
+        if(kind_out)
+            *kind_out = 2;
+        if(slot_out)
+            *slot_out = gvr_mt_sequence_insertion_slot(view, frame);
+        if(frame_out)
+            *frame_out = frame;
+        return TRUE;
     }
 
-    event = g_new0(GvrMultiTrackEventData, 1);
-    event->project_frame = frame;
-    event->order = order;
-    event->message = g_strdup(message);
-    event->label = gvr_mt_message_label(message, &event->vims_id);
-    g_ptr_array_add(lane->events, event);
+    if(lane->play_mode != MODE_SAMPLE && lane->play_mode != MODE_STREAM)
+        return FALSE;
+
+    if(track_out)
+        *track_out = track;
+    if(kind_out)
+        *kind_out = 1;
+    if(slot_out)
+        *slot_out = -1;
+    if(frame_out)
+        *frame_out = frame;
+    return TRUE;
+}
+
+static gboolean gvr_mt_drag_motion(GtkWidget *widget,
+                                   GdkDragContext *context,
+                                   gint x,
+                                   gint y,
+                                   guint time,
+                                   gpointer user_data)
+{
+    GvrMultiTrackEdit *view = GVR_MULTI_TRACK_EDIT(user_data);
+    GtkAllocation allocation;
+    int track = -1;
+    int kind = 0;
+    int slot = -1;
+    int frame = 0;
+    gboolean valid;
+
+    gtk_widget_get_allocation(widget, &allocation);
+    if(x < 32) {
+        view->timeline_view_start -= MAX(1, gvr_mt_visible_frames(view) / 30);
+        gvr_mt_update_pan(view);
+    }
+    else if(x > allocation.width - 32) {
+        view->timeline_view_start += MAX(1, gvr_mt_visible_frames(view) / 30);
+        gvr_mt_update_pan(view);
+    }
+    valid = gvr_mt_source_drop_target(view,
+                                      x, y, allocation.width,
+                                      &track, &kind, &slot, &frame);
+    view->source_drag_active = valid;
+    view->source_drag_track = track;
+    view->source_drag_kind = kind;
+    view->source_drag_slot = slot;
+    view->source_drag_frame = frame;
+    gdk_drag_status(context, valid ? GDK_ACTION_COPY : 0, time);
     gvr_mt_queue_timeline_draw(view);
+    return TRUE;
+}
+
+static void gvr_mt_drag_leave(GtkWidget *widget,
+                              GdkDragContext *context,
+                              guint time,
+                              gpointer user_data)
+{
+    GvrMultiTrackEdit *view = GVR_MULTI_TRACK_EDIT(user_data);
+    (void)widget;
+    (void)context;
+    (void)time;
+    view->source_drag_active = FALSE;
+    view->source_drag_track = -1;
+    view->source_drag_kind = 0;
+    view->source_drag_slot = -1;
+    gvr_mt_queue_timeline_draw(view);
+}
+
+static gboolean gvr_mt_parse_source_payload(GtkSelectionData *selection,
+                                            int *sample_id,
+                                            int *sample_type)
+{
+    const guchar *bytes = gtk_selection_data_get_data(selection);
+    const gint length = gtk_selection_data_get_length(selection);
+    char *payload;
+    int version = 0;
+    int id = 0;
+    int type = -1;
+    int consumed = 0;
+    gboolean valid = FALSE;
+
+    if(!bytes || length <= 0)
+        return FALSE;
+
+    payload = g_strndup((const char *)bytes, length);
+    if(sscanf(payload, "%d %d %d %n", &version, &id, &type, &consumed) == 3 &&
+       version == 1 && id > 0 && type >= 0) {
+        const char *tail = payload + consumed;
+        while(*tail && g_ascii_isspace(*tail))
+            tail++;
+        valid = *tail == '\0';
+    }
+    g_free(payload);
+
+    if(valid) {
+        if(sample_id)
+            *sample_id = id;
+        if(sample_type)
+            *sample_type = type;
+    }
+    return valid;
 }
 
 static void gvr_mt_drag_data_received(GtkWidget *widget,
@@ -2630,38 +3265,54 @@ static void gvr_mt_drag_data_received(GtkWidget *widget,
 {
     GvrMultiTrackEdit *view = GVR_MULTI_TRACK_EDIT(user_data);
     GtkAllocation allocation;
-    const guchar *bytes = gtk_selection_data_get_data(selection);
-    const gint length = gtk_selection_data_get_length(selection);
-    int track;
-    int frame;
-    gchar *message = NULL;
+    int track = -1;
+    int kind = 0;
+    int insertion_slot = -1;
+    int frame = 0;
+    int sample_id = 0;
+    int sample_type = -1;
     gboolean success = FALSE;
 
     (void)info;
     gtk_widget_get_allocation(widget, &allocation);
-    track = y >= GVR_MT_RULER_HEIGHT ?
-        (y - GVR_MT_RULER_HEIGHT) / GVR_MT_LANE_HEIGHT : -1;
-    frame = gvr_mt_x_to_frame(view, x, allocation.width);
 
-    if(track >= 0 && track < view->max_tracks &&
-       view->lanes[track].connected && bytes && length > 0) {
-        message = g_strndup((const gchar *)bytes, length);
-        g_strstrip(message);
-        if(message[0]) {
-            gvr_mt_select_track(view, track, TRUE);
-            gvr_mt_add_dropped_event(view, track, frame, message);
+    if(gvr_mt_source_drop_target(view,
+                                 x, y, allocation.width,
+                                 &track, &kind, &insertion_slot, &frame) &&
+       gvr_mt_parse_source_payload(selection, &sample_id, &sample_type)) {
+        gvr_mt_select_track(view, track, TRUE);
+        view->pending_source_track = track;
+        view->pending_source_id = sample_id;
+        view->pending_source_type = sample_type;
+        view->pending_source_kind = kind;
+        if(kind == 2) {
+            g_signal_emit(
+                view,
+                gvr_multi_track_edit_signals[SIGNAL_SEQUENCE_SOURCE_INSERT_REQUESTED],
+                0,
+                track,
+                view->lanes[track].sequence_bank,
+                insertion_slot,
+                sample_id,
+                sample_type);
+        }
+        else {
             g_signal_emit(view,
-                          gvr_multi_track_edit_signals[SIGNAL_EVENT_DROPPED],
+                          gvr_multi_track_edit_signals[SIGNAL_SOURCE_PLAY_REQUESTED],
                           0,
                           track,
-                          frame,
-                          message);
-            success = TRUE;
+                          sample_id,
+                          sample_type);
         }
+        success = TRUE;
     }
 
+    view->source_drag_active = FALSE;
+    view->source_drag_track = -1;
+    view->source_drag_kind = 0;
+    view->source_drag_slot = -1;
+    gvr_mt_queue_timeline_draw(view);
     gtk_drag_finish(context, success, FALSE, time);
-    g_free(message);
 }
 
 static void gvr_mt_build_lane_header(GvrMultiTrackEdit *view, int track)
@@ -2907,9 +3558,7 @@ static void gvr_multi_track_edit_class_init(GvrMultiTrackEditClass *klass)
                      NULL,
                      g_cclosure_marshal_generic,
                      G_TYPE_NONE,
-                     4,
-                     G_TYPE_INT,
-                     G_TYPE_INT,
+                     2,
                      G_TYPE_INT,
                      G_TYPE_INT);
 
@@ -2925,19 +3574,47 @@ static void gvr_multi_track_edit_class_init(GvrMultiTrackEditClass *klass)
                      1,
                      G_TYPE_INT);
 
-    gvr_multi_track_edit_signals[SIGNAL_EVENT_DROPPED] =
-        g_signal_new("event-dropped",
+    gvr_multi_track_edit_signals[SIGNAL_SOURCE_PLAY_REQUESTED] =
+        g_signal_new("source-play-requested",
                      G_TYPE_FROM_CLASS(klass),
                      G_SIGNAL_RUN_LAST,
-                     0,
-                     NULL,
-                     NULL,
+                     0, NULL, NULL,
                      g_cclosure_marshal_generic,
-                     G_TYPE_NONE,
-                     3,
-                     G_TYPE_INT,
-                     G_TYPE_INT,
-                     G_TYPE_STRING);
+                     G_TYPE_NONE, 3,
+                     G_TYPE_INT, G_TYPE_INT, G_TYPE_INT);
+
+    gvr_multi_track_edit_signals[SIGNAL_SEQUENCE_SOURCE_INSERT_REQUESTED] =
+        g_signal_new("sequence-source-insert-requested",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_LAST,
+                     0, NULL, NULL,
+                     g_cclosure_marshal_generic,
+                     G_TYPE_NONE, 5,
+                     G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT, G_TYPE_INT);
+
+    gvr_multi_track_edit_signals[SIGNAL_REVEAL_SEQUENCE_SLOT_REQUESTED] =
+        g_signal_new("reveal-sequence-slot-requested",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_LAST,
+                     0, NULL, NULL,
+                     g_cclosure_marshal_generic,
+                     G_TYPE_NONE, 2, G_TYPE_INT, G_TYPE_INT);
+
+    gvr_multi_track_edit_signals[SIGNAL_REVEAL_SOURCE_REQUESTED] =
+        g_signal_new("reveal-source-requested",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_LAST,
+                     0, NULL, NULL,
+                     g_cclosure_marshal_generic,
+                     G_TYPE_NONE, 2, G_TYPE_INT, G_TYPE_INT);
+
+    gvr_multi_track_edit_signals[SIGNAL_RESYNC_REQUESTED] =
+        g_signal_new("resync-requested",
+                     G_TYPE_FROM_CLASS(klass),
+                     G_SIGNAL_RUN_LAST,
+                     0, NULL, NULL,
+                     g_cclosure_marshal_VOID__INT,
+                     G_TYPE_NONE, 1, G_TYPE_INT);
 
     gvr_multi_track_edit_signals[SIGNAL_TRANSITION_REQUESTED] =
         g_signal_new("transition-requested",
@@ -3003,6 +3680,12 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     view->bank = 0;
     view->fps = 25.0;
     view->timeline_zoom = 1.0;
+    view->focused_track = -1;
+    view->source_drag_track = -1;
+    view->pending_source_track = -1;
+    view->pending_source_id = -1;
+    view->pending_source_type = -1;
+    view->source_drag_slot = -1;
     view->hover_track = -1;
     view->hover_frame = -1;
     view->transport_seekable = FALSE;
@@ -3278,6 +3961,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
                           GDK_BUTTON_RELEASE_MASK |
                           GDK_BUTTON1_MOTION_MASK |
                           GDK_POINTER_MOTION_MASK |
+                          GDK_LEAVE_NOTIFY_MASK |
                           GDK_SCROLL_MASK |
                           GDK_SMOOTH_SCROLL_MASK);
     g_signal_connect(view->timeline_area,
@@ -3297,8 +3981,16 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
                      G_CALLBACK(gvr_mt_timeline_motion),
                      view);
     g_signal_connect(view->timeline_area,
+                     "leave-notify-event",
+                     G_CALLBACK(gvr_mt_timeline_leave),
+                     view);
+    g_signal_connect(view->timeline_area,
                      "scroll-event",
                      G_CALLBACK(gvr_mt_timeline_scroll),
+                     view);
+    g_signal_connect(view->timeline_area,
+                     "key-press-event",
+                     G_CALLBACK(gvr_mt_timeline_key_press),
                      view);
     g_signal_connect(view->timeline_area,
                      "query-tooltip",
@@ -3309,6 +4001,14 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
                       gvr_multi_track_edit_drop_targets,
                       G_N_ELEMENTS(gvr_multi_track_edit_drop_targets),
                       GDK_ACTION_COPY);
+    g_signal_connect(view->timeline_area,
+                     "drag-motion",
+                     G_CALLBACK(gvr_mt_drag_motion),
+                     view);
+    g_signal_connect(view->timeline_area,
+                     "drag-leave",
+                     G_CALLBACK(gvr_mt_drag_leave),
+                     view);
     g_signal_connect(view->timeline_area,
                      "drag-data-received",
                      G_CALLBACK(gvr_mt_drag_data_received),
@@ -3395,7 +4095,7 @@ GtkWidget *gvr_multi_track_edit_new(int max_tracks)
     gtk_widget_set_size_request(view->timeline_area,
                                 640,
                                 GVR_MT_RULER_HEIGHT +
-                                view->max_tracks * GVR_MT_LANE_HEIGHT);
+                                gvr_mt_visible_track_count(view) * GVR_MT_LANE_HEIGHT);
     gvr_mt_refresh_headers(view);
     gvr_mt_update_summary(view);
     gvr_mt_update_pan(view);
@@ -3556,6 +4256,21 @@ void gvr_multi_track_edit_set_project(GtkWidget *widget,
     gvr_mt_queue_draw(view);
 }
 
+void gvr_multi_track_edit_clear_pending_source(GtkWidget *widget)
+{
+    GvrMultiTrackEdit *view;
+
+    if(!GVR_IS_MULTI_TRACK_EDIT(widget))
+        return;
+
+    view = GVR_MULTI_TRACK_EDIT(widget);
+    view->pending_source_track = -1;
+    view->pending_source_id = -1;
+    view->pending_source_type = -1;
+    view->pending_source_kind = 0;
+    gvr_mt_queue_timeline_draw(view);
+}
+
 void gvr_multi_track_edit_set_master_clips(
                                       GtkWidget *widget,
                                       const GvrMultiTrackMasterClip *clips,
@@ -3569,6 +4284,12 @@ void gvr_multi_track_edit_set_master_clips(
     g_array_set_size(view->master_clips, 0);
     if(clips && count > 0)
         g_array_append_vals(view->master_clips, clips, count);
+    if(view->pending_source_kind == 2) {
+        view->pending_source_track = -1;
+        view->pending_source_id = -1;
+        view->pending_source_type = -1;
+        view->pending_source_kind = 0;
+    }
     gvr_mt_invalidate_geometry(view);
     gvr_mt_update_pan(view);
     gvr_mt_queue_draw(view);
@@ -3640,6 +4361,16 @@ void gvr_multi_track_edit_clear_track(GtkWidget *widget, int track)
     lane->drift_frames = 0;
     lane->drift_millis = 0;
     lane->drift_correcting = FALSE;
+    if(view->focused_track == track) {
+        view->focused_track = -1;
+        gvr_mt_update_focus_layout(view);
+    }
+    if(view->pending_source_track == track) {
+        view->pending_source_track = -1;
+        view->pending_source_id = -1;
+        view->pending_source_type = -1;
+        view->pending_source_kind = 0;
+    }
     if(track == view->project_master_track) {
         view->transport_seekable = FALSE;
         g_free(view->transport_seek_reason);
@@ -3786,6 +4517,16 @@ void gvr_multi_track_edit_set_track_status(GtkWidget *widget,
     lane->stream_buffer_filled = normalized_filled;
     lane->stream_buffer_position = MAX(0, stream_buffer_position);
 
+    if(view->pending_source_kind == 1 &&
+       view->pending_source_track == track &&
+       view->pending_source_id == source_id &&
+       play_mode == (view->pending_source_type == 0 ? MODE_SAMPLE : MODE_STREAM)) {
+        view->pending_source_track = -1;
+        view->pending_source_id = -1;
+        view->pending_source_type = -1;
+        view->pending_source_kind = 0;
+    }
+
     if(track == view->project_master_track && !view->seek_dragging &&
        !sequence_active && source_id > 0) {
         view->playhead = play_mode == MODE_STREAM && stream_buffer_enabled ?
@@ -3822,6 +4563,8 @@ void gvr_multi_track_edit_set_track_status(GtkWidget *widget,
         gvr_mt_invalidate_geometry(view);
     if(geometry_changed)
         gvr_mt_update_pan(view);
+    if(track == view->project_master_track)
+        gvr_mt_follow_transport(view);
 
     gvr_mt_update_lane_header(view, track);
     if(track == view->project_master_track)
@@ -4000,6 +4743,7 @@ void gvr_multi_track_edit_set_playhead(GtkWidget *widget,
                                       MAX(0, gvr_mt_effective_total(view) - 1));
         view->playhead_active = active ? TRUE : FALSE;
     }
+    gvr_mt_follow_transport(view);
     gvr_mt_update_summary(view);
     gvr_mt_queue_draw(view);
 }

@@ -213,7 +213,7 @@ void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int view_mode_arg = args[P_VIEW_MODE];
     const int softness_arg = args[P_SOFTNESS];
 
-    int iy, iu, iv;
+    int iy = 0, iu = 128, iv = 128;
 
     _rgb2yuv(args[P_RED], args[P_GREEN], args[P_BLUE], iy, iu, iv);
 

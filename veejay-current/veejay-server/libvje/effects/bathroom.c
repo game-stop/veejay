@@ -143,7 +143,7 @@ static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x
 
     uint8_t **restrict bf = b->bathroom_frame;
     int strides[4] = { len, len, len, 0 };
-    int mod_table[64];
+    int mod_table[64] = { 0 };
 
     const int half_val = val >> 1;
 
@@ -210,7 +210,7 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
 
     uint8_t **restrict bf = b->bathroom_frame;
     int strides[4] = { len, len, len, len };
-    int mod_table[64];
+    int mod_table[64] = { 0 };
 
     const int half_val = val >> 1;
 

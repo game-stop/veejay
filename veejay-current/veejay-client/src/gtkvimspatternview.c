@@ -1019,12 +1019,13 @@ static gboolean gvr_pattern_last_argument_text(const char *message,
         return FALSE;
 
     length = MIN(length, text_size - 1);
-    g_snprintf(text,
-               text_size,
-               "%.*s",
-               (int)MIN(length, (gsize)G_MAXINT),
-               start);
-    return TRUE;
+    gsize copied = 0;
+    while(copied < length && start[copied] != '\0') {
+        text[copied] = start[copied];
+        copied++;
+    }
+    text[copied] = '\0';
+    return copied > 0;
 }
 
 static void gvr_pattern_upper_token(const char *source,
@@ -1440,11 +1441,12 @@ static gboolean gvr_pattern_format_description_label(
             if(used == 0 && base_limit > 0) {
                 const gsize copy_length =
                     MIN(piece_length, base_limit);
-                g_snprintf(base,
-                           sizeof(base),
-                           "%.*s",
-                           (int)copy_length,
-                           piece);
+                gsize copied = 0;
+                while(copied < copy_length && piece[copied] != '\0') {
+                    base[copied] = piece[copied];
+                    copied++;
+                }
+                base[copied] = '\0';
             }
             break;
         }

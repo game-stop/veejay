@@ -145,6 +145,16 @@ static Boolean ParseMessage(queuedData *qd);
 static void PacketAddRef(OSCPacketBuffer packet);
 static void PacketRemoveRef(OSCPacketBuffer packet);
 
+static unsigned long long OSC_TimeTagValue(OSCTimeTag tag)
+{
+#ifdef HAS8BYTEINT
+    return (unsigned long long) tag;
+#else
+    return ((unsigned long long) tag.seconds << 32) |
+           (unsigned long long) tag.fraction;
+#endif
+}
+
 
 /**************************************************
    Initialization and memory pre-allocation
@@ -464,7 +474,8 @@ Boolean OSCInvokeMessagesThatAreReady(OSCTimeTag now) {
     }
 
 #ifdef DEBUG
-    printf("OSCInvokeMessagesThatAreReady(%llx) - yes, some are ready; earliest %llx\n", now, thisTimeTag);
+    printf("OSCInvokeMessagesThatAreReady(%llx) - yes, some are ready; earliest %llx\n",
+           OSC_TimeTagValue(now), OSC_TimeTagValue(thisTimeTag));
 #endif
 
     while (OSCTT_Compare(thisTimeTag, OSCQueueEarliestTimeTag(globals.TheQueue)) == 0) {
@@ -473,7 +484,7 @@ Boolean OSCInvokeMessagesThatAreReady(OSCTimeTag now) {
 
 #ifdef DEBUG
 	printf("...Just removed earliest entry from queue: %p, TT %llx, %s\n",
-	       x, x->timetag, x->type == MESSAGE ? "message" : "bundle");
+	       x, OSC_TimeTagValue(x->timetag), x->type == MESSAGE ? "message" : "bundle");
 	if (x->type == MESSAGE) {
 	    printf("...message %s, len %d, args %p, arglen %d, callbacks %p\n",
 		   x->data.message.messageName, x->data.message.length, x->data.message.args,
@@ -517,7 +528,8 @@ Boolean OSCInvokeMessagesThatAreReady(OSCTimeTag now) {
     if (OSCTT_Compare(thisTimeTag, OSCQueueEarliestTimeTag(globals.TheQueue)) > 0) {
 	fatal_error("OSCInvokeMessagesThatAreReady: corrupt queue!\n"
 		    "  just did %llx; earliest in queue is now %llx",
-		    thisTimeTag, OSCQueueEarliestTimeTag(globals.TheQueue));
+		    OSC_TimeTagValue(thisTimeTag),
+		    OSC_TimeTagValue(OSCQueueEarliestTimeTag(globals.TheQueue)));
     }
 #endif
 

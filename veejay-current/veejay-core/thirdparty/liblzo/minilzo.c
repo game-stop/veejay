@@ -4593,11 +4593,7 @@ __lzo_init_v2(unsigned v, int s1, int s2, int s3, int s4, int s5,
     if (!r)
         return LZO_E_ERROR;
 
-    r = _lzo_config_check();
-    if (r != LZO_E_OK)
-        return r;
-
-    return r;
+    return _lzo_config_check();
 }
 
 #if !defined(__LZO_IN_MINILZO)
@@ -4956,7 +4952,6 @@ do_compress ( const lzo_bytep in , lzo_uint  in_len,
     ii = ip;
 
     ip += ti < 4 ? 4 - ti : 0;
-    for (;;)
     {
         const lzo_bytep m_pos;
 #if !(LZO_DETERMINISTIC)
@@ -4965,7 +4960,7 @@ do_compress ( const lzo_bytep in , lzo_uint  in_len,
         lzo_uint dindex;
 next:
         if __lzo_unlikely(ip >= ip_end)
-            break;
+            goto compress_done;
         DINDEX1(dindex,ip);
         GINDEX(m_pos,m_off,dict,dindex,in);
         if (LZO_CHECK_MPOS_NON_DET(m_pos,m_off,in,ip,M4_MAX_OFFSET))
@@ -4992,7 +4987,7 @@ try_match:
 literal:
             UPDATE_I(dict,0,dindex,ip,in);
             ip += 1 + ((ip - ii) >> 5);
-            continue;
+            goto next;
         }
         UPDATE_I(dict,0,dindex,ip,in);
 #else
@@ -5005,7 +5000,7 @@ literal:
         ip += 1 + ((ip - ii) >> 5);
 next:
         if __lzo_unlikely(ip >= ip_end)
-            break;
+            goto compress_done;
         dv = UA_GET_LE32(ip);
         dindex = DINDEX(dv,ip);
         GINDEX(m_off,m_pos,in+dict,dindex,in);
@@ -5222,6 +5217,7 @@ m_len_done:
         goto next;
     }
 
+compress_done:
     *out_len = pd(op, out);
     return pd(in_end,ii-ti);
 }

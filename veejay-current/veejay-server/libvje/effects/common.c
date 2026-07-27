@@ -1651,7 +1651,7 @@ void veejay_distance_transform8(uint8_t *plane, int w, int h, uint32_t *output)
         int y_prev_idx = (y - 1) * w;
 
         for (int x = 1; x < wid; x++) {
-            uint32_t mask = -(uint32_t)(!!plane[y_idx + x]);
+            uint32_t mask = plane[y_idx + x] ? UINT32_MAX : 0u;
             uint32_t val = DT_MIN4(
                 output[y_prev_idx + x - 1] + 1,
                 output[y_prev_idx + x] + 1,
@@ -1667,7 +1667,7 @@ void veejay_distance_transform8(uint8_t *plane, int w, int h, uint32_t *output)
         int y_next_idx = (y + 1) * w;
 
         for (int x = wid; x > 1; x--) {
-            uint32_t mask = -(uint32_t)(!!plane[y_idx + x]);
+            uint32_t mask = plane[y_idx + x] ? UINT32_MAX : 0u;
             uint32_t val = DT_MIN5(
                 output[y_next_idx + x - 1] + 1,
                 output[y_idx + x],

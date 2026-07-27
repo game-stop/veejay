@@ -28,8 +28,8 @@ G_BEGIN_DECLS
 
 #define GVR_MULTI_TRACK_EDIT_MAX_TRACKS 16
 
-#define GVR_MULTI_TRACK_VIMS_DND_TARGET \
-    "application/x-gveejay-vims-message"
+#define GVR_MULTI_TRACK_SOURCE_DND_TARGET \
+    "application/x-gveejay-source-v1"
 
 typedef struct _GvrMultiTrackEdit GvrMultiTrackEdit;
 typedef struct _GvrMultiTrackEditClass GvrMultiTrackEditClass;
@@ -159,6 +159,7 @@ void gvr_multi_track_edit_set_track_drift(GtkWidget *widget,
                                           int drift_millis,
                                           gboolean correcting);
 void gvr_multi_track_edit_set_drift_lock(GtkWidget *widget, gboolean enabled);
+void gvr_multi_track_edit_clear_pending_source(GtkWidget *widget);
 
 /*
  * Signals:
@@ -175,9 +176,23 @@ void gvr_multi_track_edit_set_drift_lock(GtkWidget *widget, gboolean enabled);
  * "seek-requested"
  *   void callback(GtkWidget *widget, int frame, gpointer user_data)
  *
- * "event-dropped"
- *   void callback(GtkWidget *widget, int track, int frame,
- *                 const char *message, gpointer user_data)
+ * "source-play-requested"
+ *   void callback(GtkWidget *widget, int track, int sample_id,
+ *                 int sample_type, gpointer user_data)
+ *
+ * "sequence-source-insert-requested"
+ *   void callback(GtkWidget *widget, int track, int bank,
+ *                 int insertion_slot, int sample_id, int sample_type,
+ *                 gpointer user_data)
+ *
+ * "reveal-sequence-slot-requested"
+ *   void callback(GtkWidget *widget, int bank, int slot, gpointer user_data)
+ *
+ * "reveal-source-requested"
+ *   void callback(GtkWidget *widget, int sample_id, int sample_type, gpointer user_data)
+ *
+ * "resync-requested"
+ *   void callback(GtkWidget *widget, int track, gpointer user_data)
  *
  * "transition-source-selected"
  *   void callback(GtkWidget *widget, int track, int bus, gpointer user_data)

@@ -81,6 +81,9 @@ void vj_gui_sync_preview_toggle(int enabled);
 void vj_gui_apply_multitrack_preview(GdkPixbuf *pixbuf);
 void vj_gui_vims_observe_external(int id, const char format[], ...);
 int vj_gui_switch_cached_track(int old_track, int new_track, const char *hostname, int port_num);
+gboolean vj_gui_sequence_insert_source_at(int bank, int slot, int sample_id, int sample_type);
+void vj_gui_reveal_sequence_slot(int bank, int slot);
+void vj_gui_reveal_source(int sample_id, int sample_type);
 
 int vj_gui_vims_get_selected_action(int *event_id, int *key, int *modifier, char **args, int *is_bundle);
 int vj_gui_vims_get_selected_bundle(int *event_id);

@@ -196,8 +196,7 @@ static	double	lvd_extract_param_number( livido_port_t *instance, const char *pna
 	if( livido_property_get( instance, pname,n, &c ) != LIVIDO_NO_ERROR )
 		return pn;
 
-	if( livido_property_get( c, "value", 0, &pn ) != LIVIDO_NO_ERROR )
-		return pn;
+	(void) livido_property_get( c, "value", 0, &pn );
 	return pn;	
 }
 
@@ -222,8 +221,7 @@ static	int	lvd_extract_param_boolean( livido_port_t *instance, const char *pname
 	if( livido_property_get( instance, pname,n, &c ) != LIVIDO_NO_ERROR )
 		return pn;
 
-	if( livido_property_get( c, "value", 0, &pn ) != LIVIDO_NO_ERROR )
-		return pn;
+	(void) livido_property_get( c, "value", 0, &pn );
 	return pn;	
 }
 static	void	lvd_set_param_number( livido_port_t *instance, const char *pname,int id, double num )

@@ -6552,14 +6552,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		info->splitter = vj_split_new_from_file( split_cfg, info->video_output_width,info->video_output_height, PIX_FMT_YUV444P );
 	}
 
-	if(info->settings->composite)
-	{
-		info->osd = vj_font_single_init( info->video_output_width,info->video_output_height,el->video_fps,info->homedir  );
-	}
-	else
-	{
-		info->osd = vj_font_single_init( info->video_output_width,info->video_output_height,el->video_fps,info->homedir );
-	}
+	info->osd = vj_font_single_init(info->video_output_width,
+	                                info->video_output_height,
+	                                el->video_fps,
+	                                info->homedir);
 
 	if(!info->osd) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system for OSD");

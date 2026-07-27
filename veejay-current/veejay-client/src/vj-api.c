@@ -77,6 +77,7 @@ extern void on_previewtoggle_toggled(GtkWidget *w, gpointer user_data);
 #include <src/gtkshapeselector.h>
 #include <src/gtkvimsview.h>
 #include <src/gtksamplebankview.h>
+#include <src/gtkmultitrackedit.h>
 #include <src/gtkeditlistview.h>
 #include <veejaycore/yuvconv.h>
 #include <veejaycore/libvevo.h>
@@ -2359,6 +2360,145 @@ static void on_sample_bank_view_page_selected(GtkWidget *widget, gint page, gpoi
 static void on_sample_bank_view_slot_selected(GtkWidget *widget, gint page, gint slot, gpointer user_data);
 static void on_sample_bank_view_slot_activated(GtkWidget *widget, gint page, gint slot, gpointer user_data);
 static void on_sample_bank_view_slot_mix_requested(GtkWidget *widget, gint page, gint slot, gpointer user_data);
+
+static int samplebank_drag_page = -1;
+static int samplebank_drag_slot = -1;
+
+static GtkTargetEntry samplebank_source_drag_targets[] = {
+    { (gchar *)GVR_MULTI_TRACK_SOURCE_DND_TARGET, GTK_TARGET_SAME_APP, 0 }
+};
+
+static void samplebank_source_drag_data_get(GtkWidget *widget,
+                                            GdkDragContext *context,
+                                            GtkSelectionData *selection,
+                                            guint info_id,
+                                            guint time,
+                                            gpointer user_data)
+{
+    int sample_id = 0;
+    int sample_type = -1;
+    char payload[96];
+
+    (void)context;
+    (void)info_id;
+    (void)time;
+    (void)user_data;
+
+    if(samplebank_drag_page >= 0 && samplebank_drag_slot >= 0)
+        gvr_sample_bank_view_get_slot(widget,
+                                      samplebank_drag_page,
+                                      samplebank_drag_slot,
+                                      &sample_id,
+                                      &sample_type);
+
+    if((sample_id <= 0 || sample_type < 0) &&
+       info && info->selection_slot) {
+        sample_id = info->selection_slot->sample_id;
+        sample_type = info->selection_slot->sample_type;
+    }
+
+    if(sample_id <= 0 || sample_type < 0)
+        return;
+
+    g_snprintf(payload, sizeof(payload), "1 %d %d", sample_id, sample_type);
+    gtk_selection_data_set(selection,
+                           gtk_selection_data_get_target(selection),
+                           8,
+                           (const guchar *)payload,
+                           (gint)strlen(payload));
+}
+
+static void samplebank_cancel_multitrack_tab_switch(void);
+
+static void samplebank_source_drag_end(GtkWidget *widget,
+                                       GdkDragContext *context,
+                                       gpointer user_data)
+{
+    (void)widget;
+    (void)context;
+    (void)user_data;
+    samplebank_drag_page = -1;
+    samplebank_drag_slot = -1;
+    samplebank_cancel_multitrack_tab_switch();
+}
+
+static guint samplebank_multitrack_tab_timeout = 0;
+
+static gboolean samplebank_switch_to_multitrack_tab(gpointer data)
+{
+    GtkNotebook *notebook = GTK_NOTEBOOK(data);
+    samplebank_multitrack_tab_timeout = 0;
+    if(GTK_IS_NOTEBOOK(notebook))
+        gtk_notebook_set_current_page(notebook, NOTEBOOK18_PAGE_MULTITRACK);
+    return G_SOURCE_REMOVE;
+}
+
+static void samplebank_cancel_multitrack_tab_switch(void)
+{
+    if(samplebank_multitrack_tab_timeout) {
+        g_source_remove(samplebank_multitrack_tab_timeout);
+        samplebank_multitrack_tab_timeout = 0;
+    }
+}
+
+static int samplebank_notebook_tab_at(GtkNotebook *notebook, int x, int y)
+{
+    const int pages = gtk_notebook_get_n_pages(notebook);
+
+    for(int page = 0; page < pages; page++) {
+        GtkWidget *child = gtk_notebook_get_nth_page(notebook, page);
+        GtkWidget *tab = child ? gtk_notebook_get_tab_label(notebook, child) : NULL;
+        GtkAllocation allocation;
+        int tx = 0;
+        int ty = 0;
+
+        if(!tab || !gtk_widget_get_mapped(tab) ||
+           !gtk_widget_translate_coordinates(tab, GTK_WIDGET(notebook),
+                                             0, 0, &tx, &ty))
+            continue;
+        gtk_widget_get_allocation(tab, &allocation);
+        if(x >= tx && x < tx + allocation.width &&
+           y >= ty && y < ty + allocation.height)
+            return page;
+    }
+    return -1;
+}
+
+static gboolean samplebank_notebook_drag_motion(GtkWidget *widget,
+                                                 GdkDragContext *context,
+                                                 gint x,
+                                                 gint y,
+                                                 guint time,
+                                                 gpointer user_data)
+{
+    GtkNotebook *notebook = GTK_NOTEBOOK(widget);
+    const int page = samplebank_notebook_tab_at(notebook, x, y);
+    (void)user_data;
+
+    if(page == NOTEBOOK18_PAGE_MULTITRACK) {
+        if(!samplebank_multitrack_tab_timeout) {
+            samplebank_multitrack_tab_timeout =
+                g_timeout_add(350, samplebank_switch_to_multitrack_tab, notebook);
+        }
+        gdk_drag_status(context, GDK_ACTION_COPY, time);
+        return TRUE;
+    }
+
+    samplebank_cancel_multitrack_tab_switch();
+    return FALSE;
+}
+
+static void samplebank_notebook_drag_leave(GtkWidget *widget,
+                                            GdkDragContext *context,
+                                            guint time,
+                                            gpointer user_data)
+{
+    (void)widget;
+    (void)context;
+    (void)time;
+    (void)user_data;
+    samplebank_cancel_multitrack_tab_switch();
+}
 static sample_slot_t *update_sample_slot_data(int bank_num, int slot_num, int id, gint sample_type, gchar *title, gchar *timecode);
 static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode);
 static void set_activation_of_slot_in_samplebank(gboolean activate);
@@ -24224,6 +24364,42 @@ void vj_gui_init(const char *glade_file,
         g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-selected", G_CALLBACK(on_sample_bank_view_slot_selected), NULL);
         g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-activated", G_CALLBACK(on_sample_bank_view_slot_activated), NULL);
         g_signal_connect(G_OBJECT(info->sample_bank_view), "slot-mix-requested", G_CALLBACK(on_sample_bank_view_slot_mix_requested), NULL);
+        gtk_drag_source_set(info->sample_bank_view,
+                            GDK_BUTTON1_MASK,
+                            samplebank_source_drag_targets,
+                            G_N_ELEMENTS(samplebank_source_drag_targets),
+                            GDK_ACTION_COPY);
+        g_signal_connect(G_OBJECT(info->sample_bank_view),
+                         "drag-data-get",
+                         G_CALLBACK(samplebank_source_drag_data_get),
+                         NULL);
+        g_signal_connect(G_OBJECT(info->sample_bank_view),
+                         "drag-end",
+                         G_CALLBACK(samplebank_source_drag_end),
+                         NULL);
+        {
+            GtkWidget *notebook = widget_cache[WIDGET_NOTEBOOK18];
+            if(notebook && GTK_IS_NOTEBOOK(notebook) &&
+               !g_object_get_data(G_OBJECT(notebook),
+                                  "gvr-source-tab-dnd")) {
+                gtk_drag_dest_set(notebook,
+                                  0,
+                                  samplebank_source_drag_targets,
+                                  G_N_ELEMENTS(samplebank_source_drag_targets),
+                                  GDK_ACTION_COPY);
+                g_signal_connect(notebook,
+                                 "drag-motion",
+                                 G_CALLBACK(samplebank_notebook_drag_motion),
+                                 NULL);
+                g_signal_connect(notebook,
+                                 "drag-leave",
+                                 G_CALLBACK(samplebank_notebook_drag_leave),
+                                 NULL);
+                g_object_set_data(G_OBJECT(notebook),
+                                  "gvr-source-tab-dnd",
+                                  GINT_TO_POINTER(1));
+            }
+        }
     }
     gui->sample_banks = vj_calloc(sizeof(sample_bank_t*) * NUM_BANKS);
 
@@ -25544,6 +25720,133 @@ static void sequence_bank_view_send_slot_update(int bank, int slot, int sample_i
         multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d %d", slot, sample_id, sample_type, bank);
     else
         multi_vims(VIMS_SEQUENCE_DEL, "%d %d", slot, bank);
+}
+
+gboolean vj_gui_sequence_insert_source_at(int bank,
+                                           int slot,
+                                           int sample_id,
+                                           int sample_type)
+{
+    int empty_slot = -1;
+    int ids[MAX_SEQUENCES];
+    int types[MAX_SEQUENCES];
+
+    if(!info || !info->sequence_bank_view ||
+       bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       slot < 0 || slot >= MAX_SEQUENCES ||
+       sample_id <= 0 || sample_type < 0)
+        return FALSE;
+
+    for(int i = 0; i < MAX_SEQUENCES; i++) {
+        ids[i] = -1;
+        types[i] = -1;
+        gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                        bank, i, &ids[i], &types[i]);
+    }
+
+    if(ids[slot] <= 0)
+        empty_slot = slot;
+    else {
+        for(int i = slot + 1; i < MAX_SEQUENCES; i++) {
+            if(ids[i] <= 0) {
+                empty_slot = i;
+                break;
+            }
+        }
+    }
+
+    if(empty_slot < 0) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Sequence bank %d is full; cannot insert %s %d",
+               bank + 1,
+               sample_type == 0 ? "Sample" : "Stream",
+               sample_id);
+        return FALSE;
+    }
+
+    if(empty_slot >= GVR_VIMS_PATTERN_SLOTS &&
+       empty_slot > slot && info->vims_pattern_view &&
+       gvr_vims_pattern_view_get_cell_flags(info->vims_pattern_view,
+                                             bank,
+                                             GVR_VIMS_PATTERN_SLOTS - 1) != 0) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "Insertion would move a slot pattern beyond the pattern editor capacity");
+        return FALSE;
+    }
+
+    for(int dst = empty_slot; dst > slot; dst--) {
+        const int src = dst - 1;
+        sequence_bank_view_send_slot_update(bank, dst, ids[src], types[src]);
+        gvr_sequence_bank_view_set_slot(info->sequence_bank_view,
+                                        bank, dst, ids[src], types[src]);
+        if(info->vims_pattern_view &&
+           src < GVR_VIMS_PATTERN_SLOTS &&
+           dst < GVR_VIMS_PATTERN_SLOTS)
+            gvr_vims_pattern_view_swap_cells(info->vims_pattern_view,
+                                             bank, src, dst);
+    }
+
+    sequence_bank_view_send_slot_update(bank, slot, sample_id, sample_type);
+    gvr_sequence_bank_view_set_slot(info->sequence_bank_view,
+                                    bank, slot, sample_id, sample_type);
+
+    for(int i = slot; i <= empty_slot; i++) {
+        int id = -1;
+        int type = -1;
+        gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                        bank, i, &id, &type);
+        sequence_vims_bind_cell(bank, i, id, type);
+    }
+
+    gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+    gvr_sequence_bank_view_set_selected_slot(info->sequence_bank_view, bank, slot);
+
+    vj_msg(VEEJAY_MSG_INFO,
+           "Inserted %s %d into sequence bank %d at slot %d",
+           sample_type == 0 ? "Sample" : "Stream",
+           sample_id, bank + 1, slot + 1);
+    return TRUE;
+}
+
+void vj_gui_reveal_sequence_slot(int bank, int slot)
+{
+    GtkWidget *notebook;
+
+    if(!info || !info->sequence_bank_view ||
+       bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+       slot < 0 || slot >= MAX_SEQUENCES)
+        return;
+
+    gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
+    gvr_sequence_bank_view_set_selected_slot(info->sequence_bank_view, bank, slot);
+    notebook = widget_cache[WIDGET_NOTEBOOK18];
+    if(notebook && GTK_IS_NOTEBOOK(notebook))
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook),
+                                      NOTEBOOK18_PAGE_SEQUENCE);
+    gtk_widget_grab_focus(info->sequence_bank_view);
+}
+
+void vj_gui_reveal_source(int sample_id, int sample_type)
+{
+    sample_slot_t *source;
+    int page = -1;
+    int slot = -1;
+
+    if(!info || !info->sample_bank_view || sample_id <= 0)
+        return;
+
+    source = find_slot_by_sample(sample_id, sample_type);
+    if(!source || !samplebank_locate_slot(source, &page, &slot)) {
+        vj_msg(VEEJAY_MSG_INFO,
+               "%s %d is not present in the local source bank",
+               sample_type == 0 ? "Sample" : "Stream",
+               sample_id);
+        return;
+    }
+
+    gvr_sample_bank_view_reveal_slot(info->sample_bank_view, page, slot);
+    gvr_sample_bank_view_set_selected_slot(info->sample_bank_view, page, slot);
+    info->selection_slot = source;
 }
 
 static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gint from_slot, gint to_slot, gpointer user_data)
@@ -27151,6 +27454,8 @@ static void on_sample_bank_view_slot_selected(GtkWidget *widget, gint page, gint
 {
     (void)widget;
     (void)user_data;
+    samplebank_drag_page = page;
+    samplebank_drag_slot = slot;
     samplebank_select_model_slot(page, slot, FALSE, FALSE);
 }
 

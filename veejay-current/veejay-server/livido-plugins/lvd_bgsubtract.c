@@ -88,7 +88,7 @@ void lvd_vje_diff_plane(uint8_t *restrict A,
     for (int i = 0; i < len; i++) {
         int diff = (int)A[i] - (int)B[i];
         int absdiff = (diff ^ (diff >> 31)) - (diff >> 31);
-        O[i] = (uint8_t)(-((unsigned int)(absdiff - threshold) >> 31));
+        O[i] = (uint8_t) (absdiff < threshold ? 255 : 0);
     }
 }
 void lvd_avg_frame(uint8_t *restrict A, uint8_t *restrict O, const int len, int n_threads)

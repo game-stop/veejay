@@ -336,7 +336,7 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 		old_format = 1;
 	}
 	
-	if( 1 == 1 && width == l->out_frame->width && height == l->out_frame->height &&
+	if( width == l->out_frame->width && height == l->out_frame->height &&
 	    pixfmt == l->out_frame->format ) {
 		is_direct = 1;
 	}

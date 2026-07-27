@@ -56,6 +56,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -2321,14 +2322,22 @@ int vj_el_write_editlist(char *name, long _n1, long _n2, editlist *el)
             index[i] = num_files++;
     }
 
-    fd = fopen(name, "w");
-    if (!fd) {
+    int out_fd = open(name, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC,
+                      S_IRUSR | S_IWUSR | S_IRGRP);
+    if (out_fd < 0) {
         free(index);
         return 0;
     }
 
-    if (fchmod(fileno(fd), S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) != 0) {
-        fclose(fd);
+    if (fchmod(out_fd, S_IRUSR | S_IWUSR | S_IRGRP) != 0) {
+        close(out_fd);
+        free(index);
+        return 0;
+    }
+
+    fd = fdopen(out_fd, "w");
+    if (!fd) {
+        close(out_fd);
         free(index);
         return 0;
     }

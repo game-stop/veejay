@@ -831,7 +831,9 @@ static void multitrack_drift_reset_all_phases(multitracker_t *mt)
 
 static void multitrack_drift_clear_track(multitracker_t *mt, int track)
 {
-    if(!mt || track < 0 || track >= MAX_TRACKS || track >= __MAX_TRACKS)
+    if(!mt || track < 0 || track >= __MAX_TRACKS)
+        return;
+    if(track >= MAX_TRACKS)
         return;
 
     multitrack_drift_reset_phase(mt, track);
@@ -2019,23 +2021,121 @@ static void multitrack_seek_requested(GtkWidget *widget,
                  multitrack_seek_unavailable_reason(status));
 }
 
-static void multitrack_event_dropped(GtkWidget *widget,
-                                     gint track,
-                                     gint frame,
-                                     const gchar *message,
-                                     gpointer user_data)
+static void multitrack_source_play_requested(GtkWidget *widget,
+                                             gint track,
+                                             gint sample_id,
+                                             gint sample_type,
+                                             gpointer user_data)
+{
+    multitracker_t *mt = user_data;
+    int target_mode;
+    (void)widget;
+
+    if(!mt || track < 0 || track >= MAX_TRACKS ||
+       sample_id <= 0 || sample_type < 0 ||
+       !gvr_track_test(mt->preview, track) ||
+       mt->status_cache[track][SEQ_ACT])
+        return;
+
+    target_mode = sample_type == 0 ? MODE_SAMPLE : MODE_STREAM;
+    multitrack_drift_reset_phase(mt, track);
+    mt->drift_source_changed_us[track] = g_get_monotonic_time();
+    gvr_queue_mmvims(mt->preview,
+                     track,
+                     VIMS_SET_MODE_AND_GO,
+                     sample_id,
+                     target_mode);
+    status_print(mt,
+                 "Switching Video %d to %s %d",
+                 track + 1,
+                 sample_type == 0 ? "Sample" : "Stream",
+                 sample_id);
+}
+
+static void multitrack_sequence_source_insert_requested(GtkWidget *widget,
+                                                         gint track,
+                                                         gint bank,
+                                                         gint insertion_slot,
+                                                         gint sample_id,
+                                                         gint sample_type,
+                                                         gpointer user_data)
+{
+    multitracker_t *mt = user_data;
+    gboolean inserted;
+
+    if(!mt || track != mt->project_master_track ||
+       track != mt->current_ui_track ||
+       track < 0 || track >= MAX_TRACKS ||
+       !gvr_track_test(mt->preview, track) ||
+       !mt->status_cache[track][SEQ_ACT]) {
+        if(mt)
+            status_print(mt,
+                         "Switch control to the project-master video before editing its sequence");
+        gvr_multi_track_edit_clear_pending_source(widget);
+        return;
+    }
+
+    inserted = vj_gui_sequence_insert_source_at(bank,
+                                                 insertion_slot,
+                                                 sample_id,
+                                                 sample_type);
+    if(!inserted) {
+        gvr_multi_track_edit_clear_pending_source(widget);
+        return;
+    }
+
+    status_print(mt,
+                 "Inserted %s %d into sequence bank %d at slot %d",
+                 sample_type == 0 ? "Sample" : "Stream",
+                 sample_id,
+                 bank + 1,
+                 insertion_slot + 1);
+}
+
+static void multitrack_reveal_sequence_slot_requested(GtkWidget *widget,
+                                                       gint bank,
+                                                       gint slot,
+                                                       gpointer user_data)
 {
     multitracker_t *mt = user_data;
     (void)widget;
 
-    if(!mt || track < 0 || track >= MAX_TRACKS || !message)
+    if(!mt || mt->project_master_track != mt->current_ui_track) {
+        if(mt)
+            status_print(mt,
+                         "Switch control to the project-master video before revealing its sequence slot");
+        return;
+    }
+    vj_gui_reveal_sequence_slot(bank, slot);
+}
+
+static void multitrack_reveal_source_requested(GtkWidget *widget,
+                                                gint sample_id,
+                                                gint sample_type,
+                                                gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    vj_gui_reveal_source(sample_id, sample_type);
+}
+
+static void multitrack_resync_requested(GtkWidget *widget,
+                                        gint track,
+                                        gpointer user_data)
+{
+    multitracker_t *mt = user_data;
+    (void)widget;
+
+    if(!mt || track < 0 || track >= MAX_TRACKS ||
+       track == mt->project_master_track ||
+       !gvr_track_test(mt->preview, track))
         return;
 
-    status_print(mt,
-                 "Placed a VIMS event on Video %d at project frame %d. "
-                 "Timeline event persistence and playback routing are the next integration step.",
-                 track + 1,
-                 frame);
+    multitrack_drift_reset_phase(mt, track);
+    mt->drift_last_correction_us[track] = 0;
+    mt->drift_source_changed_us[track] = 0;
+    multitrack_drift_update_internal(mt);
+    status_print(mt, "Resynchronising Video %d to the project master", track + 1);
 }
 
 static void multitrack_switcher_source_selected(GtkWidget *widget,
@@ -2325,8 +2425,24 @@ void *multitrack_new(
                      G_CALLBACK(multitrack_seek_requested),
                      mt);
     g_signal_connect(mt->timeline,
-                     "event-dropped",
-                     G_CALLBACK(multitrack_event_dropped),
+                     "source-play-requested",
+                     G_CALLBACK(multitrack_source_play_requested),
+                     mt);
+    g_signal_connect(mt->timeline,
+                     "sequence-source-insert-requested",
+                     G_CALLBACK(multitrack_sequence_source_insert_requested),
+                     mt);
+    g_signal_connect(mt->timeline,
+                     "reveal-sequence-slot-requested",
+                     G_CALLBACK(multitrack_reveal_sequence_slot_requested),
+                     mt);
+    g_signal_connect(mt->timeline,
+                     "reveal-source-requested",
+                     G_CALLBACK(multitrack_reveal_source_requested),
+                     mt);
+    g_signal_connect(mt->timeline,
+                     "resync-requested",
+                     G_CALLBACK(multitrack_resync_requested),
                      mt);
     g_signal_connect(mt->timeline,
                      "transition-source-selected",

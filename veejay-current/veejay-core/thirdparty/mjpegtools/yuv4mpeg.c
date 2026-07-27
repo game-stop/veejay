@@ -23,6 +23,7 @@
 #include <config.h>
 
 #include <unistd.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,13 @@ static int _y4mparam_feature_level = 0;       /* default is ol YUV4MPEG2 */
 
 static void *(*_y4m_alloc)(size_t bytes) = malloc;
 static void (*_y4m_free)(void *ptr) = free;
+
+static ssize_t y4m_remaining_bytes(size_t len, int error)
+{
+  const size_t capped = len > (size_t)SSIZE_MAX ? (size_t)SSIZE_MAX : len;
+  const ssize_t remaining = (ssize_t)capped;
+  return error ? -remaining : remaining;
+}
 
 
 int y4m_allow_unknown_tags(int yn)
@@ -82,9 +90,9 @@ ssize_t y4m_read(int fd, void *buf, size_t len)
      if (n <= 0) {
        /* return amount left to read */
        if (n == 0)
-	 return len;  /* n == 0 --> eof */
+	 return y4m_remaining_bytes(len, 0);  /* n == 0 --> eof */
       else
-	 return -len; /* n < 0 --> error */
+	 return y4m_remaining_bytes(len, 1); /* n < 0 --> error */
      }
      ptr += n;
      len -= n;
@@ -99,7 +107,7 @@ ssize_t y4m_write(int fd, const void *buf, size_t len)
 
    while (len > 0) {
      n = write(fd, ptr, len);
-     if (n <= 0) return -len;  /* return amount left to write */
+     if (n <= 0) return y4m_remaining_bytes(len, 1);  /* return amount left to write */
      ptr += n;
      len -= n;
    }
@@ -796,6 +804,7 @@ static int y4m_read_stream_header_line_cb(y4m_cb_reader_t * fd, y4m_stream_info_
 static int y4m_reread_stream_header_line_cb(y4m_cb_reader_t *fd,const y4m_stream_info_t *si,char *line,int n)
 {
     y4m_stream_info_t i;
+    y4m_init_stream_info(&i);
     int err=y4m_read_stream_header_line_cb(fd,&i,line,n);
     if( err==Y4M_OK && y4m_compare_stream_info(si,&i) )
         err=Y4M_ERR_HEADER;

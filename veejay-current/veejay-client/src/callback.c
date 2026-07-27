@@ -2148,7 +2148,7 @@ static int audio_sync_named_spin_int(const char *name, int fallback)
 
 static int audio_sync_profile_slot_from_combo(const char *name, int off_allowed)
 {
-    int active = audio_sync_named_combo_active(name, off_allowed ? 0 : 0);
+    int active = audio_sync_named_combo_active(name, 0);
 
     if(off_allowed)
         return ui_clampi(active, 0, 4);
