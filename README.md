@@ -1,5 +1,3 @@
-![VeeJay banner](https://veejayhq.github.io/img/header.png)
-
 # VeeJay
 
 **VeeJay is a real-time visual instrument, video sampler, and live-performance engine for Linux.**
