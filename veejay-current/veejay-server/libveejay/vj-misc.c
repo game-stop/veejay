@@ -289,7 +289,7 @@ int	veejay_create_temp_file(const char *prefix, char *dst)
     struct timespec now;
     clock_gettime( CLOCK_MONOTONIC, &now );
 
-	sprintf(dst, "%s_%ld_%ld",prefix, now.tv_sec, now.tv_nsec ); 
+	snprintf(dst, PATH_MAX, "%s_%ld_%ld", prefix, now.tv_sec, now.tv_nsec); 
 	return 1;
 }
 

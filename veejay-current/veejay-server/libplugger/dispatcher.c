@@ -58,11 +58,11 @@ void		deinit() {
 }
 
 void		init() {
-	char server_port_name[10];
+	char server_port_name[12];
 	char *server 	 = veejay_osc_server_get_addr( info->osc_server );
 	int   server_port= veejay_osc_server_get_port( info->osc_server );	
 
-	sprintf( server_port_name, "%d", server_port );
+	snprintf(server_port_name, sizeof(server_port_name), "%d", server_port);
 	
 	veejay_msg(0, "Veejay server '%s' communicates with %s" ,server,uri );
 
@@ -99,7 +99,7 @@ void	*veejay_get_osc_sender_by_uri( veejay_t *info , const char *uri )
 void	veejay_init_ui(veejay_t * info , const char *uri)
 {
 	char veejaystr[100];
-	sprintf(veejaystr, "Veejay-NG %s", VERSION );
+	snprintf(veejaystr, sizeof(veejaystr), "Veejay-NG %s", VERSION);
 	void *sender = veejay_get_osc_sender( info );
 
 	veejay_osc_set_window( sender , "MainWindow" );
@@ -120,8 +120,8 @@ void	veejay_init_ui(veejay_t * info , const char *uri)
 int 	setup(oscplug *info, port)
 {
 	int port = info->port_offset;
-	const char port_str[50];
-	sprintf(port_str, "%d",port );
+	char port_str[50];
+	snprintf(port_str, sizeof(port_str), "%d", port);
 	info->osc_server = veejay_new_osc_server( (void*)info, port_str );
 	info->osc_namespace = vpn( VEVO_ANONYMOUS_PORT );
 	veejay_osc_namespace_events( (void*) info, "/veejay");

@@ -234,11 +234,11 @@ int vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
     switch( d->decoder->sampling )
     {
         case e_dv_sample_411:
-                sprintf(sampling , "4:1:1"); break;
+                snprintf(sampling, sizeof(sampling), "4:1:1"); break;
         case e_dv_sample_420:
-                sprintf(sampling, "4:2:0"); break;
+                snprintf(sampling, sizeof(sampling), "4:2:0"); break;
         case e_dv_sample_422:
-                sprintf(sampling, "4:2:2"); break;
+                snprintf(sampling, sizeof(sampling), "4:2:2"); break;
         case e_dv_sample_none:
                 veejay_msg(0 ,"No sampling format, cant handle this file (yet)");
                 return -1;

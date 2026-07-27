@@ -801,7 +801,7 @@ static int check_command_line_options(int argc, char *argv[])
 #endif
 
 	default:
-	    sprintf(option, "%c", n);
+	    snprintf(option, sizeof(option), "%c", n);
 	    nerr += set_option(option, optarg);
 	    break;
 	}

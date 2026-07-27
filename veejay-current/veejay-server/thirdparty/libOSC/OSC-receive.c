@@ -888,13 +888,13 @@ Boolean NetworkReceivePacket( OSCPacketBuffer packet ) {
 void	GoMultiCast( const char *group_name )
 {
 	use_mcast_ = 1;
-	strncpy( mcast_groupname, group_name, strlen(group_name ));
+	snprintf(mcast_groupname, sizeof(mcast_groupname), "%s", group_name);
 }
 
 int		IsMultiCast( char *dst )
 {
 	if(use_mcast_)
-		sprintf(dst, "%s", mcast_groupname );
+		snprintf(dst, sizeof(mcast_groupname), "%s", mcast_groupname);
 	return use_mcast_;
 }
 
