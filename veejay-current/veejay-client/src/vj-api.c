@@ -11667,6 +11667,34 @@ static void fx_chain_drop_refresh(void)
     info->uc.reload_hint[HINT_KF] = 1;
 }
 
+static int fx_selected_entry_beat_enabled(int source_id, int entry)
+{
+    GtkWidget *toggle;
+
+    if(source_id != 0 || entry < 0 || entry != info->uc.selected_chain_entry)
+        return 0;
+
+    toggle = widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE];
+    if(toggle && GTK_IS_TOGGLE_BUTTON(toggle))
+        return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle)) ? 1 : 0;
+
+    return info->uc.entry_tokens[ENTRY_BEAT_FLAG] ? 1 : 0;
+}
+
+static void fx_chain_set_preset_preserve_selected_beat(int source_id,
+                                                       int entry,
+                                                       int effect_id,
+                                                       int enabled)
+{
+    int preserve_beat = fx_selected_entry_beat_enabled(source_id, entry);
+
+    multi_vims(VIMS_CHAIN_ENTRY_SET_PRESET, "%d %d %d %d",
+               source_id, entry, effect_id, enabled);
+
+    if(preserve_beat)
+        multi_vims(VIMS_CHAIN_ENTRY_BEAT_TOGGLE, "%d %d %d", source_id, entry, 1);
+}
+
 static void fx_chain_drag_data_received(GtkWidget *widget,
                                         GdkDragContext *context,
                                         gint x,
@@ -11698,8 +11726,10 @@ static void fx_chain_drag_data_received(GtkWidget *widget,
         if(value > 0 && _effect_get_np(value) >= 0) {
             int enabled = 1;
 
-            multi_vims(VIMS_CHAIN_ENTRY_SET_PRESET, "%d %d %d %d",
-                       0, destination, value, enabled);
+            fx_chain_set_preset_preserve_selected_beat(0,
+                                                       destination,
+                                                       value,
+                                                       enabled);
 
             char trip[100];
             snprintf(trip, sizeof(trip), "%03d:%d %d %d %d;",
@@ -12383,8 +12413,10 @@ void on_effectlist_row_activated(GtkTreeView *treeview,
             else
                 info->uc.selected_fx_param = -1;
 
-            multi_vims(VIMS_CHAIN_ENTRY_SET_PRESET, "%d %d %d %d",
-                slot, info->uc.selected_chain_entry,gid, !shift_pressed);
+            fx_chain_set_preset_preserve_selected_beat(slot,
+                                                       info->uc.selected_chain_entry,
+                                                       gid,
+                                                       !shift_pressed);
 
             char trip[100];
             snprintf(trip,sizeof(trip), "%03d:%d %d %d %d;", VIMS_CHAIN_ENTRY_SET_PRESET,slot,info->uc.selected_chain_entry, gid, !shift_pressed );

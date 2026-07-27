@@ -626,62 +626,16 @@ void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 
 void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data)
 {
-    static int remembered_mode = -1;
-    static int remembered_id = -1;
-    static int remembered_entry = -1;
-    static int remembered_enabled = 0;
-
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(info->status_lock || !widget || !GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
-    int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
-    int mode = callback_playmode_effective(info->status_tokens[PLAY_MODE]);
-    int id = info->status_tokens[CURRENT_ID];
     int entry = info->uc.selected_chain_entry;
-    int same_entry = remembered_mode == mode &&
-                     remembered_id == id &&
-                     remembered_entry == entry;
-
-    if(info->status_lock) {
-        if(status) {
-            remembered_mode = mode;
-            remembered_id = id;
-            remembered_entry = entry;
-            remembered_enabled = 1;
-            return;
-        }
-
-        if(entry >= 0 &&
-           same_entry &&
-           remembered_enabled &&
-           info->uc.reload_hint[HINT_ENTRY] &&
-           is_button_toggled("audio_beat_enable_toggle")) {
-            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(widget), TRUE);
-            multi_vims(VIMS_CHAIN_ENTRY_BEAT_TOGGLE, "%d %d %d", 0, entry, 1);
-            info->uc.reload_hint[HINT_ENTRY] = 1;
-            info->uc.reload_hint[HINT_CHAIN] = 1;
-            vj_msg(VEEJAY_MSG_INFO,
-                   "Preserved beat control while replacing FX on chain entry %d",
-                   entry);
-            return;
-        }
-
-        remembered_mode = mode;
-        remembered_id = id;
-        remembered_entry = entry;
-        remembered_enabled = 0;
-        return;
-    }
-
     if(entry < 0) {
         vj_msg(VEEJAY_MSG_INFO, "Select an FX chain entry before enabling beat control");
         return;
     }
 
-    remembered_mode = mode;
-    remembered_id = id;
-    remembered_entry = entry;
-    remembered_enabled = status;
+    int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
 
     multi_vims(VIMS_CHAIN_ENTRY_BEAT_TOGGLE, "%d %d %d", 0, entry, status);
     info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -1410,26 +1364,6 @@ static void audio_beat_update_action_sensitivity(int action)
     audio_beat_update_monitor_latency_sensitivity(action);
 }
 
-static void audio_beat_enable_chain_entry_toggle_guarded(int active)
-{
-    GtkWidget *w = widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE];
-
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
-        return;
-
-    active = active ? 1 : 0;
-
-    if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == active)
-        return;
-
-    int osl = info->status_lock;
-    info->status_lock = 1;
-
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), active);
-
-    info->status_lock = osl;
-}
-
 enum {
     AUDIO_MASTER_ORIGINAL = 0,
     AUDIO_MASTER_JACK     = 1,
@@ -1582,7 +1516,6 @@ void on_audio_beat_enable_toggle_toggled(GtkToggleButton *togglebutton, gpointer
         }
 
         audio_beat_enforce_action_for_master(active, 1);
-        audio_beat_enable_chain_entry_toggle_guarded(1);
     }
 
     audio_beat_update_action_sensitivity(audio_beat_current_action_from_combo());
