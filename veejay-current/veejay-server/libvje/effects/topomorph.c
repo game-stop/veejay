@@ -171,8 +171,10 @@ static inline int topo_smooth_i(float *restrict state, const int target, const f
 
 static inline void topo_limit_chroma_pair_i(int *restrict u, int *restrict v)
 {
-    int au = (*u < 0) ? -*u : *u;
-    int av = (*v < 0) ? -*v : *v;
+    const int src_u = *u;
+    const int src_v = *v;
+    int au = (src_u < 0) ? -src_u : src_u;
+    int av = (src_v < 0) ? -src_v : src_v;
     int m = (au > av) ? au : av;
 
     if (m <= 112)
@@ -180,13 +182,21 @@ static inline void topo_limit_chroma_pair_i(int *restrict u, int *restrict v)
 
     {
         const int denominator = m;
+        const int half = denominator >> 1;
+        const int round_u = (src_u >= 0) ? half : -half;
+        const int round_v = (src_v >= 0) ? half : -half;
         int lim = 112 + ((m - 112) >> 2);
+        int out_u;
+        int out_v;
 
         if (lim > 126)
             lim = 126;
 
-        *u = (*u * lim + ((*u >= 0) ? (denominator >> 1) : -(denominator >> 1))) / denominator;
-        *v = (*v * lim + ((*v >= 0) ? (denominator >> 1) : -(denominator >> 1))) / denominator;
+        out_u = (src_u * lim + round_u) / denominator;
+        out_v = (src_v * lim + round_v) / denominator;
+
+        *u = out_u;
+        *v = out_v;
     }
 }
 

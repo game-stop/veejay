@@ -643,7 +643,7 @@ static inline void cf_compute_one_safe(chronocortex_t *c,
     int ad = diff < 0 ? -diff : diff;
 
     int event_strength = c->event_lut[ad];
-    const int event_for_adapt = cf_clampi(event_strength, 0, 255);
+    const uint8_t event_for_adapt = (uint8_t) event_strength;
 
     int on_pos = cf_index_clamped(w, h, x - dx_on, y - dy_on);
     int off_pos = cf_index_clamped(w, h, x - dx_off, y - dy_off);
@@ -731,7 +731,7 @@ static inline void cf_compute_one_direct(chronocortex_t *c,
     int ad = diff < 0 ? -diff : diff;
 
     int event_strength = c->event_lut[ad];
-    const int event_for_adapt = cf_clampi(event_strength, 0, 255);
+    const uint8_t event_for_adapt = (uint8_t) event_strength;
 
     int on_base = c->decay_lut[c->on_y[on_pos]];
     int off_base = c->decay_lut[c->off_y[off_pos]];
@@ -1107,6 +1107,7 @@ static void cf_render_cortex_const_pure(chronocortex_t *c,
         int on = c->on_y[i];
         int off = c->off_y[i];
         int ev = on + off;
+        uint8_t color_index;
 
         int ev_u;
         int ev_v;
@@ -1114,8 +1115,9 @@ static void cf_render_cortex_const_pure(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
-        ev = c->gain_lut[ev];
-        Y[i] = (uint8_t) ev;
+        color_index = c->gain_lut[ev];
+        ev = color_index;
+        Y[i] = color_index;
 
         if(ev <= 0) {
             U[i] = 128;
@@ -1141,7 +1143,7 @@ static void cf_render_cortex_const_pure(chronocortex_t *c,
         }
 
         {
-            int cev = c->color_lut[(uint8_t) ev];
+            int cev = c->color_lut[color_index];
             U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, cev);
             V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, cev);
         }
@@ -1167,6 +1169,7 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
         int on = c->on_y[i];
         int off = c->off_y[i];
         int ev = on + off;
+        uint8_t color_index;
 
         int base_y;
         uint8_t base_u;
@@ -1178,7 +1181,8 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
-        ev = c->gain_lut[ev];
+        color_index = c->gain_lut[ev];
+        ev = color_index;
 
         base_y = c->bleed_y_lut[Y[i]];
         base_u = c->bleed_uv_lut[U[i]];
@@ -1210,7 +1214,7 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
         }
 
         {
-            int cev = c->color_lut[(uint8_t) ev];
+            int cev = c->color_lut[color_index];
             U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
             V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
         }
@@ -1236,6 +1240,7 @@ static void cf_render_cortex_source(chronocortex_t *c,
         int on = c->on_y[i];
         int off = c->off_y[i];
         int ev = on + off;
+        uint8_t color_index;
 
         int base_y;
         uint8_t base_u;
@@ -1252,7 +1257,8 @@ static void cf_render_cortex_source(chronocortex_t *c,
         if(ev > 255)
             ev = 255;
 
-        ev = c->gain_lut[ev];
+        color_index = c->gain_lut[ev];
+        ev = color_index;
 
         if(source_bleed > 0) {
             base_y = c->bleed_y_lut[Y[i]];
@@ -1291,7 +1297,7 @@ static void cf_render_cortex_source(chronocortex_t *c,
         }
 
         {
-            int cev = c->color_lut[(uint8_t) ev];
+            int cev = c->color_lut[color_index];
             U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
             V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
         }

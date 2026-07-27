@@ -1868,8 +1868,9 @@ static int use_key_snoop = 0;
 #endif
 #define SEQUENCE_LENGTH 1024
 #define MEM_SLOT_SIZE 32
+#define VIMS_EVENT_LIST_SIZE 1024
 
-static vims_t vj_event_list[VIMS_MAX];
+static vims_t vj_event_list[VIMS_EVENT_LIST_SIZE];
 static vims_keys_t vims_keys_list[VIMS_KEYMAP_SIZE];
 static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
@@ -5893,7 +5894,7 @@ int vj_gui_vims_prompt_keybinding(int event_id,
                                   int *modifier,
                                   char **args)
 {
-    if(event_id <= 0 || event_id >= VIMS_MAX)
+    if(event_id <= 0 || event_id >= VIMS_EVENT_LIST_SIZE)
         return GTK_RESPONSE_REJECT;
 
 #ifndef HAVE_SDL
@@ -8921,15 +8922,17 @@ static void vj_kf_refresh(gboolean force)
 
 static void vj_kf_select_parameter(int num)
 {
-    if(!info)
+    vj_gui_t *ui = info;
+
+    if(!ui)
         return;
 
-    if(GTK3_IS_CURVE(info->curve))
+    if(GTK3_IS_CURVE(ui->curve))
         curve_live_preview_user_override(FALSE);
 
     curve_editor_clear_local_dirty();
-    info->uc.selected_parameter_id = num;
-    info->uc.reload_hint_checksums[HINT_KF] = -1;
+    ui->uc.selected_parameter_id = num;
+    ui->uc.reload_hint_checksums[HINT_KF] = -1;
 }
 
 
@@ -14012,7 +14015,7 @@ static gchar *vims_command_arguments(int event_id,
         vj_msg(VEEJAY_MSG_ERROR,
                "VIMS %03d requires values matching '%s'",
                event_id,
-               (event_id < VIMS_MAX && vj_event_list[event_id].format) ?
+               (event_id < VIMS_EVENT_LIST_SIZE && vj_event_list[event_id].format) ?
                    vj_event_list[event_id].format : "the advertised format");
         g_free(args);
         return NULL;
@@ -14257,7 +14260,7 @@ static void vims_response_show_payload(int event_id,
                                        const guint8 *payload,
                                        int payload_len)
 {
-    const char *description = (event_id > 0 && event_id < VIMS_MAX && vj_event_list[event_id].descr) ?
+    const char *description = (event_id > 0 && event_id < VIMS_EVENT_LIST_SIZE && vj_event_list[event_id].descr) ?
                               vj_event_list[event_id].descr : "VIMS event";
     gchar *request = vims_command_row_build(event_id, args);
     gchar *body = vims_payload_format(payload, payload_len);
@@ -14284,7 +14287,7 @@ static void vims_response_show_status(int event_id,
                                       const char *args,
                                       const char *status)
 {
-    const char *description = (event_id > 0 && event_id < VIMS_MAX && vj_event_list[event_id].descr) ?
+    const char *description = (event_id > 0 && event_id < VIMS_EVENT_LIST_SIZE && vj_event_list[event_id].descr) ?
                               vj_event_list[event_id].descr : "VIMS event";
     gchar *request = vims_command_row_build(event_id, args);
     gchar *text;
@@ -14982,7 +14985,7 @@ static const char *sequence_vims_description_lookup(int vims_id,
 {
     (void)user_data;
 
-    if(vims_id < 0 || vims_id >= VIMS_MAX)
+    if(vims_id < 0 || vims_id >= VIMS_EVENT_LIST_SIZE)
         return NULL;
 
     return vj_event_list[vims_id].descr;
@@ -15144,14 +15147,14 @@ static void setup_bundles(void)
 
 static const char *vims_description_for_event(int event_id)
 {
-    if(event_id > 0 && event_id < VIMS_MAX && vj_event_list[event_id].descr)
+    if(event_id > 0 && event_id < VIMS_EVENT_LIST_SIZE && vj_event_list[event_id].descr)
         return vj_event_list[event_id].descr;
     return "VIMS event";
 }
 
 static const char *vims_format_for_event(int event_id)
 {
-    if(event_id > 0 && event_id < VIMS_MAX && vj_event_list[event_id].format)
+    if(event_id > 0 && event_id < VIMS_EVENT_LIST_SIZE && vj_event_list[event_id].format)
         return vj_event_list[event_id].format;
     return "";
 }
@@ -15346,7 +15349,7 @@ static void vims_parse_key_list(const char *text, int len)
             continue;
         }
 
-        if(event_id > 0 && event_id < VIMS_MAX)
+        if(event_id > 0 && event_id < VIMS_EVENT_LIST_SIZE)
             vims_action_append(event_id,
                                vims_description_for_event(event_id),
                                vims_format_for_event(event_id),
@@ -15457,7 +15460,7 @@ static void reload_vimslist(void)
             free(line);
             break;
         }
-        if(val[0] < 0 || val[0] >= VIMS_MAX) {
+        if(val[0] < 0 || val[0] >= VIMS_EVENT_LIST_SIZE) {
             veejay_msg(0, "Invalid ID at position %d", offset);
             free(line);
             break;
@@ -21439,7 +21442,7 @@ void vj_gui_set_geom( int x, int y )
 void vj_event_list_free(void)
 {
     int i;
-    for( i = 0; i < VIMS_MAX; i ++ ) {
+    for( i = 0; i < VIMS_EVENT_LIST_SIZE; i ++ ) {
         if( vj_event_list[i].format )
             free(vj_event_list[i].format);
         if( vj_event_list[i].descr )

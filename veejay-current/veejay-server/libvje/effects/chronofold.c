@@ -665,13 +665,16 @@ static void NAME(chronofold_t *c, VJFrame *frame)                               
                     decayed = trailed;                                              \
             }                                                                       \
                                                                                     \
-            final_ev = event_strength >= decayed ? event_strength : decayed;        \
-            c->nx_y[pos] = (uint8_t) final_ev;                                      \
+            {                                                                       \
+                const uint8_t event_for_adapt = (uint8_t) event_strength;            \
+                final_ev = event_strength >= decayed ? event_strength : decayed;    \
+                c->nx_y[pos] = (uint8_t) final_ev;                                  \
                                                                                     \
-            c->ref_y[pos] = cf_blend_fast_u8(                                       \
-                (uint8_t) ref,                                                      \
-                cy,                                                                 \
-                c->adapt_lut[(uint8_t) event_strength]);                                      \
+                c->ref_y[pos] = cf_blend_fast_u8(                                   \
+                    (uint8_t) ref,                                                  \
+                    cy,                                                             \
+                    c->adapt_lut[event_for_adapt]);                                 \
+            }                                                                       \
         }                                                                           \
     }                                                                               \
 }
@@ -763,10 +766,13 @@ static void NAME(chronofold_t *c, VJFrame *frame, int color_mode)               
             c->nx_u[pos] = final_u;                                                 \
             c->nx_v[pos] = final_v;                                                 \
                                                                                     \
-            c->ref_y[pos] = cf_blend_fast_u8(                                       \
-                (uint8_t) ref,                                                      \
-                cy,                                                                 \
-                c->adapt_lut[(uint8_t) event_strength]);                                      \
+            {                                                                       \
+                const uint8_t event_for_adapt = (uint8_t) event_strength;            \
+                c->ref_y[pos] = cf_blend_fast_u8(                                   \
+                    (uint8_t) ref,                                                  \
+                    cy,                                                             \
+                    c->adapt_lut[event_for_adapt]);                                 \
+            }                                                                       \
         }                                                                           \
     }                                                                               \
 }

@@ -3576,8 +3576,14 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
   gboolean          hide_curve_for_live_trace;
   gboolean          live_trace_underlay;
 
+  if (!GTK3_IS_CURVE(widget) || !cr)
+    return TRUE;
+
   curve = GTK3_CURVE(widget);
   priv = curve->priv;
+  if (!priv)
+    return TRUE;
+
   live_scope = priv->live_trace_enabled && gtk3_curve_live_trace_use_local_axis(priv);
   hide_curve_for_live_trace = live_scope ||
                               (!priv->live_trace_user_override &&
@@ -3587,9 +3593,6 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
   live_trace_underlay = priv->live_trace_enabled &&
                         !gtk3_curve_live_trace_use_local_axis(priv) &&
                         !hide_curve_for_live_trace;
-
-  if (!cr)
-    return TRUE;
 
   gtk_widget_get_allocation(widget, &allocation);
 
@@ -3740,22 +3743,25 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
     }
   }
 
+  Gtk3CurveVector *cpoints = priv->curve_data.d_cpoints;
+  const gint n_cpoints = priv->curve_data.n_cpoints;
+
   if (!hide_curve_for_live_trace &&
       priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE &&
-      priv->curve_data.d_cpoints &&
-      priv->curve_data.n_cpoints > 0) {
-    for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+      cpoints != NULL &&
+      n_cpoints > 0) {
+    for (int i = 0; i < n_cpoints; ++i) {
       gdouble x, y;
 
-      if (priv->curve_data.d_cpoints[i].x < priv->min_x)
+      if (cpoints[i].x < priv->min_x)
         continue;
 
-      if (priv->curve_data.d_cpoints[i].x > priv->max_x)
+      if (cpoints[i].x > priv->max_x)
         continue;
 
-      x = RADIUS + gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
+      x = RADIUS + gtk3_curve_project_cpoint_x(priv, cpoints[i].x, width);
 
-      y = RADIUS + hm - gtk3_curve_project_cpoint_y(priv, priv->curve_data.d_cpoints[i].y, height);
+      y = RADIUS + hm - gtk3_curve_project_cpoint_y(priv, cpoints[i].y, height);
       if (i == priv->hover_cpoint) {
         cairo_set_source_rgba(cr, 1.0, 1.0, 1.0, 0.35);
         cairo_arc(cr, x, y, RADIUS * 2.5, 0, 2 * M_PI);
