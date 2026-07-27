@@ -590,15 +590,7 @@ static void JACK_MaybeWarnPwJack(jack_driver_t *drv)
   if (atomic_exchange_int(&drv->pwjack_hint_emitted, TRUE))
     return;
 
-  char jack_socket[128];
-  snprintf(jack_socket, sizeof(jack_socket),
-           "/dev/shm/jack-%ld/default/jack_0", (long)getuid());
-
-  if (access(jack_socket, F_OK) != 0)
-  {
-    WARN("No JACK server socket found at %s. If this is a PipeWire JACK system, start veejay through pw-jack, e.g. `pw-jack veejay ...`; otherwise start jackd.",
-         jack_socket);
-  }
+  WARN("No JACK server connection is available. On a PipeWire JACK system, start veejay through pw-jack, e.g. `pw-jack veejay ...`; otherwise start jackd.");
 }
 
 static void JACK_RecordOpenFailure(jack_driver_t *drv, int retval)

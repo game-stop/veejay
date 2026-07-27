@@ -853,28 +853,28 @@ static	int	v4l2_channel_choose( v4l2info *v, const int pref_channel )
 	return other;
 }
 
-static	int	v4l2_verify_file( const char *file )
+static int v4l2_open_verified(const char *file)
 {
-	struct stat st;
-	if( -1 == stat( file, &st )) {
-		veejay_msg(0, "v4l2: Cannot identify '%s':%d, %s",file,errno,strerror(errno));
-		return 0;
-	}
-	if( !S_ISCHR(st.st_mode)) {
-		veejay_msg(0, "v4l2: '%s' is not a device", file);
-		return 0;
-	}
+    int fd = open(file, O_RDWR | O_CLOEXEC);
+    if(fd < 0) {
+        veejay_msg(0, "v4l2: Cannot open '%s': %d, %s", file, errno, strerror(errno));
+        return -1;
+    }
 
-	int fd = open( file, O_RDWR | O_NONBLOCK );
+    struct stat st;
+    if(fstat(fd, &st) != 0) {
+        veejay_msg(0, "v4l2: Cannot identify '%s': %d, %s", file, errno, strerror(errno));
+        close(fd);
+        return -1;
+    }
 
-	if( -1 == fd ) {
-		veejay_msg(0, "v4l2: Cannot open '%s': %d, %s", file, errno, strerror(errno));
-		return 0;
-	}
+    if(!S_ISCHR(st.st_mode)) {
+        veejay_msg(0, "v4l2: '%s' is not a device", file);
+        close(fd);
+        return -1;
+    }
 
-	close(fd);
-
-	return 1;
+    return fd;
 }
 
 int	v4l2_poll( void *d , int nfds, int timeout )
@@ -900,25 +900,21 @@ int	v4l2_poll( void *d , int nfds, int timeout )
 
 void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wid, int hei, float fps, char norm  )
 {
-	//@ in case of thread, check below is done twice
-	if(!v4l2_verify_file( file ) ) {
-		return NULL;
-	}
-
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Opening Video4Linux2 device: %s ...", file );
 
-	int fd = open( file , O_RDWR );
+	int fd = v4l2_open_verified(file);
 	int i;
 
-	if( fd <= 0 ) {
+	if(fd < 0)
 		return NULL;
-	} else {
-		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Video4Linux2 device opened: %s", file );
-	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Video4Linux2 device opened: %s", file );
 
 	v4l2info *v = (v4l2info*) vj_calloc(sizeof(v4l2info));
-	if( v == NULL )
+	if( v == NULL ) {
+		close(fd);
 		return NULL;
+	}
 
 	v->fd = fd;
 
@@ -2041,13 +2037,6 @@ static	void	*v4l2_grabber_thread( void *v )
 	v4l2_thread_info *i = (v4l2_thread_info*) v;
 	req.tv_sec = 0;
 	req.tv_nsec = 1000 * 1000;
-
-	if(!v4l2_verify_file( i->file ) ) {
-		i->stop = 1;
-		unlock_(v);
-		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: Not a device file: %s" , i->file );
-		return NULL;
-	}
 
 	v4l2info *v4l2 = v4l2open( i->file, i->channel, i->host_fmt, i->wid, i->hei, i->fps, i->norm );
 	if( v4l2 == NULL ) {

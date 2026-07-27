@@ -35,6 +35,9 @@
 #include <stdarg.h>
 #include <signal.h>
 #include <time.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/random.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/hash.h>
 #include <libvje/vje.h>
@@ -143,6 +146,40 @@ static int vj_event_valid_mode(int mode) {
     }
 
     return 0;
+}
+
+static uint32_t vj_event_random_u32(void)
+{
+    uint32_t value = 0;
+    ssize_t n;
+
+    do {
+        n = getrandom(&value, sizeof(value), GRND_NONBLOCK);
+    } while(n < 0 && errno == EINTR);
+
+    if(n == (ssize_t)sizeof(value))
+        return value;
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint32_t)now.tv_nsec ^ (uint32_t)now.tv_sec ^
+           (uint32_t)getpid() ^ (uint32_t)(uintptr_t)&value;
+}
+
+static int vj_event_random_inclusive(int maximum)
+{
+    if(maximum <= 0)
+        return 0;
+
+    const uint32_t bound = (uint32_t)maximum + 1u;
+    const uint32_t threshold = (uint32_t)(-bound) % bound;
+    uint32_t value;
+
+    do {
+        value = vj_event_random_u32();
+    } while(value < threshold);
+
+    return (int)(value % bound);
 }
 
 /* define the function pointer to any event */
@@ -388,13 +425,63 @@ static char *vj_file_to_base64(const char *path, size_t *out_len)
     return b64;
 }
 
+static int vj_samplelist_private_temp_base(char *base, size_t base_size)
+{
+    const char *runtime = getenv("XDG_RUNTIME_DIR");
+    struct stat st;
+
+    if(runtime && runtime[0]) {
+        int n = snprintf(base, base_size, "%s", runtime);
+        if(n > 0 && n < (int)base_size &&
+           lstat(base, &st) == 0 && S_ISDIR(st.st_mode) &&
+           st.st_uid == geteuid() && (st.st_mode & (S_IWGRP | S_IWOTH)) == 0)
+            return 1;
+    }
+
+    const char *home = getenv("HOME");
+    if(!home || !home[0])
+        return 0;
+
+    char root[PATH_MAX];
+    int n = snprintf(root, sizeof(root), "%s/.veejay", home);
+    if(n <= 0 || n >= (int)sizeof(root))
+        return 0;
+
+    if(mkdir(root, 0700) != 0 && errno != EEXIST)
+        return 0;
+
+    if(lstat(root, &st) != 0 || !S_ISDIR(st.st_mode) ||
+       st.st_uid != geteuid() || (st.st_mode & (S_IWGRP | S_IWOTH)) != 0)
+        return 0;
+
+    n = snprintf(base, base_size, "%s/tmp", root);
+    if(n <= 0 || n >= (int)base_size)
+        return 0;
+
+    if(mkdir(base, 0700) != 0 && errno != EEXIST)
+        return 0;
+
+    if(lstat(base, &st) != 0 || !S_ISDIR(st.st_mode) ||
+       st.st_uid != geteuid() || (st.st_mode & (S_IRWXG | S_IRWXO)) != 0)
+        return 0;
+
+    return 1;
+}
+
 static char *vj_samplelist_temp_file(char **dir_out)
 {
     if(dir_out)
         *dir_out = NULL;
 
+    char base[PATH_MAX];
+    if(!vj_samplelist_private_temp_base(base, sizeof(base)))
+        return NULL;
+
     char tmpl[PATH_MAX];
-    snprintf(tmpl, sizeof(tmpl), "/tmp/veejay-samplelist-sync-XXXXXX");
+    int template_len = snprintf(tmpl, sizeof(tmpl),
+                                "%s/veejay-samplelist-sync-XXXXXX", base);
+    if(template_len <= 0 || template_len >= (int)sizeof(tmpl))
+        return NULL;
 
     char *dir = mkdtemp(tmpl);
     if(!dir)
@@ -5944,7 +6031,7 @@ void vj_event_multitrack_transition_take(void *ptr,
             return;
         }
         if(shape < 0)
-            shape = rand() % (max_shape + 1);
+            shape = vj_event_random_inclusive(max_shape);
         else if(shape > max_shape)
             shape = max_shape;
     }

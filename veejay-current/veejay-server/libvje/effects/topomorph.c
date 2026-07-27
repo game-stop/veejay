@@ -175,14 +175,18 @@ static inline void topo_limit_chroma_pair_i(int *restrict u, int *restrict v)
     int av = (*v < 0) ? -*v : *v;
     int m = (au > av) ? au : av;
 
-    if (m > 112) {
+    if (m <= 112)
+        return;
+
+    {
+        const int denominator = m;
         int lim = 112 + ((m - 112) >> 2);
 
         if (lim > 126)
             lim = 126;
 
-        *u = (*u * lim + ((*u >= 0) ? (m >> 1) : -(m >> 1))) / m;
-        *v = (*v * lim + ((*v >= 0) ? (m >> 1) : -(m >> 1))) / m;
+        *u = (*u * lim + ((*u >= 0) ? (denominator >> 1) : -(denominator >> 1))) / denominator;
+        *v = (*v * lim + ((*v >= 0) ? (denominator >> 1) : -(denominator >> 1))) / denominator;
     }
 }
 

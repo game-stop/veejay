@@ -788,6 +788,7 @@ static int y4m_read_stream_header_line_cb(y4m_cb_reader_t * fd, y4m_stream_info_
 static int y4m_reread_stream_header_line_cb(y4m_cb_reader_t *fd,const y4m_stream_info_t *si,char *line,int n)
 {
     y4m_stream_info_t i;
+    y4m_init_stream_info(&i);
     int err=y4m_read_stream_header_line_cb(fd,&i,line,n);
     if( err==Y4M_OK && y4m_compare_stream_info(si,&i) )
         err=Y4M_ERR_HEADER;

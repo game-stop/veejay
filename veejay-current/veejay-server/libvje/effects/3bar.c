@@ -129,6 +129,8 @@ void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const unsigned int divider = bar_sanitize_divider(args[0], height);
     const unsigned int top_height = height / divider;
     const unsigned int bottom_height = height - top_height;
+    const unsigned int top_span = top_height > 0 ? top_height : 1;
+    const unsigned int width_span = width > 0 ? width : 1;
 
     const unsigned int top_y_step = bar_wrap_step(args[1], top_height);
     const unsigned int bot_y_step = bar_wrap_step(args[2], bottom_height);
@@ -143,8 +145,8 @@ void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    bar->bar_top_auto_y = (bar->bar_top_auto_y + top_y_step) % top_height;
-    bar->bar_top_auto_x = (bar->bar_top_auto_x + top_x_step) % width;
+    bar->bar_top_auto_y = (bar->bar_top_auto_y + top_y_step) % top_span;
+    bar->bar_top_auto_x = (bar->bar_top_auto_x + top_x_step) % width_span;
 
     for(unsigned int y = 0; y < top_height; y++) {
         const unsigned int src_y = (y + bar->bar_top_auto_y) % top_height;
@@ -166,7 +168,7 @@ void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         const unsigned int bottom_start = top_height * width;
 
         bar->bar_bot_auto_y = (bar->bar_bot_auto_y + bot_y_step) % bottom_height;
-        bar->bar_bot_auto_x = (bar->bar_bot_auto_x + bot_x_step) % width;
+        bar->bar_bot_auto_x = (bar->bar_bot_auto_x + bot_x_step) % width_span;
 
         for(unsigned int y = 0; y < bottom_height; y++) {
             const unsigned int src_y = (y + bar->bar_bot_auto_y) % bottom_height;

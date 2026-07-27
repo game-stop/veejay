@@ -927,17 +927,15 @@ int vj_split_auto_configure_screen(void *ptr)
 
 static char *get_self(void)
 {
-    char *path = vj_malloc(1024);
+    char *path = vj_calloc(1024);
     if(path == NULL)
         return NULL;
 
-    ssize_t n = readlink("/proc/self/exe", path, 1023);
-    if(n < 0 || n >= 1024) {
+    if(readlink("/proc/self/exe", path, 1023) < 0) {
         free(path);
         return NULL;
     }
 
-    path[(size_t)n] = '\0';
     return path;
 }
 

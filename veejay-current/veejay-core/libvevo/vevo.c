@@ -1113,6 +1113,11 @@ vevo_property_set(vevo_port_t * p,
     if (!port->table) {
 		if (!new) {
 		    vevo_property_t *current = (vevo_property_t *) node;
+
+		    if (!current) {
+			vevo_free_storage(port, stor);
+			return VEVO_ERROR_NOSUCH_PROPERTY;
+		    }
 		    current->st = stor;
 		}
     } else {
@@ -1169,6 +1174,11 @@ vevo_property_set_f(vevo_port_t * p,
     if (!port->table) {
 	if (!new) {
 	    vevo_property_t *current = (vevo_property_t *) node;
+
+	    if (!current) {
+		vevo_free_storage(port, stor);
+		return VEVO_ERROR_NOSUCH_PROPERTY;
+	    }
 	    current->st = stor;
 	}
     } else {
@@ -1286,6 +1296,11 @@ vv_property_set(vevo_port_t * p,
 	   	prop_node_append(port, hash_key, stor);
 	} else {
 	    vevo_property_t *current = (vevo_property_t *) node;
+
+	    if (!current) {
+		vevo_free_storage(port, stor);
+		return VEVO_ERROR_NOSUCH_PROPERTY;
+	    }
 	    current->st = stor;
 	}
 

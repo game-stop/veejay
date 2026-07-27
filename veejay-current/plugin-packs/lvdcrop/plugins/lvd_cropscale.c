@@ -79,7 +79,7 @@ int	deinit_instance( livido_port_t *my_instance )
 	return LIVIDO_NO_ERROR;
 }
 
-static int lvd_crop_plane(uint8_t *restrict D, uint8_t *restrict S, int left, int right, int top, int bottom, int w, int h)
+static int lvd_crop_plane(uint8_t *D, uint8_t *S, int left, int right, int top, int bottom, int w, int h)
 {
     const int dst_width = w - left - right;
     const int dst_height = h - top - bottom;

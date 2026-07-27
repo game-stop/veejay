@@ -175,6 +175,10 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     uint8_t *lim;
     int sum = 0;
     int count = 0;
+
+    if (!frame || !frame[0] || !frame[1] || !frame[2] || w < 6 || h < 2)
+        return 0;
+
     p = frame[0];
     lim = frame[0] + w * (h - 1);
     while (p < lim) {
@@ -200,5 +204,5 @@ int luminance_mean(uint8_t * frame[], int w, int h)
 	p += 31;
 	count += 4;
     }
-    return sum / count;
+    return count > 0 ? sum / count : 0;
 }

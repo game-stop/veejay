@@ -4625,7 +4625,11 @@ int write_xml_atomic(const char *path, xmlDocPtr doc)
     if (fd < 0)
         return 0;
 
-    fchmod(fd, 0644);
+    if (fchmod(fd, S_IRUSR | S_IWUSR | S_IRGRP) != 0) {
+        close(fd);
+        unlink(tmp);
+        return 0;
+    }
 
     xmlSaveCtxtPtr ctxt = xmlSaveToFd(fd, "UTF-8", XML_SAVE_FORMAT);
     if (!ctxt) {

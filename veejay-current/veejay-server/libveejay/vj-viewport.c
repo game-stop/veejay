@@ -228,10 +228,13 @@ void viewport_line (uint8_t *plane,
   int swap_x = 0;
   int swap_y = 0;
 
-  if( x1 < 0 ) x1 = 0; else if (x1 > w ) x1 = w;
-  if( y1 < 0 ) y1 = 0; else if (y1 > h ) y1 = h;
-  if( x2 < 0 ) x2 = 0; else if (x2 > w ) x2 = w;
-  if( y2 < 0 ) y2 = 0; else if (y2 > h ) y2 = h;
+  if(!plane || w <= 0 || h <= 0)
+    return;
+
+  if( x1 < 0 ) x1 = 0; else if (x1 >= w ) x1 = w - 1;
+  if( y1 < 0 ) y1 = 0; else if (y1 >= h ) y1 = h - 1;
+  if( x2 < 0 ) x2 = 0; else if (x2 >= w ) x2 = w - 1;
+  if( y2 < 0 ) y2 = 0; else if (y2 >= h ) y2 = h - 1;
 
   if( x1 == x2 || y1 == y2 )
      return;
@@ -249,27 +252,6 @@ void viewport_line (uint8_t *plane,
     y2 = t;
     swap_y = 1;
   }
-
-  /* clip line */
-  if (x1 < 0) {
-    y1 = y1 + (y2-y1) * -x1 / (x2-x1);
-    x1 = 0;
-  }
-  if (y1 < 0) {
-    x1 = x1 + (x2-x1) * -y1 / (y2-y1);
-    y1 = 0;
-  }
-  if (x2 > w) {
-    y2 = y1 + (y2-y1) * (w-x1) / (x2-x1);
-    x2 = w;
-  }
-  if (y2 > h) {
-    x2 = x1 + (x2-x1) * (h-y1) / (y2-y1);
-    y2 = h;
-  }
-
-  if (x1 >= w || y1 >= h)
-    return;
 
   dx = x2 - x1;
   dy = y2 - y1;

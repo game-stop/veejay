@@ -334,6 +334,9 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
                 }
             }
 
+            if(count <= 0)
+                continue;
+
             const uint8_t ay = (uint8_t)(sum_y / count);
             k->cell_avg_y[idx] = ay;
             k->cell_avg_u[idx] = (uint8_t)(sum_u / count);
@@ -385,6 +388,9 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
                     count++;
                 }
             }
+
+            if(count <= 0)
+                continue;
 
             int ay = sum_y / count;
             const int au = sum_u / count;

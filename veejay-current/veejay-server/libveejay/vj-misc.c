@@ -468,7 +468,7 @@ char *vj_read_file_to_buffer(const char *path, size_t *out_size)
     size_t file_size = (size_t)size;
     rewind(f);
 
-    char *buffer = vj_malloc(file_size + 1u);
+    char *buffer = vj_calloc(file_size + 1u);
     if (!buffer) {
         fclose(f);
         return NULL;
@@ -481,8 +481,6 @@ char *vj_read_file_to_buffer(const char *path, size_t *out_size)
         free(buffer);
         return NULL;
     }
-
-    buffer[file_size] = '\0';
 
     if(out_size)
         *out_size = file_size;

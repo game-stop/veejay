@@ -173,6 +173,9 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args)
             const int area = bw * bh;
             int sum = 0;
 
+            if(area <= 0)
+                continue;
+
             for(int dy = 0; dy < bh; dy++) {
                 const int row = (y + dy) * width + x;
 

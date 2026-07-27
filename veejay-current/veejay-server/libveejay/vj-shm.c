@@ -72,6 +72,25 @@ static	int	just_a_shmid = 0;
 static  int simply_my_shmkey  = 0;
 static	key_t	simply_my_shmid = 0;
 
+static FILE *vj_shm_open_discovery_file(const char *path)
+{
+    int fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+    if(fd < 0)
+        return NULL;
+
+    struct stat st;
+    if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_uid != geteuid()) {
+        close(fd);
+        errno = EPERM;
+        return NULL;
+    }
+
+    FILE *f = fdopen(fd, "r");
+    if(!f)
+        close(fd);
+    return f;
+}
+
 int		vj_shm_get_my_shmid(void) {
 	return simply_my_shmkey;
 }
@@ -102,7 +121,7 @@ static void vj_shm_cleanup_stale_files(const char *dirpath) {
                 if (kill(pid_to_check, 0) == -1 && errno == ESRCH) {
                     snprintf(full_path, sizeof(full_path), "%s/%s", dirpath, entry->d_name);
                     
-                    FILE *f = fopen(full_path, "r");
+                    FILE *f = vj_shm_open_discovery_file(full_path);
                     if (f) {
                         int key_val = -1;
                         if (fscanf(f, "pid=%*d\nkey=%d", &key_val) == 1) {
@@ -124,36 +143,30 @@ static void vj_shm_cleanup_stale_files(const char *dirpath) {
 }
 
 static int vj_shm_file_ref_use_this(char *path) {
-    struct stat inf;
-    
-    if (stat(path, &inf) != 0) {
-        return 1; 
-    }
-
     int pid_in_file = -1;
     int key_in_file = -1;
-    
-    FILE *f = fopen(path, "r");
-    if (f) {
-        if (fscanf(f, "pid=%d\nkey=%d", &pid_in_file, &key_in_file) == 2) {
-            
-            if (kill(pid_in_file, 0) == -1 && errno == ESRCH) {
-                veejay_msg(VEEJAY_MSG_DEBUG, "SHM: Reclaiming stale discovery file for dead PID %d", pid_in_file);
-                
-                int shm_id = shmget(key_in_file, 0, 0);
-                if (shm_id != -1) {
-                    shmctl(shm_id, IPC_RMID, NULL);
-                }
-                
-                fclose(f);
-                remove(path);
-                return 1;
-            }
-        }
+
+    FILE *f = vj_shm_open_discovery_file(path);
+    if (!f)
+        return errno == ENOENT ? 1 : 0;
+
+    if (fscanf(f, "pid=%d\nkey=%d", &pid_in_file, &key_in_file) == 2 &&
+        kill(pid_in_file, 0) == -1 && errno == ESRCH) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "SHM: Reclaiming stale discovery file for dead PID %d",
+                   pid_in_file);
+
+        int shm_id = shmget(key_in_file, 0, 0);
+        if (shm_id != -1)
+            shmctl(shm_id, IPC_RMID, NULL);
+
         fclose(f);
+        remove(path);
+        return 1;
     }
 
-    return 0; 
+    fclose(f);
+    return 0;
 }
 
 void vj_shm_free(void *vv)
@@ -344,7 +357,7 @@ void *vj_shm_new_slave_by_pid(const char *homedir, int pid)
     char filepath[PATH_MAX];
     snprintf(filepath, sizeof(filepath), "%s/.veejay_shm/shm_%d.dat", homedir, pid);
     
-    FILE *f = fopen(filepath, "r");
+    FILE *f = vj_shm_open_discovery_file(filepath);
     if (!f) return NULL;
 
     int key_val;
@@ -372,8 +385,13 @@ static int vj_shm_file_ref(vj_shm_t *v, const char *homedir)
     pid_t my_pid = getpid();
     snprintf(filepath, sizeof(filepath), "%s/shm_%d.dat", dirpath, my_pid);
 
-    FILE *f = fopen(filepath, "w");
+    int ref_fd = open(filepath,
+                      O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC | O_NOFOLLOW,
+                      S_IRUSR | S_IWUSR);
+    FILE *f = ref_fd >= 0 ? fdopen(ref_fd, "w") : NULL;
     if (!f) {
+        if(ref_fd >= 0)
+            close(ref_fd);
         veejay_msg(0, "SHM Error: Could not create discovery file %s", filepath);
         return 0;
     }

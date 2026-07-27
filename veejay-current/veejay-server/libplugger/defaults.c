@@ -22,6 +22,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <veejaycore/vjmem.h>
@@ -41,14 +42,8 @@ FILE	*plug_open_config(const char *basedir, const char *filename, const char *mo
 
 	snprintf( path, sizeof(path), "%s/.veejay/%s", home, basedir);
 
-	if( chkdir ) {
-		struct stat st;
-		veejay_memset(&st,0,sizeof(struct stat));
-		if( stat( path, &st ) == -1 ) {
-			if(mkdir( path, 0700 ) == -1 ) {
-				return NULL;
-			}
-		}
+	if( chkdir && mkdir(path, 0700) == -1 && errno != EEXIST ) {
+		return NULL;
 	}
 
 	snprintf( path, sizeof(path), "%s/.veejay/%s/%s.cfg", home,basedir, filename);

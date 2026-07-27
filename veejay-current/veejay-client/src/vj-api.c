@@ -8781,10 +8781,11 @@ static void vj_kf_refresh(gboolean force)
 
 static void vj_kf_select_parameter(int num)
 {
-    if(info) {
-        if(GTK3_IS_CURVE(info->curve))
-            curve_live_preview_user_override(FALSE);
-    }
+    if(!info)
+        return;
+
+    if(GTK3_IS_CURVE(info->curve))
+        curve_live_preview_user_override(FALSE);
 
     curve_editor_clear_local_dirty();
     info->uc.selected_parameter_id = num;
@@ -12853,6 +12854,9 @@ static gboolean sequence_ui_wants_play_grid(void)
 {
     GtkWidget *w = widget_cache[WIDGET_SEQACTIVE];
 
+    if(!info)
+        return FALSE;
+
     if(sequence_ui_play_grid_requested)
         return TRUE;
 
@@ -12866,7 +12870,12 @@ static gboolean sequence_ui_wants_play_grid(void)
 
 static int sequence_ui_active_bank(void)
 {
-    int bank = info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK];
+    int bank;
+
+    if(!info)
+        return 0;
+
+    bank = info->status_tokens[STATUS_SEQUENCE_ACTIVE_BANK];
 
     if(bank < 0 || bank >= VJ_SEQUENCE_BANKS)
         bank = 0;
@@ -12876,7 +12885,12 @@ static int sequence_ui_active_bank(void)
 
 static int sequence_ui_status_queued_bank(void)
 {
-    int bank = VJ_SEQUENCE_STATUS_QUEUED_BANK(
+    int bank;
+
+    if(!info)
+        return -1;
+
+    bank = VJ_SEQUENCE_STATUS_QUEUED_BANK(
         info->status_tokens[STATUS_SEQUENCE_RESERVED]);
 
     return (bank >= 0 && bank < VJ_SEQUENCE_BANKS) ? bank : -1;
@@ -12917,7 +12931,12 @@ static int sequence_ui_normalize_bank_mask(int mask, int active_bank)
 static int sequence_ui_current_bank_mask(void)
 {
     int active_bank = sequence_ui_active_bank();
-    int mask = VJ_SEQUENCE_STATUS_SELECTED_MASK(
+    int mask;
+
+    if(!info)
+        return 1 << active_bank;
+
+    mask = VJ_SEQUENCE_STATUS_SELECTED_MASK(
         info->status_tokens[STATUS_SEQUENCE_RESERVED]);
 
     if(sequence_ui_bank_mask_pending) {
@@ -26185,7 +26204,7 @@ static void create_sequencer_slots(int nx, int ny)
     const gboolean compact = smallest_possible ? TRUE : FALSE;
     const int sequence_view_w = compact ? 480 : 520;
     const int sequence_view_h = compact ? 260 : 236;
-    const int sequence_frame_h = compact ? 286 : 286;
+    const int sequence_frame_h = 286;
 
     info->sample_sequencer = gtk_frame_new(NULL);
     add_class(info->sample_sequencer, "sequencer");

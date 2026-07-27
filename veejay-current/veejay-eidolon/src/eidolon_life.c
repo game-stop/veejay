@@ -3254,8 +3254,11 @@ static double avj_status_get_d(const avj_t *a, int token, double fallback)
 static void avj_status_view_fill(avj_t *a)
 {
     avj_status_view_t v;
+
+    if (!a) return;
+
     memset(&v, 0, sizeof(v));
-    v.seen = a && a->status_seen;
+    v.seen = a->status_seen;
     if (!v.seen) {
         a->prev_sv = a->sv;
         memset(&a->sv, 0, sizeof(a->sv));
@@ -5931,11 +5934,18 @@ static int avj_sanitize_mind(avj_t *a)
 static void avj_quarantine_state(avj_t *a, const char *path)
 {
     char dst[768];
-    struct stat st;
-    const char *in = path && path[0] ? path : a->state_path;
-    if (!in || !*in || stat(in, &st) != 0) return;
-    snprintf(dst, sizeof(dst), "%s.bad.%lu", in, (unsigned long)time(NULL));
-    if (rename(in, dst) == 0) avj_ui_printf( "eidolon: quarantined bad mind as %s\n", dst);
+    const char *in = path && path[0] ? path : (a ? a->state_path : NULL);
+
+    if (!in || !*in)
+        return;
+
+    int n = snprintf(dst, sizeof(dst), "%s.bad.%lu.%ld",
+                     in, (unsigned long)time(NULL), (long)getpid());
+    if (n < 0 || n >= (int)sizeof(dst))
+        return;
+
+    if (rename(in, dst) == 0)
+        avj_ui_printf("eidolon: quarantined bad mind as %s\n", dst);
 }
 
 static int avj_choose_different_fx(avj_t *a, int old_dbi)

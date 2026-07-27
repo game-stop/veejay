@@ -961,14 +961,16 @@ void		gvr_set_master(void *data, int master_track )
 	veejay_preview_t *vp = (veejay_preview_t*) data;
 	int i;
 
-	if(!gvr_track_ptr(vp, master_track))
+	veejay_track_t *master = gvr_track_ptr(vp, master_track);
+
+	if(!master)
 		return;
 
 	for( i = 0; i < vp->n_tracks; i ++ )
 		if( vp->tracks[i] )
 			vp->tracks[i]->is_master = 0;
 
-	vp->tracks[master_track]->is_master = 1;
+	master->is_master = 1;
 }
 
 int		gvr_track_swap(void *data, int track_a, int track_b)

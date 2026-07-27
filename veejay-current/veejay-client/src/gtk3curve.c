@@ -2924,6 +2924,11 @@ gtk3_curve_curve_value_at_x(Gtk3CurvePrivate *priv,
       gint first = -1;
       gfloat prev = priv->min_x - 1.0f;
 
+      if (!priv->curve_data.d_cpoints || priv->curve_data.n_cpoints <= 0) {
+        ry = priv->min_y;
+        break;
+      }
+
       for (gint i = 0; i < priv->curve_data.n_cpoints; i++) {
         if (priv->curve_data.d_cpoints[i].x > prev) {
           if (first < 0)
@@ -2944,7 +2949,7 @@ gtk3_curve_curve_value_at_x(Gtk3CurvePrivate *priv,
       }
 
       if (priv->curve_data.curve_type == GTK3_CURVE_TYPE_SPLINE) {
-        gfloat *mem = g_malloc(3 * count * sizeof(gfloat));
+        gfloat *mem = g_malloc0(3 * count * sizeof(gfloat));
         gfloat *xv;
         gfloat *yv;
         gfloat *y2v;
@@ -2973,12 +2978,19 @@ gtk3_curve_curve_value_at_x(Gtk3CurvePrivate *priv,
           }
         }
 
+        count = dst;
+        if (count < 2) {
+          ry = count == 1 ? yv[0] : priv->min_y;
+          g_free(mem);
+          break;
+        }
+
         spline_solve(count, xv, yv, y2v);
         ry = spline_eval(count, xv, yv, y2v, x_value);
         g_free(mem);
       }
       else {
-        gfloat *mem = g_malloc(2 * count * sizeof(gfloat));
+        gfloat *mem = g_malloc0(2 * count * sizeof(gfloat));
         gfloat *xv;
         gfloat *yv;
         gint dst = 0;
@@ -3004,6 +3016,13 @@ gtk3_curve_curve_value_at_x(Gtk3CurvePrivate *priv,
               yv[dst] = priv->max_y;
             dst++;
           }
+        }
+
+        count = dst;
+        if (count < 2) {
+          ry = count == 1 ? yv[0] : priv->min_y;
+          g_free(mem);
+          break;
         }
 
         xv[0] = priv->min_x;
@@ -3721,7 +3740,10 @@ gtk3_curve_draw(GtkWidget *widget, cairo_t *cr)
     }
   }
 
-  if (!hide_curve_for_live_trace && priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE) {
+  if (!hide_curve_for_live_trace &&
+      priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE &&
+      priv->curve_data.d_cpoints &&
+      priv->curve_data.n_cpoints > 0) {
     for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
       gdouble x, y;
 
@@ -4239,19 +4261,26 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
 
   distance = ~0U;
 
-  for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
-    gint cx = gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
+  if (priv->curve_data.d_cpoints) {
+    for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
+      gint cx = gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
+      guint d = (guint) abs(x - cx);
 
-    guint d = (guint) abs(x - cx);
-
-    if (d < distance)
-      distance = d;
+      if (d < distance)
+        distance = d;
+    }
   }
 
   switch (priv->curve_data.curve_type) {
     default:
     case GTK3_CURVE_TYPE_LINEAR:
     case GTK3_CURVE_TYPE_SPLINE:
+      if (!priv->curve_data.d_cpoints || priv->curve_data.n_cpoints <= 0) {
+        priv->grab_point = -1;
+        new_type = GDK_TCROSS;
+        break;
+      }
+
       if (priv->grab_point == -1) {
         if (distance <= MIN_DISTANCE)
           new_type = GDK_FLEUR;
@@ -5560,6 +5589,12 @@ gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
 
   if (priv->curve_data.curve_type != GTK3_CURVE_TYPE_FREE) {
 
+    if (!priv->curve_data.d_cpoints || priv->curve_data.n_cpoints <= 0) {
+      for (x = 0; x < veclen; ++x)
+        vector[x] = priv->min_y;
+      return;
+    }
+
     prev = min_x - 1.0f;
 
     for (i = 0; i < priv->curve_data.n_cpoints; ++i) {
@@ -5593,7 +5628,7 @@ gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
   switch (priv->curve_data.curve_type) {
     default:
     case GTK3_CURVE_TYPE_SPLINE:
-      mem = g_malloc(3 * num_active_ctlpoints * sizeof(gfloat));
+      mem = g_malloc0(3 * num_active_ctlpoints * sizeof(gfloat));
 
       if (!mem) {
         for (x = 0; x < veclen; ++x)
@@ -5623,6 +5658,15 @@ gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
         }
       }
 
+      num_active_ctlpoints = dst;
+      if (num_active_ctlpoints < 2) {
+        ry = num_active_ctlpoints == 1 ? yv[0] : priv->min_y;
+        for (x = 0; x < veclen; ++x)
+          vector[x] = ry;
+        g_free(mem);
+        return;
+      }
+
       spline_solve(num_active_ctlpoints, xv, yv, y2v);
 
       rx = min_x;
@@ -5644,7 +5688,7 @@ gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
 
     case GTK3_CURVE_TYPE_LINEAR:
     {
-      gfloat *mem = g_malloc(2 * num_active_ctlpoints * sizeof(gfloat));
+      gfloat *mem = g_malloc0(2 * num_active_ctlpoints * sizeof(gfloat));
 
       if (!mem) {
         for (x = 0; x < veclen; ++x)
@@ -5671,6 +5715,15 @@ gtk3_curve_get_vector(GtkWidget *widget, int veclen, gfloat vector[])
 
           ++dst;
         }
+      }
+
+      num_active_ctlpoints = dst;
+      if (num_active_ctlpoints < 2) {
+        ry = num_active_ctlpoints == 1 ? yv[0] : priv->min_y;
+        for (x = 0; x < veclen; ++x)
+          vector[x] = ry;
+        g_free(mem);
+        return;
       }
 
       xv[0] = priv->min_x;

@@ -749,6 +749,7 @@ typedef struct {
     int audio_phase_offset_dir;
     int audio_phase_offset_sfd;
     int audio_phase_offset_start_slice;
+    unsigned long long random_state;
 
     int scratch_initialized;
     double scratch_pos;
@@ -3227,8 +3228,17 @@ void vj_perform_setup_transition(veejay_t *info,
     int transition_shape = (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_shape(sample_id) : vj_tag_get_transition_shape(sample_id);
 
     if (transition_shape == -1) {
-        int shape_count = shapewipe_get_shape_count(settings->transition.ptr);
-        transition_shape = shape_count > 0 ? rand() % shape_count : 0;
+        const int shape_count = shapewipe_get_shape_count(settings->transition.ptr);
+        const long long frame_num =
+            atomic_load_long_long(&settings->current_frame_num);
+        const unsigned long long seed =
+            ((unsigned long long)(unsigned int)sample_id << 32) ^
+            (unsigned long long)(unsigned int)next_sample_id ^
+            ((unsigned long long)(unsigned int)next_seq_bank << 16) ^
+            (unsigned long long)(unsigned int)next_seq_idx;
+
+        transition_shape = shape_count > 0 ?
+            (int)vj_frame_rand(frame_num, 0, shape_count - 1, seed) : 0;
     }
 
     int speed =
@@ -4708,9 +4718,16 @@ static long vj_calc_next_sample_offset(
         off = max_off;
 
     if (advance && loop_mode == 3) {
-        off = (long)((double)len * (double)rand() / ((double)RAND_MAX + 1.0));
-        if (off > max_off)
-            off = max_off;
+        const unsigned long long seed =
+            ((unsigned long long)(unsigned int)sb->sample_id << 32) ^
+            (unsigned long long)(unsigned int)sb->sample_type ^
+            (unsigned long long)(unsigned int)sb->direction;
+
+        sb->random_state += 0x9e3779b97f4a7c15ULL;
+        off = vj_frame_rand((long long)sb->random_state,
+                            0,
+                            max_off,
+                            seed);
 
         sb->offset = off;
         return off;
