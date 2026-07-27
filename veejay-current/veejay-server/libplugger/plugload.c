@@ -281,16 +281,17 @@ char		*list_plugins(void)
 	if(len <= 0 )
 		return NULL;
 
-	res = (char*) vj_malloc( len );
-	memset( res,0,len );
+	const size_t res_size = (size_t) len + 1;
+	res = (char*) vj_malloc(res_size);
+	memset(res, 0, res_size);
 	char *p = res;
 	for ( i = 0; i < index_; i ++ )
 	{
 		char *name = plug_get_name(i);
 		if(name)
 		{
-			sprintf(p, "%s:",name );
-			p += strlen(name) + 1;
+			snprintf(p, res_size - (size_t)(p - res), "%s:", name );
+			p += strlen(p);
 		}
 	}
 	return res;
@@ -405,7 +406,7 @@ static	int	scan_plugins(void)
 	char data[CONFIG_FILE_LEN];
 	if(!home) return 0;
 	
-	sprintf( path , "%s/.veejay/plugins.cfg" , home );
+	snprintf(path, sizeof(path), "%s/.veejay/plugins.cfg", home);
 
 	int fd = open( path, O_RDONLY );
 	if( fd < 0 ) {
@@ -832,7 +833,7 @@ char	*plug_describe( int fx_id )
 	
 		for( i = 0; i < pi; i ++ )
 		{
-			sprintf(key, "p%02d",i);
+			snprintf(key, sizeof(key), "p%02d",i);
 			in_params[i] = flatten_port( plug , key );
 			len += strlen(in_params[i])+1;
 		}
@@ -843,7 +844,7 @@ char	*plug_describe( int fx_id )
 	
 		for( i = 0; i < po; i ++ )
 		{
-			sprintf(key, "q%02d",i);
+			snprintf(key, sizeof(key), "q%02d",i);
 			out_params[i] = flatten_port( plug , key );
 			len += strlen(out_params[i])+1;
 		}
@@ -857,10 +858,11 @@ char	*plug_describe( int fx_id )
 	len += strlen( author )+8;
 	len += strlen( license )+9;
 
-	res = (char*) vj_malloc(sizeof(char) * len + 150 );
-	memset(res,0,len);
+	const size_t res_size = (size_t) len + 150;
+	res = (char*) vj_malloc(res_size);
+	memset(res, 0, res_size);
 
-	sprintf( res,
+	snprintf(res, res_size,
 			"name=%s:description=%s:author=%s:maintainer=%s:license=%s:version=%s:outs=%d:ins=%d",
 				name,description,author,maintainer,license,version,co,ci );
 
@@ -868,14 +870,14 @@ char	*plug_describe( int fx_id )
 	
 	for( i = 0; i < pi ; i ++ )
 	{
-		sprintf(p, "p%02d=[%s]:", i, in_params[i] );
-		p += strlen(in_params[i]) + 7;
+		snprintf(p, res_size - (size_t)(p - res), "p%02d=[%s]:", i, in_params[i] );
+		p += strlen(p);
 		free(in_params[i]);
 	}
 	for( i = 0; i < po ; i ++ )
 	{
-		sprintf(p, "q%02d=[%s]:", i, out_params[i] );
-		p += strlen( out_params[i] ) + 7;
+		snprintf(p, res_size - (size_t)(p - res), "q%02d=[%s]:", i, out_params[i] );
+		p += strlen(p);
 		free(out_params[i]);
 	}
 
@@ -1158,7 +1160,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 		for( k = 0; k < vje->num_params;k++ )
 		{
 			char key[20];
-			sprintf(key, "p%02d", k );
+			snprintf(key, sizeof(key), "p%02d", k );
 			void *parameter = NULL;
 			vevo_property_get( port, key, 0, &parameter );
 			if(parameter)

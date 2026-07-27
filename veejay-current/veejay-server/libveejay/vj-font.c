@@ -635,37 +635,37 @@ void    vj_font_xml_pack( xmlNodePtr node, void *font )
         
             xmlNodePtr childnode = xmlNewChild( node, NULL, (const xmlChar*) "SUBTITLES" , NULL );
     
-                sprintf(buf, "%d", s->id );
+                snprintf(buf, sizeof(buf), "%d", s->id );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "srt_id", (const xmlChar*) buf ); 
 
-                sprintf(buf, "%d",s->x );
+                snprintf(buf, sizeof(buf), "%d",s->x );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "x_pos", (const xmlChar*) buf );
 
-                sprintf(buf, "%d", s->y );
+                snprintf(buf, sizeof(buf), "%d", s->y );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "y_pos", (const xmlChar*) buf );
     
-                sprintf(buf, "%d", s->size );
+                snprintf(buf, sizeof(buf), "%d", s->size );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "font_size", (const xmlChar*) buf );
 
-                sprintf(buf, "%d", s->font );
+                snprintf(buf, sizeof(buf), "%d", s->font );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "font_family", (const xmlChar*) buf );
     
-                sprintf(buf, "%d %d %d", s->bg[0],s->bg[1],s->bg[2] );
+                snprintf(buf, sizeof(buf), "%d %d %d", s->bg[0],s->bg[1],s->bg[2] );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "bg" , (const xmlChar*) buf );
 
-                sprintf(buf, "%d %d %d", s->fg[0], s->fg[1], s->fg[2] );    
+                snprintf(buf, sizeof(buf), "%d %d %d", s->fg[0], s->fg[1], s->fg[2] );    
                 xmlNewChild(childnode, NULL, (const xmlChar*) "fg", (const xmlChar*) buf );
 
-                sprintf(buf, "%d %d %d", s->ln[0], s->ln[1], s->ln[2] );
+                snprintf(buf, sizeof(buf), "%d %d %d", s->ln[0], s->ln[1], s->ln[2] );
                 xmlNewChild(childnode,NULL, (const xmlChar*) "ln", (const xmlChar*) buf );
 
-                sprintf(buf, "%d %d %d", s->alpha[0], s->alpha[1],s->alpha[2] );
+                snprintf(buf, sizeof(buf), "%d %d %d", s->alpha[0], s->alpha[1],s->alpha[2] );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "alpha", (const xmlChar*) buf );
 
-                sprintf(buf, "%d", s->use_bg );
+                snprintf(buf, sizeof(buf), "%d", s->use_bg );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "use_bg", (const xmlChar*) buf );
     
-                sprintf(buf, "%d", s->outline );
+                snprintf(buf, sizeof(buf), "%d", s->outline );
                 xmlNewChild(childnode, NULL, (const xmlChar*) "use_outline", (const xmlChar*) buf );
                     
 

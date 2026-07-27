@@ -1552,7 +1552,7 @@ void	*vevo_port_register( vevo_port_t *in, vevo_port_t *ref )
 	char pkey[32];
 	if(store)
 	{
-		sprintf(pkey,"%p", ref);
+		snprintf(pkey, sizeof(pkey), "%p", ref);
 		if( vevo_property_exists( port, pkey ) == 0 )
 			vevo_property_set( port, pkey,VEVO_ATOM_TYPE_PORTPTR, 1 , &ref );
 	}

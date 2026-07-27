@@ -440,7 +440,7 @@ char *viewport_get_my_help(void *vv)
 
 	char reverse_mode[32];
 	veejay_memset(reverse_mode,0,sizeof(reverse_mode));
-	sprintf(reverse_mode, "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
+	snprintf(reverse_mode, sizeof(reverse_mode), "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
 	
 	char scroll_mode[64];
 
@@ -1661,7 +1661,7 @@ void	viewport_save_settings( void *ptr, int frontback, char *path )
 
 	char content[512];
 
-	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
+	snprintf(content, sizeof(content), "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
 			v->x1,v->y1,v->x2,v->y2,
 			v->x3,v->y3,v->x4,v->y4,
 			v->user_reverse,

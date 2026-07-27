@@ -837,11 +837,11 @@ int	livido_plug_build_namespace( void *plugin_template , int entry_id, void *fx_
 		char *param_name = get_str_vevo( param_templ, "name" );
 		char *descrip    = get_str_vevo( param_templ, "description" );
 		
-		sprintf(base, "/sample_%d/fx_%d/%s",
+		snprintf(base, sizeof(base), "/sample_%d/fx_%d/%s",
 				sample_id,
 				entry_id,
 				plug_name );
-		sprintf(mpath, "/sample_%d/fx_%d/%s/%s",
+		snprintf(mpath, sizeof(mpath), "/sample_%d/fx_%d/%s/%s",
 				sample_id,
 				entry_id,
 				plug_name,
@@ -1403,8 +1403,9 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loading LiVIDO-%d plugin '%s'" , compiled_as, plugin_name);
 	
-	char *clone_name = (char*) vj_malloc( strlen(plugin_name) + 5);
-	sprintf(clone_name, "LVD %s", plugin_name );
+	size_t clone_name_size = strlen(plugin_name) + 5;
+	char *clone_name = (char*) vj_malloc(clone_name_size);
+	snprintf(clone_name, clone_name_size, "LVD %s", plugin_name );
 
 	int mixer = (n_inputs == 2 && n_outputs == 1 ) ? 1: 0;
 

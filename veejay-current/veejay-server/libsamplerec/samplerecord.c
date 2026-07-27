@@ -19,6 +19,7 @@
 #include <config.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 #include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>
 #include <veejaycore/vj-msg.h>
@@ -54,7 +55,7 @@ int sample_get_encoded_file(int sample_id, char *description)
        si->encoder_total_frames_recorded <= 0)
         return -1;
 
-    sprintf(description, "%s", si->encoder_destination);
+    snprintf(description, PATH_MAX, "%s", si->encoder_destination);
     return 1;
 }
 
@@ -75,7 +76,7 @@ int sample_get_sequenced_file(int sample_id, char *descr, int num, char *ext)
 
     	
     
-    sprintf(descr, "%s-%05d.%s", si->encoder_destination,
+    snprintf(descr, PATH_MAX, "%s-%05d.%s", si->encoder_destination,
 				   num, ext);
     return 1;
 
@@ -112,17 +113,17 @@ int sample_try_filename(int sample_id, char *filename, int format)
 	switch(format)
 	{
 		case ENCODER_DVVIDEO:
-			sprintf(ext,"dv");
+			snprintf(ext, sizeof(ext),"dv");
 			break;
 		case ENCODER_YUV4MPEG:
-			sprintf(ext,"yuv");
+			snprintf(ext, sizeof(ext),"yuv");
 			break;
 		case ENCODER_QUICKTIME_MJPEG:
 		case ENCODER_QUICKTIME_DV:
-			sprintf(ext,"mov");
+			snprintf(ext, sizeof(ext),"mov");
 			break;
 		default:
-			sprintf(ext,"avi");
+			snprintf(ext, sizeof(ext),"avi");
 			break;
 	}
 

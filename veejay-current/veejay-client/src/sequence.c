@@ -1191,7 +1191,7 @@ static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
 {
 	char message[16];
 
-	sprintf(message, "%03d:;", vims_id );
+	snprintf(message, sizeof(message), "%03d:;", vims_id );
 
 	if( v->n_queued < __MAX_TRACKS )
 	{
@@ -1204,7 +1204,7 @@ static void	gvr_multi_queue_vims( veejay_track_t *v, int vims_id, int val )
 {
 	char message[64];
 
-	sprintf(message, "%03d:%d;", vims_id,val );
+	snprintf(message, sizeof(message), "%03d:%d;", vims_id,val );
 
 	if( v->n_queued < __MAX_TRACKS )
 	{
@@ -1216,7 +1216,7 @@ static	void	gvr_multivx_queue_vims( veejay_track_t *v, int vims_id, int val1,uns
 {
 	char message[1024];
 
-	sprintf(message, "%03d:%d %s;", vims_id,val1,val2 );
+	snprintf(message, sizeof(message), "%03d:%d %s;", vims_id,val1,val2 );
 
 	if( v->n_queued < __MAX_TRACKS )
 	{
@@ -1228,7 +1228,7 @@ static	void	gvr_multivvv_queue_vims( veejay_track_t *v, int vims_id, int val1,in
 {
 	char message[64];
 
-	sprintf(message, "%03d:%d %d %d;", vims_id,val1,val2, val3 );
+	snprintf(message, sizeof(message), "%03d:%d %d %d;", vims_id,val1,val2, val3 );
 
 	if( v->n_queued < __MAX_TRACKS )
 	{
@@ -1266,7 +1266,7 @@ static	void	gvr_multiv_queue_vims( veejay_track_t *v, int vims_id, int val1,int 
 {
 	char message[64];
 
-	sprintf(message, "%03d:%d %d;", vims_id,val1,val2 );
+	snprintf(message, sizeof(message), "%03d:%d %d;", vims_id,val1,val2 );
 
 	if( v->n_queued < __MAX_TRACKS )
 	{

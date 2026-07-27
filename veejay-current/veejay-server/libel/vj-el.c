@@ -2050,20 +2050,20 @@ void	vj_el_print(editlist *el)
 		switch( lav_video_interlacing(el->lav_fd[i]))
 		{
 			case LAV_NOT_INTERLACED:
-				sprintf(interlacing, "Not interlaced"); break;
+				snprintf(interlacing, sizeof(interlacing), "Not interlaced"); break;
 			case LAV_INTER_TOP_FIRST:
-				sprintf(interlacing,"Top field first"); break;
+				snprintf(interlacing, sizeof(interlacing),"Top field first"); break;
 			case LAV_INTER_BOTTOM_FIRST:
-				sprintf(interlacing, "Bottom field first"); break;
+				snprintf(interlacing, sizeof(interlacing), "Bottom field first"); break;
 			default:
-				sprintf(interlacing, "Unknown !"); break;
+				snprintf(interlacing, sizeof(interlacing), "Unknown !"); break;
 		} 
 
 		mpeg_timecode(&tc, num_frames,
 				mpeg_framerate_code( mpeg_conform_framerate( el->video_fps )),
 				el->video_fps );
 
-		sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f );
+		snprintf(timecode, sizeof(timecode), "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f );
 
 		veejay_msg(VEEJAY_MSG_INFO, "\tFile %s (%s) with %ld frames (total duration %s)",
 			el->video_file_list[i],
@@ -2077,7 +2077,7 @@ void	vj_el_print(editlist *el)
 			mpeg_framerate_code( mpeg_conform_framerate( el->video_fps )),
 			el->video_fps );
 
-	sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", ttc.h, ttc.m, ttc.s, ttc.f );
+	snprintf(timecode, sizeof(timecode), "%2d:%2.2d:%2.2d:%2.2d", ttc.h, ttc.m, ttc.s, ttc.f );
 
 	veejay_msg(VEEJAY_MSG_INFO, "\tDuration: %s (%2d hours, %2d minutes)(%ld frames)", timecode,ttc.h,ttc.m,el->video_frames);
 }

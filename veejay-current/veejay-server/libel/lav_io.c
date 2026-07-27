@@ -255,53 +255,53 @@ lav_file_t *lav_open_output_file(char *filename, char format,
     case 'A':
              /* Open AVI output file */
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI MJPEG");
-        sprintf(fourcc, "MJPG" );
+        snprintf(fourcc, sizeof(fourcc), "MJPG" );
         break;
     case 'H':
         veejay_msg(VEEJAY_MSG_DEBUG,"[lavio] Writing output file in AVI HFYU");
-        sprintf(fourcc, "HFYU");
+        snprintf(fourcc, sizeof(fourcc), "HFYU");
         break;
     case 'l':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI LJPEG");
-        sprintf(fourcc, "JPGL");
+        snprintf(fourcc, sizeof(fourcc), "JPGL");
         break;
     case 'L':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI LZO (veejay's fourcc)");
-        sprintf(fourcc, "MLZO" );
+        snprintf(fourcc, sizeof(fourcc), "MLZO" );
         break;
     case 'o':
     case 'O':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI QOI");
-        sprintf(fourcc, "QOIY");
+        snprintf(fourcc, sizeof(fourcc), "QOIY");
         break;
     case 'v':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI VJ20 (veejay's fourcc)");
-        sprintf(fourcc,"VJ20");
+        snprintf(fourcc, sizeof(fourcc),"VJ20");
         break;  
     case 'V':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI VJ22 (veejay's fourcc)");
-        sprintf(fourcc,"VJ22");
+        snprintf(fourcc, sizeof(fourcc),"VJ22");
         break;
     case 'Y':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI IYUV");
-        sprintf(fourcc, "IYUV" );
+        snprintf(fourcc, sizeof(fourcc), "IYUV" );
         break;
     case 'P':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI YV16");  
-        sprintf(fourcc, "YV16");
+        snprintf(fourcc, sizeof(fourcc), "YV16");
         break;
     case 'D':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI DIV3");
-        sprintf(fourcc, "DIV3");
+        snprintf(fourcc, sizeof(fourcc), "DIV3");
         break;
     case 'M':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI MP4V");
-        sprintf(fourcc,"MP4V");
+        snprintf(fourcc, sizeof(fourcc),"MP4V");
         break;
     case 'b':
     case 'd':
         veejay_msg(VEEJAY_MSG_DEBUG, "[lavio] Writing output file in AVI DVSD");
-        sprintf(fourcc, "DVSD");
+        snprintf(fourcc, sizeof(fourcc), "DVSD");
         break;
 
     case 'q':
@@ -1445,19 +1445,19 @@ const char *lav_strerror(void)
    switch(internal_error)
    {
       case ERROR_JPEG:
-         sprintf(error_string,"Internal: broken JPEG format");
+         snprintf(error_string, sizeof(error_string),"Internal: broken JPEG format");
          internal_error = 0;
          return error_string;
       case ERROR_MALLOC:
-         sprintf(error_string,"Internal: Out of memory");
+         snprintf(error_string, sizeof(error_string),"Internal: Out of memory");
          internal_error = 0;
          return error_string;
       case ERROR_FORMAT:
-         sprintf(error_string,"Input file format not recognized");
+         snprintf(error_string, sizeof(error_string),"Input file format not recognized");
          internal_error = 0;
          return error_string;
       case ERROR_NOAUDIO:
-         sprintf(error_string,"Trying to read audio from a video only file");
+         snprintf(error_string, sizeof(error_string),"Trying to read audio from a video only file");
          internal_error = 0;
          return error_string;
    }

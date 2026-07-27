@@ -40,7 +40,7 @@ int main( int argc, char *argv[] )
 	{
 	char status[30];
 	int status_len; 
-	sprintf(status, "%d %d %d", frame,frame,frame);
+	snprintf(status, sizeof(status), "%d %d %d", frame,frame,frame);
 	frame++;
 	status_len = strlen(status);
 	if( vj_server_poll(s) )

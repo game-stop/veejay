@@ -19,6 +19,7 @@
 #include <config.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
 #include <veejaycore/defs.h>
 #include <libstream/vj-tag.h>
 #include <libstream/vj-cali.h>
@@ -1489,7 +1490,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             plug_get_parameters( tag->generator, tag->genargs, &tmp);   
             
             if (filename != NULL) {
-                sprintf(tag->source_name,"%s", filename);
+                snprintf(tag->source_name, SOURCE_NAME_LEN, "%s", filename);
             }
         }
         else {
@@ -2341,7 +2342,7 @@ int vj_tag_get_encoded_file(int t1, char *description)
     if(!tag || !tag->encoder_destination[0] || tag->encoder_total_frames_recorded <= 0)
         return 0;
 
-    sprintf(description, "%s", tag->encoder_destination );
+    snprintf(description, sizeof(tag->encoder_destination), "%s", tag->encoder_destination );
     return 1;
 }
 
@@ -2363,7 +2364,7 @@ int vj_tag_get_sequenced_file(int t1, char *descr, int num, char *ext)
 {
     vj_tag *tag = vj_tag_get(t1);
     if(!tag) return -1;
-    sprintf(descr, "%s-%05d.%s", tag->encoder_destination,num,ext );
+    snprintf(descr, PATH_MAX, "%s-%05d.%s", tag->encoder_destination, num, ext );
     return 1;
 }
 
@@ -2384,16 +2385,16 @@ int vj_tag_try_filename(int t1, char *filename, int format)
     {
         case ENCODER_QUICKTIME_DV:
         case ENCODER_QUICKTIME_MJPEG:
-            sprintf(ext, "mov");
+            snprintf(ext, sizeof(ext), "mov");
             break;
         case ENCODER_YUV4MPEG:
-            sprintf(ext, "yuv");
+            snprintf(ext, sizeof(ext), "yuv");
             break;
         case ENCODER_DVVIDEO:
-            sprintf(ext,"dv");
+            snprintf(ext, sizeof(ext),"dv");
             break;
         default:
-            sprintf(ext,"avi");
+            snprintf(ext, sizeof(ext),"avi");
             break;
     }   
     
@@ -3428,47 +3429,47 @@ void    vj_tag_get_by_type(int id,int type, char *description )
 {
     switch (type) {
     case VJ_TAG_TYPE_GENERATOR:
-    sprintf(description, "Generator");
+    snprintf(description, TAG_MAX_DESCR_LEN, "Generator");
     break;
     case VJ_TAG_TYPE_COLOR:
-    sprintf(description, "Solid" );
+    snprintf(description, TAG_MAX_DESCR_LEN, "Solid" );
     break;
     case VJ_TAG_TYPE_NONE:
-    sprintf(description, "%s", "EditList");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "EditList");
     break;
     case VJ_TAG_TYPE_MCAST:
-    sprintf(description, "%s", "Multicast");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Multicast");
     break;
     case VJ_TAG_TYPE_NET:
-    sprintf(description, "%s", "Unicast");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Unicast");
     break;
     case VJ_TAG_TYPE_AVFORMAT:
-    sprintf(description, "%s", "AVFormat stream reader");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "AVFormat stream reader");
     break;
 #ifdef USE_GDK_PIXBUF
     case VJ_TAG_TYPE_PICTURE:
-    sprintf(description, "%s", "GdkPixbuf");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "GdkPixbuf");
     break;
 #endif
     case VJ_TAG_TYPE_V4L:
-    sprintf(description, "%s", "Video4Linux");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Video4Linux");
     break;
 #ifdef SUPPORT_READ_DV2
     case VJ_TAG_TYPE_DV1394:
-    sprintf(description, "%s", "DV1394");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "DV1394");
     break;
 #endif
     case VJ_TAG_TYPE_YUV4MPEG:
-    sprintf(description, "%s", "YUV4MPEG");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "YUV4MPEG");
     break;
     case VJ_TAG_TYPE_CALI:
-    sprintf(description, "%s", "Image Calibration");
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Image Calibration");
     break;
     case VJ_TAG_TYPE_CLONE:
-    sprintf(description, "%s", "Clone" );
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Clone" );
     break;
     default:
-    sprintf(description ,"T%d", id );
+    snprintf(description, TAG_MAX_DESCR_LEN,"T%d", id );
     break;
     }
 }
@@ -3478,7 +3479,7 @@ void vj_tag_get_descriptive(int id, char *description)
     vj_tag *tag = vj_tag_get(id);
     if(!tag)
     {
-        sprintf(description, "invalid");
+        snprintf(description, TAG_MAX_DESCR_LEN, "invalid");
     }
     else    
     {
