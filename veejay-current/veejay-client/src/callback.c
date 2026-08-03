@@ -273,7 +273,11 @@ static void sync_fx_chain_toggle_widgets(GtkWidget *origin,
     for(unsigned int i = 0; i < G_N_ELEMENTS(toggles); i++) {
         GtkWidget *toggle = toggles[i];
 
-        if(!toggle || toggle == origin || !GTK_IS_TOGGLE_BUTTON(toggle))
+        if(!toggle)
+            continue;
+        if(toggle == origin)
+            continue;
+        if(!GTK_IS_TOGGLE_BUTTON(toggle))
             continue;
 
         if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle)) != active)
@@ -290,7 +294,9 @@ static void toggle_siamese_widget(GtkWidget *widget, GtkWidget *first, GtkWidget
 
     GtkWidget *siamese = (widget == second) ? first : second;
 
-    if (!GTK_IS_TOGGLE_BUTTON(widget) || !GTK_IS_TOGGLE_BUTTON(siamese))
+    if (!GTK_IS_TOGGLE_BUTTON(widget))
+        return;
+    if (!GTK_IS_TOGGLE_BUTTON(siamese))
         return;
 
     gboolean active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
@@ -626,7 +632,11 @@ void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 
 void on_beat_entry_toggle_toggled(GtkWidget *widget, gpointer user_data)
 {
-    if(info->status_lock || !widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(info->status_lock)
+        return;
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     int entry = info->uc.selected_chain_entry;
@@ -650,7 +660,9 @@ static void beat_param_owner_toggled(GtkWidget *widget, int param)
     if(info->status_lock || info->parameter_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     if(info->uc.selected_chain_entry < 0) {
@@ -703,7 +715,9 @@ void    on_button_audio_mute_toggled(GtkWidget *widget, gpointer user_data) {
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     int status = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
@@ -900,7 +914,9 @@ static int audio_mixer_mode_from_ui(void)
     GtkWidget *external = widget_cache[WIDGET_AUDIO_MIXER_EXTERNAL_RADIO];
     GtkWidget *mix = widget_cache[WIDGET_AUDIO_MIXER_MIX_RADIO];
 
-    if(!override || !GTK_IS_TOGGLE_BUTTON(override))
+    if(!override)
+        return AUDIO_MIX_MODE_FOLLOW;
+    if(!GTK_IS_TOGGLE_BUTTON(override))
         return AUDIO_MIX_MODE_FOLLOW;
 
     if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(override)))
@@ -1108,7 +1124,9 @@ void on_audio_mixer_override_toggled(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     audio_mixer_commit_mode_from_ui("audio_mixer_override");
@@ -1121,7 +1139,9 @@ void on_audio_mixer_route_toggled(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
@@ -1327,7 +1347,9 @@ static int audio_beat_monitor_latency_auto_active(void)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE];
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return 1;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return 1;
 
     return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
@@ -1379,7 +1401,9 @@ static int G_GNUC_UNUSED audio_current_sample_has_own_audio_source(void)
     int source;
     int mode;
 
-    if(!info || !callback_playmode_is_sample(info->status_tokens[PLAY_MODE]))
+    if(!info)
+        return 0;
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]))
         return 0;
 
     if(VIMS_STATUS_TOKENS <= SAMPLE_AUDIO_SYNC_MODE)
@@ -1451,7 +1475,9 @@ static void audio_beat_set_action_combo_guarded(int action)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_ACTION_COMBO];
     int old_lock;
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     const int combo_index = audio_beat_combo_index_from_action(action);
@@ -1621,7 +1647,9 @@ void on_audio_beat_source_loss_pause_toggled(GtkWidget *widget, gpointer user_da
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     multi_vims(VIMS_AUDIO_BEAT_SOURCE_LOSS_PAUSE,
@@ -1652,7 +1680,9 @@ void on_audio_beat_monitor_latency_auto_toggled(GtkWidget *widget, gpointer user
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     action = audio_beat_current_action_from_combo();
@@ -1697,7 +1727,9 @@ static void audio_input_selector_set_guarded(int active)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_INPUT_SELECTOR_COMBO];
     int old_lock;
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == active)
@@ -1740,7 +1772,9 @@ static int audio_input_selector_active_from_ui(void)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_INPUT_SELECTOR_COMBO];
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return AUDIO_MASTER_ORIGINAL;
+    if(!GTK_IS_COMBO_BOX(w))
         return AUDIO_MASTER_ORIGINAL;
 
     int active = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
@@ -1788,7 +1822,9 @@ static int audio_sync_get_combo_active(int widget_id, int fallback)
 {
     GtkWidget *w = widget_cache[widget_id];
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_COMBO_BOX(w))
         return fallback;
 
     int v = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
@@ -1845,7 +1881,9 @@ static int audio_sync_mode_is_tempo_follow(int mode)
 
 static int audio_sync_mode_is_provider_only(int mode)
 {
-    return audio_sync_mode_is_control_only(mode) || audio_sync_mode_is_tempo_follow(mode);
+    if(audio_sync_mode_is_control_only(mode))
+        return 1;
+    return audio_sync_mode_is_tempo_follow(mode);
 }
 
 static void audio_sync_set_mode_combo_guarded(int mode)
@@ -1854,7 +1892,9 @@ static void audio_sync_set_mode_combo_guarded(int mode)
     int active = audio_sync_mode_combo_from_mode(mode);
     int old_lock;
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     if(gtk_combo_box_get_active(GTK_COMBO_BOX(w)) == active)
@@ -1871,7 +1911,9 @@ static void audio_sync_set_enable_toggle_guarded(int enabled)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_ENABLE_TOGGLE];
     int old_lock;
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     enabled = enabled ? 1 : 0;
@@ -1908,7 +1950,9 @@ static int audio_sync_spin_int(int widget_id, int fallback)
 {
     GtkWidget *w = widget_cache[widget_id];
 
-    if(!w || !GTK_IS_SPIN_BUTTON(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_SPIN_BUTTON(w))
         return fallback;
 
     return (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
@@ -1931,7 +1975,9 @@ static int audio_sync_loop_from_ui(void)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_WAV_LOOP_TOGGLE];
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return 0;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return 0;
 
     return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
@@ -2063,7 +2109,9 @@ static int audio_sync_named_combo_active(const char *name, int fallback)
 {
     GtkWidget *w = audio_sync_named_widget(name);
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_COMBO_BOX(w))
         return fallback;
 
     return gtk_combo_box_get_active(GTK_COMBO_BOX(w));
@@ -2073,7 +2121,9 @@ static int audio_sync_named_spin_int(const char *name, int fallback)
 {
     GtkWidget *w = audio_sync_named_widget(name);
 
-    if(!w || !GTK_IS_SPIN_BUTTON(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_SPIN_BUTTON(w))
         return fallback;
 
     return (int)gtk_spin_button_get_value(GTK_SPIN_BUTTON(w));
@@ -2102,7 +2152,12 @@ void on_audio_sync_wav_profile_store_button_clicked(GtkWidget *widget, gpointer 
     loop = audio_sync_loop_from_ui();
     path = get_text("audio_sync_wav_path");
 
-    if(!path || !audio_sync_wav_path_vims_safe(path)) {
+    if(!path) {
+        vj_msg(VEEJAY_MSG_WARNING,
+               "Choose a VIMS-safe WAV path before storing a WAV profile");
+        return;
+    }
+    if(!audio_sync_wav_path_vims_safe(path)) {
         vj_msg(VEEJAY_MSG_WARNING,
                "Choose a VIMS-safe WAV path before storing a WAV profile");
         return;
@@ -2146,7 +2201,9 @@ static int sample_audio_sync_source_from_label(const char *label, int fallback)
         result = SAMPLE_AUDIO_SYNC_SOURCE_SILENCE;
     else if(strstr(lower, "original"))
         result = SAMPLE_AUDIO_SYNC_SOURCE_ORIGINAL;
-    else if(strstr(lower, "none") || strstr(lower, "follow"))
+    else if(strstr(lower, "none"))
+        result = SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE;
+    else if(strstr(lower, "follow"))
         result = SAMPLE_AUDIO_SYNC_UI_SOURCE_NONE;
 
     g_free(lower);
@@ -2250,7 +2307,11 @@ static int sample_audio_sync_apply_selection_preserve_anchor(const char *reason)
     int video_anchor;
     int wav_anchor_ms;
 
-    if(!info || !callback_playmode_is_sample(info->status_tokens[PLAY_MODE]) || info->status_tokens[CURRENT_ID] <= 0)
+    if(!info)
+        return 0;
+    if(!callback_playmode_is_sample(info->status_tokens[PLAY_MODE]))
+        return 0;
+    if(info->status_tokens[CURRENT_ID] <= 0)
         return 0;
 
     sample_id = info->status_tokens[CURRENT_ID];
@@ -2558,7 +2619,9 @@ static double audio_sync_tempo_bend_pct_from_ui(void)
 {
     GtkWidget *w = audio_sync_named_widget("audio_sync_tempo_bend_scale");
 
-    if(!w || !GTK_IS_RANGE(w))
+    if(!w)
+        return 0.0;
+    if(!GTK_IS_RANGE(w))
         return 0.0;
 
     return ui_clampd(gtk_range_get_value(GTK_RANGE(w)), -12.0, 12.0);
@@ -2569,7 +2632,9 @@ static void audio_sync_set_tempo_bend_guarded(double bend_pct)
     GtkWidget *w = audio_sync_named_widget("audio_sync_tempo_bend_scale");
     int old_lock;
 
-    if(!w || !GTK_IS_RANGE(w))
+    if(!w)
+        return;
+    if(!GTK_IS_RANGE(w))
         return;
 
     bend_pct = ui_clampd(bend_pct, -12.0, 12.0);
@@ -2701,7 +2766,9 @@ static void audio_sync_set_correction_guarded(int correction)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_CORRECTION_SPIN];
     int old_lock;
 
-    if(!w || !GTK_IS_SPIN_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_SPIN_BUTTON(w))
         return;
 
     correction = ui_clampi(correction, 0, 25);
@@ -2865,7 +2932,9 @@ void on_audio_input_selector_combo_changed(GtkWidget *widget, gpointer user_data
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_COMBO_BOX(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_COMBO_BOX(widget))
         return;
 
     if(!audio_global_source_controls_allowed()) {
@@ -2934,7 +3003,9 @@ void on_audio_sync_enable_toggle_toggled(GtkWidget *widget, gpointer user_data)
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     int enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
@@ -3694,7 +3765,9 @@ void	on_button_reset_fx_opacity_clicked(GtkWidget *w, gpointer user_data)
 		return;
 
 	GtkWidget *opacity = glade_xml_get_widget_(info->main_window, "manualopacity");
-	if(!opacity || !GTK_IS_RANGE(opacity))
+	if(!opacity)
+		return;
+	if(!GTK_IS_RANGE(opacity))
 		return;
 
 	GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(opacity));
@@ -4903,7 +4976,9 @@ static void v4l_send_named_toggle(GtkWidget *widget, const char *control_name)
     if(stream_id <= 0 || !control_name)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     value = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)) ? 1 : 0;
@@ -5432,7 +5507,9 @@ void on_check_samplefx_toggled(GtkWidget *widget, gpointer user_data)
 
     (void)user_data;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
@@ -5462,7 +5539,9 @@ void on_check_streamfx_toggled(GtkWidget *widget, gpointer user_data)
 
     (void)user_data;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget));
@@ -5959,11 +6038,15 @@ static	void	load_server_files(char *buf, int len)
 #ifdef STRICT_CHECKING
 	assert(tree != NULL);
 #endif
-	if(!buf || len <= 0 || !tree || !GTK_IS_TREE_VIEW(tree))
+	if(!buf || len <= 0 || !tree)
+		return;
+	if(!GTK_IS_TREE_VIEW(tree))
 		return;
 
 	GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
-	if(!model || !GTK_IS_LIST_STORE(model))
+	if(!model)
+		return;
+	if(!GTK_IS_LIST_STORE(model))
 		return;
 
 	GtkListStore *store = GTK_LIST_STORE(model);
@@ -6105,7 +6188,14 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *remote = g_locale_from_utf8(
 			remote_ , -1, &br, &bw, NULL );
 
-	if( !remote || strlen(remote) <= 1 )
+	if( !remote )
+	{
+		GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputstream_window" );
+		gtk_widget_hide( dialog );
+		error_dialog("Error", "Not a valid hostname. Try 'localhost' or '127.0.0.1'");
+		return;
+	}
+	if( strlen(remote) <= 1 )
 	{
 		GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputstream_window" );
 		gtk_widget_hide( dialog );
@@ -7136,7 +7226,11 @@ void on_curve_button_animation_shuffle_clicked(GtkWidget *widget, gpointer user_
 
     GtkWidget *seed_spin = widget_cache[ WIDGET_CURVE_SPIN_ANIMATION_SEED ];
 
-    if(!seed_spin || !GTK_IS_SPIN_BUTTON(seed_spin)) {
+    if(!seed_spin) {
+        update_curve_shape();
+        return;
+    }
+    if(!GTK_IS_SPIN_BUTTON(seed_spin)) {
         update_curve_shape();
         return;
     }
@@ -7435,7 +7529,9 @@ static void callback_sync_playmode_panel_pages(void)
     GtkWidget *n = glade_xml_get_widget_(info->main_window, "panels");
     int page_needed = callback_playmode_panel_page(info->status_tokens[PLAY_MODE]);
 
-    if(!n || !GTK_IS_NOTEBOOK(n))
+    if(!n)
+        return;
+    if(!GTK_IS_NOTEBOOK(n))
         return;
 
     for(int i = 0; i < 3; i++)
@@ -8409,7 +8505,9 @@ static void fx_chain_sync_toggle_button(int widget_id, int active)
 {
     GtkWidget *w = widget_cache[widget_id];
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     int old_lock = info->status_lock;
@@ -8422,7 +8520,9 @@ static void fx_chain_sync_named_toggle(const char *name, int active)
 {
     GtkWidget *w = glade_xml_get_widget_(info->main_window, name);
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     int old_lock = info->status_lock;
@@ -8874,7 +8974,9 @@ on_vims_messenger_clear_clicked(GtkButton *togglebutton, gpointer user_data)
 
     view = glade_xml_get_widget_(info->main_window,
                                  "vims_messenger_textview");
-    if(!view || !GTK_IS_TEXT_VIEW(view))
+    if(!view)
+        return;
+    if(!GTK_IS_TEXT_VIEW(view))
         return;
 
     buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
@@ -9146,7 +9248,10 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 {
 	if(info->status_lock)
 		return;
-	if( is_button_toggled( "macroplay" ) || is_button_toggled("macroplay1"))
+	int macroplay_active = is_button_toggled("macroplay");
+	if(!macroplay_active)
+		macroplay_active = is_button_toggled("macroplay1");
+	if(macroplay_active)
 	{
 		multi_vims( VIMS_MACRO, "%d", 2 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,2 );
@@ -9162,7 +9267,10 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 
     int delay = get_nums("spin_macrodelay");
 
-	if( (is_button_toggled( "macrorecord") || is_button_toggled("macrorecord1")) && delay == 0)
+	int macrorecord_active = is_button_toggled("macrorecord");
+	if(!macrorecord_active)
+		macrorecord_active = is_button_toggled("macrorecord1");
+	if(macrorecord_active && delay == 0)
 	{
 		multi_vims( VIMS_MACRO, "%d", 1 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,1 );
@@ -9179,7 +9287,10 @@ void	on_macrostop_toggled( GtkWidget *w, gpointer data )
 {
 	if(info->status_lock)
 		return;
-	if( is_button_toggled( "macrostop") || is_button_toggled("macrostop1"))
+	int macrostop_active = is_button_toggled("macrostop");
+	if(!macrostop_active)
+		macrostop_active = is_button_toggled("macrostop1");
+	if(macrostop_active)
 	{
 		multi_vims( VIMS_MACRO, "%d", 0 );
 		vj_midi_learning_vims_msg( info->midi,NULL,VIMS_MACRO,0 );
@@ -9412,7 +9523,9 @@ static void record_audio_source_changed(GtkWidget *widget, int source)
     if(info->status_lock)
         return;
 
-    if(!widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     if(!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget)))
