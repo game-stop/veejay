@@ -33,6 +33,7 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <arpa/inet.h>
+#include <time.h>
 
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
@@ -120,9 +121,9 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 	vj_link **link;
 	int i;
 
-	vj_proto	**proto  = (vj_proto**) malloc(sizeof( vj_proto* ) * 2);
+	vj_proto	**proto  = (vj_proto**) vj_calloc(sizeof( vj_proto* ) * 2);
 	
-	proto[0] = (vj_proto*) vj_malloc(sizeof( vj_proto ) );
+	proto[0] = (vj_proto*) vj_calloc(sizeof( vj_proto ) );
 	if( v->server_type == V_CMD )
 	{
 		proto[0]->s = mcast_new_sender( group_name );
@@ -162,11 +163,12 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 					the link hold all messages received  */
 	{
 		int j;
-		link[i] = (vj_link*) vj_malloc(sizeof(vj_link));
+		link[i] = (vj_link*) vj_calloc(sizeof(vj_link));
 		if(!link[i])
 		{
 			return 0;
 		}
+		link[i]->handle = -1;
 		link[i]->in_use = 1;
 		link[i]->promote = 0;
 		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
@@ -234,6 +236,160 @@ static int vj_server_addr_allowed(struct in_addr addr, int allow_internet)
 	if(vj_server_addr_linklocal(addr))
 		return 1;
 	return allow_internet ? 1 : 0;
+}
+
+
+static long long vj_server_now_ms(void)
+{
+    struct timespec ts;
+#ifdef CLOCK_MONOTONIC_COARSE
+    if(clock_gettime(CLOCK_MONOTONIC_COARSE, &ts) == 0)
+        return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+#endif
+    if(clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+        return (long long)ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL;
+    return 0;
+}
+
+static int vj_server_discovery_have_target(vj_server *vjs, struct in_addr addr)
+{
+    for(int i = 0; i < vjs->discovery_target_count; i++) {
+        if(vjs->discovery_targets[i].sin_addr.s_addr == addr.s_addr)
+            return 1;
+    }
+    return 0;
+}
+
+static void vj_server_discovery_add_target(vj_server *vjs, struct in_addr addr)
+{
+    if(vjs->discovery_target_count >= VJ_MAX_DISCOVERY_TARGETS ||
+       vj_server_discovery_have_target(vjs, addr))
+        return;
+    struct sockaddr_in *target = &vjs->discovery_targets[vjs->discovery_target_count++];
+    veejay_memset(target, 0, sizeof(*target));
+    target->sin_family = AF_INET;
+    target->sin_addr = addr;
+    target->sin_port = htons(VJ_DISCOVERY_PORT);
+}
+
+static void vj_server_discovery_build_targets(vj_server *vjs)
+{
+    struct ifaddrs *ifaddr = NULL;
+    struct ifaddrs *ifa;
+    struct in_addr loopback;
+    struct in_addr global_broadcast;
+    vjs->discovery_target_count = 0;
+
+    if(inet_pton(AF_INET, "127.0.0.1", &loopback) == 1)
+        vj_server_discovery_add_target(vjs, loopback);
+    global_broadcast.s_addr = htonl(INADDR_BROADCAST);
+    vj_server_discovery_add_target(vjs, global_broadcast);
+
+    if(getifaddrs(&ifaddr) != 0)
+        return;
+    for(ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
+        if(!ifa->ifa_addr || ifa->ifa_addr->sa_family != AF_INET ||
+           !(ifa->ifa_flags & IFF_UP) || (ifa->ifa_flags & IFF_LOOPBACK))
+            continue;
+        struct sockaddr_in *sin = (struct sockaddr_in*)ifa->ifa_addr;
+        if(!vj_server_addr_allowed(sin->sin_addr,
+                                   vj_server_env_enabled("VEEJAY_ALLOW_BIND_INTERNET")))
+            continue;
+
+        struct in_addr broadcast;
+        if((ifa->ifa_flags & IFF_BROADCAST) && ifa->ifa_broadaddr &&
+           ifa->ifa_broadaddr->sa_family == AF_INET) {
+            broadcast = ((struct sockaddr_in*)ifa->ifa_broadaddr)->sin_addr;
+        }
+        else if(ifa->ifa_netmask && ifa->ifa_netmask->sa_family == AF_INET) {
+            uint32_t addr = ntohl(sin->sin_addr.s_addr);
+            uint32_t mask = ntohl(((struct sockaddr_in*)ifa->ifa_netmask)->sin_addr.s_addr);
+            broadcast.s_addr = htonl(addr | ~mask);
+        }
+        else {
+            continue;
+        }
+        vj_server_discovery_add_target(vjs, broadcast);
+    }
+    freeifaddrs(ifaddr);
+}
+
+static void vj_server_discovery_send(vj_server *vjs)
+{
+    if(!vjs || !vjs->discovery_enabled || vjs->discovery_fd < 0)
+        return;
+
+    char packet[384];
+    int len = snprintf(packet, sizeof(packet),
+                       "VEEJAY_DISCOVERY 1 id=%s role=%s port=%d host=%s",
+                       vjs->discovery_id, vjs->discovery_role,
+                       vjs->discovery_port, vjs->discovery_hostname);
+    if(len <= 0)
+        return;
+    if(len >= (int)sizeof(packet))
+        len = (int)sizeof(packet) - 1;
+
+    for(int i = 0; i < vjs->discovery_target_count; i++) {
+        ssize_t sent = sendto(vjs->discovery_fd, packet, (size_t)len, MSG_DONTWAIT,
+                              (struct sockaddr*)&vjs->discovery_targets[i],
+                              sizeof(vjs->discovery_targets[i]));
+        if(sent < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != ENETUNREACH)
+            veejay_msg(VEEJAY_MSG_DEBUG, "LAN discovery broadcast failed: %s", strerror(errno));
+    }
+}
+
+static void vj_server_discovery_maybe_send(vj_server *vjs)
+{
+    if(!vjs || !vjs->discovery_enabled)
+        return;
+    const long long now = vj_server_now_ms();
+    if(vjs->discovery_last_ms != 0 && now - vjs->discovery_last_ms < 2000)
+        return;
+    vjs->discovery_last_ms = now;
+    vj_server_discovery_send(vjs);
+}
+
+int vj_server_discovery_enable(vj_server *vjs, const char *instance_id,
+                               const char *role, int control_port)
+{
+    if(!vjs || vjs->server_type != V_CMD || vjs->use_mcast ||
+       !instance_id || !*instance_id || !role || !*role ||
+       control_port < 1 || control_port > 65535)
+        return 0;
+    if(vj_server_env_enabled("VEEJAY_DISABLE_DISCOVERY")) {
+        veejay_msg(VEEJAY_MSG_INFO, "LAN discovery disabled by VEEJAY_DISABLE_DISCOVERY");
+        return 1;
+    }
+
+    if(vjs->discovery_fd < 0) {
+        int on = 1;
+        vjs->discovery_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if(vjs->discovery_fd < 0) {
+            veejay_msg(VEEJAY_MSG_WARNING, "Unable to create LAN discovery socket: %s", strerror(errno));
+            return 0;
+        }
+        if(setsockopt(vjs->discovery_fd, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on)) < 0) {
+            veejay_msg(VEEJAY_MSG_WARNING, "Unable to enable LAN discovery broadcast: %s", strerror(errno));
+            close(vjs->discovery_fd);
+            vjs->discovery_fd = -1;
+            return 0;
+        }
+    }
+
+    snprintf(vjs->discovery_id, sizeof(vjs->discovery_id), "%s", instance_id);
+    snprintf(vjs->discovery_role, sizeof(vjs->discovery_role), "%s", role);
+    if(gethostname(vjs->discovery_hostname, sizeof(vjs->discovery_hostname)) < 0)
+        snprintf(vjs->discovery_hostname, sizeof(vjs->discovery_hostname), "veejay-node");
+    vjs->discovery_hostname[sizeof(vjs->discovery_hostname) - 1] = '\0';
+    vjs->discovery_port = control_port;
+    vj_server_discovery_build_targets(vjs);
+    vjs->discovery_enabled = 1;
+    vjs->discovery_last_ms = 0;
+    vj_server_discovery_maybe_send(vjs);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "LAN discovery advertising %s/%s on UDP port %d",
+               vjs->discovery_role, vjs->discovery_id, VJ_DISCOVERY_PORT);
+    return 1;
 }
 
 static int vj_server_have_listener(vj_server *vjs, struct in_addr addr)
@@ -467,6 +623,8 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type, si
 	if (!vjs)
 		return NULL;
 
+	vjs->discovery_fd = -1;
+
 	size_t bl = buflen;
 	if( bl < RECV_SIZE ) {
 		bl = RECV_SIZE; //@ Ensure that receive buffer is minimally 4kb
@@ -603,11 +761,19 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 int	vj_server_link_can_write( vj_server *vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
-	if( !Link[link_id]->in_use )
+	if( !Link[link_id]->in_use || Link[link_id]->handle < 0 )
 		return 0;
 
-	if( FD_ISSET( Link[link_id]->handle, &(vje->wds) ) )
-		return 1;
+	int r;
+	do {
+		fd_set wds;
+		struct timeval t = { 0, 0 };
+		FD_ZERO(&wds);
+		FD_SET(Link[link_id]->handle, &wds);
+		r = select(Link[link_id]->handle + 1, NULL, &wds, NULL, &t);
+		if(r >= 0)
+			return r > 0 && FD_ISSET(Link[link_id]->handle, &wds);
+	} while(errno == EINTR);
 	return 0;
 }
 
@@ -699,7 +865,6 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
     Link[entry]->in_use = 1;
 
     FD_SET( socket_fd, &(vje->fds) );
-    FD_SET( socket_fd, &(vje->wds) );
 	if( vje->logfd ) {
 		fprintf(vje->logfd, "new socket %d (link %d)\n", socket_fd,entry );
 	}
@@ -724,7 +889,6 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 		}
 
 		FD_CLR( Link[link_id]->handle, &(vje->fds) );
-		FD_CLR( Link[link_id]->handle, &(vje->wds) );
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "closing link %d\n",link_id );
 		}
@@ -773,6 +937,8 @@ int vj_server_poll(vj_server * vje)
 	int i;
 	int max_fd = -1;
 
+	vj_server_discovery_maybe_send(vje);
+
 	if( vje->use_mcast )
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
@@ -780,14 +946,11 @@ int vj_server_poll(vj_server * vje)
 	}
 
 	FD_ZERO( &(vje->fds) );
-    	FD_ZERO( &(vje->wds) );
-	FD_ZERO( &(vje->eds) );
 
 	for( i = 0; i < vje->n_listen_handles; i ++ ) {
 		if( vje->listen_handles[i] <= 0 )
 			continue;
 		FD_SET( vje->listen_handles[i], &(vje->fds) );
-		FD_SET( vje->listen_handles[i], &(vje->wds) );
 		if( max_fd < vje->listen_handles[i] )
 			max_fd = vje->listen_handles[i];
 	}
@@ -798,8 +961,6 @@ int vj_server_poll(vj_server * vje)
 	    if( Link[i]->handle <= 0 || !Link[i]->in_use )
 			continue;	
 		FD_SET( Link[i]->handle, &(vje->fds) );
-		FD_SET( Link[i]->handle, &(vje->wds) );	
-		FD_SET( Link[i]->handle, &(vje->eds) );
 		if( max_fd < Link[i]->handle )
 			max_fd = Link[i]->handle;
 	}		
@@ -808,11 +969,10 @@ int vj_server_poll(vj_server * vje)
 	if( max_fd < 0 )
 		return 0;
 
-	status = select(max_fd + 1, &(vje->fds), &(vje->wds), NULL, &t);
+	status = select(max_fd + 1, &(vje->fds), NULL, NULL, &t);
 
-	if( status == -1 ) {
+	if( status == -1 && errno != EINTR )
 		veejay_msg(0, "Error while polling socket: %s", strerror(errno));
-	} 
 
 	return status;
 }
@@ -864,7 +1024,7 @@ int	vj_server_new_connection(vj_server *vje)
 			continue;
 		if( FD_ISSET( vje->listen_handles[i], &(vje->fds) ) )
 		{
-			unsigned int addr_len = sizeof(vje->remote);
+			socklen_t addr_len = sizeof(vje->remote);
 			int n = 0;
 			int fd = accept( vje->listen_handles[i], (struct sockaddr*) &(vje->remote), &addr_len );
 			if(fd == -1)
@@ -907,23 +1067,19 @@ int	vj_server_new_connection(vj_server *vje)
 static void vj_server_flush(int sock_fd)
 {
 	char buffer[RECV_SIZE];
-	int n;
-	
-flushmore_lbl:
-	n = recv( sock_fd, buffer, RECV_SIZE, 0 ); //@ read 4 kb
-	if( n == - 1) {
-		if( errno == EAGAIN ) {
-			goto flushmore_lbl;
-		}
-		veejay_msg( 0, "Error: %s", strerror(errno) );
-		return;		
+	for(;;) {
+		int n = recv(sock_fd, buffer, RECV_SIZE, MSG_DONTWAIT);
+		if(n > 0)
+			continue;
+		if(n == 0)
+			return;
+		if(errno == EINTR)
+			continue;
+		if(errno == EAGAIN || errno == EWOULDBLOCK)
+			return;
+		veejay_msg(VEEJAY_MSG_ERROR, "Error flushing socket: %s", strerror(errno));
+		return;
 	}
-
-	if( n == RECV_SIZE && errno == EAGAIN) //@ read 4kb, but still data left
-	{ 
-		goto flushmore_lbl;
-	}
-
 }
 
 #define V_TYPE_VIMS_DATA 1
@@ -944,20 +1100,20 @@ static  void vj_server_log_msg(vj_server *vje, int link_id, char *buf, int buf_l
 static int vj_server_socket_consume(vj_server *vje, int sock_fd, int link_id, char *buffer, int buf_size, int flag)
 {
     ssize_t n = 0;
-    
-    if(!vje->use_mcast) {
-        n = recv( sock_fd, buffer, buf_size, flag );
-    } else {
-        vj_proto **proto = (vj_proto**) vje->protocol;
-        n = mcast_recv( proto[0]->r, (void*) buffer, buf_size );
-    }
-	
-    if( n == - 1) {
-		if( errno == EAGAIN ) {
-            return 0;
+    do {
+        if(!vje->use_mcast) {
+            n = recv(sock_fd, buffer, buf_size, flag);
+        } else {
+            vj_proto **proto = (vj_proto**) vje->protocol;
+            n = mcast_recv(proto[0]->r, (void*)buffer, buf_size);
         }
-	    veejay_msg( VEEJAY_MSG_ERROR, "Error: %s", strerror(errno) );
-	    return -1;
+    } while(n < 0 && errno == EINTR);
+	
+    if( n == -1 ) {
+        if(errno == EAGAIN || errno == EWOULDBLOCK)
+            return 0;
+        veejay_msg(VEEJAY_MSG_ERROR, "Error: %s", strerror(errno));
+        return -1;
     }
     else if ( n == 0 ) {
         veejay_msg( VEEJAY_MSG_WARNING, "Remote has disconnected");
@@ -1189,6 +1345,10 @@ int	vj_server_update( vj_server *vje, int id )
 void vj_server_shutdown(vj_server *vje)
 {
 	int i;
+	if(vje->discovery_fd >= 0) {
+		close(vje->discovery_fd);
+		vje->discovery_fd = -1;
+	}
 	vj_link **Link = (vj_link**) vje->link;
 	int k = VJ_MAX_CONNECTIONS;
 

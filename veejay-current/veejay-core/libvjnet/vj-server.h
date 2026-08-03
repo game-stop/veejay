@@ -26,6 +26,8 @@
 #define VJ_MAX_CONNECTIONS 64
 #define VJ_MAX_PENDING_MSG 128
 #define VJ_MAX_LISTEN_SOCKETS 16
+#define VJ_DISCOVERY_PORT 3499
+#define VJ_MAX_DISCOVERY_TARGETS 18
 
 #define VEEJAY_SERVER_LOG "/tmp/veejay.net.log"
 
@@ -52,6 +54,15 @@ typedef struct vj_server_t {
     FILE *logfd; 
     unsigned int recv_bufsize;
     char bind_address[INET_ADDRSTRLEN];
+    int discovery_fd;
+    int discovery_enabled;
+    long long discovery_last_ms;
+    struct sockaddr_in discovery_targets[VJ_MAX_DISCOVERY_TARGETS];
+    int discovery_target_count;
+    char discovery_id[64];
+    char discovery_role[16];
+    char discovery_hostname[128];
+    int discovery_port;
 } vj_server;
 
 typedef struct {
@@ -95,5 +106,8 @@ int	vj_server_link_can_write( vj_server *vje, int link_id );
 int	vj_server_link_can_read( vj_server *vje, int link_id);
 
 char *vj_server_find_best_ip();
+
+int vj_server_discovery_enable(vj_server *vjs, const char *instance_id,
+                               const char *role, int control_port);
 
 #endif

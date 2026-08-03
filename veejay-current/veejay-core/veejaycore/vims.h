@@ -104,6 +104,15 @@ enum {
 	VIMS_SAMPLE_AUDIO_SYNC_CLEAR         = 276,
 	VIMS_SAMPLE_AUDIO_SYNC_REARM         = 277,
 
+    VIMS_PERF_STATUS                    = 282,
+    VIMS_PERF_RESET                     = 283,
+    VIMS_OUTPUT_GRAPH_STATUS             = 284,
+    VIMS_OUTPUT_PATTERN                  = 285,
+    VIMS_OUTPUT_SLICE                    = 286,
+    VIMS_OUTPUT_SLICE_ENABLE             = 287,
+    VIMS_INSTANCE_STATUS                 = 288,
+    VIMS_OUTPUT_GRAPH_RESET              = 289,
+
 	VIMS_SELECT_BANK				=	308,
 	VIMS_SELECT_ID					=	309,
 
