@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=VeeJay Director
+Comment=Manage VeeJay program and projection-output instances
+Exec=veejay-director %f
+Icon=video-display
+Terminal=false
+Categories=AudioVideo;Video;
+StartupNotify=true

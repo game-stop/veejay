@@ -15,6 +15,7 @@ The backend performs frame-oriented video processing in planar YUV and exposes i
 | [`veejay-client`](./veejay-client) | **Reloaded**, the GTK3 graphical client for live control and editing. |
 | [`veejay-utils`](./veejay-utils) | Command-line tools, including `sayVIMS`, for scripting and direct VIMS interaction. |
 | [`veejay-eidolon`](./veejay-eidolon) | **Eidolon**, an experimental apprentice Auto-VJ that builds and mutates FX chains while observing beat, performance, feedback, and the real-time frame budget. |
+| [`veejay-director`](./veejay-director) | **Director**, the multi-instance show and venue manager for output routing, projection mapping, projector calibration, and camera-assisted alignment. |
 | [`sendVIMS`](./sendVIMS) | A Pure Data external for sending event-style VIMS commands and receiving backend status. |
 | [`plugin-packs`](./plugin-packs) | Optional LiViDO/GMIC/crop/shared-resource/ASCII-art plugin collections. |
 
@@ -57,6 +58,7 @@ The backend performs frame-oriented video processing in planar YUV and exposes i
 - VIMS control over TCP/IP with status-driven clients.
 - GTK3 Reloaded client, `sayVIMS` command-line tools, `sendVIMS` for Pure Data, MIDI learning, keyboard control, scripts, and Eidolon Auto-VJ experiments.
 - Multi-instance control, VIMS forwarding, unicast and multicast streaming, and VeeJay chaining.
+- Director provides venue/output management, projection mapping, and camera-assisted projector calibration using V4L2 capture devices.
 
 ### Output
 

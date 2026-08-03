@@ -22,6 +22,7 @@ plugin-packs/
 sendVIMS/
 veejay-client/
 veejay-core/
+veejay-director/
 veejay-eidolon/
 veejay-server/
 veejay-utils/
@@ -64,6 +65,7 @@ The build order is:
 ```text
 veejay-core
 veejay-server
+veejay-director
 veejay-client
 veejay-utils
 veejay-eidolon
