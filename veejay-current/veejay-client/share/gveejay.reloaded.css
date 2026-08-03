@@ -2583,3 +2583,56 @@ button.multi-track-switch image {
 .multi-track-transition-controls > label {
     opacity: 0.82;
 }
+
+/* Projection mesh setup window */
+.viewport-setup-window,
+.viewport-setup-window box {
+    background-color: @bg-color;
+}
+
+.viewport-setup-toolbar {
+    padding: 4px;
+    border-bottom: 1px solid @border-color;
+    background-color: @panel-color;
+}
+
+.viewport-setup-toolbar spinbutton {
+    min-width: 58px;
+}
+
+.viewport-mesh-frame {
+    margin: 4px;
+    padding: 3px;
+    border: 1px solid @border-color;
+    background-color: @panel-color;
+}
+
+.viewport-mesh-frame drawingarea {
+    min-width: 640px;
+    min-height: 480px;
+    background-color: #131419;
+}
+
+.viewport-source-note {
+    padding: 4px;
+    color: @text-muted;
+    background-color: @panel-color;
+}
+
+.viewport-setup-status {
+    padding: 4px;
+    border-top: 1px solid @border-color;
+    background-color: @panel-color;
+}
+
+.viewport-setup-status button {
+    min-width: 30px;
+    min-height: 24px;
+}
+
+.viewport-workspace-controls {
+    background-color: @panel-color;
+    border-top: 1px solid @border-color;
+    border-bottom: 1px solid @border-color;
+    padding: 3px;
+}

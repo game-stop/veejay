@@ -2567,6 +2567,32 @@ int multitrack_get_current_ui_track(void *data)
     return mt ? mt->current_ui_track : -1;
 }
 
+int multitrack_find_track(void *data, const char *hostname, int port_num)
+{
+    multitracker_t *mt = data;
+    int track = -1;
+
+    if(!mt || !hostname || port_num <= 0)
+        return -1;
+
+    return gvr_track_find_open(mt->preview, hostname, port_num, &track) ?
+           track : -1;
+}
+
+int multitrack_has_capacity(void *data)
+{
+    multitracker_t *mt = data;
+
+    if(!mt)
+        return 0;
+
+    for(int track = 0; track < MAX_TRACKS; track++)
+        if(!gvr_track_test(mt->preview, track))
+            return 1;
+
+    return 0;
+}
+
 int multrack_audoadd(void *data, char *hostname, int port_num)
 {
     multitracker_t *mt = data;

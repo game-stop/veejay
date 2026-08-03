@@ -1112,52 +1112,102 @@ static int gvr_mt_x_to_frame(GvrMultiTrackEdit *view,
 
 static int gvr_mt_visible_track_count(GvrMultiTrackEdit *view)
 {
-    return view && view->focused_track >= 0 ? 1 :
-        (view ? view->max_tracks : 0);
+    int visible = 0;
+
+    if(!view)
+        return 0;
+
+    if(view->focused_track >= 0)
+        return view->focused_track < view->max_tracks &&
+               view->lanes[view->focused_track].connected ? 1 : 0;
+
+    for(int track = 0; track < view->max_tracks; track++)
+        if(view->lanes[track].connected)
+            visible++;
+
+    return visible;
 }
 
 static int gvr_mt_track_y(GvrMultiTrackEdit *view, int track)
 {
-    if(!view || track < 0 || track >= view->max_tracks)
+    int row = 0;
+
+    if(!view || track < 0 || track >= view->max_tracks ||
+       !view->lanes[track].connected)
         return -1;
     if(view->focused_track >= 0)
         return track == view->focused_track ? GVR_MT_RULER_HEIGHT : -1;
-    return GVR_MT_RULER_HEIGHT + track * GVR_MT_LANE_HEIGHT;
+
+    for(int i = 0; i < track; i++)
+        if(view->lanes[i].connected)
+            row++;
+
+    return GVR_MT_RULER_HEIGHT + row * GVR_MT_LANE_HEIGHT;
 }
 
 static int gvr_mt_track_at_y(GvrMultiTrackEdit *view, double y)
 {
-    int track;
+    int row;
+    int visible_row = 0;
 
     if(!view || y < GVR_MT_RULER_HEIGHT)
         return -1;
     if(view->focused_track >= 0)
-        return y < GVR_MT_RULER_HEIGHT + GVR_MT_LANE_HEIGHT ?
-            view->focused_track : -1;
-    track = (int)((y - GVR_MT_RULER_HEIGHT) / GVR_MT_LANE_HEIGHT);
-    return track >= 0 && track < view->max_tracks ? track : -1;
+        return view->focused_track < view->max_tracks &&
+               view->lanes[view->focused_track].connected &&
+               y < GVR_MT_RULER_HEIGHT + GVR_MT_LANE_HEIGHT ?
+                   view->focused_track : -1;
+
+    row = (int)((y - GVR_MT_RULER_HEIGHT) / GVR_MT_LANE_HEIGHT);
+    for(int track = 0; track < view->max_tracks; track++) {
+        if(!view->lanes[track].connected)
+            continue;
+        if(visible_row == row)
+            return track;
+        visible_row++;
+    }
+
+    return -1;
 }
 
 static void gvr_mt_update_focus_layout(GvrMultiTrackEdit *view)
 {
+    const int minimum_height = GVR_MT_RULER_HEIGHT;
+    int visible_tracks;
+
     if(!view)
         return;
 
+    if(view->focused_track >= 0 &&
+       (view->focused_track >= view->max_tracks ||
+        !view->lanes[view->focused_track].connected))
+        view->focused_track = -1;
+
+    visible_tracks = gvr_mt_visible_track_count(view);
+
     for(int track = 0; track < view->max_tracks; track++) {
-        if(!view->lanes[track].row_event)
+        GvrMultiTrackLane *lane = &view->lanes[track];
+        const gboolean visible = lane->connected &&
+            (view->focused_track < 0 || track == view->focused_track);
+
+        if(!lane->row_event)
             continue;
-        if(view->focused_track < 0 || track == view->focused_track)
-            gtk_widget_show(view->lanes[track].row_event);
+
+        gtk_widget_set_no_show_all(lane->row_event, visible ? FALSE : TRUE);
+        if(visible)
+            gtk_widget_show(lane->row_event);
         else
-            gtk_widget_hide(view->lanes[track].row_event);
+            gtk_widget_hide(lane->row_event);
     }
 
     if(view->timeline_area)
         gtk_widget_set_size_request(
             view->timeline_area,
             640,
-            GVR_MT_RULER_HEIGHT +
-            gvr_mt_visible_track_count(view) * GVR_MT_LANE_HEIGHT);
+            MAX(minimum_height,
+                GVR_MT_RULER_HEIGHT +
+                visible_tracks * GVR_MT_LANE_HEIGHT));
+
     gvr_mt_queue_draw(view);
 }
 
@@ -4099,7 +4149,14 @@ GtkWidget *gvr_multi_track_edit_new(int max_tracks)
     gvr_mt_refresh_headers(view);
     gvr_mt_update_summary(view);
     gvr_mt_update_pan(view);
+
+    /*
+     * Show every lane child once before compacting disconnected rows.
+     * This keeps preview GtkImages and lane controls visible internally;
+     * later connecting a lane only has to show its outer row_event.
+     */
     gtk_widget_show_all(GTK_WIDGET(view));
+    gvr_mt_update_focus_layout(view);
     return GTK_WIDGET(view);
 }
 
@@ -4303,6 +4360,7 @@ void gvr_multi_track_edit_set_track(GtkWidget *widget,
 {
     GvrMultiTrackEdit *view;
     GvrMultiTrackLane *lane;
+    gboolean connection_changed;
 
     if(!GVR_IS_MULTI_TRACK_EDIT(widget))
         return;
@@ -4310,6 +4368,7 @@ void gvr_multi_track_edit_set_track(GtkWidget *widget,
     if(track < 0 || track >= view->max_tracks)
         return;
     lane = &view->lanes[track];
+    connection_changed = lane->connected != (connected ? TRUE : FALSE);
     lane->connected = connected ? TRUE : FALSE;
     lane->port = connected ? port : 0;
     g_free(lane->hostname);
@@ -4329,6 +4388,8 @@ void gvr_multi_track_edit_set_track(GtkWidget *widget,
     }
     gvr_mt_invalidate_geometry(view);
     gvr_mt_refresh_headers(view);
+    if(connection_changed)
+        gvr_mt_update_focus_layout(view);
     gvr_mt_queue_draw(view);
 }
 
@@ -4361,10 +4422,8 @@ void gvr_multi_track_edit_clear_track(GtkWidget *widget, int track)
     lane->drift_frames = 0;
     lane->drift_millis = 0;
     lane->drift_correcting = FALSE;
-    if(view->focused_track == track) {
+    if(view->focused_track == track)
         view->focused_track = -1;
-        gvr_mt_update_focus_layout(view);
-    }
     if(view->pending_source_track == track) {
         view->pending_source_track = -1;
         view->pending_source_id = -1;
@@ -4413,6 +4472,7 @@ void gvr_multi_track_edit_clear_track(GtkWidget *widget, int track)
     }
     gvr_mt_invalidate_geometry(view);
     gvr_mt_refresh_headers(view);
+    gvr_mt_update_focus_layout(view);
     gvr_mt_queue_draw(view);
 }
 

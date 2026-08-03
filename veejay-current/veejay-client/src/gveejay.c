@@ -254,6 +254,13 @@ gint vj_gui_command_line (GApplication            *app,
         else if(verbosity)
             veejay_msg(VEEJAY_MSG_INFO, "Track count set to %d (track 0 + %d extra)", n_tracks, arg_tracks);
     }
+    else if(arg_autoconnect) {
+        n_tracks = mt_get_max_tracks();
+        if(verbosity)
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "LAN auto-connect enabled; using all %d multitrack slots",
+                       n_tracks);
+    }
 
     if( arg_style ) {
         vj_gui_set_stylesheet(arg_style,arg_smallaspossible);
@@ -298,7 +305,7 @@ int main(int argc, char **argv)
 
 /* in alphabetical order of short options */
     const GOptionEntry options[] = {
-    {"auto-connect", 'a', 0, G_OPTION_ARG_NONE, &arg_autoconnect, "Auto-connect to locally running Veejay instances.", NULL},
+    {"auto-connect", 'a', 0, G_OPTION_ARG_NONE, &arg_autoconnect, "Continuously discover and connect to all VeeJay instances on the LAN.", NULL},
     {"beta",        'b', 0, G_OPTION_ARG_NONE, &arg_beta, "Enable beta features.", NULL},
     {"geometry",    'g', 0, G_OPTION_ARG_STRING, &arg_geometry, "Window position on screen \"X,Y\".", NULL},
     {"host",        'h', 0, G_OPTION_ARG_STRING, &arg_host, "Veejay host to connect to (default: localhost).", NULL},

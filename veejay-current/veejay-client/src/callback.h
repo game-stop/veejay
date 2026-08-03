@@ -96,4 +96,5 @@ void on_timeline_audio_offset_changed ( GtkWidget *widget, gpointer user_data );
 
 
 void on_transition_shape_selected(GtkWidget *widget, gint shape, gpointer user_data);
+void on_projection_mesh_setup_activate(GtkWidget *widget, gpointer user_data);
 #endif

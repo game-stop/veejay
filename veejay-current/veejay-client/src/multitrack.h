@@ -26,6 +26,8 @@ void multitrack_close_tracks(void *data);
 void multitrack_set_master_track(void *data, int track);
 void multitrack_set_project_master(void *data, int track);
 int multrack_audoadd(void *data, char *hostname, int port_num);
+int multitrack_find_track(void *data, const char *hostname, int port_num);
+int multitrack_has_capacity(void *data);
 int multitrack_prepare_ui_client(void *data, int track);
 void *multitrack_take_ui_client(void *data, int track);
 void multitrack_store_ui_client(void *data, int track, void *client);

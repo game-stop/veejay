@@ -54,6 +54,9 @@
 
 extern void on_previewtoggle_toggled(GtkWidget *w, gpointer user_data);
 #include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <veejaycore/mjpeg_logging.h>
 #include <veejaycore/yuv4mpeg.h>
 #include <veejaycore/mpegconsts.h>
@@ -2528,6 +2531,8 @@ GdkPixbuf *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 static void vj_kf_select_parameter(int id);
 static void vj_kf_refresh(gboolean force);
 static void veejay_show_main_ui(vj_gui_t *gui);
+static int reloaded_discovery_start(void);
+static void reloaded_discovery_stop(void);
 static void reloaded_present_window(GtkWidget *w);
 void reportbug(void);
 void select_chain_entry(int entry);
@@ -3855,14 +3860,12 @@ static void preview_clear_live_pixbuf(void)
 
 static void preview_set_live_pixbuf(GdkPixbuf *pixbuf)
 {
-    if(preview_live_pixbuf_) {
+    GdkPixbuf *next = pixbuf ? g_object_ref(pixbuf) : NULL;
+
+    if(preview_live_pixbuf_)
         g_object_unref(preview_live_pixbuf_);
-        preview_live_pixbuf_ = NULL;
-    }
 
-    if(pixbuf)
-        preview_live_pixbuf_ = g_object_ref(pixbuf);
-
+    preview_live_pixbuf_ = next;
     preview_has_live_frame_ = preview_live_pixbuf_ ? 1 : 0;
 }
 
@@ -6869,6 +6872,8 @@ static const int sequence_vims_query_ids[] = {
     VIMS_GET_SAMPLE_IMAGE,
     VIMS_RGB24_IMAGE,
     VIMS_CALI_IMAGE,
+    VIMS_VIEWPORT,
+    VIMS_PROJECTION,
     VIMS_STREAM_GET_V4L,
     VIMS_SAMPLE_KF_GET,
     VIMS_AUDIO_BEAT_PRINT,
@@ -13906,6 +13911,8 @@ static const vims_reply_contract_t vims_reply_contracts[] =
     { VIMS_GET_SAMPLELIST_BLOB,     VIMS_REPLY_FRAMED,       6,  "Binary sample-list blob" },
     { VIMS_TRACK_LIST,              VIMS_REPLY_FRAMED,       5,  "Track list" },
     { VIMS_SAMPLE_KF_GET,           VIMS_REPLY_FRAMED,       8,  "Keyframe data" },
+    { VIMS_VIEWPORT,                VIMS_REPLY_FRAMED,       8,  "Viewport mesh state" },
+    { VIMS_PROJECTION,              VIMS_REPLY_FRAMED,       8,  "Viewport mesh state" },
     { VIMS_PROJ_GET_POINT,          VIMS_REPLY_FRAMED,       3,  "Projection point" },
     { VIMS_CHAIN_LIST,              VIMS_REPLY_FRAMED,       4,  "Effect chain" },
     { VIMS_SEQUENCE_LIST_ALL,       VIMS_REPLY_FRAMED,       6,  "All sequence banks" },
@@ -14508,45 +14515,85 @@ static void vims_receive_sample_image_reply(int event_id, const char *args)
 
 static void vims_receive_rgb_image_reply(int event_id, const char *args)
 {
+    int requested_width = 0;
+    int requested_height = 0;
+    int requested_mode = 0;
+    if(args)
+        sscanf(args, "%d %d %d", &requested_width, &requested_height, &requested_mode);
+
+    if(requested_mode == 2) {
+        guint8 header[9];
+        if(!vims_read_reply_bytes(header, sizeof(header))) {
+            vims_response_show_status(event_id, args,
+                                      "Unable to read the current-video preview header; the connection will be restarted.");
+            return;
+        }
+
+        int declared_len = 0;
+        int full_range = 0;
+        if(!vims_parse_decimal_field(header, 8, &declared_len) ||
+           !vims_parse_decimal_field(header + 8, 1, &full_range))
+        {
+            vims_response_show_payload(event_id, args,
+                                       "9-byte extended preview header",
+                                       "Malformed preview metadata; reconnecting because the payload boundary is unknown.",
+                                       header, sizeof(header));
+            reloaded_schedule_restart();
+            return;
+        }
+        if(declared_len == 0) {
+            vims_response_show_payload(event_id, args,
+                                       "9-byte zero-length preview sentinel",
+                                       "The backend rejected the requested preview dimensions or no current pre-projection frame is available.",
+                                       NULL, 0);
+            return;
+        }
+
+        int received_len = 0;
+        guint8 *payload = vims_read_payload(declared_len, &received_len);
+        gchar *metadata = g_strdup_printf("Image: %d x %d\nFull range: %s\nDeclared payload: %d bytes",
+                                          requested_width,
+                                          requested_height,
+                                          full_range ? "yes" : "no",
+                                          declared_len);
+        vims_response_show_payload(event_id, args,
+                                   "9-byte extended preview header followed by raw image data",
+                                   metadata, payload, received_len);
+        g_free(metadata);
+        if(payload)
+            free(payload);
+        return;
+    }
+
     guint8 header[13];
     veejay_memset(header, 0, sizeof(header));
 
-    if(!vims_read_reply_bytes(header, 8))
-    {
-        vims_response_show_status(event_id,
-                                  args,
+    if(!vims_read_reply_bytes(header, 8)) {
+        vims_response_show_status(event_id, args,
                                   "Unable to read the RGB preview reply header; the connection will be restarted.");
         return;
     }
 
     int declared_len = 0;
-    if(!vims_parse_decimal_field(header, 6, &declared_len))
-    {
-        vims_response_show_payload(event_id,
-                                   args,
+    if(!vims_parse_decimal_field(header, 6, &declared_len)) {
+        vims_response_show_payload(event_id, args,
                                    "RGB24 preview header",
                                    "Malformed preview length; reconnecting because the payload boundary is unknown.",
-                                   header,
-                                   8);
+                                   header, 8);
         reloaded_schedule_restart();
         return;
     }
 
-    if(declared_len == 0)
-    {
-        vims_response_show_payload(event_id,
-                                   args,
+    if(declared_len == 0) {
+        vims_response_show_payload(event_id, args,
                                    "8-byte zero-length error sentinel",
                                    "The backend rejected the requested preview dimensions.",
-                                   NULL,
-                                   0);
+                                   NULL, 0);
         return;
     }
 
-    if(!vims_read_reply_bytes(header + 8, 5))
-    {
-        vims_response_show_status(event_id,
-                                  args,
+    if(!vims_read_reply_bytes(header + 8, 5)) {
+        vims_response_show_status(event_id, args,
                                   "Unable to complete the RGB preview metadata header; the connection will be restarted.");
         return;
     }
@@ -14558,12 +14605,10 @@ static void vims_receive_rgb_image_reply(int event_id, const char *args)
        !vims_parse_decimal_field(header + 10, 2, &height) ||
        !vims_parse_decimal_field(header + 12, 1, &full_range))
     {
-        vims_response_show_payload(event_id,
-                                   args,
+        vims_response_show_payload(event_id, args,
                                    "13-byte RGB24 preview header",
                                    "Malformed preview metadata; reconnecting because the payload boundary is unknown.",
-                                   header,
-                                   sizeof(header));
+                                   header, sizeof(header));
         reloaded_schedule_restart();
         return;
     }
@@ -14571,16 +14616,12 @@ static void vims_receive_rgb_image_reply(int event_id, const char *args)
     int received_len = 0;
     guint8 *payload = vims_read_payload(declared_len, &received_len);
     gchar *metadata = g_strdup_printf("Image: %d x %d\nFull range: %s\nDeclared payload: %d bytes",
-                                      width,
-                                      height,
+                                      width, height,
                                       full_range ? "yes" : "no",
                                       declared_len);
-    vims_response_show_payload(event_id,
-                               args,
+    vims_response_show_payload(event_id, args,
                                "13-byte RGB24 header followed by raw image data",
-                               metadata,
-                               payload,
-                               received_len);
+                               metadata, payload, received_len);
     g_free(metadata);
     if(payload)
         free(payload);
@@ -20809,6 +20850,7 @@ static void detachable_windows_close_all(void);
 
 void vj_gui_free(void)
 {
+    reloaded_discovery_stop();
     detachable_windows_close_all();
     preview_clear_live_pixbuf();
     sequence_vims_pattern_flush();
@@ -21766,47 +21808,315 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
 
 }
 
-static int auto_connect_to_veejay(char *host, int port_num)
+#define RELOADED_DISCOVERY_PORT 3499
+#define RELOADED_DISCOVERY_MAGIC "VEEJAY_DISCOVERY"
+
+typedef struct {
+    char source_host[INET_ADDRSTRLEN];
+    gint64 last_attempt_us;
+    int capacity_warned;
+} reloaded_discovery_peer_t;
+
+static int reloaded_discovery_fd = -1;
+static guint reloaded_discovery_watch = 0;
+static GIOChannel *reloaded_discovery_channel = NULL;
+static GHashTable *reloaded_discovery_peers = NULL;
+
+static void reloaded_discovery_peer_free(gpointer data)
 {
-    char *hostname = (host == NULL ? "localhost" : host );
-    int i,j;
+    g_free(data);
+}
 
-    for( i = port_num; i < 9999; i += 1000 ) {
+static int reloaded_discovery_parse(const char *packet,
+                                    char *instance_id, size_t instance_id_len,
+                                    char *role, size_t role_len,
+                                    int *port,
+                                    char *advertised_host, size_t advertised_host_len)
+{
+    char id_buf[128];
+    char role_buf[32];
+    char host_buf[256];
+    int parsed_port = 0;
 
-        if( vj_gui_reconnect( hostname, NULL, i ) ) {
-            int current_track = multrack_audoadd( info->mt, hostname, i);
-            if( current_track == -1) {
-                return 0;
-            }
+    if(!packet || !instance_id || !role || !port || !advertised_host)
+        return 0;
 
-            multitrack_set_master_track( info->mt, current_track );
+    if(sscanf(packet,
+              RELOADED_DISCOVERY_MAGIC " 1 id=%127s role=%31s port=%d host=%255s",
+              id_buf, role_buf, &parsed_port, host_buf) != 4 ||
+       parsed_port <= 0 || parsed_port > 65535)
+        return 0;
 
+    g_strlcpy(instance_id, id_buf, instance_id_len);
+    g_strlcpy(role, role_buf, role_len);
+    g_strlcpy(advertised_host, host_buf, advertised_host_len);
+    *port = parsed_port;
+    return 1;
+}
 
-            update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], i);
-            put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
-            vj_gui_set_title(hostname, i);
+static void reloaded_discovery_add(const char *source_host,
+                                   const char *advertised_host,
+                                   const char *instance_id,
+                                   const char *role,
+                                   int port)
+{
+    char *identity;
+    reloaded_discovery_peer_t *peer;
+    int track;
+    gint64 now;
 
+    if(!info || !info->mt || !source_host || !*source_host ||
+       !instance_id || !*instance_id || port <= 0)
+        return;
 
-            for( j = (i+1000); j < 9999; j+= 1000 )
-            {
-                veejay_msg(VEEJAY_MSG_DEBUG, "Trying to add %s:%d as a track", hostname, j);
-                if(multrack_audoadd( info->mt, hostname, j) == -1 ) {
-                    veejay_msg(VEEJAY_MSG_DEBUG, "Failed connect on port %d", j);
-                }
-            }
-            multitrack_set_quality( info->mt, 0 );
-            i = j;
+    identity = g_strdup_printf("%s|%s|%d",
+                               advertised_host && *advertised_host ? advertised_host : source_host,
+                               instance_id,
+                               port);
+    if(!identity)
+        return;
 
-            info->watch.state = STATE_PLAYING;
-
-            return 1;
-        }
+    peer = reloaded_discovery_peers ?
+           g_hash_table_lookup(reloaded_discovery_peers, identity) : NULL;
+    track = peer ? multitrack_find_track(info->mt, peer->source_host, port) : -1;
+    if(track >= 0) {
+        g_free(identity);
+        return;
     }
 
-    update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
-    put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], hostname);
+    now = g_get_monotonic_time();
+    if(peer && now - peer->last_attempt_us < 1500000) {
+        g_free(identity);
+        return;
+    }
 
-    return 0;
+    if(!peer) {
+        peer = g_new0(reloaded_discovery_peer_t, 1);
+        if(!peer) {
+            g_free(identity);
+            return;
+        }
+        g_strlcpy(peer->source_host, source_host, sizeof(peer->source_host));
+        peer->last_attempt_us = now;
+        g_hash_table_insert(reloaded_discovery_peers, identity, peer);
+        identity = NULL;
+    }
+    else {
+        g_strlcpy(peer->source_host, source_host, sizeof(peer->source_host));
+        peer->last_attempt_us = now;
+    }
+
+    track = multitrack_find_track(info->mt, source_host, port);
+    if(track >= 0) {
+        g_free(identity);
+        return;
+    }
+
+    if(!multitrack_has_capacity(info->mt)) {
+        if(!peer->capacity_warned) {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "LAN discovery found %s/%s at %s:%d but all multitrack slots are in use",
+                       role ? role : "instance",
+                       instance_id,
+                       source_host,
+                       port);
+            peer->capacity_warned = 1;
+        }
+        g_free(identity);
+        return;
+    }
+    peer->capacity_warned = 0;
+
+    if(!info->client && info->watch.state == STATE_WAIT_FOR_USER) {
+        if(!vj_gui_reconnect((char*)source_host, NULL, port)) {
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "Discovered %s/%s at %s:%d but the control connection is not ready yet",
+                       role ? role : "instance",
+                       instance_id,
+                       source_host,
+                       port);
+            g_free(identity);
+            return;
+        }
+
+        track = multrack_audoadd(info->mt, (char*)source_host, port);
+        if(track < 0) {
+            vj_gui_disconnect(FALSE);
+            g_free(identity);
+            return;
+        }
+
+        multitrack_set_master_track(info->mt, track);
+        multitrack_set_quality(info->mt, 0);
+        update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port);
+        put_text2(widget_cache[WIDGET_ENTRY_HOSTNAME], source_host);
+        info->watch.state = STATE_PLAYING;
+        veejay_show_main_ui(info);
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "LAN discovery selected %s/%s at %s:%d as the Reloaded control instance",
+                   role ? role : "instance",
+                   instance_id,
+                   source_host,
+                   port);
+        g_free(identity);
+        return;
+    }
+
+    track = multrack_audoadd(info->mt, (char*)source_host, port);
+    if(track >= 0)
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "LAN discovery added %s/%s at %s:%d as Video %d",
+                   role ? role : "instance",
+                   instance_id,
+                   source_host,
+                   port,
+                   track + 1);
+
+    g_free(identity);
+}
+
+static gboolean reloaded_discovery_io(GIOChannel *channel,
+                                      GIOCondition condition,
+                                      gpointer data)
+{
+    (void)channel;
+    (void)data;
+
+    if(condition & (G_IO_ERR | G_IO_HUP | G_IO_NVAL))
+        return G_SOURCE_CONTINUE;
+
+    for(;;) {
+        struct sockaddr_in source;
+        socklen_t source_len = sizeof(source);
+        char packet[512];
+        char source_host[INET_ADDRSTRLEN];
+        char instance_id[128];
+        char role[32];
+        char advertised_host[256];
+        int port = 0;
+        ssize_t n;
+
+        n = recvfrom(reloaded_discovery_fd,
+                     packet,
+                     sizeof(packet) - 1,
+                     MSG_DONTWAIT,
+                     (struct sockaddr*)&source,
+                     &source_len);
+        if(n < 0) {
+            if(errno == EINTR)
+                continue;
+            if(errno == EAGAIN || errno == EWOULDBLOCK)
+                break;
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "LAN discovery receive failed: %s",
+                       strerror(errno));
+            break;
+        }
+        if(n == 0)
+            break;
+
+        packet[n] = '\0';
+        if(source.sin_family != AF_INET ||
+           !inet_ntop(AF_INET, &source.sin_addr, source_host, sizeof(source_host)))
+            continue;
+
+        if(!reloaded_discovery_parse(packet,
+                                     instance_id, sizeof(instance_id),
+                                     role, sizeof(role),
+                                     &port,
+                                     advertised_host, sizeof(advertised_host)))
+            continue;
+
+        reloaded_discovery_add(source_host,
+                               advertised_host,
+                               instance_id,
+                               role,
+                               port);
+    }
+
+    return G_SOURCE_CONTINUE;
+}
+
+static int reloaded_discovery_start(void)
+{
+    struct sockaddr_in addr;
+    int reuse = 1;
+    int flags;
+
+    if(reloaded_discovery_fd >= 0)
+        return 1;
+
+    reloaded_discovery_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if(reloaded_discovery_fd < 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Unable to open LAN discovery socket: %s",
+                   strerror(errno));
+        return 0;
+    }
+
+    setsockopt(reloaded_discovery_fd,
+               SOL_SOCKET,
+               SO_REUSEADDR,
+               &reuse,
+               sizeof(reuse));
+
+    flags = fcntl(reloaded_discovery_fd, F_GETFL, 0);
+    if(flags >= 0)
+        fcntl(reloaded_discovery_fd, F_SETFL, flags | O_NONBLOCK);
+
+    veejay_memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(RELOADED_DISCOVERY_PORT);
+
+    if(bind(reloaded_discovery_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Unable to bind LAN discovery UDP port %d: %s",
+                   RELOADED_DISCOVERY_PORT,
+                   strerror(errno));
+        close(reloaded_discovery_fd);
+        reloaded_discovery_fd = -1;
+        return 0;
+    }
+
+    reloaded_discovery_peers = g_hash_table_new_full(g_str_hash,
+                                                      g_str_equal,
+                                                      g_free,
+                                                      reloaded_discovery_peer_free);
+    reloaded_discovery_channel = g_io_channel_unix_new(reloaded_discovery_fd);
+    g_io_channel_set_encoding(reloaded_discovery_channel, NULL, NULL);
+    g_io_channel_set_buffered(reloaded_discovery_channel, FALSE);
+    g_io_channel_set_close_on_unref(reloaded_discovery_channel, FALSE);
+    reloaded_discovery_watch = g_io_add_watch(reloaded_discovery_channel,
+                                               G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
+                                               reloaded_discovery_io,
+                                               NULL);
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Reloaded -a listening for VeeJay LAN discovery on UDP port %d",
+               RELOADED_DISCOVERY_PORT);
+    return 1;
+}
+
+static void reloaded_discovery_stop(void)
+{
+    if(reloaded_discovery_watch) {
+        g_source_remove(reloaded_discovery_watch);
+        reloaded_discovery_watch = 0;
+    }
+    if(reloaded_discovery_channel) {
+        g_io_channel_unref(reloaded_discovery_channel);
+        reloaded_discovery_channel = NULL;
+    }
+    if(reloaded_discovery_fd >= 0) {
+        close(reloaded_discovery_fd);
+        reloaded_discovery_fd = -1;
+    }
+    if(reloaded_discovery_peers) {
+        g_hash_table_destroy(reloaded_discovery_peers);
+        reloaded_discovery_peers = NULL;
+    }
 }
 
 static void init_sample_bank(sample_bank_t *bank, int bank_num)
@@ -24670,11 +24980,8 @@ void vj_gui_init(const char *glade_file,
 
     ui_window_set_startup_size(mainw);
 
-    if( auto_connect ) {
-        if(auto_connect_to_veejay(hostname, port_num)) {
-            veejay_show_main_ui(gui);
-        }
-    }
+    if(auto_connect)
+        reloaded_discovery_start();
 
     if(info->watch.state != STATE_PLAYING) {
         if(hostname) {
@@ -27857,4 +28164,10 @@ void veejay_release_track(int id, int release_this)
 void veejay_bind_track( int id, int bind_this )
 {
     multitrack_bind_track(info->mt, id, bind_this );
+}
+
+void on_projection_mesh_setup_activate(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
 }

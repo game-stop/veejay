@@ -2057,7 +2057,7 @@
             <property name="can-focus">False</property>
             <property name="halign">start</property>
             <property name="margin-left">4</property>
-            <property name="label" translatable="yes">Select a live V4L2/vloopback source or a loaded calibration source</property>
+            <property name="label" translatable="yes">Select the current video source to use for calibration</property>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -5055,6 +5055,15 @@
                         <property name="label" translatable="yes">_Image Calibration</property>
                         <property name="use-underline">True</property>
                         <signal name="activate" handler="on_image_calibration_activate" swapped="no"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="projection_mesh_setup">
+                        <property name="visible">False</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Projection _Mesh Setup</property>
+                        <property name="use-underline">True</property>
+                        <signal name="activate" handler="on_projection_mesh_setup_activate" swapped="no"/>
                       </object>
                     </child>
                   </object>
