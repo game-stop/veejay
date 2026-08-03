@@ -269,7 +269,7 @@ static int viewport_mesh_create(viewport_t *v, int width, int height,
 {
     v->mesh = vj_output_mesh_create(width, height, width, height, columns, rows);
     if(v->mesh)
-        vj_output_mesh_set_thread_count(v->mesh, vje_advise_num_threads(width * height));
+        vj_output_mesh_set_thread_count(v->mesh, vje_max_threads(width * height));
     v->mesh_selected_point = 0;
     v->mesh_hover_point = -1;
     return v->mesh != NULL;
@@ -702,7 +702,7 @@ static int viewport_apply_profile(viewport_t *v,
                                  profile->columns, profile->rows);
     if(!mesh)
         return 0;
-    vj_output_mesh_set_thread_count(mesh, vje_advise_num_threads(v->w * v->h));
+    vj_output_mesh_set_thread_count(mesh, vje_max_threads(v->w * v->h));
     if(!vj_output_mesh_set_source_rect(mesh,
                                        (float)x0, (float)y0,
                                        (float)w0, (float)h0)) {

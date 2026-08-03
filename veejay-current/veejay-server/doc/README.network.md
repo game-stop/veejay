@@ -6,12 +6,13 @@
       \/_/ \/_/ \/_____/  \/_/  \/_/   \/_/ \/_____/ \/_/ /_/ \/_/\/_/
                                                             and veejay
 
-_We are entering in some advanced veejay's features, it is not necessary to read / understand those aspects for basics usages._
 
-We will devellop some advanced veejay's network features like, streaming (point to point), multicasting (point to multipoint)...
-Have a look at the end of this documentation how to setup multicast on your machine.
 
-Also, you should read [VIMS](./VIMS.md) documentation before going further.
+# Foreword
+
+This section is pretty old, but it still serves as an example.
+Nowadays, you can use reloaded and/or director to control veejay over the network
+
 
 # Veejay stats
 
