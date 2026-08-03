@@ -107,6 +107,7 @@ for project in \
     veejay-server \
     veejay-client \
     veejay-utils \
+    veejay-directory \
     veejay-eidolon
 do
     (
