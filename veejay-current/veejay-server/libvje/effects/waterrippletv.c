@@ -78,6 +78,19 @@ static inline int clampi(int v, int lo, int hi)
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
+static inline int waterripple_decay_term(int v, int decay)
+{
+    const unsigned int shift = (unsigned int)clampi(decay, 1, 31);
+
+    if(v >= 0)
+        return (int)((uint32_t)v >> shift);
+
+    const uint64_t magnitude = (uint64_t)(-(int64_t)v);
+    const uint64_t bias = (UINT64_C(1) << shift) - 1u;
+
+    return -(int)((magnitude + bias) >> shift);
+}
+
 static inline unsigned int wfastrand(ripple_tv *r)
 {
     r->wfastrand_val = r->wfastrand_val * 1103515245u + 12345u;
@@ -430,7 +443,7 @@ static void waterripple_simulate(ripple_tv *rip, int loopnum, int decay)
 
                 int v = rip->map1[idx] - rip->map2[idx];
 
-                v += h - (v >> decay);
+                v += h - waterripple_decay_term(v, decay);
 
                 rip->map3[idx] = v + rip->map1[idx];
             }

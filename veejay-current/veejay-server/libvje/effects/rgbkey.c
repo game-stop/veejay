@@ -41,6 +41,37 @@ static inline int clampi(int v, int lo, int hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
+typedef struct {
+    int y;
+    int u;
+    int v;
+} rgbkey_yuv_t;
+
+static inline rgbkey_yuv_t rgbkey_rgb_to_yuv(int r, int g, int b)
+{
+    rgbkey_yuv_t out = { 0, 128, 128 };
+
+    switch(vje_get_rgb_parameter_conversion_type()) {
+        case CCIR601_RGB:
+            CCIR601_rgb2yuv(r, g, b, out.y, out.u, out.v);
+            break;
+        case OLD_RGB:
+            COLOR_rgb2yuv(r, g, b, out.y, out.u, out.v);
+            break;
+        case GIMP_RGB:
+        case JFIF_RGB:
+        default:
+            GIMP_rgb2yuv(r, g, b, out.y, out.u, out.v);
+            break;
+    }
+
+    out.y = clampi(out.y, 0, 255);
+    out.u = clampi(out.u, 0, 255);
+    out.v = clampi(out.v, 0, 255);
+
+    return out;
+}
+
 vj_effect *rgbkey_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *)vj_calloc(sizeof(vj_effect));
@@ -131,12 +162,14 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int spill_kill_arg = args[P_SPILL_KILL];
     const int mode_arg = args[P_MODE];
 
-    int iy = 0, iu = 128, iv = 128;
+    const rgbkey_yuv_t key = rgbkey_rgb_to_yuv(
+        args[P_RED],
+        args[P_GREEN],
+        args[P_BLUE]
+    );
 
-    _rgb2yuv(args[P_RED], args[P_GREEN], args[P_BLUE], iy, iu, iv);
-
-    const float ut_f = (float)iu - 128.0f;
-    const float vt_f = (float)iv - 128.0f;
+    const float ut_f = (float)key.u - 128.0f;
+    const float vt_f = (float)key.v - 128.0f;
 
     float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
 

@@ -143,20 +143,15 @@ static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x
 
     uint8_t **restrict bf = b->bathroom_frame;
     int strides[4] = { len, len, len, 0 };
-    int mod_table[64] = { 0 };
-
     const int half_val = val >> 1;
 
     vj_frame_copy(frame->data, bf, strides);
-
-    for(int i = 0; i < val; i++)
-        mod_table[i] = i - half_val;
 
     if(horiz) {
         int y_mod = 0;
 
         for(int y = 0; y < height; y++) {
-            const int y_offset = mod_table[y_mod];
+            const int y_offset = y_mod - half_val;
             const int y_base = y * width;
 
             y_mod++;
@@ -180,7 +175,7 @@ static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x
             int x_mod = 0;
 
             for(int x = x0; x < x1; x++) {
-                const int y_offset = mod_table[x_mod];
+                const int y_offset = x_mod - half_val;
                 const int sy = clampi(y + y_offset, 0, height - 1);
                 const int src_idx = sy * width + x;
                 const int dst_idx = y_base + x;
@@ -210,20 +205,15 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
 
     uint8_t **restrict bf = b->bathroom_frame;
     int strides[4] = { len, len, len, len };
-    int mod_table[64] = { 0 };
-
     const int half_val = val >> 1;
 
     vj_frame_copy(frame->data, bf, strides);
-
-    for(int i = 0; i < val; i++)
-        mod_table[i] = i - half_val;
 
     if(horiz) {
         int y_mod = 0;
 
         for(int y = 0; y < height; y++) {
-            const int y_offset = mod_table[y_mod];
+            const int y_offset = y_mod - half_val;
             const int y_base = y * width;
 
             y_mod++;
@@ -248,7 +238,7 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
             int x_mod = 0;
 
             for(int x = x0; x < x1; x++) {
-                const int y_offset = mod_table[x_mod];
+                const int y_offset = x_mod - half_val;
                 const int sy = clampi(y + y_offset, 0, height - 1);
                 const int src_idx = sy * width + x;
                 const int dst_idx = y_base + x;

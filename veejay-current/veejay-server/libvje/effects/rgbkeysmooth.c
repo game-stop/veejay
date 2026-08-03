@@ -57,6 +57,37 @@ static inline int clampi(int v, int lo, int hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
+typedef struct {
+    int y;
+    int u;
+    int v;
+} rgbkeysmooth_yuv_t;
+
+static inline rgbkeysmooth_yuv_t rgbkeysmooth_rgb_to_yuv(int r, int g, int b)
+{
+    rgbkeysmooth_yuv_t out = { 0, 128, 128 };
+
+    switch(vje_get_rgb_parameter_conversion_type()) {
+        case CCIR601_RGB:
+            CCIR601_rgb2yuv(r, g, b, out.y, out.u, out.v);
+            break;
+        case OLD_RGB:
+            COLOR_rgb2yuv(r, g, b, out.y, out.u, out.v);
+            break;
+        case GIMP_RGB:
+        case JFIF_RGB:
+        default:
+            GIMP_rgb2yuv(r, g, b, out.y, out.u, out.v);
+            break;
+    }
+
+    out.y = clampi(out.y, 0, 255);
+    out.u = clampi(out.u, 0, 255);
+    out.v = clampi(out.v, 0, 255);
+
+    return out;
+}
+
 static inline float rgbkeysmooth_clampf(float v, float lo, float hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -213,12 +244,14 @@ void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int view_mode_arg = args[P_VIEW_MODE];
     const int softness_arg = args[P_SOFTNESS];
 
-    int iy = 0, iu = 128, iv = 128;
+    const rgbkeysmooth_yuv_t key = rgbkeysmooth_rgb_to_yuv(
+        args[P_RED],
+        args[P_GREEN],
+        args[P_BLUE]
+    );
 
-    _rgb2yuv(args[P_RED], args[P_GREEN], args[P_BLUE], iy, iu, iv);
-
-    const int kU_int = iu - 128;
-    const int kV_int = iv - 128;
+    const int kU_int = key.u - 128;
+    const int kV_int = key.v - 128;
     const int kD = kU_int * kU_int + kV_int * kV_int;
     const float kInvMag = rgbkey->inv_mag_lut[kD];
     const float kU = (float)kU_int * kInvMag;
