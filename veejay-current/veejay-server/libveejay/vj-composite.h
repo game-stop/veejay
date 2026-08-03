@@ -33,6 +33,7 @@ int	composite_get_top(void *compiz, uint8_t *current_in[4], uint8_t *out[4], int
 int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[4], VJFrame *input );
 
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp, int pixfmt );
+int composite_copy_output_frame(void *compiz, VJFrame *frame, int which_vp);
 
 void composite_process_divert( void *compiz, uint8_t *in[4], VJFrame *out, void *splitter, int setting );
 
@@ -47,6 +48,10 @@ void *composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_
 void *composite_clone( void *compiz );
 
 void composite_set_file_mode(void *data, const char *homedir, int mode, int id);
+int composite_bind_port_configuration(void *data, const char *homedir, int port, int *active);
+int composite_save_port_configuration(void *data, int frontback);
+int composite_reset_port_configuration(void *data);
+int composite_get_configuration_port(void *data);
 
 void *composite_get_vp( void *data );
 void composite_set_ui(void *compiz, int status );

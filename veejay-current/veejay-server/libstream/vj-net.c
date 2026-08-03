@@ -48,6 +48,8 @@ typedef struct
     VJFrame *info;
     VJFrame *frames[2];
     int published_index;
+    uint64_t published_sequence;
+    int screen_id;
     void *scaler;
     int scaler_src_width;
     int scaler_src_height;
@@ -228,6 +230,7 @@ static int net_publish_decoded(threaded_t *t)
 
     lock(t);
     t->published_index = back;
+    t->published_sequence++;
     unlock(t);
 
     return 1;
@@ -316,7 +319,7 @@ static void *reader_thread(void *data)
     char buf[16];
     int retrieve = 0;
 
-    snprintf(buf, sizeof(buf), "%03d:%d;", VIMS_GET_FRAME, my_screen_id);
+    snprintf(buf, sizeof(buf), "%03d:%d;", VIMS_GET_FRAME, t->screen_id);
 
     for(;;) {
         int state = net_state_get(t);
@@ -472,7 +475,24 @@ int net_thread_get_frame(vj_tag *tag, VJFrame *dst)
     return 1;
 }
 
-int net_thread_start(vj_tag *tag, VJFrame *info)
+int net_thread_get_frame_since(vj_tag *tag, VJFrame *dst, uint64_t *sequence)
+{
+    threaded_t *t = tag ? (threaded_t*)tag->priv : NULL;
+    if(!t || !dst || !sequence)
+        return 0;
+
+    lock(t);
+    if(t->published_index < 0 || *sequence == t->published_sequence) {
+        unlock(t);
+        return 0;
+    }
+    net_copy_frame(dst, t->frames[t->published_index]);
+    *sequence = t->published_sequence;
+    unlock(t);
+    return 1;
+}
+
+int net_thread_start_screen(vj_tag *tag, VJFrame *info, int screen_id)
 {
     threaded_t *t = (threaded_t*) vj_calloc(sizeof(threaded_t));
     if(!t)
@@ -485,6 +505,8 @@ int net_thread_start(vj_tag *tag, VJFrame *info)
     t->v = NULL;
     t->scaler = NULL;
     t->published_index = -1;
+    t->published_sequence = 0;
+    t->screen_id = screen_id;
     t->frames[0] = net_frame_alloc_like(info);
     t->frames[1] = net_frame_alloc_like(info);
 
@@ -523,6 +545,11 @@ int net_thread_start(vj_tag *tag, VJFrame *info)
     tag->priv = NULL;
 
     return 0;
+}
+
+int net_thread_start(vj_tag *tag, VJFrame *info)
+{
+    return net_thread_start_screen(tag, info, my_screen_id);
 }
 
 void net_thread_stop(vj_tag *tag)

@@ -208,6 +208,23 @@ typedef struct {
 	volatile int current_write;
 } display_frame_t;
 
+#define VJ_VIDEO_PACKET_DISCONTINUITY (1u << 0)
+#define VJ_VIDEO_PACKET_HELD_FRAME    (1u << 1)
+#define VJ_VIDEO_PACKET_COMPOSITE     (1u << 2)
+
+typedef struct {
+    VJFrame *frame;
+    uint64_t sequence;
+    long long timeline_frame;
+    long long source_frame;
+    double pts_s;
+    double duration_s;
+    int fps_generation;
+    int transport_epoch;
+    unsigned int flags;
+    int queue_index;
+} vj_video_packet_t;
+
 
 typedef struct {
     VJFrame frame;
@@ -410,8 +427,8 @@ typedef struct {
 	pthread_t signal_thread;
 
 	VJFrame *buffers[VIDEO_QUEUE_LEN];
+	vj_video_packet_t video_packets[VIDEO_QUEUE_LEN];
 	buffer_state_t states[VIDEO_QUEUE_LEN];
-	uint64_t frame_seq[VIDEO_QUEUE_LEN];
 	uint64_t next_seq;
 	pthread_mutex_t mutex;
 	pthread_mutex_t control_mutex;
@@ -701,6 +718,12 @@ typedef struct {
 #define VIDEO_OUT_Y4M 3
 #define VIDEO_OUT_NONE 4
 
+typedef enum {
+    VJ_INSTANCE_ROLE_STANDALONE = 0,
+    VJ_INSTANCE_ROLE_PROGRAM = 1,
+    VJ_INSTANCE_ROLE_OUTPUT = 2
+} vj_instance_role_t;
+
 typedef struct veejay_t
 {
     int video_output_width;
@@ -763,7 +786,20 @@ typedef struct veejay_t
     int render_continue;
     video_playback_setup *settings;
     video_recording_setup *recording;
-	video_playback_stats stats;
+    video_playback_stats stats;
+    void *perf;
+    void *output_graph;
+    int instance_role;
+    int instance_id_explicit;
+    char instance_id[64];
+    char output_source_host[256];
+    int output_source_port;
+    int output_source_pid;
+    int output_source_shm_id;
+    void *input_shm;
+    VJFrame *output_input_frame;
+    uint8_t *output_input_buffer;
+    uint64_t output_input_sequence;
     int real_fps;
     int dump;
     int verbose;

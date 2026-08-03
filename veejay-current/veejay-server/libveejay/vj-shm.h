@@ -21,12 +21,27 @@
 
 #ifndef VJ_SHM
 #define VJ_SHM
+#include <stdint.h>
+
+#define VJ_SHM_PROTOCOL_VERSION 2
+
+typedef struct {
+    int width;
+    int height;
+    int palette;
+    int protocol_version;
+    int plane_size[4];
+    uint64_t sequence;
+} vj_shm_frame_info;
+
 int		vj_shm_write( void *vv, uint8_t *frame[4], int plane_sizes[4] );
 void	*vj_shm_new_slave(int shm_id);
 void *vj_shm_new_slave_by_pid(const char *homedir, int pid);
 void	vj_shm_free_slave(void *vv);
 void	*vj_shm_new_master(const char *homedir, VJFrame *frame);
-int		vj_shm_read( void *vv, uint8_t *dst[4] );
+int     vj_shm_read(void *vv, uint8_t *dst[4]);
+int     vj_shm_read_latest(void *vv, uint8_t *dst[4], const int capacity[4], uint64_t *sequence);
+int     vj_shm_get_frame_info(void *vv, vj_shm_frame_info *info);
 int		vj_shm_stop( void *vv );
 void	vj_shm_free(void *vv);
 int		vj_shm_get_status( void *vv );

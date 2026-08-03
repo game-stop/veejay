@@ -248,7 +248,13 @@ static void Usage(char *progname)
     fprintf(stderr, "  -M/--multicast-osc <addr>    Use multicast OSC\n");
     fprintf(stderr, "  -T/--multicast-vims <addr>   Use multicast VIMS\n");
     fprintf(stderr, "  -K/--master                  Run as the master video output\n");
-    fprintf(stderr, "  -C/--connect <addr[:port]>   Connect to a master Veejay instance\n");
+    fprintf(stderr, "  -C/--connect <addr[:port]>   Connect to a master VeeJay instance\n");
+    fprintf(stderr, "     --instance-role <role>    standalone, program, or output\n");
+    fprintf(stderr, "     --instance-id <name>      Stable backend identity for a show topology\n");
+    fprintf(stderr, "     --output-source <host:port>\n");
+    fprintf(stderr, "                                Output role: consume Program via local SHM or remote TCP frames\n");
+    fprintf(stderr, "     --output-source-pid <pid> Output role: consume SHM published by process PID\n");
+    fprintf(stderr, "     --output-source-shm <key> Output role: consume an explicit SysV SHM key\n");
     fprintf(stderr, "  -l/--sample-file <file>      Load a sample list file\n");
     fprintf(stderr, "  -F/--action-file <file>      Load an action/keybinding file\n");
     fprintf(stderr, "  -P/--preserve-pathnames      Do not canonicalize paths in edit lists\n");
@@ -279,11 +285,13 @@ static void Usage(char *progname)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "Video input and format:\n");
-    fprintf(stderr, "  -d/--dummy                   Start without video files; render black frames\n");
+    fprintf(stderr, "  -d/--dummy, --blank          Start without video files; render a blank source\n");
     fprintf(stderr, "  -A/--capture-device <num>    Start with capture device <num>\n");
     fprintf(stderr, "  -Z/--load-generators <num>   Load generator plugins and start stream <num>\n");
-    fprintf(stderr, "  -W/--input-width <num>       Set input video width\n");
-    fprintf(stderr, "  -H/--input-height <num>      Set input video height\n");
+    fprintf(stderr, "  -W/--input-width, --source-width <num>\n");
+    fprintf(stderr, "                                Set blank-source width\n");
+    fprintf(stderr, "  -H/--input-height, --source-height <num>\n");
+    fprintf(stderr, "                                Set blank-source height\n");
     fprintf(stderr, "  -N/--norm <num>              Set norm: 0=PAL, 1=NTSC, 2=SECAM (default: PAL)\n");
     fprintf(stderr, "  -Y/--yuv [0|1|2]             Force YCbCr mode: 0=default, 1=limited, 2=full-range\n");
     fprintf(stderr, "  -e/--swap-range              Swap YUV range 0-255 <-> 16-235 on video files\n");
@@ -291,7 +299,8 @@ static void Usage(char *progname)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "Video output and display:\n");
-    fprintf(stderr, "  -D/--composite               Do not start with the camera/projection viewport\n");
+    fprintf(stderr, "  -D/--composite, --no-viewport\n");
+    fprintf(stderr, "                                Do not start with the legacy camera/projection viewport\n");
     fprintf(stderr, "  -G/--graphics-driver <num>   Alias for -O/--output\n");
     fprintf(stderr, "  -O/--output <num>            Select video output driver\n");
 #ifdef HAVE_SDL
@@ -304,12 +313,18 @@ static void Usage(char *progname)
     fprintf(stderr, "                                7 = Vloopback YUV 4:2:0 (requires -o)\n");
     fprintf(stderr, "                                8 = Vloopback BGR (requires -o)\n");
     fprintf(stderr, "  -o/--output-file <file>      Write output to file/device for -O/--output\n");
-    fprintf(stderr, "  -w/--output-width <num>      Set output/projection width\n");
-    fprintf(stderr, "  -h/--output-height <num>     Set output/projection height\n");
+    fprintf(stderr, "  -w/--output-width, --project-width <num>\n");
+    fprintf(stderr, "                                Set project/output canvas width\n");
+    fprintf(stderr, "  -h/--output-height, --project-height <num>\n");
+    fprintf(stderr, "                                Set project/output canvas height\n");
 #ifdef HAVE_SDL
-    fprintf(stderr, "  -s/--size WxH                Set SDL window size\n");
-    fprintf(stderr, "  -x/--geometry-x <num>        Set SDL window X position\n");
-    fprintf(stderr, "  -y/--geometry-y <num>        Set SDL window Y position\n");
+    fprintf(stderr, "  -s/--size, --window-size WxH Set SDL window size\n");
+    fprintf(stderr, "  -x/--geometry-x, --window-x <num>\n");
+    fprintf(stderr, "                                Set SDL window X position\n");
+    fprintf(stderr, "  -y/--geometry-y, --window-y <num>\n");
+    fprintf(stderr, "                                Set SDL window Y position\n");
+    fprintf(stderr, "     --fullscreen              Start SDL output in fullscreen-desktop mode\n");
+    fprintf(stderr, "     --windowed                Start SDL output in windowed mode\n");
     fprintf(stderr, "     --borderless              Open SDL window without a title bar\n");
     fprintf(stderr, "     --no-keyboard             Disable SDL keyboard input\n");
     fprintf(stderr, "     --no-mouse                Disable SDL mouse input\n");
@@ -319,7 +334,8 @@ static void Usage(char *progname)
 
     fprintf(stderr, "Cache, rendering and utilities:\n");
     fprintf(stderr, "  -m/--memory <num>            Cache memory percentage (0=disable, max=100)\n");
-    fprintf(stderr, "  -j/--max_cache <num>         Divide cache memory over N samples\n");
+    fprintf(stderr, "  -j/--max_cache, --max-cache <num>\n");
+    fprintf(stderr, "                                Divide cache memory over N samples\n");
     fprintf(stderr, "  -t/--timer <num>             Select timer: 0=none, 1=default (default: 1)\n");
     fprintf(stderr, "  -S/--scene-detection <num>   Create samples using scene detection threshold\n");
     fprintf(stderr, "  -X/--dynamic-fx-chain        Do not keep FX chain buffers in RAM\n");
@@ -354,6 +370,38 @@ static int parse_binary_option(const char *name, const char *value, int *dst)
     return 1;
 }
 
+static int parse_positive_int_option(const char *name, const char *value, int *dst)
+{
+    char *end = NULL;
+    long parsed;
+
+    if(!value || !*value) {
+        fprintf(stderr, "%s requires a positive integer\n", name);
+        return 1;
+    }
+
+    errno = 0;
+    parsed = strtol(value, &end, 10);
+    if(errno != 0 || end == value || *end != '\0' || parsed <= 0 || parsed > INT_MAX) {
+        fprintf(stderr, "%s requires a positive integer\n", name);
+        return 1;
+    }
+
+    *dst = (int)parsed;
+    return 0;
+}
+
+static int parse_port_option(const char *name, const char *value, int *dst)
+{
+    if(parse_positive_int_option(name, value, dst))
+        return 1;
+    if(*dst > 65535) {
+        fprintf(stderr, "%s must be in the range 1..65535\n", name);
+        return 1;
+    }
+    return 0;
+}
+
 static int parse_split_screen_option(const char *value)
 {
     if(!value || value[0] == '\0') {
@@ -380,7 +428,7 @@ static int set_option(const char *name, char *value)
     /* return 1 means error, return 0 means okay */
     int nerr = 0;
     if (strcmp(name, "port") == 0 || strcmp(name, "p") == 0) {
-	info->uc->port = atoi(optarg);
+        nerr += parse_port_option("-p/--port", value, &info->uc->port);
     } else if (strcmp(name, "verbose") == 0 || strcmp(name, "v") == 0) {
 		info->verbose = 1;
 		veejay_set_debug_level(info->verbose);
@@ -458,7 +506,8 @@ static int set_option(const char *name, char *value)
 		info->settings->use_mcast = 1;
 		info->settings->group_name = strdup( optarg );
 	}
-	else if (strcmp(name, "max_cache" )== 0 || strcmp(name, "j" ) == 0 )
+	else if (strcmp(name, "max_cache" )== 0 || strcmp(name, "max-cache") == 0 ||
+             strcmp(name, "j" ) == 0 )
 	{
 		n_slots_ = atoi( optarg );
 		if(n_slots_ < 0 ) n_slots_ = 0; else if (n_slots_ > 100) n_slots_ = 100;
@@ -483,19 +532,15 @@ static int set_option(const char *name, char *value)
 	       || strcmp(name, "G") == 0
 	       || strcmp(name, "output") == 0
 	       || strcmp(name, "O") == 0) {
-	    info->video_out = atoi(optarg);	/* use SDL */
-/*#ifndef HAVE_GL
-            if(info->video_out==3)
-	    {
-		fprintf(stderr, "OpenGL support not enabled at compile time\n");
-		exit(-1);
-	    }
-#endif
-*/
-	    if( info->video_out < 0 || info->video_out > 8 ) {
-		    fprintf(stderr, "Select a valid output display driver\n");
-		    exit(-1);
-		   }
+        char *end = NULL;
+        long driver = value ? strtol(value, &end, 10) : -1;
+        if(!value || end == value || *end != '\0' || driver < 0 || driver > 8) {
+            fprintf(stderr, "-O/--output requires a display driver between 0 and 8\n");
+            nerr++;
+        }
+        else {
+            info->video_out = (int)driver;
+        }
     } else if (strcmp(name, "B") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
         nerr++;
@@ -520,12 +565,13 @@ static int set_option(const char *name, char *value)
 		}
     } else if (strcmp(name, "deinterlace") == 0 || strcmp(name, "I" )==0) {
 		info->auto_deinterlace = 1;
-    } else if (strcmp(name, "size") == 0 || strcmp(name, "s") == 0) {
-	if (sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) !=
-	    2) {
-	    fprintf(stderr,"-s/--size parameter requires NxN argument\n");
-	    nerr++;
-	}
+    } else if (strcmp(name, "size") == 0 || strcmp(name, "window-size") == 0 ||
+               strcmp(name, "s") == 0) {
+        if(!value || sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) != 2 ||
+           info->bes_width <= 0 || info->bes_height <= 0) {
+            fprintf(stderr,"-s/--size/--window-size requires positive WxH\n");
+            nerr++;
+        }
      } else if (strcmp(name,"scene-detection" ) == 0 || strcmp( name,"S") == 0 ) {
 	if ((sscanf(value, "%d", &info->uc->scene_detection )) != 1 ) {
 		fprintf(stderr, "-S/--scene-detection requires threshold argument\n");
@@ -548,38 +594,136 @@ static int set_option(const char *name, char *value)
 
 		info->load_sample_file = 1;
 	}
+    else if(strcmp(name, "instance-role") == 0) {
+        if(!value) {
+            nerr++;
+        }
+        else if(strcmp(value, "standalone") == 0) {
+            info->instance_role = VJ_INSTANCE_ROLE_STANDALONE;
+        }
+        else if(strcmp(value, "program") == 0) {
+            info->instance_role = VJ_INSTANCE_ROLE_PROGRAM;
+        }
+        else if(strcmp(value, "output") == 0) {
+            info->instance_role = VJ_INSTANCE_ROLE_OUTPUT;
+            info->dummy->active = 1;
+            info->audio = NO_AUDIO;
+            info->settings->composite = 0;
+        }
+        else {
+            fprintf(stderr, "--instance-role must be standalone, program, or output\n");
+            nerr++;
+        }
+    }
+    else if(strcmp(name, "instance-id") == 0) {
+        if(!value || value[0] == '\0') {
+            fprintf(stderr, "--instance-id requires a non-empty name\n");
+            nerr++;
+        }
+        else {
+            snprintf(info->instance_id, sizeof(info->instance_id), "%s", value);
+            info->instance_id_explicit = 1;
+        }
+    }
+    else if(strcmp(name, "output-source") == 0) {
+        const char *sep = value ? strrchr(value, ':') : NULL;
+        if(!sep || sep == value || sep[1] == '\0') {
+            fprintf(stderr, "--output-source requires host:port\n");
+            nerr++;
+        }
+        else {
+            size_t host_len = (size_t)(sep - value);
+            if(host_len >= sizeof(info->output_source_host))
+                host_len = sizeof(info->output_source_host) - 1;
+            memcpy(info->output_source_host, value, host_len);
+            info->output_source_host[host_len] = '\0';
+            info->output_source_port = atoi(sep + 1);
+            if(info->output_source_port <= 0 || info->output_source_port > 65535) {
+                fprintf(stderr, "--output-source port is invalid\n");
+                nerr++;
+            }
+        }
+    }
+    else if(strcmp(name, "output-source-pid") == 0) {
+        info->output_source_pid = value ? atoi(value) : 0;
+        if(info->output_source_pid <= 0) {
+            fprintf(stderr, "--output-source-pid requires a positive PID\n");
+            nerr++;
+        }
+    }
+    else if(strcmp(name, "output-source-shm") == 0) {
+        info->output_source_shm_id = value ? atoi(value) : 0;
+        if(info->output_source_shm_id <= 0) {
+            fprintf(stderr, "--output-source-shm requires a positive key\n");
+            nerr++;
+        }
+    }
 	else if (strcmp(name, "master") == 0 || strcmp(name, "K") == 0) {
 		info->is_master = 1;
 	}
 	else if (strcmp(name, "connect") == 0 || strcmp(name, "C") == 0) {
-		char *sep = strchr(optarg, ':');
-        if(info->master_origin) {
-            free(info->master_origin);
-            info->master_origin = NULL;
+        const char *sep = value ? strrchr(value, ':') : NULL;
+        int port = VJ_PORT;
+        size_t host_len = value ? strlen(value) : 0;
+
+        if(sep) {
+            char *endp = NULL;
+            long parsed = strtol(sep + 1, &endp, 10);
+            if(sep == value || sep[1] == '\0' || endp == sep + 1 || *endp != '\0' ||
+               parsed < 1 || parsed > 65535) {
+                fprintf(stderr, "-C/--connect requires host or host:port with a valid TCP port\n");
+                nerr++;
+                return nerr;
+            }
+            host_len = (size_t)(sep - value);
+            port = (int)parsed;
         }
-        if(sep)
-        {
-            *sep = '\0';
-            info->master_origin = strdup(optarg);
-            info->master_origin_port = atoi(sep + 1);
-            *sep = ':';
+        if(!value || host_len == 0) {
+            fprintf(stderr, "-C/--connect requires a non-empty host\n");
+            nerr++;
+            return nerr;
         }
-        else
-        {
-            info->master_origin = strdup(optarg);
-            info->master_origin_port = VJ_PORT;
+
+        char *host = (char*)malloc(host_len + 1);
+        if(!host) {
+            fprintf(stderr, "Unable to allocate master endpoint\n");
+            nerr++;
+            return nerr;
         }
+        memcpy(host, value, host_len);
+        host[host_len] = '\0';
+        free(info->master_origin);
+        info->master_origin = host;
+        info->master_origin_port = port;
         info->master_origin_explicit = 1;
 	}
-	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "x")==0) {
-		default_geometry_x = atoi(optarg);
+	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "window-x") == 0 ||
+             strcmp(name, "x")==0) {
+        if(!value) {
+            fprintf(stderr, "--window-x requires an integer\n");
+            nerr++;
+        }
+        else
+            default_geometry_x = atoi(value);
 	}
-	else if (strcmp(name, "geometry-y") == 0 || strcmp(name,"y")==0) {
-		default_geometry_y = atoi(optarg);
+	else if (strcmp(name, "geometry-y") == 0 || strcmp(name, "window-y") == 0 ||
+             strcmp(name,"y")==0) {
+        if(!value) {
+            fprintf(stderr, "--window-y requires an integer\n");
+            nerr++;
+        }
+        else
+            default_geometry_y = atoi(value);
 	}
 	else if (strcmp(name, "no-keyboard") == 0 ) {
 		use_keyb = 0;
 	}
+    else if (strcmp(name, "fullscreen") == 0 ) {
+        info->settings->full_screen = 1;
+    }
+    else if (strcmp(name, "windowed") == 0 ) {
+        info->settings->full_screen = 0;
+    }
     else if (strcmp(name, "borderless") == 0 ) {
         borderless = 1;
     }
@@ -592,11 +736,13 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"dump-events")==0 || strcmp(name,"u")==0) {
 	info->dump = 1;
 	}
-	else if(strcmp(name, "input-width") == 0 || strcmp(name, "W") == 0 ) {
-		info->dummy->width = atoi(optarg);
+	else if(strcmp(name, "input-width") == 0 || strcmp(name, "source-width") == 0 ||
+            strcmp(name, "W") == 0 ) {
+        nerr += parse_positive_int_option("--source-width", value, &info->dummy->width);
 	}
-	else if(strcmp(name, "input-height") == 0 || strcmp(name, "H") == 0 ) {
-		info->dummy->height = atoi(optarg);
+	else if(strcmp(name, "input-height") == 0 || strcmp(name, "source-height") == 0 ||
+            strcmp(name, "H") == 0 ) {
+        nerr += parse_positive_int_option("--source-height", value, &info->dummy->height);
 	}
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
 		int val = atoi(optarg);
@@ -611,15 +757,18 @@ static int set_option(const char *name, char *value)
 			nerr++;
 		}
 	}
-	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0)
+	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0 ||
+            strcmp(name, "no-viewport") == 0)
 	{
 		info->settings->composite = 0;
 	}
-	else if(strcmp(name, "output-width") == 0 || strcmp(name, "w") == 0) {
-		info->video_output_width = atoi(optarg);
+	else if(strcmp(name, "output-width") == 0 || strcmp(name, "project-width") == 0 ||
+            strcmp(name, "w") == 0) {
+        nerr += parse_positive_int_option("--project-width", value, &info->video_output_width);
 	}
-	else if(strcmp(name, "output-height") == 0 || strcmp(name, "h") == 0) {
-		info->video_output_height = atoi(optarg);
+	else if(strcmp(name, "output-height") == 0 || strcmp(name, "project-height") == 0 ||
+            strcmp(name, "h") == 0) {
+        nerr += parse_positive_int_option("--project-height", value, &info->video_output_height);
 	}
 	else if(strcmp(name, "audiorate") == 0 || strcmp(name, "r") == 0 )
 	{
@@ -646,7 +795,12 @@ static int set_option(const char *name, char *value)
 		}
 	}
     else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
-		override_fps = atof(optarg);
+        char *end = NULL;
+        override_fps = value ? strtof(value, &end) : 0.0f;
+        if(!value || end == value || *end != '\0' || override_fps <= 0.0f || override_fps > 240.0f) {
+            fprintf(stderr, "-f/--fps must be greater than 0 and at most 240\n");
+            nerr++;
+        }
 	}
 	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
 	{
@@ -672,7 +826,7 @@ static int set_option(const char *name, char *value)
 	{	
 		info->uc->file_as_sample = 1;
 	}
-	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
+	else if (strcmp(name, "dummy") == 0 || strcmp(name, "blank") == 0 || strcmp(name, "d" ) == 0 )
 	{
 		info->dummy->active = 1; // enable DUMMY MODE
 	}
@@ -688,9 +842,10 @@ static int set_option(const char *name, char *value)
     {
         info->read_plug_cfg = 1;
     }
-    else if (strcmp(name, "help" ) == 0 || strcmp(name, "?") == 0 ) 
+    else if (strcmp(name, "help" ) == 0 || strcmp(name, "?") == 0 )
     {
-        nerr++;
+        Usage("veejay");
+        exit(0);
     }
     else {
 		nerr++;			/* unknown option - error */
@@ -707,7 +862,12 @@ static int check_command_line_options(int argc, char *argv[])
     static struct option long_options[] = {
 	{"verbose", 0, 0, 0},	/* -v/--verbose         */
 	{"master", 0 ,0 ,0},
-	{"connect", 1, 0, 0},
+    {"connect", 1, 0, 0},
+    {"instance-role", 1, 0, 0},
+    {"instance-id", 1, 0, 0},
+    {"output-source", 1, 0, 0},
+    {"output-source-pid", 1, 0, 0},
+    {"output-source-shm", 1, 0, 0},
 	{"synchronization", 1, 0, 0},	/* -c/--synchronization */
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
@@ -716,7 +876,8 @@ static int check_command_line_options(int argc, char *argv[])
 	{"audio-sync-thread", 1, 0, 0},
 	{"no-audio-beat-thread", 0, 0, 0},
 	{"audio-beat-thread", 1, 0, 0},
-	{"size", 1, 0, 0},	/* -S/--size            */
+	{"size", 1, 0, 0},	/* -s/--size            */
+    {"window-size", 1, 0, 0},
 	{"benchmark", 1, 0, 0}, /* --benchmark	 */
 /*#ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
@@ -735,10 +896,15 @@ static int check_command_line_options(int argc, char *argv[])
 	{"clip-as-sample",0,0,0},
 	{"port", 1, 0, 0},
 	{"dummy",0,0,0},
+    {"blank",0,0,0},
 	{"geometry-x",1,0,0},
+    {"window-x",1,0,0},
 	{"geometry-y",1,0,0},
+    {"window-y",1,0,0},
 	{"no-keyboard",0,0,0},
 	{"no-mouse",0,0,0},
+    {"fullscreen",0,0,0},
+    {"windowed",0,0,0},
     {"borderless",0,0,0},
 	{"show-cursor",0,0,0},
 	{"auto-loop",0,0,0},
@@ -746,11 +912,15 @@ static int check_command_line_options(int argc, char *argv[])
 	{"no-color",0,0,0},
 	{"version",0,0,0},
 	{"input-width",1,0,0},
+    {"source-width",1,0,0},
 	{"input-height",1,0,0},
+    {"source-height",1,0,0},
 	{"output-width", 1,0,0 },
+    {"project-width", 1,0,0 },
 	{"output",1,0,0},
 	{"output-file",1,0,0},
 	{"output-height", 1,0,0 },
+    {"project-height", 1,0,0 },
 	{"norm",1,0,0},
 	{"audiorate",1,0,0},
 	{"audio-channels",1,0,0},
@@ -759,9 +929,11 @@ static int check_command_line_options(int argc, char *argv[])
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"composite",0,0,0},
+    {"no-viewport",0,0,0},
 	{"quit",0,0,0},
 	{"memory",1,0,0},
 	{"max_cache",1,0,0},
+    {"max-cache",1,0,0},
 	{"capture-device",1,0,0},
 	{"swap-range",0,0,0},
 	{"load-generators",1,0,0},
@@ -810,6 +982,26 @@ static int check_command_line_options(int argc, char *argv[])
     if (optind > argc)
 	nerr++;
 
+    const int media_count = argc - optind;
+    if(!nerr && info->dummy->active && media_count > 0) {
+        fprintf(stderr, "--blank/--dummy cannot be combined with startup video files\n");
+        nerr++;
+    }
+    if(!nerr && info->instance_role == VJ_INSTANCE_ROLE_OUTPUT && media_count > 0) {
+        fprintf(stderr, "output role consumes a Program instance and cannot load startup video files\n");
+        nerr++;
+    }
+
+    if(!nerr && info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        int sources = (info->output_source_port > 0) +
+                      (info->output_source_pid > 0) +
+                      (info->output_source_shm_id > 0);
+        if(sources > 1) {
+            fprintf(stderr, "output role accepts at most one of --output-source, --output-source-pid, or --output-source-shm\n");
+            nerr++;
+        }
+    }
+
     if(!nerr && info->is_master && info->master_origin) {
         fprintf(stderr, "-K/--master and -C/--connect are mutually exclusive\n");
         nerr++;
@@ -817,12 +1009,10 @@ static int check_command_line_options(int argc, char *argv[])
 
     if (nerr) {
         Usage(argv[0]);
-        return 0;
+        return -1;
     }
 
-    if(!nerr) 
-		return 1;
-	return 0;
+    return 1;
 }
 
 static void print_license(void)
@@ -843,38 +1033,146 @@ static void print_license(void)
 
 }
 
-static void	veejay_backtrace_handler(int n , siginfo_t *si, void *ptr)
+static int veejay_fatal_signal_active_ = 0;
+
+static void veejay_backtrace_handler(int n, siginfo_t *si, void *ptr)
 {
-	switch(n) {
-		case SIGSEGV:
-			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system"); //@ Suggested by Matthijs
-			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge!"); //@
-			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
+    (void) si;
+    (void) ptr;
 
-			veejay_print_backtrace();
-			break;
-		default:
-			veejay_print_backtrace();
-			break;
-	}
+    if(__atomic_exchange_n(&veejay_fatal_signal_active_, 1, __ATOMIC_ACQ_REL))
+        _exit(EX_SOFTWARE);
 
-	//@ Bye
-	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
+    if(info && info->homedir)
+        (void) veejay_write_recovery_files(info);
 
-	report_bug();
+    if(n == SIGSEGV) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Found Gremlins in your system");
+        veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge!");
+        veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision...");
+    }
 
-	exit(EX_SOFTWARE);
+    veejay_print_backtrace();
+    veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system (signal %d).", n);
+    report_bug();
+
+    _exit(EX_SOFTWARE);
 }
 
-static void	sigsegfault_handler(void) {
-	struct sigaction sigst;
-	sigemptyset(&sigst.sa_mask);
-	sigaddset(&sigst.sa_mask, SIGSEGV );
-	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
-	sigst.sa_sigaction = &veejay_backtrace_handler;
+static void install_crash_signal_handlers(void)
+{
+    const int crash_signals[] = { SIGSEGV, SIGBUS, SIGFPE, SIGABRT, SIGILL };
 
-	if( sigaction(SIGSEGV, &sigst, NULL) == - 1) 
-		veejay_msg(0,"sigaction");
+    for(size_t i = 0; i < sizeof(crash_signals) / sizeof(crash_signals[0]); i++) {
+        struct sigaction sa = {0};
+        sa.sa_sigaction = veejay_backtrace_handler;
+        sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
+        sigemptyset(&sa.sa_mask);
+
+        for(size_t j = 0; j < sizeof(crash_signals) / sizeof(crash_signals[0]); j++)
+            sigaddset(&sa.sa_mask, crash_signals[j]);
+
+        if(sigaction(crash_signals[i], &sa, NULL) == -1)
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to install handler for signal %d", crash_signals[i]);
+    }
+}
+
+static void install_shutdown_signal_handlers(void)
+{
+    const int shutdown_signals[] = { SIGINT, SIGQUIT, SIGTERM, SIGPWR };
+
+    for(size_t i = 0; i < sizeof(shutdown_signals) / sizeof(shutdown_signals[0]); i++) {
+        struct sigaction sa = {0};
+        sa.sa_sigaction = veejay_handle_signal;
+        sa.sa_flags = SA_SIGINFO;
+        sigemptyset(&sa.sa_mask);
+
+        if(sigaction(shutdown_signals[i], &sa, NULL) == -1)
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to install handler for signal %d", shutdown_signals[i]);
+    }
+}
+
+static const char *veejay_cli_role_name(int role)
+{
+    switch(role) {
+        case VJ_INSTANCE_ROLE_PROGRAM: return "program";
+        case VJ_INSTANCE_ROLE_OUTPUT: return "output";
+        default: return "standalone";
+    }
+}
+
+static void veejay_log_startup_plan(int argc, char **argv)
+{
+    const int media_count = argc - optind;
+    const char *role = veejay_cli_role_name(info->instance_role);
+    const char *id = info->instance_id[0] ? info->instance_id : "veejay";
+    const char *source = info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ? "program-shm" :
+                         (info->dummy->active ? "blank" :
+                          (media_count > 0 ? "media" : "backend-default"));
+    char source_detail[320];
+    char fps_detail[48];
+    char project_detail[64];
+
+    if(override_fps > 0.0f)
+        snprintf(fps_detail, sizeof(fps_detail), "%.3f override", override_fps);
+    else
+        snprintf(fps_detail, sizeof(fps_detail), "source/default");
+
+    if(info->video_output_width > 0 && info->video_output_height > 0)
+        snprintf(project_detail, sizeof(project_detail), "%dx%d",
+                 info->video_output_width, info->video_output_height);
+    else
+        snprintf(project_detail, sizeof(project_detail), "automatic");
+
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        if(info->output_source_port > 0)
+            snprintf(source_detail, sizeof(source_detail), "%s:%d",
+                     info->output_source_host, info->output_source_port);
+        else if(info->output_source_pid > 0)
+            snprintf(source_detail, sizeof(source_detail), "pid:%d", info->output_source_pid);
+        else
+            snprintf(source_detail, sizeof(source_detail), "shm:%d", info->output_source_shm_id);
+    }
+    else if(info->dummy->active) {
+        snprintf(source_detail, sizeof(source_detail), "%dx%d",
+                 info->dummy->width, info->dummy->height);
+    }
+    else {
+        snprintf(source_detail, sizeof(source_detail), "%d file%s",
+                 media_count, media_count == 1 ? "" : "s");
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[STARTUP] plan role=%s id=%s control=%d source=%s(%s) project=%s fps=%s output-driver=%d",
+               role, id, info->uc->port, source, source_detail,
+               project_detail, fps_detail, info->video_out);
+    if(info->bes_width > 0 && info->bes_height > 0)
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[STARTUP] SDL window=%dx%d position=%d,%d mode=%s",
+                   info->bes_width, info->bes_height,
+                   default_geometry_x, default_geometry_y,
+                   info->settings->full_screen ? "fullscreen" : "windowed");
+    if(info->video_out == 0 && !(info->bes_width > 0 && info->bes_height > 0))
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[STARTUP] SDL window=project-size position=%d,%d mode=%s",
+                   default_geometry_x, default_geometry_y,
+                   info->settings->full_screen ? "fullscreen" : "windowed");
+    if(media_count > 0) {
+        veejay_msg(VEEJAY_MSG_INFO, "[STARTUP] media import mode=%s",
+                   info->uc->file_as_sample ? "one sample per file" : "single edit list");
+        for(int i = optind; i < argc; i++)
+            veejay_msg(VEEJAY_MSG_INFO, "[STARTUP] media[%d]=%s", i - optind + 1, argv[i]);
+    }
+}
+
+static void veejay_log_resolved_startup(void)
+{
+    video_playback_setup *settings = (video_playback_setup*)info->settings;
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[STARTUP] resolved project=%dx%d source=%dx%d fps=%.3f output-driver=%d",
+               info->video_output_width, info->video_output_height,
+               info->dummy->width, info->dummy->height,
+               settings->output_fps, info->video_out);
 }
 
 int main(int argc, char **argv)
@@ -895,9 +1193,10 @@ int main(int argc, char **argv)
 
     settings = (video_playback_setup *)info->settings;
 
-    if (!check_command_line_options(argc, argv)) {
+    const int command_line_status = check_command_line_options(argc, argv);
+    if(command_line_status <= 0) {
         veejay_free(info);
-        return 0;
+        return command_line_status < 0 ? EX_USAGE : 0;
     }
 
 
@@ -964,23 +1263,11 @@ int main(int argc, char **argv)
     print_license();
 	
     veejay_check_homedir(info);
+    veejay_set_instance(info);
 
-    sigsegfault_handler();
-    
-	signal(SIGPIPE, SIG_IGN);
-
-	struct { int signo; } safe_signals[] = {
-		{ SIGINT }, { SIGQUIT }, { SIGFPE },
-		{ SIGTERM }, { SIGABRT }, { SIGILL }, { SIGPWR }
-	};
-
-	for (int i = 0; i < sizeof(safe_signals)/sizeof(safe_signals[0]); i++) {
-		struct sigaction sa = {0};
-		sa.sa_sigaction = veejay_handle_signal;
-		sa.sa_flags = SA_SIGINFO | SA_ONESHOT;
-		sigemptyset(&sa.sa_mask);
-		sigaction(safe_signals[i].signo, &sa, NULL);
-	}
+    signal(SIGPIPE, SIG_IGN);
+    install_crash_signal_handlers();
+    install_shutdown_signal_handlers();
 
     veejay_msg(VEEJAY_MSG_INFO, "CPU cache line size: %d bytes", cpu_get_cacheline_size());
     veejay_msg(VEEJAY_MSG_INFO, "Memory page size: %d bytes", mem_align_size());
@@ -990,6 +1277,7 @@ int main(int argc, char **argv)
     info->show_cursor = show_cursor;
     info->borderless = borderless;
 
+    veejay_log_startup_plan(argc, argv);
 
 	if(!info->dump) {
 
@@ -1009,6 +1297,8 @@ int main(int argc, char **argv)
        }
 	
 	}
+
+    veejay_log_resolved_startup();
 
     if (veejay_init(info, default_geometry_x, default_geometry_y, NULL, live, ta) < 0) {
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Veejay");
@@ -1053,40 +1343,15 @@ int main(int argc, char **argv)
         goto VEEJAY_MAIN_EXIT;
     }
 
-	settings->display_frame.pixels[0] = vj_sdl_get_buffer(info->sdl,0);
-	settings->display_frame.pixels[1] = vj_sdl_get_buffer(info->sdl,1);
-
-    while (atomic_load_int(&settings->first_audio_frame_ready) == 0) {
-        if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
-            break;
-        usleep_accurate(100, settings);
-    }
-
-	long long last_seq = -1;
-
-    while (veejay_get_state(info) != LAVPLAY_STATE_STOP) {
-        
-		veejay_event_handle(info);
-
-		long long seq = atomic_consume(&settings->display_frame.seq);
-		if( seq != last_seq ) {
-			display_frame_t *df = &settings->display_frame;
-
-			int read_index = df->current_write;
-			uint8_t *pixels_to_render = df->pixels[read_index];
-
-			vj_sdl_put_to_screen(info->sdl, pixels_to_render);
-		}
-
-   		usleep_accurate(5000,settings);
-
-    }
+    while(veejay_get_state(info) != LAVPLAY_STATE_STOP)
+        usleep_accurate(5000, settings);
 
     veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
 
 VEEJAY_MAIN_EXIT:
     veejay_busy(info);
     veejay_close(info);
+    veejay_set_instance(NULL);
 	veejay_free(info);
     veejay_destroy_msg_ring();
 

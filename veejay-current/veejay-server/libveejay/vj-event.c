@@ -92,6 +92,8 @@
 #include <libveejay/vj-OSC.h>
 #include <veejaycore/vj-server.h>
 #include <libveejay/vj-share.h>
+#include <libveejay/vj-perf.h>
+#include <libveejay/vj-output-graph.h>
 #include <libveejay/vevo.h>
 #include <libveejay/vj-misc.h>
 #include <libvjxml/vj-xml.h>
@@ -186,6 +188,9 @@ static int vj_event_random_inclusive(int maximum)
 typedef void (*vj_event)(void *ptr, const char format[], va_list ap);
 
 extern int veejay_edit_move(veejay_t *info, editlist *el, long start, long end, long destination);
+extern int veejay_output_switch_source(veejay_t *info, const char *host, int port);
+extern int veejay_output_switch_source_shm(veejay_t *info, int port, int32_t key);
+extern int veejay_output_disconnect_source(veejay_t *info);
 
 void vj_event_create_effect_bundle(veejay_t * v,char *buf, int key_id, int key_mod );
 
@@ -910,6 +915,7 @@ static long long vj_sequence_slot_duration(veejay_t *v,
 }
 
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
+extern int veejay_output_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
 extern int       vj_event_exists( int id );
 extern void vj_perform_record_offline_disarm(veejay_t *info);
 extern const char *vj_perform_record_effective_audio_source_name(veejay_t *info);
@@ -5038,6 +5044,9 @@ void    vj_event_render_depth( void *ptr, const char format[] , va_list ap )
 
 void    vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 {
+    (void)ptr;
+    (void)format;
+    (void)ap;
 }
 
 void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
@@ -5407,34 +5416,31 @@ void    vj_event_projection_dec( void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
-    
-    float inc_x = (float) args[0];
-    float inc_y = (float) args[1];
 
-    if(!v->composite)
-    {
+    if(!v->composite) {
         veejay_msg(0,"No viewport active");
         return;
     }
-    viewport_finetune_coord( composite_get_vp(v->composite),vj_perform_get_width(v), vj_perform_get_height(v),
-        inc_x,
-        inc_y);
-        
+
+    if(!viewport_mesh_nudge_selected(composite_get_vp(v->composite),
+                                      args[0], args[1]))
+        veejay_msg(VEEJAY_MSG_WARNING, "Unable to move selected viewport mesh point");
 }
+
 void    vj_event_projection_inc( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
-    
-    if(!v->composite)
-    {
+
+    if(!v->composite) {
         veejay_msg(0,"No viewport active");
         return;
     }
-    viewport_finetune_coord( composite_get_vp(v->composite),vj_perform_get_width(v), vj_perform_get_height(v),
-        args[0],
-        args[1]);
+
+    if(!viewport_mesh_nudge_selected(composite_get_vp(v->composite),
+                                      args[0], args[1]))
+        veejay_msg(VEEJAY_MSG_WARNING, "Unable to move selected viewport mesh point");
 }
 
 void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
@@ -10457,6 +10463,14 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 
     P_A(args,sizeof(args), str, sizeof(str), format,ap);
 
+    if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        if(!veejay_output_switch_source(v, str, args[0]))
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[OUTPUT] Unable to switch to unicast video source %s:%d",
+                       str, args[0]);
+        return;
+    }
+
     if( strncasecmp( str, "localhost",9 ) == 0 || strncasecmp( str, "127.0.0.1",9 ) == 0 )
     {
         if( args[0] == v->uc->port )
@@ -10468,6 +10482,7 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 
     int existing_id = vj_event_find_unicast_stream(str, args[0]);
     if(existing_id > 0) {
+        vj_tag_set_last_tag(existing_id);
         veejay_msg(VEEJAY_MSG_INFO,
                    "Reusing existing unicast stream %d for %s:%d",
                    existing_id,
@@ -10552,40 +10567,50 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 
 void    vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap )
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1] = { -1 };
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if(!v->composite ) {
+    if(!v->composite) {
         veejay_msg(0, "No viewport active");
         return;
     }
 
-    int mode = !composite_get_status(v->composite);
-    composite_set_status( v->composite, mode );
+    const int current = composite_get_status(v->composite) ? 1 : 0;
+    const int mode = (args[0] < 0) ? !current : (args[0] ? 1 : 0);
+    composite_set_status(v->composite, mode);
 
-    veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s on startup",(mode==0? "inactive" : "active"));
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Projection transform is now %s on startup",
+               mode ? "active" : "inactive");
 }
 
 void    vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
     int args[2];
-    P_A(args,sizeof(args),NULL,0,format,ap);
+    P_A(args, sizeof(args), NULL, 0, format, ap);
 
-    if(!v->composite ) {
+    if(!v->composite) {
         veejay_msg(0, "No viewport active");
         return;
     }
 
-    if ( args[1] == 1 ) {
-        int mode = v->settings->composite;
-        if( mode == 0 ) {
-            v->settings->composite = 1;
-        } else if ( mode == 1 ) {
-            v->settings->composite = 0;
-        } else if ( mode == 2 ) {
-            v->settings->composite = 1;
-        }
-    } 
+    int mode;
+    if(args[1] == 1)
+        mode = (v->settings->composite == 1) ? 0 : 1;
+    else
+        mode = args[0] ? 1 : 0;
+
+    if(v->settings->composite == 2 && mode != 2) {
+        composite_set_ui(v->composite, 0);
+        if(v->use_osd == 3)
+            v->use_osd = 0;
+    }
+
+    v->settings->composite = mode;
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Live projection is %s", mode ? "enabled" : "disabled");
 }
 
 void    vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
@@ -10594,27 +10619,127 @@ void    vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
     veejay_t *v = (veejay_t*)ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if(!v->composite ) {
+    if(!v->composite) {
         veejay_msg(0, "No viewport active");
         return;
     }
 
-    if( args[0] <= 0 || args[0] > 4 ) {
-        veejay_msg(0, "Invalid point number. Use 1 - 4");
+    void *viewport = composite_get_vp(v->composite);
+
+    if(args[0] == 0) {
+        if(!viewport_mesh_set_grid(viewport, args[2], args[3])) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Invalid viewport mesh grid %dx%d", args[2], args[3]);
+            return;
+        }
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Viewport mesh grid set to %dx%d", args[2], args[3]);
         return;
     }
-    if( args[1] < 0 ) {
-        veejay_msg(0, "Scale must be a positive number");
+
+    const int point_count = viewport_mesh_point_count(viewport);
+    if(args[0] < 1 || args[0] > point_count) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Invalid viewport mesh point %d, expected 1-%d",
+                   args[0], point_count);
         return;
     }
-    float point_x =  ( (float) args[2] / (float) args[1] );
-    float point_y =  ( (float) args[3] / (float) args[1] );
+    if(args[1] == 0) {
+        if(!viewport_mesh_select_point(viewport, args[0])) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to select viewport mesh point %d", args[0]);
+            return;
+        }
+        return;
+    }
 
-    v->settings->cx = point_x;
-    v->settings->cy = point_y;
-    v->settings->cn = args[0];
-    v->settings->ca = 1;
+    if(args[1] < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Scale must be zero or greater");
+        return;
+    }
 
+    if(!viewport_mesh_set_point_scaled(viewport,
+                                       args[0], args[1], args[2], args[3])) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to set viewport mesh point %d", args[0]);
+        return;
+    }
+}
+
+void vj_event_vp_get_points(void *ptr, const char format[], va_list ap)
+{
+    (void)format;
+    (void)ap;
+
+    veejay_t *v = (veejay_t*)ptr;
+    if(!v || !v->composite) {
+        if(v)
+            SEND_MSG(v, "00000000");
+        return;
+    }
+
+    void *viewport = composite_get_vp(v->composite);
+    viewport_mesh_state_t state;
+    if(!viewport_mesh_get_state(viewport, &state) || state.point_count <= 0) {
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    const int scale = 10000;
+    const size_t body_capacity = 256u + ((size_t)state.point_count * 32u);
+    char *body = (char*)vj_malloc(body_capacity);
+    if(!body) {
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    int written = snprintf(body, body_capacity,
+                           "VPM1 %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+                           composite_get_ui(v->composite) ? 1 : 0,
+                           composite_get_status(v->composite) ? 1 : 0,
+                           v->settings->composite,
+                           state.columns, state.rows,
+                           state.selected_point, state.point_count,
+                           state.output_width, state.output_height,
+                           state.source_x, state.source_y,
+                           state.source_width, state.source_height,
+                           scale);
+    if(written < 0 || (size_t)written >= body_capacity) {
+        free(body);
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    size_t used = (size_t)written;
+    for(int point = 1; point <= state.point_count; point++) {
+        int x = 0;
+        int y = 0;
+        if(!viewport_mesh_get_point_scaled(viewport, point, scale, &x, &y)) {
+            free(body);
+            SEND_MSG(v, "00000000");
+            return;
+        }
+
+        written = snprintf(body + used, body_capacity - used, " %d %d", x, y);
+        if(written < 0 || (size_t)written >= body_capacity - used) {
+            free(body);
+            SEND_MSG(v, "00000000");
+            return;
+        }
+        used += (size_t)written;
+    }
+
+    char *packet = (char*)vj_malloc(used + 9u);
+    if(!packet) {
+        free(body);
+        SEND_MSG(v, "00000000");
+        return;
+    }
+
+    snprintf(packet, used + 9u, "%08zu%s", used, body);
+    SEND_MSG(v, packet);
+    free(packet);
+    free(body);
 }
 
 void    vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
@@ -10731,6 +10856,12 @@ void vj_event_v4l_set_property( void *ptr, const char format[], va_list ap )
 
     STREAM_DEFAULTS(args[0]);
 
+    if(strcmp(str, "exposure") == 0) {
+        if(!vj_tag_v4l_set_exposure(args[0], args[1]))
+            veejay_msg(VEEJAY_MSG_DEBUG, "Exposure control is not available on stream %d", args[0]);
+        return;
+    }
+
     uint32_t v4l_ctrl_id = v4l2_get_property_id( str );
     if(v4l_ctrl_id == 0 ) {
         veejay_msg(VEEJAY_MSG_DEBUG,"Invalid v4l2 property name '%s'",str );
@@ -10764,24 +10895,78 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 
 void    vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 {
-    veejay_t *v = (veejay_t*) ptr;
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1] = { -1 };
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
     if(!v->composite) {
         veejay_msg(VEEJAY_MSG_ERROR, "No viewport active");
         return;
     }
 
-    if( v->settings->composite == 2 && composite_get_ui( v->composite ) ) {
-        if(v->use_osd==3) 
+    const int current =
+        (v->settings->composite == 2 && composite_get_ui(v->composite)) ? 1 : 0;
+
+    if(args[0] == 3) {
+        if(!composite_reset_port_configuration(v->composite)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to reset viewport configuration for port %d",
+                       v->uc->port);
+            return;
+        }
+        composite_set_ui(v->composite, 0);
+        composite_set_status(v->composite, 0);
+        v->settings->composite = 0;
+        if(v->use_osd == 3)
             v->use_osd = 0;
-         composite_set_ui(v->composite, 0 );
-         v->settings->composite = 0;
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Viewport reset to identity for port %d",
+                   v->uc->port);
+        return;
     }
-    else {
-        composite_set_ui( v->composite, 2 );
-        v->settings->composite = 2;
-        v->use_osd=3;
-        veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, Press CTRL-s again to save and exit");
+
+    if(args[0] == 2) {
+        if(!composite_save_port_configuration(v->composite, 1)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to save viewport configuration for port %d",
+                       v->uc->port);
+            return;
+        }
+
+        composite_set_ui(v->composite, 0);
+        composite_set_status(v->composite, 1);
+        v->settings->composite = 1;
+        if(v->use_osd == 3)
+            v->use_osd = 0;
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Viewport mesh saved for port %d, applied now and enabled for future startups",
+                   v->uc->port);
+        return;
     }
+
+    const int enable = (args[0] < 0) ? !current : (args[0] ? 1 : 0);
+
+    if(!enable) {
+        if(current && !composite_save_port_configuration(v->composite, 1)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to save viewport configuration for port %d",
+                       v->uc->port);
+            return;
+        }
+        composite_set_ui(v->composite, 0);
+        v->settings->composite = 0;
+        if(v->use_osd == 3)
+            v->use_osd = 0;
+        return;
+    }
+
+    composite_set_ui(v->composite, 2);
+    v->settings->composite = 2;
+    v->use_osd = 3;
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Viewport mesh setup enabled; press CTRL-s again to save for port %d and exit",
+               v->uc->port);
 }
 
 void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap )
@@ -13785,54 +13970,179 @@ void    vj_event_get_image_part         (   void *ptr,  const char format[],    
     free(start_addr);
 }
 
+static void vj_event_send_preview_error(veejay_t *v, int extended_preview)
+{
+    if(extended_preview) {
+        SEND_DATA(v, "000000000", 9);
+    }
+    else {
+        SEND_MSG(v, "00000000");
+    }
+}
+
+static int vj_event_encode_decimal_field(char *dst, size_t digits, uint64_t value)
+{
+    uint64_t limit = 1;
+
+    if(!dst || digits == 0 || digits > 19)
+        return 0;
+
+    for(size_t i = 0; i < digits; i++)
+        limit *= 10;
+
+    if(value >= limit)
+        return 0;
+
+    for(size_t i = digits; i > 0; i--) {
+        dst[i - 1] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+
+    return 1;
+}
+
+static int vj_event_build_legacy_image_header(char *header,
+                                              size_t header_size,
+                                              size_t payload_len,
+                                              uint64_t field4,
+                                              uint64_t field2,
+                                              int full_range)
+{
+    if(header_size < 13 ||
+       !vj_event_encode_decimal_field(header, 6, (uint64_t)payload_len) ||
+       !vj_event_encode_decimal_field(header + 6, 4, field4) ||
+       !vj_event_encode_decimal_field(header + 10, 2, field2))
+        return 0;
+
+    header[12] = full_range ? '1' : '0';
+    return 13;
+}
+
+static int vj_event_build_preview_header(char *header,
+                                         size_t header_size,
+                                         size_t payload_len,
+                                         int width,
+                                         int height,
+                                         int full_range,
+                                         int extended_preview)
+{
+    if(extended_preview) {
+        if(header_size < 9 ||
+           !vj_event_encode_decimal_field(header, 8, (uint64_t)payload_len))
+            return 0;
+
+        header[8] = full_range ? '1' : '0';
+        return 9;
+    }
+
+    if(width < 0 || height < 0 || width > 9999)
+        return 0;
+
+    /* The legacy client decodes with the requested dimensions and ignores
+     * these metadata fields. Keep the exact 6/4/2/1 wire layout without
+     * rejecting ordinary preview heights above 99 pixels. */
+    return vj_event_build_legacy_image_header(header,
+                                               header_size,
+                                               payload_len,
+                                               (uint64_t)width,
+                                               (uint64_t)(height % 100),
+                                               full_range);
+}
+
 void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
     int args[3];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    int w=0,h=0,alpha=0;
+    int w = args[0];
+    int h = args[1];
+    int view_mode = args[2];
     int max_w = vj_perform_preview_max_width(v);
     int max_h = vj_perform_preview_max_height(v);
-        
-    w = args[0]; 
-    h = args[1];
-    alpha = args[2];
-   
-    if( w <= 0 || h <= 0 || w >= max_w || h >= max_h )
+    /* Mode 2 is the current active video immediately before viewport mapping.
+     * It is deliberately source-agnostic and uses an extended header. */
+    const int extended_preview = (view_mode == 2);
+
+    if(w <= 0 || h <= 0 || w > max_w || h > max_h)
     {
         veejay_msg(0, "Invalid image dimension %dx%d requested (max is %dx%d)",w,h,max_w,max_h );
-        SEND_MSG(v, "00000000" );
+        vj_event_send_preview_error(v, extended_preview);
+        return;
+    }
+    if(view_mode < 0 || view_mode > 2) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Invalid preview view mode %d", view_mode);
+        vj_event_send_preview_error(v, extended_preview);
+        return;
+    }
+    if(!extended_preview && w > 9999) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Legacy preview protocol cannot represent image width %d",
+                   w);
+        vj_event_send_preview_error(v, 0);
         return;
     }
 
     size_t dstlen = 0;
     VJFrame frame;
-    veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
-    vj_perform_get_primary_frame( v, frame.data );
-
-    if( alpha ) {
-        dstlen = vj_fast_alpha_picture_save_to_mem( &frame, w,h, vj_perform_get_preview_buffer(v));
-    }
-    else if( use_bw_preview_ ) {
-        dstlen = vj_fastbw_picture_save_to_mem(
-                &frame,
-                w,
-                h,
-                vj_perform_get_preview_buffer(v));
+    if(view_mode == 2) {
+        int have_frame = 0;
+        if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
+            have_frame = veejay_output_get_pre_projection_preview_frame(v, &frame);
+        else
+            have_frame = vj_perform_get_pre_projection_preview_frame(v, &frame);
+        if(!have_frame) {
+            vj_event_send_preview_error(v, extended_preview);
+            return;
+        }
     }
     else {
-        dstlen = vj_fast_picture_save_to_mem(
-                &frame,
-                w,
-                h,
-                vj_perform_get_preview_buffer(v) );
+        veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
+        vj_perform_get_primary_frame(v, frame.data);
     }
 
-    char header[32];
-    snprintf(header, sizeof(header), "%06zu%04d%02d%1d", dstlen, args[0], args[1], yuv_get_pixel_range());
-    SEND_DATA(v, header, 13);
+    if(view_mode == 1) {
+        dstlen = vj_fast_alpha_picture_save_to_mem(&frame, w, h,
+                                                   vj_perform_get_preview_buffer(v));
+    }
+    else if(use_bw_preview_) {
+        dstlen = vj_fastbw_picture_save_to_mem(&frame, w, h,
+                                               vj_perform_get_preview_buffer(v));
+    }
+    else {
+        dstlen = vj_fast_picture_save_to_mem(&frame, w, h,
+                                             vj_perform_get_preview_buffer(v));
+    }
+
+    if(dstlen == 0 ||
+       (extended_preview && dstlen > 99999999u) ||
+       (!extended_preview && dstlen > 999999u))
+    {
+        vj_event_send_preview_error(v, extended_preview);
+        return;
+    }
+
+    char header[13];
+    int header_len = vj_event_build_preview_header(header,
+                                                    sizeof(header),
+                                                    dstlen,
+                                                    w,
+                                                    h,
+                                                    yuv_get_pixel_range(),
+                                                    extended_preview);
+    if(header_len == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to encode preview header for %dx%d image (%zu bytes)",
+                   w,
+                   h,
+                   dstlen);
+        vj_event_send_preview_error(v, extended_preview);
+        return;
+    }
+
+    SEND_DATA(v, header, header_len);
     SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen);
+
 }
 
 void    vj_event_get_cali_image     (   void *ptr,  const char format[],    va_list ap  )
@@ -15212,6 +15522,144 @@ void vj_event_send_sample_options   (   void *ptr,  const char format[],    va_l
 }
 
 
+void vj_event_output_graph_status(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    char response[4096];
+    (void)format;
+    (void)ap;
+    vj_output_graph_format_status((vj_output_graph*)v->output_graph,
+                                  response, sizeof(response));
+    SEND_MSG(v, response);
+}
+
+void vj_event_output_pattern(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[4] = { VJ_OUTPUT_PATTERN_PROGRAM, 0, 0, 0 };
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+    int ok = args[0] == VJ_OUTPUT_PATTERN_STRUCTURED_LIGHT ?
+        vj_output_graph_set_structured_light((vj_output_graph*)v->output_graph,
+                                             args[1], args[2], args[3]) :
+        vj_output_graph_set_pattern((vj_output_graph*)v->output_graph, args[0]);
+    if(!ok)
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Invalid test pattern %d (%d %d %d)",
+                   args[0], args[1], args[2], args[3]);
+}
+
+void vj_event_output_slice(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[14] = { 0, 0, 0, 10000, 10000, 0, 0, 0, 0, 0, 0, 0, 0, 100 };
+    vj_output_slice_config c;
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+    memset(&c, 0, sizeof(c));
+    c.enabled = 1;
+    c.source_x = args[1];
+    c.source_y = args[2];
+    c.source_width = args[3];
+    c.source_height = args[4];
+    c.dest_x = args[5];
+    c.dest_y = args[6];
+    c.dest_width = args[7];
+    c.dest_height = args[8];
+    c.blend_left = args[9];
+    c.blend_right = args[10];
+    c.blend_top = args[11];
+    c.blend_bottom = args[12];
+    c.blend_gamma = args[13];
+    if(!vj_output_graph_set_slice((vj_output_graph*)v->output_graph, args[0], &c))
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Invalid slice configuration for slice %d", args[0]);
+}
+
+void vj_event_output_slice_enable(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2] = { 0, 1 };
+    vj_output_slice_config c;
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+    if(!vj_output_graph_get_slice((vj_output_graph*)v->output_graph, args[0], &c))
+        return;
+    c.enabled = args[1] ? 1 : 0;
+    if(!vj_output_graph_set_slice((vj_output_graph*)v->output_graph, args[0], &c))
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Unable to change slice %d state", args[0]);
+}
+
+void vj_event_output_graph_reset(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    (void)format;
+    (void)ap;
+    vj_output_graph_reset((vj_output_graph*)v->output_graph);
+    veejay_msg(VEEJAY_MSG_INFO, "[OUTPUT] Output graph reset to one identity slice");
+}
+
+void vj_event_instance_status(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    char response[512];
+    (void)format;
+    (void)ap;
+
+    if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        if(v->output_source_port > 0) {
+            snprintf(response, sizeof(response),
+                     "VJINSTANCE 1 role=%s id=%s port=%d source=%s:%d source_sequence=%llu shm_key=%d shm_enabled=%d",
+                     vj_perf_role_name(v->instance_role), v->instance_id, v->uc->port,
+                     v->output_source_host, v->output_source_port,
+                     (unsigned long long)v->output_input_sequence,
+                     v->shm ? vj_shm_get_my_id() : 0,
+                     v->shm ? vj_shm_get_status(v->shm) : 0);
+        }
+        else if(v->output_source_pid > 0) {
+            snprintf(response, sizeof(response),
+                     "VJINSTANCE 1 role=%s id=%s port=%d source_pid=%d source_sequence=%llu shm_key=%d shm_enabled=%d",
+                     vj_perf_role_name(v->instance_role), v->instance_id, v->uc->port,
+                     v->output_source_pid,
+                     (unsigned long long)v->output_input_sequence,
+                     v->shm ? vj_shm_get_my_id() : 0,
+                     v->shm ? vj_shm_get_status(v->shm) : 0);
+        }
+        else {
+            snprintf(response, sizeof(response),
+                     "VJINSTANCE 1 role=%s id=%s port=%d source_shm=%d source_sequence=%llu shm_key=%d shm_enabled=%d",
+                     vj_perf_role_name(v->instance_role), v->instance_id, v->uc->port,
+                     v->output_source_shm_id,
+                     (unsigned long long)v->output_input_sequence,
+                     v->shm ? vj_shm_get_my_id() : 0,
+                     v->shm ? vj_shm_get_status(v->shm) : 0);
+        }
+    }
+    else {
+        snprintf(response, sizeof(response),
+                 "VJINSTANCE 1 role=%s id=%s port=%d shm_key=%d shm_enabled=%d",
+                 vj_perf_role_name(v->instance_role), v->instance_id, v->uc->port,
+                 v->shm ? vj_shm_get_my_id() : 0,
+                 v->shm ? vj_shm_get_status(v->shm) : 0);
+    }
+    SEND_MSG(v, response);
+}
+
+void vj_event_perf_status(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    char response[8192];
+    (void)format;
+    (void)ap;
+
+    vj_perf_format_text((vj_perf_context*)v->perf, response, sizeof(response));
+    SEND_MSG(v, response);
+}
+
+void vj_event_perf_reset(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    (void)format;
+    (void)ap;
+    vj_perf_reset((vj_perf_context*)v->perf);
+    veejay_msg(VEEJAY_MSG_INFO, "[PERF] Per-stage telemetry reset");
+}
+
 void    vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
@@ -15249,22 +15697,83 @@ void    vj_event_get_shm( void *ptr, const char format[], va_list ap )
     SEND_MSG(v, tmp );
 }
 
+static int vj_event_find_director_shm_stream(int32_t key)
+{
+    if(key <= 0)
+        return 0;
+
+    int highest = vj_tag_highest();
+    for(int id = 1; id <= highest; id++) {
+        vj_tag *tag = vj_tag_get(id);
+        if(!tag || tag->source_type != VJ_TAG_TYPE_GENERATOR || !tag->extra)
+            continue;
+        int32_t stored_key = 0;
+        if(sscanf((const char*)tag->extra, "director-shm:%d", &stored_key) == 1 &&
+           stored_key == key)
+            return id;
+    }
+    return 0;
+}
+
 void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
-    int args[2];
+    int args[2] = { 0, 0 };
     P_A(args,sizeof(args),NULL,0,format,ap);
+
+    if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        if(args[0] <= 0 && args[1] <= 0) {
+            if(!veejay_output_disconnect_source(v))
+                veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Unable to disconnect video source");
+            return;
+        }
+        int ok = args[1] > 0 ?
+                 veejay_output_switch_source_shm(v, args[0], args[1]) :
+                 veejay_output_switch_source(v, "127.0.0.1", args[0]);
+        if(!ok)
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[OUTPUT] Unable to switch to shared video source on port %d",
+                       args[0]);
+        return;
+    }
     
     if( args[0] == v->uc->port ) {
         veejay_msg(0, "Cannot pull info from myself inside VIMS event");
         return;
     }
 
-    int32_t key = vj_share_pull_master( v->shm,"127.0.0.1", args[0] );
-    int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, 0, key);
-    
-    if( id <= 0 ) {
-        veejay_msg(0, "Unable to connect to shared resource id %d", key );
+    int32_t key = args[1] > 0 ? args[1] :
+                  vj_share_pull_master(v->shm, "127.0.0.1", args[0]);
+    if(key <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to obtain shared resource from VeeJay on port %d",
+                   args[0]);
+        return;
+    }
+
+    int existing_id = vj_event_find_director_shm_stream(key);
+    if(existing_id > 0) {
+        vj_tag_set_last_tag(existing_id);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Reusing existing shared-memory stream %d for key %d",
+                   existing_id, key);
+        return;
+    }
+
+    int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR,
+                               "lvd_shmin.so", v->nstreams, 0, key);
+    if(id <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to connect to shared resource id %d", key);
+        return;
+    }
+
+    vj_tag *tag = vj_tag_get(id);
+    if(tag) {
+        char marker[64];
+        snprintf(marker, sizeof(marker), "director-shm:%d", key);
+        free(tag->extra);
+        tag->extra = strdup(marker);
     }
 }
 
@@ -17083,9 +17592,25 @@ void    vj_event_get_sample_image       (   void *ptr,  const char format[],    
                 vj_perform_get_preview_buffer(v) );
     }
 
-    char header[32];
-    snprintf(header, sizeof(header), "%06zu%04d%02d%1d", dstlen, args[0], args[1], yuv_get_pixel_range());
-    SEND_DATA(v, header, 13);
+    char header[13];
+    int header_len = vj_event_build_legacy_image_header(header,
+                                                        sizeof(header),
+                                                        dstlen,
+                                                        (uint64_t)id,
+                                                        (uint64_t)type,
+                                                        yuv_get_pixel_range());
+    if(dstlen == 0 || header_len == 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to encode sample preview header for sample %d type %d (%zu bytes)",
+                   id,
+                   type,
+                   dstlen);
+        SEND_MSG(v, SAMPLE_IMAGE_ERROR);
+        free(frame);
+        return;
+    }
+
+    SEND_DATA(v, header, header_len);
     SEND_DATA(v, vj_perform_get_preview_buffer(v), dstlen);
 
     free(frame);

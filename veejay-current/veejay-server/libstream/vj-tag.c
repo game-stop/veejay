@@ -614,6 +614,12 @@ int vj_tag_get_last_tag(void) {
     return last_added_tag;
 }
 
+void vj_tag_set_last_tag(int id)
+{
+    if(id > 0 && vj_tag_exists(id))
+        last_added_tag = id;
+}
+
 int vj_tag_highest(void)
 {
     return this_tag_id;
@@ -2665,6 +2671,17 @@ int vj_tag_get_v4l_properties(int t1, int *values )
 
     return 0;
 #endif
+}
+
+int vj_tag_v4l_set_exposure(int t1, int value)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || tag->source_type != VJ_TAG_TYPE_V4L || value < 0 || value > 65535)
+        return 0;
+#ifdef HAVE_V4L2
+    v4l2_set_exposure(vj_tag_input->v4l2[tag->index], 0, value);
+#endif
+    return 1;
 }
 
 int vj_tag_v4l_set_control( int t1, uint32_t id, int value )

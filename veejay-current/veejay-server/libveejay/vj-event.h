@@ -44,6 +44,14 @@ void    vj_event_xml_new_keyb_event		( 	void *v,	xmlDocPtr doc, 	xmlNodePtr cur 
 #endif
 #endif
 int vj_event_get_video_format(void);
+void    vj_event_perf_status(void *ptr, const char format[], va_list ap);
+void    vj_event_perf_reset(void *ptr, const char format[], va_list ap);
+void    vj_event_output_graph_status(void *ptr, const char format[], va_list ap);
+void    vj_event_output_pattern(void *ptr, const char format[], va_list ap);
+void    vj_event_output_slice(void *ptr, const char format[], va_list ap);
+void    vj_event_output_slice_enable(void *ptr, const char format[], va_list ap);
+void    vj_event_instance_status(void *ptr, const char format[], va_list ap);
+void    vj_event_output_graph_reset(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_mix_mode(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_mix_crossfade(void *ptr, const char format[], va_list ap);
 void    vj_event_chain_fade_kf_status(void *ptr, const char format[], va_list ap);

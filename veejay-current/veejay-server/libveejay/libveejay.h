@@ -136,6 +136,7 @@ void veejay_loop_count(veejay_t *info);
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end);
 
 void veejay_change_state_save(veejay_t * info, int new_state);
+int veejay_write_recovery_files(veejay_t *info);
 
 void veejay_handle_signal(int sig, siginfo_t *si, void *unused);
 

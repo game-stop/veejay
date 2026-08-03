@@ -119,6 +119,13 @@ typedef struct
     int source_width;
     int source_height;
     int source_format;
+    VJFrame *source_444;
+    uint8_t *source_444_data;
+    void *source_444_scaler;
+    int source_444_width;
+    int source_444_height;
+    int source_444_format;
+    int source_444_range;
 } vj_split_t;
 
 typedef struct
@@ -146,6 +153,8 @@ typedef struct
 
 static char *server_ip = NULL;
 static int server_port = 0;
+
+static void vj_split_free_source_444(vj_split_t *x);
 
 
 static inline int vj_split_clampi(int v, int lo, int hi)
@@ -743,6 +752,7 @@ void vj_split_free(void *ptr)
     for(i = 0; i < x->n_screens; i++)
         vj_split_free_screen(x, i);
 
+    vj_split_free_source_444(x);
     free(x->frames);
     free(x->screens);
     free(x);
@@ -1388,16 +1398,106 @@ static int vj_split_push_shm(v_screen_t *VJ_SPLIT_RESTRICT screen, VJFrame *VJ_S
     return 1;
 }
 
+
+static void vj_split_free_source_444(vj_split_t *x)
+{
+    if(!x)
+        return;
+
+    if(x->source_444_scaler) {
+        yuv_free_swscaler(x->source_444_scaler);
+        x->source_444_scaler = NULL;
+    }
+    if(x->source_444_data) {
+        free(x->source_444_data);
+        x->source_444_data = NULL;
+    }
+    if(x->source_444) {
+        free(x->source_444);
+        x->source_444 = NULL;
+    }
+
+    x->source_444_width = 0;
+    x->source_444_height = 0;
+    x->source_444_format = 0;
+    x->source_444_range = 0;
+}
+
+static VJFrame *vj_split_prepare_source_444(vj_split_t *x, VJFrame *src)
+{
+    if(src->uv_width == src->width && src->uv_height == src->height)
+        return src;
+
+    const int width = src->width;
+    const int height = src->height;
+    const int dst_format = src->range ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P;
+    const int needs_rebuild = !x->source_444 ||
+                              x->source_444_width != width ||
+                              x->source_444_height != height ||
+                              x->source_444_format != src->format ||
+                              x->source_444_range != src->range;
+
+    if(needs_rebuild) {
+        vj_split_free_source_444(x);
+
+        x->source_444 = yuv_yuv_template(NULL, NULL, NULL,
+                                         width, height, dst_format);
+        if(!x->source_444)
+            return NULL;
+
+        const size_t plane_len = (size_t)width * (size_t)height;
+        x->source_444_data = (uint8_t*)vj_malloc(plane_len * 3u);
+        if(!x->source_444_data) {
+            vj_split_free_source_444(x);
+            return NULL;
+        }
+
+        x->source_444->data[0] = x->source_444_data;
+        x->source_444->data[1] = x->source_444_data + plane_len;
+        x->source_444->data[2] = x->source_444_data + (plane_len * 2u);
+        x->source_444->data[3] = NULL;
+        vj_split_frame_setup_444(x->source_444, width, height, src->range);
+
+        sws_template templ;
+        veejay_memset(&templ, 0, sizeof(sws_template));
+        templ.flags = VJ_SPLIT_SCALER_TYPE;
+        x->source_444_scaler = yuv_init_swscaler(src,
+                                                 x->source_444,
+                                                 &templ,
+                                                 yuv_sws_get_cpu_flags());
+        if(!x->source_444_scaler) {
+            vj_split_free_source_444(x);
+            return NULL;
+        }
+
+        x->source_444_width = width;
+        x->source_444_height = height;
+        x->source_444_format = src->format;
+        x->source_444_range = src->range;
+    }
+
+    x->source_444->frame_num = src->frame_num;
+    x->source_444->fps = src->fps;
+    yuv_convert_and_scale(x->source_444_scaler, src, x->source_444);
+    return x->source_444;
+}
+
 void vj_split_process(void *ptr, VJFrame *src)
 {
     vj_split_t *x = (vj_split_t*) ptr;
     if(!x || !src || !src->data[0] || !src->data[1] || !src->data[2])
         return;
 
+    VJFrame *source = vj_split_prepare_source_444(x, src);
+    if(!source) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to prepare split-screen 4:4:4 source");
+        return;
+    }
+
     if(x->source_width <= 0)
-        x->source_width = src->width;
+        x->source_width = source->width;
     if(x->source_height <= 0)
-        x->source_height = src->height;
+        x->source_height = source->height;
 
     int i;
     for(i = 0; i < x->n_screens; i++) {
@@ -1405,12 +1505,12 @@ void vj_split_process(void *ptr, VJFrame *src)
             continue;
 
         if(x->screens[i]->shm) {
-            if(vj_split_process_shm(x->screens[i], x->frames[i], src) == 0)
+            if(vj_split_process_shm(x->screens[i], x->frames[i], source) == 0)
                 vj_split_free_screen(x, i);
             continue;
         }
 
-        vj_split_copy_region(src, x->frames[i], x->screens[i]);
+        vj_split_copy_region(source, x->frames[i], x->screens[i]);
 
         if(x->screens[i] && x->screens[i]->net) {
             vj_split_net_t *net = (vj_split_net_t*) x->screens[i]->net;

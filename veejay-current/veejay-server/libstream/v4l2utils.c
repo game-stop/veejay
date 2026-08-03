@@ -1611,12 +1611,25 @@ int32_t	v4l2_get_temperature( void *d ) {
 // exposure
 void	v4l2_set_exposure( void *d ,int32_t type, int32_t value )
 {
-	v4l2_set_control( d, V4L2_CID_EXPOSURE, value );
-} 
+    (void) type;
+#ifdef V4L2_CID_EXPOSURE_ABSOLUTE
+    if(v4l2_get_control(d, V4L2_CID_EXPOSURE_ABSOLUTE) >= 0) {
+        v4l2_set_control(d, V4L2_CID_EXPOSURE_ABSOLUTE, value);
+        return;
+    }
+#endif
+    v4l2_set_control(d, V4L2_CID_EXPOSURE, value);
+}
 
 int32_t v4l2_get_exposure( void *d ) {
-	return v4l2_get_control( d, V4L2_CID_EXPOSURE );
+#ifdef V4L2_CID_EXPOSURE_ABSOLUTE
+    int32_t value = v4l2_get_control(d, V4L2_CID_EXPOSURE_ABSOLUTE);
+    if(value >= 0)
+        return value;
+#endif
+    return v4l2_get_control(d, V4L2_CID_EXPOSURE);
 }
+
 void	v4l2_set_black_level( void *d ,int32_t type, int32_t value )
 {
 	v4l2_set_control( d, V4L2_CID_BLACK_LEVEL, value );
@@ -1922,24 +1935,31 @@ int	v4l2_num_devices(void)
 
 static	char **v4l2_dummy_list(void)
 {
-
-	const char *list[] = {
-		"/dev/video0",
-		"/dev/video1",
-		"/dev/video2",
-		"/dev/video3",
-		"/dev/video4",
-		"/dev/video5",
-		"/dev/video6",
-		"/dev/video7",
-		NULL
-	};
-	char **dup = (char**) malloc(sizeof(char*)*9);
-	int i;
-	for( i = 0; list[i] != NULL ; i ++ )
-		dup[i] = strdup( list[i]);
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using dummy video device list");
-	return dup;
+    const char *list[] = {
+        "/dev/video0", "/dev/video1", "/dev/video2", "/dev/video3",
+        "/dev/video4", "/dev/video5", "/dev/video6", "/dev/video7",
+        NULL
+    };
+    char **dup = (char**) calloc(9, sizeof(char*));
+    if(!dup)
+        return NULL;
+    int out = 0;
+    for(int i = 0; list[i] != NULL; i++) {
+        if(access(list[i], F_OK) != 0)
+            continue;
+        char tmp[128];
+        int n = snprintf(tmp, sizeof(tmp), "%03dDevice %02d%03zu%s",
+                         9, out, strlen(list[i]), list[i]);
+        if(n <= 0 || n >= (int)sizeof(tmp))
+            continue;
+        dup[out++] = strdup(tmp);
+    }
+    if(out == 0) {
+        free(dup);
+        return NULL;
+    }
+    veejay_msg(VEEJAY_MSG_DEBUG, "Using fallback video device list (%d devices)", out);
+    return dup;
 }
 
 char **v4l2_get_device_list(void)

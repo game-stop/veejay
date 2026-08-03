@@ -1867,15 +1867,16 @@ void		vj_init_vevo_events(void)
 				NULL);
 
 	index_map_[VIMS_STREAM_NEW_SHARED]			=	_new_event(
-				"%d",
+				"%d %d",
 			   VIMS_STREAM_NEW_SHARED,
 		   		"Request shared resource from another veejay",
 		 		vj_event_connect_shm,
-				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				2,
+				VIMS_ALLOW_ANY,
 				"Port number",
 				0,
-				NULL,
+				"Known shared-memory key (0=query source)",
+				0,
 				NULL );	
 
 	index_map_[VIMS_STREAM_NEW_GENERATOR]		=	_new_event(
@@ -3419,7 +3420,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
 				"%d %d %d",	
 				VIMS_RGB24_IMAGE,
-				"GUI: Get preview image (raw RGB24) from the sample's starting position",
+				"GUI: Get scaled preview image (program, alpha, or current video before projection)",
 				vj_event_get_scaled_image,
 				3,
 				VIMS_ALLOW_ANY,
@@ -3427,7 +3428,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				0,
 				"Height",
 				0,
-				"Alpha Only",
+				"View mode (0=program legacy, 1=alpha legacy, 2=current video before projection)",
 				0,
 				NULL );
 #else
@@ -3435,7 +3436,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 		index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
 				"%d %d %d",	
 				VIMS_RGB24_IMAGE,
-				"GUI: Get preview image (raw RGB24)",
+				"GUI: Get scaled preview image (program, alpha, or current video before projection)",
 				vj_event_get_scaled_image,
 				3,
 				VIMS_ALLOW_ANY,
@@ -3443,7 +3444,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				0,
 				"Height",
 				0,
-				"Alpha Only",
+				"View mode (0=program legacy, 1=alpha legacy, 2=current video before projection)",
 				0,
 				NULL );
 #endif
@@ -3937,10 +3938,28 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				0,
 				NULL );
 
+	index_map_[ VIMS_VIEWPORT ]				=	_new_event(
+				NULL,
+				VIMS_VIEWPORT,
+				"Legacy alias: get viewport mesh editor state and control points",
+				vj_event_vp_get_points,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[ VIMS_PROJECTION ]			=	_new_event(
+				NULL,
+				VIMS_PROJECTION,
+				"Get viewport mesh editor state and all control points",
+				vj_event_vp_get_points,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[ VIMS_PROJ_INC ] 			=	_new_event(
 				"%d %d",
 				VIMS_PROJ_INC,
-				"Increase projection/camera point",
+				"Move selected viewport mesh point",
 				vj_event_projection_inc,
 				2,
 				VIMS_ALLOW_ANY,
@@ -3953,7 +3972,7 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[ VIMS_PROJ_DEC ] 			=	_new_event(
 				"%d %d",
 				VIMS_PROJ_DEC,
-				"Decrease projection/camera point",
+				"Legacy alias: move selected viewport mesh point",
 				vj_event_projection_dec,
 				2,
 				VIMS_ALLOW_ANY,
@@ -3963,13 +3982,77 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 				0,
 				NULL );
 
+    index_map_[ VIMS_OUTPUT_GRAPH_STATUS ] = _new_event(
+                NULL, VIMS_OUTPUT_GRAPH_STATUS,
+                "Get output graph, slice, blend, and test-pattern state",
+                vj_event_output_graph_status, 0, VIMS_ALLOW_ANY, NULL );
+
+    index_map_[ VIMS_OUTPUT_PATTERN ] = _new_event(
+                "%d %d %d %d", VIMS_OUTPUT_PATTERN,
+                "Select local output test or structured-light pattern",
+                vj_event_output_pattern, 4, VIMS_ALLOW_ANY,
+                "Pattern (0=program,1=black,2=white,3=gray,4=bars,5=grid,6=checker,7=slices,8=blend,9=structured-light)",
+                0,
+                "Structured-light axis (0=X,1=Y)", 0,
+                "Structured-light Gray-code bit (0=LSB)", 0,
+                "Structured-light invert (0=normal,1=inverse)", 0,
+                NULL );
+
+    index_map_[ VIMS_OUTPUT_SLICE ] = _new_event(
+                "%d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+                VIMS_OUTPUT_SLICE,
+                "Configure output slice crop, destination, and edge blend",
+                vj_event_output_slice, 14, VIMS_REQUIRE_ALL_PARAMS,
+                "Slice",0, "Source X (0-10000)",0, "Source Y (0-10000)",0,
+                "Source width (0-10000)",10000, "Source height (0-10000)",10000,
+                "Destination X",0, "Destination Y",0, "Destination width",0,
+                "Destination height",0, "Blend left",0, "Blend right",0,
+                "Blend top",0, "Blend bottom",0, "Blend gamma percent",100,
+                NULL );
+
+    index_map_[ VIMS_OUTPUT_SLICE_ENABLE ] = _new_event(
+                "%d %d", VIMS_OUTPUT_SLICE_ENABLE,
+                "Enable or disable an output slice",
+                vj_event_output_slice_enable, 2, VIMS_REQUIRE_ALL_PARAMS,
+                "Slice",0, "Enabled",1, NULL );
+
+    index_map_[ VIMS_OUTPUT_GRAPH_RESET ] = _new_event(
+                NULL, VIMS_OUTPUT_GRAPH_RESET,
+                "Reset output graph to one identity slice",
+                vj_event_output_graph_reset, 0, VIMS_ALLOW_ANY, NULL );
+
+    index_map_[ VIMS_INSTANCE_STATUS ] = _new_event(
+                NULL, VIMS_INSTANCE_STATUS,
+                "Get backend instance role and identity",
+                vj_event_instance_status, 0, VIMS_ALLOW_ANY, NULL );
+
+    index_map_[ VIMS_PERF_STATUS ] = _new_event(
+                NULL,
+                VIMS_PERF_STATUS,
+                "Get per-stage backend performance telemetry",
+                vj_event_perf_status,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
+
+    index_map_[ VIMS_PERF_RESET ] = _new_event(
+                NULL,
+                VIMS_PERF_RESET,
+                "Reset per-stage backend performance telemetry",
+                vj_event_perf_reset,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
+
 	index_map_[ VIMS_FRONTBACK ]				=	_new_event(
-				NULL,
+				"%d",
 				VIMS_FRONTBACK,
-				"Camera/Projection calibration setup",
+				"Open, save, or reset the port-scoped viewport mesh setup",
 				vj_event_viewport_frontback,
-				0,
+				1,
 				VIMS_ALLOW_ANY,
+				"Operation (-1=toggle, 0=close/save, 1=open, 2=save only, 3=reset current port)",
+				-1,
 				NULL );
 
 	index_map_[ VIMS_FEEDBACK ]				=	_new_event(
@@ -3998,48 +4081,50 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
 	index_map_[ VIMS_COMPOSITE ] 				=	_new_event(
 				NULL,
 				VIMS_COMPOSITE,
-				"Push current playing sample or stream as viewport input",
+				"Reserved legacy viewport composition event (currently no action)",
 				vj_event_viewport_composition,
 				0,
 				VIMS_ALLOW_ANY,	
 				NULL );
 
 	index_map_[ VIMS_PROJ_TOGGLE ] 				=	_new_event(
-				NULL,
+				"%d",
 				VIMS_PROJ_TOGGLE,
-				"Enable/disable viewport rendering",
+				"Set or toggle viewport transform startup state",
 				vj_event_vp_proj_toggle,
-				0,
+				1,
 				VIMS_ALLOW_ANY,
+				"State (-1=toggle, 0=inactive, 1=active)",
+				-1,
 				NULL );
 
 	index_map_[ VIMS_PROJ_STACK ] 				=	_new_event(
 				"%d %d",
 				VIMS_PROJ_STACK,
-				"Push viewport to secundary input",
+				"Set or toggle live viewport projection",
 				vj_event_vp_stack,
 				2,
 				VIMS_ALLOW_ANY,
-				"On = 1, Off = 0",
+				"Projection state (0=off, 1=on)",
 				1,
-				"Color=0, Grayscale=1",
-				1,
+				"Operation (0=set, 1=toggle)",
+				0,
 				NULL );
 
 	index_map_[ VIMS_PROJ_SET_POINT ]				=	_new_event(
 				"%d %d %d %d",
 				VIMS_PROJ_SET_POINT,
-				"Set a viewport point using scale",
+				"Set viewport mesh point in signed output coordinates, or configure grid with point 0",
 				vj_event_vp_set_points,
 				4,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"Point number",
+				"Point number (0=configures grid)",
 				0,
-				"Scale factor",
+				"Scale factor (0=select only; ignored for point 0)",
+				100,
+				"Signed X coordinate (may be outside 0-100%), or mesh columns for point 0",
 				0,
-				"X",
-				0,
-				"Y",
+				"Signed Y coordinate (may be outside 0-100%), or mesh rows for point 0",
 				0,
 				NULL );
 

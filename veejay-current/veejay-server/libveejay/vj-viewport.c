@@ -28,14 +28,19 @@
 #include <config.h>
 #include <math.h>
 #include <stdint.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
+#include <libvje/libvje.h>
 #include <libveejay/vj-viewport.h>
+#include <libveejay/vj-output-mesh.h>
 #include <libvje/effects/opacity.h>
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
@@ -80,6 +85,8 @@ typedef struct
 typedef struct
 {
 	void *scaler;
+    VJFrame *src_frame;
+    VJFrame *dst_frame;
 	uint8_t *buf[3];
 	float	scale;
 	float   sx;
@@ -143,7 +150,36 @@ typedef struct
 	grid_t	*grid;	
 	int	grid_mode;
 	int	initial_active;
+	vj_output_mesh *mesh;
+	int mesh_selected_point;
+	int mesh_hover_point;
+	char config_path[1024];
+	int config_port;
+	int config_frontback;
+	int config_bound;
 } viewport_t;
+
+#define VIEWPORT_CONFIG_VERSION 2
+#define VIEWPORT_CONFIG_MAX_PROFILES 64
+#define VIEWPORT_CONFIG_MAX_POINTS (17 * 17)
+
+typedef struct {
+    int valid;
+    int port;
+    int active;
+    int frontback;
+    int reverse;
+    int columns;
+    int rows;
+    int marker_size;
+    int grid_mode;
+    int grid_color;
+    float source_x;
+    float source_y;
+    float source_width;
+    float source_height;
+    float points[VIEWPORT_CONFIG_MAX_POINTS * 2];
+} viewport_port_profile_t;
 
 
 static	float		msx(viewport_t *v, float x);
@@ -155,6 +191,603 @@ static	float		vsy(viewport_t *v, float y);
 static void		viewport_draw_col( void *data, uint8_t *img, uint8_t *u, uint8_t *v );
 static int		viewport_update_perspective( viewport_t *v, float *values );
 static void		viewport_process( viewport_t *p );
+static void		viewport_compute_grid( viewport_t *v );
+
+static void viewport_mesh_sync_legacy_corners(viewport_t *v);
+
+static int viewport_mesh_event_index(const viewport_t *v, int point)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+
+    if(point < 1 || point > columns * rows)
+        return -1;
+
+    if(columns == 2 && rows == 2) {
+        static const int legacy_to_mesh[4] = { 0, 1, 3, 2 };
+        return legacy_to_mesh[point - 1];
+    }
+
+    return point - 1;
+}
+
+static int viewport_mesh_event_number(const viewport_t *v, int index)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+
+    if(index < 0 || index >= columns * rows)
+        return 0;
+    if(columns == 2 && rows == 2) {
+        static const int mesh_to_legacy[4] = { 1, 2, 4, 3 };
+        return mesh_to_legacy[index];
+    }
+    return index + 1;
+}
+
+static int viewport_mesh_is_corner(const viewport_t *v, int index)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+    return index == 0 || index == columns - 1 ||
+           index == (rows - 1) * columns ||
+           index == rows * columns - 1;
+}
+
+static int viewport_mesh_corner_role(const viewport_t *v, int index)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+    if(index == 0)
+        return 0;
+    if(index == columns - 1)
+        return 1;
+    if(index == rows * columns - 1)
+        return 2;
+    if(index == (rows - 1) * columns)
+        return 3;
+    return -1;
+}
+
+static void viewport_mesh_refresh_legacy_transform(viewport_t *v)
+{
+    if(!v->map)
+        return;
+    float points[9] = {
+        v->x1, v->y1, v->x2, v->y2,
+        v->x3, v->y3, v->x4, v->y4, 0.0f
+    };
+    viewport_update_perspective(v, points);
+}
+
+static int viewport_mesh_create(viewport_t *v, int width, int height,
+                                int columns, int rows)
+{
+    v->mesh = vj_output_mesh_create(width, height, width, height, columns, rows);
+    if(v->mesh)
+        vj_output_mesh_set_thread_count(v->mesh, vje_advise_num_threads(width * height));
+    v->mesh_selected_point = 0;
+    v->mesh_hover_point = -1;
+    return v->mesh != NULL;
+}
+
+static int viewport_mesh_copy_scaled(const viewport_t *source, viewport_t *target,
+                                     float scale_x, float scale_y)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(source->mesh, &columns, &rows);
+
+    if(!vj_output_mesh_set_grid(target->mesh, columns, rows))
+        return 0;
+
+    const int count = vj_output_mesh_point_count(source->mesh);
+    for(int i = 0; i < count; i++) {
+        vj_output_mesh_point point;
+        if(!vj_output_mesh_get_point(source->mesh, i, &point) ||
+           !vj_output_mesh_set_point(target->mesh, i,
+                                     point.x * scale_x, point.y * scale_y))
+            return 0;
+    }
+
+    if(!vj_output_mesh_set_source_rect(target->mesh,
+                                       (float)target->x0, (float)target->y0,
+                                       (float)target->w0, (float)target->h0) ||
+       !vj_output_mesh_compile(target->mesh))
+        return 0;
+
+    target->mesh_selected_point = source->mesh_selected_point;
+    if(target->mesh_selected_point < 0 || target->mesh_selected_point >= count)
+        target->mesh_selected_point = 0;
+    target->mesh_hover_point = -1;
+
+    viewport_mesh_sync_legacy_corners(target);
+    vj_output_mesh_get_bounds(target->mesh,
+                              &target->ttx1, &target->tty1,
+                              &target->ttx2, &target->tty2);
+    return 1;
+}
+
+static void viewport_mesh_sync_legacy_corners(viewport_t *v)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_point point;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+    if(columns < 2 || rows < 2)
+        return;
+
+    if(vj_output_mesh_get_point(v->mesh, 0, &point)) {
+        v->x1 = point.x * 100.0f / (float)v->w;
+        v->y1 = point.y * 100.0f / (float)v->h;
+    }
+    if(vj_output_mesh_get_point(v->mesh, columns - 1, &point)) {
+        v->x2 = point.x * 100.0f / (float)v->w;
+        v->y2 = point.y * 100.0f / (float)v->h;
+    }
+    if(vj_output_mesh_get_point(v->mesh, rows * columns - 1, &point)) {
+        v->x3 = point.x * 100.0f / (float)v->w;
+        v->y3 = point.y * 100.0f / (float)v->h;
+    }
+    if(vj_output_mesh_get_point(v->mesh, (rows - 1) * columns, &point)) {
+        v->x4 = point.x * 100.0f / (float)v->w;
+        v->y4 = point.y * 100.0f / (float)v->h;
+    }
+}
+
+static int viewport_mesh_sync_quad(viewport_t *v)
+{
+    if(!v->mesh)
+        return 0;
+
+    if(!vj_output_mesh_set_source_rect(v->mesh,
+                                       (float)v->x0, (float)v->y0,
+                                       (float)v->w0, (float)v->h0))
+        return 0;
+
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+    if(columns == 2 && rows == 2) {
+        if(!vj_output_mesh_set_quad(v->mesh,
+                                    v->x1 * v->w / 100.0f, v->y1 * v->h / 100.0f,
+                                    v->x2 * v->w / 100.0f, v->y2 * v->h / 100.0f,
+                                    v->x3 * v->w / 100.0f, v->y3 * v->h / 100.0f,
+                                    v->x4 * v->w / 100.0f, v->y4 * v->h / 100.0f))
+            return 0;
+    }
+    else {
+        vj_output_mesh_set_point(v->mesh, 0,
+                                 v->x1 * v->w / 100.0f,
+                                 v->y1 * v->h / 100.0f);
+        vj_output_mesh_set_point(v->mesh, columns - 1,
+                                 v->x2 * v->w / 100.0f,
+                                 v->y2 * v->h / 100.0f);
+        vj_output_mesh_set_point(v->mesh, rows * columns - 1,
+                                 v->x3 * v->w / 100.0f,
+                                 v->y3 * v->h / 100.0f);
+        vj_output_mesh_set_point(v->mesh, (rows - 1) * columns,
+                                 v->x4 * v->w / 100.0f,
+                                 v->y4 * v->h / 100.0f);
+    }
+
+    if(!vj_output_mesh_compile(v->mesh))
+        return 0;
+
+    vj_output_mesh_get_bounds(v->mesh,
+                              &v->ttx1, &v->tty1,
+                              &v->ttx2, &v->tty2);
+    return 1;
+}
+
+static void viewport_profile_init(viewport_port_profile_t *profile)
+{
+    memset(profile, 0, sizeof(*profile));
+    profile->frontback = 1;
+    profile->reverse = 1;
+    profile->columns = 2;
+    profile->rows = 2;
+    profile->marker_size = 4;
+    profile->grid_mode = 0;
+    profile->grid_color = 0xff;
+    profile->source_width = 100.0f;
+    profile->source_height = 100.0f;
+}
+
+static int viewport_profile_valid(const viewport_port_profile_t *profile)
+{
+    if(!profile || !profile->valid || !profile->active ||
+       profile->port <= 0 || profile->port > 65535 ||
+       profile->columns < 2 || profile->columns > 17 ||
+       profile->rows < 2 || profile->rows > 17 ||
+       profile->marker_size <= 0 || profile->marker_size > 128 ||
+       profile->grid_mode < 0 || profile->grid_mode > 2 ||
+       profile->grid_color < 0 || profile->grid_color > 255 ||
+       !isfinite(profile->source_x) || !isfinite(profile->source_y) ||
+       !isfinite(profile->source_width) || !isfinite(profile->source_height) ||
+       profile->source_x < 0.0f || profile->source_y < 0.0f ||
+       profile->source_width <= 0.0f || profile->source_height <= 0.0f ||
+       profile->source_x + profile->source_width > 100.0001f ||
+       profile->source_y + profile->source_height > 100.0001f)
+        return 0;
+
+    const int point_count = profile->columns * profile->rows;
+    if(point_count > VIEWPORT_CONFIG_MAX_POINTS)
+        return 0;
+    for(int point = 0; point < point_count; point++) {
+        if(!isfinite(profile->points[point * 2]) ||
+           !isfinite(profile->points[point * 2 + 1]))
+            return 0;
+    }
+    return 1;
+}
+
+static int viewport_profiles_load(const char *path,
+                                  viewport_port_profile_t *profiles,
+                                  int max_profiles)
+{
+    FILE *fd;
+    char line[512];
+    int version = 0;
+    int count = 0;
+    viewport_port_profile_t current;
+    int in_profile = 0;
+    int points_expected = 0;
+    int points_seen = 0;
+
+    if(!path || !profiles || max_profiles <= 0)
+        return 0;
+
+    fd = fopen(path, "rb");
+    if(!fd)
+        return 0;
+
+    if(!fgets(line, sizeof(line), fd) ||
+       sscanf(line, "VJVIEWPORT %d", &version) != 1 ||
+       version != VIEWPORT_CONFIG_VERSION) {
+        fclose(fd);
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Ignoring incompatible viewport configuration %s", path);
+        return 0;
+    }
+
+    viewport_profile_init(&current);
+    while(fgets(line, sizeof(line), fd)) {
+        int value = 0;
+        if(line[0] == '#' || line[0] == '\n' || line[0] == '\r')
+            continue;
+
+        if(sscanf(line, "PORT %d", &value) == 1) {
+            if(in_profile && viewport_profile_valid(&current) &&
+               points_expected == current.columns * current.rows &&
+               points_seen == points_expected && count < max_profiles)
+                profiles[count++] = current;
+            viewport_profile_init(&current);
+            current.port = value;
+            current.valid = 1;
+            in_profile = 1;
+            points_expected = 0;
+            points_seen = 0;
+            continue;
+        }
+
+        if(!in_profile)
+            continue;
+
+        if(sscanf(line, "ACTIVE %d", &value) == 1) {
+            current.active = value ? 1 : 0;
+            continue;
+        }
+        if(sscanf(line, "FRONTBACK %d", &value) == 1) {
+            current.frontback = value ? 1 : 0;
+            continue;
+        }
+        if(sscanf(line, "REVERSE %d", &value) == 1) {
+            current.reverse = value ? 1 : 0;
+            continue;
+        }
+        if(sscanf(line, "GRID %d %d", &current.columns, &current.rows) == 2) {
+            continue;
+        }
+        if(sscanf(line, "SOURCE %f %f %f %f",
+                  &current.source_x, &current.source_y,
+                  &current.source_width, &current.source_height) == 4) {
+            continue;
+        }
+        if(sscanf(line, "MARKER %d %d %d",
+                  &current.marker_size, &current.grid_mode,
+                  &current.grid_color) == 3) {
+            continue;
+        }
+        if(sscanf(line, "POINTS %d", &points_expected) == 1) {
+            points_seen = 0;
+            continue;
+        }
+        {
+            int index = -1;
+            float x = 0.0f;
+            float y = 0.0f;
+            if(sscanf(line, "POINT %d %f %f", &index, &x, &y) == 3 &&
+               index == points_seen &&
+               index >= 0 && index < VIEWPORT_CONFIG_MAX_POINTS &&
+               index < points_expected) {
+                current.points[index * 2] = x;
+                current.points[index * 2 + 1] = y;
+                points_seen++;
+                continue;
+            }
+        }
+        if(strncmp(line, "END", 3) == 0) {
+            if(viewport_profile_valid(&current) &&
+               points_expected == current.columns * current.rows &&
+               points_seen == points_expected && count < max_profiles)
+                profiles[count++] = current;
+            viewport_profile_init(&current);
+            in_profile = 0;
+            points_expected = 0;
+            points_seen = 0;
+        }
+    }
+
+    if(in_profile && viewport_profile_valid(&current) &&
+       points_expected == current.columns * current.rows &&
+       points_seen == points_expected && count < max_profiles)
+        profiles[count++] = current;
+
+    fclose(fd);
+    return count;
+}
+
+static int viewport_config_lock(const char *path)
+{
+    char lock_path[1200];
+    struct flock lock;
+    int fd;
+    int n;
+
+    if(!path)
+        return -1;
+
+    n = snprintf(lock_path, sizeof(lock_path), "%s.lock", path);
+    if(n < 0 || n >= (int)sizeof(lock_path)) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+
+    fd = open(lock_path, O_CREAT | O_RDWR, 0600);
+    if(fd < 0)
+        return -1;
+
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_WRLCK;
+    lock.l_whence = SEEK_SET;
+    while(fcntl(fd, F_SETLKW, &lock) != 0) {
+        if(errno == EINTR)
+            continue;
+        close(fd);
+        return -1;
+    }
+
+    return fd;
+}
+
+static void viewport_config_unlock(int fd)
+{
+    struct flock lock;
+
+    if(fd < 0)
+        return;
+
+    memset(&lock, 0, sizeof(lock));
+    lock.l_type = F_UNLCK;
+    lock.l_whence = SEEK_SET;
+    fcntl(fd, F_SETLK, &lock);
+    close(fd);
+}
+
+static int viewport_profiles_write(const char *path,
+                                   const viewport_port_profile_t *profiles,
+                                   int count)
+{
+    char tmp_path[1200];
+    FILE *fd;
+    int raw_fd;
+    int n;
+
+    if(!path || !profiles || count < 0)
+        return 0;
+
+    if(count == 0) {
+        if(unlink(path) != 0 && errno != ENOENT) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to remove viewport configuration %s: %s",
+                       path, strerror(errno));
+            return 0;
+        }
+        return 1;
+    }
+
+    n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp-%ld", path, (long)getpid());
+    if(n < 0 || n >= (int)sizeof(tmp_path))
+        return 0;
+
+    raw_fd = open(tmp_path, O_CREAT | O_TRUNC | O_WRONLY, 0600);
+    if(raw_fd < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to open viewport configuration %s: %s",
+                   tmp_path, strerror(errno));
+        return 0;
+    }
+    fd = fdopen(raw_fd, "wb");
+    if(!fd) {
+        close(raw_fd);
+        unlink(tmp_path);
+        return 0;
+    }
+
+    fprintf(fd, "VJVIEWPORT %d\n", VIEWPORT_CONFIG_VERSION);
+    for(int i = 0; i < count; i++) {
+        const viewport_port_profile_t *profile = &profiles[i];
+        if(!viewport_profile_valid(profile))
+            continue;
+
+        fprintf(fd, "PORT %d\n", profile->port);
+        fprintf(fd, "ACTIVE 1\n");
+        fprintf(fd, "FRONTBACK %d\n", profile->frontback ? 1 : 0);
+        fprintf(fd, "REVERSE %d\n", profile->reverse ? 1 : 0);
+        fprintf(fd, "GRID %d %d\n", profile->columns, profile->rows);
+        fprintf(fd, "SOURCE %.9g %.9g %.9g %.9g\n",
+                profile->source_x, profile->source_y,
+                profile->source_width, profile->source_height);
+        fprintf(fd, "MARKER %d %d %d\n",
+                profile->marker_size, profile->grid_mode, profile->grid_color);
+        fprintf(fd, "POINTS %d\n", profile->columns * profile->rows);
+        for(int point = 0; point < profile->columns * profile->rows; point++)
+            fprintf(fd, "POINT %d %.9g %.9g\n", point,
+                    profile->points[point * 2],
+                    profile->points[point * 2 + 1]);
+        fprintf(fd, "END\n");
+    }
+
+    int write_ok = 1;
+    if(fflush(fd) != 0)
+        write_ok = 0;
+    if(write_ok && fsync(raw_fd) != 0)
+        write_ok = 0;
+    if(fclose(fd) != 0)
+        write_ok = 0;
+    if(!write_ok) {
+        unlink(tmp_path);
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to flush viewport configuration %s", tmp_path);
+        return 0;
+    }
+
+    if(rename(tmp_path, path) != 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to replace viewport configuration %s: %s",
+                   path, strerror(errno));
+        unlink(tmp_path);
+        return 0;
+    }
+
+    return 1;
+}
+
+static int viewport_apply_profile(viewport_t *v,
+                                  const viewport_port_profile_t *profile)
+{
+    vj_output_mesh *mesh;
+    int point_count;
+    int x0;
+    int y0;
+    int w0;
+    int h0;
+
+    if(!v || !viewport_profile_valid(profile))
+        return 0;
+
+    x0 = (int)lrintf(profile->source_x * (float)v->w / 100.0f);
+    y0 = (int)lrintf(profile->source_y * (float)v->h / 100.0f);
+    w0 = (int)lrintf(profile->source_width * (float)v->w / 100.0f);
+    h0 = (int)lrintf(profile->source_height * (float)v->h / 100.0f);
+    if(w0 <= 0 || h0 <= 0)
+        return 0;
+
+    mesh = vj_output_mesh_create(v->w, v->h, v->w, v->h,
+                                 profile->columns, profile->rows);
+    if(!mesh)
+        return 0;
+    vj_output_mesh_set_thread_count(mesh, vje_advise_num_threads(v->w * v->h));
+    if(!vj_output_mesh_set_source_rect(mesh,
+                                       (float)x0, (float)y0,
+                                       (float)w0, (float)h0)) {
+        vj_output_mesh_destroy(mesh);
+        return 0;
+    }
+
+    point_count = profile->columns * profile->rows;
+    for(int point = 0; point < point_count; point++) {
+        if(!vj_output_mesh_set_point(mesh, point,
+                                     profile->points[point * 2] * (float)v->w / 100.0f,
+                                     profile->points[point * 2 + 1] * (float)v->h / 100.0f)) {
+            vj_output_mesh_destroy(mesh);
+            return 0;
+        }
+    }
+    if(!vj_output_mesh_compile(mesh)) {
+        vj_output_mesh_destroy(mesh);
+        return 0;
+    }
+
+    vj_output_mesh_destroy(v->mesh);
+    v->mesh = mesh;
+    v->x0 = x0;
+    v->y0 = y0;
+    v->w0 = w0;
+    v->h0 = h0;
+    v->marker_size = profile->marker_size > 0 ? profile->marker_size : 4;
+    v->grid_mode = profile->grid_mode;
+    v->grid_val = (uint8_t)profile->grid_color;
+    v->user_reverse = profile->reverse ? 1 : 0;
+    v->initial_active = 1;
+    v->disable = 0;
+    v->mesh_selected_point = 0;
+    v->mesh_hover_point = -1;
+    viewport_mesh_sync_legacy_corners(v);
+    viewport_mesh_refresh_legacy_transform(v);
+    vj_output_mesh_get_bounds(v->mesh,
+                              &v->ttx1, &v->tty1,
+                              &v->ttx2, &v->tty2);
+    if(v->grid)
+        viewport_compute_grid(v);
+    if(v->map)
+        viewport_process(v);
+    return 1;
+}
+
+static int viewport_reset_identity(viewport_t *v)
+{
+    if(!v || !v->mesh)
+        return 0;
+
+    if(!vj_output_mesh_set_grid(v->mesh, 2, 2) ||
+       !vj_output_mesh_set_source_rect(v->mesh, 0.0f, 0.0f,
+                                       (float)v->w, (float)v->h) ||
+       !vj_output_mesh_set_point(v->mesh, 0, 0.0f, 0.0f) ||
+       !vj_output_mesh_set_point(v->mesh, 1, (float)(v->w - 1), 0.0f) ||
+       !vj_output_mesh_set_point(v->mesh, 2, 0.0f, (float)(v->h - 1)) ||
+       !vj_output_mesh_set_point(v->mesh, 3,
+                                 (float)(v->w - 1), (float)(v->h - 1)) ||
+       !vj_output_mesh_compile(v->mesh))
+        return 0;
+
+    v->x0 = 0;
+    v->y0 = 0;
+    v->w0 = v->w;
+    v->h0 = v->h;
+    v->user_reverse = 1;
+    v->initial_active = 0;
+    v->user_ui = 0;
+    v->disable = 0;
+    v->mesh_selected_point = 0;
+    v->mesh_hover_point = -1;
+    viewport_mesh_sync_legacy_corners(v);
+    viewport_mesh_refresh_legacy_transform(v);
+    vj_output_mesh_get_bounds(v->mesh,
+                              &v->ttx1, &v->tty1,
+                              &v->ttx2, &v->tty2);
+    if(v->grid)
+        viewport_compute_grid(v);
+    if(v->map)
+        viewport_process(v);
+    return 1;
+}
+
 static int		viewport_configure( 
 					viewport_t *v,
 					float x1, float y1,
@@ -180,9 +813,7 @@ static matrix_t		*viewport_matrix(void);
 static void		viewport_find_transform( float *coord, matrix_t *M );
 void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
 static void		draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col );
-static viewport_config_t *viewport_load_settings( char *dir );
 static	void		viewport_prepare_process( viewport_t *v );
-static	void	viewport_compute_grid( viewport_t *v );
 
 #ifdef HAVE_X86CPU
 static inline int int_max( int a, int b )
@@ -236,8 +867,17 @@ void viewport_line (uint8_t *plane,
   if( x2 < 0 ) x2 = 0; else if (x2 >= w ) x2 = w - 1;
   if( y2 < 0 ) y2 = 0; else if (y2 >= h ) y2 = h - 1;
 
-  if( x1 == x2 || y1 == y2 )
-     return;
+  if(y1 == y2) {
+    for(int x = x1 < x2 ? x1 : x2; x <= (x1 > x2 ? x1 : x2); x++)
+      plane[y1 * w + x] = col;
+    return;
+  }
+
+  if(x1 == x2) {
+    for(int y = y1 < y2 ? y1 : y2; y <= (y1 > y2 ? y1 : y2); y++)
+      plane[y * w + x1] = col;
+    return;
+  }
 
   /* sort line */
   if (x2 < x1) {
@@ -334,12 +974,12 @@ static	void	draw_point( uint8_t *plane, int x, int y, int w, int h, int size, in
 	int x2 = x + size*2;
 	int y2 = y + size*2;
 
-	if( x1 < 0 ) x1 = 0; else if ( x1 > w ) x1 = w;
-	if( y1 < 0 ) y1 = 0; else if ( y1 > h ) y1 = h;
-	if( x2 < 0 ) x2 = 0; else if ( x2 > w ) x2 = w;
-	if( y2 < 0 ) y2 = 0; else if ( y2 > h ) y2 = h;
+	if( x1 < 0 ) x1 = 0; else if ( x1 >= w ) x1 = w - 1;
+	if( y1 < 0 ) y1 = 0; else if ( y1 >= h ) y1 = h - 1;
+	if( x2 < 0 ) x2 = 0; else if ( x2 >= w ) x2 = w - 1;
+	if( y2 < 0 ) y2 = 0; else if ( y2 >= h ) y2 = h - 1;
 
-	unsigned int i,j;
+	int i,j;
 	for( i = y1; i < y2; i ++ ) 
 	{
 		for( j = x1; j < x2 ; j ++ )
@@ -411,73 +1051,104 @@ void	viewport_set_ui(void *vv, int i)
 {
 	viewport_t *v = (viewport_t*) vv;
 	v->user_ui = i;
+    if(!i)
+        v->mesh_hover_point = -1;
 }
 
 
 char *viewport_get_my_help(void *vv)
 {
-	viewport_t *v = (viewport_t*) vv;
-	if(!v->user_ui )
-		return NULL;
+    viewport_t *v = (viewport_t*)vv;
+    if(!v->user_ui)
+        return NULL;
 
-	char reverse_mode[32];
-	veejay_memset(reverse_mode,0,sizeof(reverse_mode));
-	snprintf(reverse_mode, sizeof(reverse_mode), "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
-	
-	char scroll_mode[64];
+    char reverse_mode[32];
+    snprintf(reverse_mode, sizeof(reverse_mode), "%s",
+             v->user_reverse ? "Forward" : "Reverse");
 
-	switch(v->grid_mode) {
-		case 0:
-			snprintf(scroll_mode,sizeof(scroll_mode),
-					"CTRL + Mousewheel: Marker %2dx%2d up=Grid down=Dots",v->marker_size,v->marker_size);
-			break;
-		case 1:
-			snprintf(scroll_mode,sizeof(scroll_mode),
-					"CTRL + Mousewheel: Dots %2dx%2d up=Marker down=Grid",v->grid_resolution,v->grid_resolution);
-			break;
-		case 2:
-			snprintf(scroll_mode,sizeof(scroll_mode),
-					"CTRL + Mousewheel: Grid %2dx%2d up=Grid down=Marker",v->grid_resolution,v->grid_resolution);
-			break;
-	}
+    char guide_mode[96];
+    switch(v->grid_mode) {
+        case 0:
+            snprintf(guide_mode, sizeof(guide_mode),
+                     "Guide: marker %dx%d; wheel changes marker size",
+                     v->marker_size, v->marker_size);
+            break;
+        case 1:
+            snprintf(guide_mode, sizeof(guide_mode),
+                     "Guide: transformed dots every %d pixels",
+                     v->grid_resolution);
+            break;
+        default:
+            snprintf(guide_mode, sizeof(guide_mode),
+                     "Guide: transformed grid every %d pixels",
+                     v->grid_resolution);
+            break;
+    }
 
+    char tmp[2048];
+    snprintf(tmp, sizeof(tmp),
+             "Viewport Mesh Setup\n"
+             "Left click: move nearest mesh point\n"
+             "CTRL + Left click: select point without moving\n"
+             "ALT + Mousewheel: select previous/next point\n"
+             "CTRL + Cursor Keys: nudge selected point\n"
+             "Left Shift + Left click: edit source rectangle corner\n"
+             "Right click: mapping direction (%s)\n"
+             "Middle click or CTRL + S: save and exit setup\n"
+             "Left Shift + Middle click: invert overlay color\n"
+             "CTRL + Mousewheel: cycle marker/dots/grid overlay\n"
+             "CTRL + H: hide/show this help\n"
+             "CTRL + A: toggle transform startup state\n"
+             "CTRL + P: toggle live projection\n"
+             "%s\n"
+             "GTK/VIMS: 007 query state, 162 set/select/grid, 160 nudge, 006 setup\n",
+             reverse_mode, guide_mode);
 
-	char tmp[1500];
-	char startup_mode[16];
-	snprintf(startup_mode,sizeof(startup_mode), "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
-	snprintf(tmp,sizeof(tmp), "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Exit without saving\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Enable/disable transform\nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
-			reverse_mode,
-			startup_mode,
-			scroll_mode
-			);
-	
-
-	return strdup( tmp );
+    return strdup(tmp);
 }
-char *viewport_get_my_status(void  *vv)
+
+char *viewport_get_my_status(void *vv)
 {
-	viewport_t *v = (viewport_t*) vv;
-	if(!v->user_ui )
-		return NULL;
+    viewport_t *v = (viewport_t*)vv;
+    if(!v->user_ui)
+        return NULL;
 
-//	float x = v->usermouse[2] / ( v->w / 100.0f );
-//	float y = v->usermouse[3] / ( v->h / 100.0f );
+    int mesh_columns = 0;
+    int mesh_rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &mesh_columns, &mesh_rows);
 
-	float tx = vsx(v,v->usermouse[4]);
-	float ty = vsy(v,v->usermouse[5]);
+    const int point_count = mesh_columns * mesh_rows;
+    int selected = v->mesh_selected_point;
+    if(selected < 0 || selected >= point_count)
+        selected = 0;
 
-	char status[1024];
-	snprintf(status,1024, "Projection Quad: %dx%d + %dx%d\nPoints: 1=%2.2fx%2.2f 2=%2.2fx%2.2f 3=%2.2fx%2.2f 4=%2.2fx%2.2f\nCurrent Position: %2.1fx%2.1f\n",
-		v->x0,v->y0,
-		v->w0,v->h0,
-		v->x1,v->y1,
-		v->x2,v->y2,
-		v->x3,v->y3,
-		v->x4,v->y4,
-		tx,ty
-		);
+    vj_output_mesh_point selected_point = { 0.0f, 0.0f };
+    vj_output_mesh_get_point(v->mesh, selected, &selected_point);
 
-	return strdup( status );
+    const int selected_number = viewport_mesh_event_number(v, selected);
+    const int selected_row = selected / mesh_columns;
+    const int selected_col = selected % mesh_columns;
+    const int hover_number = viewport_mesh_event_number(v, v->mesh_hover_point);
+    const float percent_x = selected_point.x * 100.0f / (float)v->w;
+    const float percent_y = selected_point.y * 100.0f / (float)v->h;
+
+    int bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
+    vj_output_mesh_get_bounds(v->mesh, &bx0, &by0, &bx1, &by1);
+
+    char status[1536];
+    snprintf(status, sizeof(status),
+             "Mesh %dx%d (%d points) | selected %d [row %d, column %d] | hover %d\n"
+             "Selected output: %.2f, %.2f px | normalized: %.4f%%, %.4f%%\n"
+             "Source rectangle: %d,%d + %dx%d | mesh bounds: %d,%d - %d,%d\n"
+             "Legacy corners: 1=%.2fx%.2f 2=%.2fx%.2f 3=%.2fx%.2f 4=%.2fx%.2f\n",
+             mesh_columns, mesh_rows, point_count,
+             selected_number, selected_row + 1, selected_col + 1, hover_number,
+             selected_point.x, selected_point.y, percent_x, percent_y,
+             v->x0, v->y0, v->w0, v->h0, bx0, by0, bx1, by1,
+             v->x1, v->y1, v->x2, v->y2,
+             v->x3, v->y3, v->x4, v->y4);
+
+    return strdup(status);
 }
 
 
@@ -762,6 +1433,10 @@ static int		viewport_configure(
 	v->y4 = y4;
 	v->user_reverse = reverse;
 
+    if(!viewport_mesh_sync_quad(v)) {
+        return 0;
+    }
+
 	float tmp = v->points[X3];
 	v->points[X3] = v->points[X2];
 	v->points[X2] = tmp;
@@ -897,157 +1572,22 @@ static	void	viewport_prepare_process( viewport_t *v )
 
 void viewport_process_dynamic(void *data, uint8_t *restrict in[3], uint8_t *restrict out[3])
 {
-    viewport_t *v = (viewport_t*) data;
-    if (v->disable) return;
-
-    const int32_t w = v->w;
-    const int32_t h = v->h;
-    const int32_t tx1 = v->ttx1, tx2 = v->ttx2;
-    const int32_t ty1 = v->tty1, ty2 = v->tty2;
-    const int32_t sentinel_idx = w * h; // The "safe" black pixel
-
-    matrix_t *m = v->m;
-    const float xinc = m->m[0][0], yinc = m->m[1][0], winc = m->m[2][0];
-    const float m01  = m->m[0][1], m11  = m->m[1][1], m21  = m->m[2][1];
-    const float m02  = m->m[0][2], m12  = m->m[1][2], m22  = m->m[2][2];
-
-    const uint8_t *restrict inY = in[0];
-    const uint8_t *restrict inU = in[1];
-    const uint8_t *restrict inV = in[2];
-
-    ((uint8_t*)inY)[sentinel_idx] = 0;
-    ((uint8_t*)inU)[sentinel_idx] = 128;
-    ((uint8_t*)inV)[sentinel_idx] = 128;
-
-    veejay_memset(out[0], 0, ty1 * w);
-    veejay_memset(out[1], 128, ty1 * w);
-    veejay_memset(out[2], 128, ty1 * w);
-
-    for (int32_t y = ty1; y < ty2; y++)
-    {
-        uint8_t *restrict oY = out[0] + (y * w);
-        uint8_t *restrict oU = out[1] + (y * w);
-        uint8_t *restrict oV = out[2] + (y * w);
-
-        float tx = xinc * (tx1 + 0.5f) + m01 * (y + 0.5f) + m02;
-        float ty = yinc * (tx1 + 0.5f) + m11 * (y + 0.5f) + m12;
-        float tw = winc * (tx1 + 0.5f) + m21 * (y + 0.5f) + m22;
-
-        for (int32_t x = 0; x < tx1; x++) {
-            oY[x] = 0; oU[x] = 128; oV[x] = 128;
-        }
-
-        #pragma GCC ivdep
-        for (int32_t x = tx1; x < tx2; x++)
-        {
-            float inv_w = (tw != 0.0f) ? (1.0f / tw) : 0.0f;
-            int32_t itx = (int32_t)(tx * inv_w);
-            int32_t ity = (int32_t)(ty * inv_w);
-
-            int isValid = (itx >= 0 && itx < w && ity >= 0 && ity < h);
-            int32_t src_idx = isValid ? (ity * w + itx) : sentinel_idx;
-
-            oY[x] = inY[src_idx];
-            oU[x] = inU[src_idx];
-            oV[x] = inV[src_idx];
-
-            tx += xinc;
-            ty += yinc;
-            tw += winc;
-        }
-
-        for (int32_t x = tx2; x < w; x++) {
-            oY[x] = 0; oU[x] = 128; oV[x] = 128;
-        }
-    }
-
-    int32_t rest = h - ty2;
-    if (rest > 0) {
-        veejay_memset(out[0] + (ty2 * w), 0, rest * w);
-        veejay_memset(out[1] + (ty2 * w), 128, rest * w);
-        veejay_memset(out[2] + (ty2 * w), 128, rest * w);
-    }
+    viewport_t *v = (viewport_t*)data;
+    if(v->disable)
+        return;
+    const uint8_t *input[3] = { in[0], in[1], in[2] };
+    uint8_t *output[3] = { out[0], out[1], out[2] };
+    vj_output_mesh_render_yuv444(v->mesh, input, output);
 }
-
 
 void viewport_process_dynamic_alpha(void *data, uint8_t *restrict in[4], uint8_t *restrict out[4])
 {
-    viewport_t *v = (viewport_t*) data;
-    if (v->disable) return;
-
-    const int32_t w = v->w;
-    const int32_t h = v->h;
-    const int32_t tx1 = v->ttx1, tx2 = v->ttx2;
-    const int32_t ty1 = v->tty1, ty2 = v->tty2;
-    const int32_t sentinel_idx = w * h; // Safe black pixel
-
-    matrix_t *m = v->m;
-    const float xinc = m->m[0][0], yinc = m->m[1][0], winc = m->m[2][0];
-    const float m01  = m->m[0][1], m11  = m->m[1][1], m21  = m->m[2][1];
-    const float m02  = m->m[0][2], m12  = m->m[1][2], m22  = m->m[2][2];
-
-    const uint8_t *restrict inY = in[0];
-    const uint8_t *restrict inU = in[1];
-    const uint8_t *restrict inV = in[2];
-    const uint8_t *restrict inA = in[3];
-
-  	((uint8_t*)inY)[sentinel_idx] = 0;
-    ((uint8_t*)inU)[sentinel_idx] = 128;
-    ((uint8_t*)inV)[sentinel_idx] = 128;
-    ((uint8_t*)inA)[sentinel_idx] = 0;
-
-    veejay_memset(out[0], 0, ty1 * w);
-    veejay_memset(out[1], 128, ty1 * w);
-    veejay_memset(out[2], 128, ty1 * w);
-    veejay_memset(out[3], 0, ty1 * w);
-
-    for (int32_t y = ty1; y < ty2; y++)
-    {
-        uint8_t *restrict oY = out[0] + (y * w);
-        uint8_t *restrict oU = out[1] + (y * w);
-        uint8_t *restrict oV = out[2] + (y * w);
-        uint8_t *restrict oA = out[3] + (y * w);
-
-        float tx = xinc * (tx1 + 0.5f) + m01 * (y + 0.5f) + m02;
-        float ty = yinc * (tx1 + 0.5f) + m11 * (y + 0.5f) + m12;
-        float tw = winc * (tx1 + 0.5f) + m21 * (y + 0.5f) + m22;
-
-        for (int32_t x = 0; x < tx1; x++) {
-            oY[x] = 0; oU[x] = 128; oV[x] = 128; oA[x] = 0;
-        }
-
-        #pragma GCC ivdep
-        for (int32_t x = tx1; x < tx2; x++)
-        {
-            float inv_w = (tw != 0.0f) ? (1.0f / tw) : 0.0f;
-            int32_t itx = (int32_t)(tx * inv_w);
-            int32_t ity = (int32_t)(ty * inv_w);
-
-            int isValid = (itx >= 0 && itx < w && ity >= 0 && ity < h);
-            int32_t src_idx = isValid ? (ity * w + itx) : sentinel_idx;
-
-            oY[x] = inY[src_idx];
-            oU[x] = inU[src_idx];
-            oV[x] = inV[src_idx];
-            oA[x] = inA[src_idx];
-
-            tx += xinc;
-            ty += yinc;
-            tw += winc;
-        }
-
-        for (int32_t x = tx2; x < w; x++) {
-            oY[x] = 0; oU[x] = 128; oV[x] = 128; oA[x] = 0;
-        }
-    }
-
-    const int rest = h - ty2;
-    if (rest > 0) {
-        veejay_memset(out[0] + (ty2 * w), 0, rest * w);
-        veejay_memset(out[1] + (ty2 * w), 128, rest * w);
-        veejay_memset(out[2] + (ty2 * w), 128, rest * w);
-        veejay_memset(out[3] + (ty2 * w), 0, rest * w);
-    }
+    viewport_t *v = (viewport_t*)data;
+    if(v->disable)
+        return;
+    const uint8_t *input[4] = { in[0], in[1], in[2], in[3] };
+    uint8_t *output[4] = { out[0], out[1], out[2], out[3] };
+    vj_output_mesh_render_yuv444_alpha(v->mesh, input, output);
 }
 
 void			viewport_destroy( void *data )
@@ -1059,10 +1599,15 @@ void			viewport_destroy( void *data )
 		if( v->m ) free( v->m );
 		if( v->T ) free( v->T );
 		if( v->map ) free( v->map );
+        if( v->mesh ) vj_output_mesh_destroy(v->mesh);
 		if( v->help ) free( v->help );
 		if( v->ui ) {
-			if( v->ui->scaler ) 
+			if( v->ui->scaler )
 				yuv_free_swscaler(v->ui->scaler);
+            if(v->ui->src_frame)
+                free(v->ui->src_frame);
+            if(v->ui->dst_frame)
+                free(v->ui->dst_frame);
 			if( v->ui->buf[0] )
 				free(v->ui->buf[0]);
 			free(v->ui);
@@ -1097,13 +1642,14 @@ static	int		viewport_update_perspective( viewport_t *v, float *values )
 		v->y1 = values[1]; v->y2 = values[3]; v->y3 = values[5]; v->y4 = values[7];
 
 		if(!viewport_configure( v, v->x1, v->y1, v->x2, v->y2, v->x3, v->y3,v->x4,v->y4,
-				v->x0, v->y0, v->w0, v->h0,v->w,v->h, v->user_reverse, v->grid_val,v->grid_resolution ));
+				v->x0, v->y0, v->w0, v->h0,v->w,v->h, v->user_reverse, v->grid_val,v->grid_resolution ))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to configure the viewport");
 			veejay_msg(VEEJAY_MSG_ERROR, "If you are using a preset-configuration, remove or fix ~/.veejay/viewport.cfg");
 			v->disable = 1;
-			return res;
+			return 0;
 		}
+        res = 1;
 	}
 
 	// Clear map
@@ -1133,18 +1679,31 @@ static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 	int nh = h * u->scale;
 	u->sw  = nearest_div(nw);
 	u->sh  = nearest_div(nh);
-	VJFrame *srci = yuv_yuv_template( dummy[0],dummy[1],dummy[2],w,h,PIX_FMT_GRAY8);
-	VJFrame *dsti = yuv_yuv_template( dummy[0],dummy[1],dummy[2],u->sw,u->sh,PIX_FMT_GRAY8);
+	u->src_frame = yuv_yuv_template(dummy[0], dummy[1], dummy[2],
+                                      w, h, PIX_FMT_GRAY8);
+	u->dst_frame = yuv_yuv_template(u->buf[0], NULL, NULL,
+                                      u->sw, u->sh, PIX_FMT_GRAY8);
+	if(!u->src_frame || !u->dst_frame) {
+		if(u->src_frame) free(u->src_frame);
+		if(u->dst_frame) free(u->dst_frame);
+		u->src_frame = NULL;
+		u->dst_frame = NULL;
+		return NULL;
+	}
+
 	sws_template t;
 	memset(&t,0,sizeof(sws_template));
 	t.flags = yuv_which_scaler();
 	u->sx   = (float)w / (float) u->sw;
 	u->sy   = (float)h / (float) u->sh;
-	void *scaler = yuv_init_swscaler( srci,dsti,&t,yuv_sws_get_cpu_flags());
-
-	free(srci);	
-	free(dsti);
-
+	void *scaler = yuv_init_swscaler(u->src_frame, u->dst_frame,
+                                      &t, yuv_sws_get_cpu_flags());
+	if(!scaler) {
+		free(u->src_frame);
+		free(u->dst_frame);
+		u->src_frame = NULL;
+		u->dst_frame = NULL;
+	}
 	return scaler;
 }
 
@@ -1199,11 +1758,7 @@ void	viewport_set_initial_active( void *vv, int status )
 
 void	*viewport_get_configuration(void *vv, char *filename )
 {
-	viewport_config_t *vc = viewport_load_settings( filename );
-	if(vc) {
-		return vc;
-	} 
-
+    (void)filename;
 	viewport_t *v = (viewport_t*) vv;
 	viewport_config_t *o = (viewport_config_t*) vj_calloc(sizeof(viewport_config_t));
 	o->saved_w = v->saved_w;
@@ -1334,7 +1889,7 @@ void	viewport_update_from(void *vv, void *bb)
 	b->user_reverse = v->user_reverse;
 	
 
-	if(viewport_update_perspective(b,p)) {
+	if(viewport_update_perspective(b,p) && viewport_mesh_copy_scaled(v, b, sx, sy)) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Configured input %dx%d to (1)=%fx%f\t(2)=%fx%f\t(3)=%fx%f\t(4)=%fx%f\t%dx%d+%dx%d",
 			b->w,b->h,b->x1,b->y1,b->x2,b->y2,b->x3,b->y3,b->x4,b->y4,b->x0,b->y0,b->w0,b->h0);
 	}
@@ -1345,197 +1900,182 @@ void	viewport_update_from(void *vv, void *bb)
 
 }
 
-void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih,char *filename, int *enable, int *frontback, int mode )
+void *viewport_init(int x0, int y0, int w0, int h0, int w, int h,
+                    int iw, int ih, char *filename, int *enable,
+                    int *frontback, int mode)
 {
-	//@ try to load last saved settings
-	viewport_config_t *vc = viewport_load_settings( filename );
-	if(vc) {
-		float sx = (float) w / (float) vc->saved_w;
-		float sy = (float) h / (float) vc->saved_h;
+    (void)mode;
+    veejay_msg(VEEJAY_MSG_DEBUG, "\tBacking  : %dx%d", w, h);
+    veejay_msg(VEEJAY_MSG_DEBUG, "\tRectangle: %dx%d+%dx%d", x0, y0, w0, h0);
 
-		vc->x0 = vc->x0 * sx;
-		vc->y0 = vc->y0 * sy;
-		vc->w0 = vc->w0 * sx;
-		vc->h0 = vc->h0 * sy;
-		veejay_msg(VEEJAY_MSG_DEBUG,"\tQuad    : %dx%d+%dx%d",vc->x0,vc->y0,vc->w0,vc->h0 );
-	} 
-	veejay_msg(VEEJAY_MSG_DEBUG,"\tBacking  : %dx%d",w,h);
-	veejay_msg(VEEJAY_MSG_DEBUG,"\tRectangle: %dx%d+%dx%d",x0,y0,w0,h0);
+    viewport_t *v = (viewport_t*)vj_calloc(sizeof(viewport_t));
+    if(!v)
+        return NULL;
 
-	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
-	v->usermouse[0] = 0.0;
-	v->usermouse[1] = 0.0;
-	v->usermouse[2] = 0.0;
-	v->usermouse[3] = 0.0;
-	v->M = NULL;
-	v->m = NULL;
-	v->grid = NULL;
-	v->ui  = vj_calloc( sizeof(ui_t));
-	v->ui->buf[0] = vj_calloc(sizeof(uint8_t) * (w * h) );
-	v->ui->scale  = 0.5f;
-	v->ui->scaler = viewport_init_swscaler(v->ui,iw,ih);
-	v->saved_w = w;
-	v->saved_h = h;
-	v->w = w;
-	v->h = h;		
-	v->marker_size = 4;
-	v->disable = 0;
-	
-	int res;
+    v->ui = (ui_t*)vj_calloc(sizeof(ui_t));
+    if(!v->ui) {
+        viewport_destroy(v);
+        return NULL;
+    }
 
-	if( vc == NULL )
-	{
-		res = viewport_configure (v, 29.0, 28.0,
-					     70.0, 30.0,
-						70.0, 66.0,
-						30.0, 69.0,
+    v->ui->buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * (w * h));
+    v->ui->scale = 0.5f;
+    if(!v->ui->buf[0] || !(v->ui->scaler = viewport_init_swscaler(v->ui, iw, ih))) {
+        viewport_destroy(v);
+        return NULL;
+    }
 
-					     x0,y0,w0,h0,
-					     w,h,
-					     1,
-					     0xff,
-					     w/32 );
+    v->saved_w = w;
+    v->saved_h = h;
+    v->w = w;
+    v->h = h;
+    v->marker_size = 4;
+    v->disable = 0;
+    v->config_port = 0;
+    v->config_frontback = 1;
+    v->config_bound = 0;
+    if(filename)
+        snprintf(v->config_path, sizeof(v->config_path), "%s", filename);
 
-		*enable = 0;
-		*frontback = 1;
-		v->user_ui = 0;
+    if(!viewport_mesh_create(v, w, h, 2, 2)) {
+        viewport_destroy(v);
+        return NULL;
+    }
 
-	}
-	else
-	{
-		v->marker_size = vc->marker_size;
-		v->grid_resolution = vc->grid_resolution;
-		v->grid_mode = vc->grid_mode;	
-		v->initial_active = vc->initial_active;
+    if(!viewport_configure(v,
+                           0.0f, 0.0f,
+                           100.0f, 0.0f,
+                           100.0f, 100.0f,
+                           0.0f, 100.0f,
+                           x0, y0, w0, h0,
+                           w, h, 1, 0xff, w / 32)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize identity viewport");
+        viewport_destroy(v);
+        return NULL;
+    }
 
-		res = viewport_configure( v, 	vc->x1, vc->y1,
-					     	vc->x2, vc->y2,
-						vc->x3, vc->y3,
-					 	vc->x4, vc->y4,
-						vc->x0, vc->y0,
-						vc->w0, vc->h0,			
-						w,h,
-						vc->reverse,
-						vc->grid_color,
-						vc->grid_resolution );
+    v->initial_active = 0;
+    v->user_ui = 0;
+    if(enable)
+        *enable = 0;
+    if(frontback)
+        *frontback = 1;
 
-		*enable = vc->initial_active;
-		*frontback = vc->frontback;
-		v->user_ui = 0;
+    v->map = (int32_t*)vj_calloc(sizeof(int32_t) * (v->w * v->h + (v->w * 2)));
+    if(!v->map) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Memory allocation error");
+        viewport_destroy(v);
+        return NULL;
+    }
 
-	}
+    const int len = v->w * v->h;
+    const int eln = len + (v->w * 2);
+    veejay_memset(v->map, len + 1, eln);
+    viewport_process(v);
 
+    if(v->grid_resolution > 0)
+        viewport_compute_grid(v);
 
-	if(! res )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
-		free(v->ui->buf[0]);
-		free(v->ui);
-		free(v);
-		free(vc);
-		return NULL;
-	}
-
-	// Allocate memory for map
-	v->map = (int32_t*) vj_calloc(sizeof(int32_t) * (v->w * v->h + (v->w*2)) );
-	if(!v->map) {
-		free(v->ui->buf[0]);
-		free(v->ui);
-		free(v);
-		free(vc);
-		veejay_msg(VEEJAY_MSG_ERROR, "Memory allocation error");
-		return NULL;
-	}
-
-	const int len = v->w * v->h;
-	const int eln = len + ( v->w * 2 );
-
-	veejay_memset( v->map, len+1, eln );
-
-	// calculate initial view
-	viewport_process( v );
-
-//	v->buf = vj_calloc( sizeof(int32_t) * 50000 );
-	free(vc);
-	
-	if(v->grid_resolution > 0)
-		viewport_compute_grid(v);
-
-   	return (void*)v;
+    return (void*)v;
 }
 
-void *viewport_clone(void *vv, int new_w, int new_h )
+void *viewport_clone(void *vv, int new_w, int new_h)
 {
-	viewport_t *v = (viewport_t*) vv;
-	if(!v) return NULL;
-	viewport_t *q = (viewport_t*) vj_malloc(sizeof(viewport_t));
-	veejay_memcpy(q,v,sizeof(viewport_t));
+	viewport_t *v = (viewport_t*)vv;
+	if(!v)
+		return NULL;
 
-	float sx = (float) new_w / (float) v->w;
-	float sy = (float) new_h / (float) v->h;
-	q->M  = NULL;
-	q->m  = NULL;
+	viewport_t *q = (viewport_t*)vj_malloc(sizeof(viewport_t));
+	if(!q)
+		return NULL;
+	veejay_memcpy(q, v, sizeof(viewport_t));
+
+	q->M = NULL;
+	q->m = NULL;
+	q->T = NULL;
+	q->map = NULL;
 	q->grid = NULL;
+	q->mesh = NULL;
+	q->help = NULL;
+	q->ui = NULL;
+
+	float sx = (float)new_w / (float)v->w;
+	float sy = (float)new_h / (float)v->h;
 	q->initial_active = v->initial_active;
 	q->x0 = v->x0 * sx;
 	q->y0 = v->y0 * sy;
 	q->w0 = v->w0 * sx;
 	q->h0 = v->h0 * sy;
-	q->x  = v->x * sx;
-	q->y  = v->y * sy;
-	q->w  = new_w;
-	q->h  = new_h;
+	q->x = v->x * sx;
+	q->y = v->y * sy;
+	q->w = new_w;
+	q->h = new_h;
+	q->saved_w = new_w;
+	q->saved_h = new_h;
 	q->usermouse[0] = 0.0;
 	q->usermouse[1] = 0.0;
 	q->usermouse[2] = 0.0;
 	q->usermouse[3] = 0.0;
-	q->ui  = vj_calloc( sizeof(ui_t));
-	q->ui->buf[0] = vj_calloc(sizeof(uint8_t) * (new_w * new_h) );
-	q->ui->scale  = 1.0f;
-	q->ui->scaler = viewport_init_swscaler(q->ui,new_w,new_h);
 	q->disable = 0;
 
-	int	res = viewport_configure( q, 	q->x1, q->y1,
-					     	q->x2, q->y2,
-						q->x3, q->y3,
-					 	q->x4, q->y4,
-						q->x0, q->y0,
-						q->w0, q->h0,			
-						new_w,new_h,
-						q->user_reverse,
-						q->grid_val,
-						q->grid_resolution );
-
-	q->user_ui = 0;
-
-	if(! res )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
-		free(q->ui->buf[0]);
-		free(q->ui);
-		free(q);
+	q->ui = (ui_t*)vj_calloc(sizeof(ui_t));
+	if(!q->ui) {
+		viewport_destroy(q);
+		return NULL;
+	}
+	q->ui->buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * (new_w * new_h));
+	q->ui->scale = 1.0f;
+	if(!q->ui->buf[0] || !(q->ui->scaler = viewport_init_swscaler(q->ui, new_w, new_h))) {
+		viewport_destroy(q);
 		return NULL;
 	}
 
-	// Allocate memory for map
-	q->map = (int32_t*) vj_malloc(sizeof(int32_t) * (q->w * q->h + (q->w*2)) );
+	int mesh_columns = 2;
+	int mesh_rows = 2;
+	vj_output_mesh_get_grid(v->mesh, &mesh_columns, &mesh_rows);
+	if(!viewport_mesh_create(q, new_w, new_h, mesh_columns, mesh_rows)) {
+		viewport_destroy(q);
+		return NULL;
+	}
+
+	int res = viewport_configure(q, q->x1, q->y1,
+							 q->x2, q->y2,
+							 q->x3, q->y3,
+							 q->x4, q->y4,
+							 q->x0, q->y0,
+							 q->w0, q->h0,
+							 new_w, new_h,
+							 q->user_reverse,
+							 q->grid_val,
+							 q->grid_resolution);
+	q->user_ui = 0;
+	if(res)
+		res = viewport_mesh_copy_scaled(v, q, sx, sy);
+
+	if(!res) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
+		viewport_destroy(q);
+		return NULL;
+	}
+
+	q->map = (int32_t*)vj_malloc(sizeof(int32_t) * (q->w * q->h + (q->w * 2)));
+	if(!q->map) {
+		viewport_destroy(q);
+		return NULL;
+	}
 
 	const int len = q->w * q->h;
-	const int eln = len + ( q->w * 2 );
-	int k;
-	for( k = len ; k < eln ; k ++ )
-		q->map[k] = len+1;
+	const int eln = len + (q->w * 2);
+	for(int k = len; k < eln; k++)
+		q->map[k] = len + 1;
+	viewport_process(q);
 
-	viewport_process( q );
-
-//	q->buf = vj_calloc( sizeof(int32_t) * 50000 );
 	veejay_msg(VEEJAY_MSG_INFO,"\tConfiguring input:");
 	veejay_msg(VEEJAY_MSG_INFO, "\tPoints   :\t(1) %fx%f (2) %fx%f", q->x1,q->y1,q->x2,q->y2);
-	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", q->x2,q->y2,q->x3,q->y3);
-	veejay_msg(VEEJAY_MSG_INFO, "\tQuad     :\t%dx%d+%dx%d", q->x0,q->y0,q->w0,q->h0 );
+	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", q->x3,q->y3,q->x4,q->y4);
+	veejay_msg(VEEJAY_MSG_INFO, "\tQuad     :\t%dx%d+%dx%d", q->x0,q->y0,q->w0,q->h0);
 	veejay_msg(VEEJAY_MSG_INFO, "\tDimension:\t%dx%d",q->w,q->h);
-    
-	return (void*) q;
+	return (void*)q;
 }
 
 
@@ -1553,125 +2093,230 @@ char	*viewport_get_help(void *data)
 
 
 
-static	viewport_config_t 	*viewport_load_settings( char *path )
+int viewport_bind_port_configuration(void *data,
+                                     const char *homedir,
+                                     int port,
+                                     int *active)
 {
-	viewport_config_t *vc = vj_calloc(sizeof(viewport_config_t));
+    viewport_t *v = (viewport_t*)data;
+    viewport_port_profile_t profiles[VIEWPORT_CONFIG_MAX_PROFILES];
+    int count;
 
-	FILE *fd = fopen( path, "r" );
-	if(!fd)
-	{
-		free(vc);
-		veejay_msg(VEEJAY_MSG_WARNING, "No such file %s", path);
-		return NULL;
-	}
+    if(active)
+        *active = 0;
+    if(!v || !homedir || port <= 0)
+        return 0;
 
-	fseek(fd,0,SEEK_END );
-	unsigned int len = ftell( fd );
-		
-	if( len <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "File %s is empty",path);
-		fclose(fd);
-		free(vc);
-		return NULL;
-	}
+    int n = snprintf(v->config_path, sizeof(v->config_path),
+                     "%s/viewport.cfg", homedir);
+    if(n < 0 || n >= (int)sizeof(v->config_path))
+        return 0;
 
-	char *buf = vj_calloc( (len+1) );
+    v->config_port = port;
+    v->config_frontback = 1;
+    v->config_bound = 1;
 
-	rewind( fd );
-	fread( buf, len, 1 , fd);
+    memset(profiles, 0, sizeof(profiles));
+    count = viewport_profiles_load(v->config_path,
+                                   profiles,
+                                   VIEWPORT_CONFIG_MAX_PROFILES);
+    for(int i = 0; i < count; i++) {
+        if(profiles[i].port != port)
+            continue;
 
-	fclose(fd );
+        if(!viewport_apply_profile(v, &profiles[i])) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Viewport configuration for port %d is invalid", port);
+            viewport_reset_identity(v);
+            return 0;
+        }
 
-	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d",
-			&vc->x1, &vc->y1,
-			&vc->x2, &vc->y2,
-			&vc->x3, &vc->y3,
-			&vc->x4, &vc->y4,
-			&vc->reverse,
-			&vc->grid_resolution,
-			&vc->grid_color,
-			&vc->x0,
-			&vc->y0,
-			&vc->w0,
-			&vc->h0,
-			&vc->frontback,
-			&vc->saved_w,
-			&vc->saved_h,
-			&vc->marker_size,
-			&vc->grid_mode,
-			&vc->initial_active);
+        v->config_frontback = profiles[i].frontback ? 1 : 0;
+        v->initial_active = 1;
+        if(active)
+            *active = 1;
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "Restored and activated viewport configuration for port %d from %s",
+                   port, v->config_path);
+        return 1;
+    }
 
-	//@ pre 1.4.10
-	if( n == 20 ) {
-		vc->initial_active = 1;
-		n++;
-	}
-
-	if( n != 21 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Parse error in %s",path );
-		free(vc);
-		free(buf);
-		return NULL;
-	}
-
-	free(buf);
-	veejay_msg(VEEJAY_MSG_INFO, "Projection mapping configuration [%s]", path);
-	veejay_msg(VEEJAY_MSG_INFO, "\tBehaviour:\t%s", (vc->reverse ? "Forward" : "Projection") );
-	veejay_msg(VEEJAY_MSG_INFO, "\tPoints   :\t(1) %fx%f (2) %fx%f", vc->x1,vc->y1,vc->x2,vc->y2);
-	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", vc->x2,vc->y2,vc->x3,vc->y3);
-	veejay_msg(VEEJAY_MSG_INFO, "\tPencil   :\t%s", (vc->grid_color == 0xff ? "white" : "black" ) );
-	veejay_msg(VEEJAY_MSG_INFO, "\tEnabled  :\t%s",
-	(vc->initial_active == 0 ? "No" : "Yes"));
-
-	return vc;
+    viewport_reset_identity(v);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "No saved viewport configuration for port %d", port);
+    return 0;
 }
 
-void	viewport_save_settings( void *ptr, int frontback, char *path )
+int viewport_save_bound_configuration(void *data, int frontback)
 {
-	viewport_t *v = (viewport_t *) ptr;
+    viewport_t *v = (viewport_t*)data;
+    viewport_port_profile_t profiles[VIEWPORT_CONFIG_MAX_PROFILES];
+    viewport_port_profile_t profile;
+    int columns = 0;
+    int rows = 0;
+    int count;
+    int replace = -1;
+    int lock_fd;
+    int n;
 
-	FILE *fd = fopen( path, "wb" );
+    if(!v || !v->config_bound || v->config_port <= 0 || !v->config_path[0]) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Viewport configuration is not bound to a VeeJay port");
+        return 0;
+    }
 
-	if(!fd)
-	{
-		veejay_msg(0, "Unable to open '%s' for writing. Cannot save viewport settings",
-			path );
-		return;
-	}
+    viewport_profile_init(&profile);
+    profile.valid = 1;
+    profile.port = v->config_port;
+    profile.active = 1;
+    profile.frontback = frontback ? 1 : 0;
+    profile.reverse = v->user_reverse ? 1 : 0;
+    profile.marker_size = v->marker_size;
+    profile.grid_mode = v->grid_mode;
+    profile.grid_color = v->grid_val;
+    profile.source_x = (float)v->x0 * 100.0f / (float)v->w;
+    profile.source_y = (float)v->y0 * 100.0f / (float)v->h;
+    profile.source_width = (float)v->w0 * 100.0f / (float)v->w;
+    profile.source_height = (float)v->h0 * 100.0f / (float)v->h;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+    profile.columns = columns;
+    profile.rows = rows;
 
-	char content[512];
+    if(!viewport_profile_valid(&profile))
+        return 0;
 
-	snprintf(content, sizeof(content), "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
-			v->x1,v->y1,v->x2,v->y2,
-			v->x3,v->y3,v->x4,v->y4,
-			v->user_reverse,
-			0,
-			v->grid_val,
-			v->x0,
-			v->y0,
-			v->w0,
-			v->h0,
-			frontback,
-			v->saved_w,
-			v->saved_h,
-			v->marker_size,
-			v->grid_mode,
-	      	v->initial_active );
+    for(int point = 0; point < columns * rows; point++) {
+        vj_output_mesh_point p;
+        if(!vj_output_mesh_get_point(v->mesh, point, &p))
+            return 0;
+        profile.points[point * 2] = p.x * 100.0f / (float)v->w;
+        profile.points[point * 2 + 1] = p.y * 100.0f / (float)v->h;
+    }
 
-	int res = fwrite( content, strlen(content), 1, fd );
+    lock_fd = viewport_config_lock(v->config_path);
+    if(lock_fd < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to lock viewport configuration %s: %s",
+                   v->config_path, strerror(errno));
+        return 0;
+    }
 
-	if( res <= 0 )
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to save viewport settings to %s", path );
+    memset(profiles, 0, sizeof(profiles));
+    count = viewport_profiles_load(v->config_path,
+                                   profiles,
+                                   VIEWPORT_CONFIG_MAX_PROFILES);
+    for(int i = 0; i < count; i++) {
+        if(profiles[i].port == v->config_port) {
+            replace = i;
+            break;
+        }
+    }
 
-	fclose( fd );
+    if(replace >= 0)
+        profiles[replace] = profile;
+    else if(count < VIEWPORT_CONFIG_MAX_PROFILES)
+        profiles[count++] = profile;
+    else {
+        viewport_config_unlock(lock_fd);
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Viewport configuration contains too many port profiles");
+        return 0;
+    }
 
-	veejay_msg(VEEJAY_MSG_INFO, "Saved viewport settings to %s. Press CTRL-p to enable/disable", path);
+    if(!viewport_profiles_write(v->config_path, profiles, count)) {
+        viewport_config_unlock(lock_fd);
+        return 0;
+    }
+    viewport_config_unlock(lock_fd);
+
+    char legacy_mesh[1200];
+    n = snprintf(legacy_mesh, sizeof(legacy_mesh), "%s.mesh", v->config_path);
+    if(n > 0 && n < (int)sizeof(legacy_mesh))
+        unlink(legacy_mesh);
+
+    v->config_frontback = profile.frontback;
+    v->initial_active = 1;
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Saved viewport configuration for port %d to %s; it will activate automatically on restart",
+               v->config_port, v->config_path);
+    return 1;
 }
+
+int viewport_reset_bound_configuration(void *data)
+{
+    viewport_t *v = (viewport_t*)data;
+    viewport_port_profile_t profiles[VIEWPORT_CONFIG_MAX_PROFILES];
+    int count;
+    int lock_fd;
+    int out = 0;
+
+    if(!v || !v->config_bound || v->config_port <= 0 || !v->config_path[0])
+        return 0;
+
+    lock_fd = viewport_config_lock(v->config_path);
+    if(lock_fd < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to lock viewport configuration %s: %s",
+                   v->config_path, strerror(errno));
+        return 0;
+    }
+
+    memset(profiles, 0, sizeof(profiles));
+    count = viewport_profiles_load(v->config_path,
+                                   profiles,
+                                   VIEWPORT_CONFIG_MAX_PROFILES);
+    for(int i = 0; i < count; i++) {
+        if(profiles[i].port != v->config_port)
+            profiles[out++] = profiles[i];
+    }
+
+    if(!viewport_profiles_write(v->config_path, profiles, out)) {
+        viewport_config_unlock(lock_fd);
+        return 0;
+    }
+    viewport_config_unlock(lock_fd);
+
+    if(!viewport_reset_identity(v))
+        return 0;
+
+    char legacy_mesh[1200];
+    int n = snprintf(legacy_mesh, sizeof(legacy_mesh), "%s.mesh", v->config_path);
+    if(n > 0 && n < (int)sizeof(legacy_mesh))
+        unlink(legacy_mesh);
+
+    v->config_frontback = 1;
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Reset viewport for port %d; saved configuration removed",
+               v->config_port);
+    return 1;
+}
+
+int viewport_get_bound_port(void *data)
+{
+    viewport_t *v = (viewport_t*)data;
+    return v ? v->config_port : 0;
+}
+
+void viewport_save_settings(void *data, int frontback, char *path)
+{
+    (void)path;
+    viewport_save_bound_configuration(data, frontback);
+}
+
+void viewport_save_current_settings(void *data, const char *homedir,
+                                    int mode, int id, int frontback)
+{
+    (void)homedir;
+    (void)mode;
+    (void)id;
+    viewport_save_bound_configuration(data, frontback);
+}
+
 
 int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x, int inc_y)
 {
+    (void)screen_width;
+    (void)screen_height;
 	viewport_t *v = (viewport_t*) data;
 	if(!v->user_ui)
 		return 0;
@@ -1753,8 +2398,144 @@ int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int 
 	return 1;
 }
 
+
+static int viewport_mesh_commit_point(viewport_t *v, int index, float x, float y)
+{
+    vj_output_mesh_point previous;
+    if(!v || !v->mesh ||
+       !vj_output_mesh_get_point(v->mesh, index, &previous))
+        return 0;
+
+    if(!vj_output_mesh_set_point(v->mesh, index, x, y) ||
+       !vj_output_mesh_compile(v->mesh)) {
+        vj_output_mesh_set_point(v->mesh, index, previous.x, previous.y);
+        vj_output_mesh_compile(v->mesh);
+        return 0;
+    }
+
+    v->mesh_selected_point = index;
+    viewport_mesh_sync_legacy_corners(v);
+    if(viewport_mesh_is_corner(v, index))
+        viewport_mesh_refresh_legacy_transform(v);
+    vj_output_mesh_get_bounds(v->mesh,
+                              &v->ttx1, &v->tty1,
+                              &v->ttx2, &v->tty2);
+    return 1;
+}
+
+int viewport_mesh_set_grid(void *data, int columns, int rows)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh || !vj_output_mesh_set_grid(v->mesh, columns, rows))
+        return 0;
+    v->mesh_selected_point = 0;
+    v->mesh_hover_point = -1;
+    viewport_mesh_sync_legacy_corners(v);
+    vj_output_mesh_get_bounds(v->mesh, &v->ttx1, &v->tty1, &v->ttx2, &v->tty2);
+    return 1;
+}
+
+int viewport_mesh_get_grid(void *data, int *columns, int *rows)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh)
+        return 0;
+    vj_output_mesh_get_grid(v->mesh, columns, rows);
+    return 1;
+}
+
+int viewport_mesh_set_point_scaled(void *data, int point, int scale, int x, int y)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh || scale <= 0)
+        return 0;
+
+    const int index = viewport_mesh_event_index(v, point);
+    if(index < 0)
+        return 0;
+
+    const float px = ((float)x / (float)scale) * (float)v->w / 100.0f;
+    const float py = ((float)y / (float)scale) * (float)v->h / 100.0f;
+    return viewport_mesh_commit_point(v, index, px, py);
+}
+
+int viewport_mesh_select_point(void *data, int point)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh)
+        return 0;
+
+    const int index = viewport_mesh_event_index(v, point);
+    if(index < 0)
+        return 0;
+
+    v->mesh_selected_point = index;
+    return 1;
+}
+
+int viewport_mesh_get_point_scaled(void *data, int point, int scale, int *x, int *y)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh || scale <= 0 || !x || !y)
+        return 0;
+
+    const int index = viewport_mesh_event_index(v, point);
+    vj_output_mesh_point mesh_point;
+    if(index < 0 || !vj_output_mesh_get_point(v->mesh, index, &mesh_point))
+        return 0;
+
+    *x = (int)lrintf((mesh_point.x * 100.0f / (float)v->w) * (float)scale);
+    *y = (int)lrintf((mesh_point.y * 100.0f / (float)v->h) * (float)scale);
+    return 1;
+}
+
+int viewport_mesh_get_state(void *data, viewport_mesh_state_t *state)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh || !state)
+        return 0;
+
+    vj_output_mesh_get_grid(v->mesh, &state->columns, &state->rows);
+    state->point_count = vj_output_mesh_point_count(v->mesh);
+    state->selected_point = viewport_mesh_event_number(v, v->mesh_selected_point);
+    state->output_width = v->w;
+    state->output_height = v->h;
+    state->source_x = v->x0;
+    state->source_y = v->y0;
+    state->source_width = v->w0;
+    state->source_height = v->h0;
+    return 1;
+}
+
+int viewport_mesh_nudge_selected(void *data, int inc_x, int inc_y)
+{
+    viewport_t *v = (viewport_t*)data;
+    if(!v || !v->mesh)
+        return 0;
+
+    const int count = vj_output_mesh_point_count(v->mesh);
+    if(v->mesh_selected_point < 0 || v->mesh_selected_point >= count)
+        v->mesh_selected_point = 0;
+
+    vj_output_mesh_point point;
+    if(!vj_output_mesh_get_point(v->mesh, v->mesh_selected_point, &point))
+        return 0;
+
+    const float dx = (float)inc_x * 0.001f * (float)v->w;
+    const float dy = (float)inc_y * 0.001f * (float)v->h;
+    return viewport_mesh_commit_point(v, v->mesh_selected_point,
+                                      point.x + dx, point.y + dy);
+}
+
+int viewport_mesh_point_count(void *data)
+{
+    viewport_t *v = (viewport_t*)data;
+    return (v && v->mesh) ? vj_output_mesh_point_count(v->mesh) : 0;
+}
+
 int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height, char *homedir, int mode, int id)
 {
+    (void)img;
     viewport_t *v = (viewport_t*)data;
     
     if (sx == 0 && sy == 0 && button == 0)
@@ -1764,7 +2545,9 @@ int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int but
         return 0;
 
     int ch = 0;
+    int mesh_changed = 0;
     int point = -1;
+    int mesh_index = -1;
     int i;
 
     float x = (float)sx / (screen_width / 100.0f);
@@ -1810,31 +2593,62 @@ int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int but
     for (i = 0; i < 4; i++)
         v->users[i] = 1;
 
-    if (v->user_ui)
-    {
-        double dt[4];
-        dt[0] = sqrt((p[0] - x) * (p[0] - x) + (p[1] - y) * (p[1] - y));
-        dt[1] = sqrt((p[2] - x) * (p[2] - x) + (p[3] - y) * (p[3] - y));
-        dt[2] = sqrt((p[4] - x) * (p[4] - x) + (p[5] - y) * (p[5] - y));
-        dt[3] = sqrt((p[6] - x) * (p[6] - x) + (p[7] - y) * (p[7] - y));
+    if(v->user_ui) {
+        const int mesh_points = vj_output_mesh_point_count(v->mesh);
+        for(i = 0; i < mesh_points; i++) {
+            vj_output_mesh_point mesh_point;
+            if(!vj_output_mesh_get_point(v->mesh, i, &mesh_point))
+                continue;
 
-        for (i = 0; i < 4; i++)
-        {
-            if (dt[i] < dist)
-            {
-                dist = dt[i];
-                point = i;
+            const float px = msx(v, mesh_point.x * 100.0f / (float)v->w);
+            const float py = msy(v, mesh_point.y * 100.0f / (float)v->h);
+            const double dt = sqrt((px - x) * (px - x) +
+                                   (py - y) * (py - y));
+            if(dt < dist) {
+                dist = dt;
+                mesh_index = i;
             }
         }
+        if(mesh_index >= 0)
+            point = viewport_mesh_corner_role(v, mesh_index);
+        v->mesh_hover_point = mesh_index;
+    }
+    else {
+        v->mesh_hover_point = -1;
     }
 
     v->save = 0;
 
-    if ((button == 6 || button == 1 || button == 12) && point >= 0)
+    if((button == 1 && mesh_index >= 0) ||
+       ((button == 6 || button == 12) && point >= 0))
         v->save = 1;
 
-    if (button == 0 && point >= 0)
-        v->users[point] = 2;
+    if(v->mesh_selected_point >= 0) {
+        const int selected_corner = viewport_mesh_corner_role(v, v->mesh_selected_point);
+        if(selected_corner >= 0)
+            v->users[selected_corner] = 2;
+    }
+
+    if(button == 10 && mesh_index >= 0) {
+        v->mesh_selected_point = mesh_index;
+        return 0;
+    }
+
+    if(button == 13 || button == 14) {
+        const int count = vj_output_mesh_point_count(v->mesh);
+        if(count > 0) {
+            int selected = v->mesh_selected_point;
+            if(selected < 0 || selected >= count)
+                selected = 0;
+            selected += (button == 13) ? -1 : 1;
+            if(selected < 0)
+                selected = count - 1;
+            else if(selected >= count)
+                selected = 0;
+            v->mesh_selected_point = selected;
+        }
+        return 0;
+    }
 
     if (button == 0)
     {
@@ -1852,22 +2666,8 @@ int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int but
     {
         v->user_ui = !v->user_ui;
 
-        if (v->user_ui == 0)
-        {
-            char filename[1024];
-            switch (mode) {
-                case 1:
-                    snprintf(filename, sizeof(filename), "%s/viewport-stream-%d.cfg", homedir, id);
-                    break;
-                case 0:
-                    snprintf(filename, sizeof(filename), "%s/viewport-sample-%d.cfg", homedir, id);
-                    break;
-                default:
-                    snprintf(filename, sizeof(filename), "%s/viewport.cfg", homedir);
-                    break;
-            }
-            viewport_save_settings(v, frontback, filename);
-        }
+        if(v->user_ui == 0)
+            viewport_save_current_settings(v, homedir, mode, id, frontback);
     }
 
 	if( button == 6 && point >= 0)
@@ -1948,27 +2748,28 @@ int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int but
         v->grid_val = (v->grid_val == 0xff) ? 0 : 0xff;
     }
 
-    if (v->save)
-    {
-        if (button == 1)
-        {
-            switch (point)
-            {
-                case 0: v->x1 = tx; v->y1 = ty; break;
-                case 1: v->x2 = tx; v->y2 = ty; break;
-                case 2: v->x3 = tx; v->y3 = ty; break;
-                case 3: v->x4 = tx; v->y4 = ty; break;
-            }
+    if(v->save) {
+        if(button == 1 && mesh_index >= 0) {
+            mesh_changed = viewport_mesh_commit_point(
+                v, mesh_index,
+                tx * (float)v->w / 100.0f,
+                ty * (float)v->h / 100.0f);
         }
-        ch = 1;
+        else {
+            ch = 1;
+        }
     }
 
-    if (ch)
-    {
-        viewport_update_perspective(v, p_cpy);
-        if (v->grid)
+    if(mesh_changed) {
+        if(v->grid)
             viewport_compute_grid(v);
+        return 1;
+    }
 
+    if(ch) {
+        viewport_update_perspective(v, p_cpy);
+        if(v->grid)
+            viewport_compute_grid(v);
         return 1;
     }
 
@@ -1978,13 +2779,15 @@ int viewport_external_mouse(void *data, uint8_t *img[3], int sx, int sy, int but
 void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint8_t *V )
 {
 	viewport_t *v = (viewport_t*) data;
-	ui_t	   *u = v->ui;
-	VJFrame *srci = yuv_yuv_template( Y, U,V, w,h, PIX_FMT_GRAY8 );
-    VJFrame *dsti = yuv_yuv_template( u->buf[0],NULL,NULL,u->sw, u->sh, PIX_FMT_GRAY8); 
-  
-    yuv_convert_and_scale( u->scaler, srci,dsti );
-    free(srci);
-    free(dsti);
+	ui_t *u = v->ui;
+    (void)w;
+    (void)h;
+
+    u->src_frame->data[0] = Y;
+    u->src_frame->data[1] = U;
+    u->src_frame->data[2] = V;
+    u->dst_frame->data[0] = u->buf[0];
+    yuv_convert_and_scale(u->scaler, u->src_frame, u->dst_frame);
 }
 
 static void		viewport_translate_frame(void *data, uint8_t *plane ) 
@@ -2014,12 +2817,12 @@ static	void	viewport_draw_marker(viewport_t *v, int x, int y, int w, int h, uint
 	int x2 = x + v->marker_size;
 	int y2 = y + v->marker_size;
 
-	if( x1 < 0 ) x1 = 0; else if ( x1 > w ) x1 = w;
-	if( y1 < 0 ) y1 = 0; else if ( y1 > h ) y1 = h;
-	if( x2 < 0 ) x2 = 0; else if ( x2 > w ) x2 = w;
-	if( y2 < 0 ) y2 = 0; else if ( y2 > h ) y2 = h;
+	if( x1 < 0 ) x1 = 0; else if ( x1 >= w ) x1 = w - 1;
+	if( y1 < 0 ) y1 = 0; else if ( y1 >= h ) y1 = h - 1;
+	if( x2 < 0 ) x2 = 0; else if ( x2 >= w ) x2 = w - 1;
+	if( y2 < 0 ) y2 = 0; else if ( y2 >= h ) y2 = h - 1;
 
-	unsigned int i,j;
+	int i,j;
 	for( j = x1; j < x2 ; j ++ )
 		plane[ y1 * w + j ] = v->grid_val;
 
@@ -2108,25 +2911,102 @@ void		viewport_set_marker( void *data, int status )
 	//v->marker_size = 1;
 }
 
+static int viewport_mesh_ui_point(viewport_t *v, int index, int *x, int *y)
+{
+    vj_output_mesh_point point;
+    if(!vj_output_mesh_get_point(v->mesh, index, &point))
+        return 0;
+
+    const float percent_x = point.x * 100.0f / (float)v->w;
+    const float percent_y = point.y * 100.0f / (float)v->h;
+    *x = (int)(msx(v, percent_x) * ((float)v->w / 100.0f));
+    *y = (int)(msy(v, percent_y) * ((float)v->h / 100.0f));
+    return 1;
+}
+
+static uint8_t viewport_mesh_line_color(const viewport_t *v, int emphasized)
+{
+    if(v->grid_val == 0xff)
+        return emphasized ? 0xff : 0xb0;
+    return emphasized ? 0x00 : 0x50;
+}
+
+static void viewport_draw_mesh_handle(viewport_t *v, uint8_t *plane,
+                                      int width, int height, int index,
+                                      int x, int y)
+{
+    const int selected = index == v->mesh_selected_point;
+    const int hovered = index == v->mesh_hover_point;
+    const int corner = viewport_mesh_is_corner(v, index);
+    const uint8_t color = viewport_mesh_line_color(v, selected || hovered);
+    const int size = selected ? 3 : ((hovered || corner) ? 2 : 1);
+
+    draw_point(plane, x, y, width, height, size, color);
+
+    if(selected) {
+        const uint8_t cross = (color == 0xff) ? 0x30 : 0xd0;
+        viewport_line(plane, x - 8, y, x + 8, y, width, height, cross);
+        viewport_line(plane, x, y - 8, x, y + 8, width, height, cross);
+    }
+}
+
+static void viewport_draw_mesh(viewport_t *v, uint8_t *plane, int width, int height)
+{
+    int columns = 0;
+    int rows = 0;
+    vj_output_mesh_get_grid(v->mesh, &columns, &rows);
+
+    int selected_row = -1;
+    int selected_col = -1;
+    if(v->mesh_selected_point >= 0 &&
+       v->mesh_selected_point < columns * rows) {
+        selected_row = v->mesh_selected_point / columns;
+        selected_col = v->mesh_selected_point % columns;
+    }
+
+    for(int row = 0; row < rows; row++) {
+        const uint8_t color = viewport_mesh_line_color(v, row == selected_row);
+        for(int col = 0; col + 1 < columns; col++) {
+            int x0, y0, x1, y1;
+            const int p0 = row * columns + col;
+            if(viewport_mesh_ui_point(v, p0, &x0, &y0) &&
+               viewport_mesh_ui_point(v, p0 + 1, &x1, &y1))
+                viewport_line(plane, x0, y0, x1, y1,
+                              width, height, color);
+        }
+    }
+
+    for(int col = 0; col < columns; col++) {
+        const uint8_t color = viewport_mesh_line_color(v, col == selected_col);
+        for(int row = 0; row + 1 < rows; row++) {
+            int x0, y0, x1, y1;
+            const int p0 = row * columns + col;
+            if(viewport_mesh_ui_point(v, p0, &x0, &y0) &&
+               viewport_mesh_ui_point(v, p0 + columns, &x1, &y1))
+                viewport_line(plane, x0, y0, x1, y1,
+                              width, height, color);
+        }
+    }
+
+    const int count = columns * rows;
+    for(int i = 0; i < count; i++) {
+        int x, y;
+        if(viewport_mesh_ui_point(v, i, &x, &y))
+            viewport_draw_mesh_handle(v, plane, width, height, i, x, y);
+    }
+}
+
+
 static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *V )
 {
 	viewport_t *v = (viewport_t*) data;
+    (void)u;
+    (void)V;
 	int	width = v->w;
 	int 	height = v->h;
 
 	float wx =(float) v->w / 100.0f;
 	float wy =(float) v->h / 100.0f;
-
-	int fx1 = (int)( msx(v,v->x1) *wx );
-	int fy1 = (int)( msy(v,v->y1) *wy );
-	int fx2 = (int)( msx(v,v->x2) *wx );
-	int fy2 = (int)( msy(v,v->y2) *wy );
-	int fx3 = (int)( msx(v,v->x3) *wx );
-	int fy3 = (int)( msy(v,v->y3) *wy );
-	int fx4 = (int)( msx(v,v->x4) *wx );
-	int fy4 = (int)( msy(v,v->y4) *wy );
-
-	const uint8_t p = v->grid_val;
 
 	if(v->grid)
 		switch(v->grid_mode)
@@ -2140,10 +3020,7 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 		}
 
 	
-	viewport_line( plane, fx1, fy1, fx2,fy2,width,height, p);
-	viewport_line( plane, fx1, fy1, fx4,fy4,width,height, p );
-	viewport_line( plane, fx4, fy4, fx3,fy3,width,height, p );
-	viewport_line( plane, fx2, fy2, fx3,fy3,width,height, p );
+    viewport_draw_mesh(v, plane, width, height);
 	
 	//@ Project rectangle in v->w * v->h , but scaled to size of >sw >sh
 	ui_t *ui = v->ui;
@@ -2170,11 +3047,6 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
        viewport_line( plane,   vx0 + vw0,   vy0 + vh0,           vx0,          vy0 + vh0,   width,height, 65 );
        viewport_line( plane,   vx0,          vy0 +vh0,            vx0,          vy0,          width,height, 65);
 
-
-	draw_point( plane, fx1,fy1, width,height, v->users[0],p );
-	draw_point( plane, fx2,fy2, width,height, v->users[1],p );
-	draw_point( plane, fx3,fy3, width,height, v->users[2],p );
-	draw_point( plane, fx4,fy4, width,height, v->users[3],p );
 
 	 int mx = v->usermouse[0] * wx;
 	 int my = v->usermouse[1] * wy;
@@ -2211,80 +3083,21 @@ void	viewport_draw_interface_color( void *vdata, uint8_t *img[3] )
 	viewport_draw_col( v, img[0],img[1],img[2] );
 }
 
-void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] )
+void viewport_produce_full_img(void *vdata, uint8_t *img[3], uint8_t *out_img[3])
 {
-	viewport_t *v = (viewport_t*) vdata;
-	const int w = v->w;
-	uint32_t i,n;
-	const int32_t *map = v->map;
-	const uint8_t *inY  = (const uint8_t*) img[0];
-	const uint8_t *inU  = (const uint8_t*)img[1];
-	const uint8_t *inV  = (const uint8_t*)img[2];
-	uint8_t       *outY = out_img[0];
-	uint8_t	      *outU = out_img[1];
-    uint8_t	      *outV = out_img[2];
-
-	const int32_t tx1 = v->ttx1;
-	const int32_t tx2 = v->ttx2;
-	const int32_t ty1 = v->tty1;
-	const int32_t ty2 = v->tty2;
-
-	int x;
-	int y  = ty1 * w;
-
-	vj_frame_clear1( out_img[0], 0, v->w * v->h );
-	vj_frame_clear1( out_img[1], 128, v->w * v->h * 2 );
-
-	for( y = ty1; y < ty2; y ++ )
-	{
-		for( x = tx1; x < tx2 ; x ++ )
-		{
-			i = y * w + x;
-			n = map[i];
-			outY[i] = inY[n];
-			outU[i] = inU[n];
-			outV[i] = inV[n];
-		}
-	}
+    viewport_t *v = (viewport_t*)vdata;
+    const uint8_t *input[3] = { img[0], img[1], img[2] };
+    vj_output_mesh_render_yuv444(v->mesh, input, out_img);
 }
 
-void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly)
+void viewport_produce_bw_img(void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly)
 {
-	if( !Yonly ) {
-		viewport_produce_full_img( vdata, img, out_img );
-		return;
-	}
-
-	viewport_t *v = (viewport_t*) vdata;
-	const int len = v->w * v->h;
-	register const int w = v->w;
-	register uint32_t i,n;
-	const int32_t *map = v->map;
-	uint8_t *inY  = img[0];
-	uint8_t       *outY = out_img[0];
-	inY[len+1] = 0;
-
-	register const	int32_t	tx1 = v->ttx1;
-	register const	int32_t tx2 = v->ttx2;
-	register const	int32_t	ty1 = v->tty1;
-	register const	int32_t ty2 = v->tty2;
-
-	int x,y;
-	y  = ty1 * w;
-
-	vj_frame_clear1( outY,0,len);
-
-	for( y = ty1; y < ty2; y ++ )
-	{
-		for( x = tx1; x < tx2 ; x ++ )
-		{
-			i = y * w + x;
-			n = map[i];
-			outY[i] = inY[n];
-		}
-	}
-	y = (v->h - ty2 ) * w;
-	x = ty2 * w;
+    if(!Yonly) {
+        viewport_produce_full_img(vdata, img, out_img);
+        return;
+    }
+    viewport_t *v = (viewport_t*)vdata;
+    vj_output_mesh_render_luma(v->mesh, img[0], out_img[0]);
 }
 
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 )\
@@ -2295,44 +3108,15 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 
 void viewport_produce_full_img_yuyv(void *vdata, uint8_t *restrict img[3], uint8_t *restrict out_img)
 {
-    viewport_t *v = (viewport_t*) vdata;
-    
-	const int32_t *restrict map = v->map;
-    const uint8_t *restrict inY  = img[0];
-    const uint8_t *restrict inU  = img[1];
-    const uint8_t *restrict inV  = img[2];
-    
-    const int32_t tx1 = v->ttx1;
-    const int32_t tx2 = v->ttx2;
-    const int32_t ty1 = v->tty1;
-    const int32_t ty2 = v->tty2;
-    const int w = v->w;
-    const int uw = w >> 1;
-
-    img[0][w * v->h + 1] = 0;
-    img[1][w * v->h + 1] = 128;
-    img[2][w * v->h + 1] = 128;
-
-    yuyv_plane_clear(w * v->h * 2, (uint32_t*)out_img); 
-
-    for (int y = ty1; y < ty2; y++)
-    {
-        const int32_t *restrict row_map = &map[y * w];
-        uint32_t *restrict row_out = (uint32_t*)out_img + (y * uw);
-
-        #pragma GCC ivdep
-        for (int x = tx1; x < tx2; x += 2)
-        {
-            int32_t n = row_map[x];
-            int32_t m = row_map[x + 1];
-
-            row_out[x >> 1] = pack_yuyv_pixel(inY[n], inU[n], inU[m], inY[m], inV[n], inV[m]);
-        }
-    }
+    viewport_t *v = (viewport_t*)vdata;
+    const uint8_t *input[3] = { img[0], img[1], img[2] };
+    vj_output_mesh_render_yuyv(v->mesh, input, out_img);
 }
 
 void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height )
 {
+    (void)width;
+    (void)height;
 	viewport_t *v = (viewport_t*) vdata;
 
 	viewport_process_dynamic( v, in,out );
@@ -2343,6 +3127,10 @@ void *viewport_fx_init_map( int wid, int hei, int x1, int y1,
 		int x2, int y2, int x3, int y3, int x4, int y4, int reverse)
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
+    if(!viewport_mesh_create(v, wid, hei, 2, 2)) {
+        free(v);
+        return NULL;
+    }
 
 	v->x1 = x1;
 	v->y1 = y1;
@@ -2385,6 +3173,10 @@ int	viewport_get_mode( void *vv ) {
 void *viewport_fx_zoom_init(int type, int wid, int hei, int x, int y, int zoom, int dir)
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
+    if(!viewport_mesh_create(v, wid, hei, 2, 2)) {
+        free(v);
+        return NULL;
+    }
 	float fracx = (float) wid;
 	float fracy = (float) hei;
 

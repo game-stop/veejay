@@ -94,8 +94,11 @@
 #include <libveejay/vj-OSC.h>
 #include <veejaycore/vj-task.h>
 #include <libveejay/vj-split.h>
+#include <libveejay/vj-perf.h>
+#include <libveejay/vj-output-graph.h>
 #include <libveejay/vj-macro.h>
 #include <libveejay/vjkf.h>
+#include <libveejay/vj-share.h>
 #include <libplugger/plugload.h>
 #include <libstream/vj-vloopback.h>
 #include <veejaycore/vims.h>
@@ -110,6 +113,7 @@
 #include <veejaycore/mpegconsts.h>
 #include <veejaycore/mpegtimecode.h>
 #include <libstream/vj-tag.h>
+#include <libstream/vj-net.h>
 #include "libveejay.h"
 #include <veejaycore/mjpeg_types.h>
 #include "vj-perform.h"
@@ -241,6 +245,13 @@ extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
 
 static	veejay_t	*veejay_instance_ = NULL;
+static int veejay_recovery_in_progress_ = 0;
+static int veejay_recovery_complete_ = 0;
+
+void veejay_set_instance(veejay_t *info)
+{
+    veejay_instance_ = info;
+}
 
 #ifdef HAVE_JACK
 #ifndef VJ_AUDIO_BEAT_ACTION_BREAK_BEAT_AUTO_FX
@@ -272,6 +283,13 @@ void veejay_audio_beat_thread_set_enabled(int enabled)
 
 
 static void veejay_playback_close(veejay_t *info);
+static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped);
+static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped);
+static VJFrame *veejay_output_apply_pattern_projection(veejay_t *info, VJFrame *pattern);
+int veejay_output_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
+int veejay_output_switch_source(veejay_t *info, const char *host, int port);
+int veejay_output_switch_source_shm(veejay_t *info, int port, int32_t key);
+int veejay_output_disconnect_source(veejay_t *info);
 
 
 
@@ -1142,41 +1160,73 @@ void veejay_change_state(veejay_t * info, int new_state)
 	atomic_store_int(&settings->state, new_state);
 }
 
-void veejay_change_state_save(veejay_t * info, int new_state)
+int veejay_write_recovery_files(veejay_t *info)
 {
-	if(new_state == LAVPLAY_STATE_STOP )
-	{
-		pid_t my_pid = getpid();
-        int len = snprintf(NULL, 0, "%s/recovery/recovery_samplelist_p%d.sl", info->homedir, (int)my_pid);
-        char *recover_samples = vj_malloc(len + 1);
-        if (!recover_samples) { 
-			return;
-		}
-        snprintf(recover_samples, len + 1, "%s/recovery/recovery_samplelist_p%d.sl", info->homedir, (int)my_pid);
-        len = snprintf(NULL, 0, "%s/recovery/recovery_editlist_p%d.edl", info->homedir, (int)my_pid);
-        char *recover_edl = malloc(len + 1);
-        if (!recover_edl) { 
-			free(recover_samples); 
-			return;
-		}
-        snprintf(recover_edl, len + 1, "%s/recovery/recovery_editlist_p%d.edl", info->homedir, (int)my_pid);
-        
-		int re = veejay_save_all( info, recover_edl, 0, -1 );
-		int rs= 0;
-		if(re) {
-			rs = sample_writeToFile( recover_samples,info->composite,info->seq,info->font,
-				info->uc->sample_id, info->uc->playback_mode );
-		}
+    char recover_samples[PATH_MAX];
+    char recover_edl[PATH_MAX];
+    pid_t my_pid;
+    int ns;
+    int ne;
+    int re = 0;
+    int rs = 0;
 
-		if(rs)
-			veejay_msg(VEEJAY_MSG_WARNING, "Saved Samplelist to %s", recover_samples );
-		if(re)
-			veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl );
+    if(!info || !info->homedir || !info->uc)
+        return 0;
 
-		free(recover_samples);
-	}
+    if(__atomic_load_n(&veejay_recovery_complete_, __ATOMIC_ACQUIRE))
+        return 3;
 
-	veejay_change_state( info, new_state );
+    if(__atomic_exchange_n(&veejay_recovery_in_progress_, 1, __ATOMIC_ACQ_REL))
+        return 0;
+
+    if(__atomic_load_n(&veejay_recovery_complete_, __ATOMIC_ACQUIRE)) {
+        __atomic_store_n(&veejay_recovery_in_progress_, 0, __ATOMIC_RELEASE);
+        return 3;
+    }
+    my_pid = getpid();
+
+    ns = snprintf(recover_samples, sizeof(recover_samples),
+                  "%s/recovery/recovery_samplelist_p%d.sl",
+                  info->homedir, (int)my_pid);
+    ne = snprintf(recover_edl, sizeof(recover_edl),
+                  "%s/recovery/recovery_editlist_p%d.edl",
+                  info->homedir, (int)my_pid);
+
+    if(ne >= 0 && ne < (int)sizeof(recover_edl))
+        re = veejay_save_all(info, recover_edl, 0, -1);
+    else
+        veejay_msg(VEEJAY_MSG_ERROR, "Recovery Editlist path is too long");
+
+    if(ns >= 0 && ns < (int)sizeof(recover_samples)) {
+        rs = sample_writeToFile(recover_samples, info->composite, info->seq, info->font,
+                                info->uc->sample_id, info->uc->playback_mode);
+    } else {
+        veejay_msg(VEEJAY_MSG_ERROR, "Recovery Samplelist path is too long");
+    }
+
+    if(rs)
+        veejay_msg(VEEJAY_MSG_WARNING, "Saved Samplelist to %s", recover_samples);
+    else
+        veejay_msg(VEEJAY_MSG_WARNING, "Unable to save recovery Samplelist");
+
+    if(re)
+        veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl);
+    else
+        veejay_msg(VEEJAY_MSG_WARNING, "Unable to save recovery Editlist");
+
+    if(re && rs)
+        __atomic_store_n(&veejay_recovery_complete_, 1, __ATOMIC_RELEASE);
+
+    __atomic_store_n(&veejay_recovery_in_progress_, 0, __ATOMIC_RELEASE);
+    return (re ? 1 : 0) | (rs ? 2 : 0);
+}
+
+void veejay_change_state_save(veejay_t *info, int new_state)
+{
+    if(new_state == LAVPLAY_STATE_STOP)
+        (void) veejay_write_recovery_files(info);
+
+    veejay_change_state(info, new_state);
 }
 
 static inline int playback_dir(int speed)
@@ -3665,7 +3715,11 @@ int veejay_free(veejay_t * info)
             free(info->recording->sync_audio.buffer);
         free(info->recording);
     }
-	free(settings);
+    if(info->perf) {
+        vj_perf_destroy((vj_perf_context*)info->perf);
+        info->perf = NULL;
+    }
+    free(settings);
     free(info);
 
     return 1;
@@ -4618,7 +4672,7 @@ static int veejay_cond_wait_stop_poll(video_playback_setup *settings, pthread_co
     return atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP;
 }
 
-VJ_LIB_LOCAL VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
+VJ_LIB_LOCAL vj_video_packet_t *veejay_video_queue_reserve_packet(veejay_t *info)
 {
     video_playback_setup *settings = info->settings;
     int idx = -1;
@@ -4631,7 +4685,8 @@ VJ_LIB_LOCAL VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
                 break;
             }
         }
-        if (idx >= 0) break;
+        if (idx >= 0)
+            break;
 
         if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) {
             pthread_mutex_unlock(&settings->mutex);
@@ -4643,26 +4698,37 @@ VJ_LIB_LOCAL VJFrame *veejay_video_queue_reserve_buffer(veejay_t *info)
         }
     }
 
+    vj_video_packet_t *packet = &settings->video_packets[idx];
     settings->states[idx] = BUFFER_RESERVED;
-    settings->buffers[idx]->queue_index = idx; 
+    packet->queue_index = idx;
+    packet->sequence = 0;
+    packet->timeline_frame = -1;
+    packet->source_frame = -1;
+    packet->pts_s = 0.0;
+    packet->duration_s = 0.0;
+    packet->fps_generation = 0;
+    packet->transport_epoch = 0;
+    packet->flags = 0;
+    packet->frame->queue_index = idx;
 
     pthread_mutex_unlock(&settings->mutex);
-    return settings->buffers[idx];
+    return packet;
 }
 
-VJ_LIB_LOCAL void veejay_video_queue_post_frame(veejay_t *info, VJFrame *vf)
+VJ_LIB_LOCAL void veejay_video_queue_post_packet(veejay_t *info,
+                                                  vj_video_packet_t *packet)
 {
     video_playback_setup *settings = info->settings;
-    int idx = vf->queue_index;
+    const int idx = packet->queue_index;
+
     pthread_mutex_lock(&settings->mutex);
-
-    settings->frame_seq[idx] = settings->next_seq++;
+    packet->sequence = settings->next_seq++;
     settings->states[idx] = BUFFER_FILLED;
-
     pthread_cond_signal(&settings->renderer_wait_cv);
     pthread_mutex_unlock(&settings->mutex);
 }
-VJ_LIB_LOCAL VJFrame *veejay_video_queue_get_frame(veejay_t *info)
+
+VJ_LIB_LOCAL vj_video_packet_t *veejay_video_queue_get_packet(veejay_t *info)
 {
     video_playback_setup *settings = info->settings;
     int idx = -1;
@@ -4672,17 +4738,33 @@ VJ_LIB_LOCAL VJFrame *veejay_video_queue_get_frame(veejay_t *info)
         uint64_t best_seq = UINT64_MAX;
         idx = -1;
         for (int i = 0; i < VIDEO_QUEUE_LEN; i++) {
-            if (settings->states[i] == BUFFER_FILLED && settings->frame_seq[i] < best_seq) {
-                best_seq = settings->frame_seq[i];
+            vj_video_packet_t *packet = &settings->video_packets[i];
+            if (settings->states[i] == BUFFER_FILLED && packet->sequence < best_seq) {
+                best_seq = packet->sequence;
                 idx = i;
             }
         }
-        if (idx >= 0) break;
+
+        if (idx >= 0)
+            break;
+
         if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) {
             pthread_mutex_unlock(&settings->mutex);
             return NULL;
         }
-        if (veejay_cond_wait_stop_poll(settings, &settings->renderer_wait_cv)) {
+
+        struct timespec ts;
+        clock_gettime(CLOCK_MONOTONIC, &ts);
+        ts.tv_nsec += 10000000L;
+        if (ts.tv_nsec >= 1000000000L) {
+            ts.tv_nsec -= 1000000000L;
+            ts.tv_sec++;
+        }
+
+        int wait_rc = pthread_cond_timedwait(&settings->renderer_wait_cv,
+                                             &settings->mutex,
+                                             &ts);
+        if (wait_rc == ETIMEDOUT) {
             pthread_mutex_unlock(&settings->mutex);
             return NULL;
         }
@@ -4690,120 +4772,216 @@ VJ_LIB_LOCAL VJFrame *veejay_video_queue_get_frame(veejay_t *info)
 
     settings->states[idx] = BUFFER_IN_RENDER;
     pthread_mutex_unlock(&settings->mutex);
-	
-    return settings->buffers[idx];
+    return &settings->video_packets[idx];
 }
 
-VJ_LIB_LOCAL void video_queue_return_frame(veejay_t *info, VJFrame *vf)
+VJ_LIB_LOCAL void veejay_video_queue_return_packet(veejay_t *info,
+                                                    vj_video_packet_t *packet)
 {
     video_playback_setup *settings = info->settings;
-    int idx = vf->queue_index;
+    const int idx = packet->queue_index;
 
     pthread_mutex_lock(&settings->mutex);
     settings->states[idx] = BUFFER_FREE;
-
     pthread_cond_signal(&settings->producer_wait_cv);
     pthread_mutex_unlock(&settings->mutex);
 }
 
-static void veejay_screen_update(veejay_t *info, VJFrame *frame_to_display) {
-    video_playback_setup *settings = (video_playback_setup*) info->settings;
-    display_frame_t *df = &settings->display_frame;
+static int veejay_video_queue_has_newer_packet(veejay_t *info,
+                                               const vj_video_packet_t *packet)
+{
+    video_playback_setup *settings = info->settings;
+    int found = 0;
 
-    int render_vp  = settings->composite;
-    int write_index = (df->current_write + 1) % VIDEO_QUEUE_LEN;
-    uint8_t *pixels = df->pixels[write_index];
+    pthread_mutex_lock(&settings->mutex);
+    for(int i = 0; i < VIDEO_QUEUE_LEN; i++) {
+        if(settings->states[i] == BUFFER_FILLED &&
+           settings->video_packets[i].sequence > packet->sequence) {
+            found = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&settings->mutex);
+    return found;
+}
 
+static int veejay_output_present_primary(veejay_t *info, VJFrame *frame)
+{
+    switch(info->video_out) {
+        case VIDEO_OUT_SDL:
 #ifdef HAVE_SDL
-    if (info->video_out == 0 && !pixels && info->sdl) {
-        pixels = vj_sdl_get_buffer(info->sdl, write_index);
-        df->pixels[write_index] = pixels;
-    }
-#endif
-
-    if (info->video_out == 0 && !pixels) {
-        veejay_msg(VEEJAY_MSG_ERROR,
-                   "[DISPLAY] SDL display buffer %d is NULL; frame %lld skipped",
-                   write_index,
-                   frame_to_display ? frame_to_display->frame_num : -1LL);
-        return;
-    }
-
-	switch (info->video_out) {
-		case 0:
-			if (render_vp == 0) {
-				vj_sdl_convert_to_screen(info->sdl, frame_to_display, pixels );
-
-			} else {
-				composite_blit_yuyv(info->composite, frame_to_display->data, pixels, render_vp);
-			}
-			break;// SDL
-		case 5:
-			break;
-		case 4: // Y4M
-		case 6:
-			if( vj_yuv_put_frame( info->y4m, frame_to_display->data ) == -1 ) {
-				veejay_msg(0, "Failed to write a frame");
-				veejay_change_state(info,LAVPLAY_STATE_STOP);
-				return;
-			}
-			break;
-		default:
-			break; // Headless 
-	}
-
-	if( info->vloopback )
-	{
-		if(vj_vloopback_fill_buffer( info->vloopback , frame_to_display ))
-			vj_vloopback_write( info->vloopback );
-	}
-
-	if( info->splitter ) {
-		vj_split_render( info->splitter );
-	}
-	
-	if( atomic_load_int(&info->settings->unicast_frame_sender) ) {
-		vj_perform_send_primary_frame_s2(info, 0, info->uc->current_link, frame_to_display );
-	}
-
-	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast ) {
-		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link, frame_to_display);
-	}
-
-	if( info->shm && vj_shm_get_status(info->shm) == 1 ) {
-		int plane_sizes[4] = { frame_to_display->len, frame_to_display->uv_len,
-		   		frame_to_display->uv_len,0 };	
-		if( vj_shm_write(info->shm, frame_to_display->data,plane_sizes) == -1 ) {
-			veejay_msg(0, "[DISPLAY] Failed to write to shared resource");
-		}
-	}
-
-
-#ifdef HAVE_JPEG
-#ifdef USE_GDK_PIXBUF 
-	if (atomic_load_int(&info->uc->take_screenshot) == 1)
-	{
-		atomic_store_int(&info->uc->take_screenshot,0);
-#ifdef USE_GDK_PIXBUF
-		if(!vj_picture_save( info->settings->export_image, frame_to_display->data, 
-			info->video_output_width, info->video_output_height,
-			get_ffmpeg_pixfmt( info->pixel_format )) )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to write frame %lld to image as '%s'",	frame_to_display->frame_num, info->settings->export_image );
-		}
+            return vj_sdl_present_frame(info->sdl, frame);
 #else
+            return 0;
+#endif
+
+        case 4:
+        case 6: {
+            const uint64_t present_start = vj_perf_now_ns();
+            const int result = vj_yuv_put_frame(info->y4m, frame->data);
+            vj_perf_record((vj_perf_context*)info->perf,
+                           VJ_PERF_STAGE_UPLOAD_PRESENT,
+                           present_start, vj_perf_now_ns());
+            if(result == -1) {
+                veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Failed to write Y4M frame");
+                veejay_change_state(info, LAVPLAY_STATE_STOP);
+                return 0;
+            }
+            return 1;
+        }
+
+        default:
+            return 1;
+    }
+}
+
+static void veejay_output_push_vloopback(veejay_t *info, VJFrame *frame)
+{
+    if(info->vloopback && vj_vloopback_fill_buffer(info->vloopback, frame))
+        vj_vloopback_write(info->vloopback);
+}
+
+static int veejay_output_push_split(veejay_t *info, VJFrame *frame)
+{
+    if(!info->splitter || !info->settings->splitscreen)
+        return 0;
+    vj_split_process(info->splitter, frame);
+    vj_split_render(info->splitter);
+    return 1;
+}
+
+static int veejay_output_push_network(veejay_t *info, VJFrame *frame)
+{
+    video_playback_setup *settings = info->settings;
+    int active = 0;
+
+    if(atomic_load_int(&settings->unicast_frame_sender)) {
+        vj_perform_send_primary_frame_s2(info, 0, info->uc->current_link, frame);
+        active = 1;
+    }
+
+    if(settings->mcast_frame_sender && settings->use_vims_mcast) {
+        vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link, frame);
+        active = 1;
+    }
+    return active;
+}
+
+static int veejay_output_push_shm(veejay_t *info, VJFrame *frame)
+{
+    if(!info->shm || vj_shm_get_status(info->shm) != 1)
+        return 0;
+
+    int plane_sizes[4] = {
+        frame->len,
+        frame->uv_len,
+        frame->uv_len,
+        0
+    };
+
+    if(vj_shm_write(info->shm, frame->data, plane_sizes) == -1)
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Failed to write frame to shared resource");
+    return 1;
+}
+
+static void veejay_output_push_screenshot(veejay_t *info, VJFrame *frame)
+{
 #ifdef HAVE_JPEG
-		vj_perform_screenshot2(info, frame_to_display);
-		if(info->uc->filename) free(info->uc->filename);
-#endif
-#endif
+#ifdef USE_GDK_PIXBUF
+    if(atomic_load_int(&info->uc->take_screenshot) == 1) {
+        atomic_store_int(&info->uc->take_screenshot, 0);
+        if(!vj_picture_save(info->settings->export_image,
+                            frame->data,
+                            info->video_output_width,
+                            info->video_output_height,
+                            get_ffmpeg_pixfmt(info->pixel_format)))
+        {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to write frame %lld to image as '%s'",
+                       frame->frame_num,
+                       info->settings->export_image);
+        }
     }
 #endif
 #endif
+}
 
-    df->current_write = write_index;
-    settings->display_frame.pixels[write_index] = pixels;
-    atomic_store_long_long(&settings->display_frame.seq, frame_to_display->frame_num);
+static void veejay_output_push_frame(veejay_t *info,
+                                     VJFrame *source_frame,
+                                     long long timeline_frame)
+{
+    if(!info || !source_frame)
+        return;
+
+    uint64_t stage_start;
+
+    /* A program instance publishes the composed program frame before any
+     * local physical-output graph is applied. Output and standalone instances
+     * publish their final mapped frame instead. */
+    if(info->instance_role == VJ_INSTANCE_ROLE_PROGRAM) {
+        stage_start = vj_perf_now_ns();
+        if(veejay_output_push_shm(info, source_frame))
+            vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_SHM_WRITE,
+                           stage_start, vj_perf_now_ns());
+    }
+
+    int graph_pattern = VJ_OUTPUT_PATTERN_PROGRAM;
+    stage_start = vj_perf_now_ns();
+    VJFrame *frame = vj_output_graph_process_ex((vj_output_graph*)info->output_graph,
+                                                 source_frame, &graph_pattern);
+    vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_OUTPUT_GRAPH,
+                   stage_start, vj_perf_now_ns());
+
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        veejay_output_capture_pre_projection(info, frame);
+        if(info->settings->composite) {
+            stage_start = vj_perf_now_ns();
+            frame = veejay_output_apply_projection(info, frame);
+            vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_COMPOSITE,
+                           stage_start, vj_perf_now_ns());
+        }
+    }
+    else if(graph_pattern != VJ_OUTPUT_PATTERN_PROGRAM && info->settings->composite) {
+        stage_start = vj_perf_now_ns();
+        frame = veejay_output_apply_pattern_projection(info, frame);
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_COMPOSITE,
+                       stage_start, vj_perf_now_ns());
+    }
+
+    veejay_output_present_primary(info, frame);
+
+    veejay_output_push_vloopback(info, frame);
+
+    stage_start = vj_perf_now_ns();
+    if(veejay_output_push_split(info, frame))
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_SPLIT,
+                       stage_start, vj_perf_now_ns());
+
+    stage_start = vj_perf_now_ns();
+    VJFrame *network_frame =
+        info->instance_role == VJ_INSTANCE_ROLE_PROGRAM ? source_frame : frame;
+    if(veejay_output_push_network(info, network_frame))
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_NETWORK,
+                       stage_start, vj_perf_now_ns());
+
+    if(info->instance_role != VJ_INSTANCE_ROLE_PROGRAM) {
+        stage_start = vj_perf_now_ns();
+        if(veejay_output_push_shm(info, frame))
+            vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_SHM_WRITE,
+                           stage_start, vj_perf_now_ns());
+    }
+
+    veejay_output_push_screenshot(info, frame);
+
+    atomic_store_long_long(&info->settings->display_frame.seq, timeline_frame);
+}
+
+static void veejay_output_push_packet(veejay_t *info,
+                                      const vj_video_packet_t *packet)
+{
+    if(packet && packet->frame)
+        veejay_output_push_frame(info, packet->frame, packet->timeline_frame);
 }
 
 static int veejay_pipe_status_token_count(const char *s)
@@ -5766,42 +5944,38 @@ void	veejay_check_homedir(void *arg)
 		return;
 	}
 
-	if( statfs( tmp, &ts ) != 0 )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING,"No projection mapping file found in [%s]", tmp);
-	    veejay_msg(VEEJAY_MSG_WARNING,"Press CTRL-s to setup then CTRL-h for help. Press CTRL-s again to exit, CTRL-p to switch");
-	}
+    if(statfs(tmp, &ts) == 0)
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "Port-scoped viewport configuration file found in [%s]", tmp);
 }
 
 void veejay_handle_signal(int sig, siginfo_t *si, void *unused)
 {
     veejay_t *info = veejay_instance_;
 
+    (void) si;
+    (void) unused;
+
     switch (sig) {
         case SIGINT:
         case SIGQUIT:
+        case SIGTERM:
+        case SIGPWR:
             veejay_request_stop_fast(info);
             break;
 
         case SIGSEGV:
         case SIGBUS:
-        case SIGPWR:
         case SIGABRT:
         case SIGFPE:
-            if (info && info->homedir) {
-                veejay_change_state_save(info, LAVPLAY_STATE_STOP);
-            } else if (info) {
-                veejay_change_state(info, LAVPLAY_STATE_STOP);
-            }
-            signal(sig, SIG_DFL);
+        case SIGILL:
+            if(info && info->homedir)
+                (void) veejay_write_recovery_files(info);
+            _exit(128 + sig);
             break;
 
         case SIGPIPE:
-            if (info) veejay_change_state(info, LAVPLAY_STATE_STOP);
-            break;
-
         default:
-            veejay_msg(VEEJAY_MSG_WARNING, "Unhandled signal %d received", sig);
             break;
     }
 }
@@ -5894,6 +6068,7 @@ static void 	veejay_consume_events(veejay_t *info) {
 	SDL_Event event;
 	int ctrl_pressed = 0;
 	int shift_pressed = 0;
+	int right_shift_pressed = 0;
 	int alt_pressed = 0;
 	int mouse_x=0,mouse_y=0,but=0;
 	int mod = 0;
@@ -5901,6 +6076,11 @@ static void 	veejay_consume_events(veejay_t *info) {
 	veejay_handle_callbacks(info);
 
 	while( vj_event_pop(&event, &mod)) {
+		ctrl_pressed = (mod & KMOD_CTRL) ? 1 : 0;
+		shift_pressed = (mod & KMOD_LSHIFT) ? 1 : 0;
+		right_shift_pressed = (mod & KMOD_RSHIFT) ? 1 : 0;
+		alt_pressed = (mod & KMOD_ALT) ? 1 : 0;
+
 		if( event.type == SDL_QUIT ) {
 			veejay_change_state(info, LAVPLAY_STATE_STOP );
 		}
@@ -5918,13 +6098,6 @@ static void 	veejay_consume_events(veejay_t *info) {
 		{
 			mouse_x = event.button.x;
 			mouse_y = event.button.y;
-			shift_pressed = (mod & KMOD_LSHIFT );
-			alt_pressed = (mod & KMOD_RSHIFT );
-			if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
-				ctrl_pressed = 1; 
-			else
-				ctrl_pressed = 0;
-
 			SDL_MouseButtonEvent *mev = &(event.button);
 
 			if( mev->button == SDL_BUTTON_LEFT && shift_pressed)
@@ -5941,7 +6114,7 @@ static void 	veejay_consume_events(veejay_t *info) {
 				but = 7;
 				info->uc->mouse[3] = 2;
 			}
-			if( mev->button == SDL_BUTTON_LEFT && alt_pressed )
+			if( mev->button == SDL_BUTTON_LEFT && right_shift_pressed )
 			{
 				but = 11;
 				info->uc->mouse[3] = 11;
@@ -5951,12 +6124,6 @@ static void 	veejay_consume_events(veejay_t *info) {
 		if( info->use_mouse && event.type == SDL_MOUSEBUTTONUP )
 		{
 			SDL_MouseButtonEvent *mev = &(event.button);
-			alt_pressed = (mod & KMOD_RSHIFT );
-			if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
-				ctrl_pressed = 1; 
-			else
-				ctrl_pressed = 0;
-
 			if( mev->button == SDL_BUTTON_LEFT )
 			{
 				if( info->uc->mouse[3] == 1 )
@@ -6078,92 +6245,87 @@ void	veejay_event_handle(veejay_t *info)
 #endif
 }
 
-#ifdef HAVE_SDL
-static int veejay_bind_sdl_display_buffers(veejay_t *info)
+
+static void veejay_output_poll_events(veejay_t *info)
 {
-    video_playback_setup *settings;
-    display_frame_t *df;
+    static uint64_t next_output_control_poll_ns = 0;
 
-    if (!info || !info->settings || !info->sdl)
-        return 0;
+    if(!info)
+        return;
 
-    settings = info->settings;
-    df = &settings->display_frame;
-
-    df->current_write = 0;
-    atomic_store_long_long(&df->seq, -1);
-
-    for (int i = 0; i < VIDEO_QUEUE_LEN; i++) {
-        df->pixels[i] = vj_sdl_get_buffer(info->sdl, i);
-        if (!df->pixels[i]) {
-            veejay_msg(VEEJAY_MSG_ERROR,
-                       "[DISPLAY] SDL display buffer %d is NULL", i);
-            return 0;
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        const uint64_t now_ns = vj_perf_now_ns();
+        if(now_ns >= next_output_control_poll_ns) {
+            veejay_handle_callbacks(info);
+            next_output_control_poll_ns = now_ns + 10000000ULL;
         }
     }
 
-    return 1;
-}
-#endif
-
-int veejay_setup_video_out(veejay_t *info) {
-	char *title;
-	int x = 0, y = 0;
-	editlist *el = info->edit_list;
-	video_playback_setup *settings = info->settings;
-
-	if( info->uc->geox != 0 && info->uc->geoy != 0 )
-	{
-		x = info->uc->geox;
-		y = info->uc->geoy;
-	}
-
-	switch(info->video_out) {
-		case 0:
-			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 #ifdef HAVE_SDL
-			info->sdl = vj_sdl_allocate( info->effect_frame1, info->use_keyb, info->use_mouse,info->show_cursor, info->borderless);
-			if( !info->sdl )
-				return -1;
+    if(info->sdl &&
+       (info->video_out == VIDEO_OUT_SDL || info->video_out == 2))
+        vj_sdl_process_pending(info->sdl);
 
-			title = veejay_title( info );
-
-			if (!vj_sdl_init(info->sdl, x,y,info->video_output_width, info->video_output_height, info->bes_width, info->bes_height, title,1,info->settings->full_screen,info->pixel_format,el->video_fps, &settings->vsync_interval_s))
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
-				free(title);
-				return -1;
-			}
-
-			if (!veejay_bind_sdl_display_buffers(info)) {
-				veejay_msg(VEEJAY_MSG_ERROR, "Error binding SDL display buffers");
-				free(title);
-				return -1;
-			}
-
-			free(title);
+    veejay_event_handle(info);
 #endif
-		break;
+}
 
-		case 1:
-		break;
+static void veejay_output_wait_until(veejay_t *info, double target_time_s)
+{
+    video_playback_setup *settings = info->settings;
+
+    while(atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+        double now_s = vj_runtime_master_clock_now_s(info, NULL);
+        double remaining_s = target_time_s - now_s;
+        if(remaining_s <= 0.0)
+            break;
+
+        if(remaining_s > 0.010)
+            remaining_s = 0.010;
+        usleep_accurate((long long)(remaining_s * 1.0e6), settings);
+        veejay_output_poll_events(info);
+    }
+}
 
 
-		case 2:
-		break;
-		case 3:
-	    case 4:
-		case 5:
-		case 6:
-		case 7:
-		case 8:
-			break;
-		default:
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345678]");
-			return -1;
-	}
 
-	return 0;
+int veejay_setup_video_out(veejay_t *info)
+{
+    switch(info->video_out) {
+        case VIDEO_OUT_SDL:
+            veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
+#ifdef HAVE_SDL
+            video_playback_setup *settings = info->settings;
+
+            info->sdl = vj_sdl_allocate(info->effect_frame1,
+                                        info->use_keyb,
+                                        info->use_mouse,
+                                        info->show_cursor,
+                                        info->borderless);
+            if(!info->sdl)
+                return -1;
+
+            atomic_store_long_long(&settings->display_frame.seq, -1);
+#endif
+            break;
+
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+            break;
+
+        default:
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Invalid playback mode. Use -O [012345678]");
+            return -1;
+    }
+
+    return 0;
 }
 
 static double vj_get_relative_time(void)
@@ -6229,83 +6391,1117 @@ char	*veejay_title(veejay_t *info)
 	return strdup(tmp);
 }
 
+
+static const char *veejay_instance_role_name(int role)
+{
+    switch(role) {
+        case VJ_INSTANCE_ROLE_PROGRAM: return "program";
+        case VJ_INSTANCE_ROLE_OUTPUT: return "output";
+        default: return "standalone";
+    }
+}
+
+typedef struct {
+    VJFrame *transport_frame;
+    uint8_t *transport_buffer;
+    uint8_t *canonical_buffer;
+    void *to_output;
+    VJFrame *projection_source_frame;
+    VJFrame *projection_frame;
+    VJFrame *present_frame;
+    uint8_t *projection_source_buffer;
+    uint8_t *projection_buffer;
+    uint8_t *present_buffer;
+    void *to_projection;
+    void *from_projection;
+    int capacity[4];
+    int native_format;
+    int output_format;
+    int projection_format;
+    int source_mode;
+    int remote_stream_id;
+    uint64_t remote_sequence;
+    int projection_preview_valid;
+} veejay_output_source_state;
+
+static void veejay_output_source_free(veejay_t *info)
+{
+    if(!info)
+        return;
+    if(info->input_shm) {
+        vj_shm_free_slave(info->input_shm);
+        info->input_shm = NULL;
+    }
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(state) {
+        if(state->remote_stream_id > 0 && vj_tag_exists(state->remote_stream_id)) {
+            vj_tag_del(state->remote_stream_id, 0);
+            if(info->nstreams > 0)
+                info->nstreams--;
+            state->remote_stream_id = 0;
+        }
+        if(state->to_output)
+            yuv_free_swscaler(state->to_output);
+        if(state->to_projection)
+            yuv_free_swscaler(state->to_projection);
+        if(state->from_projection)
+            yuv_free_swscaler(state->from_projection);
+        free(state->projection_source_frame);
+        free(state->projection_frame);
+        free(state->present_frame);
+        free(state->projection_source_buffer);
+        free(state->projection_buffer);
+        free(state->present_buffer);
+        if(state->transport_frame &&
+           state->transport_frame != info->output_input_frame)
+            free(state->transport_frame);
+        if(state->canonical_buffer &&
+           state->canonical_buffer != state->transport_buffer)
+            free(state->canonical_buffer);
+        free(state->transport_buffer);
+        free(state);
+    }
+
+    info->output_input_buffer = NULL;
+    free(info->output_input_frame);
+    info->output_input_frame = NULL;
+    info->output_input_sequence = 0;
+}
+
+static int veejay_output_alloc_frame_storage(VJFrame *frame, uint8_t **storage)
+{
+    if(!frame || !storage)
+        return 0;
+    const size_t bytes = (size_t)frame->len + (size_t)frame->uv_len * 2u;
+    uint8_t *buffer = (uint8_t*)vj_malloc(bytes);
+    if(!buffer)
+        return 0;
+    frame->data[0] = buffer;
+    frame->data[1] = buffer + frame->len;
+    frame->data[2] = frame->data[1] + frame->uv_len;
+    frame->data[3] = NULL;
+    *storage = buffer;
+    return 1;
+}
+
+static int veejay_output_projection_init(veejay_t *info,
+                                         veejay_output_source_state *state)
+{
+    if(!info || !state)
+        return 0;
+
+    state->projection_format = (info->pixel_format == FMT_422F) ?
+                               PIX_FMT_YUVJ444P : PIX_FMT_YUV444P;
+    state->projection_source_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                                       info->video_output_width,
+                                                       info->video_output_height,
+                                                       state->projection_format);
+    state->projection_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                                info->video_output_width,
+                                                info->video_output_height,
+                                                state->projection_format);
+    state->present_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                             info->video_output_width,
+                                             info->video_output_height,
+                                             state->output_format);
+    if(!state->projection_source_frame || !state->projection_frame || !state->present_frame ||
+       !veejay_output_alloc_frame_storage(state->projection_source_frame,
+                                          &state->projection_source_buffer) ||
+       !veejay_output_alloc_frame_storage(state->projection_frame,
+                                          &state->projection_buffer) ||
+       !veejay_output_alloc_frame_storage(state->present_frame,
+                                          &state->present_buffer))
+        return 0;
+
+    state->projection_source_frame->fps = info->settings->output_fps;
+    state->projection_frame->fps = info->settings->output_fps;
+    state->present_frame->fps = info->settings->output_fps;
+
+    if(state->output_format != state->projection_format) {
+        sws_template templ;
+        veejay_memset(&templ, 0, sizeof(templ));
+        templ.flags = yuv_which_scaler();
+        state->to_projection = yuv_init_swscaler(state->present_frame,
+                                                  state->projection_source_frame,
+                                                  &templ,
+                                                  yuv_sws_get_cpu_flags());
+        state->from_projection = yuv_init_swscaler(state->projection_frame,
+                                                    state->present_frame,
+                                                    &templ,
+                                                    yuv_sws_get_cpu_flags());
+        if(!state->to_projection || !state->from_projection)
+            return 0;
+    }
+    return 1;
+}
+
+static void veejay_output_copy_444(VJFrame *dst, const VJFrame *src)
+{
+    int strides[4] = { src->len, src->uv_len, src->uv_len, 0 };
+    vj_frame_copy((uint8_t**)src->data, dst->data, strides);
+}
+
+static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped)
+{
+    if(!info || !mapped || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+        return 0;
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(!state || !state->projection_source_frame)
+        return 0;
+
+    state->projection_preview_valid = 0;
+    if(state->to_projection)
+        yuv_convert_and_scale(state->to_projection, mapped, state->projection_source_frame);
+    else
+        veejay_output_copy_444(state->projection_source_frame, mapped);
+
+    state->projection_source_frame->frame_num = mapped->frame_num;
+    state->projection_source_frame->fps = mapped->fps;
+    state->projection_preview_valid = 1;
+    return 1;
+}
+
+int veejay_output_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
+{
+    if(!info || !frame || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+        return 0;
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(!state || !state->projection_preview_valid || !state->projection_source_frame)
+        return 0;
+
+    veejay_memcpy(frame, state->projection_source_frame, sizeof(VJFrame));
+    return 1;
+}
+
+static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped)
+{
+    if(!info || !mapped || !info->settings->composite || !info->composite ||
+       info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+        return mapped;
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(!state || !state->projection_source_frame ||
+       !state->projection_frame || !state->present_frame)
+        return mapped;
+
+    if(!state->projection_preview_valid &&
+       !veejay_output_capture_pre_projection(info, mapped))
+        return mapped;
+
+    void *viewport = composite_get_vp(info->composite);
+    if(!viewport)
+        return mapped;
+
+    viewport_produce_full_img(viewport,
+                              state->projection_source_frame->data,
+                              state->projection_frame->data);
+    state->projection_frame->frame_num = mapped->frame_num;
+    state->projection_frame->fps = mapped->fps;
+
+    if(state->from_projection)
+        yuv_convert_and_scale(state->from_projection,
+                              state->projection_frame, state->present_frame);
+    else
+        veejay_output_copy_444(state->present_frame, state->projection_frame);
+    state->present_frame->frame_num = mapped->frame_num;
+    state->present_frame->fps = mapped->fps;
+    return state->present_frame;
+}
+
+static VJFrame *veejay_output_apply_pattern_projection(veejay_t *info, VJFrame *pattern)
+{
+    if(!info || !pattern || !info->settings->composite || !info->composite ||
+       info->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
+        return pattern;
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(!state || !state->projection_source_frame ||
+       !state->projection_frame || !state->present_frame)
+        return pattern;
+
+    if(state->to_projection)
+        yuv_convert_and_scale(state->to_projection, pattern, state->projection_source_frame);
+    else
+        veejay_output_copy_444(state->projection_source_frame, pattern);
+    state->projection_source_frame->frame_num = pattern->frame_num;
+    state->projection_source_frame->fps = pattern->fps;
+
+    void *viewport = composite_get_vp(info->composite);
+    if(!viewport)
+        return pattern;
+
+    viewport_produce_full_img(viewport,
+                              state->projection_source_frame->data,
+                              state->projection_frame->data);
+    state->projection_frame->frame_num = pattern->frame_num;
+    state->projection_frame->fps = pattern->fps;
+
+    if(state->from_projection)
+        yuv_convert_and_scale(state->from_projection,
+                              state->projection_frame, state->present_frame);
+    else
+        veejay_output_copy_444(state->present_frame, state->projection_frame);
+    state->present_frame->frame_num = pattern->frame_num;
+    state->present_frame->fps = pattern->fps;
+    return state->present_frame;
+}
+
+static int veejay_output_source_host_is_local(const char *host)
+{
+    if(!host || !*host)
+        return 1;
+
+    return strcmp(host, "localhost") == 0 ||
+           strcmp(host, "127.0.0.1") == 0 ||
+           strcmp(host, "::1") == 0;
+}
+
+
+#define VJ_OUTPUT_SOURCE_NONE (-1)
+#define VJ_OUTPUT_SOURCE_SHM 0
+#define VJ_OUTPUT_SOURCE_NETWORK 1
+
+static int veejay_output_pattern_projection_init(veejay_t *info)
+{
+    if(!info || info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ||
+       !info->composite || info->output_input_buffer)
+        return 1;
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)vj_calloc(sizeof(veejay_output_source_state));
+    if(!state)
+        return 0;
+
+    info->output_input_buffer = (uint8_t*)state;
+    state->source_mode = VJ_OUTPUT_SOURCE_NONE;
+    state->output_format = vj_to_pixfmt(info->pixel_format);
+    state->native_format = state->output_format;
+    state->remote_sequence = UINT64_MAX;
+
+    if(!veejay_output_projection_init(info, state)) {
+        veejay_output_source_free(info);
+        return 0;
+    }
+    return 1;
+}
+
+static int veejay_output_source_attach_remote(veejay_t *info,
+                                               const char *host,
+                                               int port)
+{
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)vj_calloc(sizeof(veejay_output_source_state));
+    if(!state)
+        return 0;
+
+    info->output_input_buffer = (uint8_t*)state;
+    state->source_mode = VJ_OUTPUT_SOURCE_NETWORK;
+    state->output_format = vj_to_pixfmt(info->pixel_format);
+    state->native_format = state->output_format;
+    state->remote_sequence = UINT64_MAX;
+
+    info->output_input_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                                 info->video_output_width,
+                                                 info->video_output_height,
+                                                 state->output_format);
+    if(!info->output_input_frame ||
+       !veejay_output_alloc_frame_storage(info->output_input_frame,
+                                          &state->canonical_buffer)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to allocate remote Program staging frame");
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    info->output_input_frame->fps = info->settings->output_fps;
+    info->output_input_frame->data[3] = NULL;
+    memset(info->output_input_frame->data[0], 0,
+           (size_t)info->output_input_frame->len);
+    memset(info->output_input_frame->data[1], 128,
+           (size_t)info->output_input_frame->uv_len);
+    memset(info->output_input_frame->data[2], 128,
+           (size_t)info->output_input_frame->uv_len);
+    info->output_input_sequence = UINT64_MAX;
+
+    if(!veejay_output_projection_init(info, state)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to initialize projection staging for remote Program");
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    state->remote_stream_id = veejay_create_tag(info, VJ_TAG_TYPE_NET,
+                                                 (char*)host,
+                                                 info->nstreams,
+                                                 port, 0);
+    if(state->remote_stream_id <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to create TCP video source %s:%d",
+                   host, port);
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    vj_tag *tag = vj_tag_get(state->remote_stream_id);
+    if(!tag || !net_thread_start_screen(tag, info->output_input_frame, -1)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to start TCP Program receiver for %s:%d",
+                   host, port);
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    if(info->output_graph)
+        vj_output_graph_destroy((vj_output_graph*)info->output_graph);
+    info->output_graph = vj_output_graph_create(info->video_output_width,
+                                                 info->video_output_height,
+                                                 info->output_input_frame);
+    if(!info->output_graph) {
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[OUTPUT] Attached remote Program %s:%d over VIMS TCP frames; graph format is %s",
+               host, port, yuv_get_pixfmt_description(state->output_format));
+    return 1;
+}
+
+static int veejay_output_source_attach(veejay_t *info)
+{
+    int key = info->output_source_shm_id;
+
+    if(info->output_source_port <= 0 && info->output_source_pid <= 0 && key <= 0) {
+        veejay_output_source_state *state =
+            (veejay_output_source_state*)vj_calloc(sizeof(veejay_output_source_state));
+        if(!state)
+            return 0;
+
+        info->output_input_buffer = (uint8_t*)state;
+        state->source_mode = VJ_OUTPUT_SOURCE_NONE;
+        state->output_format = vj_to_pixfmt(info->pixel_format);
+        state->native_format = state->output_format;
+        state->remote_sequence = UINT64_MAX;
+
+        info->output_input_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                                     info->video_output_width,
+                                                     info->video_output_height,
+                                                     state->output_format);
+        if(!info->output_input_frame ||
+           !veejay_output_alloc_frame_storage(info->output_input_frame,
+                                              &state->canonical_buffer)) {
+            veejay_output_source_free(info);
+            return 0;
+        }
+
+        info->output_input_frame->fps = info->settings->output_fps;
+        info->output_input_frame->data[3] = NULL;
+        memset(info->output_input_frame->data[0], 0,
+               (size_t)info->output_input_frame->len);
+        memset(info->output_input_frame->data[1], 128,
+               (size_t)info->output_input_frame->uv_len);
+        memset(info->output_input_frame->data[2], 128,
+               (size_t)info->output_input_frame->uv_len);
+        info->output_input_sequence = UINT64_MAX;
+
+        if(!veejay_output_projection_init(info, state)) {
+            veejay_output_source_free(info);
+            return 0;
+        }
+
+        if(info->output_graph)
+            vj_output_graph_destroy((vj_output_graph*)info->output_graph);
+        info->output_graph = vj_output_graph_create(info->video_output_width,
+                                                     info->video_output_height,
+                                                     info->output_input_frame);
+        if(!info->output_graph) {
+            veejay_output_source_free(info);
+            return 0;
+        }
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[OUTPUT] Started without a primary video feed; presenting blank canvas");
+        return 1;
+    }
+
+    if(info->output_source_port > 0) {
+        const char *host = info->output_source_host[0] ?
+                           info->output_source_host : "127.0.0.1";
+
+        if(!veejay_output_source_host_is_local(host))
+            return veejay_output_source_attach_remote(info, host, info->output_source_port);
+
+        if(key <= 0)
+            key = vj_share_pull_master(NULL, host, info->output_source_port);
+    }
+
+    if(info->output_source_pid > 0)
+        info->input_shm = vj_shm_new_slave_by_pid(info->homedir, info->output_source_pid);
+    else if(key > 0)
+        info->input_shm = vj_shm_new_slave(key);
+
+    if(!info->input_shm) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Unable to attach program shared-memory source");
+        return 0;
+    }
+
+    vj_shm_frame_info source;
+    if(!vj_shm_get_frame_info(info->input_shm, &source)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Unable to read source frame metadata");
+        veejay_output_source_free(info);
+        return 0;
+    }
+    if(source.protocol_version != VJ_SHM_PROTOCOL_VERSION) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Incompatible SHM protocol %d (required %d)",
+                   source.protocol_version, VJ_SHM_PROTOCOL_VERSION);
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    if(source.width <= 0 || source.height <= 0 ||
+       source.width > 32768 || source.height > 32768 ||
+       source.plane_size[0] <= 0 || source.plane_size[1] <= 0 ||
+       source.plane_size[2] <= 0)
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Invalid SHM frame metadata");
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    const size_t y_len = (size_t)source.width * (size_t)source.height;
+    if(y_len > INT_MAX || (size_t)source.plane_size[0] != y_len ||
+       source.plane_size[2] != source.plane_size[1])
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Invalid SHM plane layout");
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    int format;
+    if((size_t)source.plane_size[1] == y_len)
+        format = PIX_FMT_YUV444P;
+    else if((size_t)source.plane_size[1] * 2u == y_len)
+        format = PIX_FMT_YUV422P;
+    else if((size_t)source.plane_size[1] * 4u == y_len)
+        format = PIX_FMT_YUV420P;
+    else {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unsupported SHM frame layout %dx%d planes=%d/%d/%d",
+                   source.width, source.height,
+                   source.plane_size[0], source.plane_size[1], source.plane_size[2]);
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)vj_calloc(sizeof(veejay_output_source_state));
+    if(!state) {
+        veejay_output_source_free(info);
+        return 0;
+    }
+    info->output_input_buffer = (uint8_t*)state;
+    state->source_mode = VJ_OUTPUT_SOURCE_SHM;
+    state->remote_sequence = UINT64_MAX;
+    state->native_format = format;
+    state->output_format = vj_to_pixfmt(info->pixel_format);
+
+    state->transport_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                              source.width, source.height, format);
+    info->output_input_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                                source.width, source.height,
+                                                state->output_format);
+    if(!state->transport_frame || !info->output_input_frame ||
+       state->transport_frame->len != source.plane_size[0] ||
+       state->transport_frame->uv_len != source.plane_size[1])
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to construct SHM source format %dx%d planes=%d/%d/%d",
+                   source.width, source.height,
+                   source.plane_size[0], source.plane_size[1], source.plane_size[2]);
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    const size_t transport_bytes = (size_t)source.plane_size[0] +
+                                   (size_t)source.plane_size[1] * 2u;
+    const size_t output_bytes = (size_t)info->output_input_frame->len +
+                                (size_t)info->output_input_frame->uv_len * 2u;
+    state->transport_buffer = (uint8_t*)vj_malloc(transport_bytes);
+    if(!state->transport_buffer) {
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    state->transport_frame->data[0] = state->transport_buffer;
+    state->transport_frame->data[1] =
+        state->transport_frame->data[0] + source.plane_size[0];
+    state->transport_frame->data[2] =
+        state->transport_frame->data[1] + source.plane_size[1];
+
+    if(format == state->output_format) {
+        state->canonical_buffer = state->transport_buffer;
+        info->output_input_frame->data[0] = state->transport_frame->data[0];
+        info->output_input_frame->data[1] = state->transport_frame->data[1];
+        info->output_input_frame->data[2] = state->transport_frame->data[2];
+    }
+    else {
+        state->canonical_buffer = (uint8_t*)vj_malloc(output_bytes);
+        if(!state->canonical_buffer) {
+            veejay_output_source_free(info);
+            return 0;
+        }
+        info->output_input_frame->data[0] = state->canonical_buffer;
+        info->output_input_frame->data[1] =
+            info->output_input_frame->data[0] + info->output_input_frame->len;
+        info->output_input_frame->data[2] =
+            info->output_input_frame->data[1] + info->output_input_frame->uv_len;
+
+        sws_template templ;
+        veejay_memset(&templ, 0, sizeof(templ));
+        templ.flags = yuv_which_scaler();
+        state->to_output = yuv_init_swscaler(state->transport_frame,
+                                             info->output_input_frame,
+                                             &templ,
+                                             yuv_sws_get_cpu_flags());
+        if(!state->to_output) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[OUTPUT] Unable to initialize %s to %s conversion",
+                       yuv_get_pixfmt_description(format),
+                       yuv_get_pixfmt_description(state->output_format));
+            veejay_output_source_free(info);
+            return 0;
+        }
+    }
+
+    if(!veejay_output_projection_init(info, state)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to initialize projection staging frames");
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    state->transport_frame->data[3] = NULL;
+    state->transport_frame->fps = info->settings->output_fps;
+    state->capacity[0] = source.plane_size[0];
+    state->capacity[1] = source.plane_size[1];
+    state->capacity[2] = source.plane_size[2];
+    state->capacity[3] = 0;
+
+    info->output_input_frame->data[3] = NULL;
+    info->output_input_frame->fps = info->settings->output_fps;
+    memset(info->output_input_frame->data[0], 0,
+           (size_t)info->output_input_frame->len);
+    memset(info->output_input_frame->data[1], 128,
+           (size_t)info->output_input_frame->uv_len);
+    memset(info->output_input_frame->data[2], 128,
+           (size_t)info->output_input_frame->uv_len);
+    info->output_input_sequence = UINT64_MAX;
+
+    if(info->output_graph)
+        vj_output_graph_destroy((vj_output_graph*)info->output_graph);
+    info->output_graph = vj_output_graph_create(info->video_output_width,
+                                                 info->video_output_height,
+                                                 info->output_input_frame);
+    if(!info->output_graph) {
+        veejay_output_source_free(info);
+        return 0;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[OUTPUT] Attached video source %dx%d %s; output graph format is %s, SHM sequence=%llu",
+               source.width, source.height,
+               yuv_get_pixfmt_description(format),
+               yuv_get_pixfmt_description(state->output_format),
+               (unsigned long long)source.sequence);
+    return 1;
+}
+
+static void veejay_output_graph_snapshot(veejay_t *info,
+                                         int *pattern,
+                                         vj_output_slice_config slices[VJ_OUTPUT_GRAPH_MAX_SLICES],
+                                         int valid[VJ_OUTPUT_GRAPH_MAX_SLICES])
+{
+    if(pattern)
+        *pattern = VJ_OUTPUT_PATTERN_PROGRAM;
+    for(int i = 0; i < VJ_OUTPUT_GRAPH_MAX_SLICES; i++)
+        valid[i] = 0;
+    if(!info || !info->output_graph)
+        return;
+    if(pattern)
+        *pattern = vj_output_graph_get_pattern((vj_output_graph*)info->output_graph);
+    for(int i = 0; i < VJ_OUTPUT_GRAPH_MAX_SLICES; i++)
+        valid[i] = vj_output_graph_get_slice((vj_output_graph*)info->output_graph,
+                                             i, &slices[i]);
+}
+
+static void veejay_output_graph_restore(veejay_t *info,
+                                        int pattern,
+                                        const vj_output_slice_config slices[VJ_OUTPUT_GRAPH_MAX_SLICES],
+                                        const int valid[VJ_OUTPUT_GRAPH_MAX_SLICES])
+{
+    if(!info || !info->output_graph)
+        return;
+    vj_output_graph_set_pattern((vj_output_graph*)info->output_graph, pattern);
+    for(int i = 0; i < VJ_OUTPUT_GRAPH_MAX_SLICES; i++) {
+        if(valid[i])
+            vj_output_graph_set_slice((vj_output_graph*)info->output_graph,
+                                      i, &slices[i]);
+    }
+}
+
+static int veejay_output_switch_source_internal(veejay_t *info,
+                                                const char *host,
+                                                int port,
+                                                int32_t known_shm_key)
+{
+    if(!info || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT ||
+       !host || !host[0] || port <= 0 || port > 65535 || known_shm_key < 0)
+        return 0;
+
+    if(known_shm_key > 0 &&
+       veejay_output_source_host_is_local(host) &&
+       info->output_source_shm_id == known_shm_key &&
+       info->input_shm) {
+        snprintf(info->output_source_host, sizeof(info->output_source_host), "%s", host);
+        info->output_source_port = port;
+        return 1;
+    }
+
+    if(known_shm_key == 0 &&
+       info->output_source_port == port &&
+       strcasecmp(info->output_source_host, host) == 0 &&
+       info->output_input_buffer)
+        return 1;
+
+    int pattern = VJ_OUTPUT_PATTERN_PROGRAM;
+    vj_output_slice_config slices[VJ_OUTPUT_GRAPH_MAX_SLICES];
+    int valid[VJ_OUTPUT_GRAPH_MAX_SLICES];
+    veejay_output_graph_snapshot(info, &pattern, slices, valid);
+
+    char old_host[sizeof(info->output_source_host)];
+    snprintf(old_host, sizeof(old_host), "%s", info->output_source_host);
+    const int old_port = info->output_source_port;
+    const int old_pid = info->output_source_pid;
+    const int old_shm = info->output_source_shm_id;
+
+    veejay_output_source_free(info);
+    snprintf(info->output_source_host, sizeof(info->output_source_host), "%s", host);
+    info->output_source_port = port;
+    info->output_source_pid = 0;
+    info->output_source_shm_id = known_shm_key;
+
+    if(!veejay_output_source_attach(info)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to switch video source to %s:%d; restoring previous source",
+                   host, port);
+        snprintf(info->output_source_host, sizeof(info->output_source_host), "%s", old_host);
+        info->output_source_port = old_port;
+        info->output_source_pid = old_pid;
+        info->output_source_shm_id = old_shm;
+        if(!veejay_output_source_attach(info)) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[OUTPUT] Previous video source could not be restored");
+            return 0;
+        }
+        veejay_output_graph_restore(info, pattern, slices, valid);
+        return 0;
+    }
+
+    veejay_output_graph_restore(info, pattern, slices, valid);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[OUTPUT] Switched live video source to %s:%d%s",
+               host, port, known_shm_key > 0 ? " using supplied SHM key" : "");
+    return 1;
+}
+
+int veejay_output_switch_source(veejay_t *info, const char *host, int port)
+{
+    return veejay_output_switch_source_internal(info, host, port, 0);
+}
+
+int veejay_output_switch_source_shm(veejay_t *info, int port, int32_t key)
+{
+    if(key <= 0)
+        return 0;
+    return veejay_output_switch_source_internal(info, "127.0.0.1", port, key);
+}
+
+int veejay_output_disconnect_source(veejay_t *info)
+{
+    if(!info || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+        return 0;
+
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(!state)
+        return 0;
+
+    if(info->input_shm) {
+        vj_shm_free_slave(info->input_shm);
+        info->input_shm = NULL;
+    }
+    if(state->remote_stream_id > 0 && vj_tag_exists(state->remote_stream_id)) {
+        vj_tag_del(state->remote_stream_id, 0);
+        if(info->nstreams > 0)
+            info->nstreams--;
+    }
+    state->remote_stream_id = 0;
+    state->remote_sequence = 0;
+    state->source_mode = VJ_OUTPUT_SOURCE_NONE;
+    state->projection_preview_valid = 0;
+    info->output_source_host[0] = '\0';
+    info->output_source_port = 0;
+    info->output_source_pid = 0;
+    info->output_source_shm_id = 0;
+    info->output_input_sequence = UINT64_MAX;
+
+    if(info->output_input_frame) {
+        if(info->output_input_frame->data[0])
+            veejay_memset(info->output_input_frame->data[0], 0, info->output_input_frame->len);
+        if(info->output_input_frame->data[1])
+            veejay_memset(info->output_input_frame->data[1], 128, info->output_input_frame->uv_len);
+        if(info->output_input_frame->data[2])
+            veejay_memset(info->output_input_frame->data[2], 128, info->output_input_frame->uv_len);
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "[OUTPUT] Disconnected live video source");
+    return 1;
+}
+
+static uint64_t veejay_output_frame_interval_ns(const video_playback_setup *settings)
+{
+    double fps = settings ? settings->output_fps : 25.0;
+    if(fps < 1.0)
+        fps = 25.0;
+    return (uint64_t)(1000000000.0 / fps + 0.5);
+}
+
+static int veejay_output_present_idle_graph(veejay_t *info,
+                                            uint64_t now_ns,
+                                            uint64_t *next_present_ns,
+                                            int force)
+{
+    if(!info || !info->output_graph || !info->output_input_frame || !next_present_ns)
+        return 0;
+    if(!force && now_ns < *next_present_ns)
+        return 0;
+
+    const long long timeline_frame = info->output_input_sequence == UINT64_MAX ?
+                                     0LL : (long long)info->output_input_sequence;
+    info->output_input_frame->frame_num = timeline_frame;
+    veejay_output_push_frame(info, info->output_input_frame, timeline_frame);
+    *next_present_ns = now_ns + veejay_output_frame_interval_ns(info->settings);
+    return 1;
+}
+
+static int veejay_output_initialize_owner(veejay_t *info)
+{
+#ifdef HAVE_SDL
+    if(info->video_out == VIDEO_OUT_SDL) {
+        video_playback_setup *settings = info->settings;
+        editlist *el = info->edit_list;
+        char *title = veejay_title(info);
+        const int x = info->uc->geox;
+        const int y = info->uc->geoy;
+        int initialized;
+
+        vj_sdl_set_perf(info->sdl, info->perf);
+        initialized = vj_sdl_init(info->sdl,
+                                  x,
+                                  y,
+                                  info->video_output_width,
+                                  info->video_output_height,
+                                  info->bes_width,
+                                  info->bes_height,
+                                  title,
+                                  1,
+                                  settings->full_screen,
+                                  info->pixel_format,
+                                  el->video_fps,
+                                  &settings->vsync_interval_s);
+        free(title);
+
+        if(!initialized) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[DISPLAY] Error initializing SDL in renderer thread");
+            return 0;
+        }
+    }
+#else
+    (void)info;
+#endif
+
+    return 1;
+}
+
 void *veejay_display_renderer_thread(void *arg)
 {
-    veejay_t *info = (veejay_t *) arg;
+    veejay_t *info = (veejay_t *)arg;
     video_playback_setup *settings = info->settings;
 
-	sigset_t mask;
-	sigemptyset(&mask);
-	sigaddset(&mask, SIGPIPE);
-	pthread_sigmask(SIG_BLOCK, &mask, NULL);
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGPIPE);
+    pthread_sigmask(SIG_BLOCK, &mask, NULL);
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
 
+    const int output_ready = veejay_output_initialize_owner(info);
 
     pthread_mutex_lock(&settings->start_mutex);
-    settings->video_out_ready = 1;
+    settings->video_out_ready = output_ready ? 1 : -1;
     pthread_cond_broadcast(&settings->start_cond);
     pthread_mutex_unlock(&settings->start_mutex);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Waiting for first audio frame to be ready");
-    while (atomic_load_int(&settings->first_audio_frame_ready) == 0 &&
-           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
-        usleep_accurate(200, settings);
+    if(!output_ready) {
+        veejay_change_state(info, LAVPLAY_STATE_STOP);
+#ifdef HAVE_SDL
+        if(info->sdl)
+            vj_sdl_shutdown(info->sdl);
+#endif
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] Renderer thread stopped during output initialization");
+        return NULL;
     }
 
-    double audio_start_offset = atomic_load_double(&settings->audio_start_offset);
-    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Audio anchor established at %.6f s", audio_start_offset);
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        veejay_output_source_state *source_state =
+            (veejay_output_source_state*)info->output_input_buffer;
+        uint64_t last_stall_note_ns = vj_perf_now_ns();
+        uint64_t next_idle_present_ns = 0;
+        int last_graph_pattern = VJ_OUTPUT_PATTERN_PROGRAM;
 
-	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+        if(source_state->source_mode == VJ_OUTPUT_SOURCE_NETWORK)
+            veejay_msg(VEEJAY_MSG_INFO, "[OUTPUT] Renderer consuming video frames over TCP");
+        else if(source_state->source_mode == VJ_OUTPUT_SOURCE_SHM)
+            veejay_msg(VEEJAY_MSG_INFO, "[OUTPUT] Renderer consuming video frames from shared memory");
+        else
+            veejay_msg(VEEJAY_MSG_INFO, "[OUTPUT] Renderer presenting blank canvas until a source is connected");
 
-		VJFrame *frame = veejay_video_queue_get_frame(info);
-		if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) {
-            if (frame) video_queue_return_frame(info, frame);
-            break;
+        while(atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+            veejay_output_poll_events(info);
+            source_state = (veejay_output_source_state*)info->output_input_buffer;
+            if(!source_state) {
+                veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Video source is unavailable");
+                veejay_change_state(info, LAVPLAY_STATE_STOP);
+                break;
+            }
+            const uint64_t renderer_start = vj_perf_now_ns();
+            const uint64_t read_start = renderer_start;
+            const uint64_t previous_sequence = info->output_input_sequence;
+            int read_result = 0;
+
+            if(source_state->source_mode == VJ_OUTPUT_SOURCE_NETWORK) {
+                vj_tag *remote = vj_tag_get(source_state->remote_stream_id);
+                if(remote) {
+                    read_result = net_thread_get_frame_since(remote,
+                                                             info->output_input_frame,
+                                                             &source_state->remote_sequence);
+                    if(read_result > 0)
+                        info->output_input_sequence = source_state->remote_sequence;
+                }
+            }
+            else if(source_state->source_mode == VJ_OUTPUT_SOURCE_SHM) {
+                read_result = vj_shm_read_latest(info->input_shm,
+                                                 source_state->transport_frame->data,
+                                                 source_state->capacity,
+                                                 &info->output_input_sequence);
+            }
+
+            const uint64_t read_end = vj_perf_now_ns();
+            if(read_result > 0) {
+                if(source_state->source_mode == VJ_OUTPUT_SOURCE_NETWORK) {
+                    vj_perf_record((vj_perf_context*)info->perf,
+                                   VJ_PERF_STAGE_NETWORK,
+                                   read_start, read_end);
+                }
+                else {
+                    vj_perf_record((vj_perf_context*)info->perf,
+                                   VJ_PERF_STAGE_SHM_READ,
+                                   read_start, read_end);
+                    if(source_state->to_output) {
+                        const uint64_t convert_start = vj_perf_now_ns();
+                        yuv_convert_and_scale(source_state->to_output,
+                                              source_state->transport_frame,
+                                              info->output_input_frame);
+                        vj_perf_record((vj_perf_context*)info->perf,
+                                       VJ_PERF_STAGE_CONVERT,
+                                       convert_start, vj_perf_now_ns());
+                    }
+                }
+            }
+
+            if(read_result < 0 &&
+               source_state->source_mode == VJ_OUTPUT_SOURCE_SHM) {
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "[OUTPUT] Program shared-memory source became unreadable");
+                veejay_change_state(info, LAVPLAY_STATE_STOP);
+                break;
+            }
+
+            if(read_result == 0) {
+                const int graph_pattern =
+                    vj_output_graph_get_pattern((vj_output_graph*)info->output_graph);
+                const int pattern_changed = graph_pattern != last_graph_pattern;
+                const int have_cached_program = info->output_input_sequence != UINT64_MAX;
+
+                if(pattern_changed)
+                    next_idle_present_ns = 0;
+
+                if(source_state->source_mode == VJ_OUTPUT_SOURCE_NONE ||
+                   graph_pattern != VJ_OUTPUT_PATTERN_PROGRAM ||
+                   (pattern_changed && have_cached_program))
+                {
+                    if(veejay_output_present_idle_graph(info, read_end,
+                                                        &next_idle_present_ns,
+                                                        pattern_changed))
+                    {
+                        vj_perf_record((vj_perf_context*)info->perf,
+                                       VJ_PERF_STAGE_RENDERER_TOTAL,
+                                       renderer_start, vj_perf_now_ns());
+                    }
+                }
+
+                last_graph_pattern = graph_pattern;
+                if(read_end - last_stall_note_ns >= 500000000ULL) {
+                    vj_perf_note_source_stall((vj_perf_context*)info->perf, 1);
+                    last_stall_note_ns = read_end;
+                }
+                usleep_accurate(1000, settings);
+                continue;
+            }
+
+            last_stall_note_ns = read_end;
+            if(previous_sequence != UINT64_MAX &&
+               info->output_input_sequence > previous_sequence + 1ULL)
+            {
+                vj_perf_note_replace((vj_perf_context*)info->perf,
+                                     info->output_input_sequence - previous_sequence - 1ULL);
+            }
+            info->output_input_frame->frame_num =
+                (long long)info->output_input_sequence;
+            veejay_output_push_frame(info,
+                                     info->output_input_frame,
+                                     (long long)info->output_input_sequence);
+            last_graph_pattern =
+                vj_output_graph_get_pattern((vj_output_graph*)info->output_graph);
+            if(last_graph_pattern != VJ_OUTPUT_PATTERN_PROGRAM)
+                next_idle_present_ns = vj_perf_now_ns() +
+                                       veejay_output_frame_interval_ns(settings);
+            veejay_output_poll_events(info);
+            vj_perf_record((vj_perf_context*)info->perf,
+                           VJ_PERF_STAGE_RENDERER_TOTAL,
+                           renderer_start, vj_perf_now_ns());
+        }
+    }
+    else {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[DISPLAY] Waiting for first audio frame to be ready");
+        while(atomic_load_int(&settings->first_audio_frame_ready) == 0 &&
+              atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+            veejay_output_poll_events(info);
+            usleep_accurate(200, settings);
         }
 
-        if (!frame) continue;
+        const double audio_start_offset =
+            atomic_load_double(&settings->audio_start_offset);
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[DISPLAY] Audio anchor established at %.6f s",
+                   audio_start_offset);
 
-		if (frame->frame_num < 0) {
-			video_queue_return_frame(info, frame);
-			continue;
-		}
+        while(atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
+            veejay_output_poll_events(info);
 
-		double audio_master = atomic_load_double(&settings->audio_master_s);
-        double spvf = vj_runtime_effective_spvf(settings);
-        double target_time_s = vj_runtime_target_time_s(settings, frame->frame_num);
-		double delay_s = target_time_s - audio_master;
+            const uint64_t renderer_start = vj_perf_now_ns();
+            const uint64_t queue_wait_start = renderer_start;
+            vj_video_packet_t *packet = veejay_video_queue_get_packet(info);
+            vj_perf_record((vj_perf_context*)info->perf,
+                           VJ_PERF_STAGE_QUEUE_WAIT,
+                           queue_wait_start, vj_perf_now_ns());
+            if(atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) {
+                if(packet)
+                    veejay_video_queue_return_packet(info, packet);
+                break;
+            }
 
-		if (delay_s < -spvf) {
-			veejay_screen_update(info, frame);
-			video_queue_return_frame(info,frame);
-			continue;
-		}
+            if(!packet)
+                continue;
 
-		if (delay_s > (spvf * 1.5f)) {
-			usleep_accurate((long long)(spvf * 1.0e6), settings);
-			veejay_screen_update(info, frame);		
-			video_queue_return_frame(info, frame);
-			continue;
-		}
-		else{
-			if (delay_s > 0) {
-				usleep_accurate((long long)(delay_s * 1.0e6), settings);
-			}
-			veejay_screen_update(info, frame);
-			video_queue_return_frame(info, frame);
-		}
-	}
+            VJFrame *frame = packet->frame;
+            if(!frame || packet->timeline_frame < 0) {
+                veejay_video_queue_return_packet(info, packet);
+                continue;
+            }
+
+            const int current_transport_epoch =
+                atomic_load_int(&settings->transport_epoch);
+            if((int)packet->transport_epoch != current_transport_epoch) {
+                info->stats.dropped_frames++;
+                vj_perf_note_drop((vj_perf_context*)info->perf, 1);
+                veejay_video_queue_return_packet(info, packet);
+                continue;
+            }
+
+            const double audio_master = vj_runtime_master_clock_now_s(info, NULL);
+            const double spvf = packet->duration_s > 0.0 ?
+                                packet->duration_s :
+                                vj_runtime_effective_spvf(settings);
+            const double late_s = audio_master - packet->pts_s;
+
+            if(late_s > (spvf * 1.5) &&
+               veejay_video_queue_has_newer_packet(info, packet)) {
+                info->stats.dropped_frames++;
+                vj_perf_note_drop((vj_perf_context*)info->perf, 1);
+                veejay_video_queue_return_packet(info, packet);
+                continue;
+            }
+
+            const uint64_t sync_wait_start = vj_perf_now_ns();
+            veejay_output_wait_until(info, packet->pts_s);
+            vj_perf_record((vj_perf_context*)info->perf,
+                           VJ_PERF_STAGE_SYNC_WAIT,
+                           sync_wait_start, vj_perf_now_ns());
+            if(atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) {
+                veejay_video_queue_return_packet(info, packet);
+                break;
+            }
+
+            veejay_output_poll_events(info);
+            veejay_output_push_packet(info, packet);
+            veejay_output_poll_events(info);
+            veejay_video_queue_return_packet(info, packet);
+            vj_perf_record((vj_perf_context*)info->perf,
+                           VJ_PERF_STAGE_RENDERER_TOTAL,
+                           renderer_start, vj_perf_now_ns());
+        }
+    }
+
+#ifdef HAVE_SDL
+    if(info->video_out == VIDEO_OUT_SDL && info->sdl)
+        vj_sdl_shutdown(info->sdl);
+#endif
 
     veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Renderer thread exiting...");
-	pthread_exit(NULL);
     return NULL;
 }
 
 
 static void Welcome(veejay_t *info)
 {
+    veejay_msg(VEEJAY_MSG_INFO, "Instance: %s (%s), control port %d",
+               info->instance_id,
+               veejay_instance_role_name(info->instance_role),
+               info->uc->port);
 	veejay_msg(VEEJAY_MSG_INFO, "Video project settings: %ldx%ld, Norm: [%s], fps [%2.2f], %s",
 			info->video_output_width,
 			info->video_output_height,
@@ -6417,6 +7613,11 @@ int veejay_open(veejay_t * info)
              veejay_msg(VEEJAY_MSG_ERROR, "Failed to allocate queue buffer %d. Aborting.", i);
              return 0;
         }
+        settings->video_packets[i].frame = settings->buffers[i];
+        settings->video_packets[i].queue_index = i;
+        settings->video_packets[i].timeline_frame = -1;
+        settings->video_packets[i].source_frame = -1;
+        settings->states[i] = BUFFER_FREE;
     }
 
 	return 1;
@@ -6505,11 +7706,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
 		return -1;
 	}
-	// override geometry set in config file
-	if( info->uc->geox != 0 && info->uc->geoy != 0 )
-	{
+	// A configured geometry overrides automatic CLI placement. Zero is a valid
+	// coordinate, so either configured axis makes the pair authoritative.
+	if(info->uc->geox != 0 || info->uc->geoy != 0) {
 		x = info->uc->geox;
 		y = info->uc->geoy;
+	}
+	if(x != -1 || y != -1) {
+		info->uc->geox = x == -1 ? 0 : x;
+		info->uc->geoy = y == -1 ? 0 : y;
 	}
 
 	vj_event_init((void*)info);
@@ -6585,18 +7790,26 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg(VEEJAY_MSG_ERROR, "You should specify an output resolution that is a multiple of 4");
 	}
 
-	if(!vj_perform_init(info))
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
-		return -1;
-	}
+    if(!vj_perform_init(info))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
+        return -1;
+    }
 
-	info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
+    info->output_graph = vj_output_graph_create(info->video_output_width,
+                                                 info->video_output_height,
+                                                 info->effect_frame1);
+    if(!info->output_graph) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize output graph");
+        return -1;
+    }
+
+    info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
 	if( !info->shm ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource");
 	}
 
-	if( info->settings->composite )
+	if( info->settings->composite || info->instance_role == VJ_INSTANCE_ROLE_OUTPUT )
 	{
 		char path[1024];
 		snprintf(path,sizeof(path),"%s/viewport.cfg", info->homedir);
@@ -6680,6 +7893,50 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg(VEEJAY_MSG_ERROR,"For example: $ veejay -p 4490 -d");
 		return -1;
 	}
+
+    if(!info->instance_id_explicit)
+        snprintf(info->instance_id, sizeof(info->instance_id), "%s-%d",
+                 veejay_instance_role_name(info->instance_role), info->uc->port);
+
+    if(info->instance_role == VJ_INSTANCE_ROLE_PROGRAM && info->shm)
+        vj_shm_set_status(info->shm, 1);
+
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT && !veejay_output_source_attach(info))
+        return -1;
+
+    vj_perf_set_identity((vj_perf_context*)info->perf,
+                         info->instance_id,
+                         info->instance_role,
+                         info->uc->port,
+                         settings->output_fps);
+
+    if(info->vjs[VEEJAY_PORT_CMD])
+        vj_server_discovery_enable(info->vjs[VEEJAY_PORT_CMD],
+                                   info->instance_id,
+                                   veejay_instance_role_name(info->instance_role),
+                                   info->uc->port);
+
+    veejay_msg(VEEJAY_MSG_INFO, "[INSTANCE] role=%s id=%s port=%d",
+               veejay_instance_role_name(info->instance_role),
+               info->instance_id, info->uc->port);
+
+    if(info->composite) {
+        int viewport_active = 0;
+        composite_bind_port_configuration(info->composite,
+                                          info->homedir,
+                                          info->uc->port,
+                                          &viewport_active);
+        composite_set_status(info->composite, viewport_active);
+        info->settings->composite = viewport_active ? 1 : 0;
+        info->settings->zoom = 0;
+    }
+
+    if(info->instance_role != VJ_INSTANCE_ROLE_OUTPUT && info->composite &&
+       !veejay_output_pattern_projection_init(info))
+    {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Unable to initialize renderer projection staging for test patterns");
+    }
 
 	/* now setup the output driver */
 	switch (info->video_out)
@@ -9799,31 +11056,47 @@ static void *veejay_producer_thread_loop(void *ptr)
         }
 #endif
 
-        VJFrame *vf = veejay_video_queue_reserve_buffer(info);
-        if (!vf) {
+        vj_video_packet_t *packet = veejay_video_queue_reserve_packet(info);
+        if (!packet) {
             if (atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP) break;
             atomic_add_fetch_old_long_long(&settings->audio_osd.prod_queue_nulls, 1);
             usleep_accurate(1000, settings);
             continue;
         }
 
+        VJFrame *vf = packet->frame;
         vf->frame_num = frame;
+        packet->timeline_frame = frame;
+        packet->pts_s = pts;
+        packet->duration_s = spvf;
+        packet->fps_generation = atomic_load_int(&settings->fps_generation);
+        packet->transport_epoch = atomic_load_int(&settings->transport_epoch);
 
-		double t_before = monotonic_now_s();
+        double t_before = monotonic_now_s();
+        const uint64_t producer_start = vj_perf_now_ns();
         int rendered = vj_perform_queue_video_frame(info, vf);
         if(!rendered) {
-            video_queue_return_frame(info, vf);
+            veejay_video_queue_return_packet(info, packet);
             atomic_add_fetch_old_long_long(&settings->audio_osd.prod_queue_nulls, 1);
             usleep_accurate(1000, settings);
             continue;
         }
-        
-		double t_after = monotonic_now_s();
-		info->stats.render_duration = (t_after - t_before);
+
+        packet->source_frame = vf->frame_num;
+        if(settings->composite)
+            packet->flags |= VJ_VIDEO_PACKET_COMPOSITE;
+        if(settings->output_hold_active)
+            packet->flags |= VJ_VIDEO_PACKET_HELD_FRAME;
+
+        const uint64_t producer_end = vj_perf_now_ns();
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_PRODUCER_TOTAL,
+                       producer_start, producer_end);
+        double t_after = monotonic_now_s();
+        info->stats.render_duration = (t_after - t_before);
         if(info->stats.render_duration > (0.85 * spvf))
             atomic_add_fetch_old_long_long(&settings->audio_osd.prod_slow_renders, 1);
 		
-        veejay_video_queue_post_frame(info, vf);
+        veejay_video_queue_post_packet(info, packet);
 		long long master_frame = atomic_add_fetch_old_long_long(&settings->master_frame_num, 1);
 
         info->stats.current_frame = atomic_load_long_long(&settings->current_frame_num);
@@ -9848,13 +11121,18 @@ static void veejay_playback_close(veejay_t *info)
 
     if(info->osc) vj_osc_free(info->osc);
 
-	if( info->shm ) {
-		vj_shm_stop(info->shm);
-		vj_shm_free(info->shm);
-	}
-	if( info->splitter ) {
-		vj_split_free(info->splitter);
-	}
+    veejay_output_source_free(info);
+    if(info->shm) {
+        vj_shm_free(info->shm);
+        info->shm = NULL;
+    }
+    if(info->output_graph) {
+        vj_output_graph_destroy((vj_output_graph*)info->output_graph);
+        info->output_graph = NULL;
+    }
+    if( info->splitter ) {
+        vj_split_free(info->splitter);
+    }
 
     if( info->y4m ) {
 	    vj_yuv_stream_stop_write( info->y4m );
@@ -9869,10 +11147,8 @@ static void veejay_playback_close(veejay_t *info)
 	}
 	
 #ifdef HAVE_SDL
-	if( info->sdl ) {
-		vj_sdl_enable_screensaver(); 
+	if(info->sdl)
         vj_sdl_free(info->sdl);
-    }
     vj_sdl_quit();
 #endif
 #ifdef HAVE_FREETYPE
@@ -10011,9 +11287,21 @@ veejay_t *veejay_malloc()
     if (!info)
 		return NULL;
 
+    info->perf = vj_perf_create();
+    if(!info->perf) {
+        free(info);
+        return NULL;
+    }
+    info->instance_role = VJ_INSTANCE_ROLE_STANDALONE;
+    snprintf(info->instance_id, sizeof(info->instance_id), "%s", "standalone");
+    snprintf(info->output_source_host, sizeof(info->output_source_host), "%s", "127.0.0.1");
+
     info->settings = (video_playback_setup *) vj_calloc(sizeof(video_playback_setup));
-    if (!(info->settings)) 
+    if (!(info->settings)) {
+        vj_perf_destroy((vj_perf_context*)info->perf);
+        free(info);
 		return NULL;
+    }
 
     info->recording = (video_recording_setup *) vj_calloc(sizeof(video_recording_setup));
     if (!(info->recording)) {
@@ -10228,7 +11516,7 @@ veejay_t *veejay_malloc()
     vj_osc_set_veejay_t(info);
     vj_tag_set_veejay_t(info);
 
-	veejay_instance_ = info;
+	veejay_set_instance(info);
 	
     return info;
 }
@@ -10293,6 +11581,10 @@ int veejay_main(veejay_t *info)
         }
     }
 
+    pthread_mutex_lock(&settings->start_mutex);
+    settings->video_out_ready = 0;
+    pthread_mutex_unlock(&settings->start_mutex);
+
     veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Starting Video Renderer Thread (Display)");
     err = pthread_create(&settings->renderer_thread, attrp,
                          veejay_display_renderer_thread, (void *)info);
@@ -10305,6 +11597,28 @@ int veejay_main(veejay_t *info)
 
     if (attr_inited)
         pthread_attr_destroy(&attr);
+
+    pthread_mutex_lock(&settings->start_mutex);
+    while(settings->video_out_ready == 0 &&
+          atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP)
+        pthread_cond_wait(&settings->start_cond, &settings->start_mutex);
+    const int video_out_ready = settings->video_out_ready;
+    pthread_mutex_unlock(&settings->start_mutex);
+
+    if(video_out_ready < 0 ||
+       atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+    {
+        pthread_join(settings->renderer_thread, NULL);
+        settings->renderer_thread = 0;
+        return 0;
+    }
+
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        atomic_store_int(&settings->first_audio_frame_ready, 1);
+        Welcome(info);
+        return 1;
+    }
+
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Starting Video Producer Thread (Decode/Effects)");
     if (pthread_create(&settings->producer_thread, NULL,
                        veejay_producer_thread_loop, (void *)info) != 0) {

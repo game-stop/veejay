@@ -5,6 +5,7 @@
 
 /* multithreaded code, what starts in queue belongs to playback_thread */
 uint8_t *vj_perform_get_preview_buffer(veejay_t *info);
+int vj_perform_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
 int vj_perform_preview_max_width(veejay_t *info);
 int vj_perform_preview_max_height(veejay_t *info);
 

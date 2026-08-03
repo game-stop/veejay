@@ -216,6 +216,7 @@ int vj_tag_buffer_goto(int t1, int frame);
 int vj_tag_buffer_skip(int t1, int frames);
 int vj_tag_buffer_get_status(int t1, int *enabled, int *capacity, int *filled, int *position, int *speed, int *direction, int *mode, int *state);
 int 	vj_tag_get_last_tag();
+void vj_tag_set_last_tag(int id);
 
 void	*vj_tag_get_macro(int t1);
 
@@ -360,6 +361,7 @@ int	vj_tag_set_white(int t1, int value);
 int	vj_tag_set_saturation(int t1, int value);
 void 	vj_tag_set_veejay_t(void *info);
 int	vj_tag_v4l_set_control( int t1, uint32_t id, int value );
+int	vj_tag_v4l_set_exposure( int t1, int value );
 int 	vj_tag_set_manual_fader(int t1, int value );
 int	vj_tag_get_fade_entry(int t1);
 int	vj_tag_get_fade_method(int t1);

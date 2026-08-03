@@ -79,13 +79,41 @@ void	*composite_get_vp( void *data )
 
 void	composite_set_file_mode(void *data, const char *homedir, int mode, int id)
 {
-	composite_t *c = (composite_t*) data;
-	switch(mode) {
-		case 2: snprintf(c->tmp_path,sizeof(c->tmp_path),"%s/viewport.cfg", homedir ); break;
-		case 1: snprintf(c->tmp_path,sizeof(c->tmp_path),"%s/viewport-stream-%d", homedir,id );break;
-		default:snprintf(c->tmp_path,sizeof(c->tmp_path),"%s/viewport-sample-%d.cfg", homedir,id );break; 
-	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "Save/load from File [%s]",c->tmp_path );
+    (void)mode;
+    (void)id;
+	composite_t *c = (composite_t*)data;
+    if(!c || !homedir)
+        return;
+	snprintf(c->tmp_path, sizeof(c->tmp_path), "%s/viewport.cfg", homedir);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Viewport configuration file [%s]", c->tmp_path);
+}
+
+int composite_bind_port_configuration(void *data, const char *homedir,
+                                      int port, int *active)
+{
+    composite_t *c = (composite_t*)data;
+    if(!c)
+        return 0;
+    composite_set_file_mode(c, homedir, 0, 0);
+    return viewport_bind_port_configuration(c->vp1, homedir, port, active);
+}
+
+int composite_save_port_configuration(void *data, int frontback)
+{
+    composite_t *c = (composite_t*)data;
+    return c ? viewport_save_bound_configuration(c->vp1, frontback) : 0;
+}
+
+int composite_reset_port_configuration(void *data)
+{
+    composite_t *c = (composite_t*)data;
+    return c ? viewport_reset_bound_configuration(c->vp1) : 0;
+}
+
+int composite_get_configuration_port(void *data)
+{
+    composite_t *c = (composite_t*)data;
+    return c ? viewport_get_bound_port(c->vp1) : 0;
 }
 
 int	composite_get_ui(void *data )
@@ -132,6 +160,8 @@ void	*composite_init( int pw, int ph, int iw, int ih, char *homedir, int sample_
 	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, c->frame1->format );
 	c->frame3 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw,ph,c->frame1->format );
 	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
+	c->frame5 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw,ph,
+                                  (pf == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P) );
 
 	c->scaler = yuv_init_swscaler( c->frame1, c->frame2, &sws_templ, 0 );
 	c->back_scaler = yuv_init_swscaler( c->frame4, c->frame3, &sws_templ, 0 );
@@ -185,6 +215,7 @@ void	composite_destroy( void *compiz )
 		if(c->frame2) free(c->frame2);
 		if(c->frame3) free(c->frame3);
 		if(c->frame4) free(c->frame4);
+		if(c->frame5) free(c->frame5);
 		free(c);
 	}
 	c = NULL;
@@ -385,6 +416,43 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	return 1;
 }
 
+int composite_copy_output_frame(void *compiz, VJFrame *frame, int which_vp)
+{
+    composite_t *c = (composite_t*) compiz;
+    if(!c || !frame || !frame->data[0] || !frame->data[1] || !frame->data[2])
+        return 0;
+
+    if(frame->width != c->proj_width || frame->height != c->proj_height) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Composite output frame is %dx%d, projection is %dx%d",
+                   frame->width, frame->height,
+                   c->proj_width, c->proj_height);
+        return 0;
+    }
+
+    const int vp1_active = viewport_active(c->vp1);
+    const int len = c->proj_width * c->proj_height;
+    int strides[4] = { len, len, len, 0 };
+
+    if(vp1_active) {
+        vj_frame_copy(c->proj_plane, frame->data, strides);
+        return 1;
+    }
+
+    if(which_vp == 1) {
+        viewport_produce_full_img(c->vp1, c->proj_plane, frame->data);
+        return 1;
+    }
+
+    if(which_vp == 2 &&
+       (c->proj_width != c->img_width || c->proj_height != c->img_height)) {
+        vj_frame_copy(c->proj_plane, frame->data, strides);
+        return 1;
+    }
+
+    return 1;
+}
+
 int	composite_get_colormode(void *compiz)
 {
 	composite_t *c = (composite_t*) compiz;
@@ -403,11 +471,6 @@ void	composite_set_colormode( void *compiz, int mode )
 void	*composite_get_draw_buffer( void *compiz )
 {
 	composite_t *c = (composite_t*) compiz;
-	VJFrame *frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
-	vj_get_yuv444_template( frame, c->proj_width,c->proj_height);
-	frame->data[0] = c->proj_plane[0];
-	frame->data[1] = c->proj_plane[1];
-	frame->data[2] = c->proj_plane[2];
-	return (void*)frame;
+	return c ? (void*)c->frame5 : NULL;
 }
 

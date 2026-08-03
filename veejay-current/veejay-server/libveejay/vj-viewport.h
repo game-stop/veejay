@@ -22,6 +22,19 @@
 
 /* Viewport component for FX */
 #define	VP_QUADZOOM 1
+typedef struct {
+    int columns;
+    int rows;
+    int point_count;
+    int selected_point;
+    int output_width;
+    int output_height;
+    int source_x;
+    int source_y;
+    int source_width;
+    int source_height;
+} viewport_mesh_state_t;
+
 void viewport_process_dynamic_alpha(void *data, uint8_t *restrict in[4], uint8_t *restrict out[4]);
 void viewport_process_dynamic(void *data, uint8_t *restrict in[3], uint8_t *restrict out[3]);
 void *viewport_fx_init_map( int wid, int hei, int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, int reverse);
@@ -62,7 +75,20 @@ void viewport_set_initial_active( void *vv, int status );
 int	viewport_get_initial_active( void *vv );
 char *viewport_get_my_help(void *vv);
 int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x, int inc_y);
+int viewport_mesh_set_grid(void *data, int columns, int rows);
+int viewport_mesh_get_grid(void *data, int *columns, int *rows);
+int viewport_mesh_set_point_scaled(void *data, int point, int scale, int x, int y);
+int viewport_mesh_select_point(void *data, int point);
+int viewport_mesh_get_point_scaled(void *data, int point, int scale, int *x, int *y);
+int viewport_mesh_get_state(void *data, viewport_mesh_state_t *state);
+int viewport_mesh_nudge_selected(void *data, int inc_x, int inc_y);
+int viewport_mesh_point_count(void *data);
 void viewport_save_settings( void *v, int frontback, char *path );
+void viewport_save_current_settings(void *data, const char *homedir, int mode, int id, int frontback);
+int viewport_bind_port_configuration(void *data, const char *homedir, int port, int *active);
+int viewport_save_bound_configuration(void *data, int frontback);
+int viewport_reset_bound_configuration(void *data);
+int viewport_get_bound_port(void *data);
 void viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] );
 void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height );
 void viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *out_img );

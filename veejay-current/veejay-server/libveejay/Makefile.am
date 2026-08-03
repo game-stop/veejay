@@ -57,6 +57,9 @@ libveejay_la_SOURCES = \
     vj-audio-sync.c \
     vj-share.c \
     vj-split.c \
+    vj-output-mesh.c \
+    vj-output-graph.c \
+    vj-perf.c \
     liblavplayvj.c
 
 libveejay_la_LDFLAGS = \

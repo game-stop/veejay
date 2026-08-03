@@ -53,6 +53,7 @@
 #include <veejaycore/lzo.h>
 #include <libveejay/vj-viewport.h>
 #include <libveejay/vj-composite.h>
+#include <libveejay/vj-perf.h>
 #ifdef HAVE_FREETYPE
 #include <libveejay/vj-font.h>
 #endif
@@ -955,6 +956,9 @@ typedef struct
     ycbcr_frame *preview_buffer;
     int preview_max_w;
     int preview_max_h;
+    VJFrame pre_projection_preview_frame;
+    uint8_t *pre_projection_preview_buffer;
+    volatile int pre_projection_preview_valid;
     performer_t *A;
     performer_t *B;
     VJFrame feedback_frame;
@@ -3624,6 +3628,18 @@ int vj_perform_allocate(veejay_t *info)
 
     const int w = info->video_output_width;
     const int h = info->video_output_height;
+    const size_t preview_plane_len = (size_t)w * (size_t)h;
+    global->pre_projection_preview_buffer = (uint8_t*)vj_malloc(preview_plane_len * 4u);
+    if(!global->pre_projection_preview_buffer)
+        return 1;
+    veejay_memset(global->pre_projection_preview_buffer, 0, preview_plane_len * 4u);
+    veejay_memcpy(&global->pre_projection_preview_frame, info->effect_frame1, sizeof(VJFrame));
+    global->pre_projection_preview_frame.data[0] = global->pre_projection_preview_buffer;
+    global->pre_projection_preview_frame.data[1] = global->pre_projection_preview_buffer + preview_plane_len;
+    global->pre_projection_preview_frame.data[2] = global->pre_projection_preview_buffer + preview_plane_len * 2u;
+    global->pre_projection_preview_frame.data[3] = global->pre_projection_preview_buffer + preview_plane_len * 3u;
+    global->pre_projection_preview_valid = 0;
+
     const long frame_len = ((w*h)+w+w);
     size_t buf_len = frame_len * 4 * sizeof(uint8_t);
 
@@ -3656,6 +3672,7 @@ void vj_perform_destroy(veejay_t *info) {
     performer_global_t *global = (performer_global_t*) info->performer;
     free(global->preview_buffer->Y);
     free(global->preview_buffer);
+    free(global->pre_projection_preview_buffer);
     free(global);
 }
 
@@ -4223,6 +4240,11 @@ void vj_perform_free(veejay_t * info)
             free(global->preview_buffer->Y);
         free(global->preview_buffer);
     }
+    if(global->pre_projection_preview_buffer) {
+        free(global->pre_projection_preview_buffer);
+        global->pre_projection_preview_buffer = NULL;
+        global->pre_projection_preview_valid = 0;
+    }
     if(global->feedback_buffer[0]) {
        free(global->feedback_buffer[0]);
        global->feedback_buffer[0] = NULL;
@@ -4379,6 +4401,61 @@ uint8_t *vj_perform_get_preview_buffer(veejay_t *info)
 {
     performer_global_t *global = (performer_global_t*)info->performer;
     return global->preview_buffer->Y;
+}
+
+/* Snapshot the current fully rendered video immediately before viewport
+ * projection. This path is source-agnostic: sample, stream, V4L2, network and
+ * generated sources all use the same active frame. The snapshot lets the VIMS
+ * preview request read a stable previous frame at the producer boundary. */
+static void vj_perform_capture_pre_projection_preview(veejay_t *info, const VJFrame *frame)
+{
+    performer_global_t *global = (performer_global_t*)info->performer;
+    if(!global || !global->pre_projection_preview_buffer || !frame || !frame->data[0])
+        return;
+
+    const size_t plane_capacity = (size_t)info->video_output_width *
+                                  (size_t)info->video_output_height;
+    const size_t y_len = frame->len > 0 && (size_t)frame->len <= plane_capacity
+                       ? (size_t)frame->len : plane_capacity;
+    const size_t uv_len = frame->uv_len > 0 && (size_t)frame->uv_len <= plane_capacity
+                        ? (size_t)frame->uv_len : plane_capacity;
+
+    global->pre_projection_preview_valid = 0;
+    veejay_memcpy(&global->pre_projection_preview_frame, frame, sizeof(VJFrame));
+    global->pre_projection_preview_frame.data[0] = global->pre_projection_preview_buffer;
+    global->pre_projection_preview_frame.data[1] = global->pre_projection_preview_buffer + plane_capacity;
+    global->pre_projection_preview_frame.data[2] = global->pre_projection_preview_buffer + plane_capacity * 2u;
+    global->pre_projection_preview_frame.data[3] = global->pre_projection_preview_buffer + plane_capacity * 3u;
+
+    veejay_memcpy(global->pre_projection_preview_frame.data[0], frame->data[0], y_len);
+    if(frame->data[1])
+        veejay_memcpy(global->pre_projection_preview_frame.data[1], frame->data[1], uv_len);
+    else
+        veejay_memset(global->pre_projection_preview_frame.data[1], 128, uv_len);
+    if(frame->data[2])
+        veejay_memcpy(global->pre_projection_preview_frame.data[2], frame->data[2], uv_len);
+    else
+        veejay_memset(global->pre_projection_preview_frame.data[2], 128, uv_len);
+    if(frame->data[3])
+        veejay_memcpy(global->pre_projection_preview_frame.data[3], frame->data[3], y_len);
+    else
+        veejay_memset(global->pre_projection_preview_frame.data[3], 255, y_len);
+
+    global->pre_projection_preview_valid = 1;
+}
+
+int vj_perform_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
+{
+    performer_global_t *global;
+    if(!info || !frame || !info->performer)
+        return 0;
+
+    global = (performer_global_t*)info->performer;
+    if(!global->pre_projection_preview_valid || !global->pre_projection_preview_buffer)
+        return 0;
+
+    veejay_memcpy(frame, &global->pre_projection_preview_frame, sizeof(VJFrame));
+    return 1;
 }
 
 void    vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
@@ -16712,213 +16789,260 @@ static  void    vj_perform_finish_chain( veejay_t *info,performer_t *p,VJFrame *
     }
 }
 
-static  void    vj_perform_finish_render( veejay_t *info,performer_t *p,VJFrame *frame, video_playback_setup *settings )
-{
-    uint8_t *pri[4];
+typedef struct {
     char status_buffer[2048];
     char more_buffer[2048];
     char audio_buffer[2048];
-    char *owned_osd_text = NULL;
-    const char *osd_text = NULL;
-    const char *more_text = NULL;
-    int placement = 0;
-    int osd_lines = 0;
-    int more_lines = 0;
-    int audio_lines = 0;
+    char *owned_text;
+    const char *text;
+    const char *more_text;
+    int placement;
+    int lines;
+    int more_lines;
+    int audio_lines;
+} vj_perform_output_osd_t;
 
-    pri[0] = p->primary_buffer[0]->Y;
-    pri[1] = p->primary_buffer[0]->Cb;
-    pri[2] = p->primary_buffer[0]->Cr;
-    pri[3] = p->primary_buffer[0]->alpha;
+static void vj_perform_output_osd_collect(veejay_t *info,
+                                          video_playback_setup *settings,
+                                          vj_perform_output_osd_t *osd)
+{
+    veejay_memset(osd, 0, sizeof(*osd));
 
-    if( settings->composite  )
-    {
-        if( settings->ca ) {
-            settings->ca = 0;
-        }
-
-        if(composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],
-            vj_perform_get_width(info), vj_perform_get_height(info),info->homedir,info->uc->playback_mode,info->uc->sample_id ) ) {
-#ifdef HAVE_SDL
-            if( info->video_out == 0 ) {
-
-                vj_sdl_grab( info->sdl, 0 );
-            }
-#endif
-        }
+    if(!settings->composite)
+        return;
 
 #ifdef HAVE_SDL
-        if(info->use_osd == 2) {
-            owned_osd_text = vj_perform_print_credits(info);
-            osd_text = owned_osd_text;
-            placement = 1;
-        }
-        else if(info->use_osd == 1) {
-            osd_lines = vj_perform_osd_status(info, status_buffer, sizeof(status_buffer));
-            if(osd_lines > 0)
-                osd_text = status_buffer;
+    if(info->use_osd == 2) {
+        osd->owned_text = vj_perform_print_credits(info);
+        osd->text = osd->owned_text;
+        osd->placement = 1;
+    }
+    else if(info->use_osd == 1) {
+        osd->lines = vj_perform_osd_status(info,
+                                           osd->status_buffer,
+                                           sizeof(osd->status_buffer));
+        if(osd->lines > 0)
+            osd->text = osd->status_buffer;
 #ifdef HAVE_JACK
-            audio_lines = vj_perform_audio_clock_osd_status(info, audio_buffer, sizeof(audio_buffer));
-#endif
-        }
-        else if(info->use_osd == 3 && info->composite) {
-            placement = 1;
-            owned_osd_text = viewport_get_my_help(composite_get_vp(info->composite));
-            osd_text = owned_osd_text;
-            more_lines = vj_perform_osd_status(info, more_buffer, sizeof(more_buffer));
-            if(more_lines > 0)
-                more_text = more_buffer;
-        }
+        osd->audio_lines = vj_perform_audio_clock_osd_status(
+            info, osd->audio_buffer, sizeof(osd->audio_buffer));
 #endif
     }
-
-    if( settings->composite  ) {
-        VJFrame out;
-        veejay_memcpy( &out, info->effect_frame1, sizeof(VJFrame));
-        int curfmt = out.format;
-        if( out.ssm )
-        {
-            out.format = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
-        }
-
-        if(!frame->ssm) {
-              chroma_supersample(settings->sample_mode,frame,pri );
-              vj_perform_set_444(frame);
-        }
-
-        composite_process(info->composite,&out,info->effect_frame1,settings->composite,frame->format);
-
-        if( settings->splitscreen ) {
-            composite_process_divert(info->composite,out.data,frame, info->splitter, settings->composite );
-        }
-
-        if(osd_text || more_text || audio_lines > 0) {
-            VJFrame *tst = composite_get_draw_buffer(info->composite);
-            if(tst) {
-                if(audio_lines > 0)
-                    vj_font_render_osd_panel_lines(info->osd, tst, audio_buffer, 1, audio_lines);
-                if(osd_text) {
-                    if(osd_lines > 0)
-                        vj_font_render_osd_panel_lines(info->osd, tst, osd_text, placement, osd_lines);
-                    else
-                        vj_font_render_osd_status(info->osd, tst, (char*)osd_text, placement);
-                }
-                if(more_text) {
-                    if(more_lines > 0)
-                        vj_font_render_osd_panel_lines(info->osd, tst, more_text, 0, more_lines);
-                    else
-                        vj_font_render_osd_status(info->osd, tst, (char*)more_text, 0);
-                }
-                free(tst);
-            }
-        }
-
-        if( frame->ssm ) {
-            frame->uv_len = frame->uv_width * frame->uv_height;
-            frame->format = curfmt;
-        }
+    else if(info->use_osd == 3 && info->composite) {
+        osd->placement = 1;
+        osd->owned_text = viewport_get_my_help(composite_get_vp(info->composite));
+        osd->text = osd->owned_text;
+        osd->more_lines = vj_perform_osd_status(info,
+                                                osd->more_buffer,
+                                                sizeof(osd->more_buffer));
+        if(osd->more_lines > 0)
+            osd->more_text = osd->more_buffer;
     }
-    else {
+#else
+    (void)info;
+#endif
+}
 
-        if(settings->splitscreen ) {
-            if(!frame->ssm) {
-              chroma_supersample(settings->sample_mode,frame,pri );
-              vj_perform_set_444(frame);
-            }
-            vj_split_process( info->splitter, frame );
-        }
+static void vj_perform_output_osd_render(veejay_t *info,
+                                         VJFrame *frame,
+                                         const vj_perform_output_osd_t *osd)
+{
+    if(osd->audio_lines > 0)
+        vj_font_render_osd_panel_lines(info->osd, frame,
+                                       (char*)osd->audio_buffer,
+                                       1, osd->audio_lines);
 
-        if(audio_lines > 0)
-            vj_font_render_osd_panel_lines(info->osd, frame, audio_buffer, 1, audio_lines);
-        if(osd_text) {
-            if(osd_lines > 0)
-                vj_font_render_osd_panel_lines(info->osd, frame, osd_text, placement, osd_lines);
-            else
-                vj_font_render_osd_status(info->osd, frame, (char*)osd_text, placement);
-        }
-        if(more_text) {
-            if(more_lines > 0)
-                vj_font_render_osd_panel_lines(info->osd, frame, more_text, 0, more_lines);
-            else
-                vj_font_render_osd_status(info->osd, frame, (char*)more_text, 0);
-        }
+    if(osd->text) {
+        if(osd->lines > 0)
+            vj_font_render_osd_panel_lines(info->osd, frame,
+                                           (char*)osd->text,
+                                           osd->placement, osd->lines);
+        else
+            vj_font_render_osd_status(info->osd, frame,
+                                      (char*)osd->text, osd->placement);
     }
 
-    free(owned_osd_text);
+    if(osd->more_text) {
+        if(osd->more_lines > 0)
+            vj_font_render_osd_panel_lines(info->osd, frame,
+                                           (char*)osd->more_text,
+                                           0, osd->more_lines);
+        else
+            vj_font_render_osd_status(info->osd, frame,
+                                      (char*)osd->more_text, 0);
+    }
+}
 
-    if(settings->splitscreen && info->splitter)
-        vj_split_render(info->splitter);
+static void vj_perform_handle_composite_input(veejay_t *info,
+                                               performer_t *p,
+                                               video_playback_setup *settings)
+{
+    if(!settings->composite)
+        return;
 
-    if(!settings->composite && info->uc->mouse[0] > 0 && info->uc->mouse[1] > 0)
-    {
-        if( info->uc->mouse[2] == 1 ) {
-            uint8_t y,u,v,r,g,b;
+    uint8_t *pri[4] = {
+        p->primary_buffer[0]->Y,
+        p->primary_buffer[0]->Cb,
+        p->primary_buffer[0]->Cr,
+        p->primary_buffer[0]->alpha
+    };
 
-            y = pri[0][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
-            if( frame->ssm == 1 ) {
-                u = pri[1][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
-                v = pri[2][ info->uc->mouse[1] * frame->width + info->uc->mouse[0] ];
-            }
-            else {
-                u = pri[1][ info->uc->mouse[1] * frame->uv_width + (info->uc->mouse[0]>>1) ];
-                v = pri[2][ info->uc->mouse[1] * frame->uv_width + (info->uc->mouse[0]>>1) ];
-            }
 
-            r = y + (1.370705f * ( v- 128 ));
-            g = y - (0.698001f * ( v - 128)) - (0.337633 * (u-128));
-            b = y + (1.732446f * ( u - 128 ));
+    if(composite_event(info->composite, pri,
+                       info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2],
+                       vj_perform_get_width(info), vj_perform_get_height(info),
+                       info->homedir, info->uc->playback_mode, info->uc->sample_id)) {
+#ifdef HAVE_SDL
+        if(info->video_out == VIDEO_OUT_SDL)
+            vj_sdl_grab(info->sdl, 0);
+#endif
+    }
+}
 
-            if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
-                int pos = sample_get_selected_entry(info->uc->sample_id);
-                int fx_id = sample_get_effect( info->uc->sample_id,pos);
-                if( vje_has_rgbkey( fx_id ) ) {
-                    sample_set_effect_arg( info->uc->sample_id, pos, 1, r );
-                    sample_set_effect_arg( info->uc->sample_id, pos, 2, g );
-                    sample_set_effect_arg( info->uc->sample_id, pos, 3, b );
-                    veejay_msg(VEEJAY_MSG_INFO,"Selected RGB color #%02x%02x%02x",r,g,b);
-                }
-            }
-            else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
-                int pos = vj_tag_get_selected_entry(info->uc->sample_id);
-                int fx_id = vj_tag_get_effect( info->uc->sample_id, pos );
-                if( vje_has_rgbkey( fx_id ) ) {
-                    vj_tag_set_effect_arg( info->uc->sample_id,pos,1,r);
-                    vj_tag_set_effect_arg( info->uc->sample_id,pos,2,g);
-                    vj_tag_set_effect_arg( info->uc->sample_id,pos,3,b);
-                    veejay_msg(VEEJAY_MSG_INFO,"Selected RGB color #%02x%02x%02x",r,g,b);
-                }
-            }
+static void vj_perform_compose_output_frame(veejay_t *info,
+                                             performer_t *p,
+                                             VJFrame *frame,
+                                             video_playback_setup *settings,
+                                             const vj_perform_output_osd_t *osd)
+{
+    uint8_t *pri[4] = {
+        p->primary_buffer[0]->Y,
+        p->primary_buffer[0]->Cb,
+        p->primary_buffer[0]->Cr,
+        p->primary_buffer[0]->alpha
+    };
+
+    if(!settings->composite) {
+        vj_perform_output_osd_render(info, frame, osd);
+        return;
+    }
+
+    VJFrame out;
+    veejay_memcpy(&out, frame, sizeof(VJFrame));
+    const int curfmt = out.format;
+    if(out.ssm)
+        out.format = (info->pixel_format == FMT_422F) ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P;
+
+    if(!frame->ssm) {
+        chroma_supersample(settings->sample_mode, frame, pri);
+        vj_perform_set_444(frame);
+    }
+
+    composite_process(info->composite, &out, frame,
+                      settings->composite, frame->format);
+
+    VJFrame *draw = composite_get_draw_buffer(info->composite);
+    if(draw)
+        vj_perform_output_osd_render(info, draw, osd);
+
+    if(!composite_copy_output_frame(info->composite, frame, settings->composite))
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to commit composite output frame");
+
+    if(frame->ssm) {
+        frame->uv_len = frame->uv_width * frame->uv_height;
+        frame->format = curfmt;
+    }
+}
+
+static void vj_perform_apply_mouse_tools(veejay_t *info,
+                                         performer_t *p,
+                                         VJFrame *frame,
+                                         video_playback_setup *settings)
+{
+    if(settings->composite || info->uc->mouse[0] <= 0 || info->uc->mouse[1] <= 0)
+        return;
+
+    const int mouse_x = vj_perform_clampi(info->uc->mouse[0], 0, frame->width - 1);
+    const int mouse_y = vj_perform_clampi(info->uc->mouse[1], 0, frame->height - 1);
+
+    uint8_t *pri[4] = {
+        p->primary_buffer[0]->Y,
+        p->primary_buffer[0]->Cb,
+        p->primary_buffer[0]->Cr,
+        p->primary_buffer[0]->alpha
+    };
+
+    if(info->uc->mouse[2] == 1) {
+        uint8_t y, u, v, r, g, b;
+        y = pri[0][mouse_y * frame->width + mouse_x];
+        if(frame->ssm == 1) {
+            u = pri[1][mouse_y * frame->width + mouse_x];
+            v = pri[2][mouse_y * frame->width + mouse_x];
+        }
+        else {
+            u = pri[1][mouse_y * frame->uv_width + (mouse_x >> 1)];
+            v = pri[2][mouse_y * frame->uv_width + (mouse_x >> 1)];
         }
 
-        if( info->uc->mouse[2] == 2 ) {
-            info->uc->drawmode = !info->uc->drawmode;
-        }
+        r = y + (1.370705f * (v - 128));
+        g = y - (0.698001f * (v - 128)) - (0.337633f * (u - 128));
+        b = y + (1.732446f * (u - 128));
 
-        if( info->uc->mouse[2] == 0 && info->uc->drawmode ) {
-            int x1 = info->uc->mouse[0] - info->uc->drawsize;
-            int y1 = info->uc->mouse[1] - info->uc->drawsize;
-            int x2 = info->uc->mouse[0] + info->uc->drawsize;
-            int y2 = info->uc->mouse[1] + info->uc->drawsize;
-
-            if( x1 < 0 ) x1 = 0; else if ( x1 > frame->width ) x1 = frame->width;
-            if( y1 < 0 ) y1 = 0; else if ( y1 > frame->height ) y1 = frame->height;
-            if( x2 < 0 ) x2 = 0; else if ( x2 > frame->width ) x2 = frame->width;
-            if( y2 < 0 ) y2 = 0; else if ( y2 > frame->height ) y2 = frame->height;
-
-            unsigned int i,j;
-            for( j = x1; j < x2 ; j ++ )
-                pri[0][ y1 * frame->width + j ] = 0xff - pri[0][y1 * frame->width + j];
-
-            for( i = y1; i < y2; i ++ )
-            {
-                pri[0][ i * frame->width + x1 ] = 0xff - pri[0][i * frame->width + x1];
-                pri[0][ i * frame->width + x2 ] = 0xff - pri[0][i * frame->width + x2];
+        if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+            int pos = sample_get_selected_entry(info->uc->sample_id);
+            int fx_id = sample_get_effect(info->uc->sample_id, pos);
+            if(vje_has_rgbkey(fx_id)) {
+                sample_set_effect_arg(info->uc->sample_id, pos, 1, r);
+                sample_set_effect_arg(info->uc->sample_id, pos, 2, g);
+                sample_set_effect_arg(info->uc->sample_id, pos, 3, b);
+                veejay_msg(VEEJAY_MSG_INFO, "Selected RGB color #%02x%02x%02x", r, g, b);
             }
-
-            for( j = x1; j < x2 ; j ++ )
-                pri[0][ y2 * frame->width + j ] = 0xff - pri[0][y2*frame->width+j];
+        }
+        else if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) {
+            int pos = vj_tag_get_selected_entry(info->uc->sample_id);
+            int fx_id = vj_tag_get_effect(info->uc->sample_id, pos);
+            if(vje_has_rgbkey(fx_id)) {
+                vj_tag_set_effect_arg(info->uc->sample_id, pos, 1, r);
+                vj_tag_set_effect_arg(info->uc->sample_id, pos, 2, g);
+                vj_tag_set_effect_arg(info->uc->sample_id, pos, 3, b);
+                veejay_msg(VEEJAY_MSG_INFO, "Selected RGB color #%02x%02x%02x", r, g, b);
+            }
         }
     }
+
+    if(info->uc->mouse[2] == 2)
+        info->uc->drawmode = !info->uc->drawmode;
+
+    if(info->uc->mouse[2] == 0 && info->uc->drawmode) {
+        int x1 = mouse_x - info->uc->drawsize;
+        int y1 = mouse_y - info->uc->drawsize;
+        int x2 = mouse_x + info->uc->drawsize;
+        int y2 = mouse_y + info->uc->drawsize;
+
+        x1 = vj_perform_clampi(x1, 0, frame->width - 1);
+        y1 = vj_perform_clampi(y1, 0, frame->height - 1);
+        x2 = vj_perform_clampi(x2, 0, frame->width - 1);
+        y2 = vj_perform_clampi(y2, 0, frame->height - 1);
+
+        for(unsigned int j = (unsigned int)x1; j < (unsigned int)x2; j++)
+            pri[0][y1 * frame->width + j] = 0xff - pri[0][y1 * frame->width + j];
+
+        for(unsigned int i = (unsigned int)y1; i < (unsigned int)y2; i++) {
+            pri[0][i * frame->width + x1] = 0xff - pri[0][i * frame->width + x1];
+            pri[0][i * frame->width + x2] = 0xff - pri[0][i * frame->width + x2];
+        }
+
+        for(unsigned int j = (unsigned int)x1; j < (unsigned int)x2; j++)
+            pri[0][y2 * frame->width + j] = 0xff - pri[0][y2 * frame->width + j];
+    }
+}
+
+static void vj_perform_finish_render(veejay_t *info,
+                                     performer_t *p,
+                                     VJFrame *frame,
+                                     video_playback_setup *settings)
+{
+    vj_perform_output_osd_t osd;
+
+    vj_perform_handle_composite_input(info, p, settings);
+    vj_perform_output_osd_collect(info, settings, &osd);
+    const uint64_t composite_start = vj_perf_now_ns();
+    vj_perform_compose_output_frame(info, p, frame, settings, &osd);
+    vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_COMPOSITE,
+                   composite_start, vj_perf_now_ns());
+    vj_perform_apply_mouse_tools(info, p, frame, settings);
+
+    free(osd.owned_text);
 }
 
 static  void    vj_perform_render_font( veejay_t *info, video_playback_setup *settings, VJFrame *frame )
@@ -17842,6 +17966,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 
 
 
+    const uint64_t source_start = vj_perf_now_ns();
     vj_perform_sample_tick_reset(g);
 
     long long cur_frame = atomic_load_long_long(&info->settings->current_frame_num);
@@ -17896,9 +18021,15 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
         vje_disable_parallel();
     }
 
+    vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_SOURCE,
+                   source_start, vj_perf_now_ns());
+
+    const uint64_t fx_start = vj_perf_now_ns();
     if(!transition_enabled) {
         vj_perform_render_video_frames(info, g->A, info->effect_info, info->uc->sample_id, info->uc->playback_mode, info->effect_frame1, info->effect_frame2, info->effect_frame_info, info->effect_info );
         vj_perform_try_sequence(info);
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_FX,
+                       fx_start, vj_perf_now_ns());
     }
     else
     {
@@ -17916,18 +18047,29 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
                 info->effect_frame3, info->effect_frame4, info->effect_frame_info2, info->effect_info2 );
 }
 #pragma omp taskwait
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_FX,
+                       fx_start, vj_perf_now_ns());
+        const uint64_t transition_start = vj_perf_now_ns();
         vj_perform_transition_sample( info, info->effect_frame1, info->effect_frame3 );
+        vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_TRANSITION,
+                       transition_start, vj_perf_now_ns());
 }
 }
     }
 
+    const uint64_t osd_start = vj_perf_now_ns();
     vj_perform_scene_detect_frame(settings, info->effect_frame1, render_frame);
 
     vj_perform_render_font( info, settings, info->effect_frame1);
 
     if(!settings->composite)
         vj_perform_render_osd( info, settings, info->effect_frame1 );
+    vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_OSD,
+                   osd_start, vj_perf_now_ns());
 
+    /* Keep the calibration preview source-independent. The user chooses the
+     * active source; this captures exactly the current video before mapping. */
+    vj_perform_capture_pre_projection_preview(info, info->effect_frame1);
     vj_perform_finish_render( info, g->A, info->effect_frame1, settings );
 
     if(trace)
@@ -18003,7 +18145,10 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
                    info->effect_frame1->uv_len,
                    info->out_buf);
 
+    const uint64_t queue_copy_start = vj_perf_now_ns();
     vj_frame_copy( input, dst->data, strides );
+    vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_QUEUE_COPY,
+                   queue_copy_start, vj_perf_now_ns());
 
     vj_perform_output_hold_update(info, p, dst);
 
