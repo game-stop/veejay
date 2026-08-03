@@ -295,21 +295,27 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 
 	while( bytes_left > 0 )
 	{
-sock_t_recv_lbl:
-		n = recv( s->sock_fd, addr + bytes_done, bytes_left, MSG_WAITALL );
-		if ( n <= 0 ) {
-			if( n == -1 ) {
-                if( errno == EINTR ) goto sock_t_recv_lbl;
-                if( errno == EAGAIN || errno == EWOULDBLOCK ) {
-                    veejay_msg(VEEJAY_MSG_ERROR, "Strange things happen: EAGAIN with MSG_WAITALL");
-                    usleep(1000);
-                    goto sock_t_recv_lbl;
-                }
-                veejay_msg(0, "Error while receiving from network: %s", strerror(errno));
-                return -1;
-            }
-            return 0;
-        }
+		for(;;) {
+			n = recv( s->sock_fd, addr + bytes_done, bytes_left, MSG_WAITALL );
+			if(n >= 0)
+				break;
+
+			if(errno == EINTR)
+				continue;
+
+			if(errno == EAGAIN || errno == EWOULDBLOCK) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Strange things happen: EAGAIN with MSG_WAITALL");
+				usleep(1000);
+				continue;
+			}
+
+			veejay_msg(0, "Error while receiving from network: %s", strerror(errno));
+			return -1;
+		}
+
+		if(n == 0)
+			return 0;
+
 		bytes_done += n;
 		bytes_left -= n;
 	}

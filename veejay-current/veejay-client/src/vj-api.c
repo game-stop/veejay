@@ -11768,7 +11768,9 @@ static int fx_selected_entry_beat_enabled(int source_id, int entry)
         return 0;
 
     toggle = widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE];
-    if(toggle && GTK_IS_TOGGLE_BUTTON(toggle))
+    if(!toggle)
+        return info->uc.entry_tokens[ENTRY_BEAT_FLAG] ? 1 : 0;
+    if(GTK_IS_TOGGLE_BUTTON(toggle))
         return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle)) ? 1 : 0;
 
     return info->uc.entry_tokens[ENTRY_BEAT_FLAG] ? 1 : 0;
@@ -15592,7 +15594,14 @@ static void reload_vimslist(void)
             free(line);
             break;
         }
-        if(val[0] < 0 || val[0] >= VIMS_EVENT_LIST_SIZE) {
+        if(val[0] < 0) {
+            veejay_msg(0, "Invalid ID at position %d", offset);
+            free(line);
+            break;
+        }
+
+        const size_t event_index = (size_t)val[0];
+        if(event_index >= G_N_ELEMENTS(vj_event_list)) {
             veejay_msg(0, "Invalid ID at position %d", offset);
             free(line);
             break;
@@ -15616,15 +15625,17 @@ static void reload_vimslist(void)
             offset += val[3];
         }
 
-        if(vj_event_list[val[0]].format)
-            free(vj_event_list[val[0]].format);
-        if(vj_event_list[val[0]].descr)
-            free(vj_event_list[val[0]].descr);
+        vims_t *event = &vj_event_list[event_index];
 
-        vj_event_list[val[0]].event_id = val[0];
-        vj_event_list[val[0]].params = val[1];
-        vj_event_list[val[0]].format = format;
-        vj_event_list[val[0]].descr = descr;
+        if(event->format)
+            free(event->format);
+        if(event->descr)
+            free(event->descr);
+
+        event->event_id = val[0];
+        event->params = val[1];
+        event->format = format;
+        event->descr = descr;
 
         gvr_vims_view_append_namespace(info->vims_view,
                                        val[0],
@@ -25022,25 +25033,30 @@ void vj_gui_init(const char *glade_file,
                          NULL);
         {
             GtkWidget *notebook = widget_cache[WIDGET_NOTEBOOK18];
-            if(notebook && GTK_IS_NOTEBOOK(notebook) &&
-               !g_object_get_data(G_OBJECT(notebook),
-                                  "gvr-source-tab-dnd")) {
-                gtk_drag_dest_set(notebook,
-                                  0,
-                                  samplebank_source_drag_targets,
-                                  G_N_ELEMENTS(samplebank_source_drag_targets),
-                                  GDK_ACTION_COPY);
-                g_signal_connect(notebook,
-                                 "drag-motion",
-                                 G_CALLBACK(samplebank_notebook_drag_motion),
-                                 NULL);
-                g_signal_connect(notebook,
-                                 "drag-leave",
-                                 G_CALLBACK(samplebank_notebook_drag_leave),
-                                 NULL);
-                g_object_set_data(G_OBJECT(notebook),
-                                  "gvr-source-tab-dnd",
-                                  GINT_TO_POINTER(1));
+            if(notebook) {
+                if(GTK_IS_NOTEBOOK(notebook)) {
+                    gpointer dnd_initialized =
+                        g_object_get_data(G_OBJECT(notebook),
+                                          "gvr-source-tab-dnd");
+                    if(!dnd_initialized) {
+                        gtk_drag_dest_set(notebook,
+                                          0,
+                                          samplebank_source_drag_targets,
+                                          G_N_ELEMENTS(samplebank_source_drag_targets),
+                                          GDK_ACTION_COPY);
+                        g_signal_connect(notebook,
+                                         "drag-motion",
+                                         G_CALLBACK(samplebank_notebook_drag_motion),
+                                         NULL);
+                        g_signal_connect(notebook,
+                                         "drag-leave",
+                                         G_CALLBACK(samplebank_notebook_drag_leave),
+                                         NULL);
+                        g_object_set_data(G_OBJECT(notebook),
+                                          "gvr-source-tab-dnd",
+                                          GINT_TO_POINTER(1));
+                    }
+                }
             }
         }
     }
@@ -26467,9 +26483,11 @@ void vj_gui_reveal_sequence_slot(int bank, int slot)
     gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
     gvr_sequence_bank_view_set_selected_slot(info->sequence_bank_view, bank, slot);
     notebook = widget_cache[WIDGET_NOTEBOOK18];
-    if(notebook && GTK_IS_NOTEBOOK(notebook))
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook),
-                                      NOTEBOOK18_PAGE_SEQUENCE);
+    if(notebook) {
+        if(GTK_IS_NOTEBOOK(notebook))
+            gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook),
+                                          NOTEBOOK18_PAGE_SEQUENCE);
+    }
     gtk_widget_grab_focus(info->sequence_bank_view);
 }
 

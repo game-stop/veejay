@@ -831,16 +831,21 @@ static void multitrack_drift_reset_all_phases(multitracker_t *mt)
 
 static void multitrack_drift_clear_track(multitracker_t *mt, int track)
 {
-    if(!mt || track < 0 || track >= __MAX_TRACKS)
-        return;
-    if(track >= MAX_TRACKS)
+    size_t index;
+
+    if(!mt || track < 0)
         return;
 
-    multitrack_drift_reset_phase(mt, track);
-    mt->drift_frames[track] = 0;
-    mt->drift_correcting[track] = 0;
+    index = (size_t)track;
+    if(index >= G_N_ELEMENTS(mt->drift_frames) ||
+       index >= (size_t)MAX_TRACKS)
+        return;
+
+    multitrack_drift_reset_phase(mt, (int)index);
+    mt->drift_frames[index] = 0;
+    mt->drift_correcting[index] = 0;
     gvr_multi_track_edit_set_track_drift(mt->timeline,
-                                          track,
+                                          (int)index,
                                           0,
                                           0,
                                           FALSE);

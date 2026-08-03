@@ -288,16 +288,18 @@ static int viewport_mesh_copy_scaled(const viewport_t *source, viewport_t *targe
     const int count = vj_output_mesh_point_count(source->mesh);
     for(int i = 0; i < count; i++) {
         vj_output_mesh_point point;
-        if(!vj_output_mesh_get_point(source->mesh, i, &point) ||
-           !vj_output_mesh_set_point(target->mesh, i,
+        if(!vj_output_mesh_get_point(source->mesh, i, &point))
+            return 0;
+        if(!vj_output_mesh_set_point(target->mesh, i,
                                      point.x * scale_x, point.y * scale_y))
             return 0;
     }
 
     if(!vj_output_mesh_set_source_rect(target->mesh,
                                        (float)target->x0, (float)target->y0,
-                                       (float)target->w0, (float)target->h0) ||
-       !vj_output_mesh_compile(target->mesh))
+                                       (float)target->w0, (float)target->h0))
+        return 0;
+    if(!vj_output_mesh_compile(target->mesh))
         return 0;
 
     target->mesh_selected_point = source->mesh_selected_point;
@@ -446,8 +448,13 @@ static int viewport_profiles_load(const char *path,
     if(!fd)
         return 0;
 
-    if(!fgets(line, sizeof(line), fd) ||
-       sscanf(line, "VJVIEWPORT %d", &version) != 1 ||
+    if(!fgets(line, sizeof(line), fd)) {
+        fclose(fd);
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Ignoring incompatible viewport configuration %s", path);
+        return 0;
+    }
+    if(sscanf(line, "VJVIEWPORT %d", &version) != 1 ||
        version != VIEWPORT_CONFIG_VERSION) {
         fclose(fd);
         veejay_msg(VEEJAY_MSG_WARNING,
@@ -755,15 +762,21 @@ static int viewport_reset_identity(viewport_t *v)
     if(!v || !v->mesh)
         return 0;
 
-    if(!vj_output_mesh_set_grid(v->mesh, 2, 2) ||
-       !vj_output_mesh_set_source_rect(v->mesh, 0.0f, 0.0f,
-                                       (float)v->w, (float)v->h) ||
-       !vj_output_mesh_set_point(v->mesh, 0, 0.0f, 0.0f) ||
-       !vj_output_mesh_set_point(v->mesh, 1, (float)(v->w - 1), 0.0f) ||
-       !vj_output_mesh_set_point(v->mesh, 2, 0.0f, (float)(v->h - 1)) ||
-       !vj_output_mesh_set_point(v->mesh, 3,
-                                 (float)(v->w - 1), (float)(v->h - 1)) ||
-       !vj_output_mesh_compile(v->mesh))
+    if(!vj_output_mesh_set_grid(v->mesh, 2, 2))
+        return 0;
+    if(!vj_output_mesh_set_source_rect(v->mesh, 0.0f, 0.0f,
+                                       (float)v->w, (float)v->h))
+        return 0;
+    if(!vj_output_mesh_set_point(v->mesh, 0, 0.0f, 0.0f))
+        return 0;
+    if(!vj_output_mesh_set_point(v->mesh, 1, (float)(v->w - 1), 0.0f))
+        return 0;
+    if(!vj_output_mesh_set_point(v->mesh, 2, 0.0f, (float)(v->h - 1)))
+        return 0;
+    if(!vj_output_mesh_set_point(v->mesh, 3,
+                                 (float)(v->w - 1), (float)(v->h - 1)))
+        return 0;
+    if(!vj_output_mesh_compile(v->mesh))
         return 0;
 
     v->x0 = 0;
@@ -1920,7 +1933,12 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h,
 
     v->ui->buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * (w * h));
     v->ui->scale = 0.5f;
-    if(!v->ui->buf[0] || !(v->ui->scaler = viewport_init_swscaler(v->ui, iw, ih))) {
+    if(!v->ui->buf[0]) {
+        viewport_destroy(v);
+        return NULL;
+    }
+    v->ui->scaler = viewport_init_swscaler(v->ui, iw, ih);
+    if(!v->ui->scaler) {
         viewport_destroy(v);
         return NULL;
     }
@@ -2025,7 +2043,12 @@ void *viewport_clone(void *vv, int new_w, int new_h)
 	}
 	q->ui->buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * (new_w * new_h));
 	q->ui->scale = 1.0f;
-	if(!q->ui->buf[0] || !(q->ui->scaler = viewport_init_swscaler(q->ui, new_w, new_h))) {
+	if(!q->ui->buf[0]) {
+		viewport_destroy(q);
+		return NULL;
+	}
+	q->ui->scaler = viewport_init_swscaler(q->ui, new_w, new_h);
+	if(!q->ui->scaler) {
 		viewport_destroy(q);
 		return NULL;
 	}
@@ -2402,12 +2425,17 @@ int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int 
 static int viewport_mesh_commit_point(viewport_t *v, int index, float x, float y)
 {
     vj_output_mesh_point previous;
-    if(!v || !v->mesh ||
-       !vj_output_mesh_get_point(v->mesh, index, &previous))
+    if(!v || !v->mesh)
+        return 0;
+    if(!vj_output_mesh_get_point(v->mesh, index, &previous))
         return 0;
 
-    if(!vj_output_mesh_set_point(v->mesh, index, x, y) ||
-       !vj_output_mesh_compile(v->mesh)) {
+    if(!vj_output_mesh_set_point(v->mesh, index, x, y)) {
+        vj_output_mesh_set_point(v->mesh, index, previous.x, previous.y);
+        vj_output_mesh_compile(v->mesh);
+        return 0;
+    }
+    if(!vj_output_mesh_compile(v->mesh)) {
         vj_output_mesh_set_point(v->mesh, index, previous.x, previous.y);
         vj_output_mesh_compile(v->mesh);
         return 0;
@@ -2426,7 +2454,9 @@ static int viewport_mesh_commit_point(viewport_t *v, int index, float x, float y
 int viewport_mesh_set_grid(void *data, int columns, int rows)
 {
     viewport_t *v = (viewport_t*)data;
-    if(!v || !v->mesh || !vj_output_mesh_set_grid(v->mesh, columns, rows))
+    if(!v || !v->mesh)
+        return 0;
+    if(!vj_output_mesh_set_grid(v->mesh, columns, rows))
         return 0;
     v->mesh_selected_point = 0;
     v->mesh_hover_point = -1;
@@ -2481,7 +2511,9 @@ int viewport_mesh_get_point_scaled(void *data, int point, int scale, int *x, int
 
     const int index = viewport_mesh_event_index(v, point);
     vj_output_mesh_point mesh_point;
-    if(index < 0 || !vj_output_mesh_get_point(v->mesh, index, &mesh_point))
+    if(index < 0)
+        return 0;
+    if(!vj_output_mesh_get_point(v->mesh, index, &mesh_point))
         return 0;
 
     *x = (int)lrintf((mesh_point.x * 100.0f / (float)v->w) * (float)scale);

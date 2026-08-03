@@ -2628,8 +2628,13 @@ gboolean director_instance_parse_instance_status(DirectorInstance *instance,
        (g_strcmp0(role, "standalone") != 0 &&
         g_strcmp0(role, "program") != 0 &&
         g_strcmp0(role, "output") != 0) ||
-       !director_instance_id_valid(id) ||
-       !parse_signed(port, &instance->live_port)) {
+       !director_instance_id_valid(id)) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Incomplete or invalid VJINSTANCE response");
+        g_hash_table_destroy(values);
+        return FALSE;
+    }
+    if(!parse_signed(port, &instance->live_port)) {
         g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
                     "Incomplete or invalid VJINSTANCE response");
         g_hash_table_destroy(values);

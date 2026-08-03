@@ -2822,8 +2822,12 @@ static void timeline_draw_beat_grid(TimelineSelection *te,
     first = -phase * beat_frames;
 
     guard = 0;
-    while (first < 0.0 && guard++ < 8192)
+    while (first < 0.0) {
+        if (guard >= 8192)
+            break;
+        guard++;
         first += stride_frames;
+    }
 
     ruler_y = floor(track_y + 2.0) + 0.5;
     tick_top = ruler_y;

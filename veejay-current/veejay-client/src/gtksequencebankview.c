@@ -1520,7 +1520,9 @@ static void gvr_sequence_bank_view_menu_action(GtkMenuItem *item, gpointer user_
     (void)item;
     GvrSequenceMenuAction *data = (GvrSequenceMenuAction *)user_data;
 
-    if(!data || !GVR_IS_SEQUENCE_BANK_VIEW(data->widget))
+    if(!data)
+        return;
+    if(!GVR_IS_SEQUENCE_BANK_VIEW(data->widget))
         return;
 
     GvrSequenceBankView *view = GVR_SEQUENCE_BANK_VIEW(data->widget);

@@ -457,11 +457,11 @@ void	veejay_bundle_sample_fx_add( void *osc, int id, int entry, const char *word
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
 
-	sprintf(osc_path, "/sample_%d/fx_%d/%s", id, entry, word );
+	snprintf(osc_path, sizeof(osc_path), "/sample_%d/fx_%d/%s", id, entry, word );
 	lo_message lmsg = lo_message_new();
 
 	char realwin[128];
-	sprintf(realwin, "%sFX%d", c->window, entry );
+	snprintf(realwin, sizeof(realwin), "%sFX%d", c->window, entry );
 	lo_message_add_string(lmsg, realwin );
 
 	lo_message_add_string(lmsg, osc_path );
@@ -484,7 +484,7 @@ void	veejay_bundle_sample_add( void *osc, int id, const char *word, const char *
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
 
-	sprintf(osc_path, "/sample_%d/%s", id, word );
+	snprintf(osc_path, sizeof(osc_path), "/sample_%d/%s", id, word );
 	lo_message lmsg = lo_message_new();
 	lo_message_add_string(lmsg, c->window );
 	lo_message_add_string(lmsg, osc_path );
@@ -509,10 +509,10 @@ void	veejay_bundle_sample_add_fx_atom( void *osc, int id,int entry, const char *
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
 
-	sprintf(osc_path, "/sample_%d/fx_%d/%s", id, entry,word );
+	snprintf(osc_path, sizeof(osc_path), "/sample_%d/fx_%d/%s", id, entry, word );
 	lo_message lmsg = lo_message_new();
 	char realwin[128];
-	sprintf(realwin, "%sFX%d", c->window, entry );
+	snprintf(realwin, sizeof(realwin), "%sFX%d", c->window, entry );
 	lo_message_add_string(lmsg, realwin );
 	lo_message_add_string(lmsg, osc_path );
 
@@ -604,7 +604,7 @@ void	veejay_bundle_sample_add_atom( void *osc, int id, const char *word, const c
 		c->bundle = lo_bundle_new( LO_TT_IMMEDIATE );
 	}
 
-	sprintf(osc_path, "/sample_%d/%s", id, word );
+	snprintf(osc_path, sizeof(osc_path), "/sample_%d/%s", id, word );
 	lo_message lmsg = lo_message_new();
 	lo_message_add_string(lmsg, c->window );
 	lo_message_add_string(lmsg, osc_path );

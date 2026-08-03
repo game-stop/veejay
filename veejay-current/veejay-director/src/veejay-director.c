@@ -2956,7 +2956,9 @@ static void director_calibration_invalidate_map(DirectorApp *app,
         return;
     DirectorVenueProfile *venue = director_show_find_venue(app->show,
                                                             app->show->active_venue);
-    if(!venue || !director_venue_remove_camera_map(venue, instance->id))
+    if(!venue)
+        return;
+    if(!director_venue_remove_camera_map(venue, instance->id))
         return;
     app->show->dirty = TRUE;
     director_log(app, "Dense projector-camera map for %s invalidated%s%s",
@@ -4232,7 +4234,11 @@ static gboolean director_recovery_file_is_fresh(const gchar *path,
                                                  gint64 process_started_real_us)
 {
     struct stat st;
-    if(!path || !*path || stat(path, &st) != 0 || !S_ISREG(st.st_mode) || st.st_size <= 0)
+    if(!path || !*path)
+        return FALSE;
+    if(stat(path, &st) != 0)
+        return FALSE;
+    if(!S_ISREG(st.st_mode) || st.st_size <= 0)
         return FALSE;
     if(process_started_real_us <= 0)
         return TRUE;
@@ -4492,8 +4498,13 @@ static gboolean director_eidolon_open_pty(gint *master_fd,
 
     gint unlock = 0;
     guint pty_number = 0;
-    if(ioctl(master, TIOCSPTLCK, &unlock) < 0 ||
-       ioctl(master, TIOCGPTN, &pty_number) < 0) {
+    if(ioctl(master, TIOCSPTLCK, &unlock) < 0) {
+        g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(errno),
+                    "Cannot allocate pseudo-terminal: %s", g_strerror(errno));
+        close(master);
+        return FALSE;
+    }
+    if(ioctl(master, TIOCGPTN, &pty_number) < 0) {
         g_set_error(error, G_FILE_ERROR, g_file_error_from_errno(errno),
                     "Cannot allocate pseudo-terminal: %s", g_strerror(errno));
         close(master);
@@ -6487,8 +6498,9 @@ static gboolean director_calibration_analyze_overlap(DirectorApp *app)
 {
     DirectorCalibrationMeasure *measure = &app->calibration_measure;
     DirectorCalibrationMaskStats ma, mb;
-    if(!director_calibration_mask_stats(measure->black, measure->frame_a, &ma) ||
-       !director_calibration_mask_stats(measure->black, measure->frame_b, &mb))
+    if(!director_calibration_mask_stats(measure->black, measure->frame_a, &ma))
+        return FALSE;
+    if(!director_calibration_mask_stats(measure->black, measure->frame_b, &mb))
         return FALSE;
 
     measure->ax0 = ma.x0; measure->ay0 = ma.y0; measure->ax1 = ma.x1; measure->ay1 = ma.y1;
@@ -7102,7 +7114,12 @@ static gboolean director_calibration_scan_commit(DirectorApp *app,
     DirectorVenueProfile staged = { 0 };
     for(guint i = 0; i < scan->pending_maps->len; i++) {
         DirectorPendingCameraMap *pending = g_ptr_array_index(scan->pending_maps, i);
-        if(!pending || !director_venue_store_camera_map(
+        if(!pending) {
+            if(staged.camera_maps)
+                g_hash_table_destroy(staged.camera_maps);
+            return FALSE;
+        }
+        if(!director_venue_store_camera_map(
                 &staged, pending->instance_id,
                 pending->camera_width, pending->camera_height,
                 pending->projector_width, pending->projector_height,
@@ -13892,8 +13909,9 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         if(!source || source == target)
             continue;
         gdouble sx, sy, sw, sh, tx, ty, tw, th;
-        if(!director_stage_wiring_node_rect(app, source, &sx, &sy, &sw, &sh) ||
-           !director_stage_wiring_node_rect(app, target, &tx, &ty, &tw, &th))
+        if(!director_stage_wiring_node_rect(app, source, &sx, &sy, &sw, &sh))
+            continue;
+        if(!director_stage_wiring_node_rect(app, target, &tx, &ty, &tw, &th))
             continue;
         const gboolean local = director_video_wire_is_local(source, target);
         const gdouble start_x = sx + sw;
@@ -17849,7 +17867,9 @@ static void director_open(GApplication *application,
     app->suppress_startup_chooser = TRUE;
     director_activate(GTK_APPLICATION(application), app);
     app->suppress_startup_chooser = FALSE;
-    if(n_files <= 0 || !director_confirm_show_replacement(app))
+    if(n_files <= 0)
+        return;
+    if(!director_confirm_show_replacement(app))
         return;
     gchar *path = g_file_get_path(files[0]);
     if(path) {

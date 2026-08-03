@@ -1849,13 +1849,21 @@ static int vj_pattern_compile_document(sequencer_t *seq,
             unsigned char *message_data = NULL;
             char *message = NULL;
 
-            if(!vj_pattern_parse_int(fields[1], &bank) ||
-               !vj_pattern_parse_int(fields[2], &slot) ||
-               !vj_pattern_parse_int(fields[3], &sample_id) ||
-               !vj_pattern_parse_int(fields[4], &sample_type) ||
-               !vj_pattern_parse_int(fields[5], &frame) ||
-               !vj_pattern_parse_int(fields[6], &column) ||
-               !vj_pattern_parse_int(fields[7], &vims_id) ||
+            int parse_ok = vj_pattern_parse_int(fields[1], &bank);
+            if(parse_ok)
+                parse_ok = vj_pattern_parse_int(fields[2], &slot);
+            if(parse_ok)
+                parse_ok = vj_pattern_parse_int(fields[3], &sample_id);
+            if(parse_ok)
+                parse_ok = vj_pattern_parse_int(fields[4], &sample_type);
+            if(parse_ok)
+                parse_ok = vj_pattern_parse_int(fields[5], &frame);
+            if(parse_ok)
+                parse_ok = vj_pattern_parse_int(fields[6], &column);
+            if(parse_ok)
+                parse_ok = vj_pattern_parse_int(fields[7], &vims_id);
+
+            if(!parse_ok ||
                !vj_pattern_target_valid(bank, slot) ||
                frame < 0 || frame >= VJ_PATTERN_MAX_FRAMES ||
                column < 0 || column >= VJ_PATTERN_COLUMNS ||
@@ -1889,11 +1897,15 @@ static int vj_pattern_compile_document(sequencer_t *seq,
 
             message = (char*)message_data;
             vj_pattern_target_t *target = vj_pattern_target_find(runtime, bank, slot, 1);
-            if(!target || !vj_pattern_target_add_event(target,
-                                                       frame,
-                                                       column,
-                                                       vims_id,
-                                                       message))
+            if(!target) {
+                free(message);
+                goto fail;
+            }
+            if(!vj_pattern_target_add_event(target,
+                                            frame,
+                                            column,
+                                            vims_id,
+                                            message))
             {
                 free(message);
                 goto fail;
@@ -2832,8 +2844,9 @@ static long long vj_pattern_sequence_slot_duration(veejay_t *info,
         int dup;
         long long span;
 
-        if(!sample_exists(sample_id) ||
-           sample_get_short_info(sample_id, &start, &end, &looptype, &speed) != 0)
+        if(!sample_exists(sample_id))
+            return -1;
+        if(sample_get_short_info(sample_id, &start, &end, &looptype, &speed) != 0)
             return -1;
 
         speed = abs(speed);
@@ -6506,12 +6519,15 @@ static int veejay_output_projection_init(veejay_t *info,
                                              info->video_output_width,
                                              info->video_output_height,
                                              state->output_format);
-    if(!state->projection_source_frame || !state->projection_frame || !state->present_frame ||
-       !veejay_output_alloc_frame_storage(state->projection_source_frame,
-                                          &state->projection_source_buffer) ||
-       !veejay_output_alloc_frame_storage(state->projection_frame,
-                                          &state->projection_buffer) ||
-       !veejay_output_alloc_frame_storage(state->present_frame,
+    if(!state->projection_source_frame || !state->projection_frame || !state->present_frame)
+        return 0;
+    if(!veejay_output_alloc_frame_storage(state->projection_source_frame,
+                                          &state->projection_source_buffer))
+        return 0;
+    if(!veejay_output_alloc_frame_storage(state->projection_frame,
+                                          &state->projection_buffer))
+        return 0;
+    if(!veejay_output_alloc_frame_storage(state->present_frame,
                                           &state->present_buffer))
         return 0;
 
@@ -6712,8 +6728,13 @@ static int veejay_output_source_attach_remote(veejay_t *info,
                                                  info->video_output_width,
                                                  info->video_output_height,
                                                  state->output_format);
-    if(!info->output_input_frame ||
-       !veejay_output_alloc_frame_storage(info->output_input_frame,
+    if(!info->output_input_frame) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to allocate remote Program staging frame");
+        veejay_output_source_free(info);
+        return 0;
+    }
+    if(!veejay_output_alloc_frame_storage(info->output_input_frame,
                                           &state->canonical_buffer)) {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[OUTPUT] Unable to allocate remote Program staging frame");
@@ -6751,7 +6772,14 @@ static int veejay_output_source_attach_remote(veejay_t *info,
     }
 
     vj_tag *tag = vj_tag_get(state->remote_stream_id);
-    if(!tag || !net_thread_start_screen(tag, info->output_input_frame, -1)) {
+    if(!tag) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[OUTPUT] Unable to start TCP Program receiver for %s:%d",
+                   host, port);
+        veejay_output_source_free(info);
+        return 0;
+    }
+    if(!net_thread_start_screen(tag, info->output_input_frame, -1)) {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[OUTPUT] Unable to start TCP Program receiver for %s:%d",
                    host, port);
@@ -6795,8 +6823,11 @@ static int veejay_output_source_attach(veejay_t *info)
                                                      info->video_output_width,
                                                      info->video_output_height,
                                                      state->output_format);
-        if(!info->output_input_frame ||
-           !veejay_output_alloc_frame_storage(info->output_input_frame,
+        if(!info->output_input_frame) {
+            veejay_output_source_free(info);
+            return 0;
+        }
+        if(!veejay_output_alloc_frame_storage(info->output_input_frame,
                                               &state->canonical_buffer)) {
             veejay_output_source_free(info);
             return 0;
@@ -12299,8 +12330,11 @@ static int veejay_audio_sync_probe_wav_duration_ms(const char *path)
     if(!fp)
         return 0;
 
-    if(fread(hdr, 1, sizeof(hdr), fp) != sizeof(hdr) ||
-       memcmp(hdr, "RIFF", 4) != 0 ||
+    if(fread(hdr, 1, sizeof(hdr), fp) != sizeof(hdr)) {
+        fclose(fp);
+        return 0;
+    }
+    if(memcmp(hdr, "RIFF", 4) != 0 ||
        memcmp(hdr + 8, "WAVE", 4) != 0)
     {
         fclose(fp);
