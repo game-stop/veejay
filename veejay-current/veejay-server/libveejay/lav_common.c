@@ -204,5 +204,8 @@ int luminance_mean(uint8_t * frame[], int w, int h)
 	p += 31;
 	count += 4;
     }
-    return count > 0 ? sum / count : 0;
+    if (count == 0)
+	return 0;
+
+    return sum / count;
 }
