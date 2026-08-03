@@ -2246,6 +2246,7 @@ static const char *sequence_vims_description_lookup(int vims_id,
                                                     gpointer user_data);
 static int sequence_vims_message_id(const char *message);
 static void sequence_vims_sync_target(void);
+static void sequence_vims_schedule_target_sync(void);
 static gboolean sequence_vims_select_grid_target(int bank, int slot);
 static gboolean sequence_ui_wants_play_grid(void);
 static void sequence_vims_update_playback(void);
@@ -2257,6 +2258,7 @@ static void sequence_vims_pattern_flush(void);
 static void sequence_vims_pattern_load_backend(void);
 static void sequence_vims_timeline_invalidate(int bank);
 static void sequence_vims_note_outgoing_id(int id);
+static void sequence_bank_view_send_slot_update(int bank, int slot, int sample_id, int sample_type);
 static gdouble get_numd(const char *name);
 static int get_nums(const char *name);
 static int get_nums2(GtkWidget *w);
@@ -8196,6 +8198,25 @@ static void sequence_vims_sync_target(void)
         live_frame_count);
 }
 
+static guint sequence_vims_target_sync_idle_id = 0;
+
+static gboolean sequence_vims_target_sync_idle(gpointer user_data)
+{
+    (void)user_data;
+    sequence_vims_target_sync_idle_id = 0;
+    sequence_vims_sync_target();
+    return G_SOURCE_REMOVE;
+}
+
+static void sequence_vims_schedule_target_sync(void)
+{
+    if(sequence_vims_target_sync_idle_id)
+        return;
+
+    sequence_vims_target_sync_idle_id =
+        g_idle_add(sequence_vims_target_sync_idle, NULL);
+}
+
 void vj_gui_vims_pattern_sync_target(void)
 {
     sequence_vims_sync_target();
@@ -13400,6 +13421,24 @@ static gboolean sequence_bank_view_bank_has_content(int bank)
     }
 
     return FALSE;
+}
+
+static void sequence_ui_stop_play_grid_for_clear(int bank)
+{
+    if(!info || bank != sequence_ui_active_bank() ||
+       !sequence_ui_wants_play_grid())
+        return;
+
+    multi_vims(VIMS_SEQUENCE_STATUS, "%d", 0);
+    sequence_ui_sync_play_grid_toggle(0);
+
+    if(info->sequence_bank_view)
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view,
+                                                   FALSE);
+    if(info->vims_pattern_view)
+        gvr_vims_pattern_view_stop_all_playback(info->vims_pattern_view);
+
+    info->sequence_playing = -1;
 }
 
 static void sequence_ui_rearm_play_grid_for_bank(int bank)
@@ -26007,14 +26046,17 @@ static void on_sequence_bank_clear_clicked(GtkWidget *widget, gpointer user_data
     if(bank == sequence_ui_queued_bank())
         sequence_ui_send_bank_queue(-1);
 
+    sequence_ui_stop_play_grid_for_clear(bank);
     multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_clear_bank(info->sequence_bank_view, bank);
     if(info->vims_pattern_view)
         gvr_vims_pattern_view_clear_bank(info->vims_pattern_view, bank);
     sequence_vims_timeline_invalidate(bank);
+    sequence_vims_schedule_target_sync();
     if(bank == sequence_ui_active_bank())
         info->sequence_playing = -1;
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -26345,19 +26387,13 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
     if(id <= 0)
         return;
 
-    int old_id = 0;
-    int old_type = 0;
-    if(info->sequence_bank_view &&
-       gvr_sequence_bank_view_get_slot(info->sequence_bank_view, bank, slot, &old_id, &old_type) &&
-       old_id > 0)
-        return;
-
-    multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d %d", slot, id, type, bank);
+    sequence_bank_view_send_slot_update(bank, slot, id, type);
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, id, type);
     sequence_vims_bind_cell(bank, slot, id, type);
     sequence_vims_timeline_invalidate(bank);
-    sequence_vims_sync_target();
+    sequence_vims_schedule_target_sync();
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -26372,17 +26408,37 @@ static void on_sequence_bank_view_slot_delete(GtkWidget *widget, gint bank, gint
     if(info->vims_pattern_view)
         gvr_vims_pattern_view_clear_cell(info->vims_pattern_view, bank, slot);
     sequence_vims_bind_cell(bank, slot, -1, -1);
+    if(!sequence_bank_view_bank_has_content(bank))
+        sequence_ui_stop_play_grid_for_clear(bank);
     sequence_vims_timeline_invalidate(bank);
-    sequence_vims_sync_target();
+    sequence_vims_schedule_target_sync();
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
 static void sequence_bank_view_send_slot_update(int bank, int slot, int sample_id, int sample_type)
 {
-    if(sample_id > 0)
+    int old_id = 0;
+    int old_type = 0;
+    gboolean occupied = FALSE;
+
+    if(info && info->sequence_bank_view)
+        occupied = gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                                    bank,
+                                                    slot,
+                                                    &old_id,
+                                                    &old_type) && old_id > 0;
+
+    if(sample_id > 0) {
+        if(occupied && old_id == sample_id && old_type == sample_type)
+            return;
+        if(occupied)
+            multi_vims(VIMS_SEQUENCE_DEL, "%d %d", slot, bank);
         multi_vims(VIMS_SEQUENCE_ADD, "%d %d %d %d", slot, sample_id, sample_type, bank);
-    else
+    }
+    else if(occupied) {
         multi_vims(VIMS_SEQUENCE_DEL, "%d %d", slot, bank);
+    }
 }
 
 gboolean vj_gui_sequence_insert_source_at(int bank,
@@ -26463,6 +26519,11 @@ gboolean vj_gui_sequence_insert_source_at(int bank,
 
     gvr_sequence_bank_view_set_selected_bank(info->sequence_bank_view, bank);
     gvr_sequence_bank_view_set_selected_slot(info->sequence_bank_view, bank, slot);
+
+    sequence_vims_timeline_invalidate(bank);
+    sequence_vims_schedule_target_sync();
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 
     vj_msg(VEEJAY_MSG_INFO,
            "Inserted %s %d into sequence bank %d at slot %d",
@@ -26548,7 +26609,7 @@ static void on_sequence_bank_view_slot_reorder(GtkWidget *widget, gint bank, gin
     if(info->vims_pattern_view)
         gvr_vims_pattern_view_swap_cells(info->vims_pattern_view, bank, from_slot, to_slot);
     sequence_vims_timeline_invalidate(bank);
-    sequence_vims_sync_target();
+    sequence_vims_schedule_target_sync();
 
     vj_msg(VEEJAY_MSG_INFO,
            "Swapped sequence bank %d slots %d and %d",
@@ -26584,6 +26645,7 @@ static void sequence_bank_view_copy_bank_to_target(int src_bank, int dst_bank)
     if(info->vims_pattern_view)
         gvr_vims_pattern_view_copy_bank(info->vims_pattern_view, src_bank, dst_bank);
     sequence_vims_timeline_invalidate(dst_bank);
+    sequence_vims_schedule_target_sync();
     sequence_vims_refresh_badges();
 
     vj_msg(VEEJAY_MSG_INFO,
@@ -26641,6 +26703,7 @@ static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpoin
     if(bank == sequence_ui_queued_bank())
         sequence_ui_send_bank_queue(-1);
 
+    sequence_ui_stop_play_grid_for_clear(bank);
     multi_vims(VIMS_SEQUENCE_DEL, "%d %d", -1, bank);
 
     if(info->sequence_bank_view)
@@ -26648,10 +26711,11 @@ static void on_sequence_bank_view_bank_clear(GtkWidget *widget, gint bank, gpoin
     if(info->vims_pattern_view)
         gvr_vims_pattern_view_clear_bank(info->vims_pattern_view, bank);
     sequence_vims_timeline_invalidate(bank);
-    sequence_vims_sync_target();
+    sequence_vims_schedule_target_sync();
 
     if(bank == sequence_ui_active_bank())
         info->sequence_playing = -1;
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -26671,13 +26735,14 @@ static void on_sequence_bank_view_slot_paste(GtkWidget *widget, gint bank, gint 
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, sample_id, sample_type);
     sequence_vims_bind_cell(bank, slot, sample_id, sample_type);
     sequence_vims_timeline_invalidate(bank);
-    sequence_vims_sync_target();
+    sequence_vims_schedule_target_sync();
 
     vj_msg(VEEJAY_MSG_INFO,
            "Pasted sequence entry to bank %d slot %d",
            bank + 1,
            slot + 1);
 
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
 
@@ -26686,6 +26751,35 @@ static void on_sequence_bank_view_refresh(GtkWidget *widget, gpointer user_data)
     (void)widget;
     (void)user_data;
     sequence_vims_timeline_invalidate(-1);
+    info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
+    info->uc.reload_hint[HINT_SEQ_ACT] = 1;
+}
+
+void vj_gui_sequence_clear_all_local(void)
+{
+    if(!info)
+        return;
+
+    sequence_ui_queue_pending = -1;
+    sequence_ui_sync_play_grid_toggle(0);
+
+    if(info->sequence_bank_view) {
+        gvr_sequence_bank_view_clear_all(info->sequence_bank_view);
+        gvr_sequence_bank_view_set_sequence_active(info->sequence_bank_view, FALSE);
+        gvr_sequence_bank_view_set_queued_bank(info->sequence_bank_view, -1);
+    }
+
+    if(info->vims_pattern_view) {
+        gvr_vims_pattern_view_stop_all_playback(info->vims_pattern_view);
+        gvr_vims_pattern_view_clear_all(info->vims_pattern_view);
+        gvr_vims_pattern_view_clear_target(info->vims_pattern_view);
+    }
+
+    sequence_vims_manual_grid_target = FALSE;
+    sequence_vims_manual_grid_bank = -1;
+    sequence_vims_manual_grid_slot = -2;
+    sequence_vims_timeline_invalidate(-1);
+    info->sequence_playing = -1;
     info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }
@@ -26911,6 +27005,10 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
                  bank + 1,
                  slot + 1);
     }
+
+    g_strlcat(text,
+              "\nRight click: overwrite with the selected source, delete, copy, or add a command",
+              sizeof(text));
 
     sequence_vims_append_pattern_tooltip(text, sizeof(text), bank, slot);
     gtk_tooltip_set_text(tooltip, text);

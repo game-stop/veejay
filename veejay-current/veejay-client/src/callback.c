@@ -5114,22 +5114,30 @@ void on_check_autowhitebalance_toggled(GtkWidget *widget, gpointer user_data)
 
 void on_button_seq_clearall_clicked(GtkWidget *w, gpointer data)
 {
+    int playing_slot;
+
     if(prompt_dialog("Clear All Sequence Banks",
                      "Clear all sequence banks?\nThis cannot be undone.") != GTK_RESPONSE_ACCEPT)
         return;
 
+    playing_slot = info->sequence_playing;
+
+    if(info->status_tokens[SEQ_ACT] != 0)
+        multi_vims(VIMS_SEQUENCE_STATUS, "%d", 0);
+
     single_vims(VIMS_SEQUENCE_CLEAR_ALL);
+    vj_gui_sequence_clear_all_local();
 
     if(info->sequencer_view && info->sequencer_view->gui_slot)
     {
         const int n_slots = info->sequencer_col * info->sequencer_row;
 
-        if(info->sequence_playing >= 0 &&
-           info->sequence_playing < n_slots &&
-           info->sequencer_view->gui_slot[info->sequence_playing])
+        if(playing_slot >= 0 &&
+           playing_slot < n_slots &&
+           info->sequencer_view->gui_slot[playing_slot])
         {
             indicate_sequence(FALSE,
-                info->sequencer_view->gui_slot[info->sequence_playing]);
+                info->sequencer_view->gui_slot[playing_slot]);
         }
 
         info->sequence_playing = -1;

@@ -7879,25 +7879,42 @@ void gvr_vims_pattern_view_stop_all_playback(GtkWidget *widget)
     gtk_widget_queue_draw(view->area);
 }
 
+static gboolean gvr_vims_pattern_view_clear_cell_silent(GvrVimsPatternView *view,
+                                                        int bank,
+                                                        int slot)
+{
+    GvrVimsPatternCell *cell;
+
+    if(!view)
+        return FALSE;
+
+    cell = gvr_pattern_cell(view, bank, slot);
+    if(!cell)
+        return FALSE;
+
+    gvr_pattern_cell_clear_data(cell);
+    gvr_pattern_clear_playback_highlight_for(view, bank, slot);
+    return TRUE;
+}
+
 void gvr_vims_pattern_view_clear_cell(GtkWidget *widget,
                                       int bank,
                                       int slot)
 {
     GvrVimsPatternView *view;
-    GvrVimsPatternCell *cell;
 
     if(!GVR_IS_VIMS_PATTERN_VIEW(widget))
         return;
 
     view = GVR_VIMS_PATTERN_VIEW(widget);
-    cell = gvr_pattern_cell(view, bank, slot);
-    if(!cell)
+    if(!gvr_pattern_cell(view, bank, slot))
         return;
 
     gvr_pattern_history_invalidate_target(view,
                                           bank,
                                           slot);
-    gvr_pattern_cell_clear_data(cell);
+    if(!gvr_vims_pattern_view_clear_cell_silent(view, bank, slot))
+        return;
     gvr_pattern_emit_changed(view, bank, slot);
     if(bank == view->selected_bank && slot == view->selected_slot)
         gvr_pattern_sync_loop_controls(view);
@@ -7905,21 +7922,36 @@ void gvr_vims_pattern_view_clear_cell(GtkWidget *widget,
 
 void gvr_vims_pattern_view_clear_bank(GtkWidget *widget, int bank)
 {
+    gboolean selected_target;
+
     if(!GVR_IS_VIMS_PATTERN_VIEW(widget) || bank < 0 || bank >= GVR_VIMS_PATTERN_BANKS)
         return;
 
     GvrVimsPatternView *view = GVR_VIMS_PATTERN_VIEW(widget);
+    selected_target = view->selected_bank == bank ||
+                      (view->selected_bank == GVR_VIMS_PATTERN_SEQUENCE_BANK &&
+                       view->selected_slot == bank);
+
+    if(selected_target) {
+        gvr_pattern_history_reset(view);
+        gvr_pattern_selection_clear(view);
+    }
+
     for(int slot = 0; slot < GVR_VIMS_PATTERN_SLOTS; slot++)
-        gvr_vims_pattern_view_clear_cell(widget, bank, slot);
+        gvr_vims_pattern_view_clear_cell_silent(view, bank, slot);
 
-    gvr_vims_pattern_view_clear_cell(widget,
-                                     GVR_VIMS_PATTERN_SEQUENCE_BANK,
-                                     bank);
+    gvr_vims_pattern_view_clear_cell_silent(view,
+                                            GVR_VIMS_PATTERN_SEQUENCE_BANK,
+                                            bank);
+    gvr_pattern_emit_changed(view,
+                             GVR_VIMS_PATTERN_SEQUENCE_BANK,
+                             bank);
 
-    if(view->selected_bank == bank ||
-       (view->selected_bank == GVR_VIMS_PATTERN_SEQUENCE_BANK &&
-        view->selected_slot == bank))
+    if(selected_target) {
+        gvr_pattern_update_target_label(view);
+        gvr_pattern_sync_loop_controls(view);
         gtk_widget_queue_draw(view->area);
+    }
 }
 
 void gvr_vims_pattern_view_clear_all(GtkWidget *widget)

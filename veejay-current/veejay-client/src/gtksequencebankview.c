@@ -1707,6 +1707,16 @@ static void gvr_sequence_bank_view_popup_menu(GtkWidget *widget,
             have_slot_section = TRUE;
         }
 
+        if(selected_slot_filled) {
+            gvr_sequence_bank_view_menu_item(menu,
+                                             "Overwrite with selected source",
+                                             widget,
+                                             GVR_SEQUENCE_MENU_ASSIGN,
+                                             -1,
+                                             TRUE);
+            have_slot_section = TRUE;
+        }
+
         if(can_paste) {
             gvr_sequence_bank_view_menu_item(menu,
                                              "Paste here",
