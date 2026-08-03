@@ -10,15 +10,14 @@ The backend performs frame-oriented video processing in planar YUV and exposes i
 
 | Component | Purpose |
 | --- | --- |
-| [`veejay-core`](./veejay-core) | Shared memory, networking, frame, audio, protocol, and utility libraries used by the other components. |
-| [`veejay-server`](./veejay-server) | The `veejay` real-time video engine, sampler, FX host, recorder, stream processor, and VIMS server. |
-| [`veejay-client`](./veejay-client) | **Reloaded**, the GTK3 graphical client for live control and editing. |
-| [`veejay-utils`](./veejay-utils) | Command-line tools, including `sayVIMS`, for scripting and direct VIMS interaction. |
-| [`veejay-eidolon`](./veejay-eidolon) | **Eidolon**, an experimental apprentice Auto-VJ that builds and mutates FX chains while observing beat, performance, feedback, and the real-time frame budget. |
-| [`veejay-director`](./veejay-director) | **Director**, the multi-instance show and venue manager for output routing, projection mapping, projector calibration, and camera-assisted alignment. |
-| [`sendVIMS`](./sendVIMS) | A Pure Data external for sending event-style VIMS commands and receiving backend status. |
-| [`plugin-packs`](./plugin-packs) | Optional LiViDO/GMIC/crop/shared-resource/ASCII-art plugin collections. |
-
+| [`veejay-core`](veejay-current/veejay-core/README.md) | Shared memory, networking, frame, audio, protocol, and utility libraries used by the other components. |
+| [`veejay-server`](veejay-current/veejay-server/README.md) | The `veejay` real-time video engine, sampler, FX host, recorder, stream processor, and VIMS server. |
+| [`veejay-client`](veejay-current/veejay-client/README.md) | **Reloaded**, the GTK3 graphical client for live control and editing. |
+| [`veejay-utils`](veejay-current/veejay-utils/README.md) | Command-line tools, including `sayVIMS`, for scripting and direct VIMS interaction. |
+| [`veejay-eidolon`](veejay-current/veejay-eidolon/README.md) | **Eidolon**, an experimental apprentice Auto-VJ that builds and mutates FX chains while observing beat, performance, feedback, and the real-time frame budget. |
+| [`veejay-director`](veejay-current/veejay-director/README.md) | **Director**, the multi-instance show and venue manager for output routing, projection mapping, projector calibration, and camera-assisted alignment. |
+| [`sendVIMS`](veejay-current/sendVIMS/README.md) | A Pure Data external for sending event-style VIMS commands and receiving backend status. |
+| [`plugin-packs`](veejay-current/plugin-packs/README.md) | Optional LiViDO/GMIC/crop/shared-resource/ASCII-art plugin collections. |
 
 ## Feature overview
 
