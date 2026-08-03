@@ -518,7 +518,7 @@ hnode_t *hash_scan_next(hscan_t *scan)
 	if (next->next) {	/* 4 */
 	    scan->next = next->next;
 	} else {
-            hash_val_t chain = scan->chain + 1;
+            hash_val_t chain = (next->hkey & hash->mask) + 1;
 	    while (chain < nchains && hash->table[chain] == 0)	/* 5 */
 	    	chain++;
 	    if (chain < nchains) {	/* 6 */
