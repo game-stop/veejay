@@ -96,6 +96,7 @@ build_autogen_project "veejay-server"
 build_autogen_project "veejay-client"
 build_autogen_project "veejay-utils"
 build_autogen_project "veejay-eidolon"
+build_autogen_project "veejay-director"
 
 build_make_project "sendVIMS"
 
