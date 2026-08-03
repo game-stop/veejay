@@ -686,7 +686,7 @@ avi_t* AVI_open_output_file(char * filename)
   // AVI->fdes = open(filename, O_RDWR|O_CREAT|O_BINARY,
     //                S_IRUSR | S_IWUSR | S_IGRP | S_IROTH);
 
-	AVI->fdes = open(filename, O_RDWR | O_CREAT | O_BINARY, 0644 );
+	AVI->fdes = open(filename, O_RDWR | O_CREAT | O_BINARY, 0600 );
    
    if (AVI->fdes < 0)
    {
