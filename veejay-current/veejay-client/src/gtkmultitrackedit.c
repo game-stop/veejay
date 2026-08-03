@@ -701,11 +701,15 @@ static void gvr_mt_set_button_icon(GtkWidget *button, const char *icon_name)
 {
     GtkWidget *image;
 
-    if(!button || !GTK_IS_BUTTON(button))
+    if(!button)
+        return;
+    if(!GTK_IS_BUTTON(button))
         return;
 
     image = gtk_button_get_image(GTK_BUTTON(button));
-    if(!image || !GTK_IS_IMAGE(image)) {
+    if(!image)
+        return;
+    if(!GTK_IS_IMAGE(image)) {
         image = gtk_image_new();
         gtk_button_set_image(GTK_BUTTON(button), image);
     }

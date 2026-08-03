@@ -737,7 +737,9 @@ static void gvr_edit_list_update_playhead_summary(GvrEditListView *view)
     gchar *position;
     gchar *playhead;
 
-    if(!view || !GTK_IS_LABEL(view->playhead_label))
+    if(!view)
+        return;
+    if(!GTK_IS_LABEL(view->playhead_label))
         return;
 
     position = gvr_edit_list_format_time(view, view->playhead);

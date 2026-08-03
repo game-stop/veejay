@@ -2319,7 +2319,9 @@ static void gvr_vims_view_set_text(GtkWidget *view, const char *text)
     GtkTextBuffer *buffer;
     GtkTextIter start;
 
-    if(!view || !GTK_IS_TEXT_VIEW(view))
+    if(!view)
+        return;
+    if(!GTK_IS_TEXT_VIEW(view))
         return;
     buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
     gtk_text_buffer_set_text(buffer, text ? text : "", -1);

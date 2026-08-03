@@ -91,7 +91,12 @@ static void vj_midi_send_toggle_vims(vmidi_t *v, dvims_t *d, int *data)
     }
 
     GtkWidget *toggle = glade_xml_get_widget_(v->mw, d->widget);
-    if(!toggle || !GTK_IS_TOGGLE_BUTTON(toggle)) {
+    if(!toggle) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned widget '%s' is not a toggle button",
+               data[0], data[1], data[2], d->widget);
+        return;
+    }
+    if(!GTK_IS_TOGGLE_BUTTON(toggle)) {
         vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned widget '%s' is not a toggle button",
                data[0], data[1], data[2], d->widget);
         return;
@@ -119,7 +124,12 @@ static void vj_midi_send_dual_toggle_vims(vmidi_t *v, dvims_t *d, int *data)
     }
 
     GtkWidget *toggle = glade_xml_get_widget_(v->mw, d->widget);
-    if(!toggle || !GTK_IS_TOGGLE_BUTTON(toggle)) {
+    if(!toggle) {
+        vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned widget '%s' is not a toggle button",
+               data[0], data[1], data[2], d->widget);
+        return;
+    }
+    if(!GTK_IS_TOGGLE_BUTTON(toggle)) {
         vj_msg(VEEJAY_MSG_ERROR, "MIDI %x:%x,%x -> learned widget '%s' is not a toggle button",
                data[0], data[1], data[2], d->widget);
         return;

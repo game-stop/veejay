@@ -6547,7 +6547,11 @@ gtk3_curve_live_trace_priv(GtkWidget *widget)
 {
   Gtk3Curve *curve;
 
-  if (!widget || !GTK_IS_WIDGET(widget) || !GTK3_IS_CURVE(widget))
+  if (!widget)
+    return NULL;
+  if (!GTK_IS_WIDGET(widget))
+    return NULL;
+  if (!GTK3_IS_CURVE(widget))
     return NULL;
 
   curve = GTK3_CURVE(widget);

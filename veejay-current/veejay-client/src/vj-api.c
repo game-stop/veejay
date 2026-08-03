@@ -2654,7 +2654,9 @@ static void fx_box_clear(GtkWidget *box)
     GList *children;
     GList *iter;
 
-    if(!box || !GTK_IS_CONTAINER(box))
+    if(!box)
+        return;
+    if(!GTK_IS_CONTAINER(box))
         return;
 
     children = gtk_container_get_children(GTK_CONTAINER(box));
@@ -2727,7 +2729,11 @@ static void nav_reparent_widget(GtkWidget *child, GtkWidget *new_parent)
 {
     GtkWidget *old_parent;
 
-    if(!child || !new_parent || !GTK_IS_CONTAINER(new_parent))
+    if(!child)
+        return;
+    if(!new_parent)
+        return;
+    if(!GTK_IS_CONTAINER(new_parent))
         return;
 
     old_parent = gtk_widget_get_parent(child);
@@ -2743,7 +2749,11 @@ static void nav_reparent_widget(GtkWidget *child, GtkWidget *new_parent)
 
 static void nav_pack_box(GtkWidget *box, GtkWidget *child, gboolean expand, gboolean fill, guint padding)
 {
-    if(!box || !child || !GTK_IS_BOX(box))
+    if(!box)
+        return;
+    if(!child)
+        return;
+    if(!GTK_IS_BOX(box))
         return;
 
     nav_reparent_widget(child, box);
@@ -2894,7 +2904,13 @@ static void fx_entry_split_size_allocate(GtkWidget *widget, GdkRectangle *alloca
 {
     (void)data;
 
-    if(!widget || !GTK_IS_PANED(widget) || !allocation || allocation->height <= 0)
+    if(!widget)
+        return;
+    if(!GTK_IS_PANED(widget))
+        return;
+    if(!allocation)
+        return;
+    if(allocation->height <= 0)
         return;
 
     int target = fx_entry_split_target_position(allocation->height);
@@ -2912,7 +2928,13 @@ static void init_fx_panel_split_layout(void)
     GtkWidget *fx_list_box;
     GtkWidget *split;
 
-    if(!vbox || !fx_entry || !notebook || !GTK_IS_BOX(vbox))
+    if(!vbox)
+        return;
+    if(!fx_entry)
+        return;
+    if(!notebook)
+        return;
+    if(!GTK_IS_BOX(vbox))
         return;
 
     if(gtk_widget_get_parent(fx_entry) != vbox)
@@ -2979,7 +3001,17 @@ static void init_fx_param_step_buttons(void)
         GtkWidget *step_box = NULL;
         GtkWidget *slider_stack = NULL;
 
-        if(!frame || !box || !slider || !inc || !dec || !GTK_IS_BOX(box))
+        if(!frame)
+            continue;
+        if(!box)
+            continue;
+        if(!slider)
+            continue;
+        if(!inc)
+            continue;
+        if(!dec)
+            continue;
+        if(!GTK_IS_BOX(box))
             continue;
 
         snprintf(name, sizeof(name), "frame_p%d", i);
@@ -3619,7 +3651,9 @@ static void add_class_by_name(const char *widget_name, const char *name) {
 
 static void ui_size_probe_widget(const char *name, GtkWidget *widget)
 {
-    if(!widget || !GTK_IS_WIDGET(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_WIDGET(widget))
         return;
 
     GtkRequisition min_req;
@@ -4445,7 +4479,9 @@ static void ui_compact_fx_panel(void)
         GtkWidget *w = glade_xml_get_widget_(info->main_window, scrolls[i]);
         GtkWidget *parent;
 
-        if(!w || !GTK_IS_SCROLLED_WINDOW(w))
+        if(!w)
+            continue;
+        if(!GTK_IS_SCROLLED_WINDOW(w))
             continue;
 
         gtk_widget_set_size_request(w, -1, 76);
@@ -4700,7 +4736,13 @@ static void combo_replace_texts(GtkWidget *combo, const char * const *items, int
     GtkTreeModel *model;
     int column;
 
-    if(!combo || !GTK_IS_COMBO_BOX(combo) || !items || n_items <= 0)
+    if(!combo)
+        return;
+    if(!GTK_IS_COMBO_BOX(combo))
+        return;
+    if(!items)
+        return;
+    if(n_items <= 0)
         return;
 
     model = gtk_combo_box_get_model(GTK_COMBO_BOX(combo));
@@ -4713,7 +4755,9 @@ static void combo_replace_texts(GtkWidget *combo, const char * const *items, int
         return;
     }
 
-    if(!model || !GTK_IS_LIST_STORE(model))
+    if(!model)
+        return;
+    if(!GTK_IS_LIST_STORE(model))
         return;
 
     column = combo_model_string_column(model);
@@ -5225,7 +5269,9 @@ static GtkWidget *ui_transition_shape_selector_replace(int cache_id)
         return NULL;
 
     parent = gtk_widget_get_parent(old_widget);
-    if(!parent || !GTK_IS_CONTAINER(parent))
+    if(!parent)
+        return NULL;
+    if(!GTK_IS_CONTAINER(parent))
         return NULL;
 
     selector = gvr_shape_selector_new();
@@ -5577,7 +5623,9 @@ static gboolean set_progress_bar_fraction_by_name(const char *name, gdouble val)
         return FALSE;
 
     w = glade_xml_get_widget_(info->main_window, name);
-    if(!w || !GTK_IS_PROGRESS_BAR(w))
+    if(!w)
+        return FALSE;
+    if(!GTK_IS_PROGRESS_BAR(w))
         return FALSE;
 
     val = (val < 0.0) ? 0.0 : ((val > 1.0) ? 1.0 : val);
@@ -6267,7 +6315,9 @@ cleanup:
 
 static void record_audio_source_set_radio_local(GtkWidget *w, int active)
 {
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     active = active ? 1 : 0;
@@ -6322,7 +6372,9 @@ static void audio_input_selector_set_from_record_source_local(int source)
     GtkWidget *w = widget_cache[WIDGET_AUDIO_INPUT_SELECTOR_COMBO];
     int active;
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     active = audio_input_selector_active_from_record_source_local(source);
@@ -8972,7 +9024,9 @@ static void vj_kf_set_curve_type_button_locked(Gtk3CurveType curve_type)
             break;
     }
 
-    if(!button || !GTK_IS_TOGGLE_BUTTON(button))
+    if(!button)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(button))
         return;
 
     info->status_lock = 1;
@@ -9292,7 +9346,9 @@ static void update_slider_value2(GtkWidget *w, gint value, gint scale)
     else
         gvalue = (gdouble) value;
 
-    if(!w || !GTK_IS_RANGE(w))
+    if(!w)
+        return;
+    if(!GTK_IS_RANGE(w))
         return;
 
     GtkAdjustment *a = gtk_range_get_adjustment(GTK_RANGE(w));
@@ -9344,7 +9400,9 @@ static void update_spin_incr( const char *name, gdouble step, gdouble page )
 
 static void update_spin_range2(GtkWidget *w, gint min, gint max, gint val)
 {
-    if(!w || !GTK_IS_SPIN_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_SPIN_BUTTON(w))
         return;
 
     GtkAdjustment *a = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(w));
@@ -9478,7 +9536,9 @@ static void update_slider_range(const char *name, gint min, gint max, gint value
 static void update_label_i2(GtkWidget *label, int num, int prefix)
 {
     char str[20];
-    if(!label || !GTK_IS_LABEL(label))
+    if(!label)
+        return;
+    if(!GTK_IS_LABEL(label))
         return;
 
     if(prefix)
@@ -9497,7 +9557,9 @@ static void ui_set_toggle_active_if_changed(int widget_id, int active)
     GtkWidget *w = widget_cache[widget_id];
     gboolean wanted = active ? TRUE : FALSE;
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == wanted)
@@ -9561,7 +9623,11 @@ static void update_label_str2(GtkWidget *label, const char *text)
     assert(label != NULL);
     assert(GTK_IS_LABEL(label));
 #else
-    if(!label || !GTK_IS_LABEL(label) || !text)
+    if(!label)
+        return;
+    if(!GTK_IS_LABEL(label))
+        return;
+    if(!text)
         return;
 #endif
 
@@ -9697,11 +9763,15 @@ static void fx_chain_panel_toggle_update_icon(GtkWidget *toggle)
     GdkPixbuf *pixbuf;
     gboolean active;
 
-    if(!toggle || !GTK_IS_TOGGLE_BUTTON(toggle))
+    if(!toggle)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(toggle))
         return;
 
     image = g_object_get_data(G_OBJECT(toggle), FX_CHAIN_PANEL_IMAGE_DATA);
-    if(!image || !GTK_IS_IMAGE(image))
+    if(!image)
+        return;
+    if(!GTK_IS_IMAGE(image))
         return;
 
     active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(toggle));
@@ -9730,7 +9800,12 @@ static void fx_chain_panel_toggle_mount(void)
         return;
 
     container = glade_xml_get_widget_(info->main_window, "hbox650");
-    if(!container || !GTK_IS_BOX(container)) {
+    if(!container) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Unable to mount FX-chain toggle: hbox650 is missing or not a GtkBox");
+        return;
+    }
+    if(!GTK_IS_BOX(container)) {
         veejay_msg(VEEJAY_MSG_WARNING,
                    "Unable to mount FX-chain toggle: hbox650 is missing or not a GtkBox");
         return;
@@ -9861,12 +9936,16 @@ static void clear_chain_row_in_tree(int entry)
 
     GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_chain");
 
-    if(!tree || !GTK_IS_TREE_VIEW(tree))
+    if(!tree)
+        return;
+    if(!GTK_IS_TREE_VIEW(tree))
         return;
 
     GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
 
-    if(!model || !GTK_IS_LIST_STORE(model))
+    if(!model)
+        return;
+    if(!GTK_IS_LIST_STORE(model))
         return;
 
     GtkTreeIter iter;
@@ -9956,7 +10035,9 @@ static void refresh_selected_chain_row_from_status(void)
 {
     GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_chain");
 
-    if(!tree || !GTK_IS_TREE_VIEW(tree))
+    if(!tree)
+        return;
+    if(!GTK_IS_TREE_VIEW(tree))
         return;
 
     GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
@@ -9986,7 +10067,9 @@ static void set_widget_sensitive_cached(int widget_id, int sensitive)
         return;
 
     w = widget_cache[widget_id];
-    if(!w || !GTK_IS_WIDGET(w))
+    if(!w)
+        return;
+    if(!GTK_IS_WIDGET(w))
         return;
 
     if(gtk_widget_get_sensitive(w) != wanted)
@@ -10147,7 +10230,9 @@ static void stream_source_page_set_available(gboolean available)
     source_page = GTK_WIDGET(glade_xml_get_widget_(info->main_window,
                                                     "stream_source_page"));
 
-    if(!GTK_IS_NOTEBOOK(notebook_widget) || !GTK_IS_WIDGET(source_page))
+    if(!GTK_IS_NOTEBOOK(notebook_widget))
+        return;
+    if(!GTK_IS_WIDGET(source_page))
         return;
 
     source_page_num = gtk_notebook_page_num(GTK_NOTEBOOK(notebook_widget), source_page);
@@ -13144,7 +13229,9 @@ static void sequence_ui_sync_play_grid_toggle(int active)
 
     sequence_ui_set_play_grid_requested(active != 0);
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     if(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) == (active != 0))
@@ -13169,7 +13256,9 @@ static void sequence_ui_sync_bank_buttons(int active_bank, int mask)
     sequence_ui_bank_button_sync = 1;
     for(int bank = 0; bank < VJ_SEQUENCE_BANKS; bank++) {
         GtkWidget *button = sequence_ui_bank_buttons[bank];
-        if(!button || !GTK_IS_TOGGLE_BUTTON(button))
+        if(!button)
+            continue;
+        if(!GTK_IS_TOGGLE_BUTTON(button))
             continue;
 
         gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(button),
@@ -15125,7 +15214,9 @@ static void vims_mount_view(void)
         return;
 
     panel = glade_xml_get_widget_(info->main_window, "vims_panel");
-    if(!panel || !GTK_IS_BOX(panel))
+    if(!panel)
+        return;
+    if(!GTK_IS_BOX(panel))
         return;
 
     GList *children = gtk_container_get_children(GTK_CONTAINER(panel));
@@ -15617,7 +15708,9 @@ static void edit_list_attach_to_playmode(int play_mode)
               : "edit_list_view_host";
     host = glade_xml_get_widget_(info->main_window, host_name);
 
-    if(!host || !GTK_IS_BOX(host))
+    if(!host)
+        return;
+    if(!GTK_IS_BOX(host))
         return;
 
     if(edit_list_attached_playmode != play_mode ||
@@ -15993,7 +16086,11 @@ static void edit_list_mount_view(void)
         return;
 
     host = glade_xml_get_widget_(info->main_window, "edit_list_view_host");
-    if(!host || !GTK_IS_BOX(host)) {
+    if(!host) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Edit List host widget not found");
+        return;
+    }
+    if(!GTK_IS_BOX(host)) {
         veejay_msg(VEEJAY_MSG_ERROR, "Edit List host widget not found");
         return;
     }
@@ -16032,7 +16129,11 @@ static void media_view_mount(void)
         return;
 
     host = glade_xml_get_widget_(info->main_window, "media_view_host");
-    if(!host || !GTK_IS_BOX(host)) {
+    if(!host) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Media host widget not found");
+        return;
+    }
+    if(!GTK_IS_BOX(host)) {
         veejay_msg(VEEJAY_MSG_ERROR, "Media host widget not found");
         return;
     }
@@ -16587,7 +16688,9 @@ static void recorder_progress_sync(const char *name, int active, int recorded, i
     char text[64];
     gdouble fraction = 0.0;
 
-    if(!w || !GTK_IS_PROGRESS_BAR(w))
+    if(!w)
+        return;
+    if(!GTK_IS_PROGRESS_BAR(w))
         return;
 
     if(active && total > 0)
@@ -16868,7 +16971,9 @@ static void ui_sync_playmode_panel_pages(int pm)
     GtkWidget *n = widget_cache[WIDGET_PANELS];
     int page_needed = ui_playmode_panel_page(pm);
 
-    if(!n || !GTK_IS_NOTEBOOK(n))
+    if(!n)
+        return;
+    if(!GTK_IS_NOTEBOOK(n))
         return;
 
     for(int i = 0; i < 3; i++)
@@ -16951,7 +17056,9 @@ static void update_status_accessibility(int old_pm, int new_pm, int force)
 
 static GtkWidget *playmode_find_tab_label(GtkWidget *widget)
 {
-    if(!widget || !GTK_IS_WIDGET(widget))
+    if(!widget)
+        return NULL;
+    if(!GTK_IS_WIDGET(widget))
         return NULL;
 
     if(GTK_IS_LABEL(widget))
@@ -17155,7 +17262,9 @@ static void audio_beat_set_label_s(int widget_id, const char *txt)
 {
     GtkWidget *w = widget_cache[widget_id];
 
-    if(!w || !GTK_IS_LABEL(w))
+    if(!w)
+        return;
+    if(!GTK_IS_LABEL(w))
         return;
 
     gtk_label_set_text(GTK_LABEL(w), txt ? txt : "");
@@ -17167,7 +17276,9 @@ static void audio_beat_set_toggle(int widget_id, int value)
     GtkWidget *w = widget_cache[widget_id];
     int old_lock;
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     value = value ? 1 : 0;
@@ -17335,7 +17446,9 @@ static int audio_beat_status_monitor_latency_auto_active(void)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_BEAT_MONITOR_LATENCY_AUTO_TOGGLE];
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return 1;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return 1;
 
     return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w)) ? 1 : 0;
@@ -17429,7 +17542,9 @@ static void audio_beat_set_action_combo_from_status(int action)
 
     audio_beat_status_update_action_sensitivity(action);
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     const int combo_index = audio_beat_status_combo_index_from_action(action);
@@ -17531,7 +17646,11 @@ static void audio_beat_curve_live_stop(void)
         return;
 
     curve = info->curve;
-    if(!curve || !GTK_IS_WIDGET(curve) || !GTK3_IS_CURVE(curve))
+    if(!curve)
+        return;
+    if(!GTK_IS_WIDGET(curve))
+        return;
+    if(!GTK3_IS_CURVE(curve))
         return;
 
     gtk3_curve_live_trace_set_domain(curve,
@@ -17948,7 +18067,11 @@ static void audio_beat_update_curve_live_traces(gboolean push_samples)
         return;
 
     curve = info->curve;
-    if(!curve || !GTK_IS_WIDGET(curve) || !GTK3_IS_CURVE(curve))
+    if(!curve)
+        return;
+    if(!GTK_IS_WIDGET(curve))
+        return;
+    if(!GTK3_IS_CURVE(curve))
         return;
 
     if(!info->status_tokens[AUDIO_BEAT_ENABLED] ||
@@ -18341,7 +18464,9 @@ static void audio_sync_set_combo(int widget_id, int active)
     GtkWidget *w = widget_cache[widget_id];
     int old_lock;
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     if(active < 0)
@@ -18520,7 +18645,9 @@ static int audio_mixer_mode_from_ui_local(void)
         return 3;
     }
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return 0;
+    if(!GTK_IS_COMBO_BOX(w))
         return 0;
 
     mode = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
@@ -18532,7 +18659,9 @@ static int audio_sync_combo_active_local(int widget_id, int fallback)
     GtkWidget *w = widget_cache[widget_id];
     int active;
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_COMBO_BOX(w))
         return fallback;
 
     active = gtk_combo_box_get_active(GTK_COMBO_BOX(w));
@@ -18562,7 +18691,9 @@ static int audio_sync_mode_ui_local(int fallback)
 {
     GtkWidget *w = widget_cache[WIDGET_AUDIO_SYNC_MODE_COMBO];
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_COMBO_BOX(w))
         return fallback;
 
     return audio_sync_mode_from_combo_active_local(
@@ -18765,7 +18896,9 @@ static void audio_sync_set_spin_d(int widget_id, gdouble value)
     GtkWidget *w = widget_cache[widget_id];
     int old_lock;
 
-    if(!w || !GTK_IS_SPIN_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_SPIN_BUTTON(w))
         return;
 
     if(fabs(gtk_spin_button_get_value(GTK_SPIN_BUTTON(w)) - value) < 0.0001)
@@ -18835,7 +18968,9 @@ static void sample_audio_sync_status_set_combo(const char *name, int active)
 {
     GtkWidget *w = sample_audio_sync_named_widget(name);
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return;
+    if(!GTK_IS_COMBO_BOX(w))
         return;
 
     gtk_combo_box_set_active(GTK_COMBO_BOX(w), active);
@@ -18845,7 +18980,9 @@ static void sample_audio_sync_status_set_spin(const char *name, int value)
 {
     GtkWidget *w = sample_audio_sync_named_widget(name);
 
-    if(!w || !GTK_IS_SPIN_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_SPIN_BUTTON(w))
         return;
 
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(w), (gdouble)value);
@@ -18863,7 +19000,9 @@ static int sample_audio_sync_status_combo_active(const char *name, int fallback)
 {
     GtkWidget *w = sample_audio_sync_named_widget(name);
 
-    if(!w || !GTK_IS_COMBO_BOX(w))
+    if(!w)
+        return fallback;
+    if(!GTK_IS_COMBO_BOX(w))
         return fallback;
 
     return gtk_combo_box_get_active(GTK_COMBO_BOX(w));
@@ -19922,7 +20061,9 @@ static void fx_beat_owner_set_guarded(int param, int active, int sensitive, int 
     char tip[256];
     const char *name = NULL;
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     active = active ? 1 : 0;
@@ -20082,7 +20223,9 @@ static void kf_param_combo_set_active_guarded(GtkWidget *kf_param, gint active)
 {
     int old_lock;
 
-    if(!kf_param || !GTK_IS_COMBO_BOX(kf_param))
+    if(!kf_param)
+        return;
+    if(!GTK_IS_COMBO_BOX(kf_param))
         return;
 
     if(gtk_combo_box_get_active(GTK_COMBO_BOX(kf_param)) == active)
@@ -20099,7 +20242,9 @@ static void kf_param_combo_rebuild_if_needed(GtkWidget *kf_param, int fx_id, int
     int old_lock;
     char kf_param_text[20];
 
-    if(!kf_param || !GTK_IS_COMBO_BOX_TEXT(kf_param))
+    if(!kf_param)
+        return;
+    if(!GTK_IS_COMBO_BOX_TEXT(kf_param))
         return;
 
     if(kf_param_combo_cached_fx_id == fx_id &&
@@ -20395,7 +20540,9 @@ static void sync_chain_entry_beat_toggle_from_status(void)
     GtkWidget *w = widget_cache[WIDGET_CHAIN_ENTRY_BEAT_TOGGLE];
     int *p = &(info->uc.entry_tokens[0]);
 
-    if(!w || !GTK_IS_TOGGLE_BUTTON(w))
+    if(!w)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(w))
         return;
 
     int active = p[ENTRY_BEAT_FLAG] ? 1 : 0;
@@ -21423,11 +21570,15 @@ void vj_gui_wipe(void)
 
 GtkWidget *new_bank_pad(GtkWidget *box)
 {
-    if(!box || !GTK_IS_BOX(box))
+    if(!box)
+        return NULL;
+    if(!GTK_IS_BOX(box))
         return NULL;
 
     GtkWidget *pad = gvr_sample_bank_view_new();
-    if(!pad || !GTK_IS_WIDGET(pad))
+    if(!pad)
+        return NULL;
+    if(!GTK_IS_WIDGET(pad))
         return NULL;
 
     add_class(pad, "samplebank-view");
@@ -21599,7 +21750,9 @@ static void ui_window_preferred_minimum(GtkWidget *mainw, int *w, int *h)
     *w = ui_default_target_w_;
     *h = ui_default_target_h_;
 
-    if(!mainw || !GTK_IS_WIDGET(mainw))
+    if(!mainw)
+        return;
+    if(!GTK_IS_WIDGET(mainw))
         return;
 
     gtk_widget_get_preferred_size(mainw, &min_req, &nat_req);
@@ -21615,7 +21768,9 @@ static void ui_window_set_startup_size(GtkWidget *mainw)
     int min_w = ui_default_target_w_;
     int min_h = ui_default_target_h_;
 
-    if(!mainw || !GTK_IS_WINDOW(mainw))
+    if(!mainw)
+        return;
+    if(!GTK_IS_WINDOW(mainw))
         return;
 
     gtk_window_set_resizable(GTK_WINDOW(mainw), TRUE);
@@ -21635,7 +21790,9 @@ static void ui_window_log_startup_size(GtkWidget *mainw, const char *stage)
     int min_w = ui_default_target_w_;
     int min_h = ui_default_target_h_;
 
-    if(!mainw || !GTK_IS_WINDOW(mainw))
+    if(!mainw)
+        return;
+    if(!GTK_IS_WINDOW(mainw))
         return;
 
     ui_window_preferred_minimum(mainw, &min_w, &min_h);
@@ -22207,7 +22364,13 @@ static void samplebank_action_reparent(GtkWidget *widget,
 {
     GtkWidget *old_parent;
 
-    if(!widget || !parent || !GTK_IS_WIDGET(widget) || !GTK_IS_BOX(parent))
+    if(!widget)
+        return;
+    if(!parent)
+        return;
+    if(!GTK_IS_WIDGET(widget))
+        return;
+    if(!GTK_IS_BOX(parent))
         return;
 
     old_parent = gtk_widget_get_parent(widget);
@@ -22362,9 +22525,11 @@ static GtkWidget *samplebank_action_layout_mount(void)
         glade_xml_get_widget_(info->main_window,
                               "samplebank_footer");
 
-    if(!layout->page ||
-       !layout->host ||
-       !GTK_IS_BOX(layout->host))
+    if(!layout->page)
+        return layout->host;
+    if(!layout->host)
+        return layout->host;
+    if(!GTK_IS_BOX(layout->host))
         return layout->host;
 
     gtk_orientable_set_orientation(
@@ -22479,7 +22644,9 @@ static GtkWidget *samplebank_action_layout_mount(void)
 
 static void detachable_preserve_hidden_descendants(GtkWidget *widget)
 {
-    if(!widget || !GTK_IS_WIDGET(widget))
+    if(!widget)
+        return;
+    if(!GTK_IS_WIDGET(widget))
         return;
 
     if(!gtk_widget_get_visible(widget))
@@ -22525,7 +22692,9 @@ static gint detachable_notebook_real_page_count(GtkNotebook *notebook)
 {
     gint count = 0;
 
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+    if(!notebook)
+        return 0;
+    if(!GTK_IS_NOTEBOOK(notebook))
         return 0;
 
     gint n_pages = gtk_notebook_get_n_pages(notebook);
@@ -22542,7 +22711,9 @@ static gint detachable_notebook_real_page_count(GtkNotebook *notebook)
 
 static gint detachable_notebook_first_real_page(GtkNotebook *notebook)
 {
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+    if(!notebook)
+        return -1;
+    if(!GTK_IS_NOTEBOOK(notebook))
         return -1;
 
     gint n_pages = gtk_notebook_get_n_pages(notebook);
@@ -22570,7 +22741,9 @@ static gboolean detachable_notebook_current_page_is_placeholder(GtkNotebook *not
     gint page_num;
     GtkWidget *page;
 
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+    if(!notebook)
+        return FALSE;
+    if(!GTK_IS_NOTEBOOK(notebook))
         return FALSE;
 
     page_num = gtk_notebook_get_current_page(notebook);
@@ -22585,7 +22758,9 @@ static void detachable_notebook_update_visibility(GtkNotebook *notebook)
 {
     GtkWidget *widget;
 
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+    if(!notebook)
+        return;
+    if(!GTK_IS_NOTEBOOK(notebook))
         return;
 
     if(g_object_get_data(G_OBJECT(notebook), VJ_DETACH_DATA_DETACHED_NOTEBOOK))
@@ -22604,7 +22779,9 @@ static void detachable_notebook_update_visibility(GtkNotebook *notebook)
 
 static gchar *detachable_label_text(GtkWidget *widget)
 {
-    if(!widget || !GTK_IS_WIDGET(widget))
+    if(!widget)
+        return NULL;
+    if(!GTK_IS_WIDGET(widget))
         return NULL;
 
     if(GTK_IS_LABEL(widget)) {
@@ -22645,7 +22822,11 @@ static gchar *detachable_widget_name(GtkWidget *widget)
 
 static gboolean detachable_notebook_is_internal(GtkNotebook *notebook)
 {
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook) || !GTK_IS_BUILDABLE(notebook))
+    if(!notebook)
+        return FALSE;
+    if(!GTK_IS_NOTEBOOK(notebook))
+        return FALSE;
+    if(!GTK_IS_BUILDABLE(notebook))
         return FALSE;
 
     const gchar *name = gtk_buildable_get_name(GTK_BUILDABLE(notebook));
@@ -22656,7 +22837,9 @@ static gboolean detachable_notebook_is_internal(GtkNotebook *notebook)
 
 static void detachable_notebook_keep_internal(GtkNotebook *notebook)
 {
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+    if(!notebook)
+        return;
+    if(!GTK_IS_NOTEBOOK(notebook))
         return;
 
     gtk_notebook_set_show_tabs(notebook, FALSE);
@@ -22732,7 +22915,13 @@ static void detachable_install_tab(GtkNotebook *notebook, GtkWidget *page)
     GtkWidget *tab = NULL;
     gchar *title = NULL;
 
-    if(!notebook || !page || !GTK_IS_NOTEBOOK(notebook) || !GTK_IS_WIDGET(page))
+    if(!notebook)
+        return;
+    if(!page)
+        return;
+    if(!GTK_IS_NOTEBOOK(notebook))
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     if(gtk_notebook_page_num(notebook, page) < 0)
@@ -22763,7 +22952,11 @@ static gint detachable_window_page_count(detached_notebook_t *detached)
 
 static GtkWidget *detachable_window_nth_page(detached_notebook_t *detached, gint index)
 {
-    if(!detached || !detached->notebook || !GTK_IS_NOTEBOOK(detached->notebook))
+    if(!detached)
+        return NULL;
+    if(!detached->notebook)
+        return NULL;
+    if(!GTK_IS_NOTEBOOK(detached->notebook))
         return NULL;
 
     return gtk_notebook_get_nth_page(GTK_NOTEBOOK(detached->notebook), index);
@@ -22773,7 +22966,11 @@ static GtkWidget *detachable_window_current_page(detached_notebook_t *detached)
 {
     gint page_num;
 
-    if(!detached || !detached->notebook || !GTK_IS_NOTEBOOK(detached->notebook))
+    if(!detached)
+        return NULL;
+    if(!detached->notebook)
+        return NULL;
+    if(!GTK_IS_NOTEBOOK(detached->notebook))
         return NULL;
 
     page_num = gtk_notebook_get_current_page(GTK_NOTEBOOK(detached->notebook));
@@ -22789,7 +22986,11 @@ static void detachable_window_update_title(detached_notebook_t *detached)
     gchar *title = NULL;
     gint count = detachable_window_page_count(detached);
 
-    if(!detached || !detached->window || !GTK_IS_WINDOW(detached->window))
+    if(!detached)
+        return;
+    if(!detached->window)
+        return;
+    if(!GTK_IS_WINDOW(detached->window))
         return;
 
     if(count == 1) {
@@ -22809,7 +23010,11 @@ static void detachable_window_update_notebook(detached_notebook_t *detached)
 {
     gint count = detachable_window_page_count(detached);
 
-    if(!detached || !detached->notebook || !GTK_IS_NOTEBOOK(detached->notebook))
+    if(!detached)
+        return;
+    if(!detached->notebook)
+        return;
+    if(!GTK_IS_NOTEBOOK(detached->notebook))
         return;
 
     gtk_notebook_set_show_tabs(GTK_NOTEBOOK(detached->notebook), count > 1);
@@ -22821,7 +23026,9 @@ static void detachable_present_page_window(GtkWidget *page)
 {
     GtkWidget *window = NULL;
 
-    if(!page || !GTK_IS_WIDGET(page))
+    if(!page)
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     window = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_WINDOW));
@@ -22878,11 +23085,19 @@ static void detachable_remove_placeholder_for_page(GtkNotebook *origin,
     GtkWidget *placeholder = NULL;
     gint pos = -1;
 
-    if(!origin || !page || !GTK_IS_NOTEBOOK(origin) || !GTK_IS_WIDGET(page))
+    if(!origin)
+        return;
+    if(!page)
+        return;
+    if(!GTK_IS_NOTEBOOK(origin))
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     placeholder = GTK_WIDGET(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER));
-    if(!placeholder || !GTK_IS_WIDGET(placeholder))
+    if(!placeholder)
+        return;
+    if(!GTK_IS_WIDGET(placeholder))
         return;
 
     if(gtk_widget_get_parent(placeholder) != GTK_WIDGET(origin)) {
@@ -22912,7 +23127,13 @@ static void detachable_create_placeholder_for_page(GtkNotebook *origin,
     gint n_pages = 0;
     gint pos = (gint) page_num;
 
-    if(!origin || !page || !GTK_IS_NOTEBOOK(origin) || !GTK_IS_WIDGET(page))
+    if(!origin)
+        return;
+    if(!page)
+        return;
+    if(!GTK_IS_NOTEBOOK(origin))
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_PLACEHOLDER))
@@ -22957,7 +23178,13 @@ static void detachable_notebook_prepare_page(GtkNotebook *notebook,
                                              GtkWidget *page,
                                              gint page_num)
 {
-    if(!notebook || !page || !GTK_IS_NOTEBOOK(notebook) || !GTK_IS_WIDGET(page))
+    if(!notebook)
+        return;
+    if(!page)
+        return;
+    if(!GTK_IS_NOTEBOOK(notebook))
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
@@ -22987,8 +23214,11 @@ static void detachable_notebook_page_added(GtkNotebook *notebook,
     gpointer origin_data = NULL;
     (void) user_data;
 
-    if(!page || !GTK_IS_WIDGET(page) ||
-       g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
+    if(!page)
+        return;
+    if(!GTK_IS_WIDGET(page))
+        return;
+    if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
         return;
 
     detachable_notebook_prepare_page(notebook, page, (gint) page_num);
@@ -23019,8 +23249,11 @@ static void detachable_notebook_page_removed(GtkNotebook *notebook,
     gpointer origin_data = NULL;
     (void) user_data;
 
-    if(!page || !GTK_IS_WIDGET(page) ||
-       g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
+    if(!page)
+        return;
+    if(!GTK_IS_WIDGET(page))
+        return;
+    if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER))
         return;
 
     origin_data = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN);
@@ -23052,7 +23285,9 @@ static void detachable_notebook_setup(GtkNotebook *notebook, detached_notebook_t
 {
     (void) detached;
 
-    if(!notebook || !GTK_IS_NOTEBOOK(notebook))
+    if(!notebook)
+        return;
+    if(!GTK_IS_NOTEBOOK(notebook))
         return;
 
     if(g_object_get_data(G_OBJECT(notebook), VJ_DETACH_DATA_DETACHED_NOTEBOOK))
@@ -23132,8 +23367,19 @@ static void detachable_detach_page_to_window(GtkNotebook *from,
     gint page_num = -1;
     gint detached_pos = -1;
 
-    if(!from || !page || !detached || !detached->notebook ||
-       !GTK_IS_NOTEBOOK(from) || !GTK_IS_WIDGET(page) || !GTK_IS_NOTEBOOK(detached->notebook))
+    if(!from)
+        return;
+    if(!page)
+        return;
+    if(!detached)
+        return;
+    if(!detached->notebook)
+        return;
+    if(!GTK_IS_NOTEBOOK(from))
+        return;
+    if(!GTK_IS_WIDGET(page))
+        return;
+    if(!GTK_IS_NOTEBOOK(detached->notebook))
         return;
 
     page_num = gtk_notebook_page_num(from, page);
@@ -23192,7 +23438,9 @@ static void detachable_reattach_page(GtkNotebook *from, GtkWidget *page)
 
     (void) from;
 
-    if(!page || !GTK_IS_WIDGET(page))
+    if(!page)
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     origin_data = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_ORIGIN);
@@ -23303,7 +23551,13 @@ static void detachable_detach_page(GtkNotebook *from, GtkWidget *page)
 {
     detached_notebook_t *detached = NULL;
 
-    if(!from || !page || !GTK_IS_NOTEBOOK(from) || !GTK_IS_WIDGET(page))
+    if(!from)
+        return;
+    if(!page)
+        return;
+    if(!GTK_IS_NOTEBOOK(from))
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     if(g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER)) {
@@ -23392,7 +23646,13 @@ static void detachable_append_existing_window_menu(GtkWidget *menu, GtkWidget *p
     GtkWidget *root = NULL;
     gint added = 0;
 
-    if(!menu || !GTK_IS_MENU_SHELL(menu) || !page || !GTK_IS_WIDGET(page))
+    if(!menu)
+        return;
+    if(!GTK_IS_MENU_SHELL(menu))
+        return;
+    if(!page)
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     for(GList *node = detached_notebooks_; node; node = node->next) {
@@ -23402,7 +23662,11 @@ static void detachable_append_existing_window_menu(GtkWidget *menu, GtkWidget *p
         const gchar *window_title = NULL;
         gchar *label = NULL;
 
-        if(!detached || !detached->window || !GTK_IS_WINDOW(detached->window))
+        if(!detached)
+            continue;
+        if(!detached->window)
+            continue;
+        if(!GTK_IS_WINDOW(detached->window))
             continue;
         if(g_list_find(detached->pages, page))
             continue;
@@ -23451,7 +23715,9 @@ static void detachable_popup_for_page(GtkWidget *page, GdkEventButton *event)
     gpointer origin_data = NULL;
     gboolean is_placeholder = FALSE;
 
-    if(!page || !GTK_IS_WIDGET(page))
+    if(!page)
+        return;
+    if(!GTK_IS_WIDGET(page))
         return;
 
     is_placeholder = g_object_get_data(G_OBJECT(page), VJ_DETACH_DATA_IS_PLACEHOLDER) != NULL;
@@ -23533,7 +23799,9 @@ static gboolean detachable_window_button_press(GtkWidget *widget,
         return FALSE;
 
     page = detachable_window_current_page(detached);
-    if(!page || !GTK_IS_WIDGET(page))
+    if(!page)
+        return FALSE;
+    if(!GTK_IS_WIDGET(page))
         return FALSE;
 
     detachable_popup_for_page(page, event);
@@ -23578,7 +23846,13 @@ static void detachable_key_file_set_window(GKeyFile *kf, const gchar *group, Gtk
     gint w = 0;
     gint h = 0;
 
-    if(!kf || !group || !window || !GTK_IS_WINDOW(window))
+    if(!kf)
+        return;
+    if(!group)
+        return;
+    if(!window)
+        return;
+    if(!GTK_IS_WINDOW(window))
         return;
 
     gtk_window_get_position(GTK_WINDOW(window), &x, &y);
@@ -23695,7 +23969,15 @@ static void detachable_apply_window_geometry(GKeyFile *kf, const gchar *group, G
     gint w = -1;
     gint h = -1;
 
-    if(!kf || !group || !window || !GTK_IS_WINDOW(window) || !g_key_file_has_group(kf, group))
+    if(!kf)
+        return;
+    if(!group)
+        return;
+    if(!window)
+        return;
+    if(!GTK_IS_WINDOW(window))
+        return;
+    if(!g_key_file_has_group(kf, group))
         return;
 
     detachable_key_file_get_integer(kf, group, "x", &x);
@@ -23774,7 +24056,11 @@ static gboolean detachable_restore_page_group(GKeyFile *kf,
     GtkWidget *page = detachable_find_page_from_config(kf, group);
     GtkWidget *parent = page ? gtk_widget_get_parent(page) : NULL;
 
-    if(!page || !parent || !GTK_IS_NOTEBOOK(parent))
+    if(!page)
+        return FALSE;
+    if(!parent)
+        return FALSE;
+    if(!GTK_IS_NOTEBOOK(parent))
         return FALSE;
 
     if(!*detached)
@@ -24387,7 +24673,11 @@ static GtkWidget *menu_shell_find_item_named(GtkWidget *menu, const char *name)
     GtkWidget *found = NULL;
     GList *children = NULL;
 
-    if(!menu || !GTK_IS_CONTAINER(menu) || !name)
+    if(!menu)
+        return NULL;
+    if(!GTK_IS_CONTAINER(menu))
+        return NULL;
+    if(!name)
         return NULL;
 
     children = gtk_container_get_children(GTK_CONTAINER(menu));
@@ -24446,7 +24736,11 @@ static void init_window_configuration_menu(void)
         }
     }
 
-    if(!menu || !GTK_IS_MENU_SHELL(menu)) {
+    if(!menu) {
+        vj_msg(VEEJAY_MSG_WARNING, "Could not install Preferences menu items: Preferences menu not found");
+        return;
+    }
+    if(!GTK_IS_MENU_SHELL(menu)) {
         vj_msg(VEEJAY_MSG_WARNING, "Could not install Preferences menu items: Preferences menu not found");
         return;
     }
@@ -24474,7 +24768,11 @@ static void init_window_configuration_menu(void)
     }
 
     layout_menu = GTK_IS_MENU_ITEM(layout_item) ? gtk_menu_item_get_submenu(GTK_MENU_ITEM(layout_item)) : NULL;
-    if(!layout_menu || !GTK_IS_MENU_SHELL(layout_menu)) {
+    if(!layout_menu) {
+        layout_menu = gtk_menu_new();
+        gtk_menu_item_set_submenu(GTK_MENU_ITEM(layout_item), layout_menu);
+    }
+    else if(!GTK_IS_MENU_SHELL(layout_menu)) {
         layout_menu = gtk_menu_new();
         gtk_menu_item_set_submenu(GTK_MENU_ITEM(layout_item), layout_menu);
     }
@@ -25075,7 +25373,9 @@ void vj_gui_sync_preview_toggle(int enabled)
         return;
 
     toggle = glade_xml_get_widget_(info->main_window, "previewtoggle");
-    if(!toggle || !GTK_IS_TOGGLE_BUTTON(toggle))
+    if(!toggle)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(toggle))
         return;
 
     enabled = enabled ? 1 : 0;
@@ -25594,8 +25894,13 @@ static void on_sequence_bank_button_toggled(GtkWidget *widget, gpointer user_dat
     if(info->status_lock || sequence_ui_bank_button_sync)
         return;
 
-    if(bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
-       !widget || !GTK_IS_TOGGLE_BUTTON(widget))
+    if(bank < 0)
+        return;
+    if(bank >= VJ_SEQUENCE_BANKS)
+        return;
+    if(!widget)
+        return;
+    if(!GTK_IS_TOGGLE_BUTTON(widget))
         return;
 
     int active_bank = sequence_ui_active_bank();
@@ -26687,9 +26992,11 @@ static void sequence_preview_mount_action_columns(void)
     GtkWidget *row;
     GtkWidget *right;
 
-    if(!frame || !GTK_IS_FRAME(frame) ||
-       g_object_get_data(G_OBJECT(frame),
-                         "gvr-preview-action-columns"))
+    if(!frame)
+        return;
+    if(!GTK_IS_FRAME(frame))
+        return;
+    if(g_object_get_data(G_OBJECT(frame), "gvr-preview-action-columns"))
         return;
 
     center = gtk_bin_get_child(GTK_BIN(frame));
@@ -26784,7 +27091,11 @@ static gboolean sequence_vims_mount_history_page(GtkWidget *history_view)
                                            "label877");
     GList *children;
 
-    if(!page || !GTK_IS_BOX(page) || !history_view)
+    if(!page)
+        return FALSE;
+    if(!GTK_IS_BOX(page))
+        return FALSE;
+    if(!history_view)
         return FALSE;
 
     if(GTK_IS_LABEL(tab))
@@ -26819,7 +27130,11 @@ static gboolean sequence_vims_mount_pattern_page(GtkWidget *pattern_view)
     GtkWidget *tab = glade_xml_get_widget_(info->main_window, "label969");
     GList *children;
 
-    if(!page || !GTK_IS_BOX(page) || !pattern_view)
+    if(!page)
+        return FALSE;
+    if(!GTK_IS_BOX(page))
+        return FALSE;
+    if(!pattern_view)
         return FALSE;
 
     if(GTK_IS_LABEL(tab))
@@ -27636,7 +27951,9 @@ static void samplebank_update_page_label(void)
         return;
 
     w = glade_xml_get_widget_(info->main_window, "samplebank_page_status");
-    if(!w || !GTK_IS_LABEL(w))
+    if(!w)
+        return;
+    if(!GTK_IS_LABEL(w))
         return;
 
     page = samplebank_get_page();

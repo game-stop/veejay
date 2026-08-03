@@ -682,7 +682,9 @@ static void gvr_shape_selector_map(GtkWidget *widget,
     GtkWidget *toplevel = gtk_widget_get_toplevel(widget);
     GClosure *closure;
 
-    if(selector->search_accel_group || !GTK_IS_WINDOW(toplevel))
+    if(selector->search_accel_group)
+        return;
+    if(!GTK_IS_WINDOW(toplevel))
         return;
 
     selector->search_accel_group = gtk_accel_group_new();
