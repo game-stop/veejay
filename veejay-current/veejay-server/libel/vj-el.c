@@ -817,8 +817,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if( decoder_id < 900 && decoder_id != AV_CODEC_ID_HUFFYUV ) 
 			max_frame_size = get_max_frame_size( el->lav_fd[n] );
 
-		max_frame_size = ( max_frame_size );
-
 		el->decoders[n] = 
 			_el_new_decoder( el->ctx[n], decoder_id, el->video_width, el->video_height, el->video_fps, el->pixfmt[ n ],el_pixel_format_, max_frame_size );
 		if( el->decoders[n] == NULL ) {
