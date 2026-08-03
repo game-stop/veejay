@@ -8984,7 +8984,7 @@ static void vj_kf_select_parameter(int num)
     if(!ui)
         return;
 
-    if(GTK3_IS_CURVE(ui->curve))
+    if(ui->curve && GTK3_IS_CURVE(ui->curve))
         curve_live_preview_user_override(FALSE);
 
     curve_editor_clear_local_dirty();
