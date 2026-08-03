@@ -1185,8 +1185,7 @@ static void cf_render_const_pure(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
             {
-                int chroma_index = cf_u8(ev);
-
+                const unsigned chroma_index = (unsigned) cf_clampi(ev, 0, 255);
                 int cev = CHROMA[chroma_index];
                 U[i] = cf_blend_fast_u8(128, (uint8_t) ev_u, cev);
                 V[i] = cf_blend_fast_u8(128, (uint8_t) ev_v, cev);
@@ -1264,8 +1263,7 @@ static void cf_render_const_bleed(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
             {
-                int chroma_index = cf_u8(ev);
-
+                const unsigned chroma_index = (unsigned) cf_clampi(ev, 0, 255);
                 int cev = CHROMA[chroma_index];
                 U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
                 V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);
@@ -1359,8 +1357,7 @@ static void cf_render_source(chronorain_t *c,
                 cf_blend_fast_u8((uint8_t) on_v, (uint8_t) off_v, amount);
 
             {
-                int chroma_index = cf_u8(ev);
-
+                const unsigned chroma_index = (unsigned) cf_clampi(ev, 0, 255);
                 int cev = CHROMA[chroma_index];
                 U[i] = cf_blend_fast_u8(base_u, (uint8_t) ev_u, cev);
                 V[i] = cf_blend_fast_u8(base_v, (uint8_t) ev_v, cev);

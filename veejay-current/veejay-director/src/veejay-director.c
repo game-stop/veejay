@@ -2450,7 +2450,9 @@ static gchar *director_instance_command_text(DirectorApp *app,
         return message;
     }
     gchar *command = director_argv_command_text(argv);
-    g_strfreev(argv);
+    for(gint i = 0; argv[i]; i++)
+        g_free(argv[i]);
+    g_free(argv);
     return command;
 }
 
@@ -2527,7 +2529,10 @@ static void director_refresh_media_bank(DirectorApp *app)
 
 static void director_update_role_sensitivity(DirectorApp *app)
 {
-    DirectorInstance *instance = app ? app->selected : NULL;
+    if(!app)
+        return;
+
+    DirectorInstance *instance = app->selected;
     const gboolean have = instance != NULL;
     const DirectorRole role = have && app->combo_role ?
         (DirectorRole)gtk_combo_box_get_active(GTK_COMBO_BOX(app->combo_role)) :
@@ -3581,6 +3586,9 @@ static void director_update_output_live_status(DirectorApp *app)
 
 static void director_update_output_ui(DirectorApp *app)
 {
+    if(!app)
+        return;
+
     DirectorInstance *instance = app->selected;
     if(!instance)
         return;
@@ -11996,6 +12004,9 @@ static void director_calibration_preview_request_size(gint source_width,
 
 static void director_source_preview_sync_target(DirectorApp *app)
 {
+    if(!app)
+        return;
+
     const gchar *host = NULL;
     gint port = 0;
     gint source_width = 16;

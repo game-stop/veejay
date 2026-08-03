@@ -1458,23 +1458,26 @@ static void vj_perform_sample_tick_reset(performer_global_t *g) {
 }
 
 static long long vj_perform_sample_already_ticked(performer_global_t *g, int target_id, int chain_id) {
-    if(chain_id < 0 || chain_id >= SAMPLE_MAX_EFFECTS)
+    const size_t played_count = sizeof(g->played_sample_ids) / sizeof(g->played_sample_ids[0]);
+    if(chain_id < 0 || (size_t)chain_id >= played_count)
         return -1;
 
-    for( int i = 0; i <= chain_id; i ++ ) {
-        if(g->played_sample_ids[i]==target_id) {
+    const size_t last = (size_t)chain_id;
+    for(size_t i = 0; i <= last; i++) {
+        if(g->played_sample_ids[i] == target_id)
             return g->played_sample_positions[i];
-        }
     }
     return -1;
 }
 
 static void vj_perform_sample_ticked(performer_global_t *g, int target_id, int chain_id, long long pos) {
-    if(chain_id < 0 || chain_id >= SAMPLE_MAX_EFFECTS)
+    const size_t played_count = sizeof(g->played_sample_ids) / sizeof(g->played_sample_ids[0]);
+    if(chain_id < 0 || (size_t)chain_id >= played_count)
         return;
 
-    g->played_sample_ids[chain_id] = target_id;
-    g->played_sample_positions[chain_id] = pos;
+    const size_t index = (size_t)chain_id;
+    g->played_sample_ids[index] = target_id;
+    g->played_sample_positions[index] = pos;
 }
 
 
