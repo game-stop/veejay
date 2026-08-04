@@ -43,6 +43,7 @@
 #include "director-presets.h"
 #include "director-client.h"
 #include "director-wire.h"
+#include "director-ndi.h"
 #include "gtkviewportmesh.h"
 #include "gtkvjlogview.h"
 
@@ -465,6 +466,32 @@ struct _DirectorApp {
     GtkWidget *check_audio_muted;
     GtkWidget *check_audio_sync_thread;
     GtkWidget *check_audio_beat_thread;
+    GtkWidget *check_ndi_input;
+    GtkWidget *combo_ndi_source;
+    GtkWidget *button_ndi_refresh;
+    GtkWidget *check_ndi_output;
+    GtkWidget *entry_ndi_output_name;
+    GtkWidget *check_ndi_tally;
+    GtkWidget *check_ndi_follow_clock;
+    GtkWidget *ndi_runtime_label;
+    GtkWidget *ndi_backend_label;
+    GtkWidget *ndi_spinner;
+    DirectorNdiDiscovery *ndi_discovery;
+    GPtrArray *ndi_sources;
+    guint64 ndi_generation;
+    gint64 ndi_last_update_us;
+    gchar *ndi_last_update_text;
+    gboolean ndi_refresh_pending;
+    gboolean ndi_syncing;
+    gboolean ndi_selected_source_online;
+    gboolean ndi_discovery_state_valid;
+    DirectorNdiDiscoveryState ndi_discovery_state;
+    gchar *ndi_discovery_version;
+    gchar *ndi_discovery_error;
+    gboolean ndi_logged_state_valid;
+    DirectorNdiDiscoveryState ndi_logged_state;
+    guint ndi_logged_source_count;
+    gchar *ndi_logged_error;
     GtkWidget *check_auto_loop;
     GtkWidget *check_clip_as_sample;
     GtkWidget *check_deinterlace;
@@ -723,11 +750,304 @@ static void director_eidolon_open_drawer(DirectorApp *app, DirectorInstance *ins
 static void director_eidolon_open_window(DirectorApp *app, DirectorInstance *instance);
 static void director_eidolon_close_views_for_instance(DirectorApp *app,
                                                        DirectorInstance *instance);
+static void director_log(DirectorApp *app, const gchar *format, ...) G_GNUC_PRINTF(2, 3);
+static void on_startup_controls_changed(GtkWidget *widget, gpointer data);
+static const gchar *director_ndi_source_text(DirectorApp *app)
+{
+    if(!app || !app->combo_ndi_source)
+        return "";
+    GtkWidget *entry = gtk_bin_get_child(GTK_BIN(app->combo_ndi_source));
+    return GTK_IS_ENTRY(entry) ? gtk_entry_get_text(GTK_ENTRY(entry)) : "";
+}
+
+static void director_ndi_source_set_text(DirectorApp *app, const gchar *text)
+{
+    if(!app || !app->combo_ndi_source)
+        return;
+    GtkWidget *entry = gtk_bin_get_child(GTK_BIN(app->combo_ndi_source));
+    if(GTK_IS_ENTRY(entry))
+        gtk_entry_set_text(GTK_ENTRY(entry), text ? text : "");
+}
+
+static GPtrArray *director_ndi_source_array_copy(const GPtrArray *sources)
+{
+    GPtrArray *copy = g_ptr_array_new_with_free_func((GDestroyNotify)director_ndi_source_free);
+    for(guint i = 0; sources && i < sources->len; i++) {
+        const DirectorNdiSource *source = g_ptr_array_index((GPtrArray *)sources, i);
+        if(!source)
+            continue;
+        DirectorNdiSource *item = g_new0(DirectorNdiSource, 1);
+        item->name = g_strdup(source->name ? source->name : "");
+        item->url = g_strdup(source->url ? source->url : "");
+        g_ptr_array_add(copy, item);
+    }
+    return copy;
+}
+
+static gboolean director_ndi_sources_contain_name(const GPtrArray *sources,
+                                                   const gchar *name)
+{
+    if(!name || !*name)
+        return FALSE;
+    for(guint i = 0; sources && i < sources->len; i++) {
+        const DirectorNdiSource *source = g_ptr_array_index((GPtrArray *)sources, i);
+        if(source && g_strcmp0(source->name, name) == 0)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean director_ndi_name_already_added(GHashTable *names, const gchar *name)
+{
+    if(!name || !*name)
+        return TRUE;
+    if(g_hash_table_contains(names, name))
+        return TRUE;
+    g_hash_table_add(names, g_strdup(name));
+    return FALSE;
+}
+
+static void director_ndi_refresh_combo(DirectorApp *app, const gchar *selected)
+{
+    if(!app || !app->combo_ndi_source)
+        return;
+
+    GtkWidget *entry = gtk_bin_get_child(GTK_BIN(app->combo_ndi_source));
+    gint cursor = -1;
+    gint selection_start = 0;
+    gint selection_end = 0;
+    gboolean has_selection = FALSE;
+    if(GTK_IS_ENTRY(entry)) {
+        cursor = gtk_editable_get_position(GTK_EDITABLE(entry));
+        has_selection = gtk_editable_get_selection_bounds(GTK_EDITABLE(entry),
+                                                           &selection_start,
+                                                           &selection_end);
+    }
+
+    app->ndi_selected_source_online =
+        director_ndi_sources_contain_name(app->ndi_sources, selected);
+    GHashTable *names = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+
+    app->ndi_syncing = TRUE;
+    gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(app->combo_ndi_source));
+
+    if(selected && *selected && !app->ndi_selected_source_online) {
+        gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->combo_ndi_source), selected);
+        g_hash_table_add(names, g_strdup(selected));
+    }
+
+    for(guint i = 0; app->ndi_sources && i < app->ndi_sources->len; i++) {
+        DirectorNdiSource *source = g_ptr_array_index(app->ndi_sources, i);
+        if(source && !director_ndi_name_already_added(names, source->name))
+            gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->combo_ndi_source), source->name);
+    }
+    director_ndi_source_set_text(app, selected);
+    if(GTK_IS_ENTRY(entry)) {
+        if(has_selection)
+            gtk_editable_select_region(GTK_EDITABLE(entry), selection_start, selection_end);
+        else if(cursor >= 0)
+            gtk_editable_set_position(GTK_EDITABLE(entry), cursor);
+    }
+    app->ndi_syncing = FALSE;
+    g_hash_table_destroy(names);
+}
+
+static const gchar *director_ndi_discovery_state_name(DirectorNdiDiscoveryState state)
+{
+    switch(state) {
+        case DIRECTOR_NDI_DISCOVERY_STARTING: return "starting";
+        case DIRECTOR_NDI_DISCOVERY_WATCHING: return "watching";
+        case DIRECTOR_NDI_DISCOVERY_UNAVAILABLE: return "unavailable";
+        case DIRECTOR_NDI_DISCOVERY_ERROR: return "error";
+        default: return "stopped";
+    }
+}
+
+static void director_ndi_update_discovery_status(DirectorApp *app)
+{
+    if(!app || !app->ndi_runtime_label)
+        return;
+
+    const gchar *selected = director_ndi_source_text(app);
+    app->ndi_selected_source_online =
+        director_ndi_sources_contain_name(app->ndi_sources, selected);
+
+    gchar *status = NULL;
+    if(!app->ndi_discovery_state_valid) {
+        status = g_strdup("NDI discovery starting…");
+    }
+    else {
+        switch(app->ndi_discovery_state) {
+            case DIRECTOR_NDI_DISCOVERY_STARTING:
+                status = g_strdup(app->ndi_refresh_pending ?
+                                  "Refreshing NDI sources…" :
+                                  "NDI discovery starting…");
+                break;
+            case DIRECTOR_NDI_DISCOVERY_WATCHING:
+                status = g_strdup_printf("NDI %s · watching · %u source%s%s",
+                    app->ndi_discovery_version && *app->ndi_discovery_version ?
+                        app->ndi_discovery_version : "runtime",
+                    app->ndi_sources ? app->ndi_sources->len : 0,
+                    app->ndi_sources && app->ndi_sources->len == 1 ? "" : "s",
+                    selected && *selected && !app->ndi_selected_source_online ?
+                        " · configured source offline" : "");
+                break;
+            case DIRECTOR_NDI_DISCOVERY_UNAVAILABLE:
+                status = g_strdup("NDI runtime unavailable · retrying");
+                break;
+            case DIRECTOR_NDI_DISCOVERY_ERROR:
+                status = g_strdup_printf("NDI discovery error · retrying%s%s",
+                    app->ndi_discovery_error && *app->ndi_discovery_error ? ": " : "",
+                    app->ndi_discovery_error && *app->ndi_discovery_error ?
+                        app->ndi_discovery_error : "");
+                break;
+            default:
+                status = g_strdup("NDI discovery stopped");
+                break;
+        }
+    }
+
+    gtk_label_set_text(GTK_LABEL(app->ndi_runtime_label), status);
+
+    gchar *tooltip = NULL;
+    if(app->ndi_last_update_text && *app->ndi_last_update_text)
+        tooltip = g_strdup_printf("%s\nLast NDI discovery update at %s",
+                                  status, app->ndi_last_update_text);
+    else
+        tooltip = g_strdup(status);
+    gtk_widget_set_tooltip_text(app->ndi_runtime_label, tooltip);
+    g_free(tooltip);
+    g_free(status);
+
+    if(app->button_ndi_refresh) {
+        const gboolean discovery_allowed = app->selected &&
+            app->selected->role != DIRECTOR_ROLE_OUTPUT;
+        gtk_widget_set_sensitive(app->button_ndi_refresh,
+                                 discovery_allowed && !app->ndi_refresh_pending);
+    }
+
+    if(app->ndi_spinner) {
+        const gboolean active = app->ndi_refresh_pending ||
+            (app->ndi_discovery_state_valid &&
+             app->ndi_discovery_state == DIRECTOR_NDI_DISCOVERY_STARTING);
+        if(active) {
+            gtk_spinner_start(GTK_SPINNER(app->ndi_spinner));
+            gtk_widget_show(app->ndi_spinner);
+        }
+        else {
+            gtk_spinner_stop(GTK_SPINNER(app->ndi_spinner));
+            gtk_widget_hide(app->ndi_spinner);
+        }
+    }
+}
+
+static gboolean director_ndi_should_log_update(DirectorApp *app,
+                                               DirectorNdiDiscoveryState state,
+                                               guint source_count,
+                                               const gchar *error)
+{
+    if(!app->ndi_logged_state_valid)
+        return TRUE;
+
+    if(state == DIRECTOR_NDI_DISCOVERY_STARTING)
+        return app->ndi_refresh_pending;
+
+    if(state == DIRECTOR_NDI_DISCOVERY_WATCHING)
+        return app->ndi_logged_state != state ||
+               app->ndi_logged_source_count != source_count;
+
+    return app->ndi_logged_state != state ||
+           g_strcmp0(app->ndi_logged_error, error) != 0;
+}
+
+static void director_ndi_note_logged_update(DirectorApp *app,
+                                            DirectorNdiDiscoveryState state,
+                                            guint source_count,
+                                            const gchar *error)
+{
+    app->ndi_logged_state_valid = TRUE;
+    app->ndi_logged_state = state;
+    app->ndi_logged_source_count = source_count;
+    g_free(app->ndi_logged_error);
+    app->ndi_logged_error = g_strdup(error ? error : "");
+}
+
+static void director_ndi_discovery_update(DirectorNdiDiscovery *discovery,
+                                          const DirectorNdiDiscoveryUpdate *update,
+                                          gpointer user_data)
+{
+    DirectorApp *app = user_data;
+    if(!app || app->shutting_down || discovery != app->ndi_discovery || !update)
+        return;
+
+    gchar *selected = g_strdup(director_ndi_source_text(app));
+    if(update->state == DIRECTOR_NDI_DISCOVERY_WATCHING) {
+        GPtrArray *sources = director_ndi_source_array_copy(update->sources);
+        if(app->ndi_sources)
+            g_ptr_array_free(app->ndi_sources, TRUE);
+        app->ndi_sources = sources;
+        director_ndi_refresh_combo(app, selected);
+    }
+    app->ndi_generation = update->generation;
+    if(update->state != DIRECTOR_NDI_DISCOVERY_STARTING) {
+        app->ndi_last_update_us = update->observed_us;
+        GDateTime *now = g_date_time_new_now_local();
+        g_free(app->ndi_last_update_text);
+        app->ndi_last_update_text = now ? g_date_time_format(now, "%H:%M:%S") : NULL;
+        if(now)
+            g_date_time_unref(now);
+    }
+    app->ndi_discovery_state_valid = TRUE;
+    app->ndi_discovery_state = update->state;
+    g_free(app->ndi_discovery_version);
+    app->ndi_discovery_version = g_strdup(update->runtime_version ? update->runtime_version : "");
+    g_free(app->ndi_discovery_error);
+    app->ndi_discovery_error = g_strdup(update->error ? update->error : "");
+    g_free(selected);
+
+    if(update->state != DIRECTOR_NDI_DISCOVERY_STARTING)
+        app->ndi_refresh_pending = FALSE;
+    director_ndi_update_discovery_status(app);
+
+    const guint source_count = app->ndi_sources ? app->ndi_sources->len : 0;
+    if(director_ndi_should_log_update(app, update->state, source_count, update->error)) {
+        const gchar *state_name = director_ndi_discovery_state_name(update->state);
+        if(update->state == DIRECTOR_NDI_DISCOVERY_WATCHING)
+            director_log(app, "NDI discovery %s: %u source%s",
+                         state_name, source_count, source_count == 1 ? "" : "s");
+        else if(update->error && *update->error)
+            director_log(app, "NDI discovery %s: %s", state_name, update->error);
+        else
+            director_log(app, "NDI discovery %s", state_name);
+        director_ndi_note_logged_update(app, update->state, source_count, update->error);
+    }
+}
+
+static void on_ndi_refresh(GtkButton *button, gpointer data)
+{
+    (void)button;
+    DirectorApp *app = data;
+    if(!app || !app->ndi_discovery || app->ndi_refresh_pending)
+        return;
+    app->ndi_refresh_pending = TRUE;
+    director_ndi_update_discovery_status(app);
+    director_ndi_discovery_request_refresh(app->ndi_discovery);
+}
+
+static void on_ndi_source_changed(GtkWidget *widget, gpointer data)
+{
+    DirectorApp *app = data;
+    if(!app || app->syncing || app->ndi_syncing)
+        return;
+    director_ndi_update_discovery_status(app);
+    on_startup_controls_changed(widget, data);
+}
+
 static void on_startup_controls_changed(GtkWidget *widget, gpointer data)
 {
     (void)widget;
     DirectorApp *app = data;
-    if(!app || app->syncing)
+    if(!app || app->syncing || app->ndi_syncing)
         return;
     director_update_role_sensitivity(app);
     if(app->command_preview)
@@ -1754,6 +2074,30 @@ static void director_clear_live_output_state(DirectorInstance *instance)
     g_clear_pointer(&instance->last_output_status, g_free);
 }
 
+static void director_clear_live_ndi_state(DirectorInstance *instance)
+{
+    if(!instance)
+        return;
+    g_clear_pointer(&instance->live_ndi_runtime, g_free);
+    g_clear_pointer(&instance->live_ndi_source, g_free);
+    g_clear_pointer(&instance->live_ndi_tx_name, g_free);
+    g_clear_pointer(&instance->last_ndi_status, g_free);
+    instance->live_ndi_rx_enabled = FALSE;
+    instance->live_ndi_rx_connected = FALSE;
+    instance->live_ndi_tx_enabled = FALSE;
+    instance->live_ndi_tx_connections = 0;
+    instance->live_ndi_rx_video_frames = 0;
+    instance->live_ndi_rx_audio_frames = 0;
+    instance->live_ndi_rx_dropped_video_frames = 0;
+    instance->live_ndi_rx_dropped_audio_frames = 0;
+    instance->live_ndi_rx_audio_underruns = 0;
+    instance->live_ndi_tx_video_frames = 0;
+    instance->live_ndi_tx_audio_frames = 0;
+    instance->live_ndi_clock_available = FALSE;
+    instance->live_ndi_clock_age_ms = 0;
+    instance->live_ndi_clock_drift_ms = 0.0;
+}
+
 static void director_clear_live_connection_state(DirectorInstance *instance)
 {
     if(!instance)
@@ -1775,6 +2119,7 @@ static void director_clear_live_connection_state(DirectorInstance *instance)
     for(gint i = 0; i < DIRECTOR_V4L_CONTROL_COUNT; i++)
         instance->live_v4l_controls[i] = -1;
     director_clear_live_output_state(instance);
+    director_clear_live_ndi_state(instance);
     instance->live_projection_valid = FALSE;
     instance->live_projection_enabled = FALSE;
     instance->live_projection_startup_enabled = FALSE;
@@ -2450,9 +2795,7 @@ static gchar *director_instance_command_text(DirectorApp *app,
         return message;
     }
     gchar *command = director_argv_command_text(argv);
-    for(gint i = 0; argv[i]; i++)
-        g_free(argv[i]);
-    g_free(argv);
+    g_strfreev(argv);
     return command;
 }
 
@@ -2564,19 +2907,38 @@ static void director_update_role_sensitivity(DirectorApp *app)
     const gboolean preview = have && !output && control_mode == DIRECTOR_CONTROL_PREVIEW;
     const gboolean preview_headless = preview && app->check_preview_headless &&
         gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_preview_headless));
-    const gboolean media = have && !output && startup == DIRECTOR_STARTUP_MEDIA;
-    const gboolean blank = have && !output && startup == DIRECTOR_STARTUP_BLANK;
+    const gboolean ndi_input = have && !output && app->check_ndi_input &&
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_input));
+    const gboolean ndi_output = have && app->check_ndi_output &&
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_output));
+    const gboolean media = have && !output && !ndi_input && startup == DIRECTOR_STARTUP_MEDIA;
+    const gboolean blank = have && !output && !ndi_input && startup == DIRECTOR_STARTUP_BLANK;
     const gint driver_index = app->combo_output_driver ?
         gtk_combo_box_get_active(GTK_COMBO_BOX(app->combo_output_driver)) : 0;
     const gboolean driver_needs_file = !preview_headless && driver_index >= 2;
     const gboolean sdl_output = have && !preview_headless && driver_index == 0;
 
     if(app->combo_startup_source)
-        gtk_widget_set_sensitive(app->combo_startup_source, have && !output);
+        gtk_widget_set_sensitive(app->combo_startup_source, have && !output && !ndi_input);
+    if(app->check_ndi_input)
+        gtk_widget_set_sensitive(app->check_ndi_input, have && !output);
+    if(app->combo_ndi_source)
+        gtk_widget_set_sensitive(app->combo_ndi_source, have && !output && ndi_input);
+    if(app->button_ndi_refresh)
+        gtk_widget_set_sensitive(app->button_ndi_refresh,
+                                 have && !output && !app->ndi_refresh_pending);
+    if(app->check_ndi_output)
+        gtk_widget_set_sensitive(app->check_ndi_output, have);
+    if(app->entry_ndi_output_name)
+        gtk_widget_set_sensitive(app->entry_ndi_output_name, have && ndi_output);
+    if(app->check_ndi_tally)
+        gtk_widget_set_sensitive(app->check_ndi_tally, have && !output && ndi_input);
+    if(app->check_ndi_follow_clock)
+        gtk_widget_set_sensitive(app->check_ndi_follow_clock, have && !output && ndi_input);
     if(app->spin_input_width)
-        gtk_widget_set_sensitive(app->spin_input_width, blank);
+        gtk_widget_set_sensitive(app->spin_input_width, blank || ndi_input);
     if(app->spin_input_height)
-        gtk_widget_set_sensitive(app->spin_input_height, blank);
+        gtk_widget_set_sensitive(app->spin_input_height, blank || ndi_input);
     if(app->check_clip_as_sample)
         gtk_widget_set_sensitive(app->check_clip_as_sample, media);
     if(app->check_auto_loop)
@@ -2606,8 +2968,8 @@ static void director_update_role_sensitivity(DirectorApp *app)
     if(app->spin_audio_channels) gtk_widget_set_sensitive(app->spin_audio_channels, have && !output);
     if(app->spin_audio_bits) gtk_widget_set_sensitive(app->spin_audio_bits, have && !output);
     if(app->spin_pace_correction) gtk_widget_set_sensitive(app->spin_pace_correction, have && !output);
-    if(app->spin_capture_device) gtk_widget_set_sensitive(app->spin_capture_device, have && !output);
-    if(app->spin_generator_stream) gtk_widget_set_sensitive(app->spin_generator_stream, have && !output);
+    if(app->spin_capture_device) gtk_widget_set_sensitive(app->spin_capture_device, have && !output && !ndi_input);
+    if(app->spin_generator_stream) gtk_widget_set_sensitive(app->spin_generator_stream, have && !output && !ndi_input);
     if(app->check_legacy_viewport) {
         if(output && !gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_legacy_viewport))) {
             const gboolean old_syncing = app->syncing;
@@ -2672,7 +3034,9 @@ static void director_update_role_sensitivity(DirectorApp *app)
         gtk_widget_set_sensitive(app->button_sync_samplelist, preview_live);
     const gchar *video_source_id = app->combo_source_instance ?
         gtk_combo_box_get_active_id(GTK_COMBO_BOX(app->combo_source_instance)) : NULL;
-    const gboolean manual_output_feed = output && (!video_source_id || !*video_source_id);
+    if(app->combo_source_instance)
+        gtk_widget_set_sensitive(app->combo_source_instance, have && !ndi_input);
+    const gboolean manual_output_feed = output && !ndi_input && (!video_source_id || !*video_source_id);
     if(app->entry_source_host)
         gtk_widget_set_sensitive(app->entry_source_host, manual_output_feed);
     if(app->spin_source_port)
@@ -2769,6 +3133,29 @@ static void director_update_instance_form(DirectorApp *app)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_audio_muted), instance->audio_muted);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_audio_sync_thread), instance->audio_sync_thread);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_audio_beat_thread), instance->audio_beat_thread);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_ndi_input), instance->ndi_input_enabled);
+    director_ndi_source_set_text(app, instance->ndi_source_name);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_ndi_output), instance->ndi_output_enabled);
+    gtk_entry_set_text(GTK_ENTRY(app->entry_ndi_output_name),
+                       instance->ndi_output_name ? instance->ndi_output_name : "VeeJay Program");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_ndi_tally), instance->ndi_tally_enabled);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_ndi_follow_clock), instance->ndi_follow_clock);
+    if(app->ndi_backend_label) {
+        if(instance->last_ndi_status && instance->live_ndi_runtime && *instance->live_ndi_runtime) {
+            gchar *status = g_strdup_printf("Backend NDI %s · RX %s · TX %d receiver%s",
+                                            instance->live_ndi_runtime,
+                                            instance->live_ndi_rx_enabled ?
+                                                (instance->live_ndi_rx_connected ? "online" : "waiting") : "off",
+                                            instance->live_ndi_tx_connections,
+                                            instance->live_ndi_tx_connections == 1 ? "" : "s");
+            gtk_label_set_text(GTK_LABEL(app->ndi_backend_label), status);
+            g_free(status);
+        } else {
+            gtk_label_set_text(GTK_LABEL(app->ndi_backend_label),
+                               "Backend NDI status unavailable until connected");
+        }
+    }
+    director_ndi_update_discovery_status(app);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_auto_loop), instance->auto_loop);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_clip_as_sample), instance->clip_as_sample);
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_deinterlace), instance->deinterlace);
@@ -4167,6 +4554,10 @@ static void director_client_event(DirectorClient *client,
             if(!director_instance_parse_perf_status(instance, payload, &error))
                 goto parse_error;
             break;
+        case DIRECTOR_CLIENT_NDI_STATUS:
+            if(!director_instance_parse_ndi_status(instance, payload, &error))
+                goto parse_error;
+            break;
         case DIRECTOR_CLIENT_DEVICE_LIST:
             if(instance->calibration_camera)
                 director_calibration_handle_device_list(app, instance, payload);
@@ -4195,6 +4586,8 @@ parse_error:
         instance->live_projection_valid = FALSE;
         g_clear_pointer(&instance->last_projection_status, g_free);
     }
+    else if(event == DIRECTOR_CLIENT_NDI_STATUS)
+        director_clear_live_ndi_state(instance);
     g_clear_error(&error);
     director_schedule_live_ui(app,
         event == DIRECTOR_CLIENT_INSTANCE_STATUS ||
@@ -4531,39 +4924,41 @@ static gchar **director_eidolon_build_argv(DirectorApp *app,
                                            DirectorInstance *instance,
                                            GError **error)
 {
-    GPtrArray *argv = g_ptr_array_new_with_free_func(g_free);
-    g_ptr_array_add(argv, g_strdup(instance->eidolon_executable &&
-                                   *instance->eidolon_executable ?
-                                   instance->eidolon_executable : "eidolon"));
+    gint argc_extra = 0;
+    gchar **extra = NULL;
 
-    if(instance->eidolon_extra_args && *instance->eidolon_extra_args) {
-        gint argc_extra = 0;
-        gchar **extra = NULL;
-        if(!g_shell_parse_argv(instance->eidolon_extra_args,
-                               &argc_extra, &extra, error)) {
-            g_ptr_array_free(argv, TRUE);
-            return NULL;
-        }
-        for(gint i = 0; i < argc_extra; i++)
-            g_ptr_array_add(argv, g_strdup(extra[i]));
-        g_strfreev(extra);
-    }
+    if(instance->eidolon_extra_args && *instance->eidolon_extra_args &&
+       !g_shell_parse_argv(instance->eidolon_extra_args,
+                           &argc_extra, &extra, error))
+        return NULL;
 
     gchar *state_path = director_eidolon_state_path(app, instance, error);
     if(!state_path) {
-        g_ptr_array_free(argv, TRUE);
+        g_strfreev(extra);
         return NULL;
     }
 
-    g_ptr_array_add(argv, g_strdup("-h"));
-    g_ptr_array_add(argv, g_strdup(instance->host && *instance->host ?
-                                   instance->host : "127.0.0.1"));
-    g_ptr_array_add(argv, g_strdup("-p"));
-    g_ptr_array_add(argv, g_strdup_printf("%d", instance->port));
-    g_ptr_array_add(argv, g_strdup("-s"));
-    g_ptr_array_add(argv, state_path);
-    g_ptr_array_add(argv, NULL);
-    return (gchar**)g_ptr_array_free(argv, FALSE);
+    const gsize argc = (gsize)argc_extra + 7u;
+    gchar **argv = g_new0(gchar*, argc + 1u);
+    gsize pos = 0;
+
+    argv[pos++] = g_strdup(instance->eidolon_executable &&
+                           *instance->eidolon_executable ?
+                           instance->eidolon_executable : "eidolon");
+    for(gint i = 0; i < argc_extra; i++) {
+        argv[pos++] = extra[i];
+        extra[i] = NULL;
+    }
+    g_strfreev(extra);
+
+    argv[pos++] = g_strdup("-h");
+    argv[pos++] = g_strdup(instance->host && *instance->host ?
+                           instance->host : "127.0.0.1");
+    argv[pos++] = g_strdup("-p");
+    argv[pos++] = g_strdup_printf("%d", instance->port);
+    argv[pos++] = g_strdup("-s");
+    argv[pos++] = state_path;
+    return argv;
 }
 
 static void director_eidolon_view_update_status(DirectorEidolonView *view)
@@ -7116,7 +7511,7 @@ static gboolean director_calibration_scan_commit(DirectorApp *app,
         DirectorPendingCameraMap *pending = g_ptr_array_index(scan->pending_maps, i);
         if(!pending) {
             if(staged.camera_maps)
-                g_hash_table_destroy(staged.camera_maps);
+                g_ptr_array_free(staged.camera_maps, TRUE);
             return FALSE;
         }
         if(!director_venue_store_camera_map(
@@ -8915,19 +9310,20 @@ static void director_start_reloaded(DirectorApp *app)
         return;
     }
 
-    GPtrArray *argv = g_ptr_array_new_with_free_func(g_free);
-    g_ptr_array_add(argv, g_strdup(executable));
-    for(gint i = 0; i < extra_argc; i++)
-        g_ptr_array_add(argv, g_strdup(extra_argv[i]));
+    gchar **argv = g_new0(gchar*, (gsize)extra_argc + 2u);
+    argv[0] = g_strdup(executable);
+    for(gint i = 0; i < extra_argc; i++) {
+        argv[i + 1] = extra_argv[i];
+        extra_argv[i] = NULL;
+    }
     g_strfreev(extra_argv);
-    g_ptr_array_add(argv, NULL);
 
     GSubprocessLauncher *launcher = g_subprocess_launcher_new(
         G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE);
     app->reloaded_process = g_subprocess_launcher_spawnv(
-        launcher, (const gchar * const*)argv->pdata, &error);
+        launcher, (const gchar * const*)argv, &error);
     g_object_unref(launcher);
-    g_ptr_array_free(argv, TRUE);
+    g_strfreev(argv);
     if(!app->reloaded_process) {
         director_error_dialog(app, error ? error->message : "Cannot start Reloaded");
         director_log(app, "Reloaded launch failed: %s",
@@ -9057,23 +9453,26 @@ static void director_start_reloaded_for_instance(DirectorApp *app,
         return;
     }
 
-    GPtrArray *argv = g_ptr_array_new_with_free_func(g_free);
-    g_ptr_array_add(argv, g_strdup(executable));
-    for(gint i = 0; i < extra_argc; i++)
-        g_ptr_array_add(argv, g_strdup(extra_argv[i]));
+    gchar **argv = g_new0(gchar*, (gsize)extra_argc + 6u);
+    gsize pos = 0;
+    argv[pos++] = g_strdup(executable);
+    for(gint i = 0; i < extra_argc; i++) {
+        argv[pos++] = extra_argv[i];
+        extra_argv[i] = NULL;
+    }
     g_strfreev(extra_argv);
-    g_ptr_array_add(argv, g_strdup("-h"));
-    g_ptr_array_add(argv, g_strdup(instance->host && *instance->host ? instance->host : "127.0.0.1"));
-    g_ptr_array_add(argv, g_strdup("-p"));
-    g_ptr_array_add(argv, g_strdup_printf("%d", instance->port));
-    g_ptr_array_add(argv, NULL);
+    argv[pos++] = g_strdup("-h");
+    argv[pos++] = g_strdup(instance->host && *instance->host ?
+                           instance->host : "127.0.0.1");
+    argv[pos++] = g_strdup("-p");
+    argv[pos++] = g_strdup_printf("%d", instance->port);
 
     GSubprocessLauncher *launcher = g_subprocess_launcher_new(
         G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE);
     instance->reloaded_process = g_subprocess_launcher_spawnv(
-        launcher, (const gchar * const*)argv->pdata, &error);
+        launcher, (const gchar * const*)argv, &error);
     g_object_unref(launcher);
-    g_ptr_array_free(argv, TRUE);
+    g_strfreev(argv);
     if(!instance->reloaded_process) {
         if(show_errors)
             director_error_dialog(app, error ? error->message : "Cannot start Reloaded");
@@ -10767,6 +11166,17 @@ static void on_apply_instance(GtkButton *button, gpointer data)
         GTK_TOGGLE_BUTTON(app->check_preview_headless));
     gboolean new_managed = gtk_toggle_button_get_active(
         GTK_TOGGLE_BUTTON(app->check_managed));
+    const gboolean requested_ndi_input = new_role != DIRECTOR_ROLE_OUTPUT &&
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_input));
+    const gchar *requested_ndi_source = director_ndi_source_text(app);
+    const gboolean requested_ndi_output =
+        gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_output));
+    const gchar *requested_ndi_output_name =
+        gtk_entry_get_text(GTK_ENTRY(app->entry_ndi_output_name));
+    if(requested_ndi_input) {
+        new_source_id = "";
+        new_source_host = "";
+    }
     const gchar *new_executable = gtk_entry_get_text(GTK_ENTRY(app->entry_executable));
     if(!new_host || !*new_host || !new_executable || !*new_executable) {
         director_error_dialog(app, "Control host and VeeJay executable may not be empty.");
@@ -10867,17 +11277,37 @@ static void on_apply_instance(GtkButton *button, gpointer data)
         }
     }
 
+    if(requested_ndi_input && (!requested_ndi_source || !*requested_ndi_source)) {
+        director_error_dialog(app, "NDI input is enabled, but no source name is selected.");
+        return;
+    }
+    if(requested_ndi_input &&
+       strlen(requested_ndi_source) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
+        director_error_dialog(app, "The NDI source name exceeds 253 characters.");
+        return;
+    }
+    if(requested_ndi_output && (!requested_ndi_output_name || !*requested_ndi_output_name)) {
+        director_error_dialog(app, "NDI output is enabled, but the sender name is empty.");
+        return;
+    }
+    if(requested_ndi_output &&
+       strlen(requested_ndi_output_name) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
+        director_error_dialog(app, "The NDI sender name exceeds 253 characters.");
+        return;
+    }
+
     DirectorStartupMode requested_startup =
         (DirectorStartupMode)gtk_combo_box_get_active(GTK_COMBO_BOX(app->combo_startup_source));
-    if(new_role != DIRECTOR_ROLE_OUTPUT && requested_startup == DIRECTOR_STARTUP_MEDIA &&
+    if(!requested_ndi_input && new_role != DIRECTOR_ROLE_OUTPUT &&
+       requested_startup == DIRECTOR_STARTUP_MEDIA &&
        (!instance->media_files || instance->media_files->len == 0)) {
         director_error_dialog(app, "Video files is selected as the startup source, but the Media Bank is empty.");
         return;
     }
-    if(new_role == DIRECTOR_ROLE_OUTPUT)
+    if(new_role == DIRECTOR_ROLE_OUTPUT || requested_ndi_input)
         requested_startup = DIRECTOR_STARTUP_BLANK;
 
-    if(requested_startup == DIRECTOR_STARTUP_MEDIA && instance->media_files) {
+    if(!requested_ndi_input && requested_startup == DIRECTOR_STARTUP_MEDIA && instance->media_files) {
         for(guint i = 0; i < instance->media_files->len; i++) {
             const gchar *path = g_ptr_array_index(instance->media_files, i);
             if(!path || !*path || !g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
@@ -10912,6 +11342,11 @@ static void on_apply_instance(GtkButton *button, gpointer data)
         gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(app->spin_capture_device));
     const gint requested_generator_stream =
         gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(app->spin_generator_stream));
+    if(requested_ndi_input && (requested_capture_device >= 0 || requested_generator_stream >= 0)) {
+        director_error_dialog(app,
+            "NDI input cannot be combined with capture-device or generator overrides.");
+        return;
+    }
     if(requested_capture_device >= 0 && requested_generator_stream >= 0) {
         director_error_dialog(app,
             "Capture-device and generator startup overrides cannot both be enabled.");
@@ -11024,6 +11459,12 @@ static void on_apply_instance(GtkButton *button, gpointer data)
     instance->audio_rate = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(app->spin_audio_rate));
     instance->audio_channels = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(app->spin_audio_channels));
     instance->audio_bits = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(app->spin_audio_bits));
+    instance->ndi_input_enabled = requested_ndi_input;
+    replace_owned_string(&instance->ndi_source_name, requested_ndi_source);
+    instance->ndi_output_enabled = requested_ndi_output;
+    replace_owned_string(&instance->ndi_output_name, requested_ndi_output_name);
+    instance->ndi_tally_enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_tally));
+    instance->ndi_follow_clock = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_follow_clock));
     instance->scene_detection = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(app->spin_scene_detection));
     instance->capture_device = requested_capture_device;
     instance->generator_stream = requested_generator_stream;
@@ -13462,6 +13903,36 @@ static gchar *director_workspace_route(const DirectorShow *show,
                                instance->source_host, instance->source_port);
     }
 
+    if(instance->ndi_input_enabled) {
+        if(route->len)
+            g_string_append(route, " · ");
+        const gchar *source = instance->live_ndi_source && *instance->live_ndi_source ?
+                              instance->live_ndi_source :
+                              (instance->ndi_source_name && *instance->ndi_source_name ?
+                               instance->ndi_source_name : "unselected");
+        if(instance->last_ndi_status && instance->live_ndi_rx_enabled)
+            g_string_append_printf(route, "NDI RX ← %s · %s · %" G_GUINT64_FORMAT "v/%" G_GUINT64_FORMAT "a",
+                                   source, instance->live_ndi_rx_connected ? "online" : "waiting",
+                                   instance->live_ndi_rx_video_frames,
+                                   instance->live_ndi_rx_audio_frames);
+        else
+            g_string_append_printf(route, "NDI RX ← %s", source);
+    }
+    if(instance->ndi_output_enabled) {
+        if(route->len)
+            g_string_append(route, " · ");
+        const gchar *name = instance->live_ndi_tx_name && *instance->live_ndi_tx_name ?
+                            instance->live_ndi_tx_name :
+                            (instance->ndi_output_name && *instance->ndi_output_name ?
+                             instance->ndi_output_name : "unnamed");
+        if(instance->last_ndi_status && instance->live_ndi_tx_enabled)
+            g_string_append_printf(route, "NDI TX → %s · %d receiver%s",
+                                   name, instance->live_ndi_tx_connections,
+                                   instance->live_ndi_tx_connections == 1 ? "" : "s");
+        else
+            g_string_append_printf(route, "NDI TX → %s", name);
+    }
+
     if(instance->control_mode == DIRECTOR_CONTROL_PREVIEW) {
         DirectorInstance *master = instance->master_instance_id && *instance->master_instance_id ?
             director_show_find_instance((DirectorShow*)show, instance->master_instance_id) : NULL;
@@ -14038,6 +14509,8 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         const gboolean hover_target = app->stage_wire_dragging &&
             app->stage_wire_hover_target == instance && instance != app->stage_wire_source;
         const gboolean connected_input = director_instance_has_configured_video_route(instance);
+        const gboolean ndi_input = instance->ndi_input_enabled && instance->ndi_source_name &&
+                                   *instance->ndi_source_name;
         const gboolean wall_input = instance->split_master_instance_id &&
                                     *instance->split_master_instance_id;
 
@@ -14107,6 +14580,7 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
                             instance->split_row + 1,
                             instance->split_column + 1) : NULL;
         const gchar *input_label = wall_input ? wall_input_label :
+            ndi_input ? "NDI IN · video + audio" :
             instance->role == DIRECTOR_ROLE_OUTPUT ?
             (manual_input ? "PRIMARY IN · manual" :
              connected_input ? "PRIMARY IN · connected" : "PRIMARY IN") :
@@ -14114,8 +14588,8 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         cairo_move_to(cr, x + 16.0, y + 86.0);
         cairo_show_text(cr, input_label);
         g_free(wall_input_label);
-        cairo_move_to(cr, x + w - 72.0, y + 86.0);
-        cairo_show_text(cr, "VIDEO OUT");
+        cairo_move_to(cr, x + w - 92.0, y + 86.0);
+        cairo_show_text(cr, instance->ndi_output_enabled ? "VIDEO OUT · NDI" : "VIDEO OUT");
 
         cairo_arc(cr, x, y + h * 0.5, 9.0, 0, 2.0 * G_PI);
         if(wall_input)
@@ -15091,7 +15565,7 @@ static gboolean on_stage_canvas_motion(GtkWidget *widget, GdkEventMotion *event,
         app->stage_pointer_y = event->y;
         DirectorInstance *target = director_stage_hit_wiring_input(app, event->x, event->y);
         app->stage_wire_hover_target =
-            target && target != app->stage_wire_source &&
+            target && target != app->stage_wire_source && !target->ndi_input_enabled &&
             !director_video_wire_would_cycle(app, app->stage_wire_source, target) ? target : NULL;
         gtk_widget_queue_draw(widget);
         return TRUE;
@@ -15164,7 +15638,10 @@ static gboolean on_stage_canvas_release(GtkWidget *widget, GdkEventButton *event
         app->stage_wire_hover_target = NULL;
         if(target && target != source) {
             director_workspace_select_instance(app, target);
-            director_stage_connect_video(app, source, target);
+            if(target->ndi_input_enabled)
+                director_error_dialog(app, "Disable NDI input before connecting a VeeJay video wire.");
+            else
+                director_stage_connect_video(app, source, target);
         }
         gtk_widget_queue_draw(widget);
         return TRUE;
@@ -17033,6 +17510,45 @@ static GtkWidget *director_build_instance_page(DirectorApp *app)
     gtk_container_add(GTK_CONTAINER(audio_frame), audio_grid);
     gtk_box_pack_start(GTK_BOX(advanced_box), audio_frame, FALSE, FALSE, 0);
 
+    GtkWidget *ndi_frame = director_section_frame_new("NDI network video and audio");
+    GtkWidget *ndi_grid = gtk_grid_new();
+    gtk_grid_set_row_spacing(GTK_GRID(ndi_grid), 8);
+    gtk_grid_set_column_spacing(GTK_GRID(ndi_grid), 12);
+    gtk_container_set_border_width(GTK_CONTAINER(ndi_grid), 10);
+    app->check_ndi_input = director_check_button_new("Receive an NDI source");
+    app->combo_ndi_source = gtk_combo_box_text_new_with_entry();
+    app->button_ndi_refresh = gtk_button_new_with_label("Discover sources");
+    app->check_ndi_output = director_check_button_new("Publish this instance as NDI");
+    app->entry_ndi_output_name = gtk_entry_new();
+    gtk_entry_set_text(GTK_ENTRY(app->entry_ndi_output_name), "VeeJay Program");
+    app->check_ndi_tally = director_check_button_new("Send Program/Preview tally to input");
+    app->check_ndi_follow_clock = director_check_button_new("Follow NDI source timestamps while healthy");
+    app->ndi_runtime_label = gtk_label_new("NDI discovery starting…");
+    gtk_widget_set_halign(app->ndi_runtime_label, GTK_ALIGN_START);
+    gtk_label_set_ellipsize(GTK_LABEL(app->ndi_runtime_label), PANGO_ELLIPSIZE_END);
+    gtk_label_set_max_width_chars(GTK_LABEL(app->ndi_runtime_label), 96);
+    app->ndi_backend_label = gtk_label_new("Backend NDI status unavailable until connected");
+    gtk_widget_set_halign(app->ndi_backend_label, GTK_ALIGN_START);
+    gtk_label_set_ellipsize(GTK_LABEL(app->ndi_backend_label), PANGO_ELLIPSIZE_END);
+    gtk_label_set_max_width_chars(GTK_LABEL(app->ndi_backend_label), 96);
+    app->ndi_spinner = gtk_spinner_new();
+    gtk_widget_set_no_show_all(app->ndi_spinner, TRUE);
+    gtk_widget_hide(app->ndi_spinner);
+    GtkWidget *ndi_source_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(ndi_source_box), app->combo_ndi_source, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(ndi_source_box), app->ndi_spinner, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(ndi_source_box), app->button_ndi_refresh, FALSE, FALSE, 0);
+    director_grid_attach(ndi_grid, app->check_ndi_input, 0, 0, 1);
+    director_grid_attach(ndi_grid, director_labeled_widget("NDI input source", ndi_source_box), 0, 1, 2);
+    director_grid_attach(ndi_grid, app->check_ndi_tally, 0, 2, 1);
+    director_grid_attach(ndi_grid, app->check_ndi_follow_clock, 1, 2, 1);
+    director_grid_attach(ndi_grid, app->check_ndi_output, 0, 3, 1);
+    director_grid_attach(ndi_grid, director_labeled_widget("NDI sender name", app->entry_ndi_output_name), 1, 3, 1);
+    director_grid_attach(ndi_grid, app->ndi_runtime_label, 0, 4, 2);
+    director_grid_attach(ndi_grid, app->ndi_backend_label, 0, 5, 2);
+    gtk_container_add(GTK_CONTAINER(ndi_frame), ndi_grid);
+    gtk_box_pack_start(GTK_BOX(advanced_box), ndi_frame, FALSE, FALSE, 0);
+
     GtkWidget *resource_frame = director_section_frame_new("Cache and diagnostics");
     GtkWidget *resource_grid = gtk_grid_new();
     gtk_grid_set_row_spacing(GTK_GRID(resource_grid), 8);
@@ -17164,6 +17680,16 @@ static GtkWidget *director_build_instance_page(DirectorApp *app)
     g_signal_connect(app->spin_audio_rate, "value-changed", G_CALLBACK(on_startup_controls_changed), app);
     g_signal_connect(app->spin_audio_channels, "value-changed", G_CALLBACK(on_startup_controls_changed), app);
     g_signal_connect(app->spin_audio_bits, "value-changed", G_CALLBACK(on_startup_controls_changed), app);
+    g_signal_connect(app->check_ndi_input, "toggled", G_CALLBACK(on_startup_controls_changed), app);
+    g_signal_connect(app->combo_ndi_source, "changed", G_CALLBACK(on_ndi_source_changed), app);
+    GtkWidget *ndi_source_entry = gtk_bin_get_child(GTK_BIN(app->combo_ndi_source));
+    if(GTK_IS_ENTRY(ndi_source_entry))
+        g_signal_connect(ndi_source_entry, "changed", G_CALLBACK(on_ndi_source_changed), app);
+    g_signal_connect(app->button_ndi_refresh, "clicked", G_CALLBACK(on_ndi_refresh), app);
+    g_signal_connect(app->check_ndi_output, "toggled", G_CALLBACK(on_startup_controls_changed), app);
+    g_signal_connect(app->entry_ndi_output_name, "changed", G_CALLBACK(on_startup_controls_changed), app);
+    g_signal_connect(app->check_ndi_tally, "toggled", G_CALLBACK(on_startup_controls_changed), app);
+    g_signal_connect(app->check_ndi_follow_clock, "toggled", G_CALLBACK(on_startup_controls_changed), app);
     g_signal_connect(app->spin_scene_detection, "value-changed", G_CALLBACK(on_startup_controls_changed), app);
     g_signal_connect(app->spin_capture_device, "value-changed", G_CALLBACK(on_startup_controls_changed), app);
     g_signal_connect(app->spin_generator_stream, "value-changed", G_CALLBACK(on_startup_controls_changed), app);
@@ -17839,6 +18365,8 @@ static void director_activate(GtkApplication *application, gpointer data)
     app->show = director_default_show();
     app->selected_slice = 0;
     director_build_ui(app);
+    app->ndi_discovery = director_ndi_discovery_new(director_ndi_discovery_update, app);
+    director_ndi_discovery_start(app->ndi_discovery);
     if(!app->suppress_startup_chooser)
         director_choose_workbench(app);
     app->source_preview_stop = FALSE;
@@ -17886,6 +18414,19 @@ static void director_shutdown(GApplication *application, gpointer data)
     app->shutting_down = TRUE;
     director_eidolon_close_all_views(app);
     director_discovery_stop(app);
+    if(app->ndi_discovery) {
+        director_ndi_discovery_free(app->ndi_discovery);
+        app->ndi_discovery = NULL;
+    }
+    if(app->ndi_sources) {
+        g_ptr_array_free(app->ndi_sources, TRUE);
+        app->ndi_sources = NULL;
+    }
+    g_clear_pointer(&app->ndi_last_update_text, g_free);
+    g_clear_pointer(&app->ndi_discovery_version, g_free);
+    g_clear_pointer(&app->ndi_discovery_error, g_free);
+    g_clear_pointer(&app->ndi_logged_error, g_free);
+    director_ndi_shutdown();
     if(app->live_ui_idle) {
         g_source_remove(app->live_ui_idle);
         app->live_ui_idle = 0;

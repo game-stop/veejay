@@ -7,6 +7,7 @@ AM_CPPFLAGS = \
     -I$(top_srcdir)/src \
     $(VEEJAYCORE_CFLAGS) \
     $(GTK_CFLAGS) \
+    $(NDI_CFLAGS) \
     -DGNOMELOCALEDIR=\"$(datadir)/locale\" \
     -DRELOADED_DATADIR=\"$(reloaded_datadir)\"
 
@@ -20,6 +21,8 @@ veejay_director_SOURCES = \
     director-client.h \
     director-wire.c \
     director-wire.h \
+    director-ndi.c \
+    director-ndi.h \
     director-model.c \
     director-model.h \
     gtkviewportmesh.c \
@@ -36,7 +39,8 @@ veejay_director_LDFLAGS = \
 veejay_director_LDADD = \
     $(GTK_LIBS) \
     $(LIBM_LIBS) \
-    -lgthread-2.0
+    -lgthread-2.0 \
+    $(NDI_LIBS)
 
 director_desktopdir = $(datadir)/applications
 director_desktop_DATA = org.veejay.Director.desktop

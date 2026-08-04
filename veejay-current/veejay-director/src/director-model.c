@@ -157,6 +157,12 @@ DirectorInstance *director_instance_new(const gchar *id, DirectorRole role)
     instance->audio_rate = 48000;
     instance->audio_channels = 2;
     instance->audio_bits = 16;
+    instance->ndi_input_enabled = FALSE;
+    instance->ndi_source_name = g_strdup("");
+    instance->ndi_output_enabled = FALSE;
+    instance->ndi_output_name = g_strdup_printf("VeeJay %s", instance->id);
+    instance->ndi_tally_enabled = TRUE;
+    instance->ndi_follow_clock = FALSE;
     instance->scene_detection = -1;
     instance->capture_device = -1;
     instance->generator_stream = -1;
@@ -266,6 +272,9 @@ DirectorInstance *director_instance_clone_configuration(const DirectorInstance *
     copy->memory_percent = source->memory_percent; copy->max_cache = source->max_cache;
     copy->timer_mode = source->timer_mode; copy->pace_correction_ms = source->pace_correction_ms;
     copy->audio_rate = source->audio_rate; copy->audio_channels = source->audio_channels; copy->audio_bits = source->audio_bits;
+    copy->ndi_input_enabled = source->ndi_input_enabled; COPY_STR(ndi_source_name);
+    copy->ndi_output_enabled = source->ndi_output_enabled; COPY_STR(ndi_output_name);
+    copy->ndi_tally_enabled = source->ndi_tally_enabled; copy->ndi_follow_clock = source->ndi_follow_clock;
     copy->scene_detection = source->scene_detection; copy->capture_device = source->capture_device;
     copy->generator_stream = source->generator_stream; copy->swap_range = source->swap_range;
     copy->dynamic_fx_chain = source->dynamic_fx_chain; copy->fx_custom_defaults = source->fx_custom_defaults;
@@ -318,6 +327,8 @@ void director_instance_free(DirectorInstance *instance)
     g_free(instance->action_file);
     g_free(instance->working_directory);
     g_free(instance->output_file);
+    g_free(instance->ndi_source_name);
+    g_free(instance->ndi_output_name);
     g_free(instance->source_instance_id);
     g_free(instance->source_host);
     g_free(instance->stream_advertise_host);
@@ -332,11 +343,15 @@ void director_instance_free(DirectorInstance *instance)
     g_free(instance->eidolon_extra_args);
     g_free(instance->live_id);
     g_free(instance->live_source);
+    g_free(instance->live_ndi_runtime);
+    g_free(instance->live_ndi_source);
+    g_free(instance->live_ndi_tx_name);
     g_free(instance->last_error);
     g_free(instance->last_instance_status);
     g_free(instance->last_output_status);
     g_free(instance->last_projection_status);
     g_free(instance->last_perf_status);
+    g_free(instance->last_ndi_status);
     g_free(instance->recovery_editlist_path);
     g_free(instance->recovery_samplelist_path);
     if(instance->stages)
@@ -416,6 +431,8 @@ static void director_snapshot_instance_free(DirectorSnapshotInstance *entry)
     g_free(entry->source_host);
     g_free(entry->master_instance_id);
     g_free(entry->master_host);
+    g_free(entry->ndi_source_name);
+    g_free(entry->ndi_output_name);
     g_free(entry->physical.display_id);
     g_free(entry->physical.display_name);
     g_free(entry->physical.display_connector);
@@ -1011,6 +1028,12 @@ DirectorShowSnapshot *director_show_capture_snapshot(DirectorShow *show, const g
         entry->pattern = instance->live_pattern >= 0 ? instance->live_pattern : instance->pattern;
         entry->audio_enabled = instance->audio_enabled;
         entry->audio_muted = instance->audio_muted;
+        entry->ndi_input_enabled = instance->ndi_input_enabled;
+        entry->ndi_source_name = g_strdup(instance->ndi_source_name ? instance->ndi_source_name : "");
+        entry->ndi_output_enabled = instance->ndi_output_enabled;
+        entry->ndi_output_name = g_strdup(instance->ndi_output_name ? instance->ndi_output_name : "VeeJay Program");
+        entry->ndi_tally_enabled = instance->ndi_tally_enabled;
+        entry->ndi_follow_clock = instance->ndi_follow_clock;
         director_venue_output_capture(&entry->physical, instance);
         g_free(entry->physical.instance_id);
         entry->physical.instance_id = NULL;
@@ -1048,6 +1071,14 @@ guint director_show_apply_snapshot_model(DirectorShow *show, const DirectorShowS
         instance->pattern = CLAMP(entry->pattern, 0, 8);
         instance->audio_enabled = entry->audio_enabled;
         instance->audio_muted = entry->audio_muted;
+        instance->ndi_input_enabled = entry->ndi_input_enabled;
+        g_free(instance->ndi_source_name);
+        instance->ndi_source_name = g_strdup(entry->ndi_source_name ? entry->ndi_source_name : "");
+        instance->ndi_output_enabled = entry->ndi_output_enabled;
+        g_free(instance->ndi_output_name);
+        instance->ndi_output_name = g_strdup(entry->ndi_output_name ? entry->ndi_output_name : "VeeJay Program");
+        instance->ndi_tally_enabled = entry->ndi_tally_enabled;
+        instance->ndi_follow_clock = entry->ndi_follow_clock;
         DirectorVenueOutput physical = entry->physical;
         physical.instance_id = instance->id;
         director_venue_output_apply(instance, &physical);
@@ -1093,9 +1124,12 @@ static void key_file_set_projection_config(GKeyFile *file, const gchar *group,
     g_key_file_set_integer(file, group, "projection-source-width", config->source_width);
     g_key_file_set_integer(file, group, "projection-source-height", config->source_height);
     g_key_file_set_integer(file, group, "projection-scale", config->scale);
-    if(config->valid && config->point_count > 0 && config->point_count <= DIRECTOR_MAX_PROJECTION_POINTS)
-        g_key_file_set_double_list(file, group, "projection-points", config->points,
-                                   (gsize)config->point_count * 2u);
+    if(config->valid && config->point_count > 0 && config->point_count <= DIRECTOR_MAX_PROJECTION_POINTS) {
+        const gsize value_count = (gsize)config->point_count * 2u;
+        gdouble points[DIRECTOR_MAX_PROJECTION_POINTS * 2];
+        memcpy(points, config->points, value_count * sizeof(*points));
+        g_key_file_set_double_list(file, group, "projection-points", points, value_count);
+    }
 }
 
 static void key_file_get_projection_config(GKeyFile *file, const gchar *group,
@@ -1322,6 +1356,12 @@ gboolean director_show_save(DirectorShow *show, const gchar *path, GError **erro
         g_key_file_set_integer(file, group, "audio-rate", instance->audio_rate);
         g_key_file_set_integer(file, group, "audio-channels", instance->audio_channels);
         g_key_file_set_integer(file, group, "audio-bits", instance->audio_bits);
+        g_key_file_set_boolean(file, group, "ndi-input-enabled", instance->ndi_input_enabled);
+        g_key_file_set_string(file, group, "ndi-source-name", instance->ndi_source_name ? instance->ndi_source_name : "");
+        g_key_file_set_boolean(file, group, "ndi-output-enabled", instance->ndi_output_enabled);
+        g_key_file_set_string(file, group, "ndi-output-name", instance->ndi_output_name ? instance->ndi_output_name : "VeeJay Program");
+        g_key_file_set_boolean(file, group, "ndi-tally-enabled", instance->ndi_tally_enabled);
+        g_key_file_set_boolean(file, group, "ndi-follow-clock", instance->ndi_follow_clock);
         g_key_file_set_integer(file, group, "scene-detection", instance->scene_detection);
         g_key_file_set_integer(file, group, "capture-device", instance->calibration_camera ? -1 : instance->capture_device);
         g_key_file_set_integer(file, group, "generator-stream", instance->generator_stream);
@@ -1489,6 +1529,12 @@ gboolean director_show_save(DirectorShow *show, const gchar *path, GError **erro
             g_key_file_set_integer(file, group, "pattern", entry->pattern);
             g_key_file_set_boolean(file, group, "audio-enabled", entry->audio_enabled);
             g_key_file_set_boolean(file, group, "audio-muted", entry->audio_muted);
+            g_key_file_set_boolean(file, group, "ndi-input-enabled", entry->ndi_input_enabled);
+            g_key_file_set_string(file, group, "ndi-source-name", entry->ndi_source_name ? entry->ndi_source_name : "");
+            g_key_file_set_boolean(file, group, "ndi-output-enabled", entry->ndi_output_enabled);
+            g_key_file_set_string(file, group, "ndi-output-name", entry->ndi_output_name ? entry->ndi_output_name : "VeeJay Program");
+            g_key_file_set_boolean(file, group, "ndi-tally-enabled", entry->ndi_tally_enabled);
+            g_key_file_set_boolean(file, group, "ndi-follow-clock", entry->ndi_follow_clock);
             DirectorVenueOutput physical = entry->physical;
             physical.instance_id = entry->instance_id;
             key_file_set_venue_output(file, group, &physical);
@@ -1727,6 +1773,14 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
         instance->audio_rate = clamp_int(key_file_get_integer_default(file, group, "audio-rate", 48000), 8000, 384000);
         instance->audio_channels = clamp_int(key_file_get_integer_default(file, group, "audio-channels", 2), 1, 32);
         instance->audio_bits = clamp_int(key_file_get_integer_default(file, group, "audio-bits", 16), 8, 64);
+        instance->ndi_input_enabled = key_file_get_boolean_default(file, group, "ndi-input-enabled", FALSE);
+        g_free(instance->ndi_source_name);
+        instance->ndi_source_name = key_file_get_string_default(file, group, "ndi-source-name", "");
+        instance->ndi_output_enabled = key_file_get_boolean_default(file, group, "ndi-output-enabled", FALSE);
+        g_free(instance->ndi_output_name);
+        instance->ndi_output_name = key_file_get_string_default(file, group, "ndi-output-name", "VeeJay Program");
+        instance->ndi_tally_enabled = key_file_get_boolean_default(file, group, "ndi-tally-enabled", TRUE);
+        instance->ndi_follow_clock = key_file_get_boolean_default(file, group, "ndi-follow-clock", FALSE);
         instance->scene_detection = clamp_int(key_file_get_integer_default(file, group, "scene-detection", -1), -1, 1000000);
         instance->capture_device = clamp_int(key_file_get_integer_default(file, group, "capture-device", -1), -1, 255);
         instance->generator_stream = clamp_int(key_file_get_integer_default(file, group, "generator-stream", -1), -1, 255);
@@ -2014,6 +2068,12 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
             entry->pattern = clamp_int(key_file_get_integer_default(file, group, "pattern", 0), 0, 8);
             entry->audio_enabled = key_file_get_boolean_default(file, group, "audio-enabled", TRUE);
             entry->audio_muted = key_file_get_boolean_default(file, group, "audio-muted", FALSE);
+            entry->ndi_input_enabled = key_file_get_boolean_default(file, group, "ndi-input-enabled", FALSE);
+            entry->ndi_source_name = key_file_get_string_default(file, group, "ndi-source-name", "");
+            entry->ndi_output_enabled = key_file_get_boolean_default(file, group, "ndi-output-enabled", FALSE);
+            entry->ndi_output_name = key_file_get_string_default(file, group, "ndi-output-name", "VeeJay Program");
+            entry->ndi_tally_enabled = key_file_get_boolean_default(file, group, "ndi-tally-enabled", TRUE);
+            entry->ndi_follow_clock = key_file_get_boolean_default(file, group, "ndi-follow-clock", FALSE);
             entry->physical = *physical;
             g_free(entry->physical.instance_id);
             entry->physical.instance_id = NULL;
@@ -2065,7 +2125,9 @@ static gboolean director_extra_arg_reserved(const gchar *arg, DirectorRole role)
         "--swap-range", "--dynamic-fx-chain", "--split-screen",
         "--fx-custom-default-values", "--preserve-pathnames", "--bezerk",
         "--multicast-osc", "--multicast-vims",
-        "--sample-file", "--action-file", "--capture-device", "--load-generators", NULL
+        "--sample-file", "--action-file", "--capture-device", "--load-generators",
+        "--ndi-receive", "--ndi-list", "--ndi-send", "--ndi-name",
+        "--ndi-no-tally", "--ndi-follow-clock", NULL
     };
 
     for(gint i = 0; long_options[i]; i++) {
@@ -2104,6 +2166,18 @@ static void argv_add_double(GPtrArray *argv, gdouble value)
     gchar buffer[64];
     g_ascii_dtostr(buffer, sizeof(buffer), value);
     argv_add(argv, buffer);
+}
+
+static gchar **argv_finish(GPtrArray *argv)
+{
+    g_ptr_array_add(argv, NULL);
+    gchar **result = g_new0(gchar*, argv->len);
+    for(guint i = 0; i < argv->len; i++) {
+        result[i] = g_ptr_array_index(argv, i);
+        argv->pdata[i] = NULL;
+    }
+    g_ptr_array_free(argv, TRUE);
+    return result;
 }
 
 static gboolean director_output_driver_needs_file(gint driver)
@@ -2221,6 +2295,50 @@ gchar **director_instance_build_argv(const DirectorShow *show,
         instance->preview_headless)) {
         g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
                     "Instance '%s' uses Preview-only options outside Preview mode", instance->id);
+        return NULL;
+    }
+
+    if(instance->ndi_input_enabled) {
+        if(instance->role == DIRECTOR_ROLE_OUTPUT) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Output instance '%s' cannot use an NDI source directly", instance->id);
+            return NULL;
+        }
+        if(!instance->ndi_source_name || !*instance->ndi_source_name) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Instance '%s' has NDI input enabled but no source selected", instance->id);
+            return NULL;
+        }
+        if(strlen(instance->ndi_source_name) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Instance '%s' has an NDI source name longer than %d characters",
+                        instance->id, DIRECTOR_NDI_SOURCE_NAME_MAX);
+            return NULL;
+        }
+        if((instance->source_instance_id && *instance->source_instance_id) ||
+           (instance->source_host && *instance->source_host)) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "NDI input cannot be combined with a managed or manual VeeJay video route");
+            return NULL;
+        }
+        if(instance->startup_mode == DIRECTOR_STARTUP_MEDIA ||
+           instance->capture_device >= 0 || instance->generator_stream >= 0) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "NDI input cannot be combined with startup media, V4L2 capture or generators");
+            return NULL;
+        }
+    }
+    if(instance->ndi_output_enabled &&
+       (!instance->ndi_output_name || !*instance->ndi_output_name)) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                    "Instance '%s' has NDI output enabled but no sender name", instance->id);
+        return NULL;
+    }
+    if(instance->ndi_output_enabled &&
+       strlen(instance->ndi_output_name) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                    "Instance '%s' has an NDI sender name longer than %d characters",
+                    instance->id, DIRECTOR_NDI_SOURCE_NAME_MAX);
         return NULL;
     }
 
@@ -2352,6 +2470,22 @@ gchar **director_instance_build_argv(const DirectorShow *show,
             g_ptr_array_add(argv, g_strdup_printf("%s:%d", host, port));
         }
     }
+    else if(instance->ndi_input_enabled) {
+        const gint input_width = instance->input_width > 0 ?
+                                 instance->input_width : instance->output_width;
+        const gint input_height = instance->input_height > 0 ?
+                                  instance->input_height : instance->output_height;
+        argv_add(argv, "--ndi-receive");
+        argv_add(argv, instance->ndi_source_name);
+        argv_add(argv, "--source-width");
+        argv_add_int(argv, input_width);
+        argv_add(argv, "--source-height");
+        argv_add_int(argv, input_height);
+        if(!instance->ndi_tally_enabled)
+            argv_add(argv, "--ndi-no-tally");
+        if(instance->ndi_follow_clock)
+            argv_add(argv, "--ndi-follow-clock");
+    }
     else if(instance->startup_mode == DIRECTOR_STARTUP_MEDIA) {
         if(!instance->media_files || instance->media_files->len == 0) {
             g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
@@ -2400,6 +2534,11 @@ gchar **director_instance_build_argv(const DirectorShow *show,
     if(instance->yuv_mode > 0) {
         argv_add(argv, "--yuv");
         argv_add_int(argv, instance->yuv_mode);
+    }
+    if(instance->ndi_output_enabled) {
+        argv_add(argv, "--ndi-send");
+        argv_add(argv, "--ndi-name");
+        argv_add(argv, instance->ndi_output_name);
     }
 
     argv_add(argv, "--synchronization");
@@ -2527,13 +2666,13 @@ gchar **director_instance_build_argv(const DirectorShow *show,
         g_strfreev(extra_argv);
     }
 
-    if(!output_role && instance->startup_mode == DIRECTOR_STARTUP_MEDIA) {
+    if(!output_role && !instance->ndi_input_enabled &&
+       instance->startup_mode == DIRECTOR_STARTUP_MEDIA) {
         for(guint i = 0; i < instance->media_files->len; i++)
             argv_add(argv, g_ptr_array_index(instance->media_files, i));
     }
 
-    g_ptr_array_add(argv, NULL);
-    return (gchar**)g_ptr_array_free(argv, FALSE);
+    return argv_finish(argv);
 }
 
 gboolean director_instance_is_local(const DirectorInstance *instance)
@@ -2585,6 +2724,54 @@ static gboolean parse_unsigned64(const gchar *value, guint64 *result)
         return FALSE;
     *result = parsed;
     return TRUE;
+}
+
+static gboolean parse_double_ascii(const gchar *value, gdouble *result)
+{
+    gchar *end = NULL;
+    gdouble parsed;
+    if(!value || !*value)
+        return FALSE;
+    parsed = g_ascii_strtod(value, &end);
+    if(end == value || *end != '\0' || !isfinite(parsed))
+        return FALSE;
+    *result = parsed;
+    return TRUE;
+}
+
+static GHashTable *parse_line_key_values(const gchar *text,
+                                         const gchar *header,
+                                         GError **error)
+{
+    if(!text || !header) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Missing line-oriented status response");
+        return NULL;
+    }
+
+    gchar **lines = g_strsplit(text, "\n", -1);
+    if(!lines[0] || g_strcmp0(g_strstrip(lines[0]), header) != 0) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Expected response header '%s'", header);
+        g_strfreev(lines);
+        return NULL;
+    }
+
+    GHashTable *values = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+    for(gint i = 1; lines[i]; i++) {
+        gchar *line = g_strstrip(lines[i]);
+        if(!*line)
+            continue;
+        gchar *equals = strchr(line, '=');
+        if(!equals || equals == line)
+            continue;
+        *equals = '\0';
+        gchar *key = g_strstrip(line);
+        gchar *value = g_strstrip(equals + 1);
+        g_hash_table_replace(values, g_strdup(key), g_strdup(value));
+    }
+    g_strfreev(lines);
+    return values;
 }
 
 static GHashTable *parse_key_values(const gchar *text, const gchar *prefix,
@@ -3006,6 +3193,90 @@ gboolean director_instance_parse_perf_status(DirectorInstance *instance,
     }
     director_instance_append_perf_history(instance);
     replace_string(&instance->last_perf_status, text);
+    g_hash_table_destroy(values);
+    return TRUE;
+}
+
+gboolean director_instance_parse_ndi_status(DirectorInstance *instance,
+                                            const gchar *text,
+                                            GError **error)
+{
+    if(!instance) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Missing instance for VJNDI response");
+        return FALSE;
+    }
+
+    GHashTable *values = parse_line_key_values(text, "VJNDI 1", error);
+    if(!values)
+        return FALSE;
+
+    const gchar *runtime = g_hash_table_lookup(values, "runtime");
+    const gchar *rx_enabled = g_hash_table_lookup(values, "rx.enabled");
+    const gchar *tx_enabled = g_hash_table_lookup(values, "tx.enabled");
+    gint rx_flag = 0;
+    gint tx_flag = 0;
+    if(!runtime || !parse_signed(rx_enabled, &rx_flag) ||
+       !parse_signed(tx_enabled, &tx_flag)) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Incomplete VJNDI response");
+        g_hash_table_destroy(values);
+        return FALSE;
+    }
+
+    gint signed_value = 0;
+    guint64 counter = 0;
+    gdouble drift = 0.0;
+    replace_string(&instance->live_ndi_runtime, runtime);
+    replace_string(&instance->live_ndi_source,
+                   g_hash_table_lookup(values, "rx.source"));
+    replace_string(&instance->live_ndi_tx_name,
+                   g_hash_table_lookup(values, "tx.name"));
+    instance->live_ndi_rx_enabled = rx_flag != 0;
+    instance->live_ndi_tx_enabled = tx_flag != 0;
+
+    instance->live_ndi_rx_connected =
+        parse_signed(g_hash_table_lookup(values, "rx.connected"), &signed_value) &&
+        signed_value > 0;
+    signed_value = 0;
+    instance->live_ndi_tx_connections =
+        parse_signed(g_hash_table_lookup(values, "tx.connections"), &signed_value) ?
+        MAX(0, signed_value) : 0;
+
+    instance->live_ndi_rx_video_frames =
+        parse_unsigned64(g_hash_table_lookup(values, "rx.video"), &counter) ? counter : 0;
+    counter = 0;
+    instance->live_ndi_rx_audio_frames =
+        parse_unsigned64(g_hash_table_lookup(values, "rx.audio"), &counter) ? counter : 0;
+    counter = 0;
+    instance->live_ndi_rx_dropped_video_frames =
+        parse_unsigned64(g_hash_table_lookup(values, "rx.drop_video"), &counter) ? counter : 0;
+    counter = 0;
+    instance->live_ndi_rx_dropped_audio_frames =
+        parse_unsigned64(g_hash_table_lookup(values, "rx.drop_audio"), &counter) ? counter : 0;
+    counter = 0;
+    instance->live_ndi_rx_audio_underruns =
+        parse_unsigned64(g_hash_table_lookup(values, "rx.audio_underruns"), &counter) ? counter : 0;
+    counter = 0;
+    instance->live_ndi_tx_video_frames =
+        parse_unsigned64(g_hash_table_lookup(values, "tx.video"), &counter) ? counter : 0;
+    counter = 0;
+    instance->live_ndi_tx_audio_frames =
+        parse_unsigned64(g_hash_table_lookup(values, "tx.audio"), &counter) ? counter : 0;
+
+    signed_value = 0;
+    instance->live_ndi_clock_available =
+        parse_signed(g_hash_table_lookup(values, "rx.clock_available"), &signed_value) &&
+        signed_value != 0;
+    signed_value = 0;
+    instance->live_ndi_clock_age_ms =
+        parse_signed(g_hash_table_lookup(values, "rx.clock_age_ms"), &signed_value) ?
+        MAX(0, signed_value) : 0;
+    instance->live_ndi_clock_drift_ms =
+        parse_double_ascii(g_hash_table_lookup(values, "rx.clock_drift_ms"), &drift) ?
+        drift : 0.0;
+
+    replace_string(&instance->last_ndi_status, text);
     g_hash_table_destroy(values);
     return TRUE;
 }

@@ -111,6 +111,7 @@ am_veejay_director_OBJECTS =  \
 	veejay_director-veejay-director.$(OBJEXT) \
 	veejay_director-director-client.$(OBJEXT) \
 	veejay_director-director-wire.$(OBJEXT) \
+	veejay_director-director-ndi.$(OBJEXT) \
 	veejay_director-director-model.$(OBJEXT) \
 	veejay_director-gtkviewportmesh.$(OBJEXT) \
 	veejay_director-gtkvjlogview.$(OBJEXT) \
@@ -118,7 +119,7 @@ am_veejay_director_OBJECTS =  \
 veejay_director_OBJECTS = $(am_veejay_director_OBJECTS)
 am__DEPENDENCIES_1 =
 veejay_director_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -144,6 +145,7 @@ depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__maybe_remake_depfiles = depfiles
 am__depfiles_remade = ./$(DEPDIR)/veejay_director-director-client.Po \
 	./$(DEPDIR)/veejay_director-director-model.Po \
+	./$(DEPDIR)/veejay_director-director-ndi.Po \
 	./$(DEPDIR)/veejay_director-director-presets.Po \
 	./$(DEPDIR)/veejay_director-director-wire.Po \
 	./$(DEPDIR)/veejay_director-gtkviewportmesh.Po \
@@ -289,6 +291,8 @@ MAINT = @MAINT@
 MAKEINFO = @MAKEINFO@
 MANIFEST_TOOL = @MANIFEST_TOOL@
 MKDIR_P = @MKDIR_P@
+NDI_CFLAGS = @NDI_CFLAGS@
+NDI_LIBS = @NDI_LIBS@
 NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
@@ -393,6 +397,7 @@ AM_CPPFLAGS = \
     -I$(top_srcdir)/src \
     $(VEEJAYCORE_CFLAGS) \
     $(GTK_CFLAGS) \
+    $(NDI_CFLAGS) \
     -DGNOMELOCALEDIR=\"$(datadir)/locale\" \
     -DRELOADED_DATADIR=\"$(reloaded_datadir)\"
 
@@ -403,6 +408,8 @@ veejay_director_SOURCES = \
     director-client.h \
     director-wire.c \
     director-wire.h \
+    director-ndi.c \
+    director-ndi.h \
     director-model.c \
     director-model.h \
     gtkviewportmesh.c \
@@ -419,7 +426,8 @@ veejay_director_LDFLAGS = \
 veejay_director_LDADD = \
     $(GTK_LIBS) \
     $(LIBM_LIBS) \
-    -lgthread-2.0
+    -lgthread-2.0 \
+    $(NDI_LIBS)
 
 director_desktopdir = $(datadir)/applications
 director_desktop_DATA = org.veejay.Director.desktop
@@ -518,6 +526,7 @@ distclean-compile:
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay_director-director-client.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay_director-director-model.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay_director-director-ndi.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay_director-director-presets.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay_director-director-wire.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay_director-gtkviewportmesh.Po@am__quote@ # am--include-marker
@@ -592,6 +601,20 @@ veejay_director-director-wire.obj: director-wire.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='director-wire.c' object='veejay_director-director-wire.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-wire.obj `if test -f 'director-wire.c'; then $(CYGPATH_W) 'director-wire.c'; else $(CYGPATH_W) '$(srcdir)/director-wire.c'; fi`
+
+veejay_director-director-ndi.o: director-ndi.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-ndi.o -MD -MP -MF $(DEPDIR)/veejay_director-director-ndi.Tpo -c -o veejay_director-director-ndi.o `test -f 'director-ndi.c' || echo '$(srcdir)/'`director-ndi.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-ndi.Tpo $(DEPDIR)/veejay_director-director-ndi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='director-ndi.c' object='veejay_director-director-ndi.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-ndi.o `test -f 'director-ndi.c' || echo '$(srcdir)/'`director-ndi.c
+
+veejay_director-director-ndi.obj: director-ndi.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-ndi.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-ndi.Tpo -c -o veejay_director-director-ndi.obj `if test -f 'director-ndi.c'; then $(CYGPATH_W) 'director-ndi.c'; else $(CYGPATH_W) '$(srcdir)/director-ndi.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-ndi.Tpo $(DEPDIR)/veejay_director-director-ndi.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='director-ndi.c' object='veejay_director-director-ndi.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-ndi.obj `if test -f 'director-ndi.c'; then $(CYGPATH_W) 'director-ndi.c'; else $(CYGPATH_W) '$(srcdir)/director-ndi.c'; fi`
 
 veejay_director-director-model.o: director-model.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-model.o -MD -MP -MF $(DEPDIR)/veejay_director-director-model.Tpo -c -o veejay_director-director-model.o `test -f 'director-model.c' || echo '$(srcdir)/'`director-model.c
@@ -805,6 +828,7 @@ clean-am: clean-binPROGRAMS clean-generic clean-libtool mostlyclean-am
 distclean: distclean-am
 		-rm -f ./$(DEPDIR)/veejay_director-director-client.Po
 	-rm -f ./$(DEPDIR)/veejay_director-director-model.Po
+	-rm -f ./$(DEPDIR)/veejay_director-director-ndi.Po
 	-rm -f ./$(DEPDIR)/veejay_director-director-presets.Po
 	-rm -f ./$(DEPDIR)/veejay_director-director-wire.Po
 	-rm -f ./$(DEPDIR)/veejay_director-gtkviewportmesh.Po
@@ -857,6 +881,7 @@ installcheck-am:
 maintainer-clean: maintainer-clean-am
 		-rm -f ./$(DEPDIR)/veejay_director-director-client.Po
 	-rm -f ./$(DEPDIR)/veejay_director-director-model.Po
+	-rm -f ./$(DEPDIR)/veejay_director-director-ndi.Po
 	-rm -f ./$(DEPDIR)/veejay_director-director-presets.Po
 	-rm -f ./$(DEPDIR)/veejay_director-director-wire.Po
 	-rm -f ./$(DEPDIR)/veejay_director-gtkviewportmesh.Po

@@ -28,6 +28,7 @@ G_BEGIN_DECLS
 #define DIRECTOR_MAX_PROJECTION_POINTS (17 * 17)
 #define DIRECTOR_V4L_CONTROL_COUNT 21
 #define DIRECTOR_CAMERA_MAP_INVALID 0xffffffffu
+#define DIRECTOR_NDI_SOURCE_NAME_MAX 253
 
 typedef enum {
     DIRECTOR_ROLE_STANDALONE = 0,
@@ -168,6 +169,12 @@ typedef struct {
     gint pattern;
     gboolean audio_enabled;
     gboolean audio_muted;
+    gboolean ndi_input_enabled;
+    gchar *ndi_source_name;
+    gboolean ndi_output_enabled;
+    gchar *ndi_output_name;
+    gboolean ndi_tally_enabled;
+    gboolean ndi_follow_clock;
     DirectorVenueOutput physical;
 } DirectorSnapshotInstance;
 
@@ -221,6 +228,12 @@ typedef struct {
     gint audio_rate;
     gint audio_channels;
     gint audio_bits;
+    gboolean ndi_input_enabled;
+    gchar *ndi_source_name;
+    gboolean ndi_output_enabled;
+    gchar *ndi_output_name;
+    gboolean ndi_tally_enabled;
+    gboolean ndi_follow_clock;
     gint scene_detection;
     gint capture_device;
     gint generator_stream;
@@ -299,6 +312,24 @@ typedef struct {
     gint wire_source_shm_key;
     guint64 source_sequence;
 
+    gchar *live_ndi_runtime;
+    gchar *live_ndi_source;
+    gchar *live_ndi_tx_name;
+    gboolean live_ndi_rx_enabled;
+    gboolean live_ndi_rx_connected;
+    gboolean live_ndi_tx_enabled;
+    gint live_ndi_tx_connections;
+    guint64 live_ndi_rx_video_frames;
+    guint64 live_ndi_rx_audio_frames;
+    guint64 live_ndi_rx_dropped_video_frames;
+    guint64 live_ndi_rx_dropped_audio_frames;
+    guint64 live_ndi_rx_audio_underruns;
+    guint64 live_ndi_tx_video_frames;
+    guint64 live_ndi_tx_audio_frames;
+    gboolean live_ndi_clock_available;
+    gint live_ndi_clock_age_ms;
+    gdouble live_ndi_clock_drift_ms;
+
     gint graph_width;
     gint graph_height;
     gint pattern;
@@ -345,6 +376,7 @@ typedef struct {
     gchar *last_output_status;
     gchar *last_projection_status;
     gchar *last_perf_status;
+    gchar *last_ndi_status;
 
     GSubprocess *process;
     guint force_stop_timer;
@@ -467,6 +499,9 @@ gboolean director_instance_parse_projection_status(DirectorInstance *instance,
 gboolean director_instance_parse_perf_status(DirectorInstance *instance,
                                              const gchar *text,
                                              GError **error);
+gboolean director_instance_parse_ndi_status(DirectorInstance *instance,
+                                            const gchar *text,
+                                            GError **error);
 DirectorStageMetric *director_instance_find_stage(DirectorInstance *instance,
                                                   const gchar *name);
 

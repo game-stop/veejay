@@ -210,7 +210,7 @@ static gboolean director_query_framed(DirectorClient *client,
 
 static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
 {
-    gdouble instance_ms = 0.0, output_ms = 0.0, perf_ms = 0.0;
+    gdouble instance_ms = 0.0, output_ms = 0.0, perf_ms = 0.0, ndi_ms = 0.0;
     if(!director_query(client, wire, "288:;", DIRECTOR_CLIENT_INSTANCE_STATUS,
                        &instance_ms))
         return FALSE;
@@ -225,7 +225,11 @@ static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
     if(!director_query(client, wire, "282:;", DIRECTOR_CLIENT_PERF_STATUS,
                        &perf_ms))
         return FALSE;
-    client->instance->live_latency_ms = MAX(instance_ms, MAX(output_ms, perf_ms));
+    if(!director_query(client, wire, "290:;", DIRECTOR_CLIENT_NDI_STATUS,
+                       &ndi_ms))
+        return FALSE;
+    client->instance->live_latency_ms =
+        MAX(instance_ms, MAX(output_ms, MAX(perf_ms, ndi_ms)));
     return TRUE;
 }
 

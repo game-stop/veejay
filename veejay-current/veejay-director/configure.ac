@@ -174,6 +174,47 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  have_dl_dlopen=true
 fi
 
+AC_ARG_WITH([ndi],
+  [AS_HELP_STRING([--with-ndi@<:@=DIR@:>@],
+                  [enable optional NDI network video/audio support; look for the SDK headers below DIR])],
+  [with_ndi="$withval"], [with_ndi=auto])
+
+have_ndi=false
+NDI_CFLAGS=""
+NDI_LIBS=""
+if test "x$with_ndi" != "xno"; then
+  ndi_saved_CPPFLAGS="$CPPFLAGS"
+  if test "x$with_ndi" != "xauto" && test "x$with_ndi" != "xyes"; then
+    NDI_CFLAGS="-I$with_ndi -I$with_ndi/include -I$with_ndi/include/ndi"
+    CPPFLAGS="$CPPFLAGS $NDI_CFLAGS"
+  fi
+  AC_CHECK_HEADER([Processing.NDI.Lib.h], [ndi_header=yes], [ndi_header=no])
+  ndi_api=no
+  if test "x$ndi_header" = "xyes"; then
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <Processing.NDI.Lib.h>]], [[
+      const NDIlib_v5 *api = 0;
+      (void)api->find_create_v2;
+      (void)api->recv_create_v3;
+      (void)api->recv_capture_v3;
+      (void)api->recv_free_audio_v3;
+      (void)api->send_send_video_async_v2;
+      (void)api->util_send_send_audio_interleaved_16s;
+    ]])], [ndi_api=yes], [ndi_api=no])
+  fi
+  CPPFLAGS="$ndi_saved_CPPFLAGS"
+  if test "x$ndi_header" = "xyes" && test "x$ndi_api" = "xyes" && test "x$have_dl_dlopen" = "xtrue"; then
+    have_ndi=true
+    NDI_LIBS="-ldl"
+    AC_DEFINE([HAVE_NDI], [1], [Compile optional NDI network video/audio support])
+  elif test "x$with_ndi" != "xauto"; then
+    AC_MSG_ERROR([NDI support requested, but a compatible Processing.NDI.Lib.h or dlopen support is unavailable])
+  else
+    AC_MSG_NOTICE([Compatible NDI SDK headers not found; NDI support will not be built])
+  fi
+fi
+AC_SUBST([NDI_CFLAGS])
+AC_SUBST([NDI_LIBS])
+
 dnl Check for Veejay Core
 have_veejaycore=false
 PKG_CHECK_MODULES( VEEJAYCORE, [veejaycore >= 1.5.67 ],
@@ -736,6 +777,7 @@ AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
+AM_CONDITIONAL(HAVE_NDI, test x$have_ndi = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -854,3 +896,4 @@ AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Optional dependencies:])
 AC_MSG_NOTICE([  - SDL keyboard mapping support  : ${have_sdl}])
+AC_MSG_NOTICE([  - NDI discovery/configuration   : ${have_ndi}])
