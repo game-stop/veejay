@@ -112,6 +112,7 @@ enum {
     VIMS_OUTPUT_SLICE_ENABLE             = 287,
     VIMS_INSTANCE_STATUS                 = 288,
     VIMS_OUTPUT_GRAPH_RESET              = 289,
+    VIMS_NDI_STATUS                       = 290,
 
 	VIMS_SELECT_BANK				=	308,
 	VIMS_SELECT_ID					=	309,
