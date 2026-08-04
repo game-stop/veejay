@@ -4714,7 +4714,7 @@ static void set_tooltip_by_widget(GtkWidget *w, const char *text)
     if(!w)
         return;
 
-    gtk_widget_set_tooltip_text(w, text);
+    gtk_widget_set_tooltip_text(w, (text && *text) ? text : NULL);
 }
 
 static int combo_model_string_column(GtkTreeModel *model)
@@ -4802,7 +4802,7 @@ static void set_tooltip(const char *name, const char *text)
 #endif
         return;
     }
-    gtk_widget_set_tooltip_text(    w,text );
+    set_tooltip_by_widget(w, text);
 }
 
 static struct
@@ -11675,10 +11675,14 @@ static void fx_chain_drag_data_get(GtkWidget *widget,
     (void)time;
     (void)user_data;
 
-    if(target_info != FX_DND_INFO_CHAIN)
+    if(target_info == FX_DND_INFO_EFFECT) {
+        if(fx_chain_dnd_state.source_effect_id > 0)
+            fx_dnd_set_int(selection_data, fx_chain_dnd_state.source_effect_id);
         return;
+    }
 
-    if(fx_chain_dnd_state.source_entry >= 0 &&
+    if(target_info == FX_DND_INFO_CHAIN &&
+       fx_chain_dnd_state.source_entry >= 0 &&
        fx_chain_dnd_state.source_entry < SAMPLE_MAX_EFFECTS &&
        fx_chain_dnd_state.source_effect_id > 0)
         fx_dnd_set_int(selection_data, fx_chain_dnd_state.source_entry);
@@ -11874,17 +11878,18 @@ static void setup_effectchain_drag_and_drop(GtkWidget *tree)
 {
     static GtkTargetEntry source_targets[] = {
         { FX_DND_CHAIN_TARGET, GTK_TARGET_SAME_WIDGET, FX_DND_INFO_CHAIN },
+        { FX_DND_EFFECT_TARGET, GTK_TARGET_SAME_APP, FX_DND_INFO_EFFECT },
     };
     static GtkTargetEntry destination_targets[] = {
-        { FX_DND_EFFECT_TARGET, GTK_TARGET_SAME_APP, FX_DND_INFO_EFFECT },
         { FX_DND_CHAIN_TARGET, GTK_TARGET_SAME_WIDGET, FX_DND_INFO_CHAIN },
+        { FX_DND_EFFECT_TARGET, GTK_TARGET_SAME_APP, FX_DND_INFO_EFFECT },
     };
 
     gtk_drag_source_set(tree,
                         GDK_BUTTON1_MASK,
                         source_targets,
                         G_N_ELEMENTS(source_targets),
-                        GDK_ACTION_MOVE);
+                        GDK_ACTION_COPY | GDK_ACTION_MOVE);
     gtk_drag_dest_set(tree,
                       0,
                       destination_targets,
@@ -12339,6 +12344,94 @@ static gboolean favourite_fx_remove(const gchar *name, gboolean save)
     return TRUE;
 }
 
+static gboolean favourite_fx_add_effect_id(gint effect_id, gboolean save)
+{
+    effect_constr *ec;
+    const gchar *description;
+    gchar *name;
+    gboolean added;
+
+    if(effect_id <= 0 || effect_id >= EFFECT_LIST_SIZE)
+        return FALSE;
+
+    ec = info->effect_info[effect_id];
+    if(!ec || !ec->description)
+        return FALSE;
+
+    description = ec->description;
+    if(strncasecmp(description, "alpha:", 6) == 0)
+        description += 6;
+
+    name = _utf8str(description);
+    if(!name)
+        return FALSE;
+
+    if(favourite_fx_find(name, NULL))
+        added = TRUE;
+    else
+        added = favourite_fx_add(name, save);
+
+    g_free(name);
+    return added;
+}
+
+static void favourite_fx_drag_data_received(GtkWidget *widget,
+                                            GdkDragContext *context,
+                                            gint x,
+                                            gint y,
+                                            GtkSelectionData *selection_data,
+                                            guint target_info,
+                                            guint time,
+                                            gpointer user_data)
+{
+    int effect_id = 0;
+    gboolean success = FALSE;
+
+    (void)x;
+    (void)y;
+    (void)user_data;
+
+    if(target_info != FX_DND_INFO_EFFECT)
+        return;
+
+    if(fx_dnd_get_int(selection_data, &effect_id))
+        success = favourite_fx_add_effect_id(effect_id, TRUE);
+
+    gtk_drag_finish(context, success, FALSE, time);
+    g_signal_stop_emission_by_name(widget, "drag-data-received");
+}
+
+static void setup_favourite_fx_drop_target(GtkWidget *tree)
+{
+    GtkTargetList *targets;
+
+    targets = gtk_drag_dest_get_target_list(tree);
+    if(targets)
+        gtk_target_list_ref(targets);
+    else
+        targets = gtk_target_list_new(NULL, 0);
+
+    gtk_target_list_add(targets,
+                        gdk_atom_intern_static_string(FX_DND_EFFECT_TARGET),
+                        GTK_TARGET_SAME_APP,
+                        FX_DND_INFO_EFFECT);
+
+    gtk_drag_dest_set(tree,
+                      GTK_DEST_DEFAULT_MOTION |
+                      GTK_DEST_DEFAULT_HIGHLIGHT |
+                      GTK_DEST_DEFAULT_DROP,
+                      NULL,
+                      0,
+                      GDK_ACTION_COPY | GDK_ACTION_MOVE);
+    gtk_drag_dest_set_target_list(tree, targets);
+    gtk_target_list_unref(targets);
+
+    g_signal_connect(tree,
+                     "drag-data-received",
+                     G_CALLBACK(favourite_fx_drag_data_received),
+                     NULL);
+}
+
 static void favourite_fx_toggle(const gchar *name)
 {
     if(!favourite_fx_remove(name, FALSE))
@@ -12611,7 +12704,7 @@ void setup_effectlist_info(void)
     set_tooltip_by_widget (trees[0], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[1], tooltips[TOOLTIP_FXSELECT].text);
     set_tooltip_by_widget (trees[2], tooltips[TOOLTIP_ALPHA_EFFECTS].text);
-    set_tooltip_by_widget (trees[3], "Double-click to use an effect. Drag within this list to reorder, or drop it onto an FX chain slot. Delete removes it. Ctrl+Shift-click toggles favourites.");
+    set_tooltip_by_widget(trees[3], "Double-click to use an effect. Drop an effect here from an FX list or the FX chain, drag within this list to reorder, or drop it onto an FX chain slot. Delete removes it. Ctrl+Shift-click toggles favourites.");
 
     fx_list_ = (vevo_port_t*) vpn( 200 );
 
@@ -12643,6 +12736,7 @@ void setup_effectlist_info(void)
     gtk_tree_view_set_model(GTK_TREE_VIEW(trees[3]), GTK_TREE_MODEL(favourite_fx_store));
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(trees[3]), TRUE);
     gtk_tree_view_set_reorderable(GTK_TREE_VIEW(trees[3]), TRUE);
+    setup_favourite_fx_drop_target(trees[3]);
     g_object_unref(G_OBJECT(favourite_fx_store));
 
     setup_tree_text_column( "tree_effectlist", FX_STRING, "Effect",0 );
@@ -12666,7 +12760,7 @@ void setup_effectlist_info(void)
     g_signal_connect(favourite_fx_store, "rows-reordered", G_CALLBACK(favourite_fx_rows_reordered), NULL);
 
     favourite_button = glade_xml_get_widget_(info->main_window, "favourite_effects");
-    set_tooltip_by_widget(favourite_button, "Your ordered FX list. Ctrl+Shift-click any effect to add or remove it.");
+    set_tooltip_by_widget(favourite_button, "Your ordered FX list. Drop effects here from an FX list or the FX chain. Ctrl+Shift-click also adds or removes an effect.");
     g_signal_connect(favourite_button, "toggled", G_CALLBACK(favourite_fx_toggled), NULL);
 
     GtkWidget *entry_filterfx = glade_xml_get_widget_( info->main_window, "filter_effects");
@@ -20376,7 +20470,7 @@ static void disable_fx_entry(void) {
     {
         update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i], min,max, value, 0 );
         gtk_widget_set_sensitive_( widget_cache[WIDGET_SLIDER_BOX_P0 + i], FALSE );
-        gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], "" );
+        gtk_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], NULL);
 
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 +i ]), "");
 
@@ -20575,7 +20669,7 @@ static void enable_fx_entry(void) {
         if(faster_ui_ || i >= MAX_VISIBLE_FX_PARAMETERS)
             gtk_widget_hide(widget_cache[WIDGET_FRAME_P0 + i]);
 
-        gtk_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], "");
+        gtk_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], NULL);
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 + i]), "");
 
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
@@ -21705,6 +21799,30 @@ static int ui_profile_screen_w_ = 0;
 static int ui_profile_screen_h_ = 0;
 static int ui_profile_scale_ = 1;
 
+#define UI_COMPACT_PREVIEW_MAX_W 400
+#define UI_COMPACT_PREVIEW_MAX_H 240
+#define UI_COMPACT_WINDOW_STATE_KEY "gvr-compact-window-state"
+
+static void ui_compact_preview_dimensions(int *w, int *h)
+{
+    int compact_w;
+    int compact_h;
+
+    if(!smallest_possible || !w || !h || *w <= 0 || *h <= 0)
+        return;
+    if(*w <= UI_COMPACT_PREVIEW_MAX_W && *h <= UI_COMPACT_PREVIEW_MAX_H)
+        return;
+
+    preview_fit_aspect(*w,
+                       *h,
+                       UI_COMPACT_PREVIEW_MAX_W,
+                       UI_COMPACT_PREVIEW_MAX_H,
+                       &compact_w,
+                       &compact_h);
+    *w = preview_even(compact_w);
+    *h = preview_even(compact_h);
+}
+
 static void ui_update_screen_profile(gboolean log_result)
 {
     int screen_w = 0;
@@ -21813,6 +21931,77 @@ static void ui_window_preferred_minimum(GtkWidget *mainw, int *w, int *h)
         *h = min_req.height;
 }
 
+static gboolean ui_window_force_compact_windowed_idle(gpointer data)
+{
+    GtkWidget *mainw = GTK_WIDGET(data);
+
+    if(GTK_IS_WINDOW(mainw)) {
+        gtk_window_unfullscreen(GTK_WINDOW(mainw));
+        gtk_window_unmaximize(GTK_WINDOW(mainw));
+        gtk_window_set_default_size(GTK_WINDOW(mainw),
+                                    ui_default_target_w_,
+                                    ui_default_target_h_);
+        gtk_window_resize(GTK_WINDOW(mainw),
+                          ui_default_target_w_,
+                          ui_default_target_h_);
+        gtk_widget_queue_resize(mainw);
+    }
+
+    g_object_unref(mainw);
+    return G_SOURCE_REMOVE;
+}
+
+static gboolean ui_window_force_compact_windowed_on_map(GtkWidget *widget,
+                                                         GdkEvent *event,
+                                                         gpointer user_data)
+{
+    (void)event;
+    (void)user_data;
+
+    g_signal_handlers_disconnect_by_func(
+        widget,
+        G_CALLBACK(ui_window_force_compact_windowed_on_map),
+        NULL);
+    g_object_set_data(G_OBJECT(widget),
+                      UI_COMPACT_WINDOW_STATE_KEY,
+                      GINT_TO_POINTER(2));
+    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,
+                    ui_window_force_compact_windowed_idle,
+                    g_object_ref(widget),
+                    NULL);
+    return FALSE;
+}
+
+static void ui_window_prepare_compact_windowed_state(GtkWidget *mainw)
+{
+    if(!smallest_possible || !GTK_IS_WINDOW(mainw))
+        return;
+    if(g_object_get_data(G_OBJECT(mainw), UI_COMPACT_WINDOW_STATE_KEY))
+        return;
+
+    gtk_window_unfullscreen(GTK_WINDOW(mainw));
+    gtk_window_unmaximize(GTK_WINDOW(mainw));
+
+    if(gtk_widget_get_mapped(mainw)) {
+        g_object_set_data(G_OBJECT(mainw),
+                          UI_COMPACT_WINDOW_STATE_KEY,
+                          GINT_TO_POINTER(2));
+        g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,
+                        ui_window_force_compact_windowed_idle,
+                        g_object_ref(mainw),
+                        NULL);
+    }
+    else {
+        g_object_set_data(G_OBJECT(mainw),
+                          UI_COMPACT_WINDOW_STATE_KEY,
+                          GINT_TO_POINTER(1));
+        g_signal_connect_after(mainw,
+                               "map-event",
+                               G_CALLBACK(ui_window_force_compact_windowed_on_map),
+                               NULL);
+    }
+}
+
 static void ui_window_set_startup_size(GtkWidget *mainw)
 {
     int min_w = ui_default_target_w_;
@@ -21824,13 +22013,19 @@ static void ui_window_set_startup_size(GtkWidget *mainw)
         return;
 
     gtk_window_set_resizable(GTK_WINDOW(mainw), TRUE);
+    ui_window_prepare_compact_windowed_state(mainw);
     gtk_window_set_default_size(GTK_WINDOW(mainw),
                                 ui_default_target_w_,
                                 ui_default_target_h_);
 
     ui_window_preferred_minimum(mainw, &min_w, &min_h);
 
-    gtk_window_resize(GTK_WINDOW(mainw), min_w, min_h);
+    if(smallest_possible)
+        gtk_window_resize(GTK_WINDOW(mainw),
+                          ui_default_target_w_,
+                          ui_default_target_h_);
+    else
+        gtk_window_resize(GTK_WINDOW(mainw), min_w, min_h);
 }
 
 static void ui_window_log_startup_size(GtkWidget *mainw, const char *stage)
@@ -21967,6 +22162,8 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "scale.fx-param-slider contents trough { min-width:4px; margin-left:10px; margin-right:10px; border:0px; }"
             "scale.fx-param-slider contents trough highlight { min-width:4px; border:0px; }"
             "scale.fx-param-slider contents slider { min-width:16px; min-height:16px; margin-left:-6px; margin-right:-6px; }"
+            "tooltip,tooltip.background { background-color:#20242b; color:#f5f5f5; border:1px solid #69717c; border-radius:4px; padding:4px 6px; }"
+            "tooltip label { color:#f5f5f5; background-color:transparent; }"
             ".video-navigation-row { padding:0px; margin:0px; }"
             "#frame303,.video-navigation-frame,.video-navigation-frame-content,.video-navigation-attached-group,.video-navigation-frame-alignment,.video-navigation-secondary-row { padding:0px; margin:0px; border-width:0px; }"
             "#frame303 > border,.video-navigation-frame > border { padding:0px; margin:0px; border-width:0px; }"
@@ -21996,6 +22193,8 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "scale.fx-param-slider contents trough { min-width:4px; margin-left:10px; margin-right:10px; border:0px; }"
             "scale.fx-param-slider contents trough highlight { min-width:4px; border:0px; }"
             "scale.fx-param-slider contents slider { min-width:16px; min-height:16px; margin-left:-6px; margin-right:-6px; }"
+            "tooltip,tooltip.background { background-color:#20242b; color:#f5f5f5; border:1px solid #69717c; border-radius:4px; padding:4px 6px; }"
+            "tooltip label { color:#f5f5f5; background-color:transparent; }"
             ".video-navigation-row { padding:0px; margin:0px; }"
             "#frame303,.video-navigation-frame,.video-navigation-frame-content,.video-navigation-attached-group,.video-navigation-frame-alignment,.video-navigation-secondary-row { padding:0px; margin:0px; border-width:0px; }"
             "#frame303 > border,.video-navigation-frame > border { padding:0px; margin:0px; border-width:0px; }"
@@ -25194,6 +25393,13 @@ void vj_gui_init(const char *glade_file,
     int pw = MAX_PREVIEW_WIDTH;
     int ph = MAX_PREVIEW_HEIGHT;
 
+    ui_compact_preview_dimensions(&pw, &ph);
+    preview_box_w_ = pw;
+    preview_box_h_ = ph;
+    preview_display_w_ = pw;
+    preview_display_h_ = ph;
+    preview_base_w_ = pw;
+    preview_base_h_ = ph;
 
     GtkWidget *img_wid = widget_cache[WIDGET_IMAGEA];
     static const char *preview_allocate_widgets[] = {
@@ -25365,6 +25571,7 @@ void vj_gui_preview(void)
 
     if(!preview_geometry_initialized_) {
         multitrack_get_preview_dimensions(tmp_w, tmp_h, &w, &h);
+        ui_compact_preview_dimensions(&w, &h);
 
         preview_base_w_ = preview_even(w);
         preview_base_h_ = preview_even(h);
