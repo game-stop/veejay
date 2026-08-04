@@ -48,6 +48,7 @@
 #include <libvje/internal.h>
 #include <libstream/vj-net.h>
 #include <libstream/vj-avformat.h>
+#include <libstream/vj-ndi.h>
 #include <pthread.h>
 #ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
@@ -1401,6 +1402,17 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
             goto TAG_NEW_FAILED;
         }
         break;
+    case VJ_TAG_TYPE_NDI:
+        snprintf(tag->source_name, SOURCE_NAME_LEN, "%s", filename ? filename : "");
+        tag->priv = vj_ndi_receiver_create(tag->source_name, w, h, fps,
+                                           (_tag_info->dummy && _tag_info->dummy->arate > 0) ? _tag_info->dummy->arate : 48000,
+                                           (_tag_info->dummy && _tag_info->dummy->achans > 0) ? _tag_info->dummy->achans : 2);
+        if(!tag->priv) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to open NDI source '%s'", tag->source_name);
+            goto TAG_NEW_FAILED;
+        }
+        tag->active = 1;
+        break;
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
     snprintf(tag->source_name, SOURCE_NAME_LEN,"dv1394 %d", channel);
@@ -1613,6 +1625,11 @@ TAG_NEW_FAILED:
             source->clone--;
     }
 
+    if(tag->source_type == VJ_TAG_TYPE_NDI && tag->priv) {
+        vj_ndi_receiver_destroy((vj_ndi_receiver*)tag->priv);
+        tag->priv = NULL;
+    }
+
     if(tag->extra) {
         free(tag->extra);
         tag->extra = NULL;
@@ -1754,6 +1771,10 @@ static int vj_tag_del_internal_ex(vj_tag *tag, int skip_cleanup, int recycle_id)
      break;
      case VJ_TAG_TYPE_AVFORMAT:
         avformat_thread_stop(tag);
+     break;
+     case VJ_TAG_TYPE_NDI:
+        vj_ndi_receiver_destroy((vj_ndi_receiver*)tag->priv);
+        tag->priv = NULL;
      break;
 #ifdef SUPPORT_READ_DV2
       case VJ_TAG_TYPE_DV1394:
@@ -2992,6 +3013,11 @@ int vj_tag_disable(int t1) {
         avformat_thread_set_state( tag,0 );
     }
 
+    if(tag->source_type == VJ_TAG_TYPE_NDI) {
+        vj_ndi_receiver_set_tally((vj_ndi_receiver*)tag->priv, 0, 0);
+        vj_ndi_receiver_set_active((vj_ndi_receiver*)tag->priv, 0);
+    }
+
     if(tag->source_type == VJ_TAG_TYPE_V4L && !tag->clone )
     {
 #ifdef HAVE_V4L2
@@ -3020,6 +3046,8 @@ int vj_tag_disable(int t1) {
 
 int vj_tag_enable(int t1) {
     vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+        return -1;
     if( tag->source_type == VJ_TAG_TYPE_V4L && !tag->active)
     {
 #ifdef HAVE_V4L2
@@ -3049,6 +3077,12 @@ int vj_tag_enable(int t1) {
             veejay_msg(VEEJAY_MSG_ERROR, "Stream is not yet ready to start playing");
             return -1;
         }
+        tag->active = 1;
+    }
+
+    if(tag->source_type == VJ_TAG_TYPE_NDI && !tag->active) {
+        if(!vj_ndi_receiver_set_active((vj_ndi_receiver*)tag->priv, 1))
+            return -1;
         tag->active = 1;
     }
 
@@ -3123,6 +3157,7 @@ int vj_tag_set_active(int t1, int active)
     case VJ_TAG_TYPE_MCAST:
     case VJ_TAG_TYPE_NET:
     case VJ_TAG_TYPE_PICTURE:
+    case VJ_TAG_TYPE_NDI:
         if(active == 1 )
             vj_tag_enable( t1 );
         else
@@ -3463,6 +3498,9 @@ void    vj_tag_get_by_type(int id,int type, char *description )
     case VJ_TAG_TYPE_AVFORMAT:
     snprintf(description, TAG_MAX_DESCR_LEN, "%s", "AVFormat stream reader");
     break;
+    case VJ_TAG_TYPE_NDI:
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "NDI network source");
+    break;
 #ifdef USE_GDK_PIXBUF
     case VJ_TAG_TYPE_PICTURE:
     snprintf(description, TAG_MAX_DESCR_LEN, "%s", "GdkPixbuf");
@@ -3620,7 +3658,50 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[4], uint8_t *abuff, int audio_si
 
 int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 {
-    return 0;    
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || !dst_buffer || !tag->active || tag->source_type != VJ_TAG_TYPE_NDI)
+        return 0;
+    return vj_ndi_receiver_get_audio((vj_ndi_receiver*)tag->priv, dst_buffer);
+}
+
+int vj_tag_has_audio(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    return tag && tag->source_type == VJ_TAG_TYPE_NDI && tag->priv != NULL;
+}
+
+int vj_tag_get_audio_format(int t1, int *rate, int *channels, int *bits, int *bytes_per_frame)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || tag->source_type != VJ_TAG_TYPE_NDI)
+        return 0;
+    return vj_ndi_receiver_get_audio_format((vj_ndi_receiver*)tag->priv, rate, channels, bits, bytes_per_frame);
+}
+
+int vj_tag_set_ndi_tally(int t1, int program, int preview)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || tag->source_type != VJ_TAG_TYPE_NDI)
+        return 0;
+    return vj_ndi_receiver_set_tally((vj_ndi_receiver*)tag->priv, program, preview);
+}
+
+int vj_tag_get_ndi_stats(int t1, void *stats)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || tag->source_type != VJ_TAG_TYPE_NDI || !stats)
+        return 0;
+    vj_ndi_receiver_get_stats((vj_ndi_receiver*)tag->priv, (vj_ndi_stats*)stats);
+    return 1;
+}
+
+int vj_tag_get_ndi_clock(int t1, double *clock_seconds, int *age_ms)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag || tag->source_type != VJ_TAG_TYPE_NDI || !clock_seconds)
+        return 0;
+    return vj_ndi_receiver_clock_now((vj_ndi_receiver*)tag->priv,
+                                     clock_seconds, age_ms);
 }
 
 
@@ -3701,6 +3782,13 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
             plug_push_frame( tag->generator, 1, 0, dst );
             plug_set_parameters( tag->generator, plug_instance_get_num_parameters(tag->generator),tag->genargs );
             plug_process( tag->generator, -1.0 ); 
+        }
+        break;
+    case VJ_TAG_TYPE_NDI:
+        if(!tag->active || !vj_ndi_receiver_get_video((vj_ndi_receiver*)tag->priv, dst)) {
+            if(vj_tag_buffer_render_frame(tag, dst))
+                goto TAG_HAVE_FRAME;
+            return 0;
         }
         break;
     case VJ_TAG_TYPE_AVFORMAT:
@@ -4364,6 +4452,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
        tag->source_type == VJ_TAG_TYPE_NET ||
        tag->source_type == VJ_TAG_TYPE_MCAST ||
        tag->source_type == VJ_TAG_TYPE_AVFORMAT ||
+       tag->source_type == VJ_TAG_TYPE_NDI ||
        tag->source_type == VJ_TAG_TYPE_YUV4MPEG ||
        tag->source_type == VJ_TAG_TYPE_DV1394 ||
        tag->source_type == VJ_TAG_TYPE_PICTURE) {

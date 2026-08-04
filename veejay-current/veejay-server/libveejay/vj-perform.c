@@ -1040,9 +1040,22 @@ static inline int vj_audio_playback_is_stream(const veejay_t *info)
     return info && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG;
 }
 
+static inline int vj_audio_playback_has_tag_audio(const veejay_t *info)
+{
+    return vj_audio_playback_is_stream(info) &&
+           info->uc->sample_id > 0 &&
+           vj_tag_has_audio(info->uc->sample_id);
+}
+
+static inline int vj_audio_playback_is_silent_stream(const veejay_t *info)
+{
+    return vj_audio_playback_is_stream(info) &&
+           !vj_audio_playback_has_tag_audio(info);
+}
+
 static inline int vj_audio_mix_stream_safe_mode(const veejay_t *info, int mode)
 {
-    if(!vj_audio_playback_is_stream(info))
+    if(!vj_audio_playback_is_silent_stream(info))
         return mode;
 
     switch(mode) {
@@ -1088,7 +1101,7 @@ static int vj_audio_mix_follow_route_family(veejay_t *info)
             return VJ_RECORD_AUDIO_SOURCE_EXTERNAL;
     }
 
-    if(vj_audio_playback_is_stream(info))
+    if(vj_audio_playback_is_silent_stream(info))
         return VJ_RECORD_AUDIO_SOURCE_SILENCE;
 
     return VJ_RECORD_AUDIO_SOURCE_ORIGINAL;
@@ -8001,7 +8014,7 @@ const char *vj_perform_record_effective_audio_source_name(veejay_t *info)
         }
     }
 
-    if(vj_audio_playback_is_stream(info))
+    if(vj_audio_playback_is_silent_stream(info))
         return "silence";
 
     if(policy == VJ_RECORD_AUDIO_SOURCE_ORIGINAL)
@@ -8135,7 +8148,7 @@ static int vj_perform_record_audio_frame(
         return frames;
     }
 
-    if(vj_audio_playback_is_stream(info))
+    if(vj_audio_playback_is_silent_stream(info))
     {
         veejay_memset(p->audio_rec_buffer, 0, (size_t)wanted_frames * (size_t)frame_bytes);
         if(info->recording)
@@ -11196,7 +11209,7 @@ int vj_perform_queue_audio_chunk_ext(
         return client_frames_to_write;
     }
 
-    if(vj_audio_playback_is_stream(info)) {
+    if(vj_audio_playback_is_silent_stream(info)) {
         vj_jack_set_input_passthrough(0);
         if(p) {
             p->external_audio_transport_active = 0;
@@ -15394,17 +15407,23 @@ static int vj_perform_queue_audio_frame_impl(veejay_t *info, void *ptr, uint8_t 
 
     performer_t *p = (performer_t*) ptr;
     int *sample_cursor = audio_sample_ptr ? audio_sample_ptr : &(p->play_audio_sample_);
+    const int tag_audio = info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+                          vj_tag_has_audio(info->uc->sample_id);
+    int audio_rate = el->audio_rate;
+    int bps = el->audio_bps;
+    if(tag_audio)
+        vj_tag_get_audio_format(info->uc->sample_id, &audio_rate, NULL, NULL, &bps);
+    const double video_fps = el->video_fps > 0.0 ? el->video_fps :
+                             (((video_playback_setup*)info->settings)->output_fps > 0.0f ?
+                              ((video_playback_setup*)info->settings)->output_fps : 25.0);
+    int num_samples = video_fps > 0.0 ? (int)((double)audio_rate / video_fps) : 0;
 
-    if(!el->has_audio || speed == 0 || target_frame == -1) {
-        int num_samples = (el->audio_rate / el->video_fps);
-        int bps = el->audio_bps;
-        veejay_memset( a_buf, 0, num_samples * bps);
+    if((!el->has_audio && !tag_audio) || speed == 0 || target_frame == -1) {
+        veejay_memset(a_buf, 0, num_samples * bps);
         return num_samples;
     }
 
-    int num_samples =  (el->audio_rate/el->video_fps);
     int pred_len = num_samples;
-    int bps     =   el->audio_bps;
 
     if (info->audio == AUDIO_PLAY)
     {
@@ -15419,10 +15438,8 @@ static int vj_perform_queue_audio_frame_impl(veejay_t *info, void *ptr, uint8_t 
                     num_samples = vj_perform_fill_audio_buffers(info,el, a_buf, p, sample_cursor, target_frame);
                 break;
             case VJ_PLAYBACK_MODE_TAG:
-                if(el->has_audio)
-                {
+                if(tag_audio)
                     num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
-                }
                 break;
         }
 

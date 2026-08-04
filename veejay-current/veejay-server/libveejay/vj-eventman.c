@@ -4044,6 +4044,15 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 VIMS_ALLOW_ANY,
                 NULL );
 
+    index_map_[ VIMS_NDI_STATUS ] = _new_event(
+                NULL,
+                VIMS_NDI_STATUS,
+                "Get NDI receiver, sender, audio, clock, and connection telemetry",
+                vj_event_ndi_status,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
+
 	index_map_[ VIMS_FRONTBACK ]				=	_new_event(
 				"%d",
 				VIMS_FRONTBACK,

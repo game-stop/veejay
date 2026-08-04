@@ -840,6 +840,47 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  have_dl_dlopen=true
 fi
 
+AC_ARG_WITH([ndi],
+  [AS_HELP_STRING([--with-ndi@<:@=DIR@:>@],
+                  [enable optional NDI network video/audio support; look for the SDK headers below DIR])],
+  [with_ndi="$withval"], [with_ndi=auto])
+
+have_ndi=false
+NDI_CFLAGS=""
+NDI_LIBS=""
+if test "x$with_ndi" != "xno"; then
+  ndi_saved_CPPFLAGS="$CPPFLAGS"
+  if test "x$with_ndi" != "xauto" && test "x$with_ndi" != "xyes"; then
+    NDI_CFLAGS="-I$with_ndi -I$with_ndi/include -I$with_ndi/include/ndi"
+    CPPFLAGS="$CPPFLAGS $NDI_CFLAGS"
+  fi
+  AC_CHECK_HEADER([Processing.NDI.Lib.h], [ndi_header=yes], [ndi_header=no])
+  ndi_api=no
+  if test "x$ndi_header" = "xyes"; then
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <Processing.NDI.Lib.h>]], [[
+      const NDIlib_v5 *api = 0;
+      (void)api->find_create_v2;
+      (void)api->recv_create_v3;
+      (void)api->recv_capture_v3;
+      (void)api->recv_free_audio_v3;
+      (void)api->send_send_video_async_v2;
+      (void)api->util_send_send_audio_interleaved_16s;
+    ]])], [ndi_api=yes], [ndi_api=no])
+  fi
+  CPPFLAGS="$ndi_saved_CPPFLAGS"
+  if test "x$ndi_header" = "xyes" && test "x$ndi_api" = "xyes" && test "x$have_dl_dlopen" = "xtrue"; then
+    have_ndi=true
+    NDI_LIBS="-ldl"
+    AC_DEFINE([HAVE_NDI], [1], [Compile optional NDI network video/audio support])
+  elif test "x$with_ndi" != "xauto"; then
+    AC_MSG_ERROR([NDI support requested, but a compatible Processing.NDI.Lib.h or dlopen support is unavailable])
+  else
+    AC_MSG_NOTICE([Compatible NDI SDK headers not found; NDI support will not be built])
+  fi
+fi
+AC_SUBST([NDI_CFLAGS])
+AC_SUBST([NDI_LIBS])
+
 dnl
 dnl Check if we want to link with libjpeg (used for making a screenshot)
 have_jpeg=false
@@ -1114,6 +1155,7 @@ AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
 AM_CONDITIONAL(HAVE_V4L2, test x$have_v4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
+AM_CONDITIONAL(HAVE_NDI, test x$have_ndi = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_ARM, test x$have_arm = xtrue )
@@ -1260,4 +1302,4 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
-
+AC_MSG_NOTICE([  - NDI network video/audio       : ${have_ndi}])

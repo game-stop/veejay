@@ -35,6 +35,7 @@
 #define VJ_TAG_MAX_V4L 16
 #define VJ_TAG_MAX_STREAM_IN 255
 #define VJ_TAG_TYPE_DV1394 17
+#define VJ_TAG_TYPE_NDI 18
 #define VJ_TAG_TYPE_AVFORMAT 12
 #define TAG_MAX_DESCR_LEN 150
 #include <config.h>
@@ -337,6 +338,11 @@ int     vj_tag_reset_chain_offset(int t1, int entry, int s1);
 int 	vj_tag_get_frame(int t1, VJFrame *dst, uint8_t *abuf);
 
 int 	vj_tag_get_audio_frame(int t1, uint8_t *dst );
+int     vj_tag_has_audio(int t1);
+int     vj_tag_get_audio_format(int t1, int *rate, int *channels, int *bits, int *bytes_per_frame);
+int     vj_tag_set_ndi_tally(int t1, int program, int preview);
+int     vj_tag_get_ndi_stats(int t1, void *stats);
+int     vj_tag_get_ndi_clock(int t1, double *clock_seconds, int *age_ms);
 
 int 	vj_tag_enable(int t1);
 

@@ -114,6 +114,7 @@
 #include <veejaycore/mpegtimecode.h>
 #include <libstream/vj-tag.h>
 #include <libstream/vj-net.h>
+#include <libstream/vj-ndi.h>
 #include "libveejay.h"
 #include <veejaycore/mjpeg_types.h>
 #include "vj-perform.h"
@@ -283,6 +284,7 @@ void veejay_audio_beat_thread_set_enabled(int enabled)
 
 
 static void veejay_playback_close(veejay_t *info);
+static const char *veejay_instance_role_name(int role);
 static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped);
 static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped);
 static VJFrame *veejay_output_apply_pattern_projection(veejay_t *info, VJFrame *pattern);
@@ -386,6 +388,12 @@ static inline double vj_runtime_master_clock_now_s(veejay_t *info,
 
     if(uses_audio_clock)
         *uses_audio_clock = 0;
+
+    if(info && info->ndi_follow_clock && info->uc &&
+       info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+       info->uc->sample_id > 0 &&
+       vj_tag_get_ndi_clock(info->uc->sample_id, &master_s, NULL))
+        return master_s;
 
 #ifdef HAVE_JACK
     if(info && info->settings && info->audio == AUDIO_PLAY) {
@@ -4187,6 +4195,11 @@ int veejay_start_playing_sample(veejay_t *info, int sample_id)
     video_playback_setup *settings = info->settings;
     int looptype, speed, start, end;
 
+    if(info->last_tag_id > 0) {
+        vj_tag_set_ndi_tally(info->last_tag_id, 0, 0);
+        info->last_tag_id = 0;
+    }
+
     editlist *E = sample_get_editlist(sample_id);
     info->current_edit_list = E;
     veejay_reset_el_buffer(info);
@@ -4240,10 +4253,14 @@ static int veejay_start_playing_stream(veejay_t *info, int stream_id)
 {
     video_playback_setup *settings = info->settings;
 
+    if(info->last_tag_id > 0 && info->last_tag_id != stream_id)
+        vj_tag_set_ndi_tally(info->last_tag_id, 0, 0);
+
     if (vj_tag_enable(stream_id) <= 0) {
         veejay_msg(VEEJAY_MSG_WARNING,
                    "Unable to activate stream %d",
                    stream_id);
+        return 0;
     }
 
     if (settings->current_playback_speed == 0)
@@ -4266,6 +4283,7 @@ static int veejay_start_playing_stream(veejay_t *info, int stream_id)
 
     info->last_tag_id = stream_id;
     info->uc->sample_id = stream_id;
+    vj_tag_set_ndi_tally(stream_id, info->ndi_tally_enabled ? 1 : 0, 0);
 
     veejay_msg(VEEJAY_MSG_INFO,
                "Playing stream %d (%ld - %ld)",
@@ -4660,8 +4678,32 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
  	return 0;
 }
 
+int veejay_create_ndi_stream(veejay_t *info, const char *source_name)
+{
+    if(!info || !source_name || !*source_name)
+        return 0;
+    int id = veejay_create_tag(info, VJ_TAG_TYPE_NDI, (char*)source_name,
+                               info->nstreams, 0, 0);
+    if(id <= 0)
+        return 0;
+    info->ndi_stream_id = id;
+    info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+    info->uc->sample_id = id;
+    info->current_edit_list = info->edit_list;
+    if(!veejay_start_playing_stream(info, id)) {
+        info->ndi_stream_id = 0;
+        vj_tag_del(id, 0);
+        return 0;
+    }
+    return id;
+}
+
 void veejay_stop_sampling(veejay_t * info)
 {
+    if(info->last_tag_id > 0) {
+        vj_tag_set_ndi_tally(info->last_tag_id, 0, 0);
+        info->last_tag_id = 0;
+    }
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->sample_id = 0;
     info->uc->sample_start = 0;
@@ -4983,6 +5025,11 @@ static void veejay_output_push_frame(veejay_t *info,
         if(veejay_output_push_shm(info, frame))
             vj_perf_record((vj_perf_context*)info->perf, VJ_PERF_STAGE_SHM_WRITE,
                            stage_start, vj_perf_now_ns());
+    }
+
+    if(info->ndi_sender) {
+        VJFrame *ndi_frame = info->instance_role == VJ_INSTANCE_ROLE_PROGRAM ? source_frame : frame;
+        vj_ndi_sender_send_video((vj_ndi_sender*)info->ndi_sender, ndi_frame);
     }
 
     veejay_output_push_screenshot(info, frame);
@@ -6302,6 +6349,176 @@ static void veejay_output_wait_until(veejay_t *info, double target_time_s)
 
 
 
+static void veejay_ndi_xml_escape(char *dst, size_t dst_size, const char *src)
+{
+    if(!dst || dst_size == 0)
+        return;
+
+    size_t out = 0;
+    for(const unsigned char *p = (const unsigned char*)(src ? src : "");
+        *p && out + 1 < dst_size; p++) {
+        const char *entity = NULL;
+        switch(*p) {
+            case '&': entity = "&amp;"; break;
+            case '<': entity = "&lt;"; break;
+            case '>': entity = "&gt;"; break;
+            case '"': entity = "&quot;"; break;
+            case '\'': entity = "&apos;"; break;
+            default: break;
+        }
+        if(entity) {
+            size_t length = strlen(entity);
+            if(out + length >= dst_size)
+                break;
+            memcpy(dst + out, entity, length);
+            out += length;
+        } else if(*p >= 32) {
+            dst[out++] = (char)*p;
+        }
+    }
+    dst[out] = '\0';
+}
+
+int veejay_ndi_start_sender(veejay_t *info)
+{
+    if(!info || !info->ndi_send_enabled)
+        return 1;
+    if(info->ndi_sender)
+        return 1;
+    const int audio_rate = info->edit_list && info->edit_list->audio_rate > 0 ?
+                           info->edit_list->audio_rate :
+                           (info->dummy && info->dummy->arate > 0 ? info->dummy->arate : 48000);
+    const int audio_channels = info->edit_list && info->edit_list->audio_chans > 0 ?
+                               info->edit_list->audio_chans :
+                               (info->dummy && info->dummy->achans > 0 ? info->dummy->achans : 2);
+    const double fps = info->settings->output_fps > 0.0 ?
+                       info->settings->output_fps :
+                       (info->dummy && info->dummy->fps > 0.0 ? info->dummy->fps : 25.0);
+    const char *name = info->ndi_send_name[0] ? info->ndi_send_name : info->instance_id;
+    info->ndi_sender = vj_ndi_sender_create(name,
+                                             info->video_output_width,
+                                             info->video_output_height,
+                                             fps, audio_rate, audio_channels);
+    if(info->ndi_sender) {
+        char metadata[512];
+        char escaped_id[256];
+        veejay_ndi_xml_escape(escaped_id, sizeof(escaped_id), info->instance_id);
+        snprintf(metadata, sizeof(metadata),
+                 "<veejay instance_id=\"%s\" role=\"%s\" transport=\"%s\" />",
+                 escaped_id,
+                 veejay_instance_role_name(info->instance_role),
+                 info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ?
+                     "mapped-output" : "program-output");
+        vj_ndi_sender_send_metadata((vj_ndi_sender*)info->ndi_sender, metadata);
+    }
+    return info->ndi_sender != NULL;
+}
+
+void veejay_ndi_stop_sender(veejay_t *info)
+{
+    if(!info || !info->ndi_sender)
+        return;
+    vj_ndi_sender_destroy((vj_ndi_sender*)info->ndi_sender);
+    info->ndi_sender = NULL;
+}
+
+static void veejay_ndi_status_value(char *dst, size_t dst_size, const char *src)
+{
+    if(!dst || dst_size == 0)
+        return;
+    size_t out = 0;
+    for(const unsigned char *p = (const unsigned char*)(src ? src : "");
+        *p && out + 1 < dst_size; p++) {
+        unsigned char c = *p;
+        if(c == '\n' || c == '\r' || c == '\t' || c < 32)
+            c = ' ';
+        dst[out++] = (char)c;
+    }
+    while(out > 0 && dst[out - 1] == ' ')
+        out--;
+    dst[out] = '\0';
+}
+
+char *veejay_ndi_status(veejay_t *info)
+{
+    vj_ndi_stats rx;
+    vj_ndi_stats tx;
+    memset(&rx, 0, sizeof(rx));
+    memset(&tx, 0, sizeof(tx));
+
+    int rx_stream_id = info ? info->ndi_stream_id : 0;
+    if(info && info->uc &&
+       info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+       info->uc->sample_id > 0 &&
+       vj_tag_get_type(info->uc->sample_id) == VJ_TAG_TYPE_NDI)
+        rx_stream_id = info->uc->sample_id;
+
+    if(rx_stream_id > 0)
+        vj_tag_get_ndi_stats(rx_stream_id, &rx);
+    if(info && info->ndi_sender)
+        vj_ndi_sender_get_stats((vj_ndi_sender*)info->ndi_sender, &tx);
+    char metadata[256];
+    char runtime[128];
+    char source_raw[256] = {0};
+    char source[256];
+    char tx_name[256];
+    if(rx_stream_id > 0)
+        vj_tag_get_source_name(rx_stream_id, source_raw, sizeof(source_raw));
+    else if(info)
+        snprintf(source_raw, sizeof(source_raw), "%s", info->ndi_receive_name);
+    veejay_ndi_status_value(metadata, sizeof(metadata), rx.last_metadata);
+    veejay_ndi_status_value(runtime, sizeof(runtime), vj_ndi_runtime_version());
+    veejay_ndi_status_value(source, sizeof(source), source_raw);
+    veejay_ndi_status_value(tx_name, sizeof(tx_name),
+                            info && info->ndi_send_name[0] ?
+                            info->ndi_send_name :
+                            (info ? info->instance_id : ""));
+    const size_t status_size = 4096;
+    char *status = (char*)malloc(status_size);
+    if(!status)
+        return NULL;
+    snprintf(status, status_size,
+             "VJNDI 1\n"
+             "runtime=%s\n"
+             "rx.enabled=%d\nrx.source=%s\nrx.connected=%d\n"
+             "rx.video=%llu\nrx.audio=%llu\nrx.drop_video=%llu\n"
+             "rx.drop_audio=%llu\nrx.audio_underruns=%llu\n"
+             "rx.unsupported_video=%llu\nrx.format=%dx%d@%d/%d\n"
+             "rx.audio_format=%d/%d\nrx.tally_program=%d\n"
+             "rx.tally_preview=%d\nrx.video_timecode=%lld\n"
+             "rx.video_timestamp=%lld\nrx.audio_timecode=%lld\n"
+             "rx.audio_timestamp=%lld\nrx.clock_follow=%d\n"
+             "rx.clock_available=%d\nrx.clock_age_ms=%d\n"
+             "rx.clock_drift_ms=%.3f\nrx.metadata=%s\n"
+             "tx.enabled=%d\ntx.name=%s\ntx.connections=%d\n"
+             "tx.video=%llu\ntx.audio=%llu\ntx.tally_program=%d\n"
+             "tx.tally_preview=%d\n",
+             runtime, rx_stream_id > 0,
+             source, rx.connected,
+             (unsigned long long)rx.video_frames,
+             (unsigned long long)rx.audio_frames,
+             (unsigned long long)rx.dropped_video_frames,
+             (unsigned long long)rx.dropped_audio_frames,
+             (unsigned long long)rx.audio_underruns,
+             (unsigned long long)rx.unsupported_video_frames,
+             rx.width, rx.height, rx.source_fps_n, rx.source_fps_d,
+             rx.audio_rate, rx.audio_channels,
+             rx.program_tally, rx.preview_tally,
+             (long long)rx.last_video_timecode,
+             (long long)rx.last_video_timestamp,
+             (long long)rx.last_audio_timecode,
+             (long long)rx.last_audio_timestamp,
+             info ? info->ndi_follow_clock : 0,
+             rx.clock_available, rx.clock_age_ms, rx.clock_drift_ms,
+             metadata,
+             info ? info->ndi_send_enabled : 0,
+             tx_name, tx.connected,
+             (unsigned long long)tx.video_frames,
+             (unsigned long long)tx.audio_frames,
+             tx.program_tally, tx.preview_tally);
+    return status;
+}
+
 int veejay_setup_video_out(veejay_t *info)
 {
     switch(info->video_out) {
@@ -6338,6 +6555,10 @@ int veejay_setup_video_out(veejay_t *info)
             return -1;
     }
 
+    if(!veejay_ndi_start_sender(info)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to start requested NDI sender");
+        return -1;
+    }
     return 0;
 }
 
@@ -6864,8 +7085,9 @@ static int veejay_output_source_attach(veejay_t *info)
     }
 
     if(info->output_source_port > 0) {
-        const char *host = info->output_source_host[0] ?
-                           info->output_source_host : "127.0.0.1";
+        char loopback_host[] = "127.0.0.1";
+        char *host = info->output_source_host[0] ?
+                     info->output_source_host : loopback_host;
 
         if(!veejay_output_source_host_is_local(host))
             return veejay_output_source_attach_remote(info, host, info->output_source_port);
@@ -9538,6 +9760,12 @@ void *veejay_audio_producer_thread(void *arg)
                 decoded = needed;
             }
 
+            if(info->ndi_sender && el && el->audio_bits == 16 && decoded > 0 &&
+               BPS >= 2 && (BPS & 1) == 0)
+                vj_ndi_sender_send_audio_format((vj_ndi_sender*)info->ndi_sender,
+                                                audio_chunk, decoded,
+                                                (int)CLIENT_RATE, BPS / 2);
+
             int frames_written = 0;
             int write_pos = 0;
             int remaining = decoded;
@@ -11153,6 +11381,7 @@ static void veejay_playback_close(veejay_t *info)
     if(info->osc) vj_osc_free(info->osc);
 
     veejay_output_source_free(info);
+    veejay_ndi_stop_sender(info);
     if(info->shm) {
         vj_shm_free(info->shm);
         info->shm = NULL;
@@ -11186,6 +11415,7 @@ static void veejay_playback_close(veejay_t *info)
 	vj_font_destroy( info->osd );
 #endif
     vj_perform_free(info);
+    vj_ndi_runtime_shutdown();
 
 }
 
@@ -11326,6 +11556,8 @@ veejay_t *veejay_malloc()
     info->instance_role = VJ_INSTANCE_ROLE_STANDALONE;
     snprintf(info->instance_id, sizeof(info->instance_id), "%s", "standalone");
     snprintf(info->output_source_host, sizeof(info->output_source_host), "%s", "127.0.0.1");
+    info->ndi_send_name[0] = '\0';
+    info->ndi_tally_enabled = 1;
 
     info->settings = (video_playback_setup *) vj_calloc(sizeof(video_playback_setup));
     if (!(info->settings)) {

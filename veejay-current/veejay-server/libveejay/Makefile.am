@@ -32,7 +32,8 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               $(LIBUNWIND_CFLAGS) \
               $(PTHREAD_CFLAGS) \
               $(LIBQRENCODE_CFLAGS) \
-              $(VEEJAYCORE_CFLAGS)
+              $(VEEJAYCORE_CFLAGS) \
+	      $(NDI_CFLAGS)
 
 lib_LTLIBRARIES = libveejay.la
 
@@ -103,7 +104,8 @@ libveejay_la_LIBADD = \
     $(LIBQUICKTIME_LIBS) \
     $(RT_LIBS) \
     $(LIBQRENCODE_LIBS) \
-    $(VEEJAYCORE_LIBS)
+    $(VEEJAYCORE_LIBS) \
+    $(NDI_LIBS)
 
 libveejay_la_LDFLAGS += \
     -DDYNAMIC \

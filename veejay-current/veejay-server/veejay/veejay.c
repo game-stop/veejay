@@ -54,6 +54,7 @@
 #include <libveejay/vj-split.h>
 #include <build.h>
 #include <libvje/libvje.h>
+#include <libstream/vj-ndi.h>
 
 extern void el_cache_configure(int t);
 extern void vj_avcodec_print_version();
@@ -74,6 +75,7 @@ static int n_slots_ = 0;
 static int max_mem_ = 0;
 static int live = -1;
 static int ta = -1;
+static int audio_option_explicit = 0;
 
 static void report_bug(void)
 {
@@ -223,6 +225,9 @@ static void CompiledWith(void)
 #ifdef HAVE_QRCODE
 	fprintf(stdout,"\tSupport for QR code\n");
 #endif
+#ifdef HAVE_NDI
+    fprintf(stdout, "\tSupport for NDI network video/audio (runtime: %s)\n", vj_ndi_runtime_version());
+#endif
 
     fprintf(stdout, "\n\n");
 
@@ -287,6 +292,8 @@ static void Usage(char *progname)
     fprintf(stderr, "Video input and format:\n");
     fprintf(stderr, "  -d/--dummy, --blank          Start without video files; render a blank source\n");
     fprintf(stderr, "  -A/--capture-device <num>    Start with capture device <num>\n");
+    fprintf(stderr, "     --ndi-receive <source>    Start with an NDI network video/audio source\n");
+    fprintf(stderr, "     --ndi-list                Discover NDI sources and exit\n");
     fprintf(stderr, "  -Z/--load-generators <num>   Load generator plugins and start stream <num>\n");
     fprintf(stderr, "  -W/--input-width, --source-width <num>\n");
     fprintf(stderr, "                                Set blank-source width\n");
@@ -299,6 +306,10 @@ static void Usage(char *progname)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "Video output and display:\n");
+    fprintf(stderr, "     --ndi-send                Publish the Program/final Output as NDI\n");
+    fprintf(stderr, "     --ndi-name <name>         Set the advertised NDI sender name\n");
+    fprintf(stderr, "     --ndi-no-tally            Disable NDI program/preview tally output\n");
+    fprintf(stderr, "     --ndi-follow-clock        Follow received NDI timestamps when the source clock is healthy\n");
     fprintf(stderr, "  -D/--composite, --no-viewport\n");
     fprintf(stderr, "                                Do not start with the legacy camera/projection viewport\n");
     fprintf(stderr, "  -G/--graphics-driver <num>   Alias for -O/--output\n");
@@ -423,6 +434,22 @@ fprintf(stderr, " Invalid argument given for %s\n",msg);\
 }\
 }
 
+static void print_ndi_sources_and_exit(void)
+{
+    vj_ndi_source_info sources[256];
+    if(!vj_ndi_runtime_available()) {
+        fprintf(stderr, "NDI runtime is not available. Install the NDI runtime or configure without NDI.\n");
+        exit(1);
+    }
+    int count = vj_ndi_discover(sources, 256, 1500);
+    printf("NDI runtime: %s\n", vj_ndi_runtime_version());
+    printf("Discovered %d NDI source%s\n", count, count == 1 ? "" : "s");
+    for(int i = 0; i < count; i++)
+        printf("%3d  %s%s%s\n", i, sources[i].name,
+               sources[i].url[0] ? "  " : "", sources[i].url);
+    exit(0);
+}
+
 static int set_option(const char *name, char *value)
 {
     /* return 1 means error, return 0 means okay */
@@ -440,8 +467,10 @@ static int set_option(const char *name, char *value)
         int enabled = 0;
         if(parse_binary_option("-a/--audio", value, &enabled))
             nerr++;
-        else
+        else {
             info->audio = enabled ? AUDIO_PLAY : NO_AUDIO;
+            audio_option_explicit = 1;
+        }
     } else if (strcmp(name, "audio-muted") == 0) {
         atomic_store_int(&info->settings->audio_mute, 1);
     } else if (strcmp(name, "no-audio-sync-thread") == 0) {
@@ -658,6 +687,46 @@ static int set_option(const char *name, char *value)
             nerr++;
         }
     }
+    else if(strcmp(name, "ndi-receive") == 0) {
+        if(!value || !*value) {
+            fprintf(stderr, "--ndi-receive requires an advertised NDI source name\n");
+            nerr++;
+        } else if(strlen(value) > VJ_NDI_SOURCE_NAME_MAX) {
+            fprintf(stderr, "--ndi-receive source name exceeds %d characters\n",
+                    VJ_NDI_SOURCE_NAME_MAX);
+            nerr++;
+        } else {
+            snprintf(info->ndi_receive_name, sizeof(info->ndi_receive_name), "%s", value);
+            info->ndi_receive_enabled = 1;
+            info->dummy->active = 1;
+            if(!audio_option_explicit)
+                info->audio = AUDIO_PLAY;
+        }
+    }
+    else if(strcmp(name, "ndi-send") == 0) {
+        info->ndi_send_enabled = 1;
+    }
+    else if(strcmp(name, "ndi-name") == 0) {
+        if(!value || !*value) {
+            fprintf(stderr, "--ndi-name requires a non-empty sender name\n");
+            nerr++;
+        } else if(strlen(value) > VJ_NDI_SOURCE_NAME_MAX) {
+            fprintf(stderr, "--ndi-name exceeds %d characters\n",
+                    VJ_NDI_SOURCE_NAME_MAX);
+            nerr++;
+        } else {
+            snprintf(info->ndi_send_name, sizeof(info->ndi_send_name), "%s", value);
+        }
+    }
+    else if(strcmp(name, "ndi-no-tally") == 0) {
+        info->ndi_tally_enabled = 0;
+    }
+    else if(strcmp(name, "ndi-follow-clock") == 0) {
+        info->ndi_follow_clock = 1;
+    }
+    else if(strcmp(name, "ndi-list") == 0) {
+        print_ndi_sources_and_exit();
+    }
 	else if (strcmp(name, "master") == 0 || strcmp(name, "K") == 0) {
 		info->is_master = 1;
 	}
@@ -868,6 +937,12 @@ static int check_command_line_options(int argc, char *argv[])
     {"output-source", 1, 0, 0},
     {"output-source-pid", 1, 0, 0},
     {"output-source-shm", 1, 0, 0},
+    {"ndi-receive", 1, 0, 0},
+    {"ndi-send", 0, 0, 0},
+    {"ndi-name", 1, 0, 0},
+    {"ndi-no-tally", 0, 0, 0},
+    {"ndi-follow-clock", 0, 0, 0},
+    {"ndi-list", 0, 0, 0},
 	{"synchronization", 1, 0, 0},	/* -c/--synchronization */
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
@@ -991,6 +1066,10 @@ static int check_command_line_options(int argc, char *argv[])
         fprintf(stderr, "output role consumes a Program instance and cannot load startup video files\n");
         nerr++;
     }
+    if(!nerr && info->instance_role == VJ_INSTANCE_ROLE_OUTPUT && info->ndi_receive_enabled) {
+        fprintf(stderr, "output role cannot use --ndi-receive; use a standalone/program instance or publish from the Program instance\n");
+        nerr++;
+    }
 
     if(!nerr && info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
         int sources = (info->output_source_port > 0) +
@@ -1030,6 +1109,10 @@ static void print_license(void)
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 
 	vj_avcodec_print_version();
+#ifdef HAVE_NDI
+    veejay_msg(VEEJAY_MSG_INFO, "NDI transport: %s", vj_ndi_runtime_version());
+    veejay_msg(VEEJAY_MSG_INFO, "NDI is a registered trademark of Vizrt NDI AB");
+#endif
 
 }
 
@@ -1107,8 +1190,9 @@ static void veejay_log_startup_plan(int argc, char **argv)
     const char *role = veejay_cli_role_name(info->instance_role);
     const char *id = info->instance_id[0] ? info->instance_id : "veejay";
     const char *source = info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ? "program-shm" :
-                         (info->dummy->active ? "blank" :
-                          (media_count > 0 ? "media" : "backend-default"));
+                         (info->ndi_receive_enabled ? "ndi" :
+                          (info->dummy->active ? "blank" :
+                           (media_count > 0 ? "media" : "backend-default")));
     char source_detail[320];
     char fps_detail[48];
     char project_detail[64];
@@ -1132,6 +1216,9 @@ static void veejay_log_startup_plan(int argc, char **argv)
             snprintf(source_detail, sizeof(source_detail), "pid:%d", info->output_source_pid);
         else
             snprintf(source_detail, sizeof(source_detail), "shm:%d", info->output_source_shm_id);
+    }
+    else if(info->ndi_receive_enabled) {
+        snprintf(source_detail, sizeof(source_detail), "%s", info->ndi_receive_name);
     }
     else if(info->dummy->active) {
         snprintf(source_detail, sizeof(source_detail), "%dx%d",
@@ -1304,6 +1391,15 @@ int main(int argc, char **argv)
         veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Veejay");
         main_ret = 1;
         goto VEEJAY_MAIN_EXIT;
+    }
+
+    if(info->ndi_receive_enabled) {
+        if(!veejay_create_ndi_stream(info, info->ndi_receive_name)) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to create NDI input '%s'", info->ndi_receive_name);
+            main_ret = 1;
+            goto VEEJAY_MAIN_EXIT;
+        }
+        veejay_msg(VEEJAY_MSG_INFO, "NDI input '%s' is the active live stream", info->ndi_receive_name);
     }
 
     if (settings->splitscreen) {

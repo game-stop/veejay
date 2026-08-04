@@ -796,6 +796,14 @@ typedef struct veejay_t
     int output_source_port;
     int output_source_pid;
     int output_source_shm_id;
+    int ndi_receive_enabled;
+    int ndi_send_enabled;
+    int ndi_tally_enabled;
+    int ndi_follow_clock;
+    int ndi_stream_id;
+    char ndi_receive_name[256];
+    char ndi_send_name[256];
+    void *ndi_sender;
     void *input_shm;
     VJFrame *output_input_frame;
     uint8_t *output_input_buffer;
@@ -861,5 +869,11 @@ typedef struct {
     int minterpolate;
     int interpolate;
 } vj_key;
+
+
+int veejay_create_ndi_stream(veejay_t *info, const char *source_name);
+int veejay_ndi_start_sender(veejay_t *info);
+void veejay_ndi_stop_sender(veejay_t *info);
+char *veejay_ndi_status(veejay_t *info);
 
 #endif

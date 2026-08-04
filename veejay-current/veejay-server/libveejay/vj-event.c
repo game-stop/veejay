@@ -15660,6 +15660,22 @@ void vj_event_perf_reset(void *ptr, const char format[], va_list ap)
     veejay_msg(VEEJAY_MSG_INFO, "[PERF] Per-stage telemetry reset");
 }
 
+void vj_event_ndi_status(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    (void)format;
+    (void)ap;
+
+    char *response = veejay_ndi_status(v);
+    if(response) {
+        SEND_MSG(v, response);
+        free(response);
+        return;
+    }
+
+    SEND_MSG(v, "VJNDI 1\nruntime=unavailable\nrx.enabled=0\ntx.enabled=0\n");
+}
+
 void    vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
