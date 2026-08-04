@@ -1,4 +1,4 @@
-.TH "VEEJAY" "1" "July 2026" "Veejay" "User Commands"
+.TH "VEEJAY" "1" "August 2026" "Veejay" "User Commands"
 .SH NAME
 veejay \- a visual video instrument and video sampler for GNU/Linux
 
@@ -30,9 +30,11 @@ video installations.
 
 .SH RUNNING MULTIPLE VEEJAYS: MASTER OUTPUT AND PREVIEW
 
-Veejay can run multiple instances at the same time. A common live setup is to
-run one veejay as the master video output and a second veejay as the preview or
-editing instance.
+Veejay can run multiple instances at the same time. A legacy live-control setup
+uses one veejay as the master video output and a second veejay as the preview or
+editing instance. This master/preview arrangement controls VIMS forwarding and
+samplelist synchronization. It is distinct from the newer Program/Output
+rendering roles documented below.
 
 The master output instance is started with
 .B --master
@@ -92,6 +94,108 @@ the current samplelist to the master over VIMS. The two instances no longer need
 to load the same samplelist file for this sync action. The master still needs to
 be able to resolve the media files, editlists, and stream resources referenced
 by the transferred samplelist.
+
+.SH PROGRAM AND OUTPUT INSTANCE TOPOLOGY
+
+The
+.BR --instance-role
+option selects the rendering role of a backend. This role is independent of the
+legacy
+.BR --master
+and
+.BR --connect
+control-forwarding topology described above.
+
+.TP
+.B standalone
+The default role. The instance loads media or live inputs, processes samples and
+FX, and presents its own final output.
+
+.TP
+.B program
+A Program instance loads and processes the show. It publishes the composed
+Program frame before local physical-output mapping, projection, or calibration
+is applied. This gives one or more Output instances a clean Program feed while
+the Program instance remains the authoritative playback and FX backend.
+
+.TP
+.B output
+An Output instance is a dedicated presentation endpoint. It does not load
+startup video files and cannot use
+.BR --ndi-receive .
+It consumes a Program feed, applies its own output graph and projection mapping,
+and then presents or exports the result through SDL, vloopback, split-screen,
+shared memory, screenshots, network output, or NDI as configured. Without a
+source selector it starts on a blank canvas and may be connected later.
+
+.PP
+Use
+.BR --instance-id
+for a stable backend identity. If no ID is supplied, veejay generates one from
+the role and control port, such as
+.B program-3490
+or
+.BR output-4490 .
+
+An Output instance accepts at most one startup source selector:
+
+.TP
+.B --output-source host:port
+Connect to the Program backend at the given VIMS endpoint. For a local host,
+veejay discovers and attaches to the Program shared-memory publisher. For a
+remote host, it receives Program frames over the VIMS TCP frame transport.
+
+.TP
+.B --output-source-pid pid
+Attach directly to the shared-memory publisher owned by the given local process
+ID.
+
+.TP
+.B --output-source-shm key
+Attach directly to an explicit local System V shared-memory key.
+
+.PP
+A typical local Program and Output pair is:
+
+.PP
+.RS
+.nf
+\fBveejay --instance-role program --instance-id main-program -p 3490 movie.avi\fR
+\fBveejay --instance-role output --instance-id projector-left -p 4490 \\
+        --output-source 127.0.0.1:3490 --project-width 1920 \\
+        --project-height 1080 --fullscreen\fR
+.fi
+.RE
+
+.SH NDI NETWORK VIDEO
+
+When built with NDI support and used with an available NDI runtime, veejay can
+receive and transmit NDI video and audio.
+
+.B --ndi-list
+performs source discovery, prints the advertised source names and URLs, and
+exits.
+
+.B --ndi-receive
+starts the named advertised NDI source as the active live input. It cannot be
+combined with startup media files or with
+.BR "--instance-role output" .
+Unless
+.BR -a/--audio
+was explicitly set, NDI receive starts with audio playback enabled.
+
+.B --ndi-send
+publishes the backend output as NDI. A Program instance publishes its clean
+composed Program frame before physical-output mapping. Standalone and Output
+instances publish their final mapped frame. Use
+.B --ndi-name
+to override the advertised sender name; otherwise the instance ID is used.
+
+NDI tally output is enabled by default for an active NDI input. Use
+.B --ndi-no-tally
+to suppress program/preview tally signalling. Use
+.B --ndi-follow-clock
+to follow received NDI timestamps when the source clock is healthy.
 
 .SH SUPPORTED VIDEO CONTAINERS AND INPUTS
 
@@ -429,8 +533,10 @@ Print veejay version and exit.
 Print command-line help and exit.
 
 .TP
-.B \-D/--composite
-Do not start with the camera/projection calibration viewport.
+.B \-D/--composite/--no-viewport
+Do not start with the legacy camera/projection calibration viewport. The
+.B --no-viewport
+name is an alias for the same option.
 
 .TP
 .B \-p/--port <num>
@@ -451,7 +557,7 @@ Set maximum memory to use for cache, as a percentage of total system RAM.
 Use 0 to disable. Valid range is 0-100. Default is 30.
 
 .TP
-.B \-j/--max_cache <num>
+.B \-j/--max_cache/--max-cache <num>
 Divide cache memory over at most N samples. Valid range is 0-100. Default is 0.
 
 .TP
@@ -496,6 +602,42 @@ preview/editor instance its own base port with
 .BR -p ,
 for example
 .BR "-p 4490 --connect 127.0.0.1:3490" .
+
+.TP
+.B \--instance-role <standalone|program|output>
+Select the backend rendering role. The default is
+.BR standalone .
+The
+.B output
+role cannot load startup media files or use
+.BR --ndi-receive .
+
+.TP
+.B \--instance-id <name>
+Set a non-empty stable identity for discovery, performance reporting, NDI
+metadata, and show topology. Without this option, the runtime ID is generated
+from the role and VIMS port.
+
+.TP
+.B \--output-source <host:port>
+For an Output role, consume the Program feed exposed by the backend at the given
+host and TCP port. A local endpoint uses shared-memory discovery; a remote
+endpoint uses VIMS TCP frames. The port must be in the range 1 to 65535.
+
+.TP
+.B \--output-source-pid <pid>
+For an Output role, attach to the local Program shared-memory publisher owned by
+the positive process ID.
+
+.TP
+.B \--output-source-shm <key>
+For an Output role, attach to the positive System V shared-memory key.
+Only one of
+.BR --output-source ,
+.BR --output-source-pid ,
+and
+.B --output-source-shm
+may be supplied.
 
 .TP
 .B \-l/--sample-file <filename>
@@ -567,6 +709,25 @@ non-negative. This is a startup timing offset, not a volume or mixer control.
 Disable or enable sync correction. Default is on.
 
 .TP
+.B \--ndi-send
+Publish the Program or final Output as NDI video/audio. Program instances send
+the composed Program frame before physical-output mapping; standalone and
+Output instances send the final mapped frame.
+
+.TP
+.B \--ndi-name <name>
+Set the advertised NDI sender name. The name must be non-empty. When omitted,
+the instance ID is used.
+
+.TP
+.B \--ndi-no-tally
+Disable NDI program/preview tally output for the active NDI input.
+
+.TP
+.B \--ndi-follow-clock
+Follow received NDI timestamps while the source clock is healthy.
+
+.TP
 .B \-G/--graphics-driver <num>
 Alias for
 .BR --output .
@@ -603,16 +764,25 @@ Write video output to file or device. This is used with
 .BR -O/--output .
 
 .TP
-.B \-s/--size WxH
+.B \-s/--size/--window-size WxH
 Set display dimensions for the SDL video window.
 
 .TP
-.B \-x/--geometry-x <num>
+.B \-x/--geometry-x/--window-x <num>
 Set the top-left X offset for the SDL video window.
 
 .TP
-.B \-y/--geometry-y <num>
+.B \-y/--geometry-y/--window-y <num>
 Set the top-left Y offset for the SDL video window.
+
+.TP
+.B \--fullscreen
+Start SDL output in fullscreen-desktop mode.
+
+.TP
+.B \--windowed
+Start SDL output in windowed mode. If both window mode options are present, the
+last one on the command line takes effect.
 
 .TP
 .B \--borderless
@@ -631,6 +801,18 @@ Disable mouse input for the SDL video window.
 Show the mouse cursor in the SDL video window.
 
 .TP
+.B \--ndi-list
+Discover available NDI sources, print their advertised names and URLs, and
+exit. This requires an available NDI runtime.
+
+.TP
+.B \--ndi-receive <source-name>
+Start the advertised NDI source as the active live video/audio input. The source
+name must be non-empty. This option cannot be combined with startup media files
+or with
+.BR "--instance-role output" .
+
+.TP
 .B \-A/--capture-device <num>
 Start with capture device
 .BR <num> .
@@ -639,9 +821,9 @@ This replaces the older
 description.
 
 .TP
-.B \-d/--dummy
-Start with no video files. This is dummy mode. By default, veejay plays black
-frames.
+.B \-d/--dummy/--blank
+Start without video files and render a blank source. Startup media files cannot
+be combined with this mode.
 
 .TP
 .B \-Z/--load-generators <num>
@@ -649,21 +831,18 @@ Load all generator plugins as streams and start playing generator stream
 .BR <num> .
 
 .TP
-.B \-W/--input-width <num>
-Set input video width for dummy/capture input.
+.B \-W/--input-width/--source-width <num>
+Set the blank-source width. The value must be greater than zero.
 
 .TP
-.B \-H/--input-height <num>
-Set input video height for dummy/capture input.
+.B \-H/--input-height/--source-height <num>
+Set the blank-source height. The value must be greater than zero.
 
 .TP
 .B \-f/--fps <num>
-Override the default frame rate. By default, the frame rate is read from the
-first loaded file. This may affect source audio playback and source audio/video
-sync. Use
-.BR "-a 0"
-to start without source audio playback. External JACK/WAV
-sync and beat services are controlled separately.
+Override the frame rate. The value must be greater than 0 and at most 240.
+Overriding the frame rate disables source-media audio synchronization. External
+JACK/WAV sync and beat services are controlled separately.
 
 .TP
 .B \-r/--audiorate <num>
@@ -686,12 +865,12 @@ Deinterlace video if it is interlaced.
 Set video norm. Use 0 for PAL, 1 for NTSC, or 2 for SECAM. Default is PAL.
 
 .TP
-.B \-w/--output-width <num>
-Set output video width for projection/output rendering.
+.B \-w/--output-width/--project-width <num>
+Set project/output canvas width. The value must be greater than zero.
 
 .TP
-.B \-h/--output-height <num>
-Set output video height for projection/output rendering.
+.B \-h/--output-height/--project-height <num>
+Set project/output canvas height. The value must be greater than zero.
 
 .TP
 .B \--benchmark WxH
@@ -1526,6 +1705,37 @@ loopback device. Audio, if any, still goes to JACK.
 Start veejay headless and write YUV4MPEG video to a named FIFO pipe. Only video
 is written to the pipe. Audio, if any, still goes to JACK. Because of how pipes
 work, audio and video can lose sync.
+
+.TP
+.B veejay --instance-role program --instance-id main-program -p 3490 movie.avi
+Start a Program backend that owns media playback, samples, FX, and the clean
+Program feed.
+
+.TP
+.B veejay --instance-role output --instance-id projector-left -p 4490 --output-source 127.0.0.1:3490 --project-width 1920 --project-height 1080 --fullscreen
+Start a local dedicated Output backend. It discovers the Program shared-memory
+publisher through port 3490, applies its own output graph and projection mapping,
+and opens a 1920x1080 fullscreen SDL output.
+
+.TP
+.B veejay --instance-role output -p 5490 --output-source 192.168.1.20:3490 --project-width 1920 --project-height 1080
+Start a remote Output backend that receives Program frames over the VIMS TCP
+frame transport.
+
+.TP
+.B veejay --ndi-list
+Discover NDI sources and print their advertised source names.
+
+.TP
+.B veejay --ndi-receive "Studio Camera" --ndi-follow-clock
+Start the advertised NDI source named
+.B Studio Camera
+as the active live input and follow its timestamps while its clock is healthy.
+
+.TP
+.B veejay --instance-role program --instance-id stage-program movie.avi --ndi-send --ndi-name "Veejay Program"
+Publish the clean composed Program frame as the NDI source
+.BR "Veejay Program" .
 
 .TP
 .B veejay -p 3490 -a 1 -v -n -l veejay-samplelist.sl --master -w 1920 -h 1080
