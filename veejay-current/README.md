@@ -81,3 +81,15 @@ To override automatic CPU detection:
 ```bash
 JOBS=8 ./run-and-install-locally.sh --enable-debug
 ```
+
+To build with NDI
+```bash
+JOBS=8 ./run-and-install-locally.sh --with-ndi=/opt/ndi6
+```
+
+To run with NDI, point NDI_RUNTIME_DIR_V6 to where you installed NDI
+
+```bash
+NDI_RUNTIME_DIR_V6=/opt/ndi6/bin/x86_64-linux-gnu veejay --ndi-list
+```
+
