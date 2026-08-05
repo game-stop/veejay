@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "gtksamplebankview.h"
+#include "vj-api.h"
 
 #ifndef GVR_SAMPLE_BANK_MAX_PAGES
 #define GVR_SAMPLE_BANK_MAX_PAGES 512
@@ -968,8 +969,7 @@ static gboolean gvr_sample_bank_view_query_tooltip(GtkWidget *widget,
                  page + 1,
                  view->page_count,
                  slot + 1);
-        gtk_tooltip_set_text(tooltip, text);
-        return TRUE;
+        return vj_gui_tooltip_set_text(widget, tooltip, text);
     }
 
     snprintf(text, sizeof(text),
@@ -991,8 +991,7 @@ static gboolean gvr_sample_bank_view_query_tooltip(GtkWidget *widget,
              view->page_count,
              slot + 1);
 
-    gtk_tooltip_set_text(tooltip, text);
-    return TRUE;
+    return vj_gui_tooltip_set_text(widget, tooltip, text);
 }
 
 static gboolean gvr_sample_bank_view_key_press(GtkWidget *widget, GdkEventKey *event)

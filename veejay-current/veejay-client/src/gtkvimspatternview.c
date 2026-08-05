@@ -24,6 +24,7 @@
 #include <string.h>
 #include <veejaycore/vims.h>
 #include "gtkvimspatternview.h"
+#include "vj-api.h"
 
 #define GVR_PATTERN_ROW_HEIGHT_MIN 21
 #define GVR_PATTERN_HEADER_HEIGHT 0
@@ -5495,8 +5496,7 @@ static gboolean gvr_pattern_area_query_tooltip(GtkWidget *widget,
                        hidden.rows == 1 ? "" : "s",
                        next_frame);
 
-        gtk_tooltip_set_text(tooltip, text);
-        return TRUE;
+        return vj_gui_tooltip_set_text(widget, tooltip, text);
     }
 
     if(event && event->message && view->description_lookup)
@@ -5549,8 +5549,7 @@ static gboolean gvr_pattern_area_query_tooltip(GtkWidget *widget,
             column + 1);
     }
 
-    gtk_tooltip_set_text(tooltip, text);
-    return TRUE;
+    return vj_gui_tooltip_set_text(widget, tooltip, text);
 }
 
 static void gvr_pattern_toolbar_clear_event(GtkButton *button, gpointer user_data)

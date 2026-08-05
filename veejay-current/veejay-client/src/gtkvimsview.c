@@ -22,6 +22,7 @@
 #include <math.h>
 #include <string.h>
 #include "gtkvimsview.h"
+#include "vj-api.h"
 
 #define GVR_VIMS_ROW_HEIGHT_MIN 27
 #define GVR_VIMS_HEADER_HEIGHT_MIN 25
@@ -1141,7 +1142,7 @@ static gboolean gvr_vims_list_query_tooltip(GtkWidget *widget,
                                item->widget && item->widget[0] ? item->widget : "none",
                                item->message && item->message[0] ? item->message : "none");
     }
-    gtk_tooltip_set_text(tooltip, text);
+    vj_gui_tooltip_set_text(widget, tooltip, text);
     g_free(text);
     return TRUE;
 }

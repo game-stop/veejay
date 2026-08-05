@@ -20,6 +20,7 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include "gtkmediaview.h"
+#include "vj-api.h"
 
 enum {
     MEDIA_COL_NAME,
@@ -396,6 +397,41 @@ static void gvr_media_view_append_column(GvrMediaView *view,
     gtk_tree_view_append_column(GTK_TREE_VIEW(view->tree), column);
 }
 
+static gboolean gvr_media_view_query_tooltip(GtkWidget *widget,
+                                                gint x,
+                                                gint y,
+                                                gboolean keyboard_mode,
+                                                GtkTooltip *tooltip,
+                                                gpointer user_data)
+{
+    GtkTreeModel *model = NULL;
+    GtkTreePath *path = NULL;
+    GtkTreeIter iter;
+    gchar *text = NULL;
+    gboolean result = FALSE;
+
+    (void)user_data;
+
+    if(!gtk_tree_view_get_tooltip_context(GTK_TREE_VIEW(widget),
+                                          &x,
+                                          &y,
+                                          keyboard_mode,
+                                          &model,
+                                          &path,
+                                          &iter))
+        return FALSE;
+
+    gtk_tree_model_get(model, &iter, MEDIA_COL_PATH, &text, -1);
+    if(text && text[0]) {
+        gtk_tree_view_set_tooltip_row(GTK_TREE_VIEW(widget), tooltip, path);
+        result = vj_gui_tooltip_set_text(widget, tooltip, text);
+    }
+
+    g_free(text);
+    gtk_tree_path_free(path);
+    return result;
+}
+
 static void gvr_media_view_init(GvrMediaView *view)
 {
     GtkWidget *toolbar;
@@ -448,7 +484,7 @@ static void gvr_media_view_init(GvrMediaView *view)
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(view->tree), TRUE);
     gtk_tree_view_set_enable_search(GTK_TREE_VIEW(view->tree), TRUE);
     gtk_tree_view_set_search_column(GTK_TREE_VIEW(view->tree), MEDIA_COL_NAME);
-    gtk_tree_view_set_tooltip_column(GTK_TREE_VIEW(view->tree), MEDIA_COL_PATH);
+    gtk_widget_set_has_tooltip(view->tree, TRUE);
     gvr_media_view_add_class(view->tree, "media-view-tree");
 
     gvr_media_view_append_column(view, "File", MEDIA_COL_NAME, TRUE, 180);
@@ -471,6 +507,10 @@ static void gvr_media_view_init(GvrMediaView *view)
     g_signal_connect(view->search_entry,
                      "changed",
                      G_CALLBACK(gvr_media_view_search_changed),
+                     view);
+    g_signal_connect(view->tree,
+                     "query-tooltip",
+                     G_CALLBACK(gvr_media_view_query_tooltip),
                      view);
     g_signal_connect(view->tree,
                      "row-activated",

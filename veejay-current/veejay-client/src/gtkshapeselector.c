@@ -16,6 +16,7 @@
 #include <gtk/gtk.h>
 #include <string.h>
 #include "gtkshapeselector.h"
+#include "vj-api.h"
 
 #define GVR_SHAPE_THUMB_WIDTH       64
 #define GVR_SHAPE_THUMB_HEIGHT      64
@@ -771,6 +772,41 @@ static void gvr_shape_selector_class_init(GvrShapeSelectorClass *klass)
                      G_TYPE_INT);
 }
 
+static gboolean gvr_shape_selector_query_tooltip(GtkWidget *widget,
+                                                   gint x,
+                                                   gint y,
+                                                   gboolean keyboard_mode,
+                                                   GtkTooltip *tooltip,
+                                                   gpointer user_data)
+{
+    GtkTreeModel *model = NULL;
+    GtkTreePath *path = NULL;
+    GtkTreeIter iter;
+    gchar *text = NULL;
+    gboolean result = FALSE;
+
+    (void)user_data;
+
+    if(!gtk_icon_view_get_tooltip_context(GTK_ICON_VIEW(widget),
+                                          &x,
+                                          &y,
+                                          keyboard_mode,
+                                          &model,
+                                          &path,
+                                          &iter))
+        return FALSE;
+
+    gtk_tree_model_get(model, &iter, MODEL_TOOLTIP, &text, -1);
+    if(text && text[0]) {
+        gtk_icon_view_set_tooltip_item(GTK_ICON_VIEW(widget), tooltip, path);
+        result = vj_gui_tooltip_set_text(widget, tooltip, text);
+    }
+
+    g_free(text);
+    gtk_tree_path_free(path);
+    return result;
+}
+
 static void gvr_shape_selector_init(GvrShapeSelector *selector)
 {
     GtkWidget *header;
@@ -857,8 +893,7 @@ static void gvr_shape_selector_init(GvrShapeSelector *selector)
         "shape-selector-grid");
     gtk_icon_view_set_pixbuf_column(GTK_ICON_VIEW(selector->icon_view),
                                     MODEL_PIXBUF);
-    gtk_icon_view_set_tooltip_column(GTK_ICON_VIEW(selector->icon_view),
-                                     MODEL_TOOLTIP);
+    gtk_widget_set_has_tooltip(selector->icon_view, TRUE);
     gtk_icon_view_set_selection_mode(GTK_ICON_VIEW(selector->icon_view),
                                      GTK_SELECTION_SINGLE);
     gtk_icon_view_set_item_width(GTK_ICON_VIEW(selector->icon_view),
@@ -887,6 +922,10 @@ static void gvr_shape_selector_init(GvrShapeSelector *selector)
     gtk_container_add(GTK_CONTAINER(selector->scrolled), selector->icon_view);
     gtk_box_pack_start(GTK_BOX(selector), selector->scrolled, TRUE, TRUE, 0);
 
+    g_signal_connect(selector->icon_view,
+                     "query-tooltip",
+                     G_CALLBACK(gvr_shape_selector_query_tooltip),
+                     selector);
     g_signal_connect(selector->icon_view,
                      "selection-changed",
                      G_CALLBACK(gvr_shape_selection_changed),

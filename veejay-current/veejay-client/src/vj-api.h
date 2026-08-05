@@ -76,6 +76,8 @@ void vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
 void vj_gui_set_timeout(int timer);
 int vj_gui_sleep_time( void );
 void vj_gui_style_setup(void);
+gboolean vj_gui_tooltip_set_text(GtkWidget *widget, GtkTooltip *tooltip, const char *text);
+gboolean vj_gui_tooltip_set_markup(GtkWidget *widget, GtkTooltip *tooltip, const char *markup);
 void vj_gui_plain_sample_attention_start(void);
 void vj_gui_sync_preview_toggle(int enabled);
 void vj_gui_apply_multitrack_preview(GdkPixbuf *pixbuf);

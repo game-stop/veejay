@@ -23,6 +23,7 @@
 #include <string.h>
 #include <veejaycore/vims.h>
 #include "gtkvimshistoryview.h"
+#include "vj-api.h"
 
 
 static GtkTargetEntry gvr_vims_message_drag_targets[] = {
@@ -752,8 +753,7 @@ static gboolean gvr_vims_history_query_tooltip(GtkWidget *widget,
                entry->message,
                entry->count,
                entry->count == 1 ? "" : "s");
-    gtk_tooltip_set_text(tooltip, text);
-    return TRUE;
+    return vj_gui_tooltip_set_text(widget, tooltip, text);
 }
 
 static void gvr_vims_history_drag_data_get(GtkWidget *widget,

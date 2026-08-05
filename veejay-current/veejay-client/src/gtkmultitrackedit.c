@@ -21,6 +21,7 @@
 #include <veejaycore/vims.h>
 #include "gtkmultitrackedit.h"
 #include "gtkshapeselector.h"
+#include "vj-api.h"
 
 #define GVR_MT_HEADER_WIDTH       360
 #define GVR_MT_RULER_HEIGHT        30
@@ -2939,8 +2940,7 @@ static gboolean gvr_mt_query_tooltip(GtkWidget *widget,
         g_snprintf(text, sizeof(text),
                    "Project frame %d · %s", frame, timecode);
 
-    gtk_tooltip_set_text(tooltip, text);
-    return TRUE;
+    return vj_gui_tooltip_set_text(widget, tooltip, text);
 }
 
 static gboolean gvr_mt_timeline_scroll(GtkWidget *widget,

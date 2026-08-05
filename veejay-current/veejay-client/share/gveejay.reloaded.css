@@ -312,6 +312,21 @@ tooltip {
     color: @text-color;
 }
 
+window.reloaded-tooltip-window {
+    background-color: @panel-color;
+    border: 1px solid @select-color;
+    border-radius: 4px;
+    font-size: 98%;
+}
+
+window.reloaded-tooltip-window label.reloaded-tooltip-label,
+.reloaded-tooltip-label {
+    background-color: @panel-color;
+    color: @text-color;
+    font-size: 98%;
+    padding: 5px 7px;
+}
+
 
 button:hover image, button:hover label {
   background-color: @select-color;
@@ -1401,10 +1416,11 @@ scale.fx-param-slider contents,
 
 scale.fx-param-slider value,
 .fx-param-slider value {
-    min-width: 0;
-    min-height: 0;
+    color: @text-color;
+    min-width: 28px;
+    min-height: 14px;
     padding: 0;
-    margin: 0;
+    margin: 0 0 2px 0;
 }
 
 scale.fx-param-slider trough,

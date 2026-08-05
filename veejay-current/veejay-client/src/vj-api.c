@@ -3061,7 +3061,7 @@ static void init_fx_param_step_buttons(void)
         gtk_widget_set_halign(slider, GTK_ALIGN_CENTER);
         gtk_widget_set_valign(slider, GTK_ALIGN_FILL);
         if(GTK_IS_SCALE(slider)) {
-            gtk_scale_set_draw_value(GTK_SCALE(slider), FALSE);
+            gtk_scale_set_draw_value(GTK_SCALE(slider), TRUE);
             gtk_scale_set_value_pos(GTK_SCALE(slider), GTK_POS_TOP);
         }
 
@@ -4709,12 +4709,592 @@ static void scan_generators( const char *name)
     gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
 
+#define RELOADED_TOOLTIP_EVENT_MASK \
+    (GDK_POINTER_MOTION_MASK | GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK)
+
+#define RELOADED_TOOLTIP_WINDOW_DATA "reloaded-tooltip-window"
+#define RELOADED_TOOLTIP_LABEL_DATA "reloaded-tooltip-label"
+#define RELOADED_TOOLTIP_HIDE_SOURCE_DATA "reloaded-tooltip-hide-source"
+#define RELOADED_TOOLTIP_LIFECYCLE_DATA "reloaded-tooltip-lifecycle"
+
+
+static GtkWidget *tooltip_custom_label(GtkWindow *window)
+{
+    if(!GTK_IS_WINDOW(window))
+        return NULL;
+
+    return GTK_WIDGET(g_object_get_data(G_OBJECT(window),
+                                        RELOADED_TOOLTIP_LABEL_DATA));
+}
+
+static GtkWindow *tooltip_custom_window_new(void)
+{
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_POPUP);
+    GtkWidget *label = gtk_label_new(NULL);
+    GtkStyleContext *window_context;
+    GtkStyleContext *label_context;
+
+    g_object_ref_sink(window);
+
+    gtk_widget_set_name(window, "gtk-tooltip");
+    gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+    gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+    gtk_window_set_skip_taskbar_hint(GTK_WINDOW(window), TRUE);
+    gtk_window_set_skip_pager_hint(GTK_WINDOW(window), TRUE);
+    gtk_window_set_accept_focus(GTK_WINDOW(window), FALSE);
+    gtk_window_set_focus_on_map(GTK_WINDOW(window), FALSE);
+    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
+    gtk_window_set_gravity(GTK_WINDOW(window), GDK_GRAVITY_NORTH_WEST);
+
+    window_context = gtk_widget_get_style_context(window);
+    gtk_style_context_add_class(window_context, "reloaded-tooltip-window");
+
+    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
+    gtk_label_set_yalign(GTK_LABEL(label), 0.5f);
+    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
+    gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
+    gtk_label_set_max_width_chars(GTK_LABEL(label), 80);
+    gtk_widget_set_margin_start(label, 0);
+    gtk_widget_set_margin_end(label, 0);
+    gtk_widget_set_margin_top(label, 0);
+    gtk_widget_set_margin_bottom(label, 0);
+
+    label_context = gtk_widget_get_style_context(label);
+    gtk_style_context_add_class(label_context, "reloaded-tooltip-label");
+
+    gtk_container_add(GTK_CONTAINER(window), label);
+    gtk_widget_show(label);
+
+    g_object_set_data(G_OBJECT(window),
+                      RELOADED_TOOLTIP_LABEL_DATA,
+                      label);
+
+    return GTK_WINDOW(window);
+}
+
+static void tooltip_custom_cancel_hide(GtkWindow *window)
+{
+    guint source_id;
+
+    if(!GTK_IS_WINDOW(window))
+        return;
+
+    source_id = GPOINTER_TO_UINT(
+        g_object_get_data(G_OBJECT(window),
+                          RELOADED_TOOLTIP_HIDE_SOURCE_DATA));
+
+    if(source_id != 0) {
+        g_source_remove(source_id);
+        g_object_set_data(G_OBJECT(window),
+                          RELOADED_TOOLTIP_HIDE_SOURCE_DATA,
+                          NULL);
+    }
+}
+
+static gboolean tooltip_custom_hide_timeout(gpointer data)
+{
+    GtkWindow *window = GTK_WINDOW(data);
+
+    if(GTK_IS_WINDOW(window)) {
+        g_object_set_data(G_OBJECT(window),
+                          RELOADED_TOOLTIP_HIDE_SOURCE_DATA,
+                          NULL);
+        gtk_widget_hide(GTK_WIDGET(window));
+    }
+
+    return G_SOURCE_REMOVE;
+}
+
+static void tooltip_custom_schedule_hide(GtkWindow *window)
+{
+    guint source_id;
+
+    if(!GTK_IS_WINDOW(window))
+        return;
+
+    tooltip_custom_cancel_hide(window);
+
+    source_id = g_timeout_add_full(G_PRIORITY_DEFAULT,
+                                   120,
+                                   tooltip_custom_hide_timeout,
+                                   g_object_ref(window),
+                                   g_object_unref);
+
+    g_object_set_data(G_OBJECT(window),
+                      RELOADED_TOOLTIP_HIDE_SOURCE_DATA,
+                      GUINT_TO_POINTER(source_id));
+}
+
+static gboolean tooltip_custom_widget_leave(GtkWidget *widget,
+                                            GdkEventCrossing *event,
+                                            gpointer user_data)
+{
+    GtkWindow *window = gtk_widget_get_tooltip_window(widget);
+
+    (void)event;
+    (void)user_data;
+
+    if(GTK_IS_WINDOW(window))
+        tooltip_custom_schedule_hide(window);
+
+    return FALSE;
+}
+
+static void tooltip_custom_install_lifecycle(GtkWidget *widget)
+{
+    if(!GTK_IS_WIDGET(widget))
+        return;
+
+    if(g_object_get_data(G_OBJECT(widget),
+                         RELOADED_TOOLTIP_LIFECYCLE_DATA))
+        return;
+
+    gtk_widget_add_events(widget,
+                          GDK_POINTER_MOTION_MASK |
+                          GDK_ENTER_NOTIFY_MASK |
+                          GDK_LEAVE_NOTIFY_MASK);
+
+    g_signal_connect(widget,
+                     "leave-notify-event",
+                     G_CALLBACK(tooltip_custom_widget_leave),
+                     NULL);
+
+    g_object_set_data(G_OBJECT(widget),
+                      RELOADED_TOOLTIP_LIFECYCLE_DATA,
+                      GINT_TO_POINTER(1));
+}
+
+static void tooltip_custom_show_now(GtkWidget *widget,
+                                    GtkWindow *window)
+{
+    GtkWidget *toplevel;
+    GdkWindow *toplevel_window;
+    GtkRequisition minimum;
+    GtkRequisition natural;
+    GdkDisplay *display;
+    GdkMonitor *monitor;
+    GdkRectangle workarea;
+    gint widget_x = 0;
+    gint widget_y = 0;
+    gint root_x = 0;
+    gint root_y = 0;
+    gint popup_width;
+    gint popup_height;
+    gint target_x;
+    gint target_y;
+    gint work_left;
+    gint work_top;
+    gint work_right;
+    gint work_bottom;
+    const gint edge_margin = 6;
+    const gint widget_gap = 6;
+    const gint x_inset = 8;
+
+    if(!GTK_IS_WIDGET(widget) || !GTK_IS_WINDOW(window))
+        return;
+
+    toplevel = gtk_widget_get_toplevel(widget);
+    if(!GTK_IS_WINDOW(toplevel))
+        return;
+
+    toplevel_window = gtk_widget_get_window(toplevel);
+    if(!GDK_IS_WINDOW(toplevel_window))
+        return;
+
+    tooltip_custom_cancel_hide(window);
+
+    gtk_window_set_transient_for(window, GTK_WINDOW(toplevel));
+    gtk_window_set_screen(window, gtk_widget_get_screen(widget));
+
+    if(!gtk_widget_translate_coordinates(widget,
+                                         toplevel,
+                                         0,
+                                         0,
+                                         &widget_x,
+                                         &widget_y))
+    {
+        widget_x = 0;
+        widget_y = 0;
+    }
+
+    gdk_window_get_origin(toplevel_window, &root_x, &root_y);
+    widget_x += root_x;
+    widget_y += root_y;
+
+    gtk_widget_get_preferred_size(GTK_WIDGET(window), &minimum, &natural);
+    popup_width = MAX(1, natural.width);
+    popup_height = MAX(1, natural.height);
+
+    display = gtk_widget_get_display(widget);
+    monitor = gdk_display_get_monitor_at_point(
+        display,
+        widget_x + MAX(1, gtk_widget_get_allocated_width(widget)) / 2,
+        widget_y + MAX(1, gtk_widget_get_allocated_height(widget)) / 2);
+
+    if(monitor) {
+        gdk_monitor_get_workarea(monitor, &workarea);
+    }
+    else {
+        GdkScreen *screen = gtk_widget_get_screen(widget);
+        workarea.x = 0;
+        workarea.y = 0;
+        workarea.width = gdk_screen_get_width(screen);
+        workarea.height = gdk_screen_get_height(screen);
+    }
+
+    work_left = workarea.x + edge_margin;
+    work_top = workarea.y + edge_margin;
+    work_right = workarea.x + workarea.width - edge_margin;
+    work_bottom = workarea.y + workarea.height - edge_margin;
+
+    target_x = widget_x + x_inset;
+    target_y = widget_y +
+               MAX(1, gtk_widget_get_allocated_height(widget)) +
+               widget_gap;
+
+    if(target_y + popup_height > work_bottom)
+        target_y = widget_y - popup_height - widget_gap;
+
+    if(popup_width <= work_right - work_left)
+        target_x = CLAMP(target_x, work_left, work_right - popup_width);
+    else
+        target_x = work_left;
+
+    if(popup_height <= work_bottom - work_top)
+        target_y = CLAMP(target_y, work_top, work_bottom - popup_height);
+    else
+        target_y = work_top;
+
+    gtk_window_resize(window, popup_width, popup_height);
+    gtk_window_move(window, target_x, target_y);
+    gtk_widget_show(GTK_WIDGET(window));
+    gtk_window_move(window, target_x, target_y);
+
+}
+
+gboolean vj_gui_tooltip_set_text(GtkWidget *widget,
+                                 GtkTooltip *tooltip,
+                                 const char *text)
+{
+    GtkWindow *window;
+    GtkWidget *label;
+
+    if(!GTK_IS_WIDGET(widget) || !text || !text[0])
+        return FALSE;
+
+    window = gtk_widget_get_tooltip_window(widget);
+    label = tooltip_custom_label(window);
+
+    if(GTK_IS_LABEL(label)) {
+        gtk_label_set_text(GTK_LABEL(label), text);
+        gtk_widget_show(label);
+        tooltip_custom_show_now(widget, window);
+        return TRUE;
+    }
+
+    if(tooltip) {
+        gtk_tooltip_set_text(tooltip, text);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+gboolean vj_gui_tooltip_set_markup(GtkWidget *widget,
+                                   GtkTooltip *tooltip,
+                                   const char *markup)
+{
+    GtkWindow *window;
+    GtkWidget *label;
+
+    if(!GTK_IS_WIDGET(widget) || !markup || !markup[0])
+        return FALSE;
+
+    window = gtk_widget_get_tooltip_window(widget);
+    label = tooltip_custom_label(window);
+
+    if(GTK_IS_LABEL(label)) {
+        gtk_label_set_markup(GTK_LABEL(label), markup);
+        gtk_widget_show(label);
+        tooltip_custom_show_now(widget, window);
+        return TRUE;
+    }
+
+    if(tooltip) {
+        gtk_tooltip_set_markup(tooltip, markup);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static gboolean tooltip_static_query(GtkWidget *widget,
+                                     gint x,
+                                     gint y,
+                                     gboolean keyboard_mode,
+                                     GtkTooltip *tooltip,
+                                     gpointer user_data)
+{
+    gchar *markup;
+    gchar *text;
+    gboolean result = FALSE;
+
+    (void)x;
+    (void)y;
+    (void)keyboard_mode;
+    (void)user_data;
+
+    markup = gtk_widget_get_tooltip_markup(widget);
+    if(markup && markup[0])
+        result = vj_gui_tooltip_set_markup(widget, tooltip, markup);
+    g_free(markup);
+
+    if(result)
+        return TRUE;
+
+    text = gtk_widget_get_tooltip_text(widget);
+    if(text && text[0])
+        result = vj_gui_tooltip_set_text(widget, tooltip, text);
+    g_free(text);
+
+    return result;
+}
+
+static void tooltip_install_static_fallback(GtkWidget *widget)
+{
+    gchar *markup;
+    gchar *text;
+    gboolean has_static = FALSE;
+
+    if(!GTK_IS_WIDGET(widget))
+        return;
+    if(g_object_get_data(G_OBJECT(widget), "reloaded-tooltip-static-fallback"))
+        return;
+
+    markup = gtk_widget_get_tooltip_markup(widget);
+    if(markup && markup[0])
+        has_static = TRUE;
+    g_free(markup);
+
+    text = gtk_widget_get_tooltip_text(widget);
+    if(text && text[0])
+        has_static = TRUE;
+    g_free(text);
+
+    if(!has_static)
+        return;
+
+    g_signal_connect(widget,
+                     "query-tooltip",
+                     G_CALLBACK(tooltip_static_query),
+                     NULL);
+    g_object_set_data(G_OBJECT(widget),
+                      "reloaded-tooltip-static-fallback",
+                      GINT_TO_POINTER(1));
+}
+
+static void tooltip_prepare_widget_tree(GtkWidget *widget,
+                                        GtkWindow *tooltip_window,
+                                        GHashTable *visited,
+                                        int *prepared)
+{
+    if(!GTK_IS_WIDGET(widget))
+        return;
+    if(g_hash_table_contains(visited, widget))
+        return;
+
+    g_hash_table_add(visited, widget);
+
+    if(gtk_widget_get_has_tooltip(widget)) {
+        gtk_widget_add_events(widget, RELOADED_TOOLTIP_EVENT_MASK);
+        if(GTK_IS_WINDOW(tooltip_window))
+            gtk_widget_set_tooltip_window(widget, tooltip_window);
+        tooltip_custom_install_lifecycle(widget);
+        tooltip_install_static_fallback(widget);
+        (*prepared)++;
+    }
+
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        for(GList *node = children; node; node = node->next)
+            tooltip_prepare_widget_tree(GTK_WIDGET(node->data),
+                                        tooltip_window,
+                                        visited,
+                                        prepared);
+        g_list_free(children);
+    }
+}
+
+static void tooltip_rearm_widget_tree(GtkWidget *widget,
+                                      GtkWindow *tooltip_window,
+                                      GHashTable *visited,
+                                      int *rearmed)
+{
+    if(!GTK_IS_WIDGET(widget))
+        return;
+    if(g_hash_table_contains(visited, widget))
+        return;
+
+    g_hash_table_add(visited, widget);
+
+    if(gtk_widget_get_has_tooltip(widget)) {
+        gtk_widget_add_events(widget, RELOADED_TOOLTIP_EVENT_MASK);
+        if(GTK_IS_WINDOW(tooltip_window))
+            gtk_widget_set_tooltip_window(widget, tooltip_window);
+        gtk_widget_set_has_tooltip(widget, FALSE);
+        gtk_widget_set_has_tooltip(widget, TRUE);
+        tooltip_custom_install_lifecycle(widget);
+        tooltip_install_static_fallback(widget);
+        (*rearmed)++;
+    }
+
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        for(GList *node = children; node; node = node->next)
+            tooltip_rearm_widget_tree(GTK_WIDGET(node->data),
+                                      tooltip_window,
+                                      visited,
+                                      rearmed);
+        g_list_free(children);
+    }
+}
+
+typedef struct {
+    GtkWidget *root;
+    GtkWindow *tooltip_window;
+} ReloadedTooltipRearm;
+
+static void tooltip_rearm_data_free(gpointer data)
+{
+    ReloadedTooltipRearm *rearm = data;
+
+    if(!rearm)
+        return;
+    if(rearm->root)
+        g_object_unref(rearm->root);
+    if(rearm->tooltip_window)
+        g_object_unref(rearm->tooltip_window);
+    g_free(rearm);
+}
+
+static gboolean tooltip_rearm_widget_idle(gpointer data)
+{
+    ReloadedTooltipRearm *rearm = data;
+    GtkWidget *root = rearm->root;
+    GtkWindow *tooltip_window = rearm->tooltip_window;
+    GHashTable *visited = g_hash_table_new(g_direct_hash, g_direct_equal);
+    int rearmed = 0;
+
+    tooltip_rearm_widget_tree(root, tooltip_window, visited, &rearmed);
+
+
+    g_hash_table_destroy(visited);
+    return G_SOURCE_REMOVE;
+}
+
+static void tooltip_schedule_rearm(GtkWidget *root,
+                                   GtkWindow *tooltip_window)
+{
+    ReloadedTooltipRearm *rearm;
+
+    if(!GTK_IS_WIDGET(root) || !GTK_IS_WINDOW(tooltip_window))
+        return;
+
+    rearm = g_new0(ReloadedTooltipRearm, 1);
+    rearm->root = g_object_ref(root);
+    rearm->tooltip_window = g_object_ref(tooltip_window);
+
+    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,
+                    tooltip_rearm_widget_idle,
+                    rearm,
+                    tooltip_rearm_data_free);
+}
+
+static void tooltip_rearm_toplevel_map(GtkWidget *widget,
+                                       gpointer user_data)
+{
+    GtkBuilder *builder = GTK_BUILDER(user_data);
+    GtkWindow *tooltip_window;
+
+    if(!builder)
+        return;
+
+    tooltip_window = GTK_WINDOW(g_object_get_data(G_OBJECT(builder),
+                                                   RELOADED_TOOLTIP_WINDOW_DATA));
+    if(!GTK_IS_WINDOW(tooltip_window))
+        return;
+
+
+    tooltip_schedule_rearm(widget, tooltip_window);
+}
+
+
+static void tooltip_rearm_install(GtkBuilder *builder)
+{
+    GSList *objects;
+    int prepared = 0;
+    GHashTable *visited;
+    GtkWindow *tooltip_window;
+
+    if(!builder)
+        return;
+
+    tooltip_window = tooltip_custom_window_new();
+    g_object_set_data_full(G_OBJECT(builder),
+                           RELOADED_TOOLTIP_WINDOW_DATA,
+                           tooltip_window,
+                           g_object_unref);
+
+    visited = g_hash_table_new(g_direct_hash, g_direct_equal);
+    objects = gtk_builder_get_objects(builder);
+    for(GSList *node = objects; node; node = node->next) {
+        if(GTK_IS_WINDOW(node->data))
+            tooltip_prepare_widget_tree(GTK_WIDGET(node->data),
+                                        tooltip_window,
+                                        visited,
+                                        &prepared);
+    }
+    g_hash_table_destroy(visited);
+
+    for(GSList *node = objects; node; node = node->next) {
+        if(!GTK_IS_WINDOW(node->data))
+            continue;
+
+        GtkWidget *window = GTK_WIDGET(node->data);
+        g_signal_connect_after(window,
+                               "map",
+                               G_CALLBACK(tooltip_rearm_toplevel_map),
+                               builder);
+
+        if(gtk_widget_get_mapped(window))
+            tooltip_rearm_toplevel_map(window, builder);
+    }
+
+
+    g_slist_free(objects);
+}
+
 static void set_tooltip_by_widget(GtkWidget *w, const char *text)
 {
+    GtkWindow *tooltip_window = NULL;
+
     if(!w)
         return;
 
     gtk_widget_set_tooltip_text(w, (text && *text) ? text : NULL);
+
+    if(!text || !*text)
+        return;
+
+    gtk_widget_add_events(w, RELOADED_TOOLTIP_EVENT_MASK);
+
+    if(info && info->main_window)
+        tooltip_window = GTK_WINDOW(g_object_get_data(
+            G_OBJECT(info->main_window),
+            RELOADED_TOOLTIP_WINDOW_DATA));
+
+    if(GTK_IS_WINDOW(tooltip_window))
+        gtk_widget_set_tooltip_window(w, tooltip_window);
 }
 
 static int combo_model_string_column(GtkTreeModel *model)
@@ -12355,7 +12935,7 @@ static gboolean favourite_fx_add_effect_id(gint effect_id, gboolean save)
         return FALSE;
 
     ec = info->effect_info[effect_id];
-    if(!ec || !ec->description)
+    if(!ec || ec->description[0] == '\0')
         return FALSE;
 
     description = ec->description;
@@ -22164,6 +22744,9 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "scale.fx-param-slider contents slider { min-width:16px; min-height:16px; margin-left:-6px; margin-right:-6px; }"
             "tooltip,tooltip.background { background-color:#20242b; color:#f5f5f5; border:1px solid #69717c; border-radius:4px; padding:4px 6px; }"
             "tooltip label { color:#f5f5f5; background-color:transparent; }"
+            "window.reloaded-tooltip-window { background-color:#20242b; color:#f5f5f5; border:1px solid #69717c; border-radius:4px; }"
+            "window.reloaded-tooltip-window { font-size:100%%; }"
+            ".reloaded-tooltip-label { color:#f5f5f5; background-color:#20242b; font-size:100%%; }"
             ".video-navigation-row { padding:0px; margin:0px; }"
             "#frame303,.video-navigation-frame,.video-navigation-frame-content,.video-navigation-attached-group,.video-navigation-frame-alignment,.video-navigation-secondary-row { padding:0px; margin:0px; border-width:0px; }"
             "#frame303 > border,.video-navigation-frame > border { padding:0px; margin:0px; border-width:0px; }"
@@ -22195,6 +22778,9 @@ void vj_gui_activate_stylesheet(vj_gui_t *gui)
             "scale.fx-param-slider contents slider { min-width:16px; min-height:16px; margin-left:-6px; margin-right:-6px; }"
             "tooltip,tooltip.background { background-color:#20242b; color:#f5f5f5; border:1px solid #69717c; border-radius:4px; padding:4px 6px; }"
             "tooltip label { color:#f5f5f5; background-color:transparent; }"
+            "window.reloaded-tooltip-window { background-color:#20242b; color:#f5f5f5; border:1px solid #69717c; border-radius:4px; }"
+            "window.reloaded-tooltip-window { font-size:100%%; }"
+            ".reloaded-tooltip-label { color:#f5f5f5; background-color:#20242b; font-size:100%%; }"
             ".video-navigation-row { padding:0px; margin:0px; }"
             "#frame303,.video-navigation-frame,.video-navigation-frame-content,.video-navigation-attached-group,.video-navigation-frame-alignment,.video-navigation-secondary-row { padding:0px; margin:0px; border-width:0px; }"
             "#frame303 > border,.video-navigation-frame > border { padding:0px; margin:0px; border-width:0px; }"
@@ -25318,6 +25904,7 @@ void vj_gui_init(const char *glade_file,
     gtk_window_set_default(GTK_WINDOW(connection_dial), vj_button);
 
     gtk_builder_connect_signals( gui->main_window , NULL);
+    tooltip_rearm_install(gui->main_window);
     fx_chain_panel_toggle_mount();
     fx_chain_controls_sync_from_status(info->status_tokens[PLAY_MODE],
                                        info->status_tokens[SAMPLE_FX]);
@@ -25785,6 +26372,7 @@ static void veejay_show_main_ui(vj_gui_t *gui)
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
     reloaded_present_window(mw);
+    tooltip_rearm_toplevel_map(mw, info->main_window);
     ui_window_set_startup_size(mw);
 
     if(info->client &&
@@ -27142,8 +27730,7 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
             g_strlcat(header_tip, pattern_text, sizeof(header_tip));
         }
 
-        gtk_tooltip_set_text(tooltip, header_tip);
-        return TRUE;
+        return vj_gui_tooltip_set_text(widget, tooltip, header_tip);
     }
 
     if(bank < 0 || slot < 0)
@@ -27156,7 +27743,9 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
         return FALSE;
 
     if(sample_id <= 0) {
-        gtk_tooltip_set_text(tooltip,
+        return vj_gui_tooltip_set_text(
+            widget,
+            tooltip,
             "Empty sequence slot\n"
             "Left click / Enter: add current sample/stream\n"
             "Cursor keys: move selection\n"
@@ -27169,7 +27758,6 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
             "Ctrl+Shift+C / Ctrl+Shift+V: copy/paste whole bank\n"
             "Alt+drag: swap filled slots\n"
             "Right click: actions menu, including copy to bank");
-        return TRUE;
     }
 
     sample_slot_t *source_slot = find_slot_by_sample(sample_id, sample_type);
@@ -27218,8 +27806,7 @@ static gboolean on_sequence_bank_view_query_tooltip(GtkWidget *widget,
               sizeof(text));
 
     sequence_vims_append_pattern_tooltip(text, sizeof(text), bank, slot);
-    gtk_tooltip_set_text(tooltip, text);
-    return TRUE;
+    return vj_gui_tooltip_set_text(widget, tooltip, text);
 }
 
 static GtkWidget *sequence_toolbar_pack_existing(GtkWidget *toolbar,

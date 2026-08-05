@@ -2913,7 +2913,7 @@ static gboolean gvr_edit_list_navigator_query_tooltip(GtkWidget *widget,
                 gvr_edit_list_navigator_x_to_boundary(view, x, allocation.width));
     time = gvr_edit_list_format_time(view, frame);
     text = g_strdup_printf("Timeline overview\nFrame %d · %s\nDrag the viewport to pan", frame, time);
-    gtk_tooltip_set_text(tooltip, text);
+    vj_gui_tooltip_set_text(widget, tooltip, text);
     g_free(text);
     g_free(time);
     return TRUE;
@@ -3835,7 +3835,7 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
             text = g_strdup_printf("%s\nSeparator at boundary %d · %s\nDrag to move · double-click to rename · Delete removes it",
                                    separator->name ? separator->name : "Separator",
                                    separator->frame, time);
-            gtk_tooltip_set_text(tooltip, text);
+            vj_gui_tooltip_set_text(widget, tooltip, text);
             g_free(text);
             g_free(time);
             return TRUE;
@@ -3853,7 +3853,7 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
                                        start_frame, end_boundary - 1,
                                        end_boundary - start_frame,
                                        start_time, end_time);
-                gtk_tooltip_set_text(tooltip, text);
+                vj_gui_tooltip_set_text(widget, tooltip, text);
                 g_free(text);
                 g_free(start_time);
                 g_free(end_time);
@@ -3889,7 +3889,7 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
                                edge_hint);
         g_free(time);
     }
-    gtk_tooltip_set_text(tooltip, text);
+    vj_gui_tooltip_set_text(widget, tooltip, text);
     g_free(text);
     return TRUE;
 }
