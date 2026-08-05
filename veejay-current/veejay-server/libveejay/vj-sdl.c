@@ -78,6 +78,10 @@ typedef struct vj_sdl_t {
     int pending_y;
     int pending_fullscreen;
     int pending_grab;
+    int display_index;
+    int target_display_x;
+    int target_display_y;
+    int identify_overlay;
     vj_perf_context *perf;
 } vj_sdl;
 
@@ -189,6 +193,10 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
 
     vjsdl->pending_fullscreen = -1;
     vjsdl->pending_grab = -1;
+    vjsdl->display_index = -1;
+    vjsdl->target_display_x = -1;
+    vjsdl->target_display_y = -1;
+    vjsdl->identify_overlay = 0;
     return (void*) vjsdl;
 }
 
@@ -273,6 +281,36 @@ static int vj_get_sdl_yuv_mode(int vjfmt, int w)
     return mode;
 }
 
+static int vj_sdl_display_for_point(int x, int y)
+{
+    if(x == -1 || y == -1)
+        return -1;
+    const int count = SDL_GetNumVideoDisplays();
+    for(int i = 0; i < count; i++) {
+        SDL_Rect bounds;
+        if(SDL_GetDisplayBounds(i, &bounds) != 0)
+            continue;
+        if(x >= bounds.x && x < bounds.x + bounds.w &&
+           y >= bounds.y && y < bounds.y + bounds.h)
+            return i;
+    }
+    return -1;
+}
+
+static void vj_sdl_anchor_display(vj_sdl *vjsdl, int display)
+{
+    if(!vjsdl || !vjsdl->screen || display < 0 || display >= SDL_GetNumVideoDisplays())
+        return;
+    SDL_SetWindowPosition(vjsdl->screen,
+                          SDL_WINDOWPOS_CENTERED_DISPLAY(display),
+                          SDL_WINDOWPOS_CENTERED_DISPLAY(display));
+}
+
+static void vj_sdl_anchor_to_display(vj_sdl *vjsdl, int x, int y)
+{
+    vj_sdl_anchor_display(vjsdl, vj_sdl_display_for_point(x, y));
+}
+
 static int vj_sdl_is_owner(vj_sdl *vjsdl)
 {
     return vjsdl && vjsdl->owner_valid &&
@@ -290,6 +328,29 @@ static void vj_sdl_apply_grab(vj_sdl *vjsdl, int status)
                              "[DISPLAY] Grabbed mouse focus");
 }
 
+
+static void vj_sdl_abort_init(vj_sdl *vjsdl)
+{
+    if(!vjsdl)
+        return;
+    if(vjsdl->texture) {
+        SDL_DestroyTexture(vjsdl->texture);
+        vjsdl->texture = NULL;
+    }
+    if(vjsdl->renderer) {
+        SDL_DestroyRenderer(vjsdl->renderer);
+        vjsdl->renderer = NULL;
+    }
+    if(vjsdl->screen) {
+        SDL_DestroyWindow(vjsdl->screen);
+        vjsdl->screen = NULL;
+    }
+    SDL_QuitSubSystem(SDL_INIT_VIDEO);
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->initialized = 0;
+    vjsdl->owner_valid = 0;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+}
 
 int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int scaled_width, int scaled_height, char *caption, int show, int fs, int vjfmt, float fps, double *vsync)
 {
@@ -328,26 +389,54 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     vjsdl->height = input_height;
 
 
-    if( caption )
+    if(vjsdl->caption) {
+        free(vjsdl->caption);
+        vjsdl->caption = NULL;
+    }
+    if(caption)
         vjsdl->caption = strdup(caption);
 
     // SDL2: key repeat behaviour has changed; measure interval or look at repeat value on keysym
 	//int ms = ( 1.0 / fps ) * 1000;
 
-    int flags = (fs ? SDL_WINDOW_FULLSCREEN : (vjsdl->borderless ? SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS: SDL_WINDOW_OPENGL ));
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    const int target_x = vjsdl->target_display_x;
+    const int target_y = vjsdl->target_display_y;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    const int target_display = target_x != -1 && target_y != -1 ?
+                               vj_sdl_display_for_point(target_x, target_y) :
+                               vj_sdl_display_for_point(vjsdl->x, vjsdl->y);
+    const int create_x = target_display >= 0 ? SDL_WINDOWPOS_CENTERED_DISPLAY(target_display) :
+                         (vjsdl->x != -1 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED);
+    const int create_y = target_display >= 0 ? SDL_WINDOWPOS_CENTERED_DISPLAY(target_display) :
+                         (vjsdl->y != -1 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED);
+    int flags = vjsdl->borderless ? SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS : SDL_WINDOW_OPENGL;
 
-	vjsdl->screen = SDL_CreateWindow(vjsdl->caption, 
-            (vjsdl->x != -1 ? vjsdl->x : SDL_WINDOWPOS_UNDEFINED),
-            (vjsdl->y != -1 ? vjsdl->y : SDL_WINDOWPOS_UNDEFINED),
+	vjsdl->screen = SDL_CreateWindow(vjsdl->caption, create_x, create_y,
             vjsdl->sw_scale_width, vjsdl->sw_scale_height, flags );
 
     if(!vjsdl->screen)
     {
 		veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to create SDL window: %s", SDL_GetError());
+        vj_sdl_abort_init(vjsdl);
 		return 0;
     }
 
-    SDL_GetWindowPosition(vjsdl->screen, &vjsdl->x, &vjsdl->y);
+    if(target_display >= 0 && !fs && x != -1 && y != -1)
+        SDL_SetWindowPosition(vjsdl->screen, x, y);
+    if(fs) {
+        if(target_display >= 0)
+            vj_sdl_anchor_display(vjsdl, target_display);
+        else
+            vj_sdl_anchor_to_display(vjsdl, x, y);
+        if(SDL_SetWindowFullscreen(vjsdl->screen, SDL_WINDOW_FULLSCREEN_DESKTOP) != 0) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to enter fullscreen on target display: %s", SDL_GetError());
+            vj_sdl_abort_init(vjsdl);
+            return 0;
+        }
+    }
+    if(!fs)
+        SDL_GetWindowPosition(vjsdl->screen, &vjsdl->x, &vjsdl->y);
 
     // Iterate through available driver and try in order of priority
     char *sdl_driver = getenv("VEEJAY_SDL_DRIVER");
@@ -380,16 +469,14 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
             vjsdl->renderer = SDL_CreateRenderer(vjsdl->screen, -1, SDL_RENDERER_PRESENTVSYNC );
         } else {
             veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Valid values for VEEJAY_SDL_DRIVER are: \"software\", \"accelerated\", \"vsync\"");
-            SDL_DestroyWindow(vjsdl->screen);
-            vjsdl->screen = NULL;
+            vj_sdl_abort_init(vjsdl);
             return 0;
         }
     }
 
     if(!vjsdl->renderer) {
         veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] %s", SDL_GetError());
-        SDL_DestroyWindow(vjsdl->screen);
-        vjsdl->screen = NULL;
+        vj_sdl_abort_init(vjsdl);
         return 0;
     }
     
@@ -408,10 +495,7 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     vjsdl->texture = SDL_CreateTexture( vjsdl->renderer, SDL_PIXELFORMAT_YUY2, SDL_TEXTUREACCESS_STREAMING, vjsdl->width,vjsdl->height);
     if(!vjsdl->texture) {
         veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Unable to create SDL texture: %s", SDL_GetError());
-        SDL_DestroyRenderer(vjsdl->renderer);
-        SDL_DestroyWindow(vjsdl->screen);
-        vjsdl->renderer = NULL;
-        vjsdl->screen = NULL;
+        vj_sdl_abort_init(vjsdl);
         return 0;
     }
 
@@ -457,6 +541,18 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 
     SDL_DisplayMode mode;
     int display_index = SDL_GetWindowDisplayIndex(vjsdl->screen);
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->display_index = display_index;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    if(target_display >= 0) {
+        if(display_index == target_display)
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[DISPLAY] SDL window locked to display %d", display_index);
+        else
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "[DISPLAY] Requested SDL display %d but compositor placed the window on display %d",
+                       target_display, display_index);
+    }
     double vsync_interval = 1.0 / 60.0;
 
     if(vsync)
@@ -513,8 +609,20 @@ static int vj_sdl_apply_window_size(vj_sdl *vjsdl,
         current_y = y;
 
     if(!fullscreen) {
+        int target_display;
+        pthread_mutex_lock(&vjsdl->command_mutex);
+        const int target_x = vjsdl->target_display_x;
+        const int target_y = vjsdl->target_display_y;
+        pthread_mutex_unlock(&vjsdl->command_mutex);
+        target_display = target_x != -1 && target_y != -1 ?
+                         vj_sdl_display_for_point(target_x, target_y) : -1;
         SDL_SetWindowSize(vjsdl->screen, w, h);
-        SDL_SetWindowPosition(vjsdl->screen, current_x, current_y);
+        if(target_display >= 0)
+            vj_sdl_anchor_display(vjsdl, target_display);
+        else
+            vj_sdl_anchor_to_display(vjsdl, current_x, current_y);
+        if(target_display < 0 || vj_sdl_display_for_point(current_x, current_y) == target_display)
+            SDL_SetWindowPosition(vjsdl->screen, current_x, current_y);
     }
 
     if(vjsdl->renderer &&
@@ -537,8 +645,10 @@ static int vj_sdl_apply_window_size(vj_sdl *vjsdl,
         SDL_GetWindowSize(vjsdl->screen, &actual_w, &actual_h);
         SDL_GetWindowPosition(vjsdl->screen, &current_x, &current_y);
     }
+    const int actual_display = SDL_GetWindowDisplayIndex(vjsdl->screen);
 
     pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->display_index = actual_display;
     vjsdl->x = current_x;
     vjsdl->y = current_y;
     vjsdl->sw_scale_width = actual_w;
@@ -559,9 +669,26 @@ static int vj_sdl_apply_fullscreen(vj_sdl *vjsdl, int enabled)
     int height;
     int x;
     int y;
+    int requested_display = -1;
 
     if(!vjsdl || !vj_sdl_is_owner(vjsdl) || !vjsdl->screen)
         return 0;
+
+    if(enabled) {
+        pthread_mutex_lock(&vjsdl->command_mutex);
+        const int target_x = vjsdl->target_display_x;
+        const int target_y = vjsdl->target_display_y;
+        pthread_mutex_unlock(&vjsdl->command_mutex);
+        requested_display = target_x != -1 && target_y != -1 ?
+                            vj_sdl_display_for_point(target_x, target_y) :
+                            vj_sdl_display_for_point(vjsdl->x, vjsdl->y);
+        if(SDL_GetWindowFlags(vjsdl->screen) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_FULLSCREEN_DESKTOP))
+            SDL_SetWindowFullscreen(vjsdl->screen, 0);
+        if(requested_display >= 0)
+            vj_sdl_anchor_display(vjsdl, requested_display);
+        else
+            vj_sdl_anchor_to_display(vjsdl, vjsdl->x, vjsdl->y);
+    }
 
     if(SDL_SetWindowFullscreen(vjsdl->screen, flags) != 0) {
         veejay_msg(VEEJAY_MSG_ERROR,
@@ -569,7 +696,19 @@ static int vj_sdl_apply_fullscreen(vj_sdl *vjsdl, int enabled)
         return 0;
     }
 
+    const int actual_display = SDL_GetWindowDisplayIndex(vjsdl->screen);
+    if(enabled && requested_display >= 0) {
+        if(actual_display != requested_display)
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "[DISPLAY] Fullscreen requested on display %d but active on display %d",
+                       requested_display, actual_display);
+        else
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[DISPLAY] Fullscreen locked to display %d", actual_display);
+    }
+
     pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->display_index = actual_display;
     vjsdl->fs = enabled ? 1 : 0;
     width = vjsdl->sw_scale_width;
     height = vjsdl->sw_scale_height;
@@ -788,6 +927,93 @@ void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixe
     vj_sdl_convert_frame((vj_sdl*)ptr, frame_to_dsplay, pixels);
 }
 
+static void vj_sdl_yuy2_rect(uint8_t *pixels, int width, int height,
+                             int x, int y, int w, int h, uint8_t luma)
+{
+    if(!pixels || w <= 0 || h <= 0)
+        return;
+    int x0 = x < 0 ? 0 : x;
+    int y0 = y < 0 ? 0 : y;
+    int x1 = x + w > width ? width : x + w;
+    int y1 = y + h > height ? height : y + h;
+    if(x0 >= x1 || y0 >= y1)
+        return;
+
+    for(int py = y0; py < y1; py++) {
+        uint8_t *row = pixels + (size_t)py * (size_t)width * 2u;
+        for(int px = x0; px < x1; px++) {
+            const size_t off = (size_t)px * 2u;
+            row[off] = luma;
+            row[off + 1u] = 0x80;
+        }
+    }
+}
+
+static void vj_sdl_identify_digit(uint8_t *pixels, int width, int height,
+                                  int x, int y, int digit, int scale)
+{
+    static const uint8_t masks[10] = {
+        0x3f, 0x06, 0x5b, 0x4f, 0x66,
+        0x6d, 0x7d, 0x07, 0x7f, 0x6f
+    };
+    static const int segments[7][4] = {
+        {1, 0, 3, 1}, {4, 1, 1, 3}, {4, 5, 1, 3},
+        {1, 8, 3, 1}, {0, 5, 1, 3}, {0, 1, 1, 3},
+        {1, 4, 3, 1}
+    };
+    if(digit < 0 || digit > 9)
+        return;
+    const uint8_t mask = masks[digit];
+    for(int i = 0; i < 7; i++) {
+        if(mask & (1u << i))
+            vj_sdl_yuy2_rect(pixels, width, height,
+                             x + segments[i][0] * scale,
+                             y + segments[i][1] * scale,
+                             segments[i][2] * scale,
+                             segments[i][3] * scale, 235);
+    }
+}
+
+static void vj_sdl_overlay_identify(vj_sdl *vjsdl, uint8_t *pixels)
+{
+    int identify;
+    int display;
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    identify = vjsdl->identify_overlay;
+    display = vjsdl->display_index;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    if(identify == 0 || !pixels)
+        return;
+
+    int number = identify > 0 ? identify : (display >= 0 ? display + 1 : 0);
+    char text[16];
+    snprintf(text, sizeof(text), "%d", number);
+    const int digits = (int)strlen(text);
+    int scale = vjsdl->height / 14;
+    if(scale < 8)
+        scale = 8;
+    if(scale > vjsdl->width / (digits * 7 + 4))
+        scale = vjsdl->width / (digits * 7 + 4);
+    if(scale < 2)
+        scale = 2;
+
+    const int digit_w = 5 * scale;
+    const int digit_h = 9 * scale;
+    const int gap = scale;
+    const int total_w = digits * digit_w + (digits - 1) * gap;
+    const int panel_pad = 2 * scale;
+    const int x0 = (vjsdl->width - total_w) / 2;
+    const int y0 = (vjsdl->height - digit_h) / 2;
+
+    vj_sdl_yuy2_rect(pixels, vjsdl->width, vjsdl->height,
+                     x0 - panel_pad, y0 - panel_pad,
+                     total_w + panel_pad * 2, digit_h + panel_pad * 2, 16);
+    for(int i = 0; i < digits; i++)
+        vj_sdl_identify_digit(pixels, vjsdl->width, vjsdl->height,
+                              x0 + i * (digit_w + gap), y0,
+                              text[i] - '0', scale);
+}
+
 int vj_sdl_present_frame(void *ptr, VJFrame *frame)
 {
     vj_sdl *vjsdl = (vj_sdl*)ptr;
@@ -796,6 +1022,7 @@ int vj_sdl_present_frame(void *ptr, VJFrame *frame)
     const uint64_t convert_start = vj_perf_now_ns();
     if(!vj_sdl_convert_frame(vjsdl, frame, vjsdl->buf[0]))
         return 0;
+    vj_sdl_overlay_identify(vjsdl, vjsdl->buf[0]);
     vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_CONVERT,
                    convert_start, vj_perf_now_ns());
     const uint64_t present_start = vj_perf_now_ns();
@@ -803,6 +1030,51 @@ int vj_sdl_present_frame(void *ptr, VJFrame *frame)
     vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_UPLOAD_PRESENT,
                    present_start, vj_perf_now_ns());
     return result;
+}
+
+int vj_sdl_set_identify(void *ptr, int display_number)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    if(!vjsdl || display_number < -1)
+        return 0;
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->identify_overlay = display_number;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    return 1;
+}
+
+int vj_sdl_set_display_target(void *ptr, int x, int y)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    if(!vjsdl || ((x == -1) != (y == -1)))
+        return 0;
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->target_display_x = x;
+    vjsdl->target_display_y = y;
+    if(vjsdl->initialized) {
+        if(vjsdl->fs) {
+            vjsdl->pending_fullscreen = 1;
+        } else {
+            vjsdl->pending_geometry = 1;
+            vjsdl->pending_width = vjsdl->sw_scale_width > 0 ? vjsdl->sw_scale_width : vjsdl->width;
+            vjsdl->pending_height = vjsdl->sw_scale_height > 0 ? vjsdl->sw_scale_height : vjsdl->height;
+            vjsdl->pending_x = vjsdl->x;
+            vjsdl->pending_y = vjsdl->y;
+        }
+    }
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    return 1;
+}
+
+int vj_sdl_get_display_index(void *ptr)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    if(!vjsdl)
+        return -1;
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    const int display = vjsdl->display_index;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    return display;
 }
 
 void vj_sdl_set_perf(void *ptr, void *perf)
@@ -837,6 +1109,8 @@ void vj_sdl_shutdown(void *ptr)
     vjsdl->pending_geometry = 0;
     vjsdl->pending_fullscreen = -1;
     vjsdl->pending_grab = -1;
+    vjsdl->display_index = -1;
+    vjsdl->identify_overlay = 0;
     pthread_mutex_unlock(&vjsdl->command_mutex);
 
     SDL_EnableScreenSaver();

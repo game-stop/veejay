@@ -26,6 +26,7 @@
 #include <signal.h>
 #include <time.h>
 #include <stdbool.h>
+#include <pthread.h>
 #include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-tag.h>
@@ -959,6 +960,8 @@ typedef struct
     VJFrame pre_projection_preview_frame;
     uint8_t *pre_projection_preview_buffer;
     volatile int pre_projection_preview_valid;
+    pthread_mutex_t pre_projection_preview_mutex;
+    int pre_projection_preview_mutex_initialized;
     performer_t *A;
     performer_t *B;
     VJFrame feedback_frame;
@@ -3655,6 +3658,12 @@ int vj_perform_allocate(veejay_t *info)
     global->pre_projection_preview_frame.data[2] = global->pre_projection_preview_buffer + preview_plane_len * 2u;
     global->pre_projection_preview_frame.data[3] = global->pre_projection_preview_buffer + preview_plane_len * 3u;
     global->pre_projection_preview_valid = 0;
+    if(pthread_mutex_init(&global->pre_projection_preview_mutex, NULL) != 0) {
+        free(global->pre_projection_preview_buffer);
+        global->pre_projection_preview_buffer = NULL;
+        return 1;
+    }
+    global->pre_projection_preview_mutex_initialized = 1;
 
     const long frame_len = ((w*h)+w+w);
     size_t buf_len = frame_len * 4 * sizeof(uint8_t);
@@ -3689,6 +3698,8 @@ void vj_perform_destroy(veejay_t *info) {
     free(global->preview_buffer->Y);
     free(global->preview_buffer);
     free(global->pre_projection_preview_buffer);
+    if(global->pre_projection_preview_mutex_initialized)
+        pthread_mutex_destroy(&global->pre_projection_preview_mutex);
     free(global);
 }
 
@@ -4261,6 +4272,10 @@ void vj_perform_free(veejay_t * info)
         global->pre_projection_preview_buffer = NULL;
         global->pre_projection_preview_valid = 0;
     }
+    if(global->pre_projection_preview_mutex_initialized) {
+        pthread_mutex_destroy(&global->pre_projection_preview_mutex);
+        global->pre_projection_preview_mutex_initialized = 0;
+    }
     if(global->feedback_buffer[0]) {
        free(global->feedback_buffer[0]);
        global->feedback_buffer[0] = NULL;
@@ -4426,7 +4441,8 @@ uint8_t *vj_perform_get_preview_buffer(veejay_t *info)
 static void vj_perform_capture_pre_projection_preview(veejay_t *info, const VJFrame *frame)
 {
     performer_global_t *global = (performer_global_t*)info->performer;
-    if(!global || !global->pre_projection_preview_buffer || !frame || !frame->data[0])
+    if(!global || !global->pre_projection_preview_buffer ||
+       !global->pre_projection_preview_mutex_initialized || !frame || !frame->data[0])
         return;
 
     const size_t plane_capacity = (size_t)info->video_output_width *
@@ -4436,6 +4452,7 @@ static void vj_perform_capture_pre_projection_preview(veejay_t *info, const VJFr
     const size_t uv_len = frame->uv_len > 0 && (size_t)frame->uv_len <= plane_capacity
                         ? (size_t)frame->uv_len : plane_capacity;
 
+    pthread_mutex_lock(&global->pre_projection_preview_mutex);
     global->pre_projection_preview_valid = 0;
     veejay_memcpy(&global->pre_projection_preview_frame, frame, sizeof(VJFrame));
     global->pre_projection_preview_frame.data[0] = global->pre_projection_preview_buffer;
@@ -4458,20 +4475,38 @@ static void vj_perform_capture_pre_projection_preview(veejay_t *info, const VJFr
         veejay_memset(global->pre_projection_preview_frame.data[3], 255, y_len);
 
     global->pre_projection_preview_valid = 1;
+    pthread_mutex_unlock(&global->pre_projection_preview_mutex);
 }
 
-int vj_perform_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
+int vj_perform_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
 {
     performer_global_t *global;
     if(!info || !frame || !info->performer)
         return 0;
 
     global = (performer_global_t*)info->performer;
-    if(!global->pre_projection_preview_valid || !global->pre_projection_preview_buffer)
+    if(!global->pre_projection_preview_buffer ||
+       !global->pre_projection_preview_mutex_initialized)
         return 0;
+
+    pthread_mutex_lock(&global->pre_projection_preview_mutex);
+    if(!global->pre_projection_preview_valid) {
+        pthread_mutex_unlock(&global->pre_projection_preview_mutex);
+        return 0;
+    }
 
     veejay_memcpy(frame, &global->pre_projection_preview_frame, sizeof(VJFrame));
     return 1;
+}
+
+void vj_perform_unlock_pre_projection_preview_frame(veejay_t *info)
+{
+    performer_global_t *global;
+    if(!info || !info->performer)
+        return;
+    global = (performer_global_t*)info->performer;
+    if(global->pre_projection_preview_mutex_initialized)
+        pthread_mutex_unlock(&global->pre_projection_preview_mutex);
 }
 
 void    vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)

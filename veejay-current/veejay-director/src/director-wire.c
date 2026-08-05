@@ -463,15 +463,21 @@ int director_wire_query_preview(DirectorWire *wire,
         frame_height = requested_height;
     }
     else {
+        int wire_width = 0;
+        int wire_height = 0;
         if(!director_wire_receive_exact(wire, header, 13, timeout_ms))
             return 0;
         header[13] = '\0';
         if(sscanf((const char*)header, "%6zu%4d%2d%1d",
-                  &length, &frame_width, &frame_height, &range) != 4)
+                  &length, &wire_width, &wire_height, &range) != 4)
             return 0;
-        if(frame_width <= 0 || frame_width > 4096 ||
-           frame_height <= 0 || frame_height > 99)
+        if(wire_width <= 0 || wire_width > 4096 ||
+           wire_height < 0 || wire_height > 99 ||
+           wire_width != requested_width ||
+           wire_height != (requested_height % 100))
             return 0;
+        frame_width = requested_width;
+        frame_height = requested_height;
     }
 
     if(length > 16U * 1024U * 1024U ||

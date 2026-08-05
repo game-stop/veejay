@@ -53,6 +53,12 @@ void    vj_event_output_slice_enable(void *ptr, const char format[], va_list ap)
 void    vj_event_instance_status(void *ptr, const char format[], va_list ap);
 void    vj_event_output_graph_reset(void *ptr, const char format[], va_list ap);
 void    vj_event_ndi_status(void *ptr, const char format[], va_list ap);
+void    vj_event_ndi_input_set(void *ptr, const char format[], va_list ap);
+void    vj_event_ndi_output_set(void *ptr, const char format[], va_list ap);
+void    vj_event_input_route_remove(void *ptr, const char format[], va_list ap);
+void    vj_event_routing_status(void *ptr, const char format[], va_list ap);
+void    vj_event_sdl_identify(void *ptr, const char format[], va_list ap);
+void    vj_event_sdl_display_set(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_mix_mode(void *ptr, const char format[], va_list ap);
 void    vj_event_audio_mix_crossfade(void *ptr, const char format[], va_list ap);
 void    vj_event_chain_fade_kf_status(void *ptr, const char format[], va_list ap);

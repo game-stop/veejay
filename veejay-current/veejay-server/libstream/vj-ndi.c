@@ -623,6 +623,7 @@ static int vj_ndi_receiver_convert_video(vj_ndi_receiver *receiver,
 
     pthread_mutex_lock(&receiver->stats_mutex);
     receiver->stats.video_frames++;
+    const uint64_t received_frames = receiver->stats.video_frames;
     receiver->stats.width = frame->xres;
     receiver->stats.height = frame->yres;
     receiver->stats.source_fps_n = frame->frame_rate_N;
@@ -632,6 +633,9 @@ static int vj_ndi_receiver_convert_video(vj_ndi_receiver *receiver,
     vj_ndi_receiver_update_clock_locked(receiver, frame->timestamp,
                                         vj_ndi_monotonic_seconds());
     pthread_mutex_unlock(&receiver->stats_mutex);
+    if(received_frames == 1)
+        veejay_msg(VEEJAY_MSG_INFO, "NDI source '%s' delivered first video frame (%dx%d)",
+                   receiver->source_name, frame->xres, frame->yres);
     if(frame->p_metadata)
         vj_ndi_receiver_store_metadata_text(receiver, frame->p_metadata);
     vj_ndi_receiver_update_connection(receiver, 1);
@@ -906,6 +910,56 @@ static void *vj_ndi_audio_thread(void *data)
     return NULL;
 }
 
+static int vj_ndi_source_matches_label(const char *advertised, const char *requested)
+{
+    if(!advertised || !requested)
+        return 0;
+    if(strcmp(advertised, requested) == 0)
+        return 1;
+    const size_t alen = strlen(advertised);
+    const size_t rlen = strlen(requested);
+    if(alen <= rlen + 3 || advertised[alen - 1] != ')')
+        return 0;
+    const size_t open = alen - rlen - 2;
+    return advertised[open] == '(' &&
+           (open == 0 || advertised[open - 1] == ' ') &&
+           memcmp(advertised + open + 1, requested, rlen) == 0;
+}
+
+static int vj_ndi_resolve_source(const char *requested,
+                                 char *resolved_name, size_t name_size,
+                                 char *resolved_url, size_t url_size)
+{
+    if(!requested || !*requested)
+        return 0;
+    snprintf(resolved_name, name_size, "%s", requested);
+    if(resolved_url && url_size)
+        resolved_url[0] = '\0';
+    if(strchr(requested, '(') && requested[strlen(requested) - 1] == ')')
+        return 1;
+
+    vj_ndi_source_info sources[256];
+    const int count = vj_ndi_discover(sources, 256, 350);
+    int match = -1;
+    for(int i = 0; i < count; i++) {
+        if(!vj_ndi_source_matches_label(sources[i].name, requested))
+            continue;
+        if(match >= 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "NDI source label '%s' is ambiguous; use the exact discovered source name",
+                       requested);
+            return 0;
+        }
+        match = i;
+    }
+    if(match >= 0) {
+        snprintf(resolved_name, name_size, "%s", sources[match].name);
+        if(resolved_url && url_size)
+            snprintf(resolved_url, url_size, "%s", sources[match].url);
+    }
+    return 1;
+}
+
 vj_ndi_receiver *vj_ndi_receiver_create(const char *source_name,
                                          int width,
                                          int height,
@@ -925,13 +979,21 @@ vj_ndi_receiver *vj_ndi_receiver_create(const char *source_name,
         return NULL;
     }
 
+    char resolved_name[256];
+    char resolved_url[512];
+    if(!vj_ndi_resolve_source(source_name, resolved_name, sizeof(resolved_name),
+                              resolved_url, sizeof(resolved_url))) {
+        vj_ndi_runtime_release();
+        return NULL;
+    }
+
     vj_ndi_receiver *receiver = (vj_ndi_receiver*)calloc(1, sizeof(*receiver));
     if(!receiver) {
         vj_ndi_runtime_release();
         return NULL;
     }
     receiver->api = ndi_runtime.api;
-    receiver->source_name = vj_ndi_strdup(source_name);
+    receiver->source_name = vj_ndi_strdup(resolved_name);
     receiver->width = width;
     receiver->height = height;
     receiver->fps = fps;
@@ -943,6 +1005,8 @@ vj_ndi_receiver *vj_ndi_receiver_create(const char *source_name,
     receiver->video_read_index = -1;
     receiver->active = 1;
     receiver->stats.connected = -1;
+    snprintf(receiver->stats.published_name, sizeof(receiver->stats.published_name), "%s", resolved_name);
+    snprintf(receiver->stats.published_url, sizeof(receiver->stats.published_url), "%s", resolved_url);
 
     pthread_mutex_init(&receiver->state_mutex, NULL);
     pthread_cond_init(&receiver->state_cond, NULL);
@@ -980,7 +1044,7 @@ vj_ndi_receiver *vj_ndi_receiver_create(const char *source_name,
     NDIlib_recv_create_v3_t create_desc;
     memset(&create_desc, 0, sizeof(create_desc));
     create_desc.source_to_connect_to.p_ndi_name = receiver->source_name;
-    create_desc.source_to_connect_to.p_url_address = NULL;
+    create_desc.source_to_connect_to.p_url_address = resolved_url[0] ? resolved_url : NULL;
     create_desc.color_format = NDIlib_recv_color_format_fastest;
     create_desc.bandwidth = NDIlib_recv_bandwidth_highest;
     create_desc.allow_video_fields = false;
@@ -1009,7 +1073,7 @@ vj_ndi_receiver *vj_ndi_receiver_create(const char *source_name,
     receiver->audio_thread_started = 1;
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "NDI receiver connected to '%s' (%dx%d target, %.3f fps, %d Hz/%d ch audio)",
+               "NDI receiver created for '%s' (%dx%d target, %.3f fps, %d Hz/%d ch audio)",
                receiver->source_name, width, height, fps, audio_rate, audio_channels);
     return receiver;
 
@@ -1419,6 +1483,17 @@ vj_ndi_sender *vj_ndi_sender_create(const char *name,
     if(!sender->instance)
         goto fail;
 
+    snprintf(sender->stats.published_name, sizeof(sender->stats.published_name), "%s", sender->name);
+    if(sender->api->send_get_source_name) {
+        const NDIlib_source_t *published = sender->api->send_get_source_name(sender->instance);
+        if(published) {
+            if(published->p_ndi_name && *published->p_ndi_name)
+                snprintf(sender->stats.published_name, sizeof(sender->stats.published_name), "%s", published->p_ndi_name);
+            if(published->p_url_address && *published->p_url_address)
+                snprintf(sender->stats.published_url, sizeof(sender->stats.published_url), "%s", published->p_url_address);
+        }
+    }
+
     if(sender->api->send_add_connection_metadata) {
         NDIlib_metadata_frame_t product;
         memset(&product, 0, sizeof(product));
@@ -1430,8 +1505,9 @@ vj_ndi_sender *vj_ndi_sender_create(const char *name,
     }
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "Publishing NDI source '%s' at %dx%d %d/%d fps",
-               sender->name, width, height, sender->frame_rate_n, sender->frame_rate_d);
+               "Publishing NDI source '%s' as '%s' at %dx%d %d/%d fps",
+               sender->name, sender->stats.published_name, width, height,
+               sender->frame_rate_n, sender->frame_rate_d);
     return sender;
 
 fail:
@@ -1491,6 +1567,7 @@ int vj_ndi_sender_send_video(vj_ndi_sender *sender, const VJFrame *frame)
     sender->api->send_send_video_async_v2(sender->instance, &video);
     sender->video_index = 1 - index;
     sender->stats.video_frames++;
+    const uint64_t sent_frames = sender->stats.video_frames;
 
     if(sender->stats.video_frames >= sender->next_telemetry_frame) {
         NDIlib_tally_t tally;
@@ -1509,6 +1586,9 @@ int vj_ndi_sender_send_video(vj_ndi_sender *sender, const VJFrame *frame)
     }
     pthread_mutex_unlock(&sender->mutex);
     pthread_mutex_unlock(&sender->video_mutex);
+    if(sent_frames == 1)
+        veejay_msg(VEEJAY_MSG_INFO, "NDI sender '%s' submitted first video frame",
+                   sender->stats.published_name[0] ? sender->stats.published_name : sender->name);
     return 1;
 }
 

@@ -62,6 +62,8 @@ typedef struct {
     int clock_age_ms;
     double clock_drift_ms;
     char last_metadata[256];
+    char published_name[256];
+    char published_url[512];
 } vj_ndi_stats;
 
 int vj_ndi_runtime_available(void);

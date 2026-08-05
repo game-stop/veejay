@@ -29,9 +29,10 @@
 #define DIRECTOR_RECONNECT_INTERVAL_US 1000000
 #define DIRECTOR_CONNECT_TIMEOUT_MS 1000
 #define DIRECTOR_SEND_TIMEOUT_MS 600
-#define DIRECTOR_RESPONSE_MAX 16384
+#define DIRECTOR_RESPONSE_MAX 65536
 #define DIRECTOR_RESPONSE_IDLE_MS 60
 #define DIRECTOR_RESPONSE_TIMEOUT_MS 600
+#define DIRECTOR_NDI_APPLY_TIMEOUT_MS 2500
 
 typedef enum {
     DIRECTOR_REQUEST_COMMAND = 0,
@@ -45,6 +46,7 @@ typedef struct {
     gchar *command;
     DirectorClientEvent event;
     gsize header_digits;
+    gboolean query_ndi_after;
 } DirectorRequest;
 
 typedef struct {
@@ -122,7 +124,7 @@ static void director_dispatch(DirectorClient *client,
     DirectorDispatch *dispatch = g_new0(DirectorDispatch, 1);
     dispatch->client = director_client_ref(client);
     dispatch->event = event;
-    dispatch->payload = g_strdup(payload ? payload : "");
+    dispatch->payload = g_utf8_make_valid(payload ? payload : "", -1);
     g_main_context_invoke(NULL, director_dispatch_main, dispatch);
 }
 
@@ -173,24 +175,35 @@ static gboolean director_send_raw(DirectorWire *wire, const gchar *command)
     return director_wire_send(wire, command, DIRECTOR_SEND_TIMEOUT_MS) != 0;
 }
 
-static gboolean director_query(DirectorClient *client,
-                               DirectorWire *wire,
-                               const gchar *command,
-                               DirectorClientEvent event,
-                               gdouble *first_response_ms)
+static gboolean director_query_timeout(DirectorClient *client,
+                                       DirectorWire *wire,
+                                       const gchar *command,
+                                       DirectorClientEvent event,
+                                       gdouble *first_response_ms,
+                                       gint timeout_ms)
 {
     gchar response[DIRECTOR_RESPONSE_MAX];
     if(!director_wire_query_timed(wire,
                                   command,
                                   response,
                                   sizeof(response),
-                                  DIRECTOR_RESPONSE_TIMEOUT_MS,
+                                  timeout_ms,
                                   DIRECTOR_RESPONSE_IDLE_MS,
                                   first_response_ms))
         return FALSE;
     g_strstrip(response);
     director_dispatch(client, event, response);
     return TRUE;
+}
+
+static gboolean director_query(DirectorClient *client,
+                               DirectorWire *wire,
+                               const gchar *command,
+                               DirectorClientEvent event,
+                               gdouble *first_response_ms)
+{
+    return director_query_timeout(client, wire, command, event, first_response_ms,
+                                  DIRECTOR_RESPONSE_TIMEOUT_MS);
 }
 
 static gboolean director_query_framed(DirectorClient *client,
@@ -210,9 +223,12 @@ static gboolean director_query_framed(DirectorClient *client,
 
 static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
 {
-    gdouble instance_ms = 0.0, output_ms = 0.0, perf_ms = 0.0, ndi_ms = 0.0;
+    gdouble instance_ms = 0.0, routing_ms = 0.0, output_ms = 0.0, perf_ms = 0.0, ndi_ms = 0.0;
     if(!director_query(client, wire, "288:;", DIRECTOR_CLIENT_INSTANCE_STATUS,
                        &instance_ms))
+        return FALSE;
+    if(!director_query(client, wire, "294:;", DIRECTOR_CLIENT_ROUTING_STATUS,
+                       &routing_ms))
         return FALSE;
     if(!director_query(client, wire, "284:;", DIRECTOR_CLIENT_OUTPUT_STATUS,
                        &output_ms))
@@ -229,7 +245,7 @@ static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
                        &ndi_ms))
         return FALSE;
     client->instance->live_latency_ms =
-        MAX(instance_ms, MAX(output_ms, MAX(perf_ms, ndi_ms)));
+        MAX(instance_ms, MAX(routing_ms, MAX(output_ms, MAX(perf_ms, ndi_ms))));
     return TRUE;
 }
 
@@ -246,6 +262,10 @@ static gboolean director_process_request(DirectorClient *client,
             break;
         case DIRECTOR_REQUEST_COMMAND:
             ok = director_send_raw(wire, request->command);
+            if(ok && request->query_ndi_after)
+                ok = director_query_timeout(client, wire, "290:;",
+                                            DIRECTOR_CLIENT_NDI_STATUS_APPLIED, NULL,
+                                            DIRECTOR_NDI_APPLY_TIMEOUT_MS);
             break;
         case DIRECTOR_REQUEST_QUERY_FRAMED:
             ok = director_query_framed(client, wire, request->command,
@@ -419,21 +439,90 @@ DirectorInstance *director_client_get_instance(DirectorClient *client)
     return client ? client->instance : NULL;
 }
 
-void director_client_send(DirectorClient *client, const gchar *command)
+static gboolean director_client_queue_command(DirectorClient *client,
+                                                const gchar *command,
+                                                gboolean query_ndi_after)
 {
     if(!client || !command || !*command)
-        return;
+        return FALSE;
 
     g_mutex_lock(&client->mutex);
     const gboolean ready = client->started && client->connected && !client->stop;
     g_mutex_unlock(&client->mutex);
     if(!ready)
-        return;
+        return FALSE;
 
     DirectorRequest *request = g_new0(DirectorRequest, 1);
     request->type = DIRECTOR_REQUEST_COMMAND;
     request->command = g_strdup(command);
+    request->query_ndi_after = query_ndi_after;
     g_async_queue_push(client->requests, request);
+    return TRUE;
+}
+
+void director_client_send(DirectorClient *client, const gchar *command)
+{
+    (void)director_client_queue_command(client, command, FALSE);
+}
+
+static gboolean director_client_ndi_argument_valid(const gchar *value)
+{
+    if(!value)
+        return FALSE;
+    for(const unsigned char *p = (const unsigned char*)value; *p; p++) {
+        if(*p == ';' || *p == '\n' || *p == '\r')
+            return FALSE;
+    }
+    return TRUE;
+}
+
+gboolean director_client_set_ndi_input(DirectorClient *client, const gchar *source_name)
+{
+    const gchar *value = source_name && *source_name ? source_name : "-";
+    if(!director_client_ndi_argument_valid(value))
+        return FALSE;
+    gchar *command = g_strdup_printf("291:%s;", value);
+    const gboolean queued = director_client_queue_command(client, command, TRUE);
+    g_free(command);
+    return queued;
+}
+
+gboolean director_client_set_ndi_output(DirectorClient *client, gboolean enabled,
+                                         const gchar *sender_name)
+{
+    const gchar *value = sender_name && *sender_name ? sender_name : "-";
+    if(!director_client_ndi_argument_valid(value))
+        return FALSE;
+    gchar *command = g_strdup_printf("292:%d %s;", enabled ? 1 : 0, value);
+    const gboolean queued = director_client_queue_command(client, command, TRUE);
+    g_free(command);
+    return queued;
+}
+
+gboolean director_client_remove_input_route_id(DirectorClient *client, gint stream_id)
+{
+    if(!client || stream_id <= 0)
+        return FALSE;
+    gchar *command = g_strdup_printf("293:0 %d -;", stream_id);
+    const gboolean queued = director_client_queue_command(client, command, FALSE);
+    g_free(command);
+    return queued;
+}
+
+gboolean director_client_remove_input_route(DirectorClient *client,
+                                             gint transport,
+                                             gint key_or_port,
+                                             const gchar *endpoint)
+{
+    const gchar *value = endpoint && *endpoint ? endpoint : "-";
+    if(transport < DIRECTOR_INPUT_ROUTE_SHM || transport > DIRECTOR_INPUT_ROUTE_NDI ||
+       !director_client_ndi_argument_valid(value))
+        return FALSE;
+    gchar *command = g_strdup_printf("293:%d %d %s;", transport, key_or_port, value);
+    const gboolean queued = director_client_queue_command(
+        client, command, transport == DIRECTOR_INPUT_ROUTE_NDI);
+    g_free(command);
+    return queued;
 }
 
 void director_client_refresh(DirectorClient *client)

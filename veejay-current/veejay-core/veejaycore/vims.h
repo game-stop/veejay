@@ -113,6 +113,12 @@ enum {
     VIMS_INSTANCE_STATUS                 = 288,
     VIMS_OUTPUT_GRAPH_RESET              = 289,
     VIMS_NDI_STATUS                       = 290,
+    VIMS_NDI_INPUT_SET                    = 291,
+    VIMS_NDI_OUTPUT_SET                   = 292,
+    VIMS_INPUT_ROUTE_REMOVE               = 293,
+    VIMS_ROUTING_STATUS                    = 294,
+    VIMS_SDL_IDENTIFY                       = 295,
+    VIMS_SDL_DISPLAY_SET                    = 296,
 
 	VIMS_SELECT_BANK				=	308,
 	VIMS_SELECT_ID					=	309,

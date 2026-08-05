@@ -26,10 +26,12 @@ typedef enum {
     DIRECTOR_CLIENT_CONNECTED = 0,
     DIRECTOR_CLIENT_DISCONNECTED,
     DIRECTOR_CLIENT_INSTANCE_STATUS,
+    DIRECTOR_CLIENT_ROUTING_STATUS,
     DIRECTOR_CLIENT_OUTPUT_STATUS,
     DIRECTOR_CLIENT_PROJECTION_STATUS,
     DIRECTOR_CLIENT_PERF_STATUS,
     DIRECTOR_CLIENT_NDI_STATUS,
+    DIRECTOR_CLIENT_NDI_STATUS_APPLIED,
     DIRECTOR_CLIENT_DEVICE_LIST,
     DIRECTOR_CLIENT_V4L_STATUS,
     DIRECTOR_CLIENT_ERROR
@@ -49,6 +51,13 @@ void director_client_free(DirectorClient *client);
 DirectorInstance *director_client_get_instance(DirectorClient *client);
 
 void director_client_send(DirectorClient *client, const gchar *command);
+gboolean director_client_set_ndi_input(DirectorClient *client, const gchar *source_name);
+gboolean director_client_set_ndi_output(DirectorClient *client, gboolean enabled, const gchar *sender_name);
+gboolean director_client_remove_input_route_id(DirectorClient *client, gint stream_id);
+gboolean director_client_remove_input_route(DirectorClient *client,
+                                             gint transport,
+                                             gint key_or_port,
+                                             const gchar *endpoint);
 void director_client_refresh(DirectorClient *client);
 void director_client_query_devices(DirectorClient *client);
 void director_client_query_v4l(DirectorClient *client, gint stream_id);

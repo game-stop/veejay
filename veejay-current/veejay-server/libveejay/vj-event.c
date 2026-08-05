@@ -915,7 +915,6 @@ static long long vj_sequence_slot_duration(veejay_t *v,
 }
 
 extern int  _vj_server_del_client(vj_server * vje, int link_id);
-extern int veejay_output_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
 extern int       vj_event_exists( int id );
 extern void vj_perform_record_offline_disarm(veejay_t *info);
 extern const char *vj_perform_record_effective_audio_source_name(veejay_t *info);
@@ -1245,6 +1244,13 @@ struct {
     { VIMS_AUDIO_SYNC_TARGET },
     { VIMS_AUDIO_SYNC_CORRECTION },
     { VIMS_AUDIO_SYNC_PRINT },
+
+    { VIMS_NDI_INPUT_SET },
+    { VIMS_NDI_OUTPUT_SET },
+    { VIMS_INPUT_ROUTE_REMOVE },
+    { VIMS_ROUTING_STATUS },
+    { VIMS_SDL_IDENTIFY },
+    { VIMS_SDL_DISPLAY_SET },
 
     { -1 }
 };
@@ -4774,74 +4780,73 @@ void    vj_event_fullscreen(void *ptr, const char format[], va_list ap )
     int args[2];
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    if(args[0] == 2) { // Its a toggle!
+    if(args[0] == 2)
         args[0] = (v->settings->full_screen ? 0 : 1);
-    }
 
-    if (v->video_out != 0 && v->video_out != 2) {
-        return; 
-    }
-    
-    if (v->sdl == NULL) {
-        return;
-    }
-
-    int state = vj_event_lock(v);
-    int applied = vj_sdl_set_fullscreen(v->sdl, args[0]);
-    vj_event_unlock(v, state);
-
-    if(!applied)
+    if(v->sdl == NULL)
         return;
 
-    v->settings->full_screen = args[0];
+    v->settings->full_screen = args[0] ? 1 : 0;
+    atomic_store_int(&v->sdl_output_fullscreen, v->settings->full_screen);
+
+    if(atomic_load_int(&v->sdl_output_initialized)) {
+        int state = vj_event_lock(v);
+        int applied = vj_sdl_set_fullscreen(v->sdl, v->settings->full_screen);
+        vj_event_unlock(v, state);
+        if(!applied)
+            return;
+    }
 
     veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s",
         (v->settings->full_screen ? "full screen" : "windowed"));
-
 }
 
 
-void vj_event_set_screen_size(void *ptr, const char format[], va_list ap) 
+void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 {
     int args[5];
     veejay_t *v = (veejay_t*) ptr;
     P_A(args,sizeof(args),NULL,0,format,ap);
 
-    int w  = args[0];
-    int h  = args[1];
-    int x  = args[2];
-    int y  = args[3];
+    const int w = args[0];
+    const int h = args[1];
+    const int x = args[2];
+    const int y = args[3];
 
     if(w < 0 || w > 4096 || h < 0 || h > 4096 ||
-       ((w == 0) != (h == 0)))
-    {
+       ((w == 0) != (h == 0))) {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "Invalid SDL window geometry '%d %d %d %d'",
                    w, h, x, y);
         return;
     }
 
-    if(v->video_out != 0 && v->video_out != 2) {
-        veejay_msg(VEEJAY_MSG_WARNING,
-                   "SDL window geometry ignored: active video output is not SDL");
-        return;
-    }
-
     if(v->sdl == NULL) {
         veejay_msg(VEEJAY_MSG_WARNING,
-                   "SDL window geometry ignored: SDL output is not initialized");
+                   "SDL window control unavailable in this build/runtime");
         return;
     }
 
-    int state = vj_event_lock(v);
+    if(w == 0 && h == 0) {
+        if(!veejay_sdl_output_set(v, 0, 0, 0, x, y))
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to close SDL output");
+        else
+            veejay_msg(VEEJAY_MSG_INFO, "SDL output close requested");
+        return;
+    }
 
-    if(!vj_sdl_set_window_size(v->sdl, w, h, x, y))
+    if(!veejay_sdl_output_set(v, 1, w, h, x, y)) {
         veejay_msg(VEEJAY_MSG_ERROR,
-                   "Unable to apply SDL window geometry '%d %d %d %d'",
+                   "Unable to open/resize SDL window '%d %d %d %d'",
                    w, h, x, y);
+        return;
+    }
 
-    vj_event_unlock(v,state);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "SDL output open/resize requested: %dx%d at %d,%d",
+               w, h, x, y);
 }
+
 
 void    vj_event_promote_me( void *ptr, const char format[], va_list ap )
 {
@@ -14085,13 +14090,16 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
 
     size_t dstlen = 0;
     VJFrame frame;
+    int preview_locked = 0;
+    void *output_preview_token = NULL;
     if(view_mode == 2) {
-        int have_frame = 0;
-        if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
-            have_frame = veejay_output_get_pre_projection_preview_frame(v, &frame);
+        if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+            output_preview_token = veejay_output_lock_pre_projection_preview_frame(v, &frame);
+            preview_locked = output_preview_token != NULL;
+        }
         else
-            have_frame = vj_perform_get_pre_projection_preview_frame(v, &frame);
-        if(!have_frame) {
+            preview_locked = vj_perform_lock_pre_projection_preview_frame(v, &frame);
+        if(!preview_locked) {
             vj_event_send_preview_error(v, extended_preview);
             return;
         }
@@ -14112,6 +14120,13 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
     else {
         dstlen = vj_fast_picture_save_to_mem(&frame, w, h,
                                              vj_perform_get_preview_buffer(v));
+    }
+
+    if(preview_locked) {
+        if(output_preview_token)
+            veejay_output_unlock_pre_projection_preview_frame(output_preview_token);
+        else
+            vj_perform_unlock_pre_projection_preview_frame(v);
     }
 
     if(dstlen == 0 ||
@@ -15676,6 +15691,46 @@ void vj_event_ndi_status(void *ptr, const char format[], va_list ap)
     SEND_MSG(v, "VJNDI 1\nruntime=unavailable\nrx.enabled=0\ntx.enabled=0\n");
 }
 
+void vj_event_ndi_input_set(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    char source[512];
+    source[0] = '\0';
+    P_A(NULL, 0, source, sizeof(source), format, ap);
+    if(!veejay_ndi_set_receiver(v, source)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to switch NDI input to '%s'",
+                   source[0] ? source : "off");
+        return;
+    }
+    if(source[0] && strcmp(source, "-") != 0)
+        veejay_msg(VEEJAY_MSG_INFO, "Switched NDI input to '%s'", source);
+    else
+        veejay_msg(VEEJAY_MSG_INFO, "Disabled NDI input");
+}
+
+void vj_event_ndi_output_set(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1] = {0};
+    char name[512];
+    name[0] = '\0';
+    P_A(args, sizeof(args), name, sizeof(name), format, ap);
+    if(!veejay_ndi_set_sender(v, args[0] != 0, name)) {
+        if(args[0] && name[0] && strcmp(name, "-") != 0)
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to enable NDI output as '%s'", name);
+        else
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to %s NDI output",
+                       args[0] ? "enable" : "disable");
+        return;
+    }
+    if(args[0] && name[0] && strcmp(name, "-") != 0)
+        veejay_msg(VEEJAY_MSG_INFO, "NDI output enabled as '%s'", name);
+    else if(args[0])
+        veejay_msg(VEEJAY_MSG_INFO, "NDI output enabled");
+    else
+        veejay_msg(VEEJAY_MSG_INFO, "NDI output disabled");
+}
+
 void    vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
 {
     veejay_t *v = (veejay_t*) ptr;
@@ -15729,6 +15784,271 @@ static int vj_event_find_director_shm_stream(int32_t key)
             return id;
     }
     return 0;
+}
+
+static int vj_event_find_ndi_stream(const char *source_name)
+{
+    if(!source_name || !*source_name || strcmp(source_name, "-") == 0)
+        return 0;
+
+    const int highest = vj_tag_highest();
+    for(int id = 1; id <= highest; id++) {
+        if(!vj_tag_exists(id) || vj_tag_get_type(id) != VJ_TAG_TYPE_NDI)
+            continue;
+        vj_tag *tag = vj_tag_get(id);
+        if(tag && tag->source_name && strcmp(tag->source_name, source_name) == 0)
+            return id;
+    }
+    return 0;
+}
+
+static void vj_event_routing_status_value(char *dst, size_t dst_size, const char *src)
+{
+    size_t out = 0;
+    if(!dst || dst_size == 0)
+        return;
+    for(const unsigned char *p = (const unsigned char*)(src ? src : ""); *p && out + 1 < dst_size; p++) {
+        unsigned char c = *p;
+        if(c == '\n' || c == '\r' || c == '\t')
+            c = ' ';
+        dst[out++] = (char)c;
+    }
+    dst[out] = '\0';
+}
+
+void vj_event_routing_status(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    (void)format;
+    (void)ap;
+
+    const size_t capacity = 262144;
+    char *response = (char*)malloc(capacity);
+    if(!response)
+        return;
+    size_t used = 0;
+#define ROUTE_APPEND(...) do { \
+        if(used < capacity) { \
+            int _n = snprintf(response + used, capacity - used, __VA_ARGS__); \
+            if(_n < 0) { free(response); return; } \
+            if((size_t)_n >= capacity - used) used = capacity - 1; \
+            else used += (size_t)_n; \
+        } \
+    } while(0)
+
+    ROUTE_APPEND("VJROUTES 1\n");
+    int count = 0;
+    if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        if(v->output_source_shm_id > 0 || v->output_source_pid > 0) {
+            ROUTE_APPEND("route.%d.transport=shm\n", count);
+            ROUTE_APPEND("route.%d.id=0\n", count);
+            ROUTE_APPEND("route.%d.active=1\n", count);
+            ROUTE_APPEND("route.%d.current=1\n", count);
+            ROUTE_APPEND("route.%d.key=%d\n", count, v->output_source_shm_id);
+            ROUTE_APPEND("route.%d.pid=%d\n", count, v->output_source_pid);
+            ROUTE_APPEND("route.%d.port=%d\n", count, v->output_source_port);
+            count++;
+        } else if(v->output_source_port > 0) {
+            char host[512];
+            vj_event_routing_status_value(host, sizeof(host), v->output_source_host);
+            ROUTE_APPEND("route.%d.transport=tcp\n", count);
+            ROUTE_APPEND("route.%d.id=0\n", count);
+            ROUTE_APPEND("route.%d.active=1\n", count);
+            ROUTE_APPEND("route.%d.current=1\n", count);
+            ROUTE_APPEND("route.%d.host=%s\n", count, host);
+            ROUTE_APPEND("route.%d.port=%d\n", count, v->output_source_port);
+            count++;
+        }
+    } else {
+        const int highest = vj_tag_highest();
+        for(int id = 1; id <= highest; id++) {
+            if(!vj_tag_exists(id))
+                continue;
+            vj_tag *tag = vj_tag_get(id);
+            if(!tag)
+                continue;
+            const int current = v->uc && v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+                                v->uc->sample_id == id;
+            if(tag->source_type == VJ_TAG_TYPE_NET) {
+                char host[512];
+                vj_event_routing_status_value(host, sizeof(host), tag->source_name);
+                ROUTE_APPEND("route.%d.transport=tcp\n", count);
+                ROUTE_APPEND("route.%d.id=%d\n", count, id);
+                ROUTE_APPEND("route.%d.active=%d\n", count, tag->active ? 1 : 0);
+                ROUTE_APPEND("route.%d.current=%d\n", count, current ? 1 : 0);
+                ROUTE_APPEND("route.%d.host=%s\n", count, host);
+                ROUTE_APPEND("route.%d.port=%d\n", count, tag->video_channel);
+                count++;
+            } else if(tag->source_type == VJ_TAG_TYPE_NDI) {
+                char source[512];
+                vj_event_routing_status_value(source, sizeof(source), tag->source_name);
+                ROUTE_APPEND("route.%d.transport=ndi\n", count);
+                ROUTE_APPEND("route.%d.id=%d\n", count, id);
+                ROUTE_APPEND("route.%d.active=%d\n", count, tag->active ? 1 : 0);
+                ROUTE_APPEND("route.%d.current=%d\n", count, current ? 1 : 0);
+                ROUTE_APPEND("route.%d.source=%s\n", count, source);
+                count++;
+            } else if(tag->source_type == VJ_TAG_TYPE_GENERATOR &&
+                      tag->method_filename && strcmp(tag->method_filename, "lvd_shmin.so") == 0) {
+                int key = 0;
+                if(tag->extra)
+                    sscanf((const char*)tag->extra, "director-shm:%d", &key);
+                ROUTE_APPEND("route.%d.transport=shm\n", count);
+                ROUTE_APPEND("route.%d.id=%d\n", count, id);
+                ROUTE_APPEND("route.%d.active=%d\n", count, tag->active ? 1 : 0);
+                ROUTE_APPEND("route.%d.current=%d\n", count, current ? 1 : 0);
+                ROUTE_APPEND("route.%d.key=%d\n", count, key);
+                count++;
+            }
+        }
+    }
+
+    ROUTE_APPEND("count=%d\n", count);
+    ROUTE_APPEND("out.shm.enabled=%d\n", v->shm && vj_shm_get_status(v->shm) ? 1 : 0);
+    ROUTE_APPEND("out.shm.key=%d\n", v->shm ? vj_shm_get_my_id(v->shm) : 0);
+    ROUTE_APPEND("out.tcp.enabled=1\n");
+    ROUTE_APPEND("out.tcp.port=%d\n", v->uc ? v->uc->port : 0);
+    ROUTE_APPEND("out.ndi.enabled=%d\n", v->ndi_send_enabled ? 1 : 0);
+    {
+        char name[512];
+        vj_event_routing_status_value(name, sizeof(name), v->ndi_send_name);
+        ROUTE_APPEND("out.ndi.name=%s\n", name);
+    }
+    ROUTE_APPEND("out.sdl.enabled=%d\n", atomic_load_int(&v->sdl_output_enabled) ? 1 : 0);
+    ROUTE_APPEND("out.sdl.initialized=%d\n", atomic_load_int(&v->sdl_output_initialized) ? 1 : 0);
+    ROUTE_APPEND("out.sdl.fullscreen=%d\n", atomic_load_int(&v->sdl_output_fullscreen) ? 1 : 0);
+    ROUTE_APPEND("out.sdl.x=%d\n", atomic_load_int(&v->sdl_output_x));
+    ROUTE_APPEND("out.sdl.y=%d\n", atomic_load_int(&v->sdl_output_y));
+    ROUTE_APPEND("out.sdl.width=%d\n", atomic_load_int(&v->sdl_output_width));
+    ROUTE_APPEND("out.sdl.height=%d\n", atomic_load_int(&v->sdl_output_height));
+#ifdef HAVE_SDL
+    ROUTE_APPEND("out.sdl.display=%d\n", v->sdl ? vj_sdl_get_display_index(v->sdl) : -1);
+#else
+    ROUTE_APPEND("out.sdl.display=-1\n");
+#endif
+    SEND_MSG(v, response);
+    free(response);
+#undef ROUTE_APPEND
+}
+
+void vj_event_sdl_identify(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1] = { 0 };
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+#ifdef HAVE_SDL
+    if(v->sdl && vj_sdl_set_identify(v->sdl, args[0])) {
+        if(args[0] == 0)
+            veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Physical display identify disabled");
+        else if(args[0] < 0)
+            veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Physical display identify enabled using SDL display number");
+        else
+            veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Physical display identify enabled as display %d", args[0]);
+    }
+#else
+    (void)v;
+#endif
+}
+
+void vj_event_sdl_display_set(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2] = { -1, -1 };
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+#ifdef HAVE_SDL
+    if(((args[0] == -1) != (args[1] == -1)) || !v->sdl ||
+       !vj_sdl_set_display_target(v->sdl, args[0], args[1])) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Invalid SDL display target point %d,%d",
+                   args[0], args[1]);
+        return;
+    }
+    if(args[0] == -1)
+        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL display target set to automatic");
+    else
+        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL display target anchored at desktop %d,%d",
+                   args[0], args[1]);
+#else
+    (void)v;
+#endif
+}
+
+void vj_event_input_route_remove(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[2] = { 0, 0 };
+    char endpoint[512];
+    endpoint[0] = '\0';
+    P_A(args, sizeof(args), endpoint, sizeof(endpoint), format, ap);
+
+    if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        if(!veejay_output_disconnect_source(v))
+            veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Unable to disconnect input route");
+        return;
+    }
+
+    int id = 0;
+    switch(args[0]) {
+        case 0:
+            id = args[1];
+            if(id > 0 && vj_tag_exists(id)) {
+                vj_tag *tag = vj_tag_get(id);
+                const int removable = tag &&
+                    (tag->source_type == VJ_TAG_TYPE_NET ||
+                     tag->source_type == VJ_TAG_TYPE_NDI ||
+                     (tag->source_type == VJ_TAG_TYPE_GENERATOR &&
+                      tag->method_filename &&
+                      strcmp(tag->method_filename, "lvd_shmin.so") == 0));
+                if(!removable)
+                    id = 0;
+            } else {
+                id = 0;
+            }
+            break;
+        case 1:
+            id = vj_event_find_director_shm_stream((int32_t)args[1]);
+            break;
+        case 2:
+            id = vj_event_find_unicast_stream(endpoint, args[1]);
+            break;
+        case 3:
+            id = vj_event_find_ndi_stream(endpoint);
+            break;
+        default:
+            veejay_msg(VEEJAY_MSG_ERROR, "Unknown input route transport %d", args[0]);
+            return;
+    }
+
+    if(id <= 0) {
+        veejay_msg(VEEJAY_MSG_WARNING, "Input route is already absent");
+        return;
+    }
+
+    if(v->uc && v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+       v->uc->sample_id == id)
+        veejay_stop_sampling(v);
+
+    if(v->ndi_stream_id == id) {
+        vj_tag_set_ndi_tally(id, 0, 0);
+        v->ndi_stream_id = 0;
+        v->ndi_receive_enabled = 0;
+        v->ndi_receive_name[0] = '\0';
+    }
+
+    for(int i = 0; i < MAX_SEQUENCES; i++) {
+        if(v->seq->samples[i].sample_id == id && v->seq->samples[i].type != 0) {
+            v->seq->samples[i].sample_id = 0;
+            v->seq->samples[i].type = 0;
+        }
+    }
+
+    if(vj_tag_del(id, 0)) {
+        if(v->nstreams > 0)
+            v->nstreams--;
+        vj_tag_verify_delete(id, 1);
+        veejay_msg(VEEJAY_MSG_INFO, "Removed input route stream %d", id);
+    } else {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to remove input route stream %d", id);
+    }
 }
 
 void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )

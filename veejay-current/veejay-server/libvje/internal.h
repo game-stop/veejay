@@ -276,8 +276,9 @@
 #include "./effects/pressurewave.h"
 #include "./effects/tessaract.h"
 #include "./effects/bowshock.h"
+#include "./effects/darkmatter.h"
 
-#define VJ_IMAGE_EFFECT_MIN 9
+#define VJ_IMAGE_EFFECT_MIN 8
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -588,6 +589,7 @@ enum {
     VJ_IMAGE_EFFECT_PRESSUREWAVE = 11,
     VJ_IMAGE_EFFECT_TESSARACT = 10,
     VJ_IMAGE_EFFECT_BOWSHOCK = 9,
+    VJ_IMAGE_EFFECT_DARKMATTER = 8,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

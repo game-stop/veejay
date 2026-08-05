@@ -285,13 +285,69 @@ void veejay_audio_beat_thread_set_enabled(int enabled)
 
 static void veejay_playback_close(veejay_t *info);
 static const char *veejay_instance_role_name(int role);
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int users;
+    int writer;
+} veejay_ndi_sender_gate_t;
+
+static veejay_ndi_sender_gate_t veejay_ndi_sender_gate = {
+    .mutex = PTHREAD_MUTEX_INITIALIZER,
+    .cond = PTHREAD_COND_INITIALIZER
+};
+
+static vj_ndi_sender *veejay_ndi_sender_acquire(veejay_t *info)
+{
+    if(!info)
+        return NULL;
+    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+    while(veejay_ndi_sender_gate.writer)
+        pthread_cond_wait(&veejay_ndi_sender_gate.cond,
+                          &veejay_ndi_sender_gate.mutex);
+    vj_ndi_sender *sender = (vj_ndi_sender*)info->ndi_sender;
+    veejay_ndi_sender_gate.users++;
+    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
+    return sender;
+}
+
+static void veejay_ndi_sender_release(vj_ndi_sender *sender)
+{
+    (void)sender;
+    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+    if(veejay_ndi_sender_gate.users > 0)
+        veejay_ndi_sender_gate.users--;
+    if(veejay_ndi_sender_gate.users == 0)
+        pthread_cond_broadcast(&veejay_ndi_sender_gate.cond);
+    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
+}
+
+static void veejay_ndi_sender_begin_write(void)
+{
+    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+    veejay_ndi_sender_gate.writer = 1;
+    while(veejay_ndi_sender_gate.users > 0)
+        pthread_cond_wait(&veejay_ndi_sender_gate.cond,
+                          &veejay_ndi_sender_gate.mutex);
+}
+
+static void veejay_ndi_sender_end_write(void)
+{
+    veejay_ndi_sender_gate.writer = 0;
+    pthread_cond_broadcast(&veejay_ndi_sender_gate.cond);
+    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
+}
 static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped);
 static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped);
 static VJFrame *veejay_output_apply_pattern_projection(veejay_t *info, VJFrame *pattern);
-int veejay_output_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
+void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
+void veejay_output_unlock_pre_projection_preview_frame(void *token);
 int veejay_output_switch_source(veejay_t *info, const char *host, int port);
 int veejay_output_switch_source_shm(veejay_t *info, int port, int32_t key);
 int veejay_output_disconnect_source(veejay_t *info);
+#ifdef HAVE_SDL
+static int veejay_sdl_output_sync_owner(veejay_t *info);
+#endif
 
 
 
@@ -4678,25 +4734,45 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
  	return 0;
 }
 
+static int veejay_find_ndi_stream(const char *source_name)
+{
+    if(!source_name || !*source_name)
+        return 0;
+    const int highest = vj_tag_highest();
+    for(int id = 1; id <= highest; id++) {
+        if(!vj_tag_exists(id) || vj_tag_get_type(id) != VJ_TAG_TYPE_NDI)
+            continue;
+        vj_tag *tag = vj_tag_get(id);
+        if(tag && tag->source_name && strcmp(tag->source_name, source_name) == 0)
+            return id;
+    }
+    return 0;
+}
+
 int veejay_create_ndi_stream(veejay_t *info, const char *source_name)
 {
     if(!info || !source_name || !*source_name)
         return 0;
-    int id = veejay_create_tag(info, VJ_TAG_TYPE_NDI, (char*)source_name,
+
+    int id = veejay_find_ndi_stream(source_name);
+    if(id <= 0) {
+        id = veejay_create_tag(info, VJ_TAG_TYPE_NDI, (char*)source_name,
                                info->nstreams, 0, 0);
-    if(id <= 0)
-        return 0;
+        if(id <= 0)
+            return 0;
+    }
+
     info->ndi_stream_id = id;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
     info->uc->sample_id = id;
     info->current_edit_list = info->edit_list;
     if(!veejay_start_playing_stream(info, id)) {
         info->ndi_stream_id = 0;
-        vj_tag_del(id, 0);
         return 0;
     }
     return id;
 }
+
 
 void veejay_stop_sampling(veejay_t * info)
 {
@@ -4865,7 +4941,8 @@ static int veejay_output_present_primary(veejay_t *info, VJFrame *frame)
     switch(info->video_out) {
         case VIDEO_OUT_SDL:
 #ifdef HAVE_SDL
-            return vj_sdl_present_frame(info->sdl, frame);
+            return info->sdl && atomic_load_int(&info->sdl_output_initialized) ?
+                   vj_sdl_present_frame(info->sdl, frame) : 1;
 #else
             return 0;
 #endif
@@ -5006,6 +5083,13 @@ static void veejay_output_push_frame(veejay_t *info,
 
     veejay_output_present_primary(info, frame);
 
+#ifdef HAVE_SDL
+    if(info->video_out != VIDEO_OUT_SDL && info->sdl &&
+       atomic_load_int(&info->sdl_output_enabled) &&
+       atomic_load_int(&info->sdl_output_initialized))
+        vj_sdl_present_frame(info->sdl, frame);
+#endif
+
     veejay_output_push_vloopback(info, frame);
 
     stage_start = vj_perf_now_ns();
@@ -5027,10 +5111,12 @@ static void veejay_output_push_frame(veejay_t *info,
                            stage_start, vj_perf_now_ns());
     }
 
-    if(info->ndi_sender) {
+    vj_ndi_sender *ndi_sender = veejay_ndi_sender_acquire(info);
+    if(ndi_sender) {
         VJFrame *ndi_frame = info->instance_role == VJ_INSTANCE_ROLE_PROGRAM ? source_frame : frame;
-        vj_ndi_sender_send_video((vj_ndi_sender*)info->ndi_sender, ndi_frame);
+        vj_ndi_sender_send_video(ndi_sender, ndi_frame);
     }
+    veejay_ndi_sender_release(ndi_sender);
 
     veejay_output_push_screenshot(info, frame);
 
@@ -6322,8 +6408,11 @@ static void veejay_output_poll_events(veejay_t *info)
     }
 
 #ifdef HAVE_SDL
-    if(info->sdl &&
-       (info->video_out == VIDEO_OUT_SDL || info->video_out == 2))
+    if(info->sdl && !veejay_sdl_output_sync_owner(info)) {
+        atomic_store_int(&info->sdl_output_enabled, 0);
+        atomic_store_int(&info->sdl_output_initialized, 0);
+    }
+    if(info->sdl && atomic_load_int(&info->sdl_output_initialized))
         vj_sdl_process_pending(info->sdl);
 
     veejay_event_handle(info);
@@ -6379,12 +6468,10 @@ static void veejay_ndi_xml_escape(char *dst, size_t dst_size, const char *src)
     dst[out] = '\0';
 }
 
-int veejay_ndi_start_sender(veejay_t *info)
+static vj_ndi_sender *veejay_ndi_create_sender(veejay_t *info, const char *name)
 {
-    if(!info || !info->ndi_send_enabled)
-        return 1;
-    if(info->ndi_sender)
-        return 1;
+    if(!info || !name || !*name)
+        return NULL;
     const int audio_rate = info->edit_list && info->edit_list->audio_rate > 0 ?
                            info->edit_list->audio_rate :
                            (info->dummy && info->dummy->arate > 0 ? info->dummy->arate : 48000);
@@ -6394,12 +6481,11 @@ int veejay_ndi_start_sender(veejay_t *info)
     const double fps = info->settings->output_fps > 0.0 ?
                        info->settings->output_fps :
                        (info->dummy && info->dummy->fps > 0.0 ? info->dummy->fps : 25.0);
-    const char *name = info->ndi_send_name[0] ? info->ndi_send_name : info->instance_id;
-    info->ndi_sender = vj_ndi_sender_create(name,
-                                             info->video_output_width,
-                                             info->video_output_height,
-                                             fps, audio_rate, audio_channels);
-    if(info->ndi_sender) {
+    vj_ndi_sender *sender = vj_ndi_sender_create(name,
+                                                  info->video_output_width,
+                                                  info->video_output_height,
+                                                  fps, audio_rate, audio_channels);
+    if(sender) {
         char metadata[512];
         char escaped_id[256];
         veejay_ndi_xml_escape(escaped_id, sizeof(escaped_id), info->instance_id);
@@ -6409,18 +6495,148 @@ int veejay_ndi_start_sender(veejay_t *info)
                  veejay_instance_role_name(info->instance_role),
                  info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ?
                      "mapped-output" : "program-output");
-        vj_ndi_sender_send_metadata((vj_ndi_sender*)info->ndi_sender, metadata);
+        vj_ndi_sender_send_metadata(sender, metadata);
     }
-    return info->ndi_sender != NULL;
+    return sender;
+}
+
+int veejay_ndi_start_sender(veejay_t *info)
+{
+    if(!info || !info->ndi_send_enabled)
+        return 1;
+    veejay_ndi_sender_begin_write();
+    if(!info->ndi_sender) {
+        const char *name = info->ndi_send_name[0] ? info->ndi_send_name : info->instance_id;
+        info->ndi_sender = veejay_ndi_create_sender(info, name);
+    }
+    const int result = info->ndi_sender != NULL;
+    veejay_ndi_sender_end_write();
+    return result;
 }
 
 void veejay_ndi_stop_sender(veejay_t *info)
 {
-    if(!info || !info->ndi_sender)
+    if(!info)
         return;
-    vj_ndi_sender_destroy((vj_ndi_sender*)info->ndi_sender);
+    veejay_ndi_sender_begin_write();
+    vj_ndi_sender *sender = (vj_ndi_sender*)info->ndi_sender;
     info->ndi_sender = NULL;
+    veejay_ndi_sender_end_write();
+    if(sender)
+        vj_ndi_sender_destroy(sender);
 }
+
+int veejay_ndi_set_sender(veejay_t *info, int enabled, const char *name)
+{
+    if(!info)
+        return 0;
+    if(!enabled) {
+        veejay_ndi_sender_begin_write();
+        vj_ndi_sender *old = (vj_ndi_sender*)info->ndi_sender;
+        info->ndi_sender = NULL;
+        info->ndi_send_enabled = 0;
+        if(name && *name && strcmp(name, "-") != 0)
+            snprintf(info->ndi_send_name, sizeof(info->ndi_send_name), "%s", name);
+        veejay_ndi_sender_end_write();
+        if(old)
+            vj_ndi_sender_destroy(old);
+        return 1;
+    }
+
+    const char *requested_value = name && *name && strcmp(name, "-") != 0 ?
+                                  name : (info->ndi_send_name[0] ?
+                                          info->ndi_send_name : info->instance_id);
+    if(strlen(requested_value) > VJ_NDI_SOURCE_NAME_MAX)
+        return 0;
+    char requested[VJ_NDI_SOURCE_NAME_MAX + 1];
+    snprintf(requested, sizeof(requested), "%s", requested_value);
+
+    vj_ndi_sender *current = veejay_ndi_sender_acquire(info);
+    const int unchanged = current && info->ndi_send_enabled &&
+                          strcmp(info->ndi_send_name, requested) == 0;
+    veejay_ndi_sender_release(current);
+    if(unchanged)
+        return 1;
+
+    vj_ndi_sender *replacement = veejay_ndi_create_sender(info, requested);
+    if(!replacement)
+        return 0;
+
+    veejay_ndi_sender_begin_write();
+    vj_ndi_sender *old = (vj_ndi_sender*)info->ndi_sender;
+    info->ndi_sender = replacement;
+    info->ndi_send_enabled = 1;
+    snprintf(info->ndi_send_name, sizeof(info->ndi_send_name), "%s", requested);
+    veejay_ndi_sender_end_write();
+    if(old)
+        vj_ndi_sender_destroy(old);
+    return 1;
+}
+
+int veejay_ndi_set_receiver(veejay_t *info, const char *source_name)
+{
+    if(!info || info->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
+        return 0;
+    const int disable = !source_name || !*source_name ||
+                        strcmp(source_name, "-") == 0;
+    const int old_id = info->ndi_stream_id;
+
+    if(!disable && old_id > 0 && vj_tag_exists(old_id) &&
+       strcmp(info->ndi_receive_name, source_name) == 0) {
+        if(!info->uc ||
+           info->uc->playback_mode != VJ_PLAYBACK_MODE_TAG ||
+           info->uc->sample_id != old_id)
+            return veejay_start_playing_stream(info, old_id) != 0;
+        return 1;
+    }
+
+    if(disable) {
+        if(old_id > 0 && vj_tag_exists(old_id)) {
+            if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+               info->uc->sample_id == old_id)
+                veejay_stop_sampling(info);
+            vj_tag_set_ndi_tally(old_id, 0, 0);
+            vj_tag_set_active(old_id, 0);
+        }
+        info->ndi_stream_id = 0;
+        info->ndi_receive_enabled = 0;
+        info->ndi_receive_name[0] = '\0';
+        return 1;
+    }
+
+    if(strlen(source_name) > VJ_NDI_SOURCE_NAME_MAX)
+        return 0;
+
+    char old_name[sizeof(info->ndi_receive_name)];
+    snprintf(old_name, sizeof(old_name), "%s", info->ndi_receive_name);
+    const int old_mode = info->uc ? info->uc->playback_mode : VJ_PLAYBACK_MODE_PLAIN;
+    const int old_sample = info->uc ? info->uc->sample_id : 0;
+    editlist *old_edit_list = info->current_edit_list;
+
+    int new_id = veejay_create_ndi_stream(info, source_name);
+    if(new_id <= 0) {
+        info->ndi_stream_id = old_id;
+        info->ndi_receive_enabled = old_id > 0;
+        snprintf(info->ndi_receive_name, sizeof(info->ndi_receive_name), "%s", old_name);
+        if(old_id > 0 && vj_tag_exists(old_id))
+            veejay_start_playing_stream(info, old_id);
+        else if(info->uc) {
+            info->uc->playback_mode = old_mode;
+            info->uc->sample_id = old_sample;
+            info->current_edit_list = old_edit_list;
+        }
+        return 0;
+    }
+
+    info->ndi_receive_enabled = 1;
+    snprintf(info->ndi_receive_name, sizeof(info->ndi_receive_name), "%s", source_name);
+    if(old_id > 0 && old_id != new_id && vj_tag_exists(old_id)) {
+        vj_tag_set_ndi_tally(old_id, 0, 0);
+        vj_tag_set_active(old_id, 0);
+    }
+    return 1;
+}
+
 
 static void veejay_ndi_status_value(char *dst, size_t dst_size, const char *src)
 {
@@ -6455,24 +6671,38 @@ char *veejay_ndi_status(veejay_t *info)
 
     if(rx_stream_id > 0)
         vj_tag_get_ndi_stats(rx_stream_id, &rx);
-    if(info && info->ndi_sender)
-        vj_ndi_sender_get_stats((vj_ndi_sender*)info->ndi_sender, &tx);
+    int tx_active = 0;
+    char tx_name_raw[256] = {0};
+    if(info) {
+        vj_ndi_sender *sender = veejay_ndi_sender_acquire(info);
+        if(sender) {
+            tx_active = 1;
+            vj_ndi_sender_get_stats(sender, &tx);
+        }
+        snprintf(tx_name_raw, sizeof(tx_name_raw), "%s",
+                 info->ndi_send_name[0] ? info->ndi_send_name : info->instance_id);
+        veejay_ndi_sender_release(sender);
+    }
     char metadata[256];
     char runtime[128];
     char source_raw[256] = {0};
     char source[256];
     char tx_name[256];
-    if(rx_stream_id > 0)
+    char tx_source[256];
+    char tx_url[512];
+    if(rx_stream_id > 0 && rx.published_name[0])
+        snprintf(source_raw, sizeof(source_raw), "%s", rx.published_name);
+    else if(rx_stream_id > 0)
         vj_tag_get_source_name(rx_stream_id, source_raw, sizeof(source_raw));
     else if(info)
         snprintf(source_raw, sizeof(source_raw), "%s", info->ndi_receive_name);
     veejay_ndi_status_value(metadata, sizeof(metadata), rx.last_metadata);
     veejay_ndi_status_value(runtime, sizeof(runtime), vj_ndi_runtime_version());
     veejay_ndi_status_value(source, sizeof(source), source_raw);
-    veejay_ndi_status_value(tx_name, sizeof(tx_name),
-                            info && info->ndi_send_name[0] ?
-                            info->ndi_send_name :
-                            (info ? info->instance_id : ""));
+    veejay_ndi_status_value(tx_name, sizeof(tx_name), tx_name_raw);
+    veejay_ndi_status_value(tx_source, sizeof(tx_source),
+                            tx.published_name[0] ? tx.published_name : tx_name_raw);
+    veejay_ndi_status_value(tx_url, sizeof(tx_url), tx.published_url);
     const size_t status_size = 4096;
     char *status = (char*)malloc(status_size);
     if(!status)
@@ -6490,7 +6720,8 @@ char *veejay_ndi_status(veejay_t *info)
              "rx.audio_timestamp=%lld\nrx.clock_follow=%d\n"
              "rx.clock_available=%d\nrx.clock_age_ms=%d\n"
              "rx.clock_drift_ms=%.3f\nrx.metadata=%s\n"
-             "tx.enabled=%d\ntx.name=%s\ntx.connections=%d\n"
+             "tx.enabled=%d\ntx.name=%s\ntx.source=%s\ntx.url=%s\ntx.connections=%d\n"
+             "tx.self=%d\ntx.instance_id=%s\ntx.role=%s\n"
              "tx.video=%llu\ntx.audio=%llu\ntx.tally_program=%d\n"
              "tx.tally_preview=%d\n",
              runtime, rx_stream_id > 0,
@@ -6511,8 +6742,11 @@ char *veejay_ndi_status(veejay_t *info)
              info ? info->ndi_follow_clock : 0,
              rx.clock_available, rx.clock_age_ms, rx.clock_drift_ms,
              metadata,
-             info ? info->ndi_send_enabled : 0,
-             tx_name, tx.connected,
+             tx_active,
+             tx_name, tx_source, tx_url, tx.connected,
+             tx_active ? 1 : 0,
+             info ? info->instance_id : "",
+             info ? veejay_instance_role_name(info->instance_role) : "standalone",
              (unsigned long long)tx.video_frames,
              (unsigned long long)tx.audio_frames,
              tx.program_tally, tx.preview_tally);
@@ -6524,19 +6758,6 @@ int veejay_setup_video_out(veejay_t *info)
     switch(info->video_out) {
         case VIDEO_OUT_SDL:
             veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
-#ifdef HAVE_SDL
-            video_playback_setup *settings = info->settings;
-
-            info->sdl = vj_sdl_allocate(info->effect_frame1,
-                                        info->use_keyb,
-                                        info->use_mouse,
-                                        info->show_cursor,
-                                        info->borderless);
-            if(!info->sdl)
-                return -1;
-
-            atomic_store_long_long(&settings->display_frame.seq, -1);
-#endif
             break;
 
         case 1:
@@ -6555,11 +6776,69 @@ int veejay_setup_video_out(veejay_t *info)
             return -1;
     }
 
+#ifdef HAVE_SDL
+    if(!info->sdl) {
+        info->sdl = vj_sdl_allocate(info->effect_frame1,
+                                    info->use_keyb,
+                                    info->use_mouse,
+                                    info->show_cursor,
+                                    info->borderless);
+        if(!info->sdl)
+            return -1;
+    }
+    atomic_store_int(&info->sdl_output_enabled,
+                     info->video_out == VIDEO_OUT_SDL ? 1 : 0);
+    atomic_store_int(&info->sdl_output_initialized, 0);
+    atomic_store_int(&info->sdl_output_width,
+                     info->bes_width > 0 ? info->bes_width : info->video_output_width);
+    atomic_store_int(&info->sdl_output_height,
+                     info->bes_height > 0 ? info->bes_height : info->video_output_height);
+    atomic_store_int(&info->sdl_output_x, info->uc ? info->uc->geox : -1);
+    atomic_store_int(&info->sdl_output_y, info->uc ? info->uc->geoy : -1);
+    atomic_store_int(&info->sdl_output_fullscreen,
+                     info->settings ? info->settings->full_screen : 0);
+    if(info->settings)
+        atomic_store_long_long(&info->settings->display_frame.seq, -1);
+#endif
+
     if(!veejay_ndi_start_sender(info)) {
         veejay_msg(VEEJAY_MSG_ERROR, "Unable to start requested NDI sender");
         return -1;
     }
     return 0;
+}
+
+int veejay_sdl_output_set(veejay_t *info, int enabled, int width, int height, int x, int y)
+{
+#ifdef HAVE_SDL
+    if(!info || !info->sdl || width < 0 || height < 0 ||
+       ((width == 0) != (height == 0)))
+        return 0;
+
+    if(width > 0 && height > 0) {
+        atomic_store_int(&info->sdl_output_width, width);
+        atomic_store_int(&info->sdl_output_height, height);
+        atomic_store_int(&info->sdl_output_x, x);
+        atomic_store_int(&info->sdl_output_y, y);
+    }
+
+    atomic_store_int(&info->sdl_output_enabled, enabled ? 1 : 0);
+
+    if(enabled && atomic_load_int(&info->sdl_output_initialized)) {
+        if(width > 0 && height > 0 &&
+           !vj_sdl_set_window_size(info->sdl, width, height, x, y))
+            return 0;
+    }
+    return 1;
+#else
+    (void)info;
+    (void)enabled;
+    (void)width;
+    (void)height;
+    (void)x;
+    (void)y;
+    return 0;
+#endif
 }
 
 static double vj_get_relative_time(void)
@@ -6656,7 +6935,11 @@ typedef struct {
     int remote_stream_id;
     uint64_t remote_sequence;
     int projection_preview_valid;
+    pthread_mutex_t projection_preview_mutex;
+    int projection_preview_mutex_initialized;
 } veejay_output_source_state;
+
+static pthread_mutex_t veejay_output_preview_gate = PTHREAD_MUTEX_INITIALIZER;
 
 static void veejay_output_source_free(veejay_t *info)
 {
@@ -6667,8 +6950,13 @@ static void veejay_output_source_free(veejay_t *info)
         info->input_shm = NULL;
     }
 
+    pthread_mutex_lock(&veejay_output_preview_gate);
     veejay_output_source_state *state =
         (veejay_output_source_state*)info->output_input_buffer;
+    info->output_input_buffer = NULL;
+    if(state && state->projection_preview_mutex_initialized)
+        pthread_mutex_lock(&state->projection_preview_mutex);
+    pthread_mutex_unlock(&veejay_output_preview_gate);
     if(state) {
         if(state->remote_stream_id > 0 && vj_tag_exists(state->remote_stream_id)) {
             vj_tag_del(state->remote_stream_id, 0);
@@ -6695,6 +6983,10 @@ static void veejay_output_source_free(veejay_t *info)
            state->canonical_buffer != state->transport_buffer)
             free(state->canonical_buffer);
         free(state->transport_buffer);
+        if(state->projection_preview_mutex_initialized) {
+            pthread_mutex_unlock(&state->projection_preview_mutex);
+            pthread_mutex_destroy(&state->projection_preview_mutex);
+        }
         free(state);
     }
 
@@ -6725,6 +7017,12 @@ static int veejay_output_projection_init(veejay_t *info,
 {
     if(!info || !state)
         return 0;
+
+    if(!state->projection_preview_mutex_initialized) {
+        if(pthread_mutex_init(&state->projection_preview_mutex, NULL) != 0)
+            return 0;
+        state->projection_preview_mutex_initialized = 1;
+    }
 
     state->projection_format = (info->pixel_format == FMT_422F) ?
                                PIX_FMT_YUVJ444P : PIX_FMT_YUV444P;
@@ -6785,11 +7083,16 @@ static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped)
     if(!info || !mapped || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return 0;
 
+    pthread_mutex_lock(&veejay_output_preview_gate);
     veejay_output_source_state *state =
         (veejay_output_source_state*)info->output_input_buffer;
-    if(!state || !state->projection_source_frame)
+    if(!state || !state->projection_source_frame ||
+       !state->projection_preview_mutex_initialized) {
+        pthread_mutex_unlock(&veejay_output_preview_gate);
         return 0;
-
+    }
+    pthread_mutex_lock(&state->projection_preview_mutex);
+    pthread_mutex_unlock(&veejay_output_preview_gate);
     state->projection_preview_valid = 0;
     if(state->to_projection)
         yuv_convert_and_scale(state->to_projection, mapped, state->projection_source_frame);
@@ -6799,21 +7102,40 @@ static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped)
     state->projection_source_frame->frame_num = mapped->frame_num;
     state->projection_source_frame->fps = mapped->fps;
     state->projection_preview_valid = 1;
+    pthread_mutex_unlock(&state->projection_preview_mutex);
     return 1;
 }
 
-int veejay_output_get_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
+void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
 {
     if(!info || !frame || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
-        return 0;
+        return NULL;
 
+    pthread_mutex_lock(&veejay_output_preview_gate);
     veejay_output_source_state *state =
         (veejay_output_source_state*)info->output_input_buffer;
-    if(!state || !state->projection_preview_valid || !state->projection_source_frame)
-        return 0;
+    if(!state || !state->projection_source_frame ||
+       !state->projection_preview_mutex_initialized) {
+        pthread_mutex_unlock(&veejay_output_preview_gate);
+        return NULL;
+    }
+    pthread_mutex_lock(&state->projection_preview_mutex);
+    pthread_mutex_unlock(&veejay_output_preview_gate);
+
+    if(!state->projection_preview_valid) {
+        pthread_mutex_unlock(&state->projection_preview_mutex);
+        return NULL;
+    }
 
     veejay_memcpy(frame, state->projection_source_frame, sizeof(VJFrame));
-    return 1;
+    return state;
+}
+
+void veejay_output_unlock_pre_projection_preview_frame(void *token)
+{
+    veejay_output_source_state *state = (veejay_output_source_state*)token;
+    if(state && state->projection_preview_mutex_initialized)
+        pthread_mutex_unlock(&state->projection_preview_mutex);
 }
 
 static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped)
@@ -7456,43 +7778,76 @@ static int veejay_output_present_idle_graph(veejay_t *info,
     return 1;
 }
 
+#ifdef HAVE_SDL
+static int veejay_sdl_output_initialize_owner(veejay_t *info)
+{
+    if(!info || !info->sdl)
+        return 0;
+    if(atomic_load_int(&info->sdl_output_initialized))
+        return 1;
+
+    video_playback_setup *settings = info->settings;
+    editlist *el = info->edit_list;
+    char *title = veejay_title(info);
+    const int x = atomic_load_int(&info->sdl_output_x);
+    const int y = atomic_load_int(&info->sdl_output_y);
+    const int requested_width = atomic_load_int(&info->sdl_output_width);
+    const int requested_height = atomic_load_int(&info->sdl_output_height);
+    const int width = requested_width > 0 ? requested_width : info->video_output_width;
+    const int height = requested_height > 0 ? requested_height : info->video_output_height;
+
+    vj_sdl_set_perf(info->sdl, info->perf);
+    const int initialized = vj_sdl_init(info->sdl,
+                                        x,
+                                        y,
+                                        info->video_output_width,
+                                        info->video_output_height,
+                                        width,
+                                        height,
+                                        title,
+                                        1,
+                                        atomic_load_int(&info->sdl_output_fullscreen) ? 1 : 0,
+                                        info->pixel_format,
+                                        el->video_fps,
+                                        &settings->vsync_interval_s);
+    free(title);
+    if(!initialized) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] Error initializing SDL in renderer thread");
+        return 0;
+    }
+    atomic_store_int(&info->sdl_output_initialized, 1);
+    veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL output opened");
+    return 1;
+}
+
+static int veejay_sdl_output_sync_owner(veejay_t *info)
+{
+    if(!info || !info->sdl)
+        return 1;
+
+    const int enabled = atomic_load_int(&info->sdl_output_enabled);
+    const int initialized = atomic_load_int(&info->sdl_output_initialized);
+    if(enabled && !initialized)
+        return veejay_sdl_output_initialize_owner(info);
+    if(!enabled && initialized) {
+        vj_sdl_shutdown(info->sdl);
+        atomic_store_int(&info->sdl_output_initialized, 0);
+        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL output closed");
+    }
+    return 1;
+}
+#endif
+
 static int veejay_output_initialize_owner(veejay_t *info)
 {
 #ifdef HAVE_SDL
-    if(info->video_out == VIDEO_OUT_SDL) {
-        video_playback_setup *settings = info->settings;
-        editlist *el = info->edit_list;
-        char *title = veejay_title(info);
-        const int x = info->uc->geox;
-        const int y = info->uc->geoy;
-        int initialized;
-
-        vj_sdl_set_perf(info->sdl, info->perf);
-        initialized = vj_sdl_init(info->sdl,
-                                  x,
-                                  y,
-                                  info->video_output_width,
-                                  info->video_output_height,
-                                  info->bes_width,
-                                  info->bes_height,
-                                  title,
-                                  1,
-                                  settings->full_screen,
-                                  info->pixel_format,
-                                  el->video_fps,
-                                  &settings->vsync_interval_s);
-        free(title);
-
-        if(!initialized) {
-            veejay_msg(VEEJAY_MSG_ERROR,
-                       "[DISPLAY] Error initializing SDL in renderer thread");
-            return 0;
-        }
-    }
+    if(atomic_load_int(&info->sdl_output_enabled) &&
+       !veejay_sdl_output_initialize_owner(info))
+        return 0;
 #else
     (void)info;
 #endif
-
     return 1;
 }
 
@@ -7740,8 +8095,10 @@ void *veejay_display_renderer_thread(void *arg)
     }
 
 #ifdef HAVE_SDL
-    if(info->video_out == VIDEO_OUT_SDL && info->sdl)
+    if(info->sdl && atomic_load_int(&info->sdl_output_initialized)) {
         vj_sdl_shutdown(info->sdl);
+        atomic_store_int(&info->sdl_output_initialized, 0);
+    }
 #endif
 
     veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Renderer thread exiting...");
@@ -9760,11 +10117,14 @@ void *veejay_audio_producer_thread(void *arg)
                 decoded = needed;
             }
 
-            if(info->ndi_sender && el && el->audio_bits == 16 && decoded > 0 &&
-               BPS >= 2 && (BPS & 1) == 0)
-                vj_ndi_sender_send_audio_format((vj_ndi_sender*)info->ndi_sender,
-                                                audio_chunk, decoded,
-                                                (int)CLIENT_RATE, BPS / 2);
+            if(el && el->audio_bits == 16 && decoded > 0 &&
+               BPS >= 2 && (BPS & 1) == 0) {
+                vj_ndi_sender *ndi_sender = veejay_ndi_sender_acquire(info);
+                if(ndi_sender)
+                    vj_ndi_sender_send_audio_format(ndi_sender, audio_chunk, decoded,
+                                                    (int)CLIENT_RATE, BPS / 2);
+                veejay_ndi_sender_release(ndi_sender);
+            }
 
             int frames_written = 0;
             int write_pos = 0;

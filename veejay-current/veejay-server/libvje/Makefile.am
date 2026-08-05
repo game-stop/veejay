@@ -265,4 +265,5 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/mechanicalpixels.c \
     effects/pressurewave.c \
     effects/tessaract.c \
-    effects/bowshock.c
+    effects/bowshock.c \
+    effects/darkmatter.c

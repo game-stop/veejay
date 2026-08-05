@@ -41,6 +41,129 @@ static gint clamp_int(gint value, gint minimum, gint maximum)
     return value < minimum ? minimum : value > maximum ? maximum : value;
 }
 
+DirectorInputRoute *director_input_route_new(DirectorInputRouteType type,
+                                              const gchar *source_instance_id,
+                                              const gchar *host,
+                                              gint port,
+                                              const gchar *ndi_source_name)
+{
+    DirectorInputRoute *route = g_new0(DirectorInputRoute, 1);
+    route->type = type;
+    route->source_instance_id = g_strdup(source_instance_id ? source_instance_id : "");
+    route->host = g_strdup(host ? host : "");
+    route->port = port;
+    route->ndi_source_name = g_strdup(ndi_source_name ? ndi_source_name : "");
+    return route;
+}
+
+DirectorInputRoute *director_input_route_copy(const DirectorInputRoute *route)
+{
+    if(!route)
+        return NULL;
+    DirectorInputRoute *copy = director_input_route_new(route->type,
+        route->source_instance_id, route->host, route->port, route->ndi_source_name);
+    copy->shm_key = route->shm_key;
+    copy->applied_connection = route->applied_connection;
+    copy->live_stream_id = route->live_stream_id;
+    copy->live_active = route->live_active;
+    copy->live_current = route->live_current;
+    return copy;
+}
+
+void director_input_route_free(DirectorInputRoute *route)
+{
+    if(!route)
+        return;
+    g_free(route->source_instance_id);
+    g_free(route->host);
+    g_free(route->ndi_source_name);
+    g_free(route);
+}
+
+static gboolean director_input_route_matches(const DirectorInputRoute *route,
+                                              DirectorInputRouteType type,
+                                              const gchar *source_instance_id,
+                                              const gchar *host,
+                                              gint port,
+                                              const gchar *ndi_source_name)
+{
+    if(!route || route->type != type)
+        return FALSE;
+    if(type == DIRECTOR_INPUT_ROUTE_NDI)
+        return g_strcmp0(route->ndi_source_name, ndi_source_name ? ndi_source_name : "") == 0;
+    if(source_instance_id && *source_instance_id &&
+       route->source_instance_id && *route->source_instance_id)
+        return g_strcmp0(route->source_instance_id, source_instance_id) == 0;
+    return route->port == port &&
+           g_ascii_strcasecmp(route->host ? route->host : "", host ? host : "") == 0;
+}
+
+DirectorInputRoute *director_instance_find_input_route(const DirectorInstance *instance,
+                                                        DirectorInputRouteType type,
+                                                        const gchar *source_instance_id,
+                                                        const gchar *host,
+                                                        gint port,
+                                                        const gchar *ndi_source_name)
+{
+    if(!instance || !instance->input_routes)
+        return NULL;
+    for(guint i = 0; i < instance->input_routes->len; i++) {
+        DirectorInputRoute *route = g_ptr_array_index(instance->input_routes, i);
+        if(director_input_route_matches(route, type, source_instance_id, host, port, ndi_source_name))
+            return route;
+    }
+    return NULL;
+}
+
+gboolean director_instance_add_input_route(DirectorInstance *instance,
+                                            DirectorInputRouteType type,
+                                            const gchar *source_instance_id,
+                                            const gchar *host,
+                                            gint port,
+                                            const gchar *ndi_source_name)
+{
+    if(!instance)
+        return FALSE;
+    if(!instance->input_routes)
+        instance->input_routes = g_ptr_array_new_with_free_func((GDestroyNotify)director_input_route_free);
+    DirectorInputRoute *route = director_instance_find_input_route(instance, type,
+        source_instance_id, host, port, ndi_source_name);
+    if(route) {
+        g_free(route->host);
+        route->host = g_strdup(host ? host : "");
+        route->port = port;
+        return FALSE;
+    }
+    g_ptr_array_add(instance->input_routes,
+        director_input_route_new(type, source_instance_id, host, port, ndi_source_name));
+    return TRUE;
+}
+
+gboolean director_instance_remove_input_route(DirectorInstance *instance,
+                                               DirectorInputRouteType type,
+                                               const gchar *source_instance_id,
+                                               const gchar *host,
+                                               gint port,
+                                               const gchar *ndi_source_name)
+{
+    if(!instance || !instance->input_routes)
+        return FALSE;
+    for(guint i = 0; i < instance->input_routes->len; i++) {
+        DirectorInputRoute *route = g_ptr_array_index(instance->input_routes, i);
+        if(director_input_route_matches(route, type, source_instance_id, host, port, ndi_source_name)) {
+            g_ptr_array_remove_index(instance->input_routes, i);
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void director_instance_clear_input_routes(DirectorInstance *instance)
+{
+    if(instance && instance->input_routes)
+        g_ptr_array_set_size(instance->input_routes, 0);
+}
+
 const gchar *director_role_name(DirectorRole role)
 {
     switch(role) {
@@ -184,6 +307,9 @@ DirectorInstance *director_instance_new(const gchar *id, DirectorRole role)
                                                   instance->id, NULL);
     instance->source_host = g_strdup("");
     instance->source_port = 3490;
+    instance->input_routes = g_ptr_array_new_with_free_func((GDestroyNotify)director_input_route_free);
+    instance->live_input_routes = g_ptr_array_new_with_free_func((GDestroyNotify)director_input_route_free);
+    instance->live_route_sdl_display_index = -1;
     instance->stream_advertise_host = g_strdup("");
     instance->control_mode = DIRECTOR_CONTROL_INDEPENDENT;
     instance->master_host = g_strdup("127.0.0.1");
@@ -283,6 +409,9 @@ DirectorInstance *director_instance_clone_configuration(const DirectorInstance *
     copy->split_row = source->split_row; copy->split_column = source->split_column;
     COPY_STR(multicast_osc); COPY_STR(multicast_vims); COPY_STR(sample_file); COPY_STR(action_file);
     COPY_STR(source_instance_id); COPY_STR(source_host); copy->source_port = source->source_port;
+    g_ptr_array_set_size(copy->input_routes, 0);
+    for(guint route_i = 0; source->input_routes && route_i < source->input_routes->len; route_i++)
+        g_ptr_array_add(copy->input_routes, director_input_route_copy(g_ptr_array_index(source->input_routes, route_i)));
     COPY_STR(stream_advertise_host); copy->control_mode = source->control_mode;
     COPY_STR(master_instance_id); COPY_STR(master_host); copy->master_port = source->master_port;
     copy->preview_forward_vims = source->preview_forward_vims;
@@ -331,6 +460,10 @@ void director_instance_free(DirectorInstance *instance)
     g_free(instance->ndi_output_name);
     g_free(instance->source_instance_id);
     g_free(instance->source_host);
+    if(instance->input_routes)
+        g_ptr_array_free(instance->input_routes, TRUE);
+    if(instance->live_input_routes)
+        g_ptr_array_free(instance->live_input_routes, TRUE);
     g_free(instance->stream_advertise_host);
     g_free(instance->master_instance_id);
     g_free(instance->master_host);
@@ -346,12 +479,22 @@ void director_instance_free(DirectorInstance *instance)
     g_free(instance->live_ndi_runtime);
     g_free(instance->live_ndi_source);
     g_free(instance->live_ndi_tx_name);
+    g_free(instance->live_ndi_tx_source);
+    g_free(instance->live_ndi_tx_url);
+    g_free(instance->live_ndi_tx_instance_id);
+    g_free(instance->live_ndi_tx_role);
+    g_free(instance->live_route_ndi_output_name);
+    g_free(instance->ndi_input_pending_name);
+    g_free(instance->ndi_input_pending_native_source_id);
+    g_free(instance->ndi_input_pending_native_host);
+    g_free(instance->ndi_output_pending_name);
     g_free(instance->last_error);
     g_free(instance->last_instance_status);
     g_free(instance->last_output_status);
     g_free(instance->last_projection_status);
     g_free(instance->last_perf_status);
     g_free(instance->last_ndi_status);
+    g_free(instance->last_routing_status);
     g_free(instance->recovery_editlist_path);
     g_free(instance->recovery_samplelist_path);
     if(instance->stages)
@@ -429,6 +572,8 @@ static void director_snapshot_instance_free(DirectorSnapshotInstance *entry)
     g_free(entry->instance_id);
     g_free(entry->source_instance_id);
     g_free(entry->source_host);
+    if(entry->input_routes)
+        g_ptr_array_free(entry->input_routes, TRUE);
     g_free(entry->master_instance_id);
     g_free(entry->master_host);
     g_free(entry->ndi_source_name);
@@ -438,6 +583,20 @@ static void director_snapshot_instance_free(DirectorSnapshotInstance *entry)
     g_free(entry->physical.display_connector);
     g_free(entry->physical.split_master_instance_id);
     g_free(entry);
+}
+
+typedef struct {
+    gchar *key;
+    gint x;
+    gint y;
+} DirectorNdiPatchPosition;
+
+static void director_ndi_patch_position_free(DirectorNdiPatchPosition *position)
+{
+    if(!position)
+        return;
+    g_free(position->key);
+    g_free(position);
 }
 
 static void director_show_snapshot_free(DirectorShowSnapshot *snapshot)
@@ -460,6 +619,8 @@ DirectorShow *director_show_new(const gchar *name)
     show->active_venue = g_strdup("");
     show->venue_profiles = g_ptr_array_new_with_free_func((GDestroyNotify)director_venue_profile_free);
     show->snapshots = g_ptr_array_new_with_free_func((GDestroyNotify)director_show_snapshot_free);
+    show->ndi_patch_positions = g_ptr_array_new_with_free_func(
+        (GDestroyNotify)director_ndi_patch_position_free);
     show->instances = g_ptr_array_new_with_free_func((GDestroyNotify)director_instance_free);
     return show;
 }
@@ -477,9 +638,65 @@ void director_show_free(DirectorShow *show)
         g_ptr_array_free(show->venue_profiles, TRUE);
     if(show->snapshots)
         g_ptr_array_free(show->snapshots, TRUE);
+    if(show->ndi_patch_positions)
+        g_ptr_array_free(show->ndi_patch_positions, TRUE);
     if(show->instances)
         g_ptr_array_free(show->instances, TRUE);
     g_free(show);
+}
+
+gboolean director_show_get_ndi_patch_position(const DirectorShow *show,
+                                               const gchar *key,
+                                               gint *x, gint *y)
+{
+    if(!show || !key || !*key)
+        return FALSE;
+    for(guint i = 0; show->ndi_patch_positions &&
+                    i < show->ndi_patch_positions->len; i++) {
+        const DirectorNdiPatchPosition *position =
+            g_ptr_array_index(show->ndi_patch_positions, i);
+        if(position && g_strcmp0(position->key, key) == 0) {
+            if(x) *x = position->x;
+            if(y) *y = position->y;
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+void director_show_set_ndi_patch_position(DirectorShow *show,
+                                          const gchar *key,
+                                          gint x, gint y)
+{
+    if(!show || !key || !*key)
+        return;
+    for(guint i = 0; show->ndi_patch_positions &&
+                    i < show->ndi_patch_positions->len; i++) {
+        DirectorNdiPatchPosition *position =
+            g_ptr_array_index(show->ndi_patch_positions, i);
+        if(position && g_strcmp0(position->key, key) == 0) {
+            if(position->x != x || position->y != y) {
+                position->x = x;
+                position->y = y;
+                show->dirty = TRUE;
+            }
+            return;
+        }
+    }
+    DirectorNdiPatchPosition *position = g_new0(DirectorNdiPatchPosition, 1);
+    position->key = g_strdup(key);
+    position->x = x;
+    position->y = y;
+    g_ptr_array_add(show->ndi_patch_positions, position);
+    show->dirty = TRUE;
+}
+
+void director_show_clear_ndi_patch_positions(DirectorShow *show)
+{
+    if(!show || !show->ndi_patch_positions || show->ndi_patch_positions->len == 0)
+        return;
+    g_ptr_array_set_size(show->ndi_patch_positions, 0);
+    show->dirty = TRUE;
 }
 
 DirectorInstance *director_show_find_instance(DirectorShow *show, const gchar *id)
@@ -1018,6 +1235,9 @@ DirectorShowSnapshot *director_show_capture_snapshot(DirectorShow *show, const g
         entry->source_instance_id = g_strdup(instance->source_instance_id ? instance->source_instance_id : "");
         entry->source_host = g_strdup(instance->source_host ? instance->source_host : "");
         entry->source_port = instance->source_port;
+        entry->input_routes = g_ptr_array_new_with_free_func((GDestroyNotify)director_input_route_free);
+        for(guint route_i = 0; instance->input_routes && route_i < instance->input_routes->len; route_i++)
+            g_ptr_array_add(entry->input_routes, director_input_route_copy(g_ptr_array_index(instance->input_routes, route_i)));
         entry->control_mode = instance->control_mode;
         entry->master_instance_id = g_strdup(instance->master_instance_id ? instance->master_instance_id : "");
         entry->master_host = g_strdup(instance->master_host ? instance->master_host : "");
@@ -1058,6 +1278,13 @@ guint director_show_apply_snapshot_model(DirectorShow *show, const DirectorShowS
         g_free(instance->source_host);
         instance->source_host = g_strdup(entry->source_host ? entry->source_host : "");
         instance->source_port = entry->source_port;
+        director_instance_clear_input_routes(instance);
+        for(guint route_i = 0; entry->input_routes && route_i < entry->input_routes->len; route_i++) {
+            DirectorInputRoute *copy_route = director_input_route_copy(g_ptr_array_index(entry->input_routes, route_i));
+            copy_route->applied_connection = FALSE;
+            copy_route->shm_key = 0;
+            g_ptr_array_add(instance->input_routes, copy_route);
+        }
         instance->wire_applied_connection = FALSE;
         instance->control_mode = entry->control_mode;
         g_free(instance->master_instance_id);
@@ -1273,6 +1500,72 @@ static DirectorVenueOutput *key_file_get_venue_output(GKeyFile *file, const gcha
     return output;
 }
 
+static void key_file_set_input_routes(GKeyFile *file,
+                                      const gchar *group,
+                                      const GPtrArray *routes)
+{
+    const gint count = routes ? (gint)routes->len : 0;
+    g_key_file_set_integer(file, group, "input-route-count", count);
+    for(gint i = 0; i < count; i++) {
+        const DirectorInputRoute *route = g_ptr_array_index((GPtrArray*)routes, (guint)i);
+        gchar *key = g_strdup_printf("input-route-%d-type", i);
+        g_key_file_set_integer(file, group, key, route ? route->type : 0);
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-source-instance", i);
+        g_key_file_set_string(file, group, key, route && route->source_instance_id ? route->source_instance_id : "");
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-host", i);
+        g_key_file_set_string(file, group, key, route && route->host ? route->host : "");
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-port", i);
+        g_key_file_set_integer(file, group, key, route ? route->port : 0);
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-ndi-source", i);
+        g_key_file_set_string(file, group, key, route && route->ndi_source_name ? route->ndi_source_name : "");
+        g_free(key);
+    }
+}
+
+static GPtrArray *key_file_get_input_routes(GKeyFile *file,
+                                             const gchar *group,
+                                             gboolean *present)
+{
+    const gboolean has_routes = g_key_file_has_key(file, group, "input-route-count", NULL);
+    if(present)
+        *present = has_routes;
+    GPtrArray *routes = g_ptr_array_new_with_free_func((GDestroyNotify)director_input_route_free);
+    if(!has_routes)
+        return routes;
+
+    const gint count = clamp_int(key_file_get_integer_default(file, group, "input-route-count", 0), 0, 256);
+    for(gint i = 0; i < count; i++) {
+        gchar *key = g_strdup_printf("input-route-%d-type", i);
+        const gint type = key_file_get_integer_default(file, group, key, 0);
+        g_free(key);
+        if(type < DIRECTOR_INPUT_ROUTE_SHM || type > DIRECTOR_INPUT_ROUTE_NDI)
+            continue;
+        key = g_strdup_printf("input-route-%d-source-instance", i);
+        gchar *source_instance = key_file_get_string_default(file, group, key, "");
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-host", i);
+        gchar *host = key_file_get_string_default(file, group, key, "");
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-port", i);
+        const gint port = clamp_int(key_file_get_integer_default(file, group, key, 0), 0, 65530);
+        g_free(key);
+        key = g_strdup_printf("input-route-%d-ndi-source", i);
+        gchar *ndi_source = key_file_get_string_default(file, group, key, "");
+        g_free(key);
+        DirectorInputRoute *route = director_input_route_new((DirectorInputRouteType)type,
+            source_instance, host, port, ndi_source);
+        g_ptr_array_add(routes, route);
+        g_free(source_instance);
+        g_free(host);
+        g_free(ndi_source);
+    }
+    return routes;
+}
+
 gboolean director_show_save(DirectorShow *show, const gchar *path, GError **error)
 {
     if(!show || !path || !*path) {
@@ -1295,6 +1588,9 @@ gboolean director_show_save(DirectorShow *show, const gchar *path, GError **erro
                            show->venue_profiles ? (gint)show->venue_profiles->len : 0);
     g_key_file_set_integer(file, "Show", "snapshots",
                            show->snapshots ? (gint)show->snapshots->len : 0);
+    g_key_file_set_integer(file, "Show", "ndi-patch-positions",
+                           show->ndi_patch_positions ?
+                               (gint)show->ndi_patch_positions->len : 0);
     guint persistent_count = 0;
     for(guint i = 0; i < show->instances->len; i++) {
         DirectorInstance *instance = g_ptr_array_index(show->instances, i);
@@ -1302,6 +1598,19 @@ gboolean director_show_save(DirectorShow *show, const gchar *path, GError **erro
             persistent_count++;
     }
     g_key_file_set_integer(file, "Show", "instances", (gint)persistent_count);
+
+    for(guint i = 0; show->ndi_patch_positions &&
+                    i < show->ndi_patch_positions->len; i++) {
+        const DirectorNdiPatchPosition *position =
+            g_ptr_array_index(show->ndi_patch_positions, i);
+        if(!position || !position->key || !*position->key)
+            continue;
+        gchar *group = g_strdup_printf("NDI Patch Position %u", i);
+        g_key_file_set_string(file, group, "key", position->key);
+        g_key_file_set_integer(file, group, "x", position->x);
+        g_key_file_set_integer(file, group, "y", position->y);
+        g_free(group);
+    }
 
     guint persistent_index = 0;
     for(guint i = 0; i < show->instances->len; i++) {
@@ -1386,6 +1695,7 @@ gboolean director_show_save(DirectorShow *show, const gchar *path, GError **erro
         g_key_file_set_string(file, group, "source-host",
                               instance->source_host ? instance->source_host : "");
         g_key_file_set_integer(file, group, "source-port", instance->source_port);
+        key_file_set_input_routes(file, group, instance->input_routes);
         g_key_file_set_string(file, group, "stream-advertise-host",
                               instance->stream_advertise_host ? instance->stream_advertise_host : "");
         g_key_file_set_string(file, group, "control-mode",
@@ -1519,6 +1829,7 @@ gboolean director_show_save(DirectorShow *show, const gchar *path, GError **erro
             g_key_file_set_string(file, group, "source-instance", entry->source_instance_id ? entry->source_instance_id : "");
             g_key_file_set_string(file, group, "source-host", entry->source_host ? entry->source_host : "");
             g_key_file_set_integer(file, group, "source-port", entry->source_port);
+            key_file_set_input_routes(file, group, entry->input_routes);
             g_key_file_set_string(file, group, "control-mode", director_control_mode_name(entry->control_mode));
             g_key_file_set_string(file, group, "master-instance", entry->master_instance_id ? entry->master_instance_id : "");
             g_key_file_set_string(file, group, "master-host", entry->master_host ? entry->master_host : "");
@@ -1661,8 +1972,26 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
     show->active_venue = key_file_get_string_default(file, "Show", "active-venue", "");
     gint venue_count = clamp_int(key_file_get_integer_default(file, "Show", "venue-profiles", 0), 0, 64);
     gint snapshot_count = clamp_int(key_file_get_integer_default(file, "Show", "snapshots", 0), 0, 64);
+    gint ndi_position_count = clamp_int(
+        key_file_get_integer_default(file, "Show", "ndi-patch-positions", 0),
+        0, 512);
     gint count = key_file_get_integer_default(file, "Show", "instances", 0);
     count = clamp_int(count, 0, 128);
+
+    for(gint i = 0; i < ndi_position_count; i++) {
+        gchar *group = g_strdup_printf("NDI Patch Position %d", i);
+        gchar *key = key_file_get_string_default(file, group, "key", "");
+        gint x = clamp_int(key_file_get_integer_default(file, group, "x", 32),
+                           0, 1000000);
+        gint y = clamp_int(key_file_get_integer_default(file, group, "y", 82),
+                           0, 1000000);
+        if(*key) {
+            director_show_set_ndi_patch_position(show, key, x, y);
+            show->dirty = FALSE;
+        }
+        g_free(key);
+        g_free(group);
+    }
 
     for(gint i = 0; i < count; i++) {
         gchar *group = g_strdup_printf("Instance %d", i);
@@ -1813,6 +2142,28 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
         g_free(instance->source_host);
         instance->source_host = key_file_get_string_default(file, group, "source-host", "");
         instance->source_port = clamp_int(key_file_get_integer_default(file, group, "source-port", 3490), 1, 65530);
+        gboolean routes_present = FALSE;
+        GPtrArray *loaded_routes = key_file_get_input_routes(file, group, &routes_present);
+        if(routes_present) {
+            g_ptr_array_free(instance->input_routes, TRUE);
+            instance->input_routes = loaded_routes;
+        } else {
+            g_ptr_array_free(loaded_routes, TRUE);
+            director_instance_clear_input_routes(instance);
+            if(instance->source_instance_id && *instance->source_instance_id) {
+                const DirectorInputRouteType type =
+                    (instance->source_host &&
+                     (g_strcmp0(instance->source_host, "127.0.0.1") == 0 ||
+                      g_ascii_strcasecmp(instance->source_host, "localhost") == 0)) ?
+                    DIRECTOR_INPUT_ROUTE_SHM : DIRECTOR_INPUT_ROUTE_TCP;
+                director_instance_add_input_route(instance, type,
+                    instance->source_instance_id, instance->source_host,
+                    instance->source_port, NULL);
+            }
+            if(instance->ndi_input_enabled && instance->ndi_source_name && *instance->ndi_source_name)
+                director_instance_add_input_route(instance, DIRECTOR_INPUT_ROUTE_NDI,
+                    NULL, NULL, 0, instance->ndi_source_name);
+        }
         g_free(instance->stream_advertise_host);
         instance->stream_advertise_host = key_file_get_string_default(file, group,
                                                                        "stream-advertise-host", "");
@@ -2056,6 +2407,8 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
             entry->source_instance_id = key_file_get_string_default(file, group, "source-instance", "");
             entry->source_host = key_file_get_string_default(file, group, "source-host", "");
             entry->source_port = clamp_int(key_file_get_integer_default(file, group, "source-port", 3490), 1, 65530);
+            gboolean snapshot_routes_present = FALSE;
+            entry->input_routes = key_file_get_input_routes(file, group, &snapshot_routes_present);
             gchar *mode = key_file_get_string_default(file, group, "control-mode", "independent");
             entry->control_mode = director_control_mode_from_string(mode);
             g_free(mode);
@@ -2074,6 +2427,20 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
             entry->ndi_output_name = key_file_get_string_default(file, group, "ndi-output-name", "VeeJay Program");
             entry->ndi_tally_enabled = key_file_get_boolean_default(file, group, "ndi-tally-enabled", TRUE);
             entry->ndi_follow_clock = key_file_get_boolean_default(file, group, "ndi-follow-clock", FALSE);
+            if(!snapshot_routes_present) {
+                if(entry->source_instance_id && *entry->source_instance_id) {
+                    const DirectorInputRouteType route_type =
+                        (entry->source_host &&
+                         (g_strcmp0(entry->source_host, "127.0.0.1") == 0 ||
+                          g_ascii_strcasecmp(entry->source_host, "localhost") == 0)) ?
+                        DIRECTOR_INPUT_ROUTE_SHM : DIRECTOR_INPUT_ROUTE_TCP;
+                    g_ptr_array_add(entry->input_routes, director_input_route_new(route_type,
+                        entry->source_instance_id, entry->source_host, entry->source_port, NULL));
+                }
+                if(entry->ndi_input_enabled && entry->ndi_source_name && *entry->ndi_source_name)
+                    g_ptr_array_add(entry->input_routes, director_input_route_new(DIRECTOR_INPUT_ROUTE_NDI,
+                        NULL, NULL, 0, entry->ndi_source_name));
+            }
             entry->physical = *physical;
             g_free(entry->physical.instance_id);
             entry->physical.instance_id = NULL;
@@ -2205,6 +2572,103 @@ static gboolean director_control_hosts_equivalent(const gchar *a, const gchar *b
     return director_source_host_is_local(a) && director_source_host_is_local(b);
 }
 
+static gboolean director_model_route_reaches(const DirectorShow *show,
+                                               const DirectorInstance *cursor,
+                                               const DirectorInstance *target,
+                                               GHashTable *visited)
+{
+    if(!show || !cursor)
+        return FALSE;
+    if(cursor == target)
+        return TRUE;
+    if(g_hash_table_contains(visited, cursor))
+        return FALSE;
+    g_hash_table_add(visited, (gpointer)cursor);
+
+    gboolean have_native_routes = FALSE;
+    if(cursor->input_routes) {
+        for(guint i = 0; i < cursor->input_routes->len; i++) {
+            const DirectorInputRoute *route = g_ptr_array_index(cursor->input_routes, i);
+            if(!route || route->type == DIRECTOR_INPUT_ROUTE_NDI ||
+               !route->source_instance_id || !*route->source_instance_id)
+                continue;
+            have_native_routes = TRUE;
+            DirectorInstance *next = director_show_find_instance((DirectorShow*)show,
+                                                                  route->source_instance_id);
+            if(director_model_route_reaches(show, next, target, visited))
+                return TRUE;
+        }
+    }
+    if(!have_native_routes && cursor->source_instance_id && *cursor->source_instance_id) {
+        DirectorInstance *next = director_show_find_instance((DirectorShow*)show,
+                                                              cursor->source_instance_id);
+        if(director_model_route_reaches(show, next, target, visited))
+            return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean director_instance_routes_valid(const DirectorShow *show,
+                                                const DirectorInstance *instance,
+                                                GError **error)
+{
+    if(!instance || !instance->input_routes)
+        return TRUE;
+    if(instance->role == DIRECTOR_ROLE_OUTPUT && instance->input_routes->len > 1) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                    "Output instance '%s' can have only one primary input route",
+                    instance->id);
+        return FALSE;
+    }
+
+    for(guint i = 0; i < instance->input_routes->len; i++) {
+        const DirectorInputRoute *route = g_ptr_array_index(instance->input_routes, i);
+        if(!route || route->type < DIRECTOR_INPUT_ROUTE_SHM ||
+           route->type > DIRECTOR_INPUT_ROUTE_NDI) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Instance '%s' contains an invalid input route", instance->id);
+            return FALSE;
+        }
+        if(route->type == DIRECTOR_INPUT_ROUTE_NDI) {
+            if(instance->role == DIRECTOR_ROLE_OUTPUT ||
+               !route->ndi_source_name || !*route->ndi_source_name ||
+               strlen(route->ndi_source_name) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
+                g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                            "Instance '%s' contains an invalid NDI input route", instance->id);
+                return FALSE;
+            }
+            continue;
+        }
+
+        if(!route->source_instance_id || !*route->source_instance_id ||
+           route->port < 1 || route->port > 65530 ||
+           (route->type == DIRECTOR_INPUT_ROUTE_TCP &&
+            (!route->host || !*route->host))) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Instance '%s' contains an incomplete native input route", instance->id);
+            return FALSE;
+        }
+        DirectorInstance *source = director_show_find_instance((DirectorShow*)show,
+                                                                route->source_instance_id);
+        if(!source || source == instance) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Instance '%s' selects a missing or invalid video source '%s'",
+                        instance->id, route->source_instance_id);
+            return FALSE;
+        }
+        GHashTable *visited = g_hash_table_new(g_direct_hash, g_direct_equal);
+        const gboolean cycle = director_model_route_reaches(show, source, instance, visited);
+        g_hash_table_destroy(visited);
+        if(cycle) {
+            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
+                        "Video routing for instance '%s' contains a feedback cycle",
+                        instance->id);
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 gchar **director_instance_build_argv(const DirectorShow *show,
                                      const DirectorInstance *instance,
                                      GError **error)
@@ -2315,12 +2779,6 @@ gchar **director_instance_build_argv(const DirectorShow *show,
                         instance->id, DIRECTOR_NDI_SOURCE_NAME_MAX);
             return NULL;
         }
-        if((instance->source_instance_id && *instance->source_instance_id) ||
-           (instance->source_host && *instance->source_host)) {
-            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
-                        "NDI input cannot be combined with a managed or manual VeeJay video route");
-            return NULL;
-        }
         if(instance->startup_mode == DIRECTOR_STARTUP_MEDIA ||
            instance->capture_device >= 0 || instance->generator_stream >= 0) {
             g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
@@ -2341,6 +2799,9 @@ gchar **director_instance_build_argv(const DirectorShow *show,
                     instance->id, DIRECTOR_NDI_SOURCE_NAME_MAX);
         return NULL;
     }
+
+    if(!director_instance_routes_valid(show, instance, error))
+        return NULL;
 
     const gint effective_output_driver =
         instance->control_mode == DIRECTOR_CONTROL_PREVIEW && instance->preview_headless ?
@@ -2562,37 +3023,35 @@ gchar **director_instance_build_argv(const DirectorShow *show,
         argv_add(argv, "--deinterlace");
     if(!output_role && !instance->legacy_viewport)
         argv_add(argv, "--no-viewport");
-    if(effective_output_driver == 0) {
-        argv_add(argv, instance->fullscreen ? "--fullscreen" : "--windowed");
-        if(instance->borderless)
-            argv_add(argv, "--borderless");
-        if(instance->no_keyboard)
-            argv_add(argv, "--no-keyboard");
-        if(instance->no_mouse)
-            argv_add(argv, "--no-mouse");
-        if(instance->show_cursor)
-            argv_add(argv, "--show-cursor");
-        if(instance->window_width > 0 && instance->window_height > 0) {
-            argv_add(argv, "--window-size");
-            g_ptr_array_add(argv, g_strdup_printf("%dx%d",
-                                                  instance->window_width,
-                                                  instance->window_height));
-        }
-        const gboolean use_display_target = instance->display_index >= 0 &&
-                                               instance->display_width > 0 &&
-                                               instance->display_height > 0;
-        const gint launch_x = use_display_target ?
-                              instance->display_x + 1 : instance->window_x;
-        const gint launch_y = use_display_target ?
-                              instance->display_y + 1 : instance->window_y;
-        if(launch_x >= 0 || use_display_target) {
-            argv_add(argv, "--window-x");
-            argv_add_int(argv, launch_x);
-        }
-        if(launch_y >= 0 || use_display_target) {
-            argv_add(argv, "--window-y");
-            argv_add_int(argv, launch_y);
-        }
+    argv_add(argv, instance->fullscreen ? "--fullscreen" : "--windowed");
+    if(instance->borderless)
+        argv_add(argv, "--borderless");
+    if(instance->no_keyboard)
+        argv_add(argv, "--no-keyboard");
+    if(instance->no_mouse)
+        argv_add(argv, "--no-mouse");
+    if(instance->show_cursor)
+        argv_add(argv, "--show-cursor");
+    if(instance->window_width > 0 && instance->window_height > 0) {
+        argv_add(argv, "--window-size");
+        g_ptr_array_add(argv, g_strdup_printf("%dx%d",
+                                              instance->window_width,
+                                              instance->window_height));
+    }
+    const gboolean use_display_target = instance->display_index >= 0 &&
+                                           instance->display_width > 0 &&
+                                           instance->display_height > 0;
+    const gint launch_x = use_display_target ?
+                          instance->display_x + 1 : instance->window_x;
+    const gint launch_y = use_display_target ?
+                          instance->display_y + 1 : instance->window_y;
+    if(launch_x >= 0 || use_display_target) {
+        argv_add(argv, "--window-x");
+        argv_add_int(argv, launch_x);
+    }
+    if(launch_y >= 0 || use_display_target) {
+        argv_add(argv, "--window-y");
+        argv_add_int(argv, launch_y);
     }
     if(instance->verbose)
         argv_add(argv, "--verbose");
@@ -3197,6 +3656,107 @@ gboolean director_instance_parse_perf_status(DirectorInstance *instance,
     return TRUE;
 }
 
+gboolean director_instance_parse_routing_status(DirectorInstance *instance,
+                                                const gchar *text,
+                                                GError **error)
+{
+    if(!instance) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Missing instance for VJROUTES response");
+        return FALSE;
+    }
+    GHashTable *values = parse_line_key_values(text, "VJROUTES 1", error);
+    if(!values)
+        return FALSE;
+
+    gint count = 0;
+    if(!parse_signed(g_hash_table_lookup(values, "count"), &count) || count < 0 || count > 512) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Incomplete or invalid VJROUTES response");
+        g_hash_table_destroy(values);
+        return FALSE;
+    }
+
+    g_ptr_array_set_size(instance->live_input_routes, 0);
+    for(gint i = 0; i < count; i++) {
+        gchar *key = g_strdup_printf("route.%d.transport", i);
+        const gchar *transport = g_hash_table_lookup(values, key);
+        g_free(key);
+        if(!transport)
+            continue;
+
+        DirectorInputRouteType type = 0;
+        if(g_strcmp0(transport, "shm") == 0)
+            type = DIRECTOR_INPUT_ROUTE_SHM;
+        else if(g_strcmp0(transport, "tcp") == 0)
+            type = DIRECTOR_INPUT_ROUTE_TCP;
+        else if(g_strcmp0(transport, "ndi") == 0)
+            type = DIRECTOR_INPUT_ROUTE_NDI;
+        else
+            continue;
+
+        gchar *host_key = g_strdup_printf("route.%d.host", i);
+        gchar *port_key = g_strdup_printf("route.%d.port", i);
+        gchar *source_key = g_strdup_printf("route.%d.source", i);
+        const gchar *host = g_hash_table_lookup(values, host_key);
+        const gchar *source = g_hash_table_lookup(values, source_key);
+        gint port = 0;
+        parse_signed(g_hash_table_lookup(values, port_key), &port);
+        DirectorInputRoute *route = director_input_route_new(type, NULL,
+            host ? host : "", port, source ? source : "");
+        g_free(host_key);
+        g_free(port_key);
+        g_free(source_key);
+
+        gchar *id_key = g_strdup_printf("route.%d.id", i);
+        gchar *active_key = g_strdup_printf("route.%d.active", i);
+        gchar *current_key = g_strdup_printf("route.%d.current", i);
+        gchar *shm_key = g_strdup_printf("route.%d.key", i);
+        gint value = 0;
+        if(parse_signed(g_hash_table_lookup(values, id_key), &value))
+            route->live_stream_id = value;
+        value = 0;
+        route->live_active = parse_signed(g_hash_table_lookup(values, active_key), &value) && value != 0;
+        value = 0;
+        route->live_current = parse_signed(g_hash_table_lookup(values, current_key), &value) && value != 0;
+        value = 0;
+        if(parse_signed(g_hash_table_lookup(values, shm_key), &value))
+            route->shm_key = value;
+        route->applied_connection = route->live_stream_id > 0 || instance->role == DIRECTOR_ROLE_OUTPUT;
+        g_free(id_key);
+        g_free(active_key);
+        g_free(current_key);
+        g_free(shm_key);
+        g_ptr_array_add(instance->live_input_routes, route);
+    }
+
+#define PARSE_ROUTE_BOOL(name, field) do { gint _v = 0; instance->field = parse_signed(g_hash_table_lookup(values, name), &_v) && _v != 0; } while(0)
+#define PARSE_ROUTE_INT(name, field) do { gint _v = 0; if(parse_signed(g_hash_table_lookup(values, name), &_v)) instance->field = _v; else instance->field = 0; } while(0)
+    PARSE_ROUTE_BOOL("out.shm.enabled", live_route_shm_output_enabled);
+    PARSE_ROUTE_INT("out.shm.key", live_route_shm_output_key);
+    PARSE_ROUTE_BOOL("out.tcp.enabled", live_route_tcp_output_enabled);
+    PARSE_ROUTE_INT("out.tcp.port", live_route_tcp_output_port);
+    PARSE_ROUTE_BOOL("out.ndi.enabled", live_route_ndi_output_enabled);
+    replace_string(&instance->live_route_ndi_output_name,
+                   g_hash_table_lookup(values, "out.ndi.name"));
+    PARSE_ROUTE_BOOL("out.sdl.enabled", live_route_sdl_output_enabled);
+    PARSE_ROUTE_BOOL("out.sdl.initialized", live_route_sdl_output_initialized);
+    PARSE_ROUTE_BOOL("out.sdl.fullscreen", live_route_sdl_output_fullscreen);
+    PARSE_ROUTE_INT("out.sdl.x", live_route_sdl_output_x);
+    PARSE_ROUTE_INT("out.sdl.y", live_route_sdl_output_y);
+    PARSE_ROUTE_INT("out.sdl.width", live_route_sdl_output_width);
+    PARSE_ROUTE_INT("out.sdl.height", live_route_sdl_output_height);
+    PARSE_ROUTE_INT("out.sdl.display", live_route_sdl_display_index);
+    if(!g_hash_table_contains(values, "out.sdl.display"))
+        instance->live_route_sdl_display_index = -1;
+#undef PARSE_ROUTE_BOOL
+#undef PARSE_ROUTE_INT
+
+    replace_string(&instance->last_routing_status, text);
+    g_hash_table_destroy(values);
+    return TRUE;
+}
+
 gboolean director_instance_parse_ndi_status(DirectorInstance *instance,
                                             const gchar *text,
                                             GError **error)
@@ -3232,8 +3792,20 @@ gboolean director_instance_parse_ndi_status(DirectorInstance *instance,
                    g_hash_table_lookup(values, "rx.source"));
     replace_string(&instance->live_ndi_tx_name,
                    g_hash_table_lookup(values, "tx.name"));
+    replace_string(&instance->live_ndi_tx_source,
+                   g_hash_table_lookup(values, "tx.source"));
+    replace_string(&instance->live_ndi_tx_url,
+                   g_hash_table_lookup(values, "tx.url"));
+    replace_string(&instance->live_ndi_tx_instance_id,
+                   g_hash_table_lookup(values, "tx.instance_id"));
+    replace_string(&instance->live_ndi_tx_role,
+                   g_hash_table_lookup(values, "tx.role"));
     instance->live_ndi_rx_enabled = rx_flag != 0;
     instance->live_ndi_tx_enabled = tx_flag != 0;
+    signed_value = 0;
+    instance->live_ndi_tx_owned =
+        parse_signed(g_hash_table_lookup(values, "tx.self"), &signed_value) ?
+        signed_value != 0 : instance->live_ndi_tx_enabled;
 
     instance->live_ndi_rx_connected =
         parse_signed(g_hash_table_lookup(values, "rx.connected"), &signed_value) &&

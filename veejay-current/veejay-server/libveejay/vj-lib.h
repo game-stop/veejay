@@ -804,6 +804,13 @@ typedef struct veejay_t
     char ndi_receive_name[256];
     char ndi_send_name[256];
     void *ndi_sender;
+    int sdl_output_enabled;
+    int sdl_output_initialized;
+    int sdl_output_width;
+    int sdl_output_height;
+    int sdl_output_x;
+    int sdl_output_y;
+    int sdl_output_fullscreen;
     void *input_shm;
     VJFrame *output_input_frame;
     uint8_t *output_input_buffer;
@@ -872,8 +879,13 @@ typedef struct {
 
 
 int veejay_create_ndi_stream(veejay_t *info, const char *source_name);
+int veejay_ndi_set_receiver(veejay_t *info, const char *source_name);
 int veejay_ndi_start_sender(veejay_t *info);
 void veejay_ndi_stop_sender(veejay_t *info);
+int veejay_ndi_set_sender(veejay_t *info, int enabled, const char *name);
+int veejay_sdl_output_set(veejay_t *info, int enabled, int width, int height, int x, int y);
+void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
+void veejay_output_unlock_pre_projection_preview_frame(void *token);
 char *veejay_ndi_status(veejay_t *info);
 
 #endif

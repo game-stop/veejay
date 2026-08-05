@@ -141,6 +141,25 @@ typedef struct {
     gint64 updated_real_us;
 } DirectorProjectorCameraMap;
 
+typedef enum {
+    DIRECTOR_INPUT_ROUTE_SHM = 1,
+    DIRECTOR_INPUT_ROUTE_TCP = 2,
+    DIRECTOR_INPUT_ROUTE_NDI = 3
+} DirectorInputRouteType;
+
+typedef struct {
+    DirectorInputRouteType type;
+    gchar *source_instance_id;
+    gchar *host;
+    gint port;
+    gint shm_key;
+    gchar *ndi_source_name;
+    gboolean applied_connection;
+    gint live_stream_id;
+    gboolean live_active;
+    gboolean live_current;
+} DirectorInputRoute;
+
 typedef struct {
     gchar *name;
     GPtrArray *outputs;
@@ -159,6 +178,7 @@ typedef struct {
     gchar *source_instance_id;
     gchar *source_host;
     gint source_port;
+    GPtrArray *input_routes;
     DirectorControlMode control_mode;
     gchar *master_instance_id;
     gchar *master_host;
@@ -254,6 +274,8 @@ typedef struct {
     gchar *source_instance_id;
     gchar *source_host;
     gint source_port;
+    GPtrArray *input_routes;
+    GPtrArray *live_input_routes;
     gchar *stream_advertise_host;
     DirectorControlMode control_mode;
     gchar *master_instance_id;
@@ -315,9 +337,23 @@ typedef struct {
     gchar *live_ndi_runtime;
     gchar *live_ndi_source;
     gchar *live_ndi_tx_name;
+    gchar *live_ndi_tx_source;
+    gchar *live_ndi_tx_url;
+    gchar *live_ndi_tx_instance_id;
+    gchar *live_ndi_tx_role;
     gboolean live_ndi_rx_enabled;
     gboolean live_ndi_rx_connected;
     gboolean live_ndi_tx_enabled;
+    gboolean live_ndi_tx_owned;
+    gboolean ndi_input_change_pending;
+    gboolean ndi_input_pending_enabled;
+    gchar *ndi_input_pending_name;
+    gchar *ndi_input_pending_native_source_id;
+    gchar *ndi_input_pending_native_host;
+    gint ndi_input_pending_native_port;
+    gboolean ndi_output_change_pending;
+    gboolean ndi_output_pending_enabled;
+    gchar *ndi_output_pending_name;
     gint live_ndi_tx_connections;
     guint64 live_ndi_rx_video_frames;
     guint64 live_ndi_rx_audio_frames;
@@ -329,6 +365,21 @@ typedef struct {
     gboolean live_ndi_clock_available;
     gint live_ndi_clock_age_ms;
     gdouble live_ndi_clock_drift_ms;
+
+    gboolean live_route_shm_output_enabled;
+    gint live_route_shm_output_key;
+    gboolean live_route_tcp_output_enabled;
+    gint live_route_tcp_output_port;
+    gboolean live_route_ndi_output_enabled;
+    gchar *live_route_ndi_output_name;
+    gboolean live_route_sdl_output_enabled;
+    gboolean live_route_sdl_output_initialized;
+    gboolean live_route_sdl_output_fullscreen;
+    gint live_route_sdl_output_x;
+    gint live_route_sdl_output_y;
+    gint live_route_sdl_output_width;
+    gint live_route_sdl_output_height;
+    gint live_route_sdl_display_index;
 
     gint graph_width;
     gint graph_height;
@@ -377,6 +428,7 @@ typedef struct {
     gchar *last_projection_status;
     gchar *last_perf_status;
     gchar *last_ndi_status;
+    gchar *last_routing_status;
 
     GSubprocess *process;
     guint force_stop_timer;
@@ -423,6 +475,7 @@ typedef struct {
     gchar *active_venue;
     GPtrArray *venue_profiles;
     GPtrArray *snapshots;
+    GPtrArray *ndi_patch_positions;
     GPtrArray *instances;
 } DirectorShow;
 
@@ -473,6 +526,13 @@ gboolean director_projector_camera_map_lookup(const DirectorProjectorCameraMap *
 DirectorVenueProfile *director_show_capture_venue(DirectorShow *show, const gchar *name);
 guint director_show_apply_venue(DirectorShow *show, const DirectorVenueProfile *profile);
 gboolean director_show_remove_venue(DirectorShow *show, const gchar *name);
+gboolean director_show_get_ndi_patch_position(const DirectorShow *show,
+                                               const gchar *key,
+                                               gint *x, gint *y);
+void director_show_set_ndi_patch_position(DirectorShow *show,
+                                          const gchar *key,
+                                          gint x, gint y);
+void director_show_clear_ndi_patch_positions(DirectorShow *show);
 DirectorShowSnapshot *director_show_find_snapshot(DirectorShow *show, const gchar *name);
 DirectorShowSnapshot *director_show_capture_snapshot(DirectorShow *show, const gchar *name);
 guint director_show_apply_snapshot_model(DirectorShow *show, const DirectorShowSnapshot *snapshot);
@@ -502,10 +562,41 @@ gboolean director_instance_parse_perf_status(DirectorInstance *instance,
 gboolean director_instance_parse_ndi_status(DirectorInstance *instance,
                                             const gchar *text,
                                             GError **error);
+gboolean director_instance_parse_routing_status(DirectorInstance *instance,
+                                                const gchar *text,
+                                                GError **error);
 DirectorStageMetric *director_instance_find_stage(DirectorInstance *instance,
                                                   const gchar *name);
 
 gchar *director_slice_to_vims(gint index, const DirectorSlice *slice);
+
+
+DirectorInputRoute *director_input_route_new(DirectorInputRouteType type,
+                                              const gchar *source_instance_id,
+                                              const gchar *host,
+                                              gint port,
+                                              const gchar *ndi_source_name);
+DirectorInputRoute *director_input_route_copy(const DirectorInputRoute *route);
+void director_input_route_free(DirectorInputRoute *route);
+DirectorInputRoute *director_instance_find_input_route(const DirectorInstance *instance,
+                                                        DirectorInputRouteType type,
+                                                        const gchar *source_instance_id,
+                                                        const gchar *host,
+                                                        gint port,
+                                                        const gchar *ndi_source_name);
+gboolean director_instance_add_input_route(DirectorInstance *instance,
+                                            DirectorInputRouteType type,
+                                            const gchar *source_instance_id,
+                                            const gchar *host,
+                                            gint port,
+                                            const gchar *ndi_source_name);
+gboolean director_instance_remove_input_route(DirectorInstance *instance,
+                                               DirectorInputRouteType type,
+                                               const gchar *source_instance_id,
+                                               const gchar *host,
+                                               gint port,
+                                               const gchar *ndi_source_name);
+void director_instance_clear_input_routes(DirectorInstance *instance);
 
 G_END_DECLS
 

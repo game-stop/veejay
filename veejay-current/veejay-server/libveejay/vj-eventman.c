@@ -33,6 +33,8 @@
 #include <veejaycore/vjmem.h>
 
 #define MAX_INDEX 1024
+
+
 #define VIMS_DEFAULT_ARG_MAX 16
 
 #define VIMS_REQUIRE_ALL_PARAMS (1<<0)			/* all params needed */
@@ -4051,6 +4053,78 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 vj_event_ndi_status,
                 0,
                 VIMS_ALLOW_ANY,
+                NULL );
+
+    index_map_[ VIMS_NDI_INPUT_SET ] = _new_event(
+                "%s",
+                VIMS_NDI_INPUT_SET,
+                "Switch NDI input at runtime; use '-' to disconnect",
+                vj_event_ndi_input_set,
+                1,
+                VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+                "NDI source name or '-'",
+                NULL,
+                NULL );
+
+    index_map_[ VIMS_NDI_OUTPUT_SET ] = _new_event(
+                "%d %s",
+                VIMS_NDI_OUTPUT_SET,
+                "Enable, rename, or disable NDI output at runtime",
+                vj_event_ndi_output_set,
+                2,
+                VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+                "Enabled",
+                0,
+                "NDI sender name or '-'",
+                NULL,
+                NULL );
+
+    index_map_[ VIMS_INPUT_ROUTE_REMOVE ] = _new_event(
+                "%d %d %s",
+                VIMS_INPUT_ROUTE_REMOVE,
+                "Remove an input route (0=exact stream id, 1=SHM, 2=TCP, 3=NDI)",
+                vj_event_input_route_remove,
+                3,
+                VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+                "Transport",
+                0,
+                "Key or port",
+                0,
+                "Host, NDI source, or '-'",
+                NULL,
+                NULL );
+
+    index_map_[ VIMS_ROUTING_STATUS ] = _new_event(
+                NULL,
+                VIMS_ROUTING_STATUS,
+                "Get live input routes and independent output sink state",
+                vj_event_routing_status,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
+
+    index_map_[ VIMS_SDL_IDENTIFY ] = _new_event(
+                "%d",
+                VIMS_SDL_IDENTIFY,
+                "Show a local physical-display identify overlay on SDL output (0=off, -1=SDL number, >0=explicit number)",
+                vj_event_sdl_identify,
+                1,
+                VIMS_REQUIRE_ALL_PARAMS,
+                "Display number",
+                0,
+                NULL );
+
+    index_map_[ VIMS_SDL_DISPLAY_SET ] = _new_event(
+                "%d %d",
+                VIMS_SDL_DISPLAY_SET,
+                "Set the physical SDL display target by desktop coordinate (-1 -1=automatic)",
+                vj_event_sdl_display_set,
+                2,
+                VIMS_REQUIRE_ALL_PARAMS,
+                "Desktop X",
+                -1,
+                "Desktop Y",
+                -1,
                 NULL );
 
 	index_map_[ VIMS_FRONTBACK ]				=	_new_event(

@@ -135,6 +135,7 @@ static struct {
     { pressurewave_init, pressurewave_malloc,pressurewave_free, NULL,NULL, pressurewave_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_PRESSUREWAVE},
     { tessaractslide_init, tessaractslide_malloc,tessaractslide_free, NULL,NULL, tessaractslide_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_TESSARACT},
     { bowshock_init, bowshock_malloc,bowshock_free, NULL,NULL, bowshock_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BOWSHOCK},
+    { darkmatter_init, darkmatter_malloc,darkmatter_free,NULL,NULL,darkmatter_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DARKMATTER },
     { eventhorizon_init, eventhorizon_malloc,eventhorizon_free, NULL,NULL, eventhorizon_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_EVENTHORIZON },
     { edgefoldtide_init, edgefoldtide_malloc,edgefoldtide_free, NULL,NULL, edgefoldtide_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_EDGEFOLDTIDE },
     { hyperfold_init, hyperfold_malloc,hyperfold_free, NULL,NULL, hyperfold_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_HYPERFOLD },
