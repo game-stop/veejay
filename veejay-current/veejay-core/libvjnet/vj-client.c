@@ -34,7 +34,7 @@
 #include <libavcodec/avcodec.h>
 #include <veejaycore/defs.h>
 #include <libvjnet/vj-client.h>
-#include <veejaycore/avhelper.h>
+
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include <libvjnet/cmd.h>
@@ -43,6 +43,7 @@
 #include <libavutil/pixfmt.h>
 #include <pthread.h>
 #include <veejaycore/avcommon.h>
+#include <veejaycore/avhelper.h>
 #define VJC_OK 0
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2

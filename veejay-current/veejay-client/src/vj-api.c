@@ -196,22 +196,6 @@ static int faster_ui_ = 0;
 static GtkWidget *widget_cache[MAX_WIDGET_CACHE];
 
 
-int	avhelper_decode_video_buffer( void *ptr, uint8_t *data, int len )  {
-	return -1;
-}
-void	*avhelper_get_mjpeg_decoder(VJFrame *output) {
-	return NULL;
-}
-
-int	avhelper_decode_video( void *ptr, uint8_t *data, int len) {
-	return -1;
-}
-void	avhelper_close_decoder( void *ptr ) {
-}
-int	avhelper_rescale_video(void *ptr, uint8_t *dst[4]) {
-	return -1;
-}
-
 enum {
   WIDGET_IMAGEA = 0,
   WIDGET_NOTEBOOK18 = 1,

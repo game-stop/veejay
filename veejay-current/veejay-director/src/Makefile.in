@@ -119,7 +119,8 @@ am_veejay_director_OBJECTS =  \
 veejay_director_OBJECTS = $(am_veejay_director_OBJECTS)
 am__DEPENDENCIES_1 =
 veejay_director_DEPENDENCIES = $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
@@ -426,6 +427,7 @@ veejay_director_LDFLAGS = \
 veejay_director_LDADD = \
     $(GTK_LIBS) \
     $(LIBM_LIBS) \
+    $(VEEJAYCORE_LIBS) \
     -lgthread-2.0 \
     $(NDI_LIBS)
 

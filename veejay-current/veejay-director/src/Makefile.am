@@ -39,6 +39,7 @@ veejay_director_LDFLAGS = \
 veejay_director_LDADD = \
     $(GTK_LIBS) \
     $(LIBM_LIBS) \
+    $(VEEJAYCORE_LIBS) \
     -lgthread-2.0 \
     $(NDI_LIBS)
 
