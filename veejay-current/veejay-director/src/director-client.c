@@ -213,7 +213,7 @@ static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
         return FALSE;
 
     gchar response[DIRECTOR_RESPONSE_MAX];
-    if(!director_wire_query_timed(wire, "288:;", response, sizeof(response),
+    if(!director_wire_query_timed(wire, "488:;", response, sizeof(response),
                                   DIRECTOR_RESPONSE_TIMEOUT_MS,
                                   DIRECTOR_RESPONSE_IDLE_MS, NULL)) {
         director_wire_close(wire);
@@ -294,13 +294,13 @@ static gboolean director_query_framed(DirectorClient *client,
 static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
 {
     gdouble instance_ms = 0.0, routing_ms = 0.0, output_ms = 0.0, perf_ms = 0.0, ndi_ms = 0.0;
-    if(!director_query(client, wire, "288:;", DIRECTOR_CLIENT_INSTANCE_STATUS,
+    if(!director_query(client, wire, "488:;", DIRECTOR_CLIENT_INSTANCE_STATUS,
                        &instance_ms))
         return FALSE;
-    if(!director_query(client, wire, "294:;", DIRECTOR_CLIENT_ROUTING_STATUS,
+    if(!director_query(client, wire, "494:;", DIRECTOR_CLIENT_ROUTING_STATUS,
                        &routing_ms))
         return FALSE;
-    if(!director_query(client, wire, "284:;", DIRECTOR_CLIENT_OUTPUT_STATUS,
+    if(!director_query(client, wire, "484:;", DIRECTOR_CLIENT_OUTPUT_STATUS,
                        &output_ms))
         return FALSE;
     if((client->instance->role == DIRECTOR_ROLE_OUTPUT ||
@@ -308,10 +308,10 @@ static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
        !director_query_framed(client, wire, "007:;",
                               DIRECTOR_CLIENT_PROJECTION_STATUS, 8))
         return FALSE;
-    if(!director_query(client, wire, "282:;", DIRECTOR_CLIENT_PERF_STATUS,
+    if(!director_query(client, wire, "482:;", DIRECTOR_CLIENT_PERF_STATUS,
                        &perf_ms))
         return FALSE;
-    if(!director_query(client, wire, "290:;", DIRECTOR_CLIENT_NDI_STATUS,
+    if(!director_query(client, wire, "490:;", DIRECTOR_CLIENT_NDI_STATUS,
                        &ndi_ms))
         return FALSE;
     client->instance->live_latency_ms =

@@ -4703,7 +4703,7 @@ static gboolean on_perf_canvas_draw(GtkWidget *widget, cairo_t *cr, gpointer dat
         director_cairo_label_rgb(cr, 28, 48, 16, 0.76, 0.79, 0.84,
                                  "No telemetry received from the selected instance");
         director_cairo_label_rgb(cr, 28, 76, 12, 0.50, 0.54, 0.61,
-                                 "Start or connect the backend and verify VIMS 282 telemetry.");
+                                 "Start or connect the backend and verify VIMS 482 telemetry.");
         return FALSE;
     }
 
@@ -11825,8 +11825,8 @@ static gboolean director_probe_instance_identity(const DirectorInstance *instanc
         return FALSE;
 
     gchar response[1024];
-    const gboolean queried = director_wire_query(&wire, "288:;", response,
-                                                  sizeof(response), 300, 40);
+    const gboolean queried = director_wire_query(&wire, "488:;", response, 
+                                                  sizeof(response), 300, 40); // VIMS_INSTANCE_STATUS
     director_wire_close(&wire);
     if(!queried)
         return FALSE;
