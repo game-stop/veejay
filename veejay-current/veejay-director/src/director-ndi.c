@@ -286,10 +286,13 @@ static gboolean director_ndi_source_same(const DirectorNdiSource *a,
 
 static guint64 director_ndi_signature_bytes(guint64 hash, const gchar *text)
 {
-    const guchar *p = (const guchar *)(text ? text : "");
-    while(*p) {
-        hash ^= (guint64)*p++;
-        hash *= G_GUINT64_CONSTANT(1099511628211);
+    if(text) {
+        const guchar *p = (const guchar *)text;
+        while(*p) {
+            hash ^= (guint64)*p;
+            p++;
+            hash *= G_GUINT64_CONSTANT(1099511628211);
+        }
     }
     hash ^= G_GUINT64_CONSTANT(0xff);
     hash *= G_GUINT64_CONSTANT(1099511628211);

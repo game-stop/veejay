@@ -10146,9 +10146,12 @@ void *veejay_audio_producer_thread(void *arg)
 					long sleep_us = 100;
                     int retries = 0;
 
-					while (decoded <= 0 &&
-                           atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP &&
-                           retries++ < 8) {
+					while (decoded <= 0) {
+                        if(atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+                            break;
+                        if(retries >= 8)
+                            break;
+                        retries++;
 						usleep_accurate(sleep_us, settings);
 						decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);
 						sleep_us = sleep_us < 2000 ? sleep_us * 2 : 2000;

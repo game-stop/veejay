@@ -4861,10 +4861,11 @@ static void tooltip_custom_parent_active_changed(GObject *object,
 
     (void)pspec;
 
-    if(GTK_IS_WINDOW(parent) &&
-       GTK_IS_WINDOW(tooltip_window) &&
-       !gtk_window_is_active(parent))
-    {
+    if(!GTK_IS_WINDOW(parent))
+        return;
+    if(!GTK_IS_WINDOW(tooltip_window))
+        return;
+    if(!gtk_window_is_active(parent)) {
         tooltip_custom_cancel_hide(tooltip_window);
         gtk_widget_hide(GTK_WIDGET(tooltip_window));
     }
@@ -4886,7 +4887,9 @@ static void tooltip_custom_parent_unmapped(GtkWidget *widget,
 static void tooltip_custom_bind_parent(GtkWindow *tooltip_window,
                                        GtkWindow *parent)
 {
-    if(!GTK_IS_WINDOW(tooltip_window) || !GTK_IS_WINDOW(parent))
+    if(!GTK_IS_WINDOW(tooltip_window))
+        return;
+    if(!GTK_IS_WINDOW(parent))
         return;
 
     gtk_window_set_transient_for(tooltip_window, parent);
@@ -4937,7 +4940,9 @@ static void tooltip_custom_show_now(GtkWidget *widget,
     const gint widget_gap = 6;
     const gint x_inset = 8;
 
-    if(!GTK_IS_WIDGET(widget) || !GTK_IS_WINDOW(window))
+    if(!GTK_IS_WIDGET(widget))
+        return;
+    if(!GTK_IS_WINDOW(window))
         return;
 
     toplevel = gtk_widget_get_toplevel(widget);
@@ -5249,7 +5254,9 @@ static void tooltip_schedule_rearm(GtkWidget *root,
 {
     ReloadedTooltipRearm *rearm;
 
-    if(!GTK_IS_WIDGET(root) || !GTK_IS_WINDOW(tooltip_window))
+    if(!GTK_IS_WIDGET(root))
+        return;
+    if(!GTK_IS_WINDOW(tooltip_window))
         return;
 
     rearm = g_new0(ReloadedTooltipRearm, 1);
@@ -9631,8 +9638,10 @@ static void vj_kf_select_parameter(int num)
     if(!ui)
         return;
 
-    if(ui->curve && GTK3_IS_CURVE(ui->curve))
-        curve_live_preview_user_override(FALSE);
+    if(ui->curve) {
+        if(GTK3_IS_CURVE(ui->curve))
+            curve_live_preview_user_override(FALSE);
+    }
 
     curve_editor_clear_local_dirty();
     ui->uc.selected_parameter_id = num;
@@ -22602,7 +22611,9 @@ static gboolean ui_window_force_compact_windowed_on_map(GtkWidget *widget,
 
 static void ui_window_prepare_compact_windowed_state(GtkWidget *mainw)
 {
-    if(!smallest_possible || !GTK_IS_WINDOW(mainw))
+    if(!smallest_possible)
+        return;
+    if(!GTK_IS_WINDOW(mainw))
         return;
     if(g_object_get_data(G_OBJECT(mainw), UI_COMPACT_WINDOW_STATE_KEY))
         return;

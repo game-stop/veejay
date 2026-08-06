@@ -371,7 +371,11 @@ static void vj_ndi_payload_append_escaped(char **cursor, size_t *remaining,
 {
     if(!cursor || !*cursor || !remaining || *remaining == 0)
         return;
-    for(const unsigned char *p = (const unsigned char*)(text ? text : "");
+    if(!text) {
+        **cursor = '\0';
+        return;
+    }
+    for(const unsigned char *p = (const unsigned char*)text;
         *p && *remaining > 1; p++) {
         char c = (char)*p;
         if(c == '\t' || c == '\n' || c == '\r' || c == '\\') {
@@ -896,10 +900,13 @@ static void *vj_ndi_video_thread(void *data)
         } else if(type == NDIlib_frame_type_status_change) {
             vj_ndi_receiver_update_connection(receiver,
                 vj_ndi_receiver_connection_count(receiver) > 0);
-        } else if(type == NDIlib_frame_type_none && ++timeout_count >= 10) {
-            timeout_count = 0;
-            vj_ndi_receiver_update_connection(receiver,
-                vj_ndi_receiver_connection_count(receiver) > 0);
+        } else if(type == NDIlib_frame_type_none) {
+            timeout_count++;
+            if(timeout_count >= 10) {
+                timeout_count = 0;
+                vj_ndi_receiver_update_connection(receiver,
+                    vj_ndi_receiver_connection_count(receiver) > 0);
+            }
         }
     }
     return NULL;
@@ -928,10 +935,13 @@ static void *vj_ndi_audio_thread(void *data)
         } else if(type == NDIlib_frame_type_status_change) {
             vj_ndi_receiver_update_connection(receiver,
                 vj_ndi_receiver_connection_count(receiver) > 0);
-        } else if(type == NDIlib_frame_type_none && ++timeout_count >= 10) {
-            timeout_count = 0;
-            vj_ndi_receiver_update_connection(receiver,
-                vj_ndi_receiver_connection_count(receiver) > 0);
+        } else if(type == NDIlib_frame_type_none) {
+            timeout_count++;
+            if(timeout_count >= 10) {
+                timeout_count = 0;
+                vj_ndi_receiver_update_connection(receiver,
+                    vj_ndi_receiver_connection_count(receiver) > 0);
+            }
         }
     }
     return NULL;

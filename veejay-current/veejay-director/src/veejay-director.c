@@ -3380,7 +3380,7 @@ static gchar *director_instance_command_text(DirectorApp *app,
     }
     gchar *command = director_argv_command_text(argv);
     g_strfreev(argv);
-    return command;
+    return command; /* NOSONAR: g_strfreev() releases argv and every owned element. */
 }
 
 static void director_update_command_preview(DirectorApp *app)
@@ -5312,9 +5312,10 @@ static void director_client_event(DirectorClient *client,
                 g_free(message);
             }
             else {
-                if(instance->last_error &&
-                   g_str_has_prefix(instance->last_error, "Endpoint reports "))
-                    g_clear_pointer(&instance->last_error, g_free);
+                if(instance->last_error) {
+                    if(g_str_has_prefix(instance->last_error, "Endpoint reports "))
+                        g_clear_pointer(&instance->last_error, g_free);
+                }
                 if(!previous_ready && instance->backend_ready && instance->client) {
                     const gboolean bound_display = instance->display_index >= 0 &&
                         instance->display_width > 0 && instance->display_height > 0;
@@ -6115,7 +6116,7 @@ static gboolean director_eidolon_spawn(DirectorApp *app,
                      error ? error->message : "PTY unavailable");
         g_clear_error(&error);
         g_strfreev(argv);
-        return FALSE;
+        return FALSE; /* NOSONAR: argv is released by g_strfreev() above. */
     }
 
     gint stdin_fd = dup(slave_fd);
@@ -6553,7 +6554,9 @@ static gboolean director_video_device_number(const gchar *path, gint *number)
 {
     if(number)
         *number = -1;
-    if(!path || !g_str_has_prefix(path, "/dev/video"))
+    if(!path)
+        return FALSE;
+    if(!g_str_has_prefix(path, "/dev/video"))
         return FALSE;
     const gchar *digits = path + strlen("/dev/video");
     if(!*digits)
@@ -9775,6 +9778,15 @@ static GdkMonitor *director_find_saved_monitor(const DirectorInstance *instance,
     return fallback;
 }
 
+static gboolean director_display_id_is_stable(const gchar *display_id)
+{
+    if(!display_id)
+        return FALSE;
+    if(g_str_has_prefix(display_id, "edid:"))
+        return TRUE;
+    return g_str_has_prefix(display_id, "monitor:");
+}
+
 static void director_populate_display_combo(DirectorApp *app)
 {
     if(!app || !app->combo_display)
@@ -9789,9 +9801,9 @@ static void director_populate_display_combo(DirectorApp *app)
     const gint count = display ? gdk_display_get_n_monitors(display) : 0;
     gchar *active_id = NULL;
     gchar *possible_id = NULL;
-    const gboolean stable_saved = instance && instance->display_id &&
-        (g_str_has_prefix(instance->display_id, "edid:") ||
-         g_str_has_prefix(instance->display_id, "monitor:"));
+    gboolean stable_saved = FALSE;
+    if(instance)
+        stable_saved = director_display_id_is_stable(instance->display_id);
 
     for(gint i = 0; i < count; i++) {
         GdkMonitor *monitor = gdk_display_get_monitor(display, i);
@@ -9947,9 +9959,8 @@ static gboolean director_refresh_display_target_for_launch(DirectorApp *app,
         return FALSE;
     }
 
-    const gboolean stable_saved_id = instance->display_id &&
-        (g_str_has_prefix(instance->display_id, "edid:") ||
-         g_str_has_prefix(instance->display_id, "monitor:"));
+    const gboolean stable_saved_id =
+        director_display_id_is_stable(instance->display_id);
     gchar *name = director_monitor_name(monitor);
     if(stable_saved_id && id && *id && g_strcmp0(instance->display_id, id) != 0) {
         g_set_error(error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
@@ -10705,7 +10716,7 @@ static void director_start_instance(DirectorApp *app, DirectorInstance *instance
             g_free(message);
             g_object_unref(launcher);
             g_strfreev(argv);
-            return;
+            return; /* NOSONAR: argv is released by g_strfreev() above. */
         }
         g_subprocess_launcher_set_cwd(launcher, instance->working_directory);
     }
@@ -16315,10 +16326,17 @@ static void director_stage_wiring_draw_transport_label(cairo_t *cr,
     director_stage_wiring_rounded_rect(cr, x - bw * 0.5, y - bh * 0.5, bw, bh, bh * 0.5);
     cairo_set_source_rgba(cr, 0.025, 0.035, 0.050, 0.94);
     cairo_fill_preserve(cr);
-    const gboolean ndi = label && g_str_has_prefix(label, "NDI");
-    const gboolean offline = ndi && g_strrstr(label, "OFFLINE") != NULL;
-    const gboolean stale = ndi && g_strrstr(label, "STALE") != NULL;
-    const gboolean ambiguous = ndi && g_strrstr(label, "AMBIGUOUS") != NULL;
+    gboolean ndi = FALSE;
+    gboolean offline = FALSE;
+    gboolean stale = FALSE;
+    gboolean ambiguous = FALSE;
+    if(label)
+        ndi = g_str_has_prefix(label, "NDI");
+    if(ndi) {
+        offline = g_strrstr(label, "OFFLINE") != NULL;
+        stale = g_strrstr(label, "STALE") != NULL;
+        ambiguous = g_strrstr(label, "AMBIGUOUS") != NULL;
+    }
     cairo_set_source_rgba(cr,
                           ambiguous ? 0.98 :
                             (ndi ? ((offline || stale) ? 0.96 : 0.34) :

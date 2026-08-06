@@ -3299,7 +3299,12 @@ static GHashTable *parse_line_key_values(const gchar *text,
 static GHashTable *parse_key_values(const gchar *text, const gchar *prefix,
                                     GError **error)
 {
-    if(!text || !g_str_has_prefix(text, prefix)) {
+    if(!text) {
+        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
+                    "Expected response prefix '%s'", prefix);
+        return NULL;
+    }
+    if(!g_str_has_prefix(text, prefix)) {
         g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_PARSE,
                     "Expected response prefix '%s'", prefix);
         return NULL;
