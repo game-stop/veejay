@@ -15855,7 +15855,11 @@ static void vj_event_routing_status_value(char *dst, size_t dst_size, const char
     size_t out = 0;
     if(!dst || dst_size == 0)
         return;
-    for(const unsigned char *p = (const unsigned char*)(src ? src : ""); *p && out + 1 < dst_size; p++) {
+    if(!src) {
+        dst[0] = '\0';
+        return;
+    }
+    for(const unsigned char *p = (const unsigned char*)src; *p && out + 1 < dst_size; p++) {
         unsigned char c = *p;
         if(c == '\n' || c == '\r' || c == '\t')
             c = ' ';

@@ -322,20 +322,18 @@ static void veejay_ndi_sender_release(vj_ndi_sender *sender)
     pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
 }
 
-static void veejay_ndi_sender_begin_write(void)
+static void veejay_ndi_sender_wait_for_readers_locked(void)
 {
-    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
     veejay_ndi_sender_gate.writer = 1;
     while(veejay_ndi_sender_gate.users > 0)
         pthread_cond_wait(&veejay_ndi_sender_gate.cond,
                           &veejay_ndi_sender_gate.mutex);
 }
 
-static void veejay_ndi_sender_end_write(void)
+static void veejay_ndi_sender_finish_write_locked(void)
 {
     veejay_ndi_sender_gate.writer = 0;
     pthread_cond_broadcast(&veejay_ndi_sender_gate.cond);
-    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
 }
 static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped);
 static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped);
@@ -6442,9 +6440,13 @@ static void veejay_ndi_xml_escape(char *dst, size_t dst_size, const char *src)
 {
     if(!dst || dst_size == 0)
         return;
+    if(!src) {
+        dst[0] = '\0';
+        return;
+    }
 
     size_t out = 0;
-    for(const unsigned char *p = (const unsigned char*)(src ? src : "");
+    for(const unsigned char *p = (const unsigned char*)src;
         *p && out + 1 < dst_size; p++) {
         const char *entity = NULL;
         switch(*p) {
@@ -6504,13 +6506,15 @@ int veejay_ndi_start_sender(veejay_t *info)
 {
     if(!info || !info->ndi_send_enabled)
         return 1;
-    veejay_ndi_sender_begin_write();
+    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+    veejay_ndi_sender_wait_for_readers_locked();
     if(!info->ndi_sender) {
         const char *name = info->ndi_send_name[0] ? info->ndi_send_name : info->instance_id;
         info->ndi_sender = veejay_ndi_create_sender(info, name);
     }
     const int result = info->ndi_sender != NULL;
-    veejay_ndi_sender_end_write();
+    veejay_ndi_sender_finish_write_locked();
+    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
     return result;
 }
 
@@ -6518,10 +6522,12 @@ void veejay_ndi_stop_sender(veejay_t *info)
 {
     if(!info)
         return;
-    veejay_ndi_sender_begin_write();
+    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+    veejay_ndi_sender_wait_for_readers_locked();
     vj_ndi_sender *sender = (vj_ndi_sender*)info->ndi_sender;
     info->ndi_sender = NULL;
-    veejay_ndi_sender_end_write();
+    veejay_ndi_sender_finish_write_locked();
+    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
     if(sender)
         vj_ndi_sender_destroy(sender);
 }
@@ -6531,13 +6537,15 @@ int veejay_ndi_set_sender(veejay_t *info, int enabled, const char *name)
     if(!info)
         return 0;
     if(!enabled) {
-        veejay_ndi_sender_begin_write();
+        pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+        veejay_ndi_sender_wait_for_readers_locked();
         vj_ndi_sender *old = (vj_ndi_sender*)info->ndi_sender;
         info->ndi_sender = NULL;
         info->ndi_send_enabled = 0;
         if(name && *name && strcmp(name, "-") != 0)
             snprintf(info->ndi_send_name, sizeof(info->ndi_send_name), "%s", name);
-        veejay_ndi_sender_end_write();
+        veejay_ndi_sender_finish_write_locked();
+        pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
         if(old)
             vj_ndi_sender_destroy(old);
         return 1;
@@ -6562,12 +6570,14 @@ int veejay_ndi_set_sender(veejay_t *info, int enabled, const char *name)
     if(!replacement)
         return 0;
 
-    veejay_ndi_sender_begin_write();
+    pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
+    veejay_ndi_sender_wait_for_readers_locked();
     vj_ndi_sender *old = (vj_ndi_sender*)info->ndi_sender;
     info->ndi_sender = replacement;
     info->ndi_send_enabled = 1;
     snprintf(info->ndi_send_name, sizeof(info->ndi_send_name), "%s", requested);
-    veejay_ndi_sender_end_write();
+    veejay_ndi_sender_finish_write_locked();
+    pthread_mutex_unlock(&veejay_ndi_sender_gate.mutex);
     if(old)
         vj_ndi_sender_destroy(old);
     return 1;
@@ -6642,8 +6652,12 @@ static void veejay_ndi_status_value(char *dst, size_t dst_size, const char *src)
 {
     if(!dst || dst_size == 0)
         return;
+    if(!src) {
+        dst[0] = '\0';
+        return;
+    }
     size_t out = 0;
-    for(const unsigned char *p = (const unsigned char*)(src ? src : "");
+    for(const unsigned char *p = (const unsigned char*)src;
         *p && out + 1 < dst_size; p++) {
         unsigned char c = *p;
         if(c == '\n' || c == '\r' || c == '\t' || c < 32)
@@ -6939,9 +6953,41 @@ typedef struct {
     int projection_preview_valid;
     pthread_mutex_t projection_preview_mutex;
     int projection_preview_mutex_initialized;
+    int projection_preview_users;
 } veejay_output_source_state;
 
 static pthread_mutex_t veejay_output_preview_gate = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t veejay_output_preview_cond = PTHREAD_COND_INITIALIZER;
+
+static veejay_output_source_state *veejay_output_preview_state_acquire(veejay_t *info)
+{
+    if(!info)
+        return NULL;
+
+    pthread_mutex_lock(&veejay_output_preview_gate);
+    veejay_output_source_state *state =
+        (veejay_output_source_state*)info->output_input_buffer;
+    if(state && state->projection_source_frame &&
+       state->projection_preview_mutex_initialized)
+        state->projection_preview_users++;
+    else
+        state = NULL;
+    pthread_mutex_unlock(&veejay_output_preview_gate);
+    return state;
+}
+
+static void veejay_output_preview_state_release(veejay_output_source_state *state)
+{
+    if(!state)
+        return;
+
+    pthread_mutex_lock(&veejay_output_preview_gate);
+    if(state->projection_preview_users > 0)
+        state->projection_preview_users--;
+    if(state->projection_preview_users == 0)
+        pthread_cond_broadcast(&veejay_output_preview_cond);
+    pthread_mutex_unlock(&veejay_output_preview_gate);
+}
 
 static void veejay_output_source_free(veejay_t *info)
 {
@@ -6956,8 +7002,8 @@ static void veejay_output_source_free(veejay_t *info)
     veejay_output_source_state *state =
         (veejay_output_source_state*)info->output_input_buffer;
     info->output_input_buffer = NULL;
-    if(state && state->projection_preview_mutex_initialized)
-        pthread_mutex_lock(&state->projection_preview_mutex);
+    while(state && state->projection_preview_users > 0)
+        pthread_cond_wait(&veejay_output_preview_cond, &veejay_output_preview_gate);
     pthread_mutex_unlock(&veejay_output_preview_gate);
     if(state) {
         if(state->remote_stream_id > 0 && vj_tag_exists(state->remote_stream_id)) {
@@ -6985,10 +7031,8 @@ static void veejay_output_source_free(veejay_t *info)
            state->canonical_buffer != state->transport_buffer)
             free(state->canonical_buffer);
         free(state->transport_buffer);
-        if(state->projection_preview_mutex_initialized) {
-            pthread_mutex_unlock(&state->projection_preview_mutex);
+        if(state->projection_preview_mutex_initialized)
             pthread_mutex_destroy(&state->projection_preview_mutex);
-        }
         free(state);
     }
 
@@ -7085,16 +7129,11 @@ static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped)
     if(!info || !mapped || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return 0;
 
-    pthread_mutex_lock(&veejay_output_preview_gate);
-    veejay_output_source_state *state =
-        (veejay_output_source_state*)info->output_input_buffer;
-    if(!state || !state->projection_source_frame ||
-       !state->projection_preview_mutex_initialized) {
-        pthread_mutex_unlock(&veejay_output_preview_gate);
+    veejay_output_source_state *state = veejay_output_preview_state_acquire(info);
+    if(!state)
         return 0;
-    }
+
     pthread_mutex_lock(&state->projection_preview_mutex);
-    pthread_mutex_unlock(&veejay_output_preview_gate);
     state->projection_preview_valid = 0;
     if(state->to_projection)
         yuv_convert_and_scale(state->to_projection, mapped, state->projection_source_frame);
@@ -7105,6 +7144,7 @@ static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped)
     state->projection_source_frame->fps = mapped->fps;
     state->projection_preview_valid = 1;
     pthread_mutex_unlock(&state->projection_preview_mutex);
+    veejay_output_preview_state_release(state);
     return 1;
 }
 
@@ -7113,19 +7153,14 @@ void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *f
     if(!info || !frame || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return NULL;
 
-    pthread_mutex_lock(&veejay_output_preview_gate);
-    veejay_output_source_state *state =
-        (veejay_output_source_state*)info->output_input_buffer;
-    if(!state || !state->projection_source_frame ||
-       !state->projection_preview_mutex_initialized) {
-        pthread_mutex_unlock(&veejay_output_preview_gate);
+    veejay_output_source_state *state = veejay_output_preview_state_acquire(info);
+    if(!state)
         return NULL;
-    }
-    pthread_mutex_lock(&state->projection_preview_mutex);
-    pthread_mutex_unlock(&veejay_output_preview_gate);
 
+    pthread_mutex_lock(&state->projection_preview_mutex);
     if(!state->projection_preview_valid) {
         pthread_mutex_unlock(&state->projection_preview_mutex);
+        veejay_output_preview_state_release(state);
         return NULL;
     }
 
@@ -7136,8 +7171,10 @@ void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *f
 void veejay_output_unlock_pre_projection_preview_frame(void *token)
 {
     veejay_output_source_state *state = (veejay_output_source_state*)token;
-    if(state && state->projection_preview_mutex_initialized)
+    if(state && state->projection_preview_mutex_initialized) {
         pthread_mutex_unlock(&state->projection_preview_mutex);
+        veejay_output_preview_state_release(state);
+    }
 }
 
 static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped)

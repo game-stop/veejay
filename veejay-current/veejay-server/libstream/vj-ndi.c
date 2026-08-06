@@ -27,6 +27,7 @@
 #include <libstream/vj-ndi.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
+#include <veejaycore/vj-ndi-runtime.h>
 
 #include <errno.h>
 #include <limits.h>
@@ -242,28 +243,10 @@ static int vj_ndi_runtime_try_library(const char *path)
     return 1;
 }
 
-static void vj_ndi_runtime_try_folder(const char *folder)
+static int vj_ndi_runtime_try_candidate(const char *candidate, void *opaque)
 {
-    if(!folder || !*folder || ndi_runtime.initialized)
-        return;
-
-    const char *names[] = {
-#ifdef NDILIB_LIBRARY_NAME
-        NDILIB_LIBRARY_NAME,
-#endif
-        "libndi.so.6",
-        "libndi.so",
-        "libndi.so.5",
-        NULL
-    };
-    char candidate[1024];
-    for(int i = 0; !ndi_runtime.initialized && names[i]; i++) {
-        if(names[i][0] == '/')
-            snprintf(candidate, sizeof(candidate), "%s", names[i]);
-        else
-            snprintf(candidate, sizeof(candidate), "%s/%s", folder, names[i]);
-        vj_ndi_runtime_try_library(candidate);
-    }
+    (void)opaque;
+    return vj_ndi_runtime_try_library(candidate);
 }
 
 static int vj_ndi_runtime_acquire(void)
@@ -273,48 +256,22 @@ static int vj_ndi_runtime_acquire(void)
     if(!ndi_runtime.initialized && !ndi_runtime.probed) {
         ndi_runtime.probed = 1;
 
-        const char *env_names[] = {
-#ifdef NDILIB_REDIST_FOLDER
-            NDILIB_REDIST_FOLDER,
-#endif
-            "NDI_RUNTIME_DIR_V6",
-            "NDI_RUNTIME_DIR_V5",
-            NULL
-        };
-        for(int i = 0; !ndi_runtime.initialized && env_names[i]; i++) {
-            const char *folder = getenv(env_names[i]);
-            if(folder && *folder)
-                vj_ndi_runtime_try_folder(folder);
-        }
-
-        const char *libraries[] = {
 #ifdef NDILIB_LIBRARY_NAME
-            NDILIB_LIBRARY_NAME,
+        const char *preferred_library = NDILIB_LIBRARY_NAME;
+#else
+        const char *preferred_library = NULL;
 #endif
-            "libndi.so.6",
-            "libndi.so",
-            "libndi.so.5",
-            NULL
-        };
-        for(int i = 0; !ndi_runtime.initialized && libraries[i]; i++)
-            vj_ndi_runtime_try_library(libraries[i]);
-
-        const char *folders[] = {
-            "/usr/local/lib",
-            "/usr/local/lib64",
-            "/usr/lib",
-            "/usr/lib64",
-            "/usr/lib/x86_64-linux-gnu",
-            "/usr/lib/aarch64-linux-gnu",
-            "/opt/ndi/lib",
-            NULL
-        };
-        for(int i = 0; !ndi_runtime.initialized && folders[i]; i++)
-            vj_ndi_runtime_try_folder(folders[i]);
+#ifdef NDILIB_REDIST_FOLDER
+        const char *redist_env = NDILIB_REDIST_FOLDER;
+#else
+        const char *redist_env = NULL;
+#endif
+        vj_ndi_runtime_foreach_candidate(preferred_library, redist_env,
+                                         vj_ndi_runtime_try_candidate, NULL);
 
         if(!ndi_runtime.initialized && !ndi_runtime.load_error_logged) {
             veejay_msg(VEEJAY_MSG_WARNING,
-                       "NDI runtime load failed: %s. Set NDI_RUNTIME_DIR_V6 to the directory containing libndi.so.6 if it is installed outside the system library path",
+                       "NDI runtime load failed: %s. VeeJay also checks $HOME/opt/ndi-sdk6/lib/<arch>; set NDI_RUNTIME_DIR_V6 to override the runtime directory",
                        ndi_runtime.last_error[0] ? ndi_runtime.last_error : "libndi.so.6 was not found");
             ndi_runtime.load_error_logged = 1;
         }
