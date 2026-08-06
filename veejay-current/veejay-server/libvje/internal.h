@@ -277,12 +277,19 @@
 #include "./effects/tessaract.h"
 #include "./effects/bowshock.h"
 #include "./effects/darkmatter.h"
+#include "./effects/shocksilk.h"
+#include "./effects/hyperfluid.h"
+#include "./effects/fractalorganism.h"
+#include "./effects/fractalcrystal.h"
+#include "./effects/fractalbiome.h"
+#include "./effects/xraysolarization.h"
+#include "./effects/livingsignalcolony.h"
 
-#define VJ_IMAGE_EFFECT_MIN 8
+#define VJ_IMAGE_EFFECT_MIN 2
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 262 // + 1
+#define VJ_VIDEO_EFFECT_MAX 263 // + 1
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN + 1)
 
@@ -394,6 +401,7 @@ enum {
     VJ_VIDEO_EFFECT_SHAPEWIPE = 259,
     VJ_VIDEO_EFFECT_DARKREPLACEMIX = 260,
     VJ_VIDEO_EFFECT_MORPHOLOGY = 261,
+    VJ_VIDEO_EFFECT_LIVINGSIGNALCOLONY = 262,
 };
 
 enum {
@@ -590,6 +598,12 @@ enum {
     VJ_IMAGE_EFFECT_TESSARACT = 10,
     VJ_IMAGE_EFFECT_BOWSHOCK = 9,
     VJ_IMAGE_EFFECT_DARKMATTER = 8,
+    VJ_IMAGE_EFFECT_SHOCKSILK = 7,
+    VJ_IMAGE_EFFECT_HYPERFLUID = 6,
+    VJ_IMAGE_EFFECT_FRACTALORGANISM = 5,
+    VJ_IMAGE_EFFECT_FRACTALCRYSTAL = 4,
+    VJ_IMAGE_EFFECT_FRACTALBIOME = 3,
+    VJ_IMAGE_EFFECT_XRAYSOLARIZATION = 2,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 
