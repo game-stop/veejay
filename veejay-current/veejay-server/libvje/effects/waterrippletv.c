@@ -81,14 +81,13 @@ static inline int clampi(int v, int lo, int hi)
 static inline int waterripple_decay_term(int v, int decay)
 {
     const unsigned int shift = (unsigned int)clampi(decay, 1, 31);
+    const uint64_t magnitude = (v >= 0) ?
+        (uint64_t)v : (uint64_t)(-(int64_t)v);
+    const uint64_t bias = (v >= 0) ?
+        0u : ((UINT64_C(1) << shift) - 1u);
+    const int term = (int)((magnitude + bias) >> shift);
 
-    if(v >= 0)
-        return (int)((uint32_t)v >> shift);
-
-    const uint64_t magnitude = (uint64_t)(-(int64_t)v);
-    const uint64_t bias = (UINT64_C(1) << shift) - 1u;
-
-    return -(int)((magnitude + bias) >> shift);
+    return (v >= 0) ? term : -term;
 }
 
 static inline unsigned int wfastrand(ripple_tv *r)
