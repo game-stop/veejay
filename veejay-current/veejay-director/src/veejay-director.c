@@ -267,6 +267,16 @@ enum {
     DIRECTOR_STAGE_MODE_WIRING = 2
 };
 
+typedef enum {
+    DIRECTOR_START_AUTOMATIC = 0,
+    DIRECTOR_START_DISCOVER,
+    DIRECTOR_START_RESUME,
+    DIRECTOR_START_SETUP
+} DirectorStartupIntent;
+
+#define DIRECTOR_RESPONSE_DISCOVER 1001
+#define DIRECTOR_RESPONSE_RESUME   1002
+
 #define DIRECTOR_STAGE_SOURCE_TRAY_HEIGHT 0.0
 #define DIRECTOR_STAGE_SOURCE_CARD_WIDTH 172.0
 #define DIRECTOR_STAGE_SOURCE_CARD_HEIGHT 86.0
@@ -709,6 +719,11 @@ struct _DirectorApp {
     guint reloaded_force_stop_timer;
     gboolean shutting_down;
     gboolean suppress_startup_chooser;
+    DirectorStartupIntent startup_intent;
+    gboolean startup_patchbay;
+    gboolean startup_no_discovery;
+    gchar *startup_show_path;
+    gchar *startup_notice;
 
     gboolean syncing;
     gboolean last_apply_ok;
@@ -853,6 +868,7 @@ static void director_reconcile_live_routes(DirectorApp *app, DirectorInstance *i
 static guint director_split_screen_receiver_count(DirectorApp *app,
                                                    const DirectorInstance *master);
 static void director_rebuild_instance_store(DirectorApp *app);
+static void director_open_patchbay(DirectorApp *app);
 static void director_stage_wiring_update_canvas_size(DirectorApp *app);
 static void director_stage_wiring_rounded_rect(cairo_t *cr,
                                                 gdouble x, gdouble y,
@@ -1043,6 +1059,11 @@ static gdouble director_stage_wiring_socket_hit_radius(DirectorApp *app);
 static void director_discovery_start(DirectorApp *app);
 static void director_discovery_stop(DirectorApp *app);
 static void director_discovery_refresh_store(DirectorApp *app);
+static void on_open_discovery_patchbay(GtkWidget *widget, gpointer data);
+static void on_discovery_row_activated(GtkTreeView *view,
+                                       GtkTreePath *path,
+                                       GtkTreeViewColumn *column,
+                                       gpointer data);
 static void director_eidolon_maybe_start(DirectorApp *app, DirectorInstance *instance);
 static void director_eidolon_stop(DirectorApp *app, DirectorInstance *instance,
                                   gboolean disable);
@@ -5021,12 +5042,6 @@ static gboolean director_ndi_runtime_input_matches_desired(
            g_strcmp0(instance->live_ndi_source, source_name) == 0;
 }
 
-static gboolean director_ndi_runtime_input_matches(const DirectorInstance *instance)
-{
-    return instance ? director_ndi_runtime_input_matches_desired(
-        instance, instance->ndi_input_enabled, instance->ndi_source_name) : FALSE;
-}
-
 static gboolean director_ndi_runtime_output_matches_desired(
     const DirectorInstance *instance,
     gboolean enabled,
@@ -5039,12 +5054,6 @@ static gboolean director_ndi_runtime_output_matches_desired(
     return instance->live_ndi_tx_enabled && instance->live_ndi_tx_owned &&
            sender_name && *sender_name &&
            g_strcmp0(instance->live_ndi_tx_name, sender_name) == 0;
-}
-
-static gboolean director_ndi_runtime_output_matches(const DirectorInstance *instance)
-{
-    return instance ? director_ndi_runtime_output_matches_desired(
-        instance, instance->ndi_output_enabled, instance->ndi_output_name) : FALSE;
 }
 
 static void director_commit_ndi_input_configuration(DirectorApp *app,
@@ -11142,6 +11151,69 @@ static gchar *director_template_directory(void)
     return g_build_filename(g_get_user_config_dir(), "veejay", "director", "templates", NULL);
 }
 
+static gchar *director_state_directory(void)
+{
+    return g_build_filename(g_get_user_config_dir(), "veejay", "director", NULL);
+}
+
+static gchar *director_state_file(void)
+{
+    gchar *directory = director_state_directory();
+    gchar *path = g_build_filename(directory, "state.ini", NULL);
+    g_free(directory);
+    return path;
+}
+
+static gchar *director_state_last_show_path(void)
+{
+    gchar *path = director_state_file();
+    GKeyFile *file = g_key_file_new();
+    GError *error = NULL;
+    gchar *show_path = NULL;
+
+    if(g_key_file_load_from_file(file, path, G_KEY_FILE_NONE, &error)) {
+        show_path = g_key_file_get_string(file, "Session", "last-show", NULL);
+        if(show_path) {
+            g_strstrip(show_path);
+            if(!*show_path || !g_file_test(show_path, G_FILE_TEST_IS_REGULAR))
+                g_clear_pointer(&show_path, g_free);
+        }
+    }
+    g_clear_error(&error);
+    g_key_file_free(file);
+    g_free(path);
+    return show_path;
+}
+
+static void director_state_remember_show(const gchar *show_path)
+{
+    if(!show_path || !*show_path)
+        return;
+
+    gchar *directory = director_state_directory();
+    if(g_mkdir_with_parents(directory, 0700) != 0) {
+        g_free(directory);
+        return;
+    }
+
+    gchar *path = g_build_filename(directory, "state.ini", NULL);
+    GKeyFile *file = g_key_file_new();
+    GError *error = NULL;
+    g_key_file_load_from_file(file, path, G_KEY_FILE_NONE, &error);
+    g_clear_error(&error);
+    g_key_file_set_string(file, "Session", "last-show", show_path);
+
+    gsize length = 0;
+    gchar *data = g_key_file_to_data(file, &length, NULL);
+    if(data)
+        g_file_set_contents(path, data, (gssize)length, NULL);
+
+    g_free(data);
+    g_key_file_free(file);
+    g_free(path);
+    g_free(directory);
+}
+
 static gchar *director_template_slug(const gchar *name)
 {
     GString *slug = g_string_new(NULL);
@@ -11448,6 +11520,13 @@ static void on_workbench_row_activated(GtkListBox *box, GtkListBoxRow *row, gpoi
     gtk_dialog_response(GTK_DIALOG(data), GTK_RESPONSE_ACCEPT);
 }
 
+static void on_workbench_quick_action(GtkButton *button, gpointer data)
+{
+    const gint response =
+        GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "director-response"));
+    gtk_dialog_response(GTK_DIALOG(data), response);
+}
+
 static void director_workbench_add_builtin_row(DirectorWorkbenchChooser *chooser,
                                                DirectorPreset preset)
 {
@@ -11539,16 +11618,16 @@ static void director_workbench_add_template_rows(DirectorWorkbenchChooser *choos
     g_free(directory);
 }
 
-static gboolean director_choose_workbench(DirectorApp *app)
+static gboolean director_choose_workbench(DirectorApp *app, gboolean startup_actions)
 {
     GtkWidget *dialog = gtk_dialog_new_with_buttons(
-        "Choose a starting setup",
+        startup_actions ? "Start VeeJay Director" : "Create a show",
         GTK_WINDOW(app->window),
         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
         "Cancel", GTK_RESPONSE_CANCEL,
         "Create setup", GTK_RESPONSE_ACCEPT,
         NULL);
-    gtk_window_set_default_size(GTK_WINDOW(dialog), 730, 700);
+    gtk_window_set_default_size(GTK_WINDOW(dialog), 860, 620);
     gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_ACCEPT);
 
     GtkWidget *content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
@@ -11557,16 +11636,57 @@ static gboolean director_choose_workbench(DirectorApp *app)
 
     GtkWidget *title = gtk_label_new(NULL);
     gtk_label_set_markup(GTK_LABEL(title),
-        "<span size='x-large' weight='bold'>Start with a ready-made setup</span>");
+        startup_actions ?
+        "<span size='x-large' weight='bold'>Start Director</span>" :
+        "<span size='x-large' weight='bold'>Create a new show</span>");
     gtk_widget_set_halign(title, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(content), title, FALSE, FALSE, 0);
 
     GtkWidget *intro = gtk_label_new(
-        "Pick a built-in topology or one of your saved setup templates. Director creates the engines and routes; venue/display assignment remains independent.");
+        startup_actions ?
+        "Connect to running VeeJays, resume your last saved show, or create a topology from a preset or template." :
+        "Choose a built-in topology or one of your saved templates. Venue and physical-display assignment remain independent.");
     gtk_label_set_line_wrap(GTK_LABEL(intro), TRUE);
     gtk_widget_set_halign(intro, GTK_ALIGN_START);
     gtk_style_context_add_class(gtk_widget_get_style_context(intro), "dim-label");
     gtk_box_pack_start(GTK_BOX(content), intro, FALSE, FALSE, 0);
+
+    if(startup_actions) {
+        GtkWidget *quick_frame = gtk_frame_new("Quick start");
+        GtkWidget *quick = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+        gtk_container_set_border_width(GTK_CONTAINER(quick), 8);
+        gtk_container_add(GTK_CONTAINER(quick_frame), quick);
+
+        GtkWidget *discover = gtk_button_new_with_label("Discover & connect");
+        gtk_widget_set_tooltip_text(discover,
+            "Discover all VeeJay instances advertising on the LAN, connect to them automatically, and open Stage → Wiring.");
+        g_object_set_data(G_OBJECT(discover), "director-response",
+                          GINT_TO_POINTER(DIRECTOR_RESPONSE_DISCOVER));
+        g_signal_connect(discover, "clicked",
+                         G_CALLBACK(on_workbench_quick_action), dialog);
+        gtk_box_pack_start(GTK_BOX(quick), discover, FALSE, FALSE, 0);
+
+        gchar *last_show = director_state_last_show_path();
+        GtkWidget *resume = gtk_button_new_with_label("Resume last saved show");
+        gtk_widget_set_sensitive(resume, last_show != NULL);
+        gtk_widget_set_tooltip_text(resume,
+            last_show ? last_show : "No previously saved Director show is available yet.");
+        g_object_set_data(G_OBJECT(resume), "director-response",
+                          GINT_TO_POINTER(DIRECTOR_RESPONSE_RESUME));
+        g_signal_connect(resume, "clicked",
+                         G_CALLBACK(on_workbench_quick_action), dialog);
+        gtk_box_pack_start(GTK_BOX(quick), resume, FALSE, FALSE, 0);
+        g_free(last_show);
+
+        GtkWidget *quick_hint = gtk_label_new(
+            "Discovery keeps running in the background; newly advertised engines appear automatically.");
+        gtk_label_set_line_wrap(GTK_LABEL(quick_hint), TRUE);
+        gtk_widget_set_halign(quick_hint, GTK_ALIGN_START);
+        gtk_style_context_add_class(gtk_widget_get_style_context(quick_hint), "dim-label");
+        gtk_box_pack_start(GTK_BOX(quick), quick_hint, TRUE, TRUE, 8);
+
+        gtk_box_pack_start(GTK_BOX(content), quick_frame, FALSE, FALSE, 0);
+    }
 
     DirectorWorkbenchChooser chooser;
     memset(&chooser, 0, sizeof(chooser));
@@ -11578,64 +11698,97 @@ static gboolean director_choose_workbench(DirectorApp *app)
         director_workbench_add_builtin_row(&chooser, (DirectorPreset)i);
     director_workbench_add_template_rows(&chooser);
 
+    GtkWidget *body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_widget_set_vexpand(body, TRUE);
+    gtk_box_pack_start(GTK_BOX(content), body, TRUE, TRUE, 0);
+
+    GtkWidget *left = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
+    GtkWidget *list_title = gtk_label_new("Setup or template");
+    gtk_widget_set_halign(list_title, GTK_ALIGN_START);
+    gtk_style_context_add_class(gtk_widget_get_style_context(list_title), "section-title");
+    gtk_box_pack_start(GTK_BOX(left), list_title, FALSE, FALSE, 0);
+
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
                                    GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_widget_set_size_request(scroll, 500, 360);
     gtk_widget_set_vexpand(scroll, TRUE);
     gtk_container_add(GTK_CONTAINER(scroll), chooser.list);
-    gtk_box_pack_start(GTK_BOX(content), scroll, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(left), scroll, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(body), left, TRUE, TRUE, 0);
 
-    GtkWidget *size_grid = gtk_grid_new();
-    gtk_grid_set_column_spacing(GTK_GRID(size_grid), 12);
-    gtk_grid_set_row_spacing(GTK_GRID(size_grid), 4);
+    GtkWidget *right = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    gtk_widget_set_size_request(right, 285, -1);
+    GtkWidget *config_title = gtk_label_new("Configuration");
+    gtk_widget_set_halign(config_title, GTK_ALIGN_START);
+    gtk_style_context_add_class(gtk_widget_get_style_context(config_title), "section-title");
+    gtk_box_pack_start(GTK_BOX(right), config_title, FALSE, FALSE, 0);
+
     GtkWidget *size_label = gtk_label_new("Video / screen size");
     gtk_widget_set_halign(size_label, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(right), size_label, FALSE, FALSE, 0);
+
     chooser.size_combo = gtk_combo_box_text_new();
     for(guint i = 0; i < G_N_ELEMENTS(director_video_sizes); i++)
         gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(chooser.size_combo),
                                        director_video_sizes[i].label);
     gtk_combo_box_set_active(GTK_COMBO_BOX(chooser.size_combo), 7);
-    gtk_widget_set_hexpand(chooser.size_combo, TRUE);
-    gtk_grid_attach(GTK_GRID(size_grid), size_label, 0, 0, 2, 1);
-    gtk_grid_attach(GTK_GRID(size_grid), chooser.size_combo, 0, 1, 2, 1);
+    gtk_widget_set_hexpand(chooser.size_combo, FALSE);
+    gtk_widget_set_halign(chooser.size_combo, GTK_ALIGN_START);
+    gtk_widget_set_size_request(chooser.size_combo, 270, -1);
+    gtk_box_pack_start(GTK_BOX(right), chooser.size_combo, FALSE, FALSE, 0);
+
     GtkWidget *size_hint = gtk_label_new(
-        "Projector and video-wall presets use this as each physical output size. Director builds any larger logical canvas automatically.");
+        "For projector and wall presets this is the physical output size. Director builds the larger logical canvas automatically.");
     gtk_label_set_line_wrap(GTK_LABEL(size_hint), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(size_hint), 36);
     gtk_widget_set_halign(size_hint, GTK_ALIGN_START);
     gtk_style_context_add_class(gtk_widget_get_style_context(size_hint), "dim-label");
-    gtk_grid_attach(GTK_GRID(size_grid), size_hint, 0, 2, 2, 1);
-    gtk_box_pack_start(GTK_BOX(content), size_grid, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(right), size_hint, FALSE, FALSE, 0);
 
-    chooser.wall_options = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    chooser.wall_options = gtk_grid_new();
+    gtk_grid_set_column_spacing(GTK_GRID(chooser.wall_options), 8);
+    gtk_grid_set_row_spacing(GTK_GRID(chooser.wall_options), 5);
     GtkWidget *wall_label = gtk_label_new("Wall grid");
     gtk_widget_set_halign(wall_label, GTK_ALIGN_START);
     chooser.wall_columns = director_spin(1, 8, 1, 0);
     chooser.wall_rows = director_spin(1, 8, 1, 0);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(chooser.wall_columns), 3);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(chooser.wall_rows), 1);
-    gtk_box_pack_start(GTK_BOX(chooser.wall_options), wall_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(chooser.wall_options), gtk_label_new("Columns"), FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(chooser.wall_options), chooser.wall_columns, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(chooser.wall_options), gtk_label_new("Rows"), FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(chooser.wall_options), chooser.wall_rows, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(content), chooser.wall_options, FALSE, FALSE, 0);
+    gtk_grid_attach(GTK_GRID(chooser.wall_options), wall_label, 0, 0, 2, 1);
+    gtk_grid_attach(GTK_GRID(chooser.wall_options), gtk_label_new("Columns"), 0, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(chooser.wall_options), chooser.wall_columns, 1, 1, 1, 1);
+    gtk_grid_attach(GTK_GRID(chooser.wall_options), gtk_label_new("Rows"), 0, 2, 1, 1);
+    gtk_grid_attach(GTK_GRID(chooser.wall_options), chooser.wall_rows, 1, 2, 1, 1);
+    gtk_box_pack_start(GTK_BOX(right), chooser.wall_options, FALSE, FALSE, 0);
 
-    chooser.dual_options = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    chooser.dual_options = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     GtkWidget *overlap_label = gtk_label_new("Projector edge overlap");
+    gtk_widget_set_halign(overlap_label, GTK_ALIGN_START);
     chooser.overlap_spin = director_spin(0, 1279, 1, 0);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(chooser.overlap_spin), 128);
+    GtkWidget *overlap_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(overlap_row), chooser.overlap_spin, FALSE, FALSE, 0);
     GtkWidget *overlap_units = gtk_label_new("pixels");
     gtk_style_context_add_class(gtk_widget_get_style_context(overlap_units), "dim-label");
+    gtk_box_pack_start(GTK_BOX(overlap_row), overlap_units, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(chooser.dual_options), overlap_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(chooser.dual_options), chooser.overlap_spin, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(chooser.dual_options), overlap_units, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(content), chooser.dual_options, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(chooser.dual_options), overlap_row, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(right), chooser.dual_options, FALSE, FALSE, 0);
+
+    GtkWidget *summary_title = gtk_label_new("Result");
+    gtk_widget_set_halign(summary_title, GTK_ALIGN_START);
+    gtk_style_context_add_class(gtk_widget_get_style_context(summary_title), "section-title");
+    gtk_box_pack_start(GTK_BOX(right), summary_title, FALSE, FALSE, 4);
 
     chooser.summary = gtk_label_new("");
     gtk_label_set_line_wrap(GTK_LABEL(chooser.summary), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(chooser.summary), 38);
     gtk_widget_set_halign(chooser.summary, GTK_ALIGN_START);
-    gtk_style_context_add_class(gtk_widget_get_style_context(chooser.summary), "section-title");
-    gtk_box_pack_start(GTK_BOX(content), chooser.summary, FALSE, FALSE, 0);
+    gtk_widget_set_valign(chooser.summary, GTK_ALIGN_START);
+    gtk_box_pack_start(GTK_BOX(right), chooser.summary, FALSE, FALSE, 0);
+
+    gtk_box_pack_start(GTK_BOX(body), right, FALSE, FALSE, 0);
 
     g_signal_connect(chooser.list, "row-selected",
                      G_CALLBACK(on_workbench_row_selected), &chooser);
@@ -11656,6 +11809,45 @@ static gboolean director_choose_workbench(DirectorApp *app)
     director_workbench_update_summary(&chooser);
 
     const gint response = gtk_dialog_run(GTK_DIALOG(dialog));
+
+    if(response == DIRECTOR_RESPONSE_DISCOVER && startup_actions) {
+        gtk_widget_destroy(dialog);
+        DirectorShow *show = director_show_new("Running VeeJays");
+        show->dirty = FALSE;
+        if(!director_replace_show(app, show))
+            return FALSE;
+        app->startup_patchbay = TRUE;
+        director_log(app, "Discovery workspace ready · connecting to advertised VeeJay engines");
+        return TRUE;
+    }
+
+    if(response == DIRECTOR_RESPONSE_RESUME && startup_actions) {
+        gchar *path = director_state_last_show_path();
+        if(!path) {
+            gtk_widget_destroy(dialog);
+            director_error_dialog(app, "No previously saved Director show is available.");
+            return FALSE;
+        }
+        GError *error = NULL;
+        DirectorShow *show = director_show_load(path, &error);
+        if(!show) {
+            gtk_widget_destroy(dialog);
+            director_error_dialog(app, error ? error->message : "Cannot resume the last saved show");
+            g_clear_error(&error);
+            g_free(path);
+            return FALSE;
+        }
+        gtk_widget_destroy(dialog);
+        if(!director_replace_show(app, show)) {
+            g_free(path);
+            return FALSE;
+        }
+        director_state_remember_show(path);
+        director_log(app, "Resumed show from %s", path);
+        g_free(path);
+        return TRUE;
+    }
+
     if(response != GTK_RESPONSE_ACCEPT) {
         gtk_widget_destroy(dialog);
         return FALSE;
@@ -11712,6 +11904,7 @@ static gboolean director_choose_workbench(DirectorApp *app)
     return TRUE;
 }
 
+
 static void director_save_to(DirectorApp *app, const gchar *path)
 {
     GError *error = NULL;
@@ -11720,6 +11913,7 @@ static void director_save_to(DirectorApp *app, const gchar *path)
         g_clear_error(&error);
         return;
     }
+    director_state_remember_show(path);
     director_log(app, "Saved show to %s", path);
     director_update_header(app);
 }
@@ -11730,15 +11924,17 @@ static void on_new_show(GtkButton *button, gpointer data)
     DirectorApp *app = data;
     if(!director_confirm_show_replacement(app))
         return;
-    director_choose_workbench(app);
+    director_choose_workbench(app, FALSE);
 }
 
 static void director_load_show_path(DirectorApp *app, const gchar *path)
 {
     GError *error = NULL;
     DirectorShow *show = director_show_load(path, &error);
-    if(show)
-        director_replace_show(app, show);
+    if(show) {
+        if(director_replace_show(app, show))
+            director_state_remember_show(path);
+    }
     else {
         director_error_dialog(app, error ? error->message : "Cannot load show");
         g_clear_error(&error);
@@ -22549,10 +22745,17 @@ static void director_build_ui(DirectorApp *app)
     gtk_box_pack_start(GTK_BOX(left), instance_buttons, FALSE, FALSE, 0);
 
     gtk_box_pack_start(GTK_BOX(left), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), FALSE, FALSE, 4);
-    GtkWidget *lan_title = gtk_label_new("LAN activity");
+    GtkWidget *lan_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    GtkWidget *lan_title = gtk_label_new("LAN discovery");
     gtk_widget_set_halign(lan_title, GTK_ALIGN_START);
+    gtk_widget_set_hexpand(lan_title, TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(lan_title), "section-title");
-    gtk_box_pack_start(GTK_BOX(left), lan_title, FALSE, FALSE, 0);
+    GtkWidget *lan_patchbay = gtk_button_new_with_label("Open patch bay");
+    gtk_widget_set_tooltip_text(lan_patchbay,
+        "Open Stage → Wiring to see discovered VeeJays and create or remove video routes.");
+    gtk_box_pack_start(GTK_BOX(lan_header), lan_title, TRUE, TRUE, 0);
+    gtk_box_pack_end(GTK_BOX(lan_header), lan_patchbay, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(left), lan_header, FALSE, FALSE, 0);
     app->discovery_store = gtk_list_store_new(DISCOVERY_COL_COUNT,
                                                G_TYPE_STRING, G_TYPE_STRING,
                                                G_TYPE_STRING, G_TYPE_STRING,
@@ -22560,7 +22763,7 @@ static void director_build_ui(DirectorApp *app)
     app->discovery_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(app->discovery_store));
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(app->discovery_view), FALSE);
     gtk_widget_set_tooltip_text(app->discovery_view,
-        "Read-only LAN activity. One row represents one VeeJay instance identity; all currently advertised network interfaces are listed together. Backends appear automatically in Engine list as external engines.");
+        "LAN discovery groups advertisements by VeeJay instance identity. Backends connect automatically and appear in the Engine list; double-click a row to open Stage → Wiring.");
     GtkCellRenderer *lan_summary = gtk_cell_renderer_text_new();
     g_object_set(lan_summary, "wrap-mode", PANGO_WRAP_WORD_CHAR, "wrap-width", 285,
                  "xpad", 6, "ypad", 6, NULL);
@@ -22569,6 +22772,10 @@ static void director_build_ui(DirectorApp *app)
                                                  "text", DISCOVERY_COL_SUMMARY, NULL);
     GtkTreeSelection *lan_selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(app->discovery_view));
     gtk_tree_selection_set_mode(lan_selection, GTK_SELECTION_NONE);
+    g_signal_connect(app->discovery_view, "row-activated",
+                     G_CALLBACK(on_discovery_row_activated), app);
+    g_signal_connect(lan_patchbay, "clicked",
+                     G_CALLBACK(on_open_discovery_patchbay), app);
     GtkWidget *lan_scroll = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(lan_scroll),
                                    GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
@@ -22724,6 +22931,112 @@ static void director_build_ui(DirectorApp *app)
     gtk_widget_show_all(app->window);
 }
 
+static DirectorShow *director_startup_initial_show(DirectorApp *app)
+{
+    if(app->suppress_startup_chooser)
+        return director_default_show();
+
+    if(app->startup_show_path && *app->startup_show_path) {
+        GError *error = NULL;
+        DirectorShow *show = director_show_load(app->startup_show_path, &error);
+        if(show) {
+            director_state_remember_show(app->startup_show_path);
+            return show;
+        }
+        g_free(app->startup_notice);
+        app->startup_notice = g_strdup_printf("Cannot open %s: %s",
+            app->startup_show_path,
+            error ? error->message : "unknown error");
+        g_clear_error(&error);
+        return director_default_show();
+    }
+
+    if(app->startup_intent == DIRECTOR_START_DISCOVER) {
+        DirectorShow *show = director_show_new("Running VeeJays");
+        show->dirty = FALSE;
+        app->startup_patchbay = TRUE;
+        return show;
+    }
+
+    if(app->startup_intent == DIRECTOR_START_RESUME ||
+       app->startup_intent == DIRECTOR_START_AUTOMATIC) {
+        gchar *path = director_state_last_show_path();
+        if(path) {
+            GError *error = NULL;
+            DirectorShow *show = director_show_load(path, &error);
+            if(show) {
+                director_state_remember_show(path);
+                g_free(path);
+                return show;
+            }
+            g_free(app->startup_notice);
+            app->startup_notice = g_strdup_printf("Cannot resume %s: %s",
+                path, error ? error->message : "unknown error");
+            g_clear_error(&error);
+            g_free(path);
+        }
+        else if(app->startup_intent == DIRECTOR_START_RESUME) {
+            g_free(app->startup_notice);
+            app->startup_notice = g_strdup(
+                "No previously saved Director show is available; opening discovery instead.");
+        }
+
+        DirectorShow *show = director_show_new("Running VeeJays");
+        show->dirty = FALSE;
+        app->startup_patchbay = TRUE;
+        return show;
+    }
+
+    return director_default_show();
+}
+
+static gboolean director_patchbay_fit_idle(gpointer data)
+{
+    DirectorApp *app = data;
+    if(!app || app->shutting_down || !app->stage_canvas ||
+       app->stage_mode != DIRECTOR_STAGE_MODE_WIRING)
+        return G_SOURCE_REMOVE;
+    director_stage_wiring_fit(app, app->stage_canvas);
+    gtk_widget_grab_focus(app->stage_canvas);
+    return G_SOURCE_REMOVE;
+}
+
+static void director_open_patchbay(DirectorApp *app)
+{
+    if(!app || !app->notebook)
+        return;
+
+    gtk_notebook_set_current_page(GTK_NOTEBOOK(app->notebook),
+                                  DIRECTOR_PAGE_WORKSPACE);
+    if(app->stage_mode_wiring)
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->stage_mode_wiring), TRUE);
+    else
+        app->stage_mode = DIRECTOR_STAGE_MODE_WIRING;
+
+    director_stage_wiring_update_canvas_size(app);
+    if(app->stage_canvas) {
+        gtk_widget_queue_draw(app->stage_canvas);
+        g_idle_add(director_patchbay_fit_idle, app);
+    }
+}
+
+static void on_open_discovery_patchbay(GtkWidget *widget, gpointer data)
+{
+    (void)widget;
+    director_open_patchbay((DirectorApp*)data);
+}
+
+static void on_discovery_row_activated(GtkTreeView *view,
+                                       GtkTreePath *path,
+                                       GtkTreeViewColumn *column,
+                                       gpointer data)
+{
+    (void)view;
+    (void)path;
+    (void)column;
+    director_open_patchbay((DirectorApp*)data);
+}
+
 static void director_activate(GtkApplication *application, gpointer data)
 {
     DirectorApp *app = data;
@@ -22731,31 +23044,56 @@ static void director_activate(GtkApplication *application, gpointer data)
         gtk_window_present(GTK_WINDOW(app->window));
         return;
     }
+
     app->application = application;
     app->shutting_down = FALSE;
     if(!app->log_readers)
         app->log_readers = g_ptr_array_new();
-    app->show = director_default_show();
+
+    app->show = director_startup_initial_show(app);
+    if(!app->show)
+        app->show = director_default_show();
     app->selected_slice = 0;
+
     director_build_ui(app);
+
     app->ndi_discovery = director_ndi_discovery_new(director_ndi_discovery_update, app);
     director_ndi_discovery_start(app->ndi_discovery);
-    if(!app->suppress_startup_chooser)
-        director_choose_workbench(app);
+
+    if(!app->suppress_startup_chooser &&
+       app->startup_intent == DIRECTOR_START_SETUP)
+        director_choose_workbench(app, TRUE);
+
     app->source_preview_stop = FALSE;
     app->source_preview_thread = g_thread_new("director-program-preview",
                                                director_source_preview_worker, app);
     app->overview_preview_stop = FALSE;
     app->overview_preview_thread = g_thread_new("director-engine-previews",
                                                 director_overview_preview_worker, app);
-    director_select_instance(app, g_ptr_array_index(app->show->instances, 0));
-    for(guint i = 0; i < app->show->instances->len; i++)
+
+    director_select_instance(app,
+        app->show && app->show->instances->len ?
+        g_ptr_array_index(app->show->instances, 0) : NULL);
+
+    for(guint i = 0; app->show && i < app->show->instances->len; i++)
         director_ensure_client(app, g_ptr_array_index(app->show->instances, i));
-    if(!app->suppress_startup_chooser)
+
+    if(!app->startup_no_discovery)
         director_discovery_start(app);
+
     director_refresh_all_ui(app);
+
+    if(app->startup_patchbay)
+        director_open_patchbay(app);
+
     director_log(app, "VeeJay Director started");
+    if(app->startup_notice && *app->startup_notice) {
+        director_log(app, "%s", app->startup_notice);
+        if(app->status_text)
+            gtk_label_set_text(GTK_LABEL(app->status_text), app->startup_notice);
+    }
 }
+
 
 static void director_open(GApplication *application,
                           GFile **files,
@@ -22777,7 +23115,8 @@ static void director_open(GApplication *application,
         director_load_show_path(app, path);
         g_free(path);
     }
-    director_discovery_start(app);
+    if(!app->startup_no_discovery)
+        director_discovery_start(app);
 }
 
 static void director_shutdown(GApplication *application, gpointer data)
@@ -22856,6 +23195,79 @@ int main(int argc, char **argv)
 {
     DirectorApp app;
     memset(&app, 0, sizeof(app));
+
+    gboolean option_discover = FALSE;
+    gboolean option_connect_all = FALSE;
+    gboolean option_resume = FALSE;
+    gboolean option_setup = FALSE;
+    gboolean option_patchbay = FALSE;
+    gboolean option_no_discovery = FALSE;
+    gchar *option_show = NULL;
+
+    GOptionEntry options[] = {
+        { "discover", 'd', 0, G_OPTION_ARG_NONE, &option_discover,
+          "Discover and connect to all running VeeJay instances, then open Stage -> Wiring.", NULL },
+        { "connect-all", 0, 0, G_OPTION_ARG_NONE, &option_connect_all,
+          "Alias for --discover.", NULL },
+        { "resume", 'r', 0, G_OPTION_ARG_NONE, &option_resume,
+          "Resume the last saved or opened Director show.", NULL },
+        { "setup", 's', 0, G_OPTION_ARG_NONE, &option_setup,
+          "Open the Start Director setup chooser.", NULL },
+        { "show", 'f', 0, G_OPTION_ARG_FILENAME, &option_show,
+          "Open a Director .vjd show at startup.", "FILE" },
+        { "patchbay", 0, 0, G_OPTION_ARG_NONE, &option_patchbay,
+          "Open Stage → Wiring at startup.", NULL },
+        { "no-discovery", 0, 0, G_OPTION_ARG_NONE, &option_no_discovery,
+          "Disable VeeJay LAN discovery for this session.", NULL },
+        { NULL }
+    };
+
+    GOptionContext *context = g_option_context_new("[SHOW.vjd]");
+    g_option_context_set_summary(context,
+        "VeeJay Director resumes the last saved show by default. "
+        "When no saved show is available it opens a discovery workspace.");
+    g_option_context_add_main_entries(context, options, NULL);
+    g_option_context_set_ignore_unknown_options(context, TRUE);
+
+    GError *option_error = NULL;
+    if(!g_option_context_parse(context, &argc, &argv, &option_error)) {
+        g_printerr("veejay-director: %s\n",
+                   option_error ? option_error->message : "invalid command line");
+        g_clear_error(&option_error);
+        g_option_context_free(context);
+        g_free(option_show);
+        return 2;
+    }
+    g_option_context_free(context);
+
+    if(option_connect_all)
+        option_discover = TRUE;
+
+    const gint exclusive =
+        (option_discover ? 1 : 0) +
+        (option_resume ? 1 : 0) +
+        (option_setup ? 1 : 0) +
+        (option_show ? 1 : 0);
+    if(exclusive > 1) {
+        g_printerr("veejay-director: choose only one of --discover, --resume, --setup or --show\n");
+        g_free(option_show);
+        return 2;
+    }
+    if(option_discover && option_no_discovery) {
+        g_printerr("veejay-director: --discover and --no-discovery cannot be used together\n");
+        g_free(option_show);
+        return 2;
+    }
+
+    app.startup_intent =
+        option_discover ? DIRECTOR_START_DISCOVER :
+        option_resume ? DIRECTOR_START_RESUME :
+        option_setup ? DIRECTOR_START_SETUP :
+                       DIRECTOR_START_AUTOMATIC;
+    app.startup_patchbay = option_patchbay || option_discover;
+    app.startup_no_discovery = option_no_discovery;
+    app.startup_show_path = option_show;
+
     g_mutex_init(&app.source_preview_lock);
     g_cond_init(&app.source_preview_cond);
     g_mutex_init(&app.overview_preview_lock);
@@ -22865,12 +23277,15 @@ int main(int argc, char **argv)
                                                         director_overview_frame_free);
     app.discovery_records = g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
                                                    director_discovery_record_free);
+
     GtkApplication *application = gtk_application_new(DIRECTOR_APP_ID,
                                                        G_APPLICATION_HANDLES_OPEN);
     g_signal_connect(application, "activate", G_CALLBACK(director_activate), &app);
     g_signal_connect(application, "open", G_CALLBACK(director_open), &app);
     g_signal_connect(application, "shutdown", G_CALLBACK(director_shutdown), &app);
+
     gint status = g_application_run(G_APPLICATION(application), argc, argv);
+
     if(app.show)
         director_show_free(app.show);
     if(app.log_readers)
@@ -22895,6 +23310,8 @@ int main(int argc, char **argv)
     g_free(app.calibration_selected_device_id);
     g_free(app.calibration_selected_device_path);
     g_free(app.calibration_selected_device_name);
+    g_free(app.startup_show_path);
+    g_free(app.startup_notice);
     director_calibration_measure_release_frames(&app.calibration_measure);
     director_calibration_scan_stop(&app, FALSE);
     g_mutex_clear(&app.source_preview_lock);
@@ -22904,3 +23321,4 @@ int main(int argc, char **argv)
     g_object_unref(application);
     return status;
 }
+

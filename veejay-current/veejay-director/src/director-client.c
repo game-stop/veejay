@@ -17,6 +17,7 @@
 
 
 #include "director-client.h"
+#include "director-compat.h"
 #include "director-wire.h"
 
 #include <string.h>
@@ -123,7 +124,7 @@ static void director_dispatch(DirectorClient *client,
     DirectorDispatch *dispatch = g_new0(DirectorDispatch, 1);
     dispatch->client = director_client_ref(client);
     dispatch->event = event;
-    dispatch->payload = g_utf8_make_valid(payload ? payload : "", -1);
+    dispatch->payload = director_utf8_make_valid_compat(payload ? payload : "", -1);
     g_main_context_invoke(NULL, director_dispatch_main, dispatch);
 }
 

@@ -127,7 +127,7 @@ static void gvr_log_view_init(GvrLogView *view)
     GtkCssProvider *provider = gtk_css_provider_new();
     gtk_css_provider_load_from_data(provider,
         "textview.vj-console, textview.vj-console text {"
-        " background-color: #27282f; color: #ffffff;"
+        " background-color: #000000; color: #ffffff;"
         " font-family: monospace; font-size: 10.5pt;"
         "}"
         "textview.vj-console text selection {"

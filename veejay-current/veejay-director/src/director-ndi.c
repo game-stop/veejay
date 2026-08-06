@@ -19,6 +19,7 @@
  */
 #include <config.h>
 #include "director-ndi.h"
+#include "director-compat.h"
 #include <veejaycore/vj-ndi-runtime.h>
 
 #ifdef HAVE_NDI
@@ -106,7 +107,7 @@ static gboolean director_ndi_try_library(const gchar *path)
     }
 
     const gchar *version = ndi_runtime.api->version ? ndi_runtime.api->version() : "NDI runtime";
-    gchar *valid_version = g_utf8_make_valid(version ? version : "NDI runtime", -1);
+    gchar *valid_version = director_utf8_make_valid_compat(version ? version : "NDI runtime", -1);
     g_strlcpy(ndi_runtime.version, valid_version, sizeof(ndi_runtime.version));
     g_free(valid_version);
     ndi_runtime.last_error[0] = '\0';
@@ -262,7 +263,7 @@ static gboolean director_ndi_finder_wait(DirectorNdiFinder *finder, guint timeou
 
 static gchar *director_ndi_utf8_dup(const gchar *text)
 {
-    return g_utf8_make_valid(text ? text : "", -1);
+    return director_utf8_make_valid_compat(text ? text : "", -1);
 }
 
 static gint director_ndi_source_compare(gconstpointer a, gconstpointer b)

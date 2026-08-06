@@ -1,0 +1,262 @@
+.TH VEEJAY-DIRECTOR 1 "August 2026" "VeeJay" "User Commands"
+.SH NAME
+veejay-director \- manage, discover, connect, route and launch VeeJay instances
+.SH SYNOPSIS
+.B veejay-director
+.RI [ options ]
+.RI [ SHOW.vjd ]
+.PP
+.B veejay-director
+.BR \-\-discover
+.PP
+.B veejay-director
+.BR \-\-resume
+.RI [ \-\-patchbay ]
+.PP
+.B veejay-director
+.BR \-\-show
+.I FILE
+.RI [ \-\-patchbay ]
+.SH DESCRIPTION
+.B veejay-director
+is the multi-instance control, routing and deployment interface for VeeJay.
+It can manage local VeeJay processes, connect to already running instances,
+discover VeeJay engines on the LAN, configure video routes, manage projection
+and output layouts, and supervise a complete multi-engine show from one
+interface.
+.PP
+A Director show is stored in a
+.B .vjd
+file.  A show can contain standalone, program and output instances together
+with their routing, startup, display, projection and recovery configuration.
+.PP
+When started without command-line arguments,
+.B veejay-director
+opens the
+.B Start Director
+window.  From there a user can create a predefined setup, open or resume a
+show, or choose
+.B Discover & connect
+to find running VeeJay engines on the LAN.
+.PP
+The discovery workflow opens
+.B Stage \(-> Wiring
+(the patchbay) and automatically attaches advertised VeeJay instances so they
+can be inspected and connected.
+.SH STARTUP MODES
+.TP
+.B Plain startup
+Running
+.B veejay-director
+without arguments opens the
+.B Start Director
+window.
+.TP
+.B Discovery startup
+.B \-\-discover
+starts LAN discovery, connects to discovered VeeJay instances and opens the
+Wiring patchbay.
+.TP
+.B Resume startup
+.B \-\-resume
+opens the most recently saved or opened Director show.
+.TP
+.B Explicit show
+.BI \-\-show " FILE"
+opens the specified
+.B .vjd
+show directly.
+.TP
+.B Setup chooser
+.B \-\-setup
+forces the
+.B Start Director
+window even when using an explicit command-line startup.
+.SH OPTIONS
+.TP
+.BR \-d ", " \-\-discover
+Discover and connect to all running VeeJay instances advertised on the LAN,
+then open
+.B Stage \(-> Wiring
+in patchbay mode.
+.TP
+.B \-\-connect-all
+Alias for
+.BR \-\-discover .
+.TP
+.BR \-r ", " \-\-resume
+Resume the last saved or opened Director show.
+.TP
+.BR \-s ", " \-\-setup
+Open the
+.B Start Director
+setup chooser.
+.TP
+.BR \-f " FILE" ", " \-\-show " FILE"
+Open a Director
+.B .vjd
+show at startup.
+.TP
+.B \-\-patchbay
+Open
+.B Stage \(-> Wiring
+after startup.  This can be combined with
+.B \-\-show
+or
+.BR \-\-resume .
+Discovery mode enables patchbay startup automatically.
+.TP
+.B \-\-no-discovery
+Disable VeeJay LAN discovery for the current Director session.
+.TP
+.B \-\-help
+Display command-line help and exit.
+.SH OPTION INTERACTIONS
+The primary startup modes
+.BR \-\-discover ,
+.BR \-\-resume ,
+.BR \-\-setup
+and
+.B \-\-show
+are mutually exclusive.
+.PP
+.B \-\-discover
+and
+.B \-\-no-discovery
+cannot be used together.
+.PP
+.B \-\-patchbay
+is a view-selection option and may be combined with a direct show or resume
+startup.
+.SH DISCOVERY AND PATCHBAY
+VeeJay LAN discovery listens for VeeJay advertisements on UDP port 3499.
+Discovered engines are shown in the
+.B LAN discovery
+area and can be opened directly in the Wiring patchbay.
+.PP
+The patchbay presents VeeJay engines and available video transports as a
+graph.  It is used to connect and disconnect native VeeJay routes and NDI
+sources, inspect live routing state, and arrange the visual topology of a
+show.
+.PP
+For native routing, Director may select shared memory for same-host
+connections and TCP for network connections.  NDI routing is available when
+VeeJay was built with NDI support and a compatible NDI runtime is available.
+.SH MANAGED INSTANCES
+Director can launch and supervise local VeeJay processes.  Each configured
+instance has a role:
+.TP
+.B Standalone
+An independent VeeJay engine.
+.TP
+.B Program
+A source/program engine intended to feed one or more downstream outputs.
+.TP
+.B Output
+An output/rendering instance consuming a configured source.
+.PP
+Director can also connect to unmanaged VeeJay instances that were started
+outside Director.  Remote instances are controlled but are not launched or
+terminated by Director.
+.SH SHOW FILES
+Director show files use the
+.B .vjd
+suffix.
+.PP
+A show may be opened with
+.BR \-\-show ,
+as a positional
+.I SHOW.vjd
+argument, through the desktop environment, or from the Director user
+interface.
+.SH FILES
+.TP
+.I ~/.config/veejay/director/state.ini
+Director session state.  The most recently saved or opened show is recorded
+here for
+.BR \-\-resume .
+.TP
+.I ~/.config/veejay/director/templates/
+User-defined Director setup templates.
+.TP
+.I ~/.veejay/director/<instance-id>/
+Default working directory for Director-managed VeeJay instances.
+.TP
+.I *.vjd
+VeeJay Director show files.
+.SH ENVIRONMENT
+.TP
+.B NDI_RUNTIME_DIR_V6
+Overrides the directory searched for the NDI runtime when NDI support is
+enabled.
+.PP
+Director also uses the standard GTK, GLib and desktop environment variables
+that affect display selection, configuration paths and the graphical session.
+.SH EXAMPLES
+.TP
+Open the startup chooser:
+.PP
+.nf
+.RS
+veejay-director
+.RE
+.fi
+.TP
+Discover all running VeeJay engines and open the patchbay:
+.PP
+.nf
+.RS
+veejay-director \-\-discover
+.RE
+.fi
+.TP
+Resume the previous show:
+.PP
+.nf
+.RS
+veejay-director \-\-resume
+.RE
+.fi
+.TP
+Open a show directly:
+.PP
+.nf
+.RS
+veejay-director \-\-show venue.vjd
+.RE
+.fi
+.TP
+Open a show directly in the patchbay:
+.PP
+.nf
+.RS
+veejay-director \-\-show venue.vjd \-\-patchbay
+.RE
+.fi
+.TP
+Open a show without LAN discovery:
+.PP
+.nf
+.RS
+veejay-director \-\-show venue.vjd \-\-no-discovery
+.RE
+.fi
+.SH NOTES
+Director uses VeeJay's control protocol to inspect and control connected
+engines.  Some features, including NDI, projection mapping, camera calibration
+and specific output transports, depend on the capabilities of the connected
+VeeJay build and host system.
+.PP
+For a single-engine interactive VeeJay session, see
+.BR reloaded (1).
+For VeeJay server options, see
+.BR veejay (1).
+.SH SEE ALSO
+.BR veejay (1),
+.BR reloaded (1)
+.SH AUTHORS
+VeeJay and VeeJay Director are developed by Niels Elburg and contributors.
+.SH COPYRIGHT
+Copyright \(co 2002\-2026 Niels Elburg and contributors.
+.PP
+VeeJay is free software distributed under the GNU General Public License.

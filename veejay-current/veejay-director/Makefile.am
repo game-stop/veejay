@@ -1,5 +1,5 @@
 # Process with automake to produce Makefile.in
-SUBDIRS = src
+SUBDIRS = src man
 
 ACLOCAL_AMFLAGS = -I m4 
 
