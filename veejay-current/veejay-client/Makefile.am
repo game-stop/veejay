@@ -109,8 +109,6 @@ EXTRA_DIST = \
  share/icon_trash.png \
  share/icon_video.png \
  share/knob.png \
- share/reloaded_classic.glade \
- share/smooth.rc \
  share/sync.png \
  share/veejay-icon.png \
  share/veejay-logo-small.png \

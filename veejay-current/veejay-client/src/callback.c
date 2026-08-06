@@ -6176,6 +6176,371 @@ void	on_check_priout_fullscreen_clicked(
 }
 
 
+
+enum {
+    INPUTSTREAM_SOURCE_NDI = 0,
+    INPUTSTREAM_SOURCE_V4L,
+    INPUTSTREAM_SOURCE_NETWORK,
+    INPUTSTREAM_SOURCE_FILE,
+    INPUTSTREAM_SOURCE_SHM
+};
+
+enum {
+    INPUTSTREAM_NDI_NAME = 0,
+    INPUTSTREAM_NDI_URL,
+    INPUTSTREAM_NDI_COLUMNS
+};
+
+static void inputstream_set_status(const char *text)
+{
+    GtkWidget *label = glade_xml_get_widget_(info->main_window, "inputstream_status");
+    if(GTK_IS_LABEL(label))
+        gtk_label_set_text(GTK_LABEL(label), text ? text : "");
+}
+
+static void inputstream_ndi_tree_ensure(void)
+{
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_ndi_sources");
+    if(!GTK_IS_TREE_VIEW(tree))
+        return;
+
+    if(!gtk_tree_view_get_model(GTK_TREE_VIEW(tree))) {
+        GtkListStore *store = gtk_list_store_new(INPUTSTREAM_NDI_COLUMNS,
+                                                  G_TYPE_STRING,
+                                                  G_TYPE_STRING);
+        gtk_tree_view_set_model(GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+        g_object_unref(store);
+    }
+
+    if(gtk_tree_view_get_n_columns(GTK_TREE_VIEW(tree)) == 0) {
+        GtkCellRenderer *renderer;
+        GtkTreeViewColumn *column;
+
+        renderer = gtk_cell_renderer_text_new();
+        column = gtk_tree_view_column_new_with_attributes("NDI source",
+                                                           renderer,
+                                                           "text",
+                                                           INPUTSTREAM_NDI_NAME,
+                                                           NULL);
+        gtk_tree_view_column_set_expand(column, TRUE);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(tree), column);
+
+        renderer = gtk_cell_renderer_text_new();
+        column = gtk_tree_view_column_new_with_attributes("Address",
+                                                           renderer,
+                                                           "text",
+                                                           INPUTSTREAM_NDI_URL,
+                                                           NULL);
+        gtk_tree_view_column_set_expand(column, TRUE);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(tree), column);
+    }
+
+    GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+    gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+}
+
+static gchar *inputstream_ndi_unescape(const gchar *text)
+{
+    GString *out = g_string_new(NULL);
+
+    if(!text)
+        return g_string_free(out, FALSE);
+
+    for(const gchar *p = text; *p; p++) {
+        if(*p == '\\' && p[1]) {
+            p++;
+            switch(*p) {
+                case 't': g_string_append_c(out, '\t'); break;
+                case 'n': g_string_append_c(out, '\n'); break;
+                case 'r': g_string_append_c(out, '\r'); break;
+                case '\\': g_string_append_c(out, '\\'); break;
+                default:
+                    g_string_append_c(out, '\\');
+                    g_string_append_c(out, *p);
+                    break;
+            }
+        } else {
+            g_string_append_c(out, *p);
+        }
+    }
+
+    return g_string_free(out, FALSE);
+}
+
+static int inputstream_refresh_ndi_sources(void)
+{
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_ndi_sources");
+    int len = 0;
+
+    if(!GTK_IS_TREE_VIEW(tree))
+        return 0;
+
+    inputstream_ndi_tree_ensure();
+
+    GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(tree));
+    if(!GTK_IS_LIST_STORE(model))
+        return 0;
+
+    gtk_list_store_clear(GTK_LIST_STORE(model));
+    inputstream_set_status("Searching for NDI sources on the VeeJay server...");
+
+    single_vims(VIMS_NDI_SOURCES);
+    gchar *payload = recv_vims(8, &len);
+    if(!payload || len <= 0) {
+        if(payload)
+            free(payload);
+        inputstream_set_status("The server did not return an NDI source list.");
+        return 0;
+    }
+
+    gchar **lines = g_strsplit(payload, "\n", -1);
+    int declared = (lines && lines[0]) ? atoi(lines[0]) : 0;
+    int added = 0;
+
+    for(int i = 1; lines && lines[i]; i++) {
+        if(lines[i][0] == '\0')
+            continue;
+
+        gchar **fields = g_strsplit(lines[i], "\t", 3);
+        if(fields && fields[0] && fields[1]) {
+            gchar *name = inputstream_ndi_unescape(fields[1]);
+            gchar *url = inputstream_ndi_unescape(fields[2] ? fields[2] : "");
+
+            if(name && name[0]) {
+                GtkTreeIter iter;
+                gtk_list_store_append(GTK_LIST_STORE(model), &iter);
+                gtk_list_store_set(GTK_LIST_STORE(model), &iter,
+                                   INPUTSTREAM_NDI_NAME, name,
+                                   INPUTSTREAM_NDI_URL, url ? url : "",
+                                   -1);
+                added++;
+            }
+
+            g_free(name);
+            g_free(url);
+        }
+        g_strfreev(fields);
+    }
+
+    g_strfreev(lines);
+    free(payload);
+
+    char status[128];
+    if(added > 0)
+        snprintf(status, sizeof(status), "%d NDI source%s found by the server.",
+                 added, added == 1 ? "" : "s");
+    else if(declared > 0)
+        snprintf(status, sizeof(status), "The server reported %d NDI source%s, but none could be parsed.",
+                 declared, declared == 1 ? "" : "s");
+    else
+        snprintf(status, sizeof(status), "No NDI sources are currently visible to the server.");
+
+    inputstream_set_status(status);
+    return added;
+}
+
+void on_inputstream_ndi_refresh_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+    inputstream_refresh_ndi_sources();
+}
+
+void on_inputstream_source_type_changed(GtkComboBox *combo, gpointer user_data)
+{
+    (void)user_data;
+
+    GtkWidget *stack = glade_xml_get_widget_(info->main_window, "inputstream_stack");
+    if(!GTK_IS_STACK(stack))
+        return;
+
+    switch(gtk_combo_box_get_active(combo)) {
+        case INPUTSTREAM_SOURCE_NDI:
+            gtk_stack_set_visible_child_name(GTK_STACK(stack), "ndi");
+            inputstream_set_status("Choose an NDI sender discovered by the connected VeeJay server.");
+            break;
+        case INPUTSTREAM_SOURCE_V4L:
+            gtk_stack_set_visible_child_name(GTK_STACK(stack), "v4l");
+            inputstream_set_status("Choose a capture device and channel.");
+            scan_devices("tree_v4ldevices");
+            break;
+        case INPUTSTREAM_SOURCE_NETWORK:
+            gtk_stack_set_visible_child_name(GTK_STACK(stack), "network");
+            inputstream_set_status("Connect to a VeeJay TCP or multicast video stream.");
+            break;
+        case INPUTSTREAM_SOURCE_FILE:
+            gtk_stack_set_visible_child_name(GTK_STACK(stack), "file");
+            inputstream_set_status("Open a media URL/file through AVFormat, or a YUV4MPEG FIFO/file.");
+            break;
+        case INPUTSTREAM_SOURCE_SHM:
+            gtk_stack_set_visible_child_name(GTK_STACK(stack), "shm");
+            inputstream_set_status("Connect to another local VeeJay instance through shared memory.");
+            break;
+        default:
+            break;
+    }
+}
+
+static gboolean inputstream_get_selected_ndi(gchar **name_out)
+{
+    GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_ndi_sources");
+    GtkTreeIter iter;
+    GtkTreeModel *model = NULL;
+
+    if(name_out)
+        *name_out = NULL;
+    if(!GTK_IS_TREE_VIEW(tree))
+        return FALSE;
+
+    GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+    if(!gtk_tree_selection_get_selected(selection, &model, &iter))
+        return FALSE;
+
+    gchar *name = NULL;
+    gtk_tree_model_get(model, &iter, INPUTSTREAM_NDI_NAME, &name, -1);
+    if(!name || !name[0]) {
+        g_free(name);
+        return FALSE;
+    }
+
+    if(name_out)
+        *name_out = name;
+    else
+        g_free(name);
+    return TRUE;
+}
+
+void on_inputstream_create_clicked(GtkWidget *widget, gpointer user_data)
+{
+    (void)widget;
+    (void)user_data;
+
+    GtkWidget *source_combo = glade_xml_get_widget_(info->main_window, "inputstream_source_type");
+    GtkWidget *dialog = glade_xml_get_widget_(info->main_window, "inputstream_window");
+    int source_type = GTK_IS_COMBO_BOX(source_combo) ?
+                      gtk_combo_box_get_active(GTK_COMBO_BOX(source_combo)) :
+                      INPUTSTREAM_SOURCE_NDI;
+    gboolean sent = FALSE;
+
+    switch(source_type) {
+        case INPUTSTREAM_SOURCE_NDI: {
+            gchar *source = NULL;
+            if(!inputstream_get_selected_ndi(&source)) {
+                inputstream_set_status("Select an NDI source first.");
+                return;
+            }
+            multi_vims(VIMS_NDI_INPUT_SET, "%s", source);
+            g_free(source);
+            sent = TRUE;
+            break;
+        }
+
+        case INPUTSTREAM_SOURCE_V4L: {
+            GtkWidget *tree = glade_xml_get_widget_(info->main_window, "tree_v4ldevices");
+            GtkTreeIter iter;
+            GtkTreeModel *model = NULL;
+
+            if(!GTK_IS_TREE_VIEW(tree) ||
+               !gtk_tree_selection_get_selected(gtk_tree_view_get_selection(GTK_TREE_VIEW(tree)),
+                                                &model,
+                                                &iter)) {
+                inputstream_set_status("Select a video capture device first.");
+                return;
+            }
+
+            gchar *location = NULL;
+            gfloat channel = 1.0f;
+            gint device = -1;
+            gtk_tree_model_get(model, &iter,
+                               V4L_LOCATION, &location,
+                               V4L_SPINBOX, &channel,
+                               -1);
+            if(location)
+                sscanf(location, "/dev/video%d", &device);
+            g_free(location);
+
+            if(device < 0) {
+                inputstream_set_status("The selected capture device is invalid.");
+                return;
+            }
+
+            multi_vims(VIMS_STREAM_NEW_V4L, "%d %d", device, (int)channel);
+            sent = TRUE;
+            break;
+        }
+
+        case INPUTSTREAM_SOURCE_NETWORK: {
+            const gchar *remote = get_text("inputstream_remote");
+            gint port = get_nums("inputstream_portnum");
+            GtkWidget *transport = glade_xml_get_widget_(info->main_window,
+                                                         "inputstream_network_transport");
+            gint mode = GTK_IS_COMBO_BOX(transport) ?
+                        gtk_combo_box_get_active(GTK_COMBO_BOX(transport)) : 0;
+
+            if(!remote || !remote[0] || port <= 0 || port > 65535) {
+                inputstream_set_status("Enter a valid host/group and port.");
+                return;
+            }
+
+            if(mode == 1)
+                multi_vims(VIMS_STREAM_NEW_MCAST, "%d %s", port, remote);
+            else
+                multi_vims(VIMS_STREAM_NEW_UNICAST, "%d %s", port, remote);
+            sent = TRUE;
+            break;
+        }
+
+        case INPUTSTREAM_SOURCE_FILE: {
+            const gchar *filename = get_text("inputstream_filename");
+            GtkWidget *mode_combo = glade_xml_get_widget_(info->main_window,
+                                                          "inputstream_file_mode");
+            gint mode = GTK_IS_COMBO_BOX(mode_combo) ?
+                        gtk_combo_box_get_active(GTK_COMBO_BOX(mode_combo)) : 0;
+
+            if(!filename || !filename[0]) {
+                inputstream_set_status("Enter a media URL or filename.");
+                return;
+            }
+
+            if(mode == 1)
+                multi_vims(VIMS_STREAM_NEW_Y4M, "%s", filename);
+            else
+                multi_vims(VIMS_STREAM_NEW_AVFORMAT, "%s", filename);
+            sent = TRUE;
+            break;
+        }
+
+        case INPUTSTREAM_SOURCE_SHM: {
+            gint port = get_nums("inputstream_shm_port");
+            if(port <= 0 || port > 65535) {
+                inputstream_set_status("Enter a valid VeeJay port for shared-memory input.");
+                return;
+            }
+            multi_vims(VIMS_STREAM_NEW_SHARED, "%d %d", port, 0);
+            sent = TRUE;
+            break;
+        }
+
+        default:
+            inputstream_set_status("Select an input source type.");
+            return;
+    }
+
+    if(sent && dialog)
+        gtk_widget_hide(dialog);
+}
+
+void on_inputstream_ndi_row_activated(GtkTreeView *treeview,
+                                      GtkTreePath *path,
+                                      GtkTreeViewColumn *column,
+                                      gpointer user_data)
+{
+    (void)treeview;
+    (void)path;
+    (void)column;
+    on_inputstream_create_clicked(NULL, user_data);
+}
+
 void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gint mcast = is_button_toggled( "inputstream_networktype" );
@@ -6236,7 +6601,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Select Action File",FILE_FILTER_XML );
+	gchar *filename = dialog_open_file("Select input media", FILE_FILTER_DEFAULT);
 	if(filename)
 	{
 		put_text( "inputstream_filename", filename );
@@ -8067,14 +8432,22 @@ void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 {
-
-    scan_devices( "tree_v4ldevices" );
+    (void)widget;
+    (void)user_data;
 
     GtkWidget *inputstream_window = glade_xml_get_widget_(info->main_window, "inputstream_window");
-    GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
-    gtk_window_set_transient_for (GTK_WINDOW(inputstream_window),GTK_WINDOW (mainw));
-    gtk_window_set_keep_above( GTK_WINDOW(inputstream_window), TRUE );
+    GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
+    GtkWidget *source_combo = glade_xml_get_widget_(info->main_window, "inputstream_source_type");
 
+    gtk_window_set_transient_for(GTK_WINDOW(inputstream_window), GTK_WINDOW(mainw));
+
+    if(GTK_IS_COMBO_BOX(source_combo)) {
+        gtk_combo_box_set_active(GTK_COMBO_BOX(source_combo), INPUTSTREAM_SOURCE_NDI);
+        on_inputstream_source_type_changed(GTK_COMBO_BOX(source_combo), NULL);
+    }
+
+    inputstream_ndi_tree_ensure();
+    inputstream_refresh_ndi_sources();
     gtk_window_present(GTK_WINDOW(inputstream_window));
 }
 

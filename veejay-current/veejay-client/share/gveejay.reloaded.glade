@@ -15588,13 +15588,15 @@
                                       <packing>
                                         <property name="left-attach">0</property>
                                         <property name="top-attach">0</property>
-                                      </packing>
+                                        <property name="width">2</property>
+</packing>
                                     </child>
                                     <child>
                                       <object class="GtkFrame" id="stream_row5_transition_frame">
                                         <property name="visible">True</property>
                                         <property name="can-focus">False</property>
                                         <property name="hexpand">True</property>
+                                        <property name="vexpand">True</property>
                                         <property name="label-xalign">0</property>
                                         <style>
                                           <class name="stream-card"/>
@@ -15764,16 +15766,17 @@
                                         </child>
                                       </object>
                                       <packing>
-                                        <property name="left-attach">1</property>
-                                        <property name="top-attach">0</property>
-                                      </packing>
+                                        <property name="left-attach">0</property>
+                                        <property name="top-attach">1</property>
+                                        <property name="width">2</property>
+</packing>
                                     </child>
                                   </object>
                                   <packing>
-                                    <property name="expand">False</property>
+                                    <property name="expand">True</property>
                                     <property name="fill">True</property>
                                     <property name="position">0</property>
-                                  </packing>
+</packing>
                                 </child>
                               </object>
                               <packing>

@@ -22,7 +22,7 @@
 #include <string.h>
 #include "gtkpreviewcache.h"
 
-#define GVR_PREVIEW_CACHE_VERSION 3
+#define GVR_PREVIEW_CACHE_VERSION 4
 #define GVR_PREVIEW_CACHE_COLUMNS 16
 #define GVR_PREVIEW_CACHE_SAVE_DELAY_MS 1800
 

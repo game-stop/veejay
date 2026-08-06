@@ -79,6 +79,10 @@ int             gvr_track_already_open( void *preview, const char *hostname,    
 int             gvr_track_find_open( void *preview, const char *hostname, int port, int *track_num );
 
 int          gvr_get_preview_status( void *preview, int track_num );
+int          gvr_preview_pixbuf_get_source(GdkPixbuf *pixbuf,
+                                            int *play_mode,
+                                            int *current_id,
+                                            int *stream_type);
 
 char*        gvr_track_get_hostname( void *preview , int num );
 

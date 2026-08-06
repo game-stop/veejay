@@ -1635,6 +1635,7 @@ enum
     STREAM_WHITE = 4,
     STREAM_VIDEO4LINUX = 2,
     STREAM_DV1394 = 17,
+    STREAM_NDI = 18,
     STREAM_NETWORK = 13,
     STREAM_MCAST = 14,
     STREAM_YUV4MPEG = 1,
@@ -4716,6 +4717,7 @@ static void scan_generators( const char *name)
 #define RELOADED_TOOLTIP_LABEL_DATA "reloaded-tooltip-label"
 #define RELOADED_TOOLTIP_HIDE_SOURCE_DATA "reloaded-tooltip-hide-source"
 #define RELOADED_TOOLTIP_LIFECYCLE_DATA "reloaded-tooltip-lifecycle"
+#define RELOADED_TOOLTIP_PARENT_HOOK_DATA "reloaded-tooltip-parent-hook"
 
 
 static GtkWidget *tooltip_custom_label(GtkWindow *window)
@@ -4729,7 +4731,7 @@ static GtkWidget *tooltip_custom_label(GtkWindow *window)
 
 static GtkWindow *tooltip_custom_window_new(void)
 {
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_POPUP);
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     GtkWidget *label = gtk_label_new(NULL);
     GtkStyleContext *window_context;
     GtkStyleContext *label_context;
@@ -4743,6 +4745,8 @@ static GtkWindow *tooltip_custom_window_new(void)
     gtk_window_set_skip_pager_hint(GTK_WINDOW(window), TRUE);
     gtk_window_set_accept_focus(GTK_WINDOW(window), FALSE);
     gtk_window_set_focus_on_map(GTK_WINDOW(window), FALSE);
+    gtk_window_set_modal(GTK_WINDOW(window), FALSE);
+    gtk_window_set_keep_above(GTK_WINDOW(window), FALSE);
     gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
     gtk_window_set_gravity(GTK_WINDOW(window), GDK_GRAVITY_NORTH_WEST);
 
@@ -4864,6 +4868,65 @@ static void tooltip_custom_install_lifecycle(GtkWidget *widget)
                       GINT_TO_POINTER(1));
 }
 
+static void tooltip_custom_parent_active_changed(GObject *object,
+                                                 GParamSpec *pspec,
+                                                 gpointer user_data)
+{
+    GtkWindow *parent = GTK_WINDOW(object);
+    GtkWindow *tooltip_window = GTK_WINDOW(user_data);
+
+    (void)pspec;
+
+    if(GTK_IS_WINDOW(parent) &&
+       GTK_IS_WINDOW(tooltip_window) &&
+       !gtk_window_is_active(parent))
+    {
+        tooltip_custom_cancel_hide(tooltip_window);
+        gtk_widget_hide(GTK_WIDGET(tooltip_window));
+    }
+}
+
+static void tooltip_custom_parent_unmapped(GtkWidget *widget,
+                                           gpointer user_data)
+{
+    GtkWindow *tooltip_window = GTK_WINDOW(user_data);
+
+    (void)widget;
+
+    if(GTK_IS_WINDOW(tooltip_window)) {
+        tooltip_custom_cancel_hide(tooltip_window);
+        gtk_widget_hide(GTK_WIDGET(tooltip_window));
+    }
+}
+
+static void tooltip_custom_bind_parent(GtkWindow *tooltip_window,
+                                       GtkWindow *parent)
+{
+    if(!GTK_IS_WINDOW(tooltip_window) || !GTK_IS_WINDOW(parent))
+        return;
+
+    gtk_window_set_transient_for(tooltip_window, parent);
+
+    if(g_object_get_data(G_OBJECT(parent),
+                         RELOADED_TOOLTIP_PARENT_HOOK_DATA))
+        return;
+
+    g_signal_connect_object(parent,
+                            "notify::is-active",
+                            G_CALLBACK(tooltip_custom_parent_active_changed),
+                            tooltip_window,
+                            0);
+    g_signal_connect_object(parent,
+                            "unmap",
+                            G_CALLBACK(tooltip_custom_parent_unmapped),
+                            tooltip_window,
+                            0);
+
+    g_object_set_data(G_OBJECT(parent),
+                      RELOADED_TOOLTIP_PARENT_HOOK_DATA,
+                      GINT_TO_POINTER(1));
+}
+
 static void tooltip_custom_show_now(GtkWidget *widget,
                                     GtkWindow *window)
 {
@@ -4903,8 +4966,13 @@ static void tooltip_custom_show_now(GtkWidget *widget,
 
     tooltip_custom_cancel_hide(window);
 
-    gtk_window_set_transient_for(window, GTK_WINDOW(toplevel));
+    tooltip_custom_bind_parent(window, GTK_WINDOW(toplevel));
     gtk_window_set_screen(window, gtk_widget_get_screen(widget));
+
+    if(!gtk_window_is_active(GTK_WINDOW(toplevel))) {
+        gtk_widget_hide(GTK_WIDGET(window));
+        return;
+    }
 
     if(!gtk_widget_translate_coordinates(widget,
                                          toplevel,
@@ -5651,6 +5719,9 @@ void on_devicelist_row_activated(GtkTreeView *treeview,
                 num,
                 channel
                 );
+        GtkWidget *dialog = glade_xml_get_widget_(info->main_window, "inputstream_window");
+        if(dialog)
+            gtk_widget_hide(dialog);
     }
 }
 
@@ -5857,20 +5928,11 @@ static GtkWidget *ui_transition_shape_selector_replace(int cache_id)
         return NULL;
 
     selector = gvr_shape_selector_new();
-    if(cache_id == WIDGET_SAMPLE_TRANSITION_SHAPE) {
-        gtk_widget_set_hexpand(selector, TRUE);
-        gtk_widget_set_vexpand(selector, TRUE);
-        gtk_widget_set_size_request(selector, -1, 150);
-        gtk_widget_set_halign(selector, GTK_ALIGN_FILL);
-        gtk_widget_set_valign(selector, GTK_ALIGN_FILL);
-    }
-    else {
-        gtk_widget_set_hexpand(selector, TRUE);
-        gtk_widget_set_vexpand(selector, FALSE);
-        gtk_widget_set_size_request(selector, -1, 118);
-        gtk_widget_set_halign(selector, GTK_ALIGN_FILL);
-        gtk_widget_set_valign(selector, GTK_ALIGN_START);
-    }
+    gtk_widget_set_hexpand(selector, TRUE);
+    gtk_widget_set_vexpand(selector, TRUE);
+    gtk_widget_set_size_request(selector, -1, 150);
+    gtk_widget_set_halign(selector, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(selector, GTK_ALIGN_FILL);
 
     if(GTK_IS_GRID(parent)) {
         int left = 0;
@@ -10795,6 +10857,7 @@ const char *get_stream_prefix(int type)
         case STREAM_MCAST:         return "multicast";
         case STREAM_CLONE:         return "clone";
         case STREAM_DV1394:        return "dv1394";
+        case STREAM_NDI:           return "NDI";
         default:                   return "unknown";
     }
 }
@@ -14723,6 +14786,7 @@ static const vims_reply_contract_t vims_reply_contracts[] =
     { VIMS_GET_SAMPLELIST,          VIMS_REPLY_FRAMED,       8,  "Sample-list Base64" },
     { VIMS_SEQUENCE_TIMELINE,       VIMS_REPLY_FRAMED,       8,  "Sequence timeline" },
     { VIMS_SEQUENCE_PATTERN_GET,    VIMS_REPLY_FRAMED,       8,  "Sequence pattern" },
+    { VIMS_NDI_SOURCES,             VIMS_REPLY_FRAMED,       8,  "NDI source discovery" },
     { 0,                            0,                       0,  NULL }
 };
 
@@ -27173,6 +27237,9 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
     int id = info->status_tokens[CURRENT_ID];
     int pm = info->status_tokens[PLAY_MODE];
     int type = (pm == MODE_STREAM ? info->status_tokens[STREAM_TYPE] : MODE_SAMPLE);
+    int old_id = -1;
+    int old_type = -1;
+    gboolean occupied = FALSE;
 
     if(info->selection_slot) {
         id = info->selection_slot->sample_id;
@@ -27182,12 +27249,26 @@ static void on_sequence_bank_view_slot_assign(GtkWidget *widget, gint bank, gint
     if(id <= 0)
         return;
 
+    if(info->sequence_bank_view)
+        occupied = gvr_sequence_bank_view_get_slot(info->sequence_bank_view,
+                                                    bank,
+                                                    slot,
+                                                    &old_id,
+                                                    &old_type) &&
+                   old_id > 0;
+
+    if(occupied && old_id == id && old_type == type)
+        return;
+
     sequence_bank_view_send_slot_update(bank, slot, id, type);
+
     if(info->sequence_bank_view)
         gvr_sequence_bank_view_set_slot(info->sequence_bank_view, bank, slot, id, type);
+
     sequence_vims_bind_cell(bank, slot, id, type);
     sequence_vims_timeline_invalidate(bank);
     sequence_vims_schedule_target_sync();
+
     info->uc.reload_hint_checksums[HINT_SEQ_ACT] = -1;
     info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 }

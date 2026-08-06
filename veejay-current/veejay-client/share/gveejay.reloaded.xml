@@ -787,7 +787,7 @@
   </object>
   <object class="GtkWindow" id="generator_window">
     <property name="can_focus">False</property>
-    <property name="title" translatable="yes">GVeejay Reloaded - New input stream</property>
+    <property name="title" translatable="yes">Reloaded - New input stream</property>
     <property name="default_width">400</property>
     <property name="default_height">400</property>
     <property name="icon">icon_stream.png</property>
@@ -14491,7 +14491,7 @@
   </object>
   <object class="GtkWindow" id="inputstream_window">
     <property name="can_focus">False</property>
-    <property name="title" translatable="yes">GVeejay Reloaded - New input stream</property>
+    <property name="title" translatable="yes">Reloaded - New input stream</property>
     <property name="default_width">400</property>
     <property name="default_height">400</property>
     <property name="icon">icon_stream.png</property>

@@ -92,6 +92,13 @@ typedef struct
 	gboolean preview_stop;
 	gboolean preview_request;
 	int preview_alpha_only;
+	gboolean preview_status_valid;
+	int preview_status_mode;
+	int preview_status_id;
+	int preview_status_type;
+	int preview_status_stable;
+	unsigned int preview_generation;
+	unsigned int preview_request_generation;
 	int preview_failures;
 	int preview_connected;
 	GdkPixbuf *preview_pixbuf;
@@ -120,6 +127,7 @@ static int gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 static int gvr_veejay_grabber_step( void *data, void *caller_data );
 static gpointer gvr_preview_worker( gpointer data );
 static void gvr_preview_request_frame( veejay_track_t *v );
+static void gvr_preview_observe_status( veejay_track_t *v );
 
 
 static int gvr_status_to_arr(const char *status, int *tokens)
@@ -685,6 +693,79 @@ static int gvr_fetch_sequence_timeline(veejay_track_t *v, int bank)
 }
 
 
+static void gvr_preview_observe_status(veejay_track_t *v)
+{
+    const int mode = v->status_tokens[PLAY_MODE];
+    const int id = v->status_tokens[CURRENT_ID];
+    const int type = mode == MODE_STREAM ? v->status_tokens[STREAM_TYPE] : 0;
+    GdkPixbuf *old = NULL;
+
+    g_mutex_lock(&v->preview_lock);
+
+    if(v->preview_status_valid &&
+       v->preview_status_mode == mode &&
+       v->preview_status_id == id &&
+       v->preview_status_type == type)
+    {
+        if(v->preview_status_stable < INT_MAX)
+            v->preview_status_stable++;
+    }
+    else {
+        v->preview_status_valid = TRUE;
+        v->preview_status_mode = mode;
+        v->preview_status_id = id;
+        v->preview_status_type = type;
+        v->preview_status_stable = 0;
+
+        v->preview_generation++;
+        v->preview_request = FALSE;
+        v->have_frame = 0;
+
+        old = v->preview_pixbuf;
+        v->preview_pixbuf = NULL;
+    }
+
+    g_mutex_unlock(&v->preview_lock);
+
+    if(old)
+        g_object_unref(old);
+}
+
+static int gvr_preview_status_ready_locked(const veejay_track_t *v)
+{
+    int mode;
+    int start;
+    int end;
+    int frame;
+
+    if(!v->preview_status_valid)
+        return 0;
+
+    mode = v->preview_status_mode;
+
+    if(mode == MODE_SAMPLE || mode == MODE_PATTERN) {
+        if(v->preview_status_id <= 0 || v->preview_status_stable < 1)
+            return 0;
+
+        start = v->status_tokens[SAMPLE_START];
+        end = v->status_tokens[SAMPLE_END];
+        frame = v->status_tokens[FRAME_NUM];
+
+        if(end < start) {
+            int tmp = start;
+            start = end;
+            end = tmp;
+        }
+
+        return frame >= start && frame <= end;
+    }
+
+    if(mode == MODE_STREAM)
+        return v->preview_status_id > 0 && v->preview_status_stable >= 1;
+
+    return 1;
+}
+
 static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
     (void) vp;
@@ -762,6 +843,8 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
                            v->status_buffer);
 				return 0;
 			}
+
+            gvr_preview_observe_status(v);
 
             if(v->is_master)
                 vj_gui_process_pattern_status(v->status_tokens);
@@ -865,6 +948,7 @@ static gpointer gvr_preview_worker(gpointer data)
 		int width;
 		int height;
 		int alpha_only;
+		unsigned int request_generation;
 
 		g_mutex_lock(&v->preview_lock);
 		while(!v->preview_stop && !v->preview_request)
@@ -879,6 +963,7 @@ static gpointer gvr_preview_worker(gpointer data)
 		width = v->width;
 		height = v->height;
 		alpha_only = v->preview_alpha_only;
+		request_generation = v->preview_request_generation;
 		if(!v->preview || width <= 0 || height <= 0) {
 			g_mutex_unlock(&v->preview_lock);
 			continue;
@@ -928,7 +1013,11 @@ static gpointer gvr_preview_worker(gpointer data)
 
 		GdkPixbuf *old = NULL;
 		g_mutex_lock(&v->preview_lock);
-		if(!v->preview_stop && v->preview && v->width == width && v->height == height) {
+		if(!v->preview_stop &&
+		   v->preview &&
+		   v->width == width &&
+		   v->height == height &&
+		   v->preview_generation == request_generation) {
 			old = v->preview_pixbuf;
 			v->preview_pixbuf = frame;
 			v->have_frame = 1;
@@ -948,8 +1037,13 @@ static gpointer gvr_preview_worker(gpointer data)
 static void gvr_preview_request_frame(veejay_track_t *v)
 {
 	g_mutex_lock(&v->preview_lock);
-	if(!v->preview_stop && v->preview && v->width > 0 && v->height > 0) {
+	if(!v->preview_stop &&
+	   v->preview &&
+	   v->width > 0 &&
+	   v->height > 0 &&
+	   gvr_preview_status_ready_locked(v)) {
 		v->preview_alpha_only = alphaonly_view;
+		v->preview_request_generation = v->preview_generation;
 		v->preview_request = TRUE;
 		g_cond_signal(&v->preview_cond);
 	}
@@ -1586,8 +1680,9 @@ int		gvr_track_configure( void *preview, int track_num, int wid, int hei )
 			v->have_frame = 0;
 			old = v->preview_pixbuf;
 			v->preview_pixbuf = NULL;
-			if(v->preview) {
+			if(v->preview && gvr_preview_status_ready_locked(v)) {
 				v->preview_alpha_only = alphaonly_view;
+				v->preview_request_generation = v->preview_generation;
 				v->preview_request = TRUE;
 				g_cond_signal(&v->preview_cond);
 			}
@@ -1652,8 +1747,9 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	v->preview = status;
 	width = v->width;
 	height = v->height;
-	if(v->preview) {
+	if(v->preview && gvr_preview_status_ready_locked(v)) {
 		v->preview_alpha_only = alphaonly_view;
+		v->preview_request_generation = v->preview_generation;
 		v->preview_request = TRUE;
 		g_cond_signal(&v->preview_cond);
 	}
