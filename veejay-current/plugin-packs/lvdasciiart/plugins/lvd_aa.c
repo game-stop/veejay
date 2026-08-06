@@ -70,9 +70,9 @@
 #include FT_STROKER_H
 
 #include "livido.h"
-#include "utils.h"
-
 LIVIDO_PLUGIN
+
+#include "utils.h"
 #include "livido-utils.c" // NOSONAR: LiViDO plugin imports are translation-unit local
 
 #define NUM_GLYPHS 256
