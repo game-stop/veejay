@@ -28,6 +28,7 @@
 #include "waterrippletv.h"
 
 #define WATERRIPPLETV_PARAMS 5
+#define WATERRIPPLE_POINT 16
 
 #define P_REFRESH_FREQ 0
 #define P_WAVESPEED    1
@@ -51,7 +52,6 @@ typedef struct {
 
     int sqrtable[256];
 
-    int point;
     int tick;
     int last_fresh_rate;
     int n_threads;
@@ -216,7 +216,6 @@ void *waterrippletv_malloc(int width, int height)
 
     setTable(r);
 
-    r->point = 16;
     r->tick = 0;
     r->last_fresh_rate = -1;
     r->wfastrand_val = 0x12345678u;
@@ -321,7 +320,7 @@ static void waterripple_inject_drive_drops(ripple_tv *r,
         return;
 
     const int power_units = 2 + ((ripple_power * 30 + 500) / 1000);
-    const int power = -(power_units << r->point);
+    const int power = -(power_units << WATERRIPPLE_POINT);
 
     for(int i = 0; i < drops; i++)
         drop(r, power);
@@ -335,7 +334,7 @@ static void raindrop(ripple_tv *r)
                 r->rain_period = (int)(wfastrand(r) >> 23) + 100;
                 r->drop_prob = 0;
                 r->drop_prob_increment = 0x00ffffff / r->rain_period;
-                r->drop_power = (-((int)(wfastrand(r) >> 28)) - 2) << r->point;
+                r->drop_power = -((((int)(wfastrand(r) >> 28)) + 2) << WATERRIPPLE_POINT);
                 r->drops_per_frame_max = 2 << (wfastrand(r) >> 30);
                 r->rain_stat = 1;
                 break;
@@ -492,8 +491,8 @@ static void waterripple_calc_vtable(ripple_tv *rip)
             const int idx = row + x;
             const int vi = idx << 1;
 
-            const int dh = ((rip->map1[idx] - rip->map1[idx + 1]) >> (rip->point - 1)) & 0xff;
-            const int dv = ((rip->map1[idx] - rip->map1[idx + wi]) >> (rip->point - 1)) & 0xff;
+            const int dh = ((rip->map1[idx] - rip->map1[idx + 1]) >> (WATERRIPPLE_POINT - 1)) & 0xff;
+            const int dv = ((rip->map1[idx] - rip->map1[idx + wi]) >> (WATERRIPPLE_POINT - 1)) & 0xff;
 
             rip->vtable[vi]     = (int8_t)((uint8_t)rip->sqrtable[dh]);
             rip->vtable[vi + 1] = (int8_t)((uint8_t)rip->sqrtable[dv]);

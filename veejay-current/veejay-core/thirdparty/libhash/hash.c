@@ -518,7 +518,7 @@ hnode_t *hash_scan_next(hscan_t *scan)
 	if (next->next) {	/* 4 */
 	    scan->next = next->next;
 	} else {
-            hash_val_t chain = (next->hkey & hash->mask) + 1;
+            hash_val_t chain = scan->chain + 1;
 	    while (chain < nchains && hash->table[chain] == 0)	/* 5 */
 	    	chain++;
 	    if (chain < nchains) {	/* 6 */
@@ -801,6 +801,8 @@ hnode_t *hnode_create(void *data)
     hnode_t *node = malloc(sizeof *node);
     if (node) {
 	node->data = data;
+	node->key = NULL;
+	node->hkey = 0;
 	node->next = NULL;
     }
     return node;
@@ -813,6 +815,8 @@ hnode_t *hnode_create(void *data)
 hnode_t *hnode_init(hnode_t *hnode, void *data)
 {
     hnode->data = data;
+    hnode->key = NULL;
+    hnode->hkey = 0;
     hnode->next = NULL;
     return hnode;
 }
