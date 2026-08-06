@@ -38,6 +38,7 @@ typedef struct {
     guint references;
     gboolean probed;
     gchar version[160];
+    gchar last_error[512];
 } DirectorNdiRuntime;
 
 static DirectorNdiRuntime ndi_runtime;
@@ -47,6 +48,7 @@ static void director_ndi_runtime_init_once(void)
 {
     g_mutex_init(&ndi_runtime.mutex);
     g_strlcpy(ndi_runtime.version, "unavailable", sizeof(ndi_runtime.version));
+    g_strlcpy(ndi_runtime.last_error, "NDI runtime has not been probed", sizeof(ndi_runtime.last_error));
 }
 
 static void director_ndi_runtime_init(void)
@@ -57,17 +59,35 @@ static void director_ndi_runtime_init(void)
     }
 }
 
+static void director_ndi_runtime_error(const gchar *path, const gchar *detail)
+{
+    g_snprintf(ndi_runtime.last_error, sizeof(ndi_runtime.last_error), "%s%s%s",
+               path && *path ? path : "NDI runtime",
+               detail && *detail ? ": " : "",
+               detail && *detail ? detail : "load failed");
+}
+
 static gboolean director_ndi_try_library(const gchar *path)
 {
     gpointer symbol = NULL;
     DirectorNdiLoadFunc load = NULL;
 
-    ndi_runtime.library = dlopen(path, RTLD_LOCAL | RTLD_LAZY);
-    if(!ndi_runtime.library)
+    if(!path || !*path)
         return FALSE;
 
+    dlerror();
+    ndi_runtime.library = dlopen(path, RTLD_LOCAL | RTLD_LAZY);
+    if(!ndi_runtime.library) {
+        director_ndi_runtime_error(path, dlerror());
+        return FALSE;
+    }
+
+    dlerror();
     symbol = dlsym(ndi_runtime.library, "NDIlib_v5_load");
-    if(!symbol) {
+    const gchar *symbol_error = dlerror();
+    if(!symbol || symbol_error) {
+        director_ndi_runtime_error(path,
+                                   symbol_error ? symbol_error : "NDIlib_v5_load is missing");
         dlclose(ndi_runtime.library);
         ndi_runtime.library = NULL;
         return FALSE;
@@ -77,6 +97,7 @@ static gboolean director_ndi_try_library(const gchar *path)
     ndi_runtime.api = load();
     if(!ndi_runtime.api || !ndi_runtime.api->initialize ||
        !ndi_runtime.api->initialize()) {
+        director_ndi_runtime_error(path, "NDI runtime initialization failed");
         ndi_runtime.api = NULL;
         dlclose(ndi_runtime.library);
         ndi_runtime.library = NULL;
@@ -87,7 +108,28 @@ static gboolean director_ndi_try_library(const gchar *path)
     gchar *valid_version = g_utf8_make_valid(version ? version : "NDI runtime", -1);
     g_strlcpy(ndi_runtime.version, valid_version, sizeof(ndi_runtime.version));
     g_free(valid_version);
+    ndi_runtime.last_error[0] = '\0';
     return TRUE;
+}
+
+static void director_ndi_try_folder(const gchar *folder)
+{
+    if(!folder || !*folder || ndi_runtime.api)
+        return;
+
+    const gchar *names[] = {
+        NDILIB_LIBRARY_NAME,
+        "libndi.so.6",
+        "libndi.so",
+        "libndi.so.5",
+        NULL
+    };
+    for(gint i = 0; !ndi_runtime.api && names[i]; i++) {
+        gchar *candidate = g_path_is_absolute(names[i]) ?
+                           g_strdup(names[i]) : g_build_filename(folder, names[i], NULL);
+        director_ndi_try_library(candidate);
+        g_free(candidate);
+    }
 }
 
 static gboolean director_ndi_acquire(void)
@@ -96,6 +138,21 @@ static gboolean director_ndi_acquire(void)
     g_mutex_lock(&ndi_runtime.mutex);
     if(!ndi_runtime.api && !ndi_runtime.probed) {
         ndi_runtime.probed = TRUE;
+
+        const gchar *env_names[] = {
+#ifdef NDILIB_REDIST_FOLDER
+            NDILIB_REDIST_FOLDER,
+#endif
+            "NDI_RUNTIME_DIR_V6",
+            "NDI_RUNTIME_DIR_V5",
+            NULL
+        };
+        for(gint i = 0; !ndi_runtime.api && env_names[i]; i++) {
+            const gchar *folder = g_getenv(env_names[i]);
+            if(folder && *folder)
+                director_ndi_try_folder(folder);
+        }
+
         const gchar *libraries[] = {
             NDILIB_LIBRARY_NAME,
             "libndi.so.6",
@@ -103,16 +160,21 @@ static gboolean director_ndi_acquire(void)
             "libndi.so.5",
             NULL
         };
-#ifdef NDILIB_REDIST_FOLDER
-        const gchar *folder = g_getenv(NDILIB_REDIST_FOLDER);
-        if(folder && *folder) {
-            gchar *candidate = g_build_filename(folder, NDILIB_LIBRARY_NAME, NULL);
-            director_ndi_try_library(candidate);
-            g_free(candidate);
-        }
-#endif
         for(gint i = 0; !ndi_runtime.api && libraries[i]; i++)
             director_ndi_try_library(libraries[i]);
+
+        const gchar *folders[] = {
+            "/usr/local/lib",
+            "/usr/local/lib64",
+            "/usr/lib",
+            "/usr/lib64",
+            "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/opt/ndi/lib",
+            NULL
+        };
+        for(gint i = 0; !ndi_runtime.api && folders[i]; i++)
+            director_ndi_try_folder(folders[i]);
     }
     if(ndi_runtime.api)
         ndi_runtime.references++;
@@ -142,6 +204,7 @@ static void director_ndi_runtime_allow_reprobe(void)
         ndi_runtime.api = NULL;
         ndi_runtime.probed = FALSE;
         g_strlcpy(ndi_runtime.version, "unavailable", sizeof(ndi_runtime.version));
+        g_strlcpy(ndi_runtime.last_error, "NDI runtime has not been probed", sizeof(ndi_runtime.last_error));
     }
     g_mutex_unlock(&ndi_runtime.mutex);
 }
@@ -187,8 +250,9 @@ typedef struct {
 static DirectorNdiFinder *director_ndi_finder_create(GError **error)
 {
     if(!director_ndi_acquire()) {
-        g_set_error_literal(error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
-                            "The NDI runtime is not installed or could not be loaded");
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_NOT_SUPPORTED,
+                    "The NDI runtime could not be loaded: %s. Set NDI_RUNTIME_DIR_V6 to the directory containing libndi.so.6 when it is installed outside the system library path",
+                    ndi_runtime.last_error[0] ? ndi_runtime.last_error : "libndi.so.6 was not found");
         return NULL;
     }
 
@@ -751,6 +815,7 @@ void director_ndi_shutdown(void)
         ndi_runtime.api = NULL;
         ndi_runtime.probed = FALSE;
         g_strlcpy(ndi_runtime.version, "unavailable", sizeof(ndi_runtime.version));
+        g_strlcpy(ndi_runtime.last_error, "NDI runtime has not been probed", sizeof(ndi_runtime.last_error));
     }
     g_mutex_unlock(&ndi_runtime.mutex);
 }

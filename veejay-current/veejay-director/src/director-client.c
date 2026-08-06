@@ -32,7 +32,6 @@
 #define DIRECTOR_RESPONSE_MAX 65536
 #define DIRECTOR_RESPONSE_IDLE_MS 60
 #define DIRECTOR_RESPONSE_TIMEOUT_MS 600
-#define DIRECTOR_NDI_APPLY_TIMEOUT_MS 2500
 
 typedef enum {
     DIRECTOR_REQUEST_COMMAND = 0,
@@ -46,7 +45,6 @@ typedef struct {
     gchar *command;
     DirectorClientEvent event;
     gsize header_digits;
-    gboolean query_ndi_after;
 } DirectorRequest;
 
 typedef struct {
@@ -66,6 +64,7 @@ struct _DirectorClient {
     gboolean started;
     gboolean connected;
     gboolean refresh_pending;
+    gboolean identity_error_reported;
     DirectorClientEventFunc callback;
     gpointer user_data;
     gint ref_count;
@@ -158,6 +157,52 @@ static void director_clear_refresh_pending(DirectorClient *client)
     g_mutex_unlock(&client->mutex);
 }
 
+static gboolean director_identity_response_matches(DirectorClient *client,
+                                                   const gchar *response,
+                                                   gchar **message)
+{
+    if(message)
+        *message = NULL;
+    if(!client || !client->instance || !response)
+        return FALSE;
+
+    gchar *copy = g_strdup(response);
+    g_strstrip(copy);
+    gchar **tokens = g_strsplit_set(copy, " \t\r\n", -1);
+    const gchar *role = NULL;
+    const gchar *id = NULL;
+    gint port = -1;
+    for(gint i = 0; tokens && tokens[i]; i++) {
+        if(g_str_has_prefix(tokens[i], "role="))
+            role = tokens[i] + 5;
+        else if(g_str_has_prefix(tokens[i], "id="))
+            id = tokens[i] + 3;
+        else if(g_str_has_prefix(tokens[i], "port=")) {
+            gchar *end = NULL;
+            const gint64 parsed = g_ascii_strtoll(tokens[i] + 5, &end, 10);
+            if(end && *end == '\0' && parsed > 0 && parsed <= 65535)
+                port = (gint)parsed;
+        }
+    }
+
+    const gchar *expected_role = director_role_name(client->instance->role);
+    const gboolean match = role && id && port > 0 &&
+        g_strcmp0(role, expected_role) == 0 &&
+        g_strcmp0(id, client->instance->id) == 0 &&
+        port == client->port;
+    if(!match && message)
+        *message = g_strdup_printf(
+            "Control endpoint %s:%d belongs to %s/%s on port %d; expected %s/%s on port %d",
+            client->host, client->port,
+            role && *role ? role : "unknown",
+            id && *id ? id : "unknown", port,
+            expected_role, client->instance->id, client->port);
+
+    g_strfreev(tokens);
+    g_free(copy);
+    return match;
+}
+
 static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
 {
     director_wire_close(wire);
@@ -166,7 +211,32 @@ static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
                               client->port + VJ_CMD_PORT,
                               DIRECTOR_CONNECT_TIMEOUT_MS))
         return FALSE;
+
+    gchar response[DIRECTOR_RESPONSE_MAX];
+    if(!director_wire_query_timed(wire, "288:;", response, sizeof(response),
+                                  DIRECTOR_RESPONSE_TIMEOUT_MS,
+                                  DIRECTOR_RESPONSE_IDLE_MS, NULL)) {
+        director_wire_close(wire);
+        return FALSE;
+    }
+
+    gchar *identity_error = NULL;
+    if(!director_identity_response_matches(client, response, &identity_error)) {
+        if(!client->identity_error_reported) {
+            director_dispatch(client, DIRECTOR_CLIENT_ERROR,
+                              identity_error ? identity_error :
+                              "Control endpoint identity did not match the configured VeeJay instance");
+            client->identity_error_reported = TRUE;
+        }
+        g_free(identity_error);
+        director_wire_close(wire);
+        return FALSE;
+    }
+
+    client->identity_error_reported = FALSE;
     director_set_connected(client, TRUE);
+    g_strstrip(response);
+    director_dispatch(client, DIRECTOR_CLIENT_INSTANCE_STATUS, response);
     return TRUE;
 }
 
@@ -262,10 +332,6 @@ static gboolean director_process_request(DirectorClient *client,
             break;
         case DIRECTOR_REQUEST_COMMAND:
             ok = director_send_raw(wire, request->command);
-            if(ok && request->query_ndi_after)
-                ok = director_query_timeout(client, wire, "290:;",
-                                            DIRECTOR_CLIENT_NDI_STATUS_APPLIED, NULL,
-                                            DIRECTOR_NDI_APPLY_TIMEOUT_MS);
             break;
         case DIRECTOR_REQUEST_QUERY_FRAMED:
             ok = director_query_framed(client, wire, request->command,
@@ -440,8 +506,7 @@ DirectorInstance *director_client_get_instance(DirectorClient *client)
 }
 
 static gboolean director_client_queue_command(DirectorClient *client,
-                                                const gchar *command,
-                                                gboolean query_ndi_after)
+                                                const gchar *command)
 {
     if(!client || !command || !*command)
         return FALSE;
@@ -455,14 +520,28 @@ static gboolean director_client_queue_command(DirectorClient *client,
     DirectorRequest *request = g_new0(DirectorRequest, 1);
     request->type = DIRECTOR_REQUEST_COMMAND;
     request->command = g_strdup(command);
-    request->query_ndi_after = query_ndi_after;
     g_async_queue_push(client->requests, request);
     return TRUE;
 }
 
 void director_client_send(DirectorClient *client, const gchar *command)
 {
-    (void)director_client_queue_command(client, command, FALSE);
+    (void)director_client_queue_command(client, command);
+}
+
+gboolean director_client_set_shm_output(DirectorClient *client, gboolean enabled)
+{
+    return director_client_queue_command(client, enabled ? "025:1;" : "025:0;");
+}
+
+gboolean director_client_select_input_route(DirectorClient *client, gint stream_id)
+{
+    if(!client || stream_id <= 0)
+        return FALSE;
+    gchar *command = g_strdup_printf("297:%d;", stream_id);
+    const gboolean queued = director_client_queue_command(client, command);
+    g_free(command);
+    return queued;
 }
 
 static gboolean director_client_ndi_argument_valid(const gchar *value)
@@ -482,7 +561,7 @@ gboolean director_client_set_ndi_input(DirectorClient *client, const gchar *sour
     if(!director_client_ndi_argument_valid(value))
         return FALSE;
     gchar *command = g_strdup_printf("291:%s;", value);
-    const gboolean queued = director_client_queue_command(client, command, TRUE);
+    const gboolean queued = director_client_queue_command(client, command);
     g_free(command);
     return queued;
 }
@@ -494,7 +573,7 @@ gboolean director_client_set_ndi_output(DirectorClient *client, gboolean enabled
     if(!director_client_ndi_argument_valid(value))
         return FALSE;
     gchar *command = g_strdup_printf("292:%d %s;", enabled ? 1 : 0, value);
-    const gboolean queued = director_client_queue_command(client, command, TRUE);
+    const gboolean queued = director_client_queue_command(client, command);
     g_free(command);
     return queued;
 }
@@ -504,7 +583,7 @@ gboolean director_client_remove_input_route_id(DirectorClient *client, gint stre
     if(!client || stream_id <= 0)
         return FALSE;
     gchar *command = g_strdup_printf("293:0 %d -;", stream_id);
-    const gboolean queued = director_client_queue_command(client, command, FALSE);
+    const gboolean queued = director_client_queue_command(client, command);
     g_free(command);
     return queued;
 }
@@ -519,8 +598,7 @@ gboolean director_client_remove_input_route(DirectorClient *client,
        !director_client_ndi_argument_valid(value))
         return FALSE;
     gchar *command = g_strdup_printf("293:%d %d %s;", transport, key_or_port, value);
-    const gboolean queued = director_client_queue_command(
-        client, command, transport == DIRECTOR_INPUT_ROUTE_NDI);
+    const gboolean queued = director_client_queue_command(client, command);
     g_free(command);
     return queued;
 }

@@ -31,7 +31,6 @@ typedef enum {
     DIRECTOR_CLIENT_PROJECTION_STATUS,
     DIRECTOR_CLIENT_PERF_STATUS,
     DIRECTOR_CLIENT_NDI_STATUS,
-    DIRECTOR_CLIENT_NDI_STATUS_APPLIED,
     DIRECTOR_CLIENT_DEVICE_LIST,
     DIRECTOR_CLIENT_V4L_STATUS,
     DIRECTOR_CLIENT_ERROR
@@ -51,6 +50,8 @@ void director_client_free(DirectorClient *client);
 DirectorInstance *director_client_get_instance(DirectorClient *client);
 
 void director_client_send(DirectorClient *client, const gchar *command);
+gboolean director_client_set_shm_output(DirectorClient *client, gboolean enabled);
+gboolean director_client_select_input_route(DirectorClient *client, gint stream_id);
 gboolean director_client_set_ndi_input(DirectorClient *client, const gchar *source_name);
 gboolean director_client_set_ndi_output(DirectorClient *client, gboolean enabled, const gchar *sender_name);
 gboolean director_client_remove_input_route_id(DirectorClient *client, gint stream_id);

@@ -21,6 +21,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <glib/gstdio.h>
 
 #define DIRECTOR_ERROR director_error_quark()
@@ -64,6 +67,10 @@ DirectorInputRoute *director_input_route_copy(const DirectorInputRoute *route)
         route->source_instance_id, route->host, route->port, route->ndi_source_name);
     copy->shm_key = route->shm_key;
     copy->applied_connection = route->applied_connection;
+    copy->apply_pending = route->apply_pending;
+    copy->select_when_ready = route->select_when_ready;
+    copy->apply_requested_us = route->apply_requested_us;
+    copy->select_requested_us = route->select_requested_us;
     copy->live_stream_id = route->live_stream_id;
     copy->live_active = route->live_active;
     copy->live_current = route->live_current;
@@ -689,6 +696,23 @@ void director_show_set_ndi_patch_position(DirectorShow *show,
     position->y = y;
     g_ptr_array_add(show->ndi_patch_positions, position);
     show->dirty = TRUE;
+}
+
+gboolean director_show_remove_ndi_patch_position(DirectorShow *show,
+                                                  const gchar *key)
+{
+    if(!show || !show->ndi_patch_positions || !key || !*key)
+        return FALSE;
+    for(guint i = 0; i < show->ndi_patch_positions->len; i++) {
+        DirectorNdiPatchPosition *position =
+            g_ptr_array_index(show->ndi_patch_positions, i);
+        if(position && g_strcmp0(position->key, key) == 0) {
+            g_ptr_array_remove_index(show->ndi_patch_positions, i);
+            show->dirty = TRUE;
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 void director_show_clear_ndi_patch_positions(DirectorShow *show)
@@ -2553,14 +2577,57 @@ static gboolean director_output_driver_needs_file(gint driver)
            driver == 7 || driver == 8;
 }
 
-static gboolean director_source_host_is_local(const gchar *host)
+static GHashTable *director_model_local_hosts;
+static gsize director_model_local_hosts_once;
+
+static void director_model_local_hosts_init_once(void)
+{
+    director_model_local_hosts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    const gchar *fixed[] = { "localhost", "127.0.0.1", "::1", NULL };
+    for(gint i = 0; fixed[i]; i++)
+        g_hash_table_add(director_model_local_hosts, g_ascii_strdown(fixed[i], -1));
+
+    const gchar *hostname = g_get_host_name();
+    if(hostname && *hostname)
+        g_hash_table_add(director_model_local_hosts, g_ascii_strdown(hostname, -1));
+
+    struct ifaddrs *interfaces = NULL;
+    if(getifaddrs(&interfaces) == 0) {
+        for(struct ifaddrs *item = interfaces; item; item = item->ifa_next) {
+            if(!item->ifa_addr)
+                continue;
+            gchar address[INET6_ADDRSTRLEN];
+            const void *raw = NULL;
+            if(item->ifa_addr->sa_family == AF_INET)
+                raw = &((const struct sockaddr_in*)item->ifa_addr)->sin_addr;
+            else if(item->ifa_addr->sa_family == AF_INET6)
+                raw = &((const struct sockaddr_in6*)item->ifa_addr)->sin6_addr;
+            else
+                continue;
+            if(inet_ntop(item->ifa_addr->sa_family, raw, address, sizeof(address)))
+                g_hash_table_add(director_model_local_hosts, g_ascii_strdown(address, -1));
+        }
+        freeifaddrs(interfaces);
+    }
+}
+
+static gboolean director_model_host_is_local(const gchar *host)
 {
     if(!host || !*host)
         return FALSE;
+    if(g_once_init_enter(&director_model_local_hosts_once)) {
+        director_model_local_hosts_init_once();
+        g_once_init_leave(&director_model_local_hosts_once, 1);
+    }
+    gchar *normalized = g_ascii_strdown(host, -1);
+    const gboolean local = g_hash_table_contains(director_model_local_hosts, normalized);
+    g_free(normalized);
+    return local;
+}
 
-    return g_ascii_strcasecmp(host, "localhost") == 0 ||
-           g_strcmp0(host, "127.0.0.1") == 0 ||
-           g_strcmp0(host, "::1") == 0;
+static gboolean director_source_host_is_local(const gchar *host)
+{
+    return director_model_host_is_local(host);
 }
 
 static gboolean director_control_hosts_equivalent(const gchar *a, const gchar *b)
@@ -3136,11 +3203,7 @@ gchar **director_instance_build_argv(const DirectorShow *show,
 
 gboolean director_instance_is_local(const DirectorInstance *instance)
 {
-    if(!instance || !instance->host)
-        return FALSE;
-    return g_ascii_strcasecmp(instance->host, "localhost") == 0 ||
-           g_strcmp0(instance->host, "127.0.0.1") == 0 ||
-           g_strcmp0(instance->host, "::1") == 0;
+    return instance && director_model_host_is_local(instance->host);
 }
 
 void director_instance_clear_live_metrics(DirectorInstance *instance)
@@ -3311,9 +3374,7 @@ gboolean director_instance_parse_instance_status(DirectorInstance *instance,
     replace_string(&instance->live_source, source);
 
     instance->backend_ready = instance->live_role == DIRECTOR_ROLE_OUTPUT ?
-                              instance->source_sequence > 0 :
-                              (instance->live_role == DIRECTOR_ROLE_PROGRAM ?
-                               instance->shm_enabled : TRUE);
+                              instance->source_sequence > 0 : TRUE;
     replace_string(&instance->last_instance_status, text);
     g_hash_table_destroy(values);
     return TRUE;

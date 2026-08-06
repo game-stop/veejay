@@ -155,6 +155,10 @@ typedef struct {
     gint shm_key;
     gchar *ndi_source_name;
     gboolean applied_connection;
+    gboolean apply_pending;
+    gboolean select_when_ready;
+    gint64 apply_requested_us;
+    gint64 select_requested_us;
     gint live_stream_id;
     gboolean live_active;
     gboolean live_current;
@@ -347,12 +351,14 @@ typedef struct {
     gboolean live_ndi_tx_owned;
     gboolean ndi_input_change_pending;
     gboolean ndi_input_pending_enabled;
+    gint64 ndi_input_change_requested_us;
     gchar *ndi_input_pending_name;
     gchar *ndi_input_pending_native_source_id;
     gchar *ndi_input_pending_native_host;
     gint ndi_input_pending_native_port;
     gboolean ndi_output_change_pending;
     gboolean ndi_output_pending_enabled;
+    gint64 ndi_output_change_requested_us;
     gchar *ndi_output_pending_name;
     gint live_ndi_tx_connections;
     guint64 live_ndi_rx_video_frames;
@@ -368,6 +374,8 @@ typedef struct {
 
     gboolean live_route_shm_output_enabled;
     gint live_route_shm_output_key;
+    gboolean shm_output_enable_pending;
+    gint64 shm_output_enable_requested_us;
     gboolean live_route_tcp_output_enabled;
     gint live_route_tcp_output_port;
     gboolean live_route_ndi_output_enabled;
@@ -532,6 +540,8 @@ gboolean director_show_get_ndi_patch_position(const DirectorShow *show,
 void director_show_set_ndi_patch_position(DirectorShow *show,
                                           const gchar *key,
                                           gint x, gint y);
+gboolean director_show_remove_ndi_patch_position(DirectorShow *show,
+                                                  const gchar *key);
 void director_show_clear_ndi_patch_positions(DirectorShow *show);
 DirectorShowSnapshot *director_show_find_snapshot(DirectorShow *show, const gchar *name);
 DirectorShowSnapshot *director_show_capture_snapshot(DirectorShow *show, const gchar *name);

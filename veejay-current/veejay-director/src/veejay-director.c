@@ -33,6 +33,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+#include <ifaddrs.h>
 #ifdef __linux__
 #include <linux/videodev2.h>
 #endif
@@ -55,6 +56,12 @@
 #define DIRECTOR_OVERVIEW_ACTIVE_INTERVAL_US 220000LL
 #define DIRECTOR_OVERVIEW_IDLE_INTERVAL_US 250000LL
 #define DIRECTOR_OVERVIEW_FRESH_US 5000000LL
+#define DIRECTOR_ROUTE_APPLY_RETRY_US 2500000LL
+#define DIRECTOR_ROUTE_SELECT_RETRY_US 1000000LL
+#define DIRECTOR_SHM_ENABLE_RETRY_US 2500000LL
+#define DIRECTOR_NDI_CHANGE_TIMEOUT_US 8000000LL
+#define DIRECTOR_NDI_SOURCE_STALE_EXPIRE_US 10000000LL
+#define DIRECTOR_NDI_SOURCE_CLASSIFY_GRACE_US 2000000LL
 
 enum {
     INSTANCE_COL_PREVIEW = 0,
@@ -95,6 +102,8 @@ enum {
 
 typedef struct _DirectorApp DirectorApp;
 typedef struct _DirectorEidolonView DirectorEidolonView;
+
+static gboolean director_instance_ndi_runtime_unavailable(const DirectorInstance *instance);
 
 typedef struct {
     DirectorApp *app;
@@ -195,6 +204,17 @@ typedef struct {
 } DirectorOverviewWire;
 
 typedef struct {
+    gchar *name;
+    gchar *url;
+    gint64 first_seen_us;
+    gint64 last_seen_us;
+    gint64 missing_since_us;
+    gboolean online;
+    gboolean classification_ready;
+    guint matches;
+} DirectorNdiSourceRecord;
+
+typedef struct {
     gchar *key;
     gchar *name;
     gchar *display_name;
@@ -214,9 +234,16 @@ typedef struct {
 typedef enum {
     DIRECTOR_WIRING_DELETE_NONE = 0,
     DIRECTOR_WIRING_DELETE_NATIVE_INPUT,
-    DIRECTOR_WIRING_DELETE_NDI_INPUT,
-    DIRECTOR_WIRING_DELETE_NDI_OUTPUT
+    DIRECTOR_WIRING_DELETE_NDI_INPUT
 } DirectorWiringDeleteKind;
+
+typedef enum {
+    DIRECTOR_WIRING_ACTION_NONE = 0,
+    DIRECTOR_WIRING_ACTION_AUDIO,
+    DIRECTOR_WIRING_ACTION_LIVE,
+    DIRECTOR_WIRING_ACTION_BLACK,
+    DIRECTOR_WIRING_ACTION_WHITE
+} DirectorWiringAction;
 
 typedef struct {
     DirectorWiringDeleteKind kind;
@@ -245,8 +272,8 @@ enum {
 #define DIRECTOR_STAGE_SOURCE_CARD_GAP 12.0
 
 #define DIRECTOR_WIRING_CANVAS_WIDTH 1710.0
-#define DIRECTOR_WIRING_NODE_WIDTH 272.0
-#define DIRECTOR_WIRING_NODE_HEIGHT 96.0
+#define DIRECTOR_WIRING_NODE_WIDTH 300.0
+#define DIRECTOR_WIRING_NODE_HEIGHT 118.0
 #define DIRECTOR_WIRING_NDI_NODE_WIDTH 248.0
 #define DIRECTOR_WIRING_NDI_NODE_HEIGHT 82.0
 #define DIRECTOR_WIRING_NDI_X 32.0
@@ -254,13 +281,8 @@ enum {
 #define DIRECTOR_WIRING_STANDALONE_X 680.0
 #define DIRECTOR_WIRING_OUTPUT_X 1020.0
 #define DIRECTOR_WIRING_TOP 82.0
-#define DIRECTOR_WIRING_ROW_GAP 132.0
+#define DIRECTOR_WIRING_ROW_GAP 152.0
 #define DIRECTOR_WIRING_NDI_ROW_GAP 104.0
-#define DIRECTOR_WIRING_NDI_SINK_X 1390.0
-#define DIRECTOR_WIRING_NDI_SINK_Y 82.0
-#define DIRECTOR_WIRING_NDI_SINK_WIDTH 238.0
-#define DIRECTOR_WIRING_NDI_SINK_HEIGHT 96.0
-#define DIRECTOR_WIRING_NDI_SINK_KEY "ndi-network-sink"
 #define DIRECTOR_WIRING_MIN_ZOOM 0.25
 #define DIRECTOR_WIRING_MAX_ZOOM 4.0
 #define DIRECTOR_WIRING_FIT_PADDING 54.0
@@ -468,6 +490,9 @@ struct _DirectorApp {
     DirectorInstance *stage_wire_socket_hover_node;
     gboolean stage_wire_socket_hover_native;
     gboolean stage_wire_socket_hover_ndi;
+    DirectorInstance *stage_wire_action_hover_node;
+    DirectorWiringAction stage_wire_action_hover;
+    gchar *stage_wire_ndi_hover_key;
     gchar *stage_pending_ndi_sender_id;
     gchar *stage_pending_ndi_target_id;
     gchar *stage_wire_ndi_name;
@@ -482,7 +507,6 @@ struct _DirectorApp {
     gdouble stage_ndi_node_origin_x;
     gdouble stage_ndi_node_origin_y;
     GHashTable *stage_ndi_positions;
-    gboolean stage_wire_hover_ndi_sink;
     gboolean stage_wiring_panning;
     guint stage_wiring_pan_button;
     gdouble stage_wiring_pan_start_x;
@@ -561,6 +585,8 @@ struct _DirectorApp {
     GtkWidget *ndi_spinner;
     DirectorNdiDiscovery *ndi_discovery;
     GPtrArray *ndi_sources;
+    GHashTable *ndi_source_cache;
+    guint ndi_source_prune_source_id;
     guint64 ndi_generation;
     gint64 ndi_last_update_us;
     gchar *ndi_last_update_text;
@@ -746,6 +772,7 @@ static DirectorInputRoute *director_native_route_for_source(DirectorInstance *ta
 static gboolean director_remove_runtime_input_route(DirectorApp *app,
                                                      DirectorInstance *target,
                                                      const DirectorInputRoute *route);
+static void director_log(DirectorApp *app, const gchar *format, ...) G_GNUC_PRINTF(2, 3);
 static gboolean director_backend_identity_matches(const DirectorInstance *instance);
 static void director_update_role_sensitivity(DirectorApp *app);
 static void director_refresh_media_bank(DirectorApp *app);
@@ -754,7 +781,8 @@ static void director_update_header(DirectorApp *app);
 static void director_slice_model_from_controls(DirectorApp *app);
 static void director_populate_display_combo(DirectorApp *app);
 static gboolean director_host_is_local(const gchar *host);
-static gint director_next_role_port(const DirectorShow *show, DirectorRole role);
+static gint director_next_live_role_port(const DirectorApp *app, const DirectorInstance *instance);
+static gint director_prepare_managed_launch_port(DirectorApp *app, DirectorInstance *instance);
 static void director_restart_instance(DirectorApp *app, DirectorInstance *instance);
 static DirectorInstance *director_calibration_camera(DirectorApp *app);
 static void director_calibration_update_ui(DirectorApp *app);
@@ -825,13 +853,12 @@ static guint director_split_screen_receiver_count(DirectorApp *app,
                                                    const DirectorInstance *master);
 static void director_rebuild_instance_store(DirectorApp *app);
 static void director_stage_wiring_update_canvas_size(DirectorApp *app);
+static void director_stage_wiring_rounded_rect(cairo_t *cr,
+                                                gdouble x, gdouble y,
+                                                gdouble w, gdouble h,
+                                                gdouble radius);
 static gboolean director_stage_disconnect_wire(DirectorApp *app,
                                                 const DirectorWiringDeleteHit *hit);
-static void director_stage_wiring_ndi_sink_rect(DirectorApp *app,
-                                                 gdouble *x, gdouble *y,
-                                                 gdouble *w, gdouble *h);
-static gboolean director_stage_hit_wiring_ndi_sink(DirectorApp *app,
-                                                    gdouble px, gdouble py);
 static void director_stage_wiring_widget_to_world(DirectorApp *app,
                                                    gdouble x, gdouble y,
                                                    gdouble *wx, gdouble *wy);
@@ -841,8 +868,6 @@ static gboolean on_stage_canvas_scroll(GtkWidget *widget,
                                         gpointer data);
 static gboolean director_stage_connect_ndi_output(DirectorApp *app,
                                                    DirectorInstance *instance);
-static gboolean director_stage_disconnect_ndi_output(DirectorApp *app,
-                                                      DirectorInstance *instance);
 static void director_apply_pending_video_wires(DirectorApp *app);
 static gboolean director_apply_video_wire(DirectorApp *app,
                                            DirectorInstance *source,
@@ -938,6 +963,7 @@ static void director_reconcile_live_routes(DirectorApp *app, DirectorInstance *i
 {
     if(!app || !instance)
         return;
+
     if(instance->input_routes) {
         for(guint i = 0; i < instance->input_routes->len; i++) {
             DirectorInputRoute *configured = g_ptr_array_index(instance->input_routes, i);
@@ -947,38 +973,72 @@ static void director_reconcile_live_routes(DirectorApp *app, DirectorInstance *i
             configured->live_current = FALSE;
         }
     }
-    if(!instance->live_input_routes)
-        return;
-    for(guint i = 0; i < instance->live_input_routes->len; i++) {
-        DirectorInputRoute *live = g_ptr_array_index(instance->live_input_routes, i);
-        DirectorInstance *source = director_live_route_source(app, instance, live);
-        if(source)
-            replace_owned_string(&live->source_instance_id, source->id);
-        if(!instance->input_routes)
-            continue;
-        for(guint r = 0; r < instance->input_routes->len; r++) {
-            DirectorInputRoute *configured = g_ptr_array_index(instance->input_routes, r);
-            const gboolean same_source = configured->source_instance_id && *configured->source_instance_id &&
-                                         live->source_instance_id && *live->source_instance_id &&
-                                         g_strcmp0(configured->source_instance_id,
-                                                   live->source_instance_id) == 0;
-            if(director_routes_same_live(configured, live) ||
-               (same_source && configured->type == live->type)) {
+
+    if(instance->live_input_routes) {
+        for(guint i = 0; i < instance->live_input_routes->len; i++) {
+            DirectorInputRoute *live = g_ptr_array_index(instance->live_input_routes, i);
+            DirectorInstance *source = director_live_route_source(app, instance, live);
+            if(source)
+                replace_owned_string(&live->source_instance_id, source->id);
+            if(!instance->input_routes)
+                continue;
+
+            for(guint r = 0; r < instance->input_routes->len; r++) {
+                DirectorInputRoute *configured = g_ptr_array_index(instance->input_routes, r);
+                const gboolean same_source =
+                    configured->source_instance_id && *configured->source_instance_id &&
+                    live->source_instance_id && *live->source_instance_id &&
+                    g_strcmp0(configured->source_instance_id,
+                              live->source_instance_id) == 0;
+                if(!director_routes_same_live(configured, live) &&
+                   !(same_source && configured->type == live->type))
+                    continue;
+
                 configured->applied_connection = TRUE;
+                configured->apply_pending = FALSE;
+                configured->apply_requested_us = 0;
                 configured->live_stream_id = live->live_stream_id;
                 configured->live_active = live->live_active;
                 configured->live_current = live->live_current;
                 if(configured->type == DIRECTOR_INPUT_ROUTE_SHM && live->shm_key > 0)
                     configured->shm_key = live->shm_key;
+
+                if(configured->select_when_ready &&
+                   instance->role != DIRECTOR_ROLE_OUTPUT) {
+                    if(configured->live_current) {
+                        configured->select_when_ready = FALSE;
+                        configured->select_requested_us = 0;
+                    } else if(configured->live_stream_id > 0 &&
+                              instance->connected && instance->backend_ready &&
+                              instance->client) {
+                        const gint64 now = g_get_monotonic_time();
+                        if(configured->select_requested_us == 0 ||
+                           now - configured->select_requested_us >=
+                               DIRECTOR_ROUTE_SELECT_RETRY_US) {
+                            if(!director_client_select_input_route(
+                                   instance->client, configured->live_stream_id))
+                                break;
+                            if(configured->select_requested_us == 0)
+                                director_log(app,
+                                    "Selecting live %s route stream %d on %s",
+                                    configured->type == DIRECTOR_INPUT_ROUTE_SHM ?
+                                        "SHM" : "TCP",
+                                    configured->live_stream_id, instance->id);
+                            configured->select_requested_us = now;
+                        }
+                    }
+                }
                 break;
             }
         }
     }
+
     instance->wire_applied_connection = director_native_routes_applied(instance);
 }
 
 static gboolean director_video_wire_is_local(const DirectorInstance *source,
                                                 const DirectorInstance *target);
+static gdouble director_stage_wiring_socket_hit_radius(DirectorApp *app);
 static void director_discovery_start(DirectorApp *app);
 static void director_discovery_stop(DirectorApp *app);
 static void director_discovery_refresh_store(DirectorApp *app);
@@ -989,8 +1049,6 @@ static void director_eidolon_open_drawer(DirectorApp *app, DirectorInstance *ins
 static void director_eidolon_open_window(DirectorApp *app, DirectorInstance *instance);
 static void director_eidolon_close_views_for_instance(DirectorApp *app,
                                                        DirectorInstance *instance);
-static void director_log(DirectorApp *app, const gchar *format, ...) G_GNUC_PRINTF(2, 3);
-
 static void director_cairo_show_text(cairo_t *cr, const gchar *text)
 {
     const gchar *value = text ? text : "";
@@ -1049,6 +1107,143 @@ static GPtrArray *director_ndi_source_array_copy(const GPtrArray *sources)
         g_ptr_array_add(copy, item);
     }
     return copy;
+}
+
+static void director_ndi_source_record_free(gpointer data)
+{
+    DirectorNdiSourceRecord *record = data;
+    if(!record)
+        return;
+    g_free(record->name);
+    g_free(record->url);
+    g_free(record);
+}
+
+static gboolean director_ndi_source_cache_prune(gpointer data)
+{
+    DirectorApp *app = data;
+    if(!app || app->shutting_down)
+        return G_SOURCE_REMOVE;
+    if(!app->ndi_source_cache) {
+        app->ndi_source_prune_source_id = 0;
+        return G_SOURCE_REMOVE;
+    }
+
+    const gint64 now = g_get_monotonic_time();
+    gboolean changed = FALSE;
+    gboolean have_stale = FALSE;
+    gboolean have_classifying = FALSE;
+    GHashTableIter iter;
+    gpointer value = NULL;
+    g_hash_table_iter_init(&iter, app->ndi_source_cache);
+    while(g_hash_table_iter_next(&iter, NULL, &value)) {
+        DirectorNdiSourceRecord *record = value;
+        if(record->online) {
+            if(!record->classification_ready) {
+                if(record->first_seen_us > 0 &&
+                   now - record->first_seen_us >= DIRECTOR_NDI_SOURCE_CLASSIFY_GRACE_US) {
+                    record->classification_ready = TRUE;
+                    changed = TRUE;
+                } else {
+                    have_classifying = TRUE;
+                }
+            }
+            continue;
+        }
+        if(record->missing_since_us <= 0)
+            continue;
+        if(now - record->missing_since_us >= DIRECTOR_NDI_SOURCE_STALE_EXPIRE_US) {
+            g_hash_table_iter_remove(&iter);
+            changed = TRUE;
+        }
+        else {
+            have_stale = TRUE;
+        }
+    }
+
+    if(changed && app->stage_canvas)
+        gtk_widget_queue_draw(app->stage_canvas);
+    if(!have_stale && !have_classifying) {
+        app->ndi_source_prune_source_id = 0;
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+}
+
+static void director_ndi_source_cache_schedule_prune(DirectorApp *app)
+{
+    if(!app || app->ndi_source_prune_source_id != 0)
+        return;
+    app->ndi_source_prune_source_id =
+        g_timeout_add_seconds(1, director_ndi_source_cache_prune, app);
+}
+
+static void director_ndi_source_cache_update(DirectorApp *app,
+                                              const GPtrArray *sources,
+                                              gint64 observed_us)
+{
+    if(!app)
+        return;
+    if(!app->ndi_source_cache)
+        app->ndi_source_cache = g_hash_table_new_full(
+            g_str_hash, g_str_equal, g_free, director_ndi_source_record_free);
+
+    GHashTableIter iter;
+    gpointer value = NULL;
+    g_hash_table_iter_init(&iter, app->ndi_source_cache);
+    while(g_hash_table_iter_next(&iter, NULL, &value)) {
+        DirectorNdiSourceRecord *record = value;
+        record->online = FALSE;
+        record->matches = 0;
+    }
+
+    for(guint i = 0; sources && i < sources->len; i++) {
+        const DirectorNdiSource *source = g_ptr_array_index((GPtrArray *)sources, i);
+        if(!source || !source->name || !*source->name)
+            continue;
+        DirectorNdiSourceRecord *record =
+            g_hash_table_lookup(app->ndi_source_cache, source->name);
+        if(!record) {
+            record = g_new0(DirectorNdiSourceRecord, 1);
+            record->name = g_strdup(source->name);
+            record->first_seen_us = observed_us > 0 ? observed_us : g_get_monotonic_time();
+            record->classification_ready = FALSE;
+            g_hash_table_insert(app->ndi_source_cache, g_strdup(source->name), record);
+        }
+        record->online = TRUE;
+        record->last_seen_us = observed_us > 0 ? observed_us : g_get_monotonic_time();
+        record->missing_since_us = 0;
+        record->matches++;
+        if(record->matches == 1 || !record->url || !*record->url) {
+            g_free(record->url);
+            record->url = g_strdup(source->url ? source->url : "");
+        }
+    }
+
+    gboolean have_stale = FALSE;
+    const gint64 now = observed_us > 0 ? observed_us : g_get_monotonic_time();
+    g_hash_table_iter_init(&iter, app->ndi_source_cache);
+    while(g_hash_table_iter_next(&iter, NULL, &value)) {
+        DirectorNdiSourceRecord *record = value;
+        if(record->online)
+            continue;
+        if(record->missing_since_us <= 0)
+            record->missing_since_us = now;
+        if(record->matches == 0)
+            record->matches = 1;
+        have_stale = TRUE;
+    }
+    gboolean have_classifying = FALSE;
+    g_hash_table_iter_init(&iter, app->ndi_source_cache);
+    while(g_hash_table_iter_next(&iter, NULL, &value)) {
+        DirectorNdiSourceRecord *record = value;
+        if(record->online && !record->classification_ready) {
+            have_classifying = TRUE;
+            break;
+        }
+    }
+    if(have_stale || have_classifying)
+        director_ndi_source_cache_schedule_prune(app);
 }
 
 static gboolean director_ndi_sources_contain_name(const GPtrArray *sources,
@@ -1256,11 +1451,14 @@ static void director_ndi_discovery_update(DirectorNdiDiscovery *discovery,
         return;
 
     gchar *selected = g_strdup(director_ndi_source_text(app));
-    if(update->state == DIRECTOR_NDI_DISCOVERY_WATCHING) {
-        GPtrArray *sources = director_ndi_source_array_copy(update->sources);
+    if(update->state != DIRECTOR_NDI_DISCOVERY_STARTING) {
+        GPtrArray *sources = update->state == DIRECTOR_NDI_DISCOVERY_WATCHING ?
+            director_ndi_source_array_copy(update->sources) :
+            g_ptr_array_new_with_free_func((GDestroyNotify)director_ndi_source_free);
         if(app->ndi_sources)
             g_ptr_array_free(app->ndi_sources, TRUE);
         app->ndi_sources = sources;
+        director_ndi_source_cache_update(app, sources, update->observed_us);
         director_ndi_refresh_combo(app, selected);
     }
     app->ndi_generation = update->generation;
@@ -2386,6 +2584,7 @@ static void director_clear_ndi_input_pending(DirectorInstance *instance)
         return;
     instance->ndi_input_change_pending = FALSE;
     instance->ndi_input_pending_enabled = FALSE;
+    instance->ndi_input_change_requested_us = 0;
     g_clear_pointer(&instance->ndi_input_pending_name, g_free);
     g_clear_pointer(&instance->ndi_input_pending_native_source_id, g_free);
     g_clear_pointer(&instance->ndi_input_pending_native_host, g_free);
@@ -2398,6 +2597,7 @@ static void director_clear_ndi_output_pending(DirectorInstance *instance)
         return;
     instance->ndi_output_change_pending = FALSE;
     instance->ndi_output_pending_enabled = FALSE;
+    instance->ndi_output_change_requested_us = 0;
     g_clear_pointer(&instance->ndi_output_pending_name, g_free);
 }
 
@@ -2468,8 +2668,13 @@ static void director_clear_live_connection_state(DirectorInstance *instance)
         for(guint i = 0; i < instance->input_routes->len; i++) {
             DirectorInputRoute *route = g_ptr_array_index(instance->input_routes, i);
             route->applied_connection = FALSE;
+            route->apply_pending = FALSE;
+            route->apply_requested_us = 0;
+            route->select_requested_us = 0;
         }
     }
+    instance->shm_output_enable_pending = FALSE;
+    instance->shm_output_enable_requested_us = 0;
     instance->live_role = -1;
     instance->live_port = 0;
     instance->shm_key = 0;
@@ -4944,12 +5149,15 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
     if(!app || !instance)
         return;
 
+    const gint64 now = g_get_monotonic_time();
     gboolean configuration_changed = FALSE;
     if(instance->ndi_input_change_pending) {
         const gboolean desired_enabled = instance->ndi_input_pending_enabled;
         const gchar *desired_name = instance->ndi_input_pending_name;
         const gboolean matched = director_ndi_runtime_input_matches_desired(
             instance, desired_enabled, desired_name);
+        const gboolean timed_out = instance->ndi_input_change_requested_us > 0 &&
+            now - instance->ndi_input_change_requested_us >= DIRECTOR_NDI_CHANGE_TIMEOUT_US;
 
         if(matched) {
             if(!desired_enabled && instance->ndi_input_pending_native_source_id)
@@ -4960,19 +5168,20 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
                                                         desired_name);
             configuration_changed = TRUE;
             director_log(app, "%s runtime NDI input confirmed%s%s",
-                         instance->id,
-                         desired_enabled ? ": " : "",
+                         instance->id, desired_enabled ? ": " : "",
                          desired_enabled && desired_name ? desired_name : "");
-        } else {
+            director_clear_ndi_input_pending(instance);
+        } else if(timed_out) {
             director_log(app,
-                         "%s did not apply the requested NDI input change; previous patch-bay route was preserved (backend reports %s%s%s)",
+                         "%s did not apply the requested NDI input change within %.1f s; previous patch-bay route was preserved (backend reports %s%s%s)",
                          instance->id,
+                         (gdouble)DIRECTOR_NDI_CHANGE_TIMEOUT_US / 1000000.0,
                          instance->live_ndi_rx_enabled ? "'" : "NDI disabled",
                          instance->live_ndi_rx_enabled && instance->live_ndi_source ?
                              instance->live_ndi_source : "",
                          instance->live_ndi_rx_enabled ? "'" : "");
+            director_clear_ndi_input_pending(instance);
         }
-        director_clear_ndi_input_pending(instance);
     }
 
     if(instance->ndi_output_change_pending) {
@@ -4980,21 +5189,21 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
         const gchar *desired_name = instance->ndi_output_pending_name;
         const gboolean matched = director_ndi_runtime_output_matches_desired(
             instance, desired_enabled, desired_name);
+        const gboolean timed_out = instance->ndi_output_change_requested_us > 0 &&
+            now - instance->ndi_output_change_requested_us >= DIRECTOR_NDI_CHANGE_TIMEOUT_US;
 
         if(matched) {
             director_commit_ndi_output_configuration(app, instance,
-                                                     desired_enabled,
-                                                     desired_name);
+                                                     desired_enabled, desired_name);
             configuration_changed = TRUE;
             director_log(app, "%s runtime NDI output confirmed%s%s",
-                         instance->id,
-                         desired_enabled ? ": " : "",
+                         instance->id, desired_enabled ? ": " : "",
                          desired_enabled && desired_name ? desired_name : "");
             if(desired_enabled && app->stage_pending_ndi_sender_id &&
                app->stage_pending_ndi_target_id &&
                g_strcmp0(app->stage_pending_ndi_sender_id, instance->id) == 0) {
-                DirectorInstance *target = director_show_find_instance(app->show,
-                    app->stage_pending_ndi_target_id);
+                DirectorInstance *target = director_show_find_instance(
+                    app->show, app->stage_pending_ndi_target_id);
                 const gchar *published = instance->live_ndi_tx_source &&
                     *instance->live_ndi_tx_source ? instance->live_ndi_tx_source :
                     instance->live_ndi_tx_name;
@@ -5003,21 +5212,23 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
                 g_clear_pointer(&app->stage_pending_ndi_sender_id, g_free);
                 g_clear_pointer(&app->stage_pending_ndi_target_id, g_free);
             }
-        } else {
+            director_clear_ndi_output_pending(instance);
+        } else if(timed_out) {
             if(app->stage_pending_ndi_sender_id &&
                g_strcmp0(app->stage_pending_ndi_sender_id, instance->id) == 0) {
                 g_clear_pointer(&app->stage_pending_ndi_sender_id, g_free);
                 g_clear_pointer(&app->stage_pending_ndi_target_id, g_free);
             }
             director_log(app,
-                         "%s did not apply the requested NDI output change; previous patch-bay state was preserved (backend reports %s%s%s)",
+                         "%s did not apply the requested NDI output change within %.1f s; previous patch-bay state was preserved (backend reports %s%s%s)",
                          instance->id,
+                         (gdouble)DIRECTOR_NDI_CHANGE_TIMEOUT_US / 1000000.0,
                          instance->live_ndi_tx_enabled ? "'" : "NDI disabled",
                          instance->live_ndi_tx_enabled && instance->live_ndi_tx_name ?
                              instance->live_ndi_tx_name : "",
                          instance->live_ndi_tx_enabled ? "'" : "");
+            director_clear_ndi_output_pending(instance);
         }
-        director_clear_ndi_output_pending(instance);
     }
 
     if(configuration_changed) {
@@ -5161,7 +5372,19 @@ static void director_client_event(DirectorClient *client,
         case DIRECTOR_CLIENT_ROUTING_STATUS:
             if(!director_instance_parse_routing_status(instance, payload, &error))
                 goto parse_error;
+            if(instance->live_route_shm_output_key > 0)
+                instance->shm_key = instance->live_route_shm_output_key;
+            instance->shm_enabled = instance->live_route_shm_output_enabled;
+            if(instance->live_route_shm_output_enabled) {
+                if(instance->shm_output_enable_pending) {
+                    director_log(app, "%s SHM video output confirmed on key %d",
+                                 instance->id, instance->shm_key);
+                    instance->shm_output_enable_pending = FALSE;
+                    instance->shm_output_enable_requested_us = 0;
+                }
+            }
             director_reconcile_live_routes(app, instance);
+            director_apply_pending_video_wires(app);
             break;
         case DIRECTOR_CLIENT_OUTPUT_STATUS: {
             const gint previous_pattern = instance->live_pattern;
@@ -5185,13 +5408,21 @@ static void director_client_event(DirectorClient *client,
             if(!director_instance_parse_perf_status(instance, payload, &error))
                 goto parse_error;
             break;
-        case DIRECTOR_CLIENT_NDI_STATUS:
-        case DIRECTOR_CLIENT_NDI_STATUS_APPLIED:
-            if(!director_instance_parse_ndi_status(instance, payload, &error))
+        case DIRECTOR_CLIENT_NDI_STATUS: {
+            gchar *previous_runtime = g_strdup(instance->live_ndi_runtime);
+            if(!director_instance_parse_ndi_status(instance, payload, &error)) {
+                g_free(previous_runtime);
                 goto parse_error;
-            if(event == DIRECTOR_CLIENT_NDI_STATUS_APPLIED)
-                director_reconcile_ndi_runtime_changes(app, instance);
+            }
+            if(!instance->managed && director_instance_ndi_runtime_unavailable(instance) &&
+               g_strcmp0(previous_runtime, instance->live_ndi_runtime) != 0)
+                director_log(app,
+                    "%s NDI unavailable: the external backend could not load its NDI runtime",
+                    instance->id);
+            g_free(previous_runtime);
+            director_reconcile_ndi_runtime_changes(app, instance);
             break;
+        }
         case DIRECTOR_CLIENT_DEVICE_LIST:
             if(instance->calibration_camera)
                 director_calibration_handle_device_list(app, instance, payload);
@@ -5222,8 +5453,7 @@ parse_error:
         instance->live_projection_valid = FALSE;
         g_clear_pointer(&instance->last_projection_status, g_free);
     }
-    else if(event == DIRECTOR_CLIENT_NDI_STATUS ||
-            event == DIRECTOR_CLIENT_NDI_STATUS_APPLIED)
+    else if(event == DIRECTOR_CLIENT_NDI_STATUS)
         director_clear_live_ndi_state(instance);
     g_clear_error(&error);
     director_schedule_live_ui(app,
@@ -6234,11 +6464,53 @@ static void director_eidolon_close_all_views(DirectorApp *app)
     }
 }
 
+static GHashTable *director_local_hosts;
+static gsize director_local_hosts_once;
+
+static void director_local_hosts_init_once(void)
+{
+    director_local_hosts = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    const gchar *fixed[] = { "localhost", "127.0.0.1", "::1", NULL };
+    for(gint i = 0; fixed[i]; i++)
+        g_hash_table_add(director_local_hosts, g_ascii_strdown(fixed[i], -1));
+
+    const gchar *hostname = g_get_host_name();
+    if(hostname && *hostname)
+        g_hash_table_add(director_local_hosts, g_ascii_strdown(hostname, -1));
+
+    struct ifaddrs *interfaces = NULL;
+    if(getifaddrs(&interfaces) == 0) {
+        for(struct ifaddrs *item = interfaces; item; item = item->ifa_next) {
+            if(!item->ifa_addr)
+                continue;
+            gchar address[INET6_ADDRSTRLEN];
+            const void *raw = NULL;
+            if(item->ifa_addr->sa_family == AF_INET)
+                raw = &((const struct sockaddr_in*)item->ifa_addr)->sin_addr;
+            else if(item->ifa_addr->sa_family == AF_INET6)
+                raw = &((const struct sockaddr_in6*)item->ifa_addr)->sin6_addr;
+            else
+                continue;
+            if(inet_ntop(item->ifa_addr->sa_family, raw, address, sizeof(address)))
+                g_hash_table_add(director_local_hosts, g_ascii_strdown(address, -1));
+        }
+        freeifaddrs(interfaces);
+    }
+}
+
 static gboolean director_host_is_local(const gchar *host)
 {
-    return host && (g_ascii_strcasecmp(host, "localhost") == 0 ||
-                    g_strcmp0(host, "127.0.0.1") == 0 ||
-                    g_strcmp0(host, "::1") == 0);
+    if(!host || !*host)
+        return FALSE;
+    if(g_once_init_enter(&director_local_hosts_once)) {
+        director_local_hosts_init_once();
+        g_once_init_leave(&director_local_hosts_once, 1);
+    }
+
+    gchar *normalized = g_ascii_strdown(host, -1);
+    const gboolean local = g_hash_table_contains(director_local_hosts, normalized);
+    g_free(normalized);
+    return local;
 }
 
 static gboolean director_hosts_equivalent(const gchar *a, const gchar *b)
@@ -6390,7 +6662,7 @@ static DirectorInstance *director_calibration_create_camera(DirectorApp *app)
     }
     DirectorInstance *camera = director_instance_new(id, DIRECTOR_ROLE_STANDALONE);
     g_free(id);
-    const gint port = director_next_role_port(app->show, DIRECTOR_ROLE_STANDALONE);
+    const gint port = director_next_live_role_port(app, camera);
     if(port < 0) {
         director_instance_free(camera);
         director_error_dialog(app, "No free local VeeJay control-port block is available for the calibration camera.");
@@ -10373,6 +10645,10 @@ static void director_start_instance(DirectorApp *app, DirectorInstance *instance
     if(instance->process_running)
         return;
 
+    const gint port_ready = director_prepare_managed_launch_port(app, instance);
+    if(port_ready <= 0)
+        return;
+
     GError *error = NULL;
     if(director_split_screen_receiver_count(app, instance) > 0) {
         if(!director_split_screen_receivers_ready(app, instance)) {
@@ -10403,6 +10679,7 @@ static void director_start_instance(DirectorApp *app, DirectorInstance *instance
 
     GSubprocessLauncher *launcher = g_subprocess_launcher_new(
         G_SUBPROCESS_FLAGS_STDOUT_PIPE | G_SUBPROCESS_FLAGS_STDERR_PIPE);
+    g_subprocess_launcher_setenv(launcher, "VEEJAY_STRICT_PORT", "1", TRUE);
     if(instance->working_directory && *instance->working_directory) {
         if(g_mkdir_with_parents(instance->working_directory, 0700) != 0) {
             gchar *message = g_strdup_printf("Cannot create working directory '%s': %s",
@@ -10788,6 +11065,7 @@ static gboolean director_replace_show(DirectorApp *app, DirectorShow *show)
     g_clear_pointer(&app->calibration_selected_device_name, g_free);
     director_show_free(app->show);
     app->show = show;
+    director_show_remove_ndi_patch_position(show, "ndi-network-sink");
     if(app->stage_ndi_positions)
         g_hash_table_remove_all(app->stage_ndi_positions);
     app->stage_view_valid = FALSE;
@@ -11488,7 +11766,9 @@ static void on_save_show(GtkButton *button, gpointer data)
     gtk_widget_destroy(dialog);
 }
 
-static gboolean director_control_port_block_in_use(const DirectorShow *show, gint port)
+static gboolean director_control_port_block_in_use_except(const DirectorShow *show,
+                                                         const DirectorInstance *skip,
+                                                         gint port)
 {
     if(!show || port < 1 || port > 65530)
         return TRUE;
@@ -11496,7 +11776,7 @@ static gboolean director_control_port_block_in_use(const DirectorShow *show, gin
     const gint end = port + 5;
     for(guint i = 0; i < show->instances->len; i++) {
         const DirectorInstance *instance = g_ptr_array_index(show->instances, i);
-        if(!director_host_is_local(instance->host))
+        if(instance == skip || !director_host_is_local(instance->host))
             continue;
         const gint other_start = instance->port;
         const gint other_end = MIN(65535, instance->port + 5);
@@ -11506,17 +11786,185 @@ static gboolean director_control_port_block_in_use(const DirectorShow *show, gin
     return FALSE;
 }
 
-static gint director_next_role_port(const DirectorShow *show, DirectorRole role)
+static gboolean director_local_port_bindable(gint port, gint socket_type, gint protocol)
 {
-    const gint base = role == DIRECTOR_ROLE_OUTPUT ? 4490 : 3490;
-    for(gint port = base; port <= 65530; port += 10)
-        if(!director_control_port_block_in_use(show, port))
+    gint fd = socket(AF_INET, socket_type, protocol);
+    if(fd < 0)
+        return FALSE;
+
+    struct sockaddr_in address;
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET;
+    address.sin_port = htons((guint16)port);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    const gboolean available = bind(fd, (struct sockaddr*)&address, sizeof(address)) == 0;
+    close(fd);
+    return available;
+}
+
+static gboolean director_local_service_block_available(gint port)
+{
+    if(port < 1 || port > 65530)
+        return FALSE;
+
+    return director_local_port_bindable(port, SOCK_STREAM, IPPROTO_TCP) &&
+           director_local_port_bindable(port + 1, SOCK_STREAM, IPPROTO_TCP) &&
+           director_local_port_bindable(port + 5, SOCK_STREAM, IPPROTO_TCP) &&
+           director_local_port_bindable(port + 4, SOCK_DGRAM, IPPROTO_UDP);
+}
+
+static gboolean director_probe_instance_identity(const DirectorInstance *instance,
+                                                  gint port)
+{
+    if(!instance || !instance->host || !*instance->host)
+        return FALSE;
+
+    DirectorWire wire;
+    director_wire_init(&wire);
+    if(!director_wire_connect(&wire, instance->host, port, 250))
+        return FALSE;
+
+    gchar response[1024];
+    const gboolean queried = director_wire_query(&wire, "288:;", response,
+                                                  sizeof(response), 300, 40);
+    director_wire_close(&wire);
+    if(!queried)
+        return FALSE;
+
+    gchar *copy = g_strdup(response);
+    g_strstrip(copy);
+    gchar **tokens = g_strsplit_set(copy, " \t\r\n", -1);
+    const gchar *role = NULL;
+    const gchar *id = NULL;
+    gint reported_port = -1;
+    for(gint i = 0; tokens && tokens[i]; i++) {
+        if(g_str_has_prefix(tokens[i], "role="))
+            role = tokens[i] + 5;
+        else if(g_str_has_prefix(tokens[i], "id="))
+            id = tokens[i] + 3;
+        else if(g_str_has_prefix(tokens[i], "port=")) {
+            gchar *end = NULL;
+            const gint64 parsed = g_ascii_strtoll(tokens[i] + 5, &end, 10);
+            if(end && *end == '\0' && parsed > 0 && parsed <= 65535)
+                reported_port = (gint)parsed;
+        }
+    }
+    const gboolean match = role && id && reported_port == port &&
+        g_strcmp0(role, director_role_name(instance->role)) == 0 &&
+        g_strcmp0(id, instance->id) == 0;
+    g_strfreev(tokens);
+    g_free(copy);
+    return match;
+}
+
+static void director_retarget_port_references(DirectorApp *app,
+                                               DirectorInstance *instance,
+                                               gint old_port,
+                                               gint new_port)
+{
+    if(!app || !app->show || !instance || old_port == new_port)
+        return;
+
+    for(guint i = 0; i < app->show->instances->len; i++) {
+        DirectorInstance *other = g_ptr_array_index(app->show->instances, i);
+        if(other == instance)
+            continue;
+
+        if(other->input_routes) {
+            for(guint r = 0; r < other->input_routes->len; r++) {
+                DirectorInputRoute *route = g_ptr_array_index(other->input_routes, r);
+                if(route->type == DIRECTOR_INPUT_ROUTE_NDI ||
+                   !route->source_instance_id ||
+                   g_strcmp0(route->source_instance_id, instance->id) != 0)
+                    continue;
+                route->port = new_port;
+                if(route->type == DIRECTOR_INPUT_ROUTE_SHM)
+                    route->shm_key = 0;
+                route->applied_connection = FALSE;
+                route->live_stream_id = 0;
+                route->live_active = FALSE;
+                route->live_current = FALSE;
+                other->wire_applied_connection = FALSE;
+            }
+        }
+
+        if(other->source_instance_id &&
+           g_strcmp0(other->source_instance_id, instance->id) == 0) {
+            other->source_port = new_port;
+            other->wire_source_shm_key = 0;
+            other->wire_applied_connection = FALSE;
+        }
+
+        if(other->control_mode == DIRECTOR_CONTROL_PREVIEW &&
+           other->master_instance_id &&
+           g_strcmp0(other->master_instance_id, instance->id) == 0) {
+            other->master_port = new_port;
+            other->control_applied_connection = FALSE;
+            other->samplelist_synced_connection = FALSE;
+        }
+    }
+
+    app->show->dirty = TRUE;
+}
+
+static gint director_next_live_role_port(const DirectorApp *app,
+                                          const DirectorInstance *instance)
+{
+    if(!app || !app->show || !instance)
+        return -1;
+    const gint base = instance->role == DIRECTOR_ROLE_OUTPUT ? 4490 : 3490;
+    for(gint port = base; port <= 65530; port += 10) {
+        if(!director_control_port_block_in_use_except(app->show, instance, port) &&
+           director_local_service_block_available(port))
             return port;
-    for(gint port = 1024; port <= 65530; port += 10)
-        if(!director_control_port_block_in_use(show, port))
+    }
+    for(gint port = 1024; port <= 65530; port += 10) {
+        if(!director_control_port_block_in_use_except(app->show, instance, port) &&
+           director_local_service_block_available(port))
             return port;
+    }
     return -1;
 }
+
+static gint director_prepare_managed_launch_port(DirectorApp *app, DirectorInstance *instance)
+{
+    if(!app || !app->show || !instance || !instance->managed ||
+       !director_instance_is_local(instance))
+        return 1;
+
+    const gboolean reserved =
+        director_control_port_block_in_use_except(app->show, instance, instance->port);
+    const gboolean available = director_local_service_block_available(instance->port);
+    if(!reserved && available)
+        return 1;
+
+    if(!reserved && director_probe_instance_identity(instance, instance->port)) {
+        director_log(app, "%s already owns the configured VIMS endpoint %s:%d; attaching instead of launching a duplicate",
+                     instance->id, instance->host, instance->port);
+        return 0;
+    }
+
+    const gint old_port = instance->port;
+    const gint new_port = director_next_live_role_port(app, instance);
+    if(new_port < 0) {
+        director_start_failure(app, instance,
+            "No free local VeeJay service-port block is available for this managed instance.");
+        return -1;
+    }
+
+    if(instance->client)
+        director_stop_client(instance);
+    director_clear_live_connection_state(instance);
+    instance->port = new_port;
+    director_retarget_port_references(app, instance, old_port, new_port);
+    director_ensure_client(app, instance);
+    director_log(app,
+                 "%s port block %d..%d is occupied; reassigned managed instance to %d..%d before launch",
+                 instance->id, old_port, old_port + 5, new_port, new_port + 5);
+    director_refresh_all_ui(app);
+    return 1;
+}
+
 
 static void director_add_engine(DirectorApp *app, DirectorRole role)
 {
@@ -11534,7 +11982,7 @@ static void director_add_engine(DirectorApp *app, DirectorRole role)
 
     DirectorInstance *instance = director_instance_new(id, role);
     g_free(id);
-    const gint port = director_next_role_port(app->show, role);
+    const gint port = director_next_live_role_port(app, instance);
     if(port < 0) {
         director_error_dialog(app, "No free local VeeJay control-port block is available.");
         director_instance_free(instance);
@@ -11625,11 +12073,8 @@ static void on_remove_instance(GtkButton *button, gpointer data)
             other->wire_source_shm_key = 0;
             removed_route = TRUE;
         }
-        if(removed_route) {
+        if(removed_route)
             other->wire_applied_connection = director_native_routes_applied(other);
-            if(other->client && other->connected)
-                director_client_refresh(other->client);
-        }
         if(other->control_mode == DIRECTOR_CONTROL_PREVIEW &&
            g_strcmp0(other->master_instance_id, instance->id) == 0) {
             replace_owned_string(&other->master_host, instance->host);
@@ -15081,38 +15526,54 @@ static gchar *director_ndi_ip_address(const gchar *url)
     return g_strdup("IP unavailable");
 }
 
-static gboolean director_stage_wiring_ndi_sender_name_matches(
+static gboolean director_stage_wiring_ndi_sender_matches(
     const DirectorInstance *instance,
-    const gchar *source_name)
+    const gchar *source_name,
+    const gchar *source_url)
 {
     if(!instance || !source_name || !*source_name)
         return FALSE;
 
-    gchar *display_name = director_ndi_display_name(source_name);
-    const gchar *names[3] = {
-        instance->live_ndi_tx_enabled && instance->live_ndi_tx_owned ?
-            instance->live_ndi_tx_name : NULL,
-        instance->ndi_output_enabled ? instance->ndi_output_name : NULL,
-        instance->ndi_output_change_pending && instance->ndi_output_pending_enabled ?
-            instance->ndi_output_pending_name : NULL
-    };
-    gboolean match = FALSE;
-    for(guint i = 0; i < G_N_ELEMENTS(names); i++) {
-        if(!names[i] || !*names[i])
-            continue;
-        if(g_strcmp0(names[i], source_name) == 0 ||
-           g_strcmp0(names[i], display_name) == 0) {
-            match = TRUE;
-            break;
-        }
-    }
-    g_free(display_name);
+    const gboolean live = instance->live_ndi_tx_enabled &&
+                          instance->live_ndi_tx_owned;
+    const gboolean pending = instance->ndi_output_change_pending &&
+                             instance->ndi_output_pending_enabled &&
+                             instance->ndi_output_pending_name &&
+                             *instance->ndi_output_pending_name;
+    if(!live && !pending)
+        return FALSE;
+
+    if(live && source_url && *source_url && instance->live_ndi_tx_url &&
+       *instance->live_ndi_tx_url &&
+       g_strcmp0(instance->live_ndi_tx_url, source_url) == 0)
+        return TRUE;
+    if(live && instance->live_ndi_tx_source && *instance->live_ndi_tx_source &&
+       g_strcmp0(instance->live_ndi_tx_source, source_name) == 0)
+        return TRUE;
+
+    const gchar *tx_name = live && instance->live_ndi_tx_name &&
+                           *instance->live_ndi_tx_name ?
+                           instance->live_ndi_tx_name :
+                           (pending ? instance->ndi_output_pending_name : NULL);
+    const gchar *tx_source = live && instance->live_ndi_tx_source &&
+                             *instance->live_ndi_tx_source ?
+                             instance->live_ndi_tx_source : tx_name;
+    gchar *source_display = director_ndi_display_name(source_name);
+    gchar *tx_display = director_ndi_display_name(tx_source);
+    const gboolean match =
+        (tx_name && *tx_name &&
+         (g_strcmp0(tx_name, source_name) == 0 ||
+          g_strcmp0(tx_name, source_display) == 0)) ||
+        (tx_display && *tx_display && g_strcmp0(tx_display, source_display) == 0);
+    g_free(source_display);
+    g_free(tx_display);
     return match;
 }
 
 static DirectorInstance *director_stage_wiring_find_ndi_sender_instance(
     DirectorApp *app,
     const gchar *source_name,
+    const gchar *source_url,
     guint *matches)
 {
     if(matches)
@@ -15124,7 +15585,7 @@ static DirectorInstance *director_stage_wiring_find_ndi_sender_instance(
     guint count = 0;
     for(guint i = 0; i < app->show->instances->len; i++) {
         DirectorInstance *instance = g_ptr_array_index(app->show->instances, i);
-        if(!director_stage_wiring_ndi_sender_name_matches(instance, source_name))
+        if(!director_stage_wiring_ndi_sender_matches(instance, source_name, source_url))
             continue;
         count++;
         if(!found)
@@ -15215,79 +15676,112 @@ static gboolean director_stage_wiring_has_canonical_peer(DirectorApp *app,
     return FALSE;
 }
 
+static gboolean director_stage_wiring_ndi_source_classifying(DirectorApp *app,
+                                                             const gchar *name)
+{
+    if(!app || !app->ndi_source_cache || !name || !*name)
+        return FALSE;
+    DirectorNdiSourceRecord *record =
+        g_hash_table_lookup(app->ndi_source_cache, name);
+    return record && record->online && !record->classification_ready;
+}
+
+static void director_stage_wiring_add_ndi_placeholder(DirectorApp *app,
+                                                       GPtrArray *nodes,
+                                                       GHashTable *names,
+                                                       const gchar *name,
+                                                       gboolean configured)
+{
+    if(!name || !*name)
+        return;
+    if(director_stage_wiring_ndi_source_classifying(app, name))
+        return;
+    guint sender_matches = 0;
+    if(director_stage_wiring_find_ndi_sender_instance(app, name, NULL,
+                                                       &sender_matches) &&
+       sender_matches == 1)
+        return;
+
+    DirectorWiringNdiNode *node = g_hash_table_lookup(names, name);
+    if(node) {
+        if(configured)
+            node->configured = TRUE;
+        return;
+    }
+
+    node = g_new0(DirectorWiringNdiNode, 1);
+    node->name = g_strdup(name);
+    node->display_name = director_ndi_display_name(name);
+    node->url = g_strdup("");
+    node->ip_address = g_strdup("IP unavailable");
+    node->key = g_strdup_printf("ndi-name:%s", name);
+    node->online = FALSE;
+    node->configured = configured;
+    node->matches = 1;
+    g_hash_table_insert(names, g_strdup(node->name), node);
+    g_ptr_array_add(nodes, node);
+}
+
 static GPtrArray *director_stage_wiring_collect_ndi_nodes(DirectorApp *app)
 {
     GPtrArray *nodes = g_ptr_array_new_with_free_func(
         (GDestroyNotify)director_wiring_ndi_node_free);
     GHashTable *names = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
 
-    for(guint i = 0; app && app->ndi_sources && i < app->ndi_sources->len; i++) {
-        DirectorNdiSource *source = g_ptr_array_index(app->ndi_sources, i);
+    GList *source_keys = app && app->ndi_source_cache ?
+        g_hash_table_get_keys(app->ndi_source_cache) : NULL;
+    source_keys = g_list_sort(source_keys, (GCompareFunc)g_ascii_strcasecmp);
+    for(GList *item = source_keys; item; item = item->next) {
+        DirectorNdiSourceRecord *source =
+            g_hash_table_lookup(app->ndi_source_cache, item->data);
         guint sender_matches = 0;
         DirectorInstance *owned_sender = source && source->name ?
             director_stage_wiring_find_ndi_sender_instance(app, source->name,
+                                                            source->url,
                                                             &sender_matches) : NULL;
         if(!source || !source->name || !*source->name ||
+           !source->classification_ready ||
            (owned_sender && sender_matches == 1))
             continue;
-        DirectorWiringNdiNode *existing = g_hash_table_lookup(names, source->name);
-        if(existing) {
-            existing->matches++;
-            continue;
-        }
         DirectorWiringNdiNode *node = g_new0(DirectorWiringNdiNode, 1);
         node->name = g_strdup(source->name);
         node->display_name = director_ndi_display_name(source->name);
         node->url = g_strdup(source->url ? source->url : "");
         node->ip_address = director_ndi_ip_address(source->url);
         node->key = g_strdup_printf("ndi-name:%s", source->name);
-        node->online = app->ndi_discovery_state_valid &&
-                       app->ndi_discovery_state == DIRECTOR_NDI_DISCOVERY_WATCHING;
-        node->stale = !node->online;
-        node->matches = 1;
+        node->online = source->online;
+        node->stale = !source->online;
+        node->matches = MAX(1u, source->matches);
         g_hash_table_insert(names, g_strdup(node->name), node);
         g_ptr_array_add(nodes, node);
     }
+    g_list_free(source_keys);
 
     for(guint i = 0; app && app->show && i < app->show->instances->len; i++) {
         DirectorInstance *instance = g_ptr_array_index(app->show->instances, i);
         if(!instance)
             continue;
-        const gchar *candidates[2] = {
-            instance->ndi_source_name,
-            instance->ndi_input_change_pending && instance->ndi_input_pending_enabled ?
-                instance->ndi_input_pending_name : NULL
-        };
-        for(guint candidate = 0; candidate < G_N_ELEMENTS(candidates); candidate++) {
-            const gchar *name = candidates[candidate];
-            if(!name || !*name ||
-               (candidate == 1 && g_strcmp0(name, candidates[0]) == 0))
-                continue;
-            guint sender_matches = 0;
-            if(director_stage_wiring_find_ndi_sender_instance(app, name,
-                                                               &sender_matches) &&
-               sender_matches == 1)
-                continue;
 
-            DirectorWiringNdiNode *node = g_hash_table_lookup(names, name);
-            if(node) {
-                if((candidate == 0 && instance->ndi_input_enabled) || candidate == 1)
-                    node->configured = TRUE;
-                continue;
+        if(instance->input_routes) {
+            for(guint r = 0; r < instance->input_routes->len; r++) {
+                DirectorInputRoute *route = g_ptr_array_index(instance->input_routes, r);
+                if(route && route->type == DIRECTOR_INPUT_ROUTE_NDI &&
+                   route->ndi_source_name && *route->ndi_source_name)
+                    director_stage_wiring_add_ndi_placeholder(
+                        app, nodes, names, route->ndi_source_name, TRUE);
             }
-
-            node = g_new0(DirectorWiringNdiNode, 1);
-            node->name = g_strdup(name);
-            node->display_name = director_ndi_display_name(name);
-            node->url = g_strdup("");
-            node->ip_address = g_strdup("IP unavailable");
-            node->key = g_strdup_printf("ndi-name:%s", name);
-            node->online = FALSE;
-            node->configured = (candidate == 0 && instance->ndi_input_enabled) || candidate == 1;
-            node->matches = 1;
-            g_hash_table_insert(names, g_strdup(node->name), node);
-            g_ptr_array_add(nodes, node);
         }
+
+        if(instance->ndi_input_enabled && instance->ndi_source_name &&
+           *instance->ndi_source_name)
+            director_stage_wiring_add_ndi_placeholder(
+                app, nodes, names, instance->ndi_source_name, TRUE);
+
+        if(instance->ndi_input_change_pending &&
+           instance->ndi_input_pending_enabled &&
+           instance->ndi_input_pending_name && *instance->ndi_input_pending_name)
+            director_stage_wiring_add_ndi_placeholder(
+                app, nodes, names, instance->ndi_input_pending_name, TRUE);
     }
 
     g_hash_table_destroy(names);
@@ -15314,9 +15808,6 @@ static DirectorWiringPosition *director_stage_wiring_ndi_position(DirectorApp *a
                                                              &saved_x, &saved_y)) {
             position->x = saved_x;
             position->y = saved_y;
-        } else if(g_strcmp0(key, DIRECTOR_WIRING_NDI_SINK_KEY) == 0) {
-            position->x = DIRECTOR_WIRING_NDI_SINK_X;
-            position->y = DIRECTOR_WIRING_NDI_SINK_Y;
         } else {
             position->x = DIRECTOR_WIRING_NDI_X;
             position->y = DIRECTOR_WIRING_TOP + index * DIRECTOR_WIRING_NDI_ROW_GAP;
@@ -15368,6 +15859,7 @@ static gboolean director_stage_hit_wiring_ndi_source(DirectorApp *app,
 static gboolean director_stage_hit_wiring_ndi_socket(DirectorApp *app,
                                                        gdouble px,
                                                        gdouble py,
+                                                       gchar **key,
                                                        gchar **name,
                                                        guint *matches,
                                                        gdouble *socket_x,
@@ -15383,14 +15875,44 @@ static gboolean director_stage_hit_wiring_ndi_socket(DirectorApp *app,
         const gdouble sy = y + h * 0.5;
         const gdouble dx = px - sx;
         const gdouble dy = py - sy;
-        if(dx * dx + dy * dy > 13.0 * 13.0)
+        const gdouble radius = director_stage_wiring_socket_hit_radius(app);
+        if(dx * dx + dy * dy > radius * radius)
             continue;
+        if(key) *key = g_strdup(node->key);
         if(name) *name = g_strdup(node->name);
         if(matches) *matches = node->matches;
         if(socket_x) *socket_x = sx;
         if(socket_y) *socket_y = sy;
         hit = TRUE;
         break;
+    }
+    g_ptr_array_free(nodes, TRUE);
+    return hit;
+}
+
+static gboolean director_stage_hit_wiring_ndi_cleanup(DirectorApp *app,
+                                                       gdouble px,
+                                                       gdouble py,
+                                                       gchar **name)
+{
+    GPtrArray *nodes = director_stage_wiring_collect_ndi_nodes(app);
+    gboolean hit = FALSE;
+    for(gint i = (gint)nodes->len - 1; i >= 0; i--) {
+        DirectorWiringNdiNode *node = g_ptr_array_index(nodes, (guint)i);
+        if(!node || node->online || !node->configured)
+            continue;
+        gdouble x, y, w, h;
+        director_stage_wiring_ndi_node_rect(app, node, (guint)i, &x, &y, &w, &h);
+        const gdouble cx = x + w - 14.0;
+        const gdouble cy = y + h - 14.0;
+        const gdouble dx = px - cx;
+        const gdouble dy = py - cy;
+        if(dx * dx + dy * dy <= 11.0 * 11.0) {
+            if(name)
+                *name = g_strdup(node->name);
+            hit = TRUE;
+            break;
+        }
     }
     g_ptr_array_free(nodes, TRUE);
     return hit;
@@ -15501,6 +16023,155 @@ static gboolean director_stage_wiring_node_rect(DirectorApp *app,
     *w = card_w;
     *h = card_h;
     return TRUE;
+}
+
+static gboolean director_stage_wiring_action_rect(DirectorApp *app,
+                                                   const DirectorInstance *instance,
+                                                   DirectorWiringAction action,
+                                                   gdouble *x,
+                                                   gdouble *y,
+                                                   gdouble *w,
+                                                   gdouble *h)
+{
+    if(action < DIRECTOR_WIRING_ACTION_AUDIO || action > DIRECTOR_WIRING_ACTION_WHITE)
+        return FALSE;
+    gdouble nx, ny, nw, nh;
+    if(!director_stage_wiring_node_rect(app, instance, &nx, &ny, &nw, &nh))
+        return FALSE;
+    const gdouble size = 18.0;
+    const gdouble gap = 4.0;
+    const guint index = (guint)action - (guint)DIRECTOR_WIRING_ACTION_AUDIO;
+    if(x) *x = nx + 14.0 + index * (size + gap);
+    if(y) *y = ny + nh - 23.0;
+    if(w) *w = size;
+    if(h) *h = size;
+    return TRUE;
+}
+
+static gboolean director_stage_wiring_action_sensitive(const DirectorInstance *instance,
+                                                        DirectorWiringAction action)
+{
+    if(!instance)
+        return FALSE;
+    if(action == DIRECTOR_WIRING_ACTION_AUDIO)
+        return instance->role != DIRECTOR_ROLE_OUTPUT && instance->audio_enabled;
+    return !instance->calibration_camera;
+}
+
+static gboolean director_stage_wiring_action_active(const DirectorInstance *instance,
+                                                     DirectorWiringAction action)
+{
+    if(!instance)
+        return FALSE;
+    const gint pattern = instance->connected && instance->live_pattern >= 0 ?
+        instance->live_pattern : instance->pattern;
+    switch(action) {
+        case DIRECTOR_WIRING_ACTION_AUDIO: return instance->audio_muted;
+        case DIRECTOR_WIRING_ACTION_LIVE: return pattern == 0;
+        case DIRECTOR_WIRING_ACTION_BLACK: return pattern == 1;
+        case DIRECTOR_WIRING_ACTION_WHITE: return pattern == 2;
+        default: return FALSE;
+    }
+}
+
+static gboolean director_stage_hit_wiring_action(DirectorApp *app,
+                                                  gdouble px,
+                                                  gdouble py,
+                                                  DirectorInstance **instance_out,
+                                                  DirectorWiringAction *action_out)
+{
+    if(instance_out) *instance_out = NULL;
+    if(action_out) *action_out = DIRECTOR_WIRING_ACTION_NONE;
+    if(!app || !app->show)
+        return FALSE;
+    for(gint i = (gint)app->show->instances->len - 1; i >= 0; i--) {
+        DirectorInstance *instance = g_ptr_array_index(app->show->instances, (guint)i);
+        for(DirectorWiringAction action = DIRECTOR_WIRING_ACTION_AUDIO;
+            action <= DIRECTOR_WIRING_ACTION_WHITE; action++) {
+            gdouble x, y, w, h;
+            if(!director_stage_wiring_action_rect(app, instance, action, &x, &y, &w, &h))
+                continue;
+            if(px >= x && px <= x + w && py >= y && py <= y + h) {
+                if(instance_out) *instance_out = instance;
+                if(action_out) *action_out = action;
+                return TRUE;
+            }
+        }
+    }
+    return FALSE;
+}
+
+static void director_stage_wiring_draw_action(cairo_t *cr,
+                                               DirectorApp *app,
+                                               DirectorInstance *instance,
+                                               DirectorWiringAction action)
+{
+    gdouble x, y, w, h;
+    if(!director_stage_wiring_action_rect(app, instance, action, &x, &y, &w, &h))
+        return;
+    const gboolean sensitive = director_stage_wiring_action_sensitive(instance, action);
+    const gboolean active = director_stage_wiring_action_active(instance, action);
+    const gboolean hovered = app->stage_wire_action_hover_node == instance &&
+                             app->stage_wire_action_hover == action;
+
+    director_stage_wiring_rounded_rect(cr, x, y, w, h, 4.0);
+    cairo_set_source_rgba(cr,
+        hovered ? 0.20 : (active ? 0.22 : 0.06),
+        hovered ? 0.28 : (active ? 0.34 : 0.08),
+        hovered ? 0.34 : (active ? 0.30 : 0.10),
+        sensitive ? 0.96 : 0.45);
+    cairo_fill_preserve(cr);
+    cairo_set_source_rgba(cr,
+        hovered ? 0.72 : 0.42,
+        hovered ? 0.86 : (active ? 0.92 : 0.48),
+        hovered ? 1.00 : (active ? 0.72 : 0.56),
+        sensitive ? 0.92 : 0.35);
+    cairo_set_line_width(cr, hovered ? 1.5 : 1.0);
+    cairo_stroke(cr);
+
+    cairo_set_line_width(cr, 1.4);
+    cairo_set_source_rgba(cr, 1, 1, 1, sensitive ? 0.88 : 0.34);
+    const gdouble cx = x + w * 0.5;
+    const gdouble cy = y + h * 0.5;
+    if(action == DIRECTOR_WIRING_ACTION_AUDIO) {
+        cairo_move_to(cr, x + 4.0, cy - 2.5);
+        cairo_line_to(cr, x + 7.0, cy - 2.5);
+        cairo_line_to(cr, x + 10.5, cy - 5.0);
+        cairo_line_to(cr, x + 10.5, cy + 5.0);
+        cairo_line_to(cr, x + 7.0, cy + 2.5);
+        cairo_line_to(cr, x + 4.0, cy + 2.5);
+        cairo_close_path(cr);
+        cairo_stroke(cr);
+        if(instance->audio_muted) {
+            cairo_move_to(cr, x + 12.5, cy - 4.0);
+            cairo_line_to(cr, x + 16.0, cy + 4.0);
+            cairo_move_to(cr, x + 16.0, cy - 4.0);
+            cairo_line_to(cr, x + 12.5, cy + 4.0);
+            cairo_stroke(cr);
+        } else {
+            cairo_arc(cr, x + 10.5, cy, 4.0, -0.75, 0.75);
+            cairo_stroke(cr);
+        }
+    }
+    else if(action == DIRECTOR_WIRING_ACTION_LIVE) {
+        cairo_move_to(cr, cx - 3.5, cy - 5.0);
+        cairo_line_to(cr, cx + 5.0, cy);
+        cairo_line_to(cr, cx - 3.5, cy + 5.0);
+        cairo_close_path(cr);
+        cairo_fill(cr);
+    }
+    else {
+        cairo_rectangle(cr, cx - 4.5, cy - 4.5, 9.0, 9.0);
+        if(action == DIRECTOR_WIRING_ACTION_BLACK) {
+            cairo_set_source_rgba(cr, 0.01, 0.01, 0.01, sensitive ? 1.0 : 0.35);
+            cairo_fill_preserve(cr);
+            cairo_set_source_rgba(cr, 1, 1, 1, sensitive ? 0.75 : 0.28);
+            cairo_stroke(cr);
+        } else {
+            cairo_set_source_rgba(cr, 1, 1, 1, sensitive ? 0.92 : 0.34);
+            cairo_fill(cr);
+        }
+    }
 }
 
 static DirectorInstance *director_stage_hit_wiring_node(DirectorApp *app,
@@ -15655,6 +16326,12 @@ static void director_stage_wiring_draw_delete_handle(cairo_t *cr,
                                                         gdouble x,
                                                         gdouble y)
 {
+    cairo_save(cr);
+    cairo_rectangle(cr, x - 10.0, y - 15.0, 20.0, 7.0);
+    cairo_set_source_rgba(cr, 0.025, 0.035, 0.050, 0.98);
+    cairo_fill(cr);
+    cairo_restore(cr);
+
     cairo_arc(cr, x, y, 8.5, 0, 2.0 * G_PI);
     cairo_set_source_rgba(cr, 0.025, 0.035, 0.050, 0.96);
     cairo_fill_preserve(cr);
@@ -15700,7 +16377,7 @@ static gboolean director_stage_wiring_ndi_source_endpoint(
 
     guint sender_matches = 0;
     DirectorInstance *sender = director_stage_wiring_find_ndi_sender_instance(
-        app, source_name, &sender_matches);
+        app, source_name, NULL, &sender_matches);
     if(sender && sender != target && sender_matches == 1) {
         gdouble x, y, w, h;
         if(!director_stage_wiring_node_rect(app, sender, &x, &y, &w, &h))
@@ -15925,34 +16602,6 @@ static gboolean director_stage_wiring_delete_hit(DirectorApp *app,
         }
     }
 
-    gdouble sink_x, sink_y, sink_w, sink_h;
-    director_stage_wiring_ndi_sink_rect(app, &sink_x, &sink_y, &sink_w, &sink_h);
-    for(guint i = 0; i < app->show->instances->len; i++) {
-        DirectorInstance *sender = g_ptr_array_index(app->show->instances, i);
-        const gboolean configured = sender->ndi_output_enabled;
-        const gboolean live = sender->live_ndi_tx_enabled && sender->live_ndi_tx_owned;
-        const gboolean pending = sender->ndi_output_change_pending;
-        if((!configured && !live) || pending)
-            continue;
-        gdouble x, y, w, h;
-        if(!director_stage_wiring_node_rect(app, sender, &x, &y, &w, &h))
-            continue;
-        gdouble c1x, c1y, c2x, c2y, mx, my;
-        director_stage_wiring_curve_points(x + w, y + h - 17.0,
-                                           sink_x, sink_y + sink_h * 0.5,
-                                           &c1x, &c1y, &c2x, &c2y);
-        director_stage_wiring_curve_midpoint(x + w, y + h - 17.0,
-                                             c1x, c1y, c2x, c2y,
-                                             sink_x, sink_y + sink_h * 0.5,
-                                             &mx, &my);
-        if(director_stage_wiring_delete_handle_hit(px, py, mx, my)) {
-            hit->kind = DIRECTOR_WIRING_DELETE_NDI_OUTPUT;
-            hit->source = sender;
-            g_ptr_array_free(ndi_nodes, TRUE);
-            return TRUE;
-        }
-    }
-
     g_ptr_array_free(ndi_nodes, TRUE);
     return FALSE;
 }
@@ -16099,27 +16748,37 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         DirectorWiringNdiNode *node = g_ptr_array_index(ndi_nodes, i);
         gdouble x, y, w, h;
         director_stage_wiring_ndi_node_rect(app, node, i, &x, &y, &w, &h);
+        const gboolean hovered = app->stage_wire_ndi_hover_key &&
+                                 g_strcmp0(app->stage_wire_ndi_hover_key, node->key) == 0;
         director_stage_wiring_rounded_rect(cr, x, y, w, h, 9.0);
-        cairo_set_source_rgba(cr, node->online ? 0.055 : (node->stale ? 0.11 : 0.095),
-                              node->online ? 0.19 : (node->stale ? 0.14 : 0.13),
-                              node->online ? 0.16 : (node->stale ? 0.09 : 0.12), 0.98);
+        cairo_set_source_rgba(cr, node->online ? 0.18 : (node->stale ? 0.12 : 0.10),
+                              node->online ? 0.07 : (node->stale ? 0.09 : 0.08),
+                              node->online ? 0.24 : (node->stale ? 0.16 : 0.14), 0.98);
         cairo_fill_preserve(cr);
         cairo_set_source_rgba(cr, node->matches > 1 ? 0.98 :
-                                  (node->online ? 0.34 : (node->stale ? 0.96 : 0.78)),
+                                  (hovered ? 0.94 :
+                                   (node->online ? 0.74 : (node->stale ? 0.68 : 0.56))),
                               node->matches > 1 ? 0.48 :
-                                  (node->online ? 0.88 : (node->stale ? 0.68 : 0.52)),
+                                  (hovered ? 0.58 :
+                                   (node->online ? 0.34 : (node->stale ? 0.30 : 0.28))),
                               node->matches > 1 ? 0.30 :
-                                  (node->online ? 0.70 : (node->stale ? 0.24 : 0.24)), 0.96);
-        cairo_set_line_width(cr, 1.4);
+                                  (hovered ? 1.00 :
+                                   (node->online ? 0.96 : (node->stale ? 0.72 : 0.66))), 0.98);
+        cairo_set_line_width(cr, hovered ? 2.4 : 1.4);
         cairo_stroke(cr);
 
         cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
         cairo_set_font_size(cr, 11.5);
         cairo_set_source_rgba(cr, 1, 1, 1, 0.95);
-        gchar *title = director_stage_wiring_ellipsize(cr, node->display_name, w - 30.0);
+        gchar *title = director_stage_wiring_ellipsize(cr, node->display_name, w - 104.0);
         cairo_move_to(cr, x + 14.0, y + 24.0);
         director_cairo_show_text(cr, title);
         g_free(title);
+
+        cairo_set_font_size(cr, 7.8);
+        cairo_set_source_rgba(cr, 0.90, 0.54, 1.00, 0.94);
+        cairo_move_to(cr, x + w - 86.0, y + 23.0);
+        director_cairo_show_text(cr, "NDI SOURCE");
 
         cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
         cairo_set_font_size(cr, 8.7);
@@ -16134,32 +16793,58 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
         cairo_set_font_size(cr, 8.3);
         cairo_set_source_rgba(cr, node->matches > 1 ? 0.98 :
-                                  (node->online ? 0.42 : (node->stale ? 0.96 : 0.98)),
+                                  (node->online ? 0.90 : (node->stale ? 0.72 : 0.64)),
                               node->matches > 1 ? 0.48 :
-                                  (node->online ? 0.92 : (node->stale ? 0.68 : 0.64)),
+                                  (node->online ? 0.48 : (node->stale ? 0.34 : 0.30)),
                               node->matches > 1 ? 0.30 :
-                                  (node->online ? 0.70 : (node->stale ? 0.24 : 0.30)), 0.94);
+                                  (node->online ? 1.00 : (node->stale ? 0.82 : 0.74)), 0.96);
         cairo_move_to(cr, x + 14.0, y + 68.0);
         if(node->matches > 1)
             director_cairo_show_text(cr, node->online ?
-                            "ONLINE · NDI NETWORK · AMBIGUOUS" :
-                            "OFFLINE · NDI NETWORK · AMBIGUOUS");
+                            "ONLINE · AMBIGUOUS NAME" :
+                            "OFFLINE · AMBIGUOUS NAME");
         else if(node->stale)
-            director_cairo_show_text(cr, "STALE · DISCOVERY RETRYING");
+            director_cairo_show_text(cr, "STALE · EXPIRING");
         else if(node->online)
-            director_cairo_show_text(cr, "ONLINE · NDI NETWORK");
+            director_cairo_show_text(cr, "ONLINE · NETWORK SOURCE");
         else if(node->configured)
-            director_cairo_show_text(cr, "OFFLINE · CONFIGURED INPUT");
+            director_cairo_show_text(cr, "OFFLINE · SAVED INPUT");
         else
             director_cairo_show_text(cr, "OFFLINE · SAVED SOURCE");
 
-        cairo_arc(cr, x + w, y + h * 0.5, 9.0, 0, 2.0 * G_PI);
+        if(node->configured && !node->online) {
+            const gdouble cx = x + w - 14.0;
+            const gdouble cy = y + h - 14.0;
+            cairo_arc(cr, cx, cy, 8.5, 0, 2.0 * G_PI);
+            cairo_set_source_rgba(cr, 0.12, 0.04, 0.06, 0.96);
+            cairo_fill_preserve(cr);
+            cairo_set_source_rgba(cr, 0.98, 0.42, 0.32, 0.96);
+            cairo_set_line_width(cr, 1.2);
+            cairo_stroke(cr);
+            cairo_set_line_width(cr, 1.5);
+            cairo_move_to(cr, cx - 2.8, cy - 2.8);
+            cairo_line_to(cr, cx + 2.8, cy + 2.8);
+            cairo_move_to(cr, cx + 2.8, cy - 2.8);
+            cairo_line_to(cr, cx - 2.8, cy + 2.8);
+            cairo_stroke(cr);
+        }
+
+        if(hovered) {
+            const gdouble halo = 17.0 / MAX(0.25, app->stage_wiring_view_scale);
+            cairo_arc(cr, x + w, y + h * 0.5, halo, 0, 2.0 * G_PI);
+            cairo_set_source_rgba(cr, 0.82, 0.38, 1.00, 0.24);
+            cairo_fill(cr);
+        }
+        cairo_arc(cr, x + w, y + h * 0.5, hovered ? 11.0 : 9.0, 0, 2.0 * G_PI);
         cairo_set_source_rgba(cr, node->matches > 1 ? 0.98 :
-                                  (node->online ? 0.34 : (node->stale ? 0.96 : 0.72)),
+                                  (hovered ? 0.94 :
+                                   (node->online ? 0.78 : (node->stale ? 0.62 : 0.52))),
                               node->matches > 1 ? 0.48 :
-                                  (node->online ? 0.88 : (node->stale ? 0.68 : 0.50)),
+                                  (hovered ? 0.58 :
+                                   (node->online ? 0.34 : (node->stale ? 0.28 : 0.26))),
                               node->matches > 1 ? 0.30 :
-                                  (node->online ? 0.70 : (node->stale ? 0.24 : 0.28)), 1.0);
+                                  (hovered ? 1.00 :
+                                   (node->online ? 1.00 : (node->stale ? 0.74 : 0.68))), 1.0);
         cairo_fill(cr);
     }
 
@@ -16230,61 +16915,7 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         }
     }
 
-    {
-        gdouble sink_x, sink_y, sink_w, sink_h;
-        director_stage_wiring_ndi_sink_rect(app, &sink_x, &sink_y, &sink_w, &sink_h);
-        for(guint i = 0; i < app->show->instances->len; i++) {
-            DirectorInstance *sender = g_ptr_array_index(app->show->instances, i);
-            const gboolean configured = sender->ndi_output_enabled;
-            const gboolean live_owned = sender->live_ndi_tx_enabled &&
-                                        sender->live_ndi_tx_owned;
-            const gboolean live_shadow = live_owned &&
-                !director_backend_identity_matches(sender) &&
-                director_stage_wiring_has_canonical_peer(app, sender);
-            const gboolean live = live_owned && !live_shadow;
-            const gboolean pending = sender->ndi_output_change_pending;
-            const gboolean pending_enable = pending && sender->ndi_output_pending_enabled;
-            const gboolean live_match = live &&
-                (!configured || director_ndi_runtime_output_matches(sender));
-            if(!configured && !live && !pending_enable)
-                continue;
-            gdouble x, y, w, h;
-            if(!director_stage_wiring_node_rect(app, sender, &x, &y, &w, &h))
-                continue;
-            const gdouble start_x = x + w;
-            const gdouble start_y = y + h - 17.0;
-            const gdouble end_x = sink_x;
-            const gdouble end_y = sink_y + sink_h * 0.5;
-            gdouble c1x, c1y, c2x, c2y, mx, my;
-            director_stage_wiring_curve_points(start_x, start_y, end_x, end_y,
-                                               &c1x, &c1y, &c2x, &c2y);
-            cairo_set_source_rgba(cr, 0.34, 0.88, 0.70,
-                                  sender == app->selected ? 0.98 : 0.78);
-            cairo_set_line_width(cr, sender == app->selected ? 3.4 : 2.4);
-            if(pending || !live_match) {
-                const double dashes[] = { 7.0, 5.0 };
-                cairo_set_dash(cr, dashes, 2, 0.0);
-            }
-            cairo_move_to(cr, start_x, start_y);
-            cairo_curve_to(cr, c1x, c1y, c2x, c2y, end_x, end_y);
-            cairo_stroke(cr);
-            cairo_set_dash(cr, NULL, 0, 0.0);
-            director_stage_wiring_curve_midpoint(start_x, start_y,
-                                                 c1x, c1y, c2x, c2y,
-                                                 end_x, end_y, &mx, &my);
-            const gchar *tx_label = pending ?
-                (sender->ndi_output_pending_enabled ?
-                    "NDI TX · ENABLING" : "NDI TX · DISABLING") :
-                (live_match ?
-                    (director_backend_identity_matches(sender) ?
-                        "NDI TX · SELF" : "NDI TX · ID MISMATCH") :
-                 live ? "NDI TX · CONFIG / LIVE MISMATCH" :
-                        "NDI TX · CONFIGURED");
-            director_stage_wiring_draw_transport_label(cr, tx_label, mx, my - 20.0, FALSE);
-            if(!pending)
-                director_stage_wiring_draw_delete_handle(cr, mx, my);
-        }
-    }
+
 
     for(guint i = 0; i < app->show->instances->len; i++) {
         DirectorInstance *target = g_ptr_array_index(app->show->instances, i);
@@ -16495,12 +17126,30 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
     for(guint i = 0; i < app->show->instances->len; i++) {
         DirectorInstance *preview = g_ptr_array_index(app->show->instances, i);
         if(preview->control_mode != DIRECTOR_CONTROL_PREVIEW ||
-           !preview->master_instance_id || !*preview->master_instance_id)
+           !preview->preview_forward_vims)
             continue;
-        DirectorInstance *master = director_show_find_instance(app->show,
-                                                                preview->master_instance_id);
+
+        DirectorInstance *master = NULL;
+        if(preview->master_instance_id && *preview->master_instance_id)
+            master = director_show_find_instance(app->show,
+                                                 preview->master_instance_id);
+        if(!master && preview->master_host && *preview->master_host &&
+           preview->master_port > 0) {
+            for(guint m = 0; m < app->show->instances->len; m++) {
+                DirectorInstance *candidate =
+                    g_ptr_array_index(app->show->instances, m);
+                if(candidate != preview &&
+                   candidate->port == preview->master_port &&
+                   director_hosts_equivalent(candidate->host,
+                                             preview->master_host)) {
+                    master = candidate;
+                    break;
+                }
+            }
+        }
         if(!master || master == preview)
             continue;
+
         gdouble px, py, pw, ph, mx0, my0, mw, mh;
         if(!director_stage_wiring_node_rect(app, preview, &px, &py, &pw, &ph) ||
            !director_stage_wiring_node_rect(app, master, &mx0, &my0, &mw, &mh))
@@ -16511,9 +17160,10 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         const gdouble end_y = my0;
         const gdouble bend = MAX(54.0, fabs(end_x - start_x) * 0.18 + 42.0);
         const double dashes[] = { 6.0, 5.0 };
+        const gboolean emphasized = preview == app->selected || master == app->selected;
         cairo_set_source_rgba(cr, 0.94, 0.72, 0.26,
-                              preview == app->selected || master == app->selected ? 0.96 : 0.62);
-        cairo_set_line_width(cr, preview == app->selected || master == app->selected ? 2.2 : 1.5);
+                              emphasized ? 0.98 : 0.70);
+        cairo_set_line_width(cr, emphasized ? 2.4 : 1.7);
         cairo_set_dash(cr, dashes, 2, 0.0);
         cairo_move_to(cr, start_x, start_y);
         cairo_curve_to(cr, start_x, start_y - bend,
@@ -16521,13 +17171,19 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
                        end_x, end_y);
         cairo_stroke(cr);
         cairo_set_dash(cr, NULL, 0, 0.0);
+
+        const gdouble arrow_len = 9.0;
+        const gdouble arrow_half = 4.5;
+        cairo_move_to(cr, end_x, end_y);
+        cairo_line_to(cr, end_x - arrow_half, end_y - arrow_len);
+        cairo_move_to(cr, end_x, end_y);
+        cairo_line_to(cr, end_x + arrow_half, end_y - arrow_len);
+        cairo_stroke(cr);
+
         const gdouble lx = (start_x + end_x) * 0.5;
         const gdouble ly = MAX(58.0, MIN(start_y, end_y) - bend * 0.72);
-        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-        cairo_set_font_size(cr, 8.5);
-        cairo_set_source_rgba(cr, 0.98, 0.80, 0.36, 0.90);
-        cairo_move_to(cr, lx - 18.0, ly);
-        director_cairo_show_text(cr, "CONTROL");
+        director_stage_wiring_draw_transport_label(cr, "VIMS FORWARD",
+                                                    lx, ly, FALSE);
     }
 
     if(app->stage_wire_dragging) {
@@ -16550,36 +17206,7 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         cairo_set_dash(cr, NULL, 0, 0.0);
     }
 
-    {
-        gdouble x, y, w, h;
-        director_stage_wiring_ndi_sink_rect(app, &x, &y, &w, &h);
-        director_stage_wiring_rounded_rect(cr, x, y, w, h, 9.0);
-        cairo_set_source_rgba(cr, 0.055, 0.17, 0.15, 0.98);
-        cairo_fill_preserve(cr);
-        cairo_set_source_rgba(cr, app->stage_wire_hover_ndi_sink ? 0.98 : 0.34,
-                              app->stage_wire_hover_ndi_sink ? 0.75 : 0.88,
-                              app->stage_wire_hover_ndi_sink ? 0.20 : 0.70, 0.98);
-        cairo_set_line_width(cr, app->stage_wire_hover_ndi_sink ? 3.0 : 1.4);
-        cairo_stroke(cr);
-        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-        cairo_set_font_size(cr, 12.0);
-        cairo_set_source_rgba(cr, 1, 1, 1, 0.95);
-        cairo_move_to(cr, x + 17.0, y + 27.0);
-        director_cairo_show_text(cr, "NDI NETWORK");
-        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL);
-        cairo_set_font_size(cr, 9.0);
-        cairo_set_source_rgba(cr, 1, 1, 1, 0.58);
-        cairo_move_to(cr, x + 17.0, y + 49.0);
-        director_cairo_show_text(cr, "NDI output sink for VeeJay instances");
-        cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-        cairo_set_font_size(cr, 8.5);
-        cairo_set_source_rgba(cr, 0.42, 0.92, 0.72, 0.96);
-        cairo_move_to(cr, x + 17.0, y + 73.0);
-        director_cairo_show_text(cr, "NDI NETWORK · RUNTIME CONNECTABLE");
-        cairo_arc(cr, x, y + h * 0.5, 9.0, 0, 2.0 * G_PI);
-        cairo_set_source_rgba(cr, 0.34, 0.88, 0.70, 1.0);
-        cairo_fill(cr);
-    }
+
 
     for(guint i = 0; i < app->show->instances->len; i++) {
         DirectorInstance *instance = g_ptr_array_index(app->show->instances, i);
@@ -16632,6 +17259,9 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
                                             instance->ndi_output_pending_enabled;
         const gboolean ndi_sender = ndi_sender_live || instance->ndi_output_enabled ||
                                     pending_ndi_sender;
+        const gboolean ndi_runtime_unavailable = instance->connected &&
+            instance->backend_ready && director_instance_ndi_runtime_unavailable(instance);
+        const gboolean external_instance = !instance->managed;
 
         director_stage_wiring_rounded_rect(cr, x, y, w, h, 9.0);
         cairo_set_source_rgba(cr,
@@ -16641,9 +17271,12 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
                               0.98);
         cairo_fill_preserve(cr);
         cairo_set_source_rgba(cr,
-                              hover_target ? 1.0 : (selected ? 0.90 : 0.34),
-                              hover_target ? 0.74 : (selected ? 0.72 : 0.44),
-                              hover_target ? 0.18 : (selected ? 0.20 : 0.62),
+                              hover_target ? 1.0 :
+                                  (selected ? 0.90 : (external_instance ? 0.54 : 0.34)),
+                              hover_target ? 0.74 :
+                                  (selected ? 0.72 : (external_instance ? 0.40 : 0.44)),
+                              hover_target ? 0.18 :
+                                  (selected ? 0.20 : (external_instance ? 0.88 : 0.62)),
                               0.96);
         cairo_set_line_width(cr, hover_target ? 3.2 : (selected ? 2.2 : 1.1));
         cairo_stroke(cr);
@@ -16653,9 +17286,20 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         cairo_set_font_size(cr, 13.0);
         cairo_move_to(cr, x + 16.0, y + 25.0);
         gchar *instance_title = director_stage_wiring_ellipsize(
-            cr, instance->id, w - (instance->eidolon_enabled ? 112.0 : 30.0));
+            cr, instance->id, w - ((instance->eidolon_enabled || external_instance) ?
+                                      112.0 : 30.0));
         director_cairo_show_text(cr, instance_title);
         g_free(instance_title);
+
+        if(external_instance) {
+            cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
+                                   CAIRO_FONT_WEIGHT_BOLD);
+            cairo_set_font_size(cr, 7.8);
+            cairo_set_source_rgba(cr, 0.72, 0.58, 1.00, 0.96);
+            cairo_move_to(cr, x + w - 88.0, y + 24.0);
+            director_cairo_show_text(cr, instance->discovered_transient ?
+                                     "DISCOVERED" : "UNMANAGED");
+        }
 
         if(instance->eidolon_enabled) {
             cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
@@ -16698,23 +17342,27 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         cairo_set_source_rgba(cr, 1, 1, 1, 0.52);
         cairo_move_to(cr, x + 16.0, y + 68.0);
         gchar *route_display = director_stage_wiring_ellipsize(
-            cr, route, w - (ndi_sender ? 126.0 : 30.0));
+            cr, route, w - ((ndi_sender || ndi_runtime_unavailable) ? 138.0 : 30.0));
         director_cairo_show_text(cr, route_display);
         g_free(route_display);
         g_free(route);
-        if(ndi_sender) {
+        if(ndi_sender || ndi_runtime_unavailable) {
             cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
                                    CAIRO_FONT_WEIGHT_BOLD);
             cairo_set_font_size(cr, 8.0);
-            cairo_set_source_rgba(cr, 0.34, 0.88, 0.70, 0.96);
-            cairo_move_to(cr, x + w - 112.0, y + 68.0);
-            const gchar *sender_badge = instance->ndi_output_change_pending ?
-                (instance->ndi_output_pending_enabled ?
-                    "NDI TX · ENABLING" : "NDI TX · DISABLING") :
-                (ndi_sender_live ?
-                    (director_backend_identity_matches(instance) ?
-                        "NDI SENDER · SELF" : "NDI TX · ID MISMATCH") :
-                    "NDI TX · CONFIGURED");
+            cairo_set_source_rgba(cr, ndi_runtime_unavailable ? 0.92 : 0.34,
+                                  ndi_runtime_unavailable ? 0.50 : 0.88,
+                                  ndi_runtime_unavailable ? 0.36 : 0.70, 0.96);
+            cairo_move_to(cr, x + w - 124.0, y + 68.0);
+            const gchar *sender_badge = ndi_runtime_unavailable ?
+                "NDI RUNTIME · N/A" :
+                instance->ndi_output_change_pending ?
+                    (instance->ndi_output_pending_enabled ?
+                        "NDI TX · ENABLING" : "NDI TX · DISABLING") :
+                    (ndi_sender_live ?
+                        (director_backend_identity_matches(instance) ?
+                            "NDI SENDER · SELF" : "NDI TX · ID MISMATCH") :
+                        "NDI TX · CONFIGURED");
             director_cairo_show_text(cr, sender_badge);
         }
 
@@ -16763,6 +17411,11 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         g_free(pending_input_name);
         g_free(ndi_input_name);
         g_free(wall_input_label);
+
+        for(DirectorWiringAction action = DIRECTOR_WIRING_ACTION_AUDIO;
+            action <= DIRECTOR_WIRING_ACTION_WHITE; action++)
+            director_stage_wiring_draw_action(cr, app, instance, action);
+
         cairo_move_to(cr, x + w - 92.0, y + 86.0);
         director_cairo_show_text(cr, "SHM/TCP OUT");
 
@@ -16793,14 +17446,20 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
         cairo_fill(cr);
         cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
         cairo_set_font_size(cr, 7.8);
-        cairo_set_source_rgba(cr, ndi_sender ? 0.42 : 0.34,
-                              ndi_sender ? 0.92 : 0.55,
-                              ndi_sender ? 0.72 : 0.46,
-                              ndi_sender ? 0.96 : 0.68);
-        cairo_move_to(cr, x + w - 58.0, y + h - 13.0);
-        director_cairo_show_text(cr, ndi_sender ? "NDI TX" : "NDI TX +");
-        const gboolean hover_ndi_socket = app->stage_wire_socket_hover_node == instance &&
-                                          app->stage_wire_socket_hover_ndi;
+        cairo_set_source_rgba(cr, ndi_runtime_unavailable ? 0.70 :
+                                  (ndi_sender ? 0.42 : 0.34),
+                              ndi_runtime_unavailable ? 0.40 :
+                                  (ndi_sender ? 0.92 : 0.55),
+                              ndi_runtime_unavailable ? 0.34 :
+                                  (ndi_sender ? 0.72 : 0.46),
+                              ndi_runtime_unavailable ? 0.82 :
+                                  (ndi_sender ? 0.96 : 0.68));
+        cairo_move_to(cr, x + w - 64.0, y + h - 13.0);
+        director_cairo_show_text(cr, ndi_runtime_unavailable ? "NDI N/A" :
+                                 (ndi_sender ? "NDI TX" : "NDI TX +"));
+        const gboolean hover_ndi_socket = !ndi_runtime_unavailable &&
+            app->stage_wire_socket_hover_node == instance &&
+            app->stage_wire_socket_hover_ndi;
         if(hover_ndi_socket) {
             const gdouble halo = 16.0 / MAX(0.25, app->stage_wiring_view_scale);
             cairo_arc(cr, x + w, y + h - 17.0, halo, 0, 2.0 * G_PI);
@@ -16808,9 +17467,12 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
             cairo_fill(cr);
         }
         cairo_arc(cr, x + w, y + h - 17.0, hover_ndi_socket ? 10.5 : 8.0, 0, 2.0 * G_PI);
-        cairo_set_source_rgba(cr, hover_ndi_socket ? 0.62 : (ndi_sender ? 0.34 : 0.22),
-                              hover_ndi_socket ? 1.00 : (ndi_sender ? 0.88 : 0.56),
-                              hover_ndi_socket ? 0.78 : (ndi_sender ? 0.70 : 0.46), 1.0);
+        cairo_set_source_rgba(cr, ndi_runtime_unavailable ? 0.38 :
+                                  (hover_ndi_socket ? 0.62 : (ndi_sender ? 0.34 : 0.22)),
+                              ndi_runtime_unavailable ? 0.30 :
+                                  (hover_ndi_socket ? 1.00 : (ndi_sender ? 0.88 : 0.56)),
+                              ndi_runtime_unavailable ? 0.28 :
+                                  (hover_ndi_socket ? 0.78 : (ndi_sender ? 0.70 : 0.46)), 1.0);
         cairo_fill(cr);
     }
 
@@ -16843,14 +17505,33 @@ static void director_stage_draw_wiring_overlay(DirectorApp *app,
     cairo_set_font_size(cr, 9.3);
     cairo_set_source_rgba(cr, 1, 1, 1, 0.58);
     cairo_move_to(cr, x + 12.0, y + 36.0);
-    director_cairo_show_text(cr, "Drag blue SHM/TCP OUT · drag green NDI TX · midpoint X removes one route · drag boxes · middle-drag pan · wheel zoom");
+    director_cairo_show_text(cr, "Drag blue SHM/TCP · green VeeJay NDI TX · magenta NDI source · midpoint X removes route · middle-drag pan · wheel zoom");
 
     gchar hover_status[160];
     const gchar *status = "NDI discovery ready";
-    if(app->stage_wire_socket_hover_node) {
+    if(app->stage_wire_action_hover_node) {
+        const gchar *action_name = app->stage_wire_action_hover == DIRECTOR_WIRING_ACTION_AUDIO ?
+            (app->stage_wire_action_hover_node->audio_muted ? "Unmute audio" : "Mute audio") :
+            app->stage_wire_action_hover == DIRECTOR_WIRING_ACTION_LIVE ? "Live video" :
+            app->stage_wire_action_hover == DIRECTOR_WIRING_ACTION_BLACK ? "Black output" :
+            app->stage_wire_action_hover == DIRECTOR_WIRING_ACTION_WHITE ? "White output" :
+            "Instance action";
+        snprintf(hover_status, sizeof(hover_status), "%s · %s",
+                 action_name, app->stage_wire_action_hover_node->id);
+        status = hover_status;
+    }
+    else if(app->stage_wire_socket_hover_node) {
         snprintf(hover_status, sizeof(hover_status), "Ready to drag %s from %s",
                  app->stage_wire_socket_hover_ndi ? "NDI TX" : "SHM/TCP OUT",
                  app->stage_wire_socket_hover_node->id);
+        status = hover_status;
+    }
+    else if(app->stage_wire_ndi_hover_key) {
+        const gchar *name = g_str_has_prefix(app->stage_wire_ndi_hover_key, "ndi-name:") ?
+            app->stage_wire_ndi_hover_key + strlen("ndi-name:") :
+            app->stage_wire_ndi_hover_key;
+        snprintf(hover_status, sizeof(hover_status),
+                 "Ready to drag NDI source %.108s", name);
         status = hover_status;
     }
     else if(app->ndi_refresh_pending)
@@ -17246,6 +17927,91 @@ static gboolean director_remove_runtime_input_route(DirectorApp *app,
                                               key_or_port, endpoint);
 }
 
+static gboolean director_stage_cleanup_ndi_source(DirectorApp *app,
+                                                  const gchar *source_name)
+{
+    if(!app || !app->show || !source_name || !*source_name)
+        return FALSE;
+
+    for(guint i = 0; i < app->show->instances->len; i++) {
+        DirectorInstance *target = g_ptr_array_index(app->show->instances, i);
+        if(!target || !target->ndi_input_change_pending)
+            continue;
+        if((target->ndi_input_pending_name &&
+            g_strcmp0(target->ndi_input_pending_name, source_name) == 0) ||
+           (target->ndi_source_name &&
+            g_strcmp0(target->ndi_source_name, source_name) == 0)) {
+            director_error_dialog(app,
+                "Wait for the pending NDI input change to finish before cleaning up this saved source.");
+            return FALSE;
+        }
+    }
+
+    guint removed = 0;
+    for(guint i = 0; i < app->show->instances->len; i++) {
+        DirectorInstance *target = g_ptr_array_index(app->show->instances, i);
+        if(!target)
+            continue;
+
+        gboolean removed_runtime = FALSE;
+        if(target->input_routes) {
+            for(gint r = (gint)target->input_routes->len - 1; r >= 0; r--) {
+                DirectorInputRoute *route = g_ptr_array_index(target->input_routes, (guint)r);
+                if(!route || route->type != DIRECTOR_INPUT_ROUTE_NDI ||
+                   g_strcmp0(route->ndi_source_name, source_name) != 0)
+                    continue;
+                if(target->connected && target->backend_ready && target->client)
+                    removed_runtime |= director_remove_runtime_input_route(app, target, route);
+                g_ptr_array_remove_index(target->input_routes, (guint)r);
+                removed++;
+            }
+        }
+
+        if(target->live_input_routes && target->connected && target->backend_ready &&
+           target->client) {
+            for(guint r = 0; r < target->live_input_routes->len; r++) {
+                DirectorInputRoute *route = g_ptr_array_index(target->live_input_routes, r);
+                if(!route || route->type != DIRECTOR_INPUT_ROUTE_NDI ||
+                   g_strcmp0(route->ndi_source_name, source_name) != 0)
+                    continue;
+                if(route->live_stream_id > 0)
+                    removed_runtime |= director_client_remove_input_route_id(
+                        target->client, route->live_stream_id);
+            }
+        }
+
+        if(target->ndi_input_enabled && target->ndi_source_name &&
+           g_strcmp0(target->ndi_source_name, source_name) == 0) {
+            if(!removed_runtime && target->connected && target->backend_ready && target->client)
+                director_client_set_ndi_input(target->client, NULL);
+            target->ndi_input_enabled = FALSE;
+            replace_owned_string(&target->ndi_source_name, "");
+            removed++;
+        }
+    }
+
+    if(removed == 0)
+        return FALSE;
+
+    gchar *key = g_strdup_printf("ndi-name:%s", source_name);
+    if(app->stage_ndi_positions)
+        g_hash_table_remove(app->stage_ndi_positions, key);
+    director_show_remove_ndi_patch_position(app->show, key);
+    g_free(key);
+
+    app->show->dirty = TRUE;
+    director_log(app, "Removed %u saved NDI input reference%s for '%s'",
+                 removed, removed == 1 ? "" : "s", source_name);
+    director_update_instance_form(app);
+    director_update_workspace_ui(app);
+    director_update_command_preview(app);
+    director_update_header(app);
+    director_stage_wiring_update_canvas_size(app);
+    if(app->stage_canvas)
+        gtk_widget_queue_draw(app->stage_canvas);
+    return TRUE;
+}
+
 static gboolean director_apply_video_wire(DirectorApp *app,
                                            DirectorInstance *source,
                                            DirectorInstance *target,
@@ -17253,10 +18019,11 @@ static gboolean director_apply_video_wire(DirectorApp *app,
 {
     if(!app || !source || !target || source == target)
         return FALSE;
-    if(!source->connected || !source->backend_ready ||
+    if(!source->connected || !source->backend_ready || !source->client ||
        !target->connected || !target->backend_ready || !target->client)
         return FALSE;
 
+    const gint64 now = g_get_monotonic_time();
     const gboolean local = director_video_wire_is_local(source, target);
     const gchar *route_host = director_video_wire_source_host(source, target);
     if(!local && (!route_host || !*route_host)) {
@@ -17266,10 +18033,14 @@ static gboolean director_apply_video_wire(DirectorApp *app,
         return FALSE;
     }
 
-    if(local && source->shm_key <= 0)
-        return FALSE;
+    const DirectorInputRouteType type =
+        local ? DIRECTOR_INPUT_ROUTE_SHM : DIRECTOR_INPUT_ROUTE_TCP;
+    const gint source_shm_key =
+        source->live_route_shm_output_key > 0 ?
+        source->live_route_shm_output_key : source->shm_key;
+    const gboolean source_shm_enabled =
+        source->live_route_shm_output_enabled || source->shm_enabled;
 
-    DirectorInputRouteType type = local ? DIRECTOR_INPUT_ROUTE_SHM : DIRECTOR_INPUT_ROUTE_TCP;
     DirectorInputRoute *route = director_native_route_for_source(target, source);
     if(route) {
         const gboolean changed_transport = route->type != type;
@@ -17280,41 +18051,88 @@ static gboolean director_apply_video_wire(DirectorApp *app,
                                 route_host ? route_host : "") != 0);
         const gboolean changed_shm_key =
             type == DIRECTOR_INPUT_ROUTE_SHM && route->shm_key > 0 &&
-            source->shm_key > 0 && route->shm_key != source->shm_key;
-        if(changed_transport || changed_tcp_endpoint || changed_shm_key)
+            source_shm_key > 0 && route->shm_key != source_shm_key;
+        if(changed_transport || changed_tcp_endpoint || changed_shm_key) {
             director_remove_runtime_input_route(app, target, route);
+            route->applied_connection = FALSE;
+            route->apply_pending = FALSE;
+            route->apply_requested_us = 0;
+            route->live_stream_id = 0;
+            route->live_active = FALSE;
+            route->live_current = FALSE;
+        }
     } else {
         director_instance_add_input_route(target, type, source->id,
                                           route_host ? route_host : "",
                                           source->port, NULL);
         route = director_native_route_for_source(target, source);
     }
-    if(route) {
-        route->type = type;
-        g_free(route->host);
-        route->host = g_strdup(route_host ? route_host : "");
-        route->port = source->port;
+
+    if(!route)
+        return FALSE;
+
+    route->type = type;
+    replace_owned_string(&route->host, route_host ? route_host : "");
+    route->port = source->port;
+    route->shm_key = local ? source_shm_key : 0;
+    if(target->role != DIRECTOR_ROLE_OUTPUT &&
+       target->source_instance_id && *target->source_instance_id &&
+       g_strcmp0(target->source_instance_id, source->id) == 0)
+        route->select_when_ready = TRUE;
+
+    if(local && (!source_shm_enabled || source_shm_key <= 0)) {
+        const gboolean retry =
+            !source->shm_output_enable_pending ||
+            now - source->shm_output_enable_requested_us >= DIRECTOR_SHM_ENABLE_RETRY_US;
+        if(retry) {
+            if(!director_client_set_shm_output(source->client, TRUE)) {
+                if(report_errors)
+                    director_error_dialog(app,
+                        "Unable to enable shared-memory video publication on the source VeeJay.");
+                return FALSE;
+            }
+            const gboolean first_request = !source->shm_output_enable_pending;
+            source->shm_output_enable_pending = TRUE;
+            source->shm_output_enable_requested_us = now;
+            if(first_request)
+                director_log(app,
+                    "Enabling SHM video output on %s before opening %s → %s",
+                    source->id, source->id, target->id);
+        }
+        route->applied_connection = FALSE;
+        route->apply_pending = FALSE;
+        route->apply_requested_us = 0;
+        target->wire_applied_connection = FALSE;
+        return TRUE;
     }
 
+    if(local) {
+        source->shm_output_enable_pending = FALSE;
+        source->shm_output_enable_requested_us = 0;
+    }
+
+    if(route->apply_pending &&
+       now - route->apply_requested_us < DIRECTOR_ROUTE_APPLY_RETRY_US)
+        return TRUE;
+
+    route->apply_pending = FALSE;
+    route->apply_requested_us = 0;
+
     gchar *command = local ?
-        g_strdup_printf("251:%d %d;", source->port, source->shm_key) :
+        g_strdup_printf("251:%d %d;", source->port, source_shm_key) :
         g_strdup_printf("245:%d %s;", source->port, route_host);
     director_client_send(target->client, command);
     g_free(command);
 
-    if(target->role != DIRECTOR_ROLE_OUTPUT && !target->ndi_input_enabled &&
-       target->source_instance_id && *target->source_instance_id &&
-       g_strcmp0(target->source_instance_id, source->id) == 0)
-        director_client_send(target->client, "201:-1;");
+    route->applied_connection = target->role == DIRECTOR_ROLE_OUTPUT;
+    route->apply_pending = target->role != DIRECTOR_ROLE_OUTPUT;
+    route->apply_requested_us = now;
+    target->wire_source_shm_key = local ? source_shm_key : 0;
+    target->wire_applied_connection =
+        target->role == DIRECTOR_ROLE_OUTPUT || director_native_routes_applied(target);
 
-    if(route) {
-        route->shm_key = local ? source->shm_key : 0;
-        route->applied_connection = TRUE;
-    }
-    target->wire_source_shm_key = local ? source->shm_key : 0;
-    target->wire_applied_connection = director_native_routes_applied(target);
     director_log(app, "%s video route %s → %s (%s)",
-                 target->role == DIRECTOR_ROLE_OUTPUT ? "Switched" : "Opened",
+                 target->role == DIRECTOR_ROLE_OUTPUT ? "Switched" : "Requested",
                  source->id, target->id, local ? "shared memory" : "unicast TCP");
     return TRUE;
 }
@@ -17333,6 +18151,9 @@ static void director_invalidate_video_wires_from_source(DirectorApp *app,
                 if(route->type != DIRECTOR_INPUT_ROUTE_NDI && route->source_instance_id &&
                    g_strcmp0(route->source_instance_id, source->id) == 0) {
                     route->applied_connection = FALSE;
+                    route->apply_pending = FALSE;
+                    route->apply_requested_us = 0;
+                    route->select_requested_us = 0;
                     invalidated = TRUE;
                 }
             }
@@ -17369,9 +18190,13 @@ static void director_apply_pending_video_wires(DirectorApp *app)
                                                            DIRECTOR_INPUT_ROUTE_SHM,
                                                            route->shm_key, "-");
                     route->applied_connection = FALSE;
+                    route->apply_pending = FALSE;
+                    route->apply_requested_us = 0;
                 } else if(route->type == DIRECTOR_INPUT_ROUTE_SHM &&
                           route->shm_key != source->shm_key) {
                     route->applied_connection = FALSE;
+                    route->apply_pending = FALSE;
+                    route->apply_requested_us = 0;
                 }
                 if(!route->applied_connection)
                     director_apply_video_wire(app, source, target, FALSE);
@@ -17445,8 +18270,16 @@ static void director_stage_clear_wire_drag(DirectorApp *app)
     app->stage_wire_source_is_ndi = FALSE;
     app->stage_wire_source = NULL;
     app->stage_wire_hover_target = NULL;
-    app->stage_wire_hover_ndi_sink = FALSE;
     g_clear_pointer(&app->stage_wire_ndi_name, g_free);
+}
+
+static gboolean director_instance_ndi_runtime_unavailable(const DirectorInstance *instance)
+{
+    if(!instance || !instance->live_ndi_runtime || !*instance->live_ndi_runtime)
+        return FALSE;
+    return g_ascii_strcasecmp(instance->live_ndi_runtime, "unavailable") == 0 ||
+           g_ascii_strcasecmp(instance->live_ndi_runtime, "not compiled") == 0 ||
+           g_ascii_strcasecmp(instance->live_ndi_runtime, "not built") == 0;
 }
 
 static gboolean director_stage_connect_ndi(DirectorApp *app,
@@ -17466,7 +18299,7 @@ static gboolean director_stage_connect_ndi(DirectorApp *app,
     }
     if(target->role == DIRECTOR_ROLE_OUTPUT) {
         director_error_dialog(app,
-            "Output instances consume their primary VeeJay feed. Patch NDI into a Program or Standalone engine, or publish the Output instance through the NDI network sink.");
+            "Output instances consume their primary VeeJay feed. Patch NDI into a Program or Standalone engine; each VeeJay can publish its own NDI TX independently.");
         return FALSE;
     }
     if(target->split_master_instance_id && *target->split_master_instance_id) {
@@ -17476,6 +18309,11 @@ static gboolean director_stage_connect_ndi(DirectorApp *app,
     }
 
     const gboolean live = target->connected && target->backend_ready && target->client;
+    if(live && director_instance_ndi_runtime_unavailable(target)) {
+        director_error_dialog(app,
+            "The target VeeJay backend reports that its NDI runtime is unavailable. Check the backend log or NDI_RUNTIME_DIR_V6 before creating this wire.");
+        return FALSE;
+    }
     if(live) {
         if(!director_client_set_ndi_input(target->client, source_name)) {
             director_error_dialog(app,
@@ -17484,6 +18322,7 @@ static gboolean director_stage_connect_ndi(DirectorApp *app,
         }
         target->ndi_input_change_pending = TRUE;
         target->ndi_input_pending_enabled = TRUE;
+        target->ndi_input_change_requested_us = g_get_monotonic_time();
         replace_owned_string(&target->ndi_input_pending_name, source_name);
         g_clear_pointer(&target->ndi_input_pending_native_source_id, g_free);
         g_clear_pointer(&target->ndi_input_pending_native_host, g_free);
@@ -17511,9 +18350,6 @@ static gboolean director_stage_disconnect_wire(DirectorApp *app,
 {
     if(!app || !app->show || !hit || hit->kind == DIRECTOR_WIRING_DELETE_NONE)
         return FALSE;
-
-    if(hit->kind == DIRECTOR_WIRING_DELETE_NDI_OUTPUT)
-        return director_stage_disconnect_ndi_output(app, hit->source);
 
     DirectorInstance *target = hit->target;
     if(!target)
@@ -17591,8 +18427,6 @@ static gboolean director_stage_disconnect_wire(DirectorApp *app,
     }
 
     app->show->dirty = TRUE;
-    if(target->client && target->connected)
-        director_client_refresh(target->client);
     director_workspace_select_instance(app, target);
     director_update_instance_form(app);
     director_update_workspace_ui(app);
@@ -17602,31 +18436,6 @@ static gboolean director_stage_disconnect_wire(DirectorApp *app,
     if(app->stage_canvas)
         gtk_widget_queue_draw(app->stage_canvas);
     return TRUE;
-}
-
-static void director_stage_wiring_ndi_sink_rect(DirectorApp *app,
-                                                  gdouble *x, gdouble *y,
-                                                  gdouble *w, gdouble *h)
-{
-    DirectorWiringPosition *position = director_stage_wiring_ndi_position(
-        app, DIRECTOR_WIRING_NDI_SINK_KEY, 0, TRUE);
-    if(x) *x = position ? position->x : DIRECTOR_WIRING_NDI_SINK_X;
-    if(y) *y = position ? position->y : DIRECTOR_WIRING_NDI_SINK_Y;
-    if(w) *w = DIRECTOR_WIRING_NDI_SINK_WIDTH;
-    if(h) *h = DIRECTOR_WIRING_NDI_SINK_HEIGHT;
-}
-
-static gboolean director_stage_hit_wiring_ndi_sink(DirectorApp *app,
-                                                     gdouble px, gdouble py)
-{
-    gdouble x, y, w, h;
-    director_stage_wiring_ndi_sink_rect(app, &x, &y, &w, &h);
-    const gdouble sx = x;
-    const gdouble sy = y + h * 0.5;
-    const gdouble dx = px - sx;
-    const gdouble dy = py - sy;
-    return dx * dx + dy * dy <= 15.0 * 15.0 ||
-           (px >= x && px <= x + w && py >= y && py <= y + h);
 }
 
 static void director_stage_wiring_widget_to_world(DirectorApp *app,
@@ -17681,12 +18490,6 @@ static gboolean director_stage_wiring_bounds(DirectorApp *app,
         ADD_WIRING_RECT(x, y, w, h);
     }
     g_ptr_array_free(nodes, TRUE);
-
-    {
-        gdouble x, y, w, h;
-        director_stage_wiring_ndi_sink_rect(app, &x, &y, &w, &h);
-        ADD_WIRING_RECT(x, y, w, h);
-    }
 
 #undef ADD_WIRING_RECT
     if(!have)
@@ -17758,6 +18561,9 @@ static gboolean director_stage_hit_wiring_ndi_output_socket(DirectorApp *app,
 {
     if(!app || !instance)
         return FALSE;
+    if(instance->connected && instance->backend_ready &&
+       director_instance_ndi_runtime_unavailable(instance))
+        return FALSE;
     gdouble x, y, w, h;
     if(!director_stage_wiring_node_rect(app, instance, &x, &y, &w, &h))
         return FALSE;
@@ -17790,6 +18596,12 @@ static gboolean director_stage_connect_ndi_output(DirectorApp *app,
     }
 
     const gboolean live = instance->connected && instance->backend_ready && instance->client;
+    if(live && director_instance_ndi_runtime_unavailable(instance)) {
+        g_free(fallback);
+        director_error_dialog(app,
+            "This VeeJay backend reports that its NDI runtime is unavailable. Check the backend log or NDI_RUNTIME_DIR_V6 before enabling NDI TX.");
+        return FALSE;
+    }
     if(live) {
         if(!director_client_set_ndi_output(instance->client, TRUE, name)) {
             g_free(fallback);
@@ -17799,6 +18611,7 @@ static gboolean director_stage_connect_ndi_output(DirectorApp *app,
         }
         instance->ndi_output_change_pending = TRUE;
         instance->ndi_output_pending_enabled = TRUE;
+        instance->ndi_output_change_requested_us = g_get_monotonic_time();
         replace_owned_string(&instance->ndi_output_pending_name, name);
     } else {
         director_commit_ndi_output_configuration(app, instance, TRUE, name);
@@ -17809,45 +18622,6 @@ static gboolean director_stage_connect_ndi_output(DirectorApp *app,
                  live ? "Requested runtime enable of" : "Configured",
                  instance->id, name);
     g_free(fallback);
-    director_update_instance_form(app);
-    director_update_workspace_ui(app);
-    director_update_command_preview(app);
-    director_update_header(app);
-    if(app->stage_canvas)
-        gtk_widget_queue_draw(app->stage_canvas);
-    return TRUE;
-}
-
-static gboolean director_stage_disconnect_ndi_output(DirectorApp *app,
-                                                      DirectorInstance *instance)
-{
-    if(!app || !instance ||
-       !(instance->ndi_output_enabled || instance->live_ndi_tx_enabled))
-        return FALSE;
-    if(instance->ndi_output_change_pending) {
-        director_error_dialog(app,
-            "An NDI output change is already being applied for this instance.");
-        return FALSE;
-    }
-
-    const gboolean live = instance->connected && instance->backend_ready && instance->client;
-    if(live) {
-        if(!director_client_set_ndi_output(instance->client, FALSE,
-                                           instance->ndi_output_name)) {
-            director_error_dialog(app,
-                "Unable to queue the runtime NDI output disconnect command.");
-            return FALSE;
-        }
-        instance->ndi_output_change_pending = TRUE;
-        instance->ndi_output_pending_enabled = FALSE;
-        g_clear_pointer(&instance->ndi_output_pending_name, g_free);
-    } else {
-        director_commit_ndi_output_configuration(app, instance, FALSE, NULL);
-    }
-
-    director_log(app, "%s NDI network output for %s",
-                 live ? "Requested runtime disable of" : "Removed configured",
-                 instance->id);
     director_update_instance_form(app);
     director_update_workspace_ui(app);
     director_update_command_preview(app);
@@ -17928,6 +18702,10 @@ static gboolean director_stage_connect_video(DirectorApp *app,
         replace_owned_string(&route->host, route_host ? route_host : "");
         route->port = source->port;
         route->applied_connection = FALSE;
+        route->apply_pending = FALSE;
+        route->apply_requested_us = 0;
+        route->select_when_ready = target->role != DIRECTOR_ROLE_OUTPUT;
+        route->select_requested_us = 0;
     }
 
     replace_owned_string(&target->source_instance_id, source->id);
@@ -18227,7 +19005,7 @@ static void on_stage_tool_duplicate(GtkButton *button, gpointer data)
         g_free(id);
         return;
     }
-    copy->port = director_next_role_port(app->show, copy->role);
+    copy->port = director_next_live_role_port(app, copy);
     copy->display_index = -1;
     replace_owned_string(&copy->display_id, "");
     replace_owned_string(&copy->display_name, "");
@@ -18258,6 +19036,47 @@ static GtkWidget *director_stage_tool_action_button(const gchar *label,
     g_object_set_data(G_OBJECT(button), "director-tool-instance", instance);
     g_signal_connect(button, "clicked", callback, app);
     return button;
+}
+
+static void director_stage_wiring_apply_action(DirectorApp *app,
+                                               DirectorInstance *instance,
+                                               DirectorWiringAction action)
+{
+    if(!app || !instance || !director_stage_wiring_action_sensitive(instance, action))
+        return;
+
+    director_workspace_select_instance(app, instance);
+    if(action == DIRECTOR_WIRING_ACTION_AUDIO) {
+        const gboolean mute = !instance->audio_muted;
+        instance->audio_muted = mute;
+        app->show->dirty = TRUE;
+        if(instance->client && instance->connected && instance->backend_ready) {
+            gchar command[16];
+            g_snprintf(command, sizeof(command), "313:%d;", mute ? 1 : 0);
+            director_client_send(instance->client, command);
+        }
+        director_log(app, "%s audio on %s", mute ? "Muted" : "Unmuted", instance->id);
+        director_refresh_all_ui(app);
+        return;
+    }
+
+    gint pattern = 0;
+    if(action == DIRECTOR_WIRING_ACTION_BLACK)
+        pattern = 1;
+    else if(action == DIRECTOR_WIRING_ACTION_WHITE)
+        pattern = 2;
+
+    instance->pattern = pattern;
+    app->show->dirty = TRUE;
+    if(instance->client && instance->connected && instance->backend_ready) {
+        director_client_send(instance->client, "295:0;");
+        gchar *command = g_strdup_printf("285:%d;", pattern);
+        director_client_send(instance->client, command);
+        g_free(command);
+        director_client_refresh(instance->client);
+    }
+    director_log(app, "%s: %s", instance->id, director_pattern_name(pattern));
+    director_refresh_live_ui(app);
 }
 
 static void director_stage_show_tools_popover(DirectorApp *app,
@@ -18411,6 +19230,21 @@ static gboolean on_stage_canvas_button(GtkWidget *widget, GdkEventButton *event,
         if(event->button != 1)
             return FALSE;
 
+        gchar *cleanup_ndi_name = NULL;
+        if(director_stage_hit_wiring_ndi_cleanup(app, wx, wy, &cleanup_ndi_name)) {
+            director_stage_cleanup_ndi_source(app, cleanup_ndi_name);
+            g_free(cleanup_ndi_name);
+            return TRUE;
+        }
+
+        DirectorInstance *action_instance = NULL;
+        DirectorWiringAction action = DIRECTOR_WIRING_ACTION_NONE;
+        if(director_stage_hit_wiring_action(app, wx, wy, &action_instance, &action)) {
+            director_stage_wiring_apply_action(app, action_instance, action);
+            gtk_widget_queue_draw(widget);
+            return TRUE;
+        }
+
         DirectorWiringDeleteHit delete_hit;
         if(director_stage_wiring_delete_hit(app, wx, wy, &delete_hit)) {
             director_stage_disconnect_wire(app, &delete_hit);
@@ -18469,7 +19303,7 @@ static gboolean on_stage_canvas_button(GtkWidget *widget, GdkEventButton *event,
         gdouble ndi_socket_x = 0.0;
         gdouble ndi_socket_y = 0.0;
         if(director_stage_hit_wiring_ndi_socket(app, wx, wy,
-                                                &ndi_name, &ndi_matches,
+                                                NULL, &ndi_name, &ndi_matches,
                                                 &ndi_socket_x, &ndi_socket_y)) {
             if(ndi_matches > 1) {
                 gchar *message = g_strdup_printf(
@@ -18507,19 +19341,6 @@ static gboolean on_stage_canvas_button(GtkWidget *widget, GdkEventButton *event,
             return TRUE;
         }
         g_free(ndi_key);
-
-        if(director_stage_hit_wiring_ndi_sink(app, wx, wy)) {
-            DirectorWiringPosition *position = director_stage_wiring_ndi_position(
-                app, DIRECTOR_WIRING_NDI_SINK_KEY, 0, TRUE);
-            app->stage_ndi_node_dragging = TRUE;
-            g_clear_pointer(&app->stage_ndi_drag_key, g_free);
-            app->stage_ndi_drag_key = g_strdup(DIRECTOR_WIRING_NDI_SINK_KEY);
-            app->stage_ndi_node_start_x = wx;
-            app->stage_ndi_node_start_y = wy;
-            app->stage_ndi_node_origin_x = position ? position->x : DIRECTOR_WIRING_NDI_SINK_X;
-            app->stage_ndi_node_origin_y = position ? position->y : DIRECTOR_WIRING_NDI_SINK_Y;
-            return TRUE;
-        }
 
         DirectorInstance *node = director_stage_hit_wiring_node(app, wx, wy);
         if(!node) {
@@ -18689,6 +19510,8 @@ static gboolean on_stage_canvas_motion(GtkWidget *widget, GdkEventMotion *event,
 
         gdouble wx = 0.0, wy = 0.0;
         director_stage_wiring_widget_to_world(app, event->x, event->y, &wx, &wy);
+        app->stage_pointer_x = wx;
+        app->stage_pointer_y = wy;
         if(!app->stage_wire_dragging && !app->stage_wire_node_dragging &&
            !app->stage_ndi_node_dragging) {
             DirectorInstance *hover_node = NULL;
@@ -18703,28 +19526,46 @@ static gboolean on_stage_canvas_motion(GtkWidget *widget, GdkEventMotion *event,
                     hover_node = candidate; hover_native = TRUE; break;
                 }
             }
+            gchar *ndi_hover_key = NULL;
+            if(!hover_node)
+                director_stage_hit_wiring_ndi_socket(app, wx, wy,
+                                                     &ndi_hover_key, NULL, NULL,
+                                                     NULL, NULL);
+            DirectorInstance *hover_action_node = NULL;
+            DirectorWiringAction hover_action = DIRECTOR_WIRING_ACTION_NONE;
+            const gboolean hover_action_button = director_stage_hit_wiring_action(
+                app, wx, wy, &hover_action_node, &hover_action) &&
+                director_stage_wiring_action_sensitive(hover_action_node, hover_action);
             const gboolean changed = hover_node != app->stage_wire_socket_hover_node ||
                                      hover_native != app->stage_wire_socket_hover_native ||
-                                     hover_ndi != app->stage_wire_socket_hover_ndi;
+                                     hover_ndi != app->stage_wire_socket_hover_ndi ||
+                                     hover_action_node != app->stage_wire_action_hover_node ||
+                                     hover_action != app->stage_wire_action_hover ||
+                                     g_strcmp0(ndi_hover_key, app->stage_wire_ndi_hover_key) != 0;
             app->stage_wire_socket_hover_node = hover_node;
             app->stage_wire_socket_hover_native = hover_native;
             app->stage_wire_socket_hover_ndi = hover_ndi;
-            if(changed) {
-                GdkWindow *window = gtk_widget_get_window(widget);
-                if(window) {
-                    GdkCursor *cursor = hover_node ?
-                        gdk_cursor_new_for_display(gdk_window_get_display(window), GDK_CROSSHAIR) : NULL;
-                    gdk_window_set_cursor(window, cursor);
-                    if(cursor) g_object_unref(cursor);
-                }
-                gtk_widget_queue_draw(widget);
+            app->stage_wire_action_hover_node = hover_action_node;
+            app->stage_wire_action_hover = hover_action;
+            g_free(app->stage_wire_ndi_hover_key);
+            app->stage_wire_ndi_hover_key = ndi_hover_key;
+            GdkWindow *window = gtk_widget_get_window(widget);
+            if(window) {
+                GdkCursor *cursor = NULL;
+                if(hover_action_button)
+                    cursor = gdk_cursor_new_for_display(gdk_window_get_display(window), GDK_HAND2);
+                else if(hover_node || app->stage_wire_ndi_hover_key)
+                    cursor = gdk_cursor_new_for_display(gdk_window_get_display(window), GDK_CROSSHAIR);
+                gdk_window_set_cursor(window, cursor);
+                if(cursor) g_object_unref(cursor);
             }
+            if(changed)
+                gtk_widget_queue_draw(widget);
         }
         if(app->stage_wire_dragging) {
             app->stage_pointer_x = wx;
             app->stage_pointer_y = wy;
             DirectorInstance *target = director_stage_hit_wiring_input(app, wx, wy);
-            app->stage_wire_hover_ndi_sink = FALSE;
             if(app->stage_wire_source_is_ndi) {
                 app->stage_wire_hover_target = target &&
                     target != app->stage_wire_source &&
@@ -18732,11 +19573,6 @@ static gboolean on_stage_canvas_motion(GtkWidget *widget, GdkEventMotion *event,
                     target->role != DIRECTOR_ROLE_OUTPUT &&
                     (!target->split_master_instance_id || !*target->split_master_instance_id) ?
                     target : NULL;
-                if(!app->stage_wire_hover_target &&
-                   app->stage_wire_source &&
-                   !app->stage_wire_source->ndi_output_change_pending &&
-                   director_stage_hit_wiring_ndi_sink(app, wx, wy))
-                    app->stage_wire_hover_ndi_sink = TRUE;
             }
             else {
                 app->stage_wire_hover_target =
@@ -18831,8 +19667,6 @@ static gboolean on_stage_canvas_release(GtkWidget *widget, GdkEventButton *event
             DirectorInstance *source = app->stage_wire_source;
             gchar *ndi_name = g_strdup(app->stage_wire_ndi_name);
             DirectorInstance *target = director_stage_hit_wiring_input(app, wx, wy);
-            const gboolean ndi_sink = ndi_source && source &&
-                                      director_stage_hit_wiring_ndi_sink(app, wx, wy);
             director_stage_clear_wire_drag(app);
             if(target && (!source || target != source)) {
                 director_workspace_select_instance(app, target);
@@ -18863,8 +19697,6 @@ static gboolean on_stage_canvas_release(GtkWidget *widget, GdkEventButton *event
                 else if(source)
                     director_stage_connect_video(app, source, target);
             }
-            else if(ndi_sink)
-                director_stage_connect_ndi_output(app, source);
             g_free(ndi_name);
             gtk_widget_queue_draw(widget);
             return TRUE;
@@ -20369,11 +21201,11 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     GtkWidget *wiring_help = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_container_set_border_width(GTK_CONTAINER(wiring_help), 10);
     GtkWidget *wiring_help_title = gtk_label_new(
-        "Every VeeJay, NDI source and NDI NETWORK box is freely placeable. External NDI sources appear automatically with their name, IP address and online state.");
+        "Every VeeJay and NDI source is freely placeable. External NDI sources appear automatically with their name, IP address and online state.");
     gtk_widget_set_halign(wiring_help_title, GTK_ALIGN_START);
     gtk_label_set_line_wrap(GTK_LABEL(wiring_help_title), TRUE);
     GtkWidget *wiring_help_drag = gtk_label_new(
-        "Drag multiple VeeJay or NDI sources into a Program or Standalone input; routes are retained independently. Drag a VeeJay output into the NDI NETWORK sink to publish it. Click a connected input socket to clear all routes on that input.");
+        "Drag VeeJay or NDI sources into a Program or Standalone input. A green VeeJay NDI TX socket enables publication when needed. Click a route X to remove one route; an offline saved NDI source has a cleanup X that clears all remaining saved references to it.");
     gtk_widget_set_halign(wiring_help_drag, GTK_ALIGN_START);
     gtk_label_set_line_wrap(GTK_LABEL(wiring_help_drag), TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(wiring_help_drag), "dim-label");
@@ -20383,7 +21215,7 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     gtk_label_set_line_wrap(GTK_LABEL(wiring_help_view), TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(wiring_help_view), "dim-label");
     GtkWidget *wiring_help_restart = gtk_label_new(
-        "NDI input/output and SDL output switch at runtime. Dashed wires are pending, inactive, stale or offline. NDI changes are committed after backend status confirmation; native routes reconnect automatically.");
+        "Each VeeJay card has miniature Audio, Live, Black and White controls. Dashed wires are pending, inactive, stale or offline. NDI changes are committed after backend status confirmation; native routes reconnect automatically.");
     gtk_widget_set_halign(wiring_help_restart, GTK_ALIGN_START);
     gtk_label_set_line_wrap(GTK_LABEL(wiring_help_restart), TRUE);
     gtk_style_context_add_class(gtk_widget_get_style_context(wiring_help_restart), "dim-label");
@@ -21491,6 +22323,76 @@ static GtkWidget *director_icon_button(const gchar *icon, const gchar *tooltip)
     return button;
 }
 
+static const gchar *director_version_string(void)
+{
+#ifdef PACKAGE_VERSION
+    return PACKAGE_VERSION;
+#elif defined(VERSION)
+    return VERSION;
+#else
+    return "unknown";
+#endif
+}
+
+static const gchar *director_architecture_string(void)
+{
+#if defined(__x86_64__) || defined(_M_X64)
+    return "x86-64";
+#elif defined(__i386__) || defined(_M_IX86)
+    return "x86";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+    return "AArch64";
+#elif defined(__arm__) || defined(_M_ARM)
+    return "ARM";
+#elif defined(__powerpc64__)
+    return "PowerPC 64";
+#elif defined(__powerpc__)
+    return "PowerPC";
+#elif defined(__riscv)
+    return "RISC-V";
+#else
+    return "unknown";
+#endif
+}
+
+static void on_about_director(GtkButton *button, gpointer data)
+{
+    (void)button;
+    DirectorApp *app = data;
+    GtkWidget *dialog = gtk_about_dialog_new();
+    GtkAboutDialog *about = GTK_ABOUT_DIALOG(dialog);
+    gchar *comments = NULL;
+
+#ifdef HAVE_NDI
+    comments = g_strdup_printf(
+        "Multi-instance live video routing, show control and output management for VeeJay.\n\n"
+        "Arch: %s\n\n"
+        "NDI support: compiled in\n"
+        "NDI\302\256 is a registered trademark of Vizrt NDI AB.",
+        director_architecture_string());
+#else
+    comments = g_strdup_printf(
+        "Multi-instance live video routing, show control and output management for VeeJay.\n\n"
+        "Arch: %s",
+        director_architecture_string());
+#endif
+
+    gtk_about_dialog_set_program_name(about, "VeeJay Director");
+    gtk_about_dialog_set_version(about, director_version_string());
+    gtk_about_dialog_set_comments(about, comments);
+    gtk_about_dialog_set_copyright(about, "Copyright \302\251 2026 N. Elburg et al.");
+    gtk_about_dialog_set_website(about, "https://github.com/game-stop/veejay");
+    gtk_about_dialog_set_website_label(about, "VeeJay on GitHub");
+    gtk_about_dialog_set_license_type(about, GTK_LICENSE_GPL_2_0);
+    gtk_about_dialog_set_wrap_license(about, TRUE);
+
+    gtk_window_set_transient_for(GTK_WINDOW(dialog), GTK_WINDOW(app->window));
+    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+    gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+    g_free(comments);
+}
+
 static gboolean on_window_delete(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
     (void)widget;
@@ -21542,12 +22444,15 @@ static void director_build_ui(DirectorApp *app)
     GtkWidget *open_button = director_icon_button("document-open-symbolic", "Open show");
     GtkWidget *save_button = director_icon_button("document-save-symbolic", "Save show");
     GtkWidget *template_button = director_icon_button("document-save-as-symbolic", "Save current topology as a reusable setup template");
+    GtkWidget *about_button = gtk_button_new_with_label("About");
+    gtk_widget_set_tooltip_text(about_button, "About VeeJay Director");
     GtkWidget *start_button = gtk_button_new_with_label("Start show");
     GtkWidget *stop_button = gtk_button_new_with_label("Stop managed");
     gtk_header_bar_pack_start(GTK_HEADER_BAR(app->header_title), new_button);
     gtk_header_bar_pack_start(GTK_HEADER_BAR(app->header_title), open_button);
     gtk_header_bar_pack_start(GTK_HEADER_BAR(app->header_title), save_button);
     gtk_header_bar_pack_start(GTK_HEADER_BAR(app->header_title), template_button);
+    gtk_header_bar_pack_end(GTK_HEADER_BAR(app->header_title), about_button);
     gtk_header_bar_pack_end(GTK_HEADER_BAR(app->header_title), stop_button);
     gtk_header_bar_pack_end(GTK_HEADER_BAR(app->header_title), start_button);
 
@@ -21672,6 +22577,7 @@ static void director_build_ui(DirectorApp *app)
     g_signal_connect(open_button, "clicked", G_CALLBACK(on_open_show), app);
     g_signal_connect(save_button, "clicked", G_CALLBACK(on_save_show), app);
     g_signal_connect(template_button, "clicked", G_CALLBACK(on_save_setup_template), app);
+    g_signal_connect(about_button, "clicked", G_CALLBACK(on_about_director), app);
     g_signal_connect(start_button, "clicked", G_CALLBACK(on_start_all), app);
     g_signal_connect(stop_button, "clicked", G_CALLBACK(on_stop_all), app);
     g_signal_connect(add_program, "clicked", G_CALLBACK(on_add_program), app);
@@ -21842,6 +22748,7 @@ static void director_shutdown(GApplication *application, gpointer data)
     director_stage_clear_wire_drag(app);
     app->stage_ndi_node_dragging = FALSE;
     g_clear_pointer(&app->stage_ndi_drag_key, g_free);
+    g_clear_pointer(&app->stage_wire_ndi_hover_key, g_free);
     g_clear_pointer(&app->stage_pending_ndi_sender_id, g_free);
     g_clear_pointer(&app->stage_pending_ndi_target_id, g_free);
     director_eidolon_close_all_views(app);
@@ -21849,6 +22756,14 @@ static void director_shutdown(GApplication *application, gpointer data)
     if(app->ndi_discovery) {
         director_ndi_discovery_free(app->ndi_discovery);
         app->ndi_discovery = NULL;
+    }
+    if(app->ndi_source_prune_source_id) {
+        g_source_remove(app->ndi_source_prune_source_id);
+        app->ndi_source_prune_source_id = 0;
+    }
+    if(app->ndi_source_cache) {
+        g_hash_table_destroy(app->ndi_source_cache);
+        app->ndi_source_cache = NULL;
     }
     if(app->ndi_sources) {
         g_ptr_array_free(app->ndi_sources, TRUE);
