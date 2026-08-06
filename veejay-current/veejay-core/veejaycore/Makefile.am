@@ -18,13 +18,13 @@ AM_CPPFLAGS += -I /usr/X11R6/include \
 		$(LIBAVFORMAT_CFLAGS) $(LIBAVCODEC_CFLAGS) $(LIBAVUTIL_CFLAGS) $(LIBSWSCALE_CFLAGS) $(GLIB_CFLAGS) \
 		$(PTHREAD_CFLAGS) 
 
-pkginclude_HEADERS = core.h vj-task.h defs.h av.h avhelper.h avcommon.h vims.h
+pkginclude_HEADERS = core.h vj-task.h defs.h av.h avhelper.h avcommon.h vims.h vj-ndi-runtime.h
 
 VEEJAYCORE_LIB_FILE = libveejaycore.la
 
 lib_LTLIBRARIES = $(VEEJAYCORE_LIB_FILE) 
 
-libveejaycore_la_SOURCES = core.c vj-task.c  
+libveejaycore_la_SOURCES = core.c vj-task.c vj-ndi-runtime.c 
 
 libveejaycore_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
