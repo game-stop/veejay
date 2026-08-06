@@ -546,13 +546,7 @@ gboolean director_client_select_input_route(DirectorClient *client, gint stream_
 
 static gboolean director_client_ndi_argument_valid(const gchar *value)
 {
-    if(!value)
-        return FALSE;
-    for(const unsigned char *p = (const unsigned char*)value; *p; p++) {
-        if(*p == ';' || *p == '\n' || *p == '\r')
-            return FALSE;
-    }
-    return TRUE;
+    return value && strpbrk(value, ";\n\r") == NULL;
 }
 
 gboolean director_client_set_ndi_input(DirectorClient *client, const gchar *source_name)

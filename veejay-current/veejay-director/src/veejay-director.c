@@ -45,6 +45,7 @@
 #include "director-client.h"
 #include "director-wire.h"
 #include "director-ndi.h"
+#include <veejaycore/vj-ndi-runtime.h>
 #include "gtkviewportmesh.h"
 #include "gtkvjlogview.h"
 
@@ -1372,7 +1373,21 @@ static void director_ndi_update_discovery_status(DirectorApp *app)
     gtk_label_set_text(GTK_LABEL(app->ndi_runtime_label), status);
 
     gchar *tooltip = NULL;
-    if(app->ndi_last_update_text && *app->ndi_last_update_text)
+    char runtime_fallback[1024];
+    const gboolean have_runtime_fallback =
+        vj_ndi_runtime_default_user_dir(runtime_fallback, sizeof(runtime_fallback));
+    if(app->ndi_discovery_state_valid &&
+       app->ndi_discovery_state == DIRECTOR_NDI_DISCOVERY_UNAVAILABLE &&
+       have_runtime_fallback) {
+        tooltip = g_strdup_printf(
+            "%s\nAuto-search includes %s\nNDI_RUNTIME_DIR_V6 overrides the runtime directory%s%s",
+            status, runtime_fallback,
+            app->ndi_last_update_text && *app->ndi_last_update_text ?
+                "\nLast NDI discovery update at " : "",
+            app->ndi_last_update_text && *app->ndi_last_update_text ?
+                app->ndi_last_update_text : "");
+    }
+    else if(app->ndi_last_update_text && *app->ndi_last_update_text)
         tooltip = g_strdup_printf("%s\nLast NDI discovery update at %s",
                                   status, app->ndi_last_update_text);
     else
