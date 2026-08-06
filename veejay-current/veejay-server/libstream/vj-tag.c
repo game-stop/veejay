@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <limits.h>
 #include <veejaycore/defs.h>
+#include <veejaycore/avcommon.h>
 #include <libstream/vj-tag.h>
 #include <libstream/vj-cali.h>
 #include <veejaycore/hash.h>
@@ -111,6 +112,156 @@ static void vj_tag_info_release(vj_tag *tag)
     tag->info = NULL;
 }
 
+typedef struct {
+    void *slave;
+    VJFrame *transport_frame;
+    VJFrame *output_frame;
+    uint8_t *transport_buffer;
+    uint8_t *output_buffer;
+    void *converter;
+    int capacity[4];
+    uint64_t sequence;
+    int key;
+} vj_tag_shm_state;
+
+static void vj_tag_shm_state_free(vj_tag_shm_state *state)
+{
+    if(!state)
+        return;
+    if(state->converter)
+        yuv_free_swscaler(state->converter);
+    if(state->output_frame && state->output_frame != state->transport_frame)
+        free(state->output_frame);
+    if(state->output_buffer)
+        free(state->output_buffer);
+    if(state->transport_frame)
+        free(state->transport_frame);
+    if(state->transport_buffer)
+        free(state->transport_buffer);
+    if(state->slave)
+        vj_shm_free_slave(state->slave);
+    free(state);
+}
+
+static int vj_tag_shm_source_format(const vj_shm_frame_info *source)
+{
+    if(!source || source->width <= 0 || source->height <= 0 ||
+       source->width > 32768 || source->height > 32768 ||
+       source->plane_size[0] <= 0 || source->plane_size[1] <= 0 ||
+       source->plane_size[2] != source->plane_size[1])
+        return -1;
+
+    const size_t y_len = (size_t)source->width * (size_t)source->height;
+    if(y_len > INT_MAX || (size_t)source->plane_size[0] != y_len)
+        return -1;
+    if((size_t)source->plane_size[1] == y_len)
+        return PIX_FMT_YUV444P;
+    if((size_t)source->plane_size[1] * 2u == y_len)
+        return PIX_FMT_YUV422P;
+    if((size_t)source->plane_size[1] * 4u == y_len)
+        return PIX_FMT_YUV420P;
+    return -1;
+}
+
+static vj_tag_shm_state *vj_tag_shm_state_new(int key, int width, int height, int pix_fmt)
+{
+    vj_tag_shm_state *state = (vj_tag_shm_state*)vj_calloc(sizeof(vj_tag_shm_state));
+    if(!state)
+        return NULL;
+
+    state->key = key;
+    state->sequence = UINT64_MAX;
+    state->slave = vj_shm_new_slave(key);
+    if(!state->slave)
+        goto fail;
+
+    vj_shm_frame_info source;
+    if(!vj_shm_get_frame_info(state->slave, &source) ||
+       source.protocol_version != VJ_SHM_PROTOCOL_VERSION)
+        goto fail;
+
+    const int source_format = vj_tag_shm_source_format(&source);
+    const int output_format = get_ffmpeg_pixfmt(pix_fmt);
+    if(source_format < 0 || output_format < 0)
+        goto fail;
+
+    state->transport_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                              source.width, source.height,
+                                              source_format);
+    if(!state->transport_frame ||
+       state->transport_frame->len != source.plane_size[0] ||
+       state->transport_frame->uv_len != source.plane_size[1])
+        goto fail;
+
+    const size_t y_bytes = (size_t)source.plane_size[0];
+    const size_t uv_bytes = (size_t)source.plane_size[1];
+    if(uv_bytes > (SIZE_MAX - y_bytes) / 2u)
+        goto fail;
+    const size_t transport_bytes = y_bytes + uv_bytes * 2u;
+    state->transport_buffer = (uint8_t*)vj_malloc(transport_bytes);
+    if(!state->transport_buffer)
+        goto fail;
+
+    state->transport_frame->data[0] = state->transport_buffer;
+    state->transport_frame->data[1] = state->transport_frame->data[0] + source.plane_size[0];
+    state->transport_frame->data[2] = state->transport_frame->data[1] + source.plane_size[1];
+    state->transport_frame->data[3] = NULL;
+    state->capacity[0] = source.plane_size[0];
+    state->capacity[1] = source.plane_size[1];
+    state->capacity[2] = source.plane_size[2];
+    state->capacity[3] = 0;
+
+    if(source.width == width && source.height == height && source_format == output_format) {
+        state->output_frame = state->transport_frame;
+    } else {
+        state->output_frame = yuv_yuv_template(NULL, NULL, NULL,
+                                               width, height, output_format);
+        if(!state->output_frame)
+            goto fail;
+        const size_t output_y_bytes = (size_t)state->output_frame->len;
+        const size_t output_uv_bytes = (size_t)state->output_frame->uv_len;
+        if(output_uv_bytes > (SIZE_MAX - output_y_bytes) / 2u)
+            goto fail;
+        const size_t output_bytes = output_y_bytes + output_uv_bytes * 2u;
+        state->output_buffer = (uint8_t*)vj_malloc(output_bytes);
+        if(!state->output_buffer)
+            goto fail;
+        state->output_frame->data[0] = state->output_buffer;
+        state->output_frame->data[1] = state->output_frame->data[0] + state->output_frame->len;
+        state->output_frame->data[2] = state->output_frame->data[1] + state->output_frame->uv_len;
+        state->output_frame->data[3] = NULL;
+
+        sws_template templ;
+        veejay_memset(&templ, 0, sizeof(templ));
+        templ.flags = yuv_which_scaler();
+        state->converter = yuv_init_swscaler(state->transport_frame,
+                                             state->output_frame,
+                                             &templ,
+                                             yuv_sws_get_cpu_flags());
+        if(!state->converter)
+            goto fail;
+    }
+
+    veejay_memset(state->transport_frame->data[0], 0, state->transport_frame->len);
+    veejay_memset(state->transport_frame->data[1], 128, state->transport_frame->uv_len);
+    veejay_memset(state->transport_frame->data[2], 128, state->transport_frame->uv_len);
+    if(state->output_frame != state->transport_frame) {
+        veejay_memset(state->output_frame->data[0], 0, state->output_frame->len);
+        veejay_memset(state->output_frame->data[1], 128, state->output_frame->uv_len);
+        veejay_memset(state->output_frame->data[2], 128, state->output_frame->uv_len);
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Attached native SHM input key %d (%dx%d %s)",
+               key, source.width, source.height,
+               yuv_get_pixfmt_description(source_format));
+    return state;
+
+fail:
+    vj_tag_shm_state_free(state);
+    return NULL;
+}
+
 
 static int vj_tag_buffer_supported_type(int type)
 {
@@ -120,6 +271,7 @@ static int vj_tag_buffer_supported_type(int type)
         case VJ_TAG_TYPE_PICTURE:
         case VJ_TAG_TYPE_MCAST:
         case VJ_TAG_TYPE_NET:
+        case VJ_TAG_TYPE_SHM:
         case VJ_TAG_TYPE_YUV4MPEG:
         case VJ_TAG_TYPE_DV1394:
         case VJ_TAG_TYPE_AVFORMAT:
@@ -1395,6 +1547,15 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el, int pix_f
                 goto TAG_NEW_FAILED;
             }
     break;
+    case VJ_TAG_TYPE_SHM:
+        snprintf(tag->source_name, SOURCE_NAME_LEN, "Shared Memory %d", channel);
+        tag->priv = vj_tag_shm_state_new(channel, w, h, pix_fmt);
+        if(!tag->priv) {
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to attach shared-memory source %d", channel);
+            goto TAG_NEW_FAILED;
+        }
+        tag->active = 1;
+        break;
     case VJ_TAG_TYPE_AVFORMAT:
         snprintf(tag->source_name,SOURCE_NAME_LEN, "%s", filename );
         if(!avformat_thread_start(tag, _tag_info->effect_frame1)) {
@@ -1629,6 +1790,10 @@ TAG_NEW_FAILED:
         vj_ndi_receiver_destroy((vj_ndi_receiver*)tag->priv);
         tag->priv = NULL;
     }
+    if(tag->source_type == VJ_TAG_TYPE_SHM && tag->priv) {
+        vj_tag_shm_state_free((vj_tag_shm_state*)tag->priv);
+        tag->priv = NULL;
+    }
 
     if(tag->extra) {
         free(tag->extra);
@@ -1774,6 +1939,10 @@ static int vj_tag_del_internal_ex(vj_tag *tag, int skip_cleanup, int recycle_id)
      break;
      case VJ_TAG_TYPE_NDI:
         vj_ndi_receiver_destroy((vj_ndi_receiver*)tag->priv);
+        tag->priv = NULL;
+     break;
+     case VJ_TAG_TYPE_SHM:
+        vj_tag_shm_state_free((vj_tag_shm_state*)tag->priv);
         tag->priv = NULL;
      break;
 #ifdef SUPPORT_READ_DV2
@@ -3104,7 +3273,8 @@ int vj_tag_enable(int t1) {
 #endif
 
     if( tag->source_type == VJ_TAG_TYPE_GENERATOR || tag->source_type == VJ_TAG_TYPE_COLOR ||
-        tag->source_type == VJ_TAG_TYPE_CALI || tag->source_type == VJ_TAG_TYPE_CLONE ) {
+        tag->source_type == VJ_TAG_TYPE_CALI || tag->source_type == VJ_TAG_TYPE_CLONE ||
+        tag->source_type == VJ_TAG_TYPE_SHM ) {
         tag->active = 1;
     }
 
@@ -3495,6 +3665,9 @@ void    vj_tag_get_by_type(int id,int type, char *description )
     case VJ_TAG_TYPE_NET:
     snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Unicast");
     break;
+    case VJ_TAG_TYPE_SHM:
+    snprintf(description, TAG_MAX_DESCR_LEN, "%s", "Shared Memory");
+    break;
     case VJ_TAG_TYPE_AVFORMAT:
     snprintf(description, TAG_MAX_DESCR_LEN, "%s", "AVFormat stream reader");
     break;
@@ -3777,6 +3950,33 @@ int vj_tag_get_frame(int t1, VJFrame *dst, uint8_t * abuffer)
         vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
         break;
 #endif
+    case VJ_TAG_TYPE_SHM:
+        {
+            vj_tag_shm_state *state = (vj_tag_shm_state*)tag->priv;
+            if(!tag->active || !state)
+                return 0;
+            const uint64_t previous_sequence = state->sequence;
+            const int read_result = vj_shm_read_latest(state->slave,
+                                                       state->transport_frame->data,
+                                                       state->capacity,
+                                                       &state->sequence);
+            if(read_result < 0)
+                return -1;
+            if(read_result > 0) {
+                if(previous_sequence == UINT64_MAX)
+                    veejay_msg(VEEJAY_MSG_INFO,
+                               "Native SHM input key %d received first frame (sequence %llu)",
+                               state->key,
+                               (unsigned long long)state->sequence);
+                if(state->converter)
+                    yuv_convert_and_scale(state->converter,
+                                          state->transport_frame,
+                                          state->output_frame);
+            }
+            int sizes[4] = { dst->len, dst->uv_len, dst->uv_len, 0 };
+            vj_frame_copy(state->output_frame->data, dst->data, sizes);
+        }
+        break;
     case VJ_TAG_TYPE_GENERATOR:
         if( tag->generator ) {
             plug_push_frame( tag->generator, 1, 0, dst );

@@ -57,12 +57,15 @@ typedef struct {
     int initialized;
     int probed;
     int references;
+    int load_error_logged;
     char version[160];
+    char last_error[512];
 } vj_ndi_runtime_state;
 
 static vj_ndi_runtime_state ndi_runtime = {
     .mutex = PTHREAD_MUTEX_INITIALIZER,
-    .version = "unavailable"
+    .version = "unavailable",
+    .last_error = "NDI runtime has not been probed"
 };
 
 static char *vj_ndi_strdup(const char *text)
@@ -187,17 +190,34 @@ struct vj_ndi_sender {
     vj_ndi_stats stats;
 };
 
+static void vj_ndi_runtime_error(const char *path, const char *detail)
+{
+    snprintf(ndi_runtime.last_error, sizeof(ndi_runtime.last_error), "%s%s%s",
+             path && *path ? path : "NDI runtime",
+             detail && *detail ? ": " : "",
+             detail && *detail ? detail : "load failed");
+}
+
 static int vj_ndi_runtime_try_library(const char *path)
 {
     vj_ndi_load_fn load_fn = NULL;
     void *symbol = NULL;
 
-    ndi_runtime.handle = dlopen(path, RTLD_LOCAL | RTLD_LAZY);
-    if(!ndi_runtime.handle)
+    if(!path || !*path)
         return 0;
 
+    dlerror();
+    ndi_runtime.handle = dlopen(path, RTLD_LOCAL | RTLD_LAZY);
+    if(!ndi_runtime.handle) {
+        vj_ndi_runtime_error(path, dlerror());
+        return 0;
+    }
+
+    dlerror();
     symbol = dlsym(ndi_runtime.handle, "NDIlib_v5_load");
-    if(!symbol) {
+    const char *symbol_error = dlerror();
+    if(!symbol || symbol_error) {
+        vj_ndi_runtime_error(path, symbol_error ? symbol_error : "NDIlib_v5_load is missing");
         dlclose(ndi_runtime.handle);
         ndi_runtime.handle = NULL;
         return 0;
@@ -207,6 +227,7 @@ static int vj_ndi_runtime_try_library(const char *path)
     ndi_runtime.api = load_fn();
     if(!ndi_runtime.api || !ndi_runtime.api->initialize ||
        !ndi_runtime.api->initialize()) {
+        vj_ndi_runtime_error(path, "NDI runtime initialization failed");
         ndi_runtime.api = NULL;
         dlclose(ndi_runtime.handle);
         ndi_runtime.handle = NULL;
@@ -214,9 +235,35 @@ static int vj_ndi_runtime_try_library(const char *path)
     }
 
     ndi_runtime.initialized = 1;
+    ndi_runtime.load_error_logged = 0;
+    ndi_runtime.last_error[0] = '\0';
     snprintf(ndi_runtime.version, sizeof(ndi_runtime.version), "%s",
              ndi_runtime.api->version ? ndi_runtime.api->version() : "NDI runtime");
     return 1;
+}
+
+static void vj_ndi_runtime_try_folder(const char *folder)
+{
+    if(!folder || !*folder || ndi_runtime.initialized)
+        return;
+
+    const char *names[] = {
+#ifdef NDILIB_LIBRARY_NAME
+        NDILIB_LIBRARY_NAME,
+#endif
+        "libndi.so.6",
+        "libndi.so",
+        "libndi.so.5",
+        NULL
+    };
+    char candidate[1024];
+    for(int i = 0; !ndi_runtime.initialized && names[i]; i++) {
+        if(names[i][0] == '/')
+            snprintf(candidate, sizeof(candidate), "%s", names[i]);
+        else
+            snprintf(candidate, sizeof(candidate), "%s/%s", folder, names[i]);
+        vj_ndi_runtime_try_library(candidate);
+    }
 }
 
 static int vj_ndi_runtime_acquire(void)
@@ -225,12 +272,21 @@ static int vj_ndi_runtime_acquire(void)
     pthread_mutex_lock(&ndi_runtime.mutex);
     if(!ndi_runtime.initialized && !ndi_runtime.probed) {
         ndi_runtime.probed = 1;
+
+        const char *env_names[] = {
 #ifdef NDILIB_REDIST_FOLDER
-        const char *runtime_dir = getenv(NDILIB_REDIST_FOLDER);
-#else
-        const char *runtime_dir = NULL;
+            NDILIB_REDIST_FOLDER,
 #endif
-        char candidate[1024];
+            "NDI_RUNTIME_DIR_V6",
+            "NDI_RUNTIME_DIR_V5",
+            NULL
+        };
+        for(int i = 0; !ndi_runtime.initialized && env_names[i]; i++) {
+            const char *folder = getenv(env_names[i]);
+            if(folder && *folder)
+                vj_ndi_runtime_try_folder(folder);
+        }
+
         const char *libraries[] = {
 #ifdef NDILIB_LIBRARY_NAME
             NDILIB_LIBRARY_NAME,
@@ -240,16 +296,28 @@ static int vj_ndi_runtime_acquire(void)
             "libndi.so.5",
             NULL
         };
-
-        if(runtime_dir && *runtime_dir) {
-#ifdef NDILIB_LIBRARY_NAME
-            snprintf(candidate, sizeof(candidate), "%s/%s",
-                     runtime_dir, NDILIB_LIBRARY_NAME);
-            vj_ndi_runtime_try_library(candidate);
-#endif
-        }
         for(int i = 0; !ndi_runtime.initialized && libraries[i]; i++)
             vj_ndi_runtime_try_library(libraries[i]);
+
+        const char *folders[] = {
+            "/usr/local/lib",
+            "/usr/local/lib64",
+            "/usr/lib",
+            "/usr/lib64",
+            "/usr/lib/x86_64-linux-gnu",
+            "/usr/lib/aarch64-linux-gnu",
+            "/opt/ndi/lib",
+            NULL
+        };
+        for(int i = 0; !ndi_runtime.initialized && folders[i]; i++)
+            vj_ndi_runtime_try_folder(folders[i]);
+
+        if(!ndi_runtime.initialized && !ndi_runtime.load_error_logged) {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "NDI runtime load failed: %s. Set NDI_RUNTIME_DIR_V6 to the directory containing libndi.so.6 if it is installed outside the system library path",
+                       ndi_runtime.last_error[0] ? ndi_runtime.last_error : "libndi.so.6 was not found");
+            ndi_runtime.load_error_logged = 1;
+        }
     }
 
     if(ndi_runtime.initialized) {
@@ -296,7 +364,9 @@ void vj_ndi_runtime_shutdown(void)
         ndi_runtime.api = NULL;
         ndi_runtime.initialized = 0;
         ndi_runtime.probed = 0;
+        ndi_runtime.load_error_logged = 0;
         snprintf(ndi_runtime.version, sizeof(ndi_runtime.version), "%s", "unavailable");
+        snprintf(ndi_runtime.last_error, sizeof(ndi_runtime.last_error), "%s", "NDI runtime has not been probed");
     }
     pthread_mutex_unlock(&ndi_runtime.mutex);
 }

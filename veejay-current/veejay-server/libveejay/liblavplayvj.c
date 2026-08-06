@@ -6803,7 +6803,9 @@ int veejay_setup_video_out(veejay_t *info)
 
     if(!veejay_ndi_start_sender(info)) {
         veejay_msg(VEEJAY_MSG_ERROR, "Unable to start requested NDI sender");
-        return -1;
+        info->ndi_send_enabled = 0;
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Continuing without NDI output; the primary output driver remains active");
     }
     return 0;
 }
@@ -8486,8 +8488,18 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	}
 
 	int instances = 0;
+	int server_ready = vj_server_setup(info);
+	const char *strict_port_env = getenv("VEEJAY_STRICT_PORT");
+	const int strict_port = strict_port_env && *strict_port_env && atoi(strict_port_env) != 0;
 
-	while( (instances < 4 ) && !vj_server_setup(info))
+	if(!server_ready && strict_port) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+			"Port %d -~ %d is in use and strict port binding was requested; refusing automatic port fallback",
+			info->uc->port, info->uc->port + 6);
+		return -1;
+	}
+
+	while((instances < 4) && !server_ready)
 	{
 		int port = info->uc->port;
 		int new_port = info->uc->port + 1000;
@@ -8495,9 +8507,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		veejay_msg((instances < 4 ? VEEJAY_MSG_WARNING: VEEJAY_MSG_ERROR),
 			"Port %d -~ %d in use, trying to start on port %d (%d/%d attempts)", port,port+6, new_port , instances, 4 - instances);
 		info->uc->port = new_port;
+		if(instances < 4)
+			server_ready = vj_server_setup(info);
 	}
 
-	if( instances >= 4 ) {
+	if(!server_ready || instances >= 4) {
 		veejay_msg(VEEJAY_MSG_ERROR,"Unable to start network server. Most likely, there is already a veejay running");
 		veejay_msg(VEEJAY_MSG_ERROR,"If you want to run multiple veejay's on the same machine, use the '-p/--port' option");
 		veejay_msg(VEEJAY_MSG_ERROR,"For example: $ veejay -p 4490 -d");

@@ -4055,6 +4055,15 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 VIMS_ALLOW_ANY,
                 NULL );
 
+    index_map_[ VIMS_NDI_SOURCES ] = _new_event(
+                NULL,
+                VIMS_NDI_SOURCES,
+                "Discover NDI sources visible to this VeeJay server",
+                vj_event_ndi_sources,
+                0,
+                VIMS_ALLOW_ANY,
+                NULL );
+
     index_map_[ VIMS_NDI_INPUT_SET ] = _new_event(
                 "%s",
                 VIMS_NDI_INPUT_SET,
@@ -4092,6 +4101,17 @@ index_map_[VIMS_AUDIO_SYNC_STATUS] = _new_event(
                 0,
                 "Host, NDI source, or '-'",
                 NULL,
+                NULL );
+
+    index_map_[ VIMS_INPUT_ROUTE_SELECT ] = _new_event(
+                "%d",
+                VIMS_INPUT_ROUTE_SELECT,
+                "Select an existing SHM, TCP, or NDI input route locally",
+                vj_event_input_route_select,
+                1,
+                VIMS_REQUIRE_ALL_PARAMS,
+                "Input route stream ID",
+                0,
                 NULL );
 
     index_map_[ VIMS_ROUTING_STATUS ] = _new_event(

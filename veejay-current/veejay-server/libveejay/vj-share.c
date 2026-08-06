@@ -31,7 +31,6 @@
 #include <libvje/vje.h>
 #include <veejaycore/vj-client.h>
 #include <libveejay/vj-share.h>
-#include <libveejay/vj-shm.h>
 static vj_client	*vj_share_connect(char *hostname, int port)
 {
 	vj_client *c = vj_client_alloc();
@@ -85,6 +84,7 @@ static void vj_flush(vj_client *sayvims, int frames) {
 
 int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 {
+    (void)shm;
 	char tmp[64];
 	vj_client *c = vj_share_connect( master_host, master_port );
 	if(!c) {
@@ -108,8 +108,6 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 
 
 	vj_client_send( c, V_CMD, (unsigned char*) "025:1;" ); //@ master starts writing frames to shm
-
-	vj_shm_set_id( key ); //@ temporary store
 
 	vj_client_close( c );
 

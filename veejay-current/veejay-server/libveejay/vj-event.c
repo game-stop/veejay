@@ -91,7 +91,6 @@
 #include <veejaycore/libvevo.h>
 #include <libveejay/vj-OSC.h>
 #include <veejaycore/vj-server.h>
-#include <libveejay/vj-share.h>
 #include <libveejay/vj-perf.h>
 #include <libveejay/vj-output-graph.h>
 #include <libveejay/vevo.h>
@@ -105,6 +104,7 @@
 #endif
 
 #include <libstream/vj-net.h>
+#include <libstream/vj-ndi.h>
 
 #ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
@@ -1245,9 +1245,23 @@ struct {
     { VIMS_AUDIO_SYNC_CORRECTION },
     { VIMS_AUDIO_SYNC_PRINT },
 
+    { VIMS_PERF_STATUS },
+    { VIMS_PERF_RESET },
+    { VIMS_OUTPUT_GRAPH_STATUS },
+    { VIMS_OUTPUT_PATTERN },
+    { VIMS_OUTPUT_SLICE },
+    { VIMS_OUTPUT_SLICE_ENABLE },
+    { VIMS_INSTANCE_STATUS },
+    { VIMS_OUTPUT_GRAPH_RESET },
+    { VIMS_NDI_STATUS },
+    { VIMS_NDI_SOURCES },
+    { VIMS_SHM_WRITER },
+    { VIMS_STREAM_NEW_SHARED },
+    { VIMS_STREAM_NEW_UNICAST },
     { VIMS_NDI_INPUT_SET },
     { VIMS_NDI_OUTPUT_SET },
     { VIMS_INPUT_ROUTE_REMOVE },
+    { VIMS_INPUT_ROUTE_SELECT },
     { VIMS_ROUTING_STATUS },
     { VIMS_SDL_IDENTIFY },
     { VIMS_SDL_DISPLAY_SET },
@@ -15691,6 +15705,41 @@ void vj_event_ndi_status(void *ptr, const char format[], va_list ap)
     SEND_MSG(v, "VJNDI 1\nruntime=unavailable\nrx.enabled=0\ntx.enabled=0\n");
 }
 
+void vj_event_ndi_sources(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    (void)format;
+    (void)ap;
+
+    char *payload = vj_ndi_discovery_payload(350);
+    if(!payload)
+        payload = vj_strdup("0\n");
+    if(!payload)
+        return;
+
+    const size_t payload_len = strlen(payload);
+    if(payload_len > 99999999u) {
+        free(payload);
+        return;
+    }
+
+    const size_t packet_len = payload_len + 8u;
+    char *packet = (char*)vj_malloc(packet_len + 1u);
+    if(!packet) {
+        free(payload);
+        return;
+    }
+
+    snprintf(packet, 9, "%08zu", payload_len);
+    memcpy(packet + 8, payload, payload_len);
+    packet[packet_len] = '\0';
+
+    SEND_DATA(v, packet, packet_len);
+
+    free(packet);
+    free(payload);
+}
+
 void vj_event_ndi_input_set(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -15745,12 +15794,14 @@ void    vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
         }
     }
 
-    if( args[0] == 0 ) {
-        vj_shm_set_status( v->shm, 0 );
+    if(args[0] == 0) {
+        vj_shm_set_status(v->shm, 0);
+        veejay_msg(VEEJAY_MSG_INFO, "SHM video output disabled");
     } else {
-        vj_shm_set_status( v->shm, 1 );
+        vj_shm_set_status(v->shm, 1);
+        veejay_msg(VEEJAY_MSG_INFO, "SHM video output enabled on key %d",
+                   vj_shm_get_my_id(v->shm));
     }
-
 }
 
 void    vj_event_get_shm( void *ptr, const char format[], va_list ap )
@@ -15773,14 +15824,11 @@ static int vj_event_find_director_shm_stream(int32_t key)
     if(key <= 0)
         return 0;
 
-    int highest = vj_tag_highest();
+    const int highest = vj_tag_highest();
     for(int id = 1; id <= highest; id++) {
         vj_tag *tag = vj_tag_get(id);
-        if(!tag || tag->source_type != VJ_TAG_TYPE_GENERATOR || !tag->extra)
-            continue;
-        int32_t stored_key = 0;
-        if(sscanf((const char*)tag->extra, "director-shm:%d", &stored_key) == 1 &&
-           stored_key == key)
+        if(tag && tag->source_type == VJ_TAG_TYPE_SHM &&
+           tag->video_channel == key)
             return id;
     }
     return 0;
@@ -15888,16 +15936,12 @@ void vj_event_routing_status(void *ptr, const char format[], va_list ap)
                 ROUTE_APPEND("route.%d.current=%d\n", count, current ? 1 : 0);
                 ROUTE_APPEND("route.%d.source=%s\n", count, source);
                 count++;
-            } else if(tag->source_type == VJ_TAG_TYPE_GENERATOR &&
-                      tag->method_filename && strcmp(tag->method_filename, "lvd_shmin.so") == 0) {
-                int key = 0;
-                if(tag->extra)
-                    sscanf((const char*)tag->extra, "director-shm:%d", &key);
+            } else if(tag->source_type == VJ_TAG_TYPE_SHM) {
                 ROUTE_APPEND("route.%d.transport=shm\n", count);
                 ROUTE_APPEND("route.%d.id=%d\n", count, id);
                 ROUTE_APPEND("route.%d.active=%d\n", count, tag->active ? 1 : 0);
                 ROUTE_APPEND("route.%d.current=%d\n", count, current ? 1 : 0);
-                ROUTE_APPEND("route.%d.key=%d\n", count, key);
+                ROUTE_APPEND("route.%d.key=%d\n", count, tag->video_channel);
                 count++;
             }
         }
@@ -15972,6 +16016,48 @@ void vj_event_sdl_display_set(void *ptr, const char format[], va_list ap)
 #endif
 }
 
+void vj_event_input_route_select(void *ptr, const char format[], va_list ap)
+{
+    veejay_t *v = (veejay_t*)ptr;
+    int args[1] = { 0 };
+    P_A(args, sizeof(args), NULL, 0, format, ap);
+
+    if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Input route selection is not supported by output instances");
+        return;
+    }
+
+    const int id = args[0];
+    if(id <= 0 || !vj_tag_exists(id)) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Input route stream %d does not exist", id);
+        return;
+    }
+
+    vj_tag *tag = vj_tag_get(id);
+    const int selectable = tag &&
+        (tag->source_type == VJ_TAG_TYPE_NET ||
+         tag->source_type == VJ_TAG_TYPE_NDI ||
+         tag->source_type == VJ_TAG_TYPE_SHM);
+    if(!selectable) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Stream %d is not a selectable SHM, TCP, or NDI input route",
+                   id);
+        return;
+    }
+
+    veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, id);
+    if(!v->uc || v->uc->playback_mode != VJ_PLAYBACK_MODE_TAG ||
+       v->uc->sample_id != id) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to activate input route stream %d", id);
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO, "Selected input route stream %d", id);
+}
+
 void vj_event_input_route_remove(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -15995,9 +16081,7 @@ void vj_event_input_route_remove(void *ptr, const char format[], va_list ap)
                 const int removable = tag &&
                     (tag->source_type == VJ_TAG_TYPE_NET ||
                      tag->source_type == VJ_TAG_TYPE_NDI ||
-                     (tag->source_type == VJ_TAG_TYPE_GENERATOR &&
-                      tag->method_filename &&
-                      strcmp(tag->method_filename, "lvd_shmin.so") == 0));
+                     tag->source_type == VJ_TAG_TYPE_SHM);
                 if(!removable)
                     id = 0;
             } else {
@@ -16063,27 +16147,28 @@ void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )
                 veejay_msg(VEEJAY_MSG_ERROR, "[OUTPUT] Unable to disconnect video source");
             return;
         }
-        int ok = args[1] > 0 ?
-                 veejay_output_switch_source_shm(v, args[0], args[1]) :
-                 veejay_output_switch_source(v, "127.0.0.1", args[0]);
-        if(!ok)
+        if(args[1] <= 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[OUTPUT] Shared-memory routing requires an explicit SHM key");
+            return;
+        }
+        if(!veejay_output_switch_source_shm(v, args[0], args[1]))
             veejay_msg(VEEJAY_MSG_ERROR,
                        "[OUTPUT] Unable to switch to shared video source on port %d",
                        args[0]);
         return;
     }
     
-    if( args[0] == v->uc->port ) {
-        veejay_msg(0, "Cannot pull info from myself inside VIMS event");
+    if(args[0] == v->uc->port) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Cannot connect an input route to this instance's own SHM output");
         return;
     }
 
-    int32_t key = args[1] > 0 ? args[1] :
-                  vj_share_pull_master(v->shm, "127.0.0.1", args[0]);
+    const int32_t key = args[1];
     if(key <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR,
-                   "Unable to obtain shared resource from VeeJay on port %d",
-                   args[0]);
+                   "Shared-memory routing requires an explicit SHM key");
         return;
     }
 
@@ -16096,20 +16181,12 @@ void    vj_event_connect_shm( void *ptr, const char format[], va_list ap )
         return;
     }
 
-    int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR,
-                               "lvd_shmin.so", v->nstreams, 0, key);
+    const int id = veejay_create_tag(v, VJ_TAG_TYPE_SHM,
+                                     NULL, v->nstreams, key, 0);
     if(id <= 0) {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "Unable to connect to shared resource id %d", key);
         return;
-    }
-
-    vj_tag *tag = vj_tag_get(id);
-    if(tag) {
-        char marker[64];
-        snprintf(marker, sizeof(marker), "director-shm:%d", key);
-        free(tag->extra);
-        tag->extra = strdup(marker);
     }
 }
 
@@ -16128,13 +16205,18 @@ void    vj_event_connect_split_shm( void *ptr, const char format[], va_list ap )
 
     veejay_msg(VEEJAY_MSG_INFO,"Connect to shared memory resource %x (%d)", key,key);
 
-    int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, 0, key);
-    if( id <= 0 ) {
-        veejay_msg(0, "Unable to connect to shared resource id %d", key );
+    int id = vj_event_find_director_shm_stream(key);
+    if(id <= 0)
+        id = veejay_create_tag(v, VJ_TAG_TYPE_SHM, NULL,
+                               v->nstreams, key, 0);
+    if(id <= 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Unable to connect to shared resource id %d", key);
         return;
     }
 
-    veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,id);
+    vj_tag_set_last_tag(id);
+    veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, id);
 }
 
 
