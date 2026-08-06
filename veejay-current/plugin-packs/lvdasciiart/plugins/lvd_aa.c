@@ -53,97 +53,104 @@
 #ifndef IS_LIVIDO_PLUGIN
 #define IS_LIVIDO_PLUGIN
 #endif
+
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include    "livido.h"
-LIVIDO_PLUGIN
-#include    "utils.h"
-#include    "livido-utils.c"
-
 #include <aalib.h>
-
 #include <libswscale/swscale.h>
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_GLYPH_H
 #include FT_STROKER_H
+
+#include "livido.h"
+#include "utils.h"
+
+LIVIDO_PLUGIN
+#include "livido-utils.c" // NOSONAR: LiViDO plugin imports are translation-unit local
+
 #define NUM_GLYPHS 256
 
 typedef struct Glyph {
-    FT_Glyph *glyph;  ///< freetype glyph
-    uint32_t code;    ///< glyph codepoint
-    FT_Bitmap bitmap; ///< glyph bitmap
-    FT_BBox bbox;     ///< glyph bounding box
-    int bitmap_left;  ///< distance from origin to left boundary
-    int bitmap_top;   ///< distance from origin to top boundary
+    FT_Glyph glyph;
+    uint32_t code;
+    FT_Bitmap bitmap;
+    FT_BBox bbox;
+    int bitmap_left;
+    int bitmap_top;
 } Glyph;
 
 typedef struct {
-    struct SwsContext *sws; ///< sws scaling context
-    uint8_t *buf[3];        ///< sws scaling destination buffer
+    struct SwsContext *sws;
+    uint8_t *buf[3];
     int w;
     int h;
     int flags;
 } lvd_scale_t;
 
-typedef struct
-{
-    char *fontfile;            ///< font file
-    int fontsize;              ///< font size in pixels
-    int font;                  ///< selected font
-
-    FT_Library library;        ///< freetype library
-    FT_Face face;              ///< freetype font face
-    int xadvance;              ///< glyph x advance
-    int yadvance;              ///< glyph y advance
-
-    aa_context *aa;            ///< aalib context
-    struct aa_hardware_params aa_params;
-    struct aa_renderparams renderparams;
-    
-    int x;                     ///< cursor x (in characters)
-    int y;                     ///< corsor y (int characters)
-    int w;                     ///< canvas size (in characters)
+typedef struct {
+    int x;
+    int y;
+    int w;
     int h;
-
     int initialized;
     int rollover;
     int density;
     int mode;
     int aa_flags;
+} lvd_aa_runtime_t;
 
+typedef struct {
+    char *fontfile;
+    int fontsize;
+    int font;
+    FT_Library library;
+    FT_Face face;
+    int xadvance;
+    int yadvance;
+    aa_context *aa;
+    struct aa_hardware_params aa_params;
+    struct aa_renderparams renderparams;
+    lvd_aa_runtime_t runtime;
     uint8_t *buf[3];
     uint8_t *curframe_data[3];
     int curframe_width;
     int curframe_height;
-
-    Glyph **glyphs;            ///< array of glyphs
+    Glyph **glyphs;
     lvd_scale_t scale;
 } lvd_aa_t;
 
-typedef struct
-{
+typedef struct {
     int fontidx;
     char **fontlist;
     int maxfonts;
 } font_param_t;
 
-#undef __FTERRORS_H__
+typedef struct {
+    int width;
+    int height;
+    int x;
+    int y;
+    const uint8_t *bitbuffer;
+    uint32_t bitmap_rows;
+    uint32_t bitmap_width;
+    uint32_t bitmap_pitch;
+} lvd_glyph_region_t;
 
-#define FT_ERROR_START_LIST {
-#define FT_ERRORDEF(e, v, s) { (e), (s) },
-#define FT_ERROR_END_LIST { 0, NULL } };
-
-const struct {
-    int         err_code;
-    const char *err_msg;
-} ft_errors[] =
-#include FT_ERRORS_H
-#define FT_ERRMSG(e) ft_errors[e].err_msg
+typedef struct {
+    uint8_t *y;
+    uint8_t *u;
+    uint8_t *v;
+    const uint8_t *opacity;
+    const uint8_t *source_u;
+    const uint8_t *source_v;
+} lvd_glyph_planes_t;
 
 static int is_ttf(const char *file)
 {
@@ -155,83 +162,77 @@ static int is_ttf(const char *file)
     return 0;
 }
 
-static	int	find_font_file(FT_Library lib, char *path, char **fontlist, int *fontidx, int maxfonts )
+static int find_font_file(FT_Library lib, const char *path, char **fontlist, int *fontidx, int maxfonts)
 {
-	if(!path) return 0;
+    if(!path)
+        return 0;
 
-	struct stat l;
-	livido_memset( &l, 0, sizeof(struct stat) );
-	if( lstat( path, &l ) < 0 )
-		return 0;
+    struct stat st;
+    livido_memset(&st, 0, sizeof(st));
+    if(lstat(path, &st) < 0)
+        return 0;
 
-	if( S_ISLNK( l.st_mode ) )
-	{
-		livido_memset(&l,0,sizeof(struct stat));
-		stat( path, &l );
-	}
+    if(S_ISLNK(st.st_mode)) {
+        livido_memset(&st, 0, sizeof(st));
+        if(stat(path, &st) < 0)
+            return 0;
+    }
 
-	if( S_ISDIR( l.st_mode ))
-	{
-		return 1;
-	}
+    if(S_ISDIR(st.st_mode))
+        return 1;
+    if(!S_ISREG(st.st_mode) || !is_ttf(path) || *fontidx >= maxfonts)
+        return 0;
 
-	if( S_ISREG( l.st_mode ))
-	{
-		if( is_ttf( path ) )
-		{
-            if( *fontidx < maxfonts )
-			{
-                FT_Face face;
-                if( FT_New_Face( lib, path, 0, &face )  == 0 ) {  
-                    if( FT_Set_Pixel_Sizes( face, 0, 8 ) == 0 ) { 
-                        fontlist[ *fontidx ] = strdup(path);
-                        *fontidx = *fontidx + 1;
-                    }
-                    FT_Done_Face( face );
-                }
-			}
-		}
-	}
-	return 0;
+    FT_Face face;
+    if(FT_New_Face(lib, path, 0, &face) != 0)
+        return 0;
+
+    if(FT_Set_Pixel_Sizes(face, 0, 8) == 0) {
+        fontlist[*fontidx] = strdup(path);
+        if(fontlist[*fontidx])
+            (*fontidx)++;
+    }
+    FT_Done_Face(face);
+    return 0;
 }
 
-static int	find_fonts(FT_Library lib, char *path, char **fontlist, int *fontidx, int maxfonts)
+static int find_fonts(FT_Library lib, const char *path, char **fontlist, int *fontidx, int maxfonts)
 {
-	struct dirent **files;
-	int n = scandir(path, &files, NULL,alphasort);
-	if(n < 0)
-		return 0;
-	
+    struct dirent **files = NULL;
+    int n = scandir(path, &files, NULL, alphasort);
+    if(n < 0)
+        return 0;
+
     char tmp[2048];
-    
-    while( n -- )
-	{
-		snprintf( tmp, sizeof(tmp), "%s/%s", path, files[n]->d_name );
-		if( strcmp( files[n]->d_name , "." ) != 0 && strcmp( files[n]->d_name, ".." ) != 0 )
-		{
-			if(find_font_file( lib, tmp, fontlist, fontidx, maxfonts ))
-				find_fonts( lib, tmp,fontlist,fontidx,maxfonts );
-		}
-		free( files[n] );
-	}
-	free(files);
-	return 1;
+    while(n-- > 0) {
+        const char *name = files[n]->d_name;
+        if(strcmp(name, ".") != 0 && strcmp(name, "..") != 0) {
+            snprintf(tmp, sizeof(tmp), "%s/%s", path, name);
+            if(find_font_file(lib, tmp, fontlist, fontidx, maxfonts))
+                find_fonts(lib, tmp, fontlist, fontidx, maxfonts);
+        }
+        free(files[n]);
+    }
+    free(files);
+    return 1;
 }
 
-static void load_fonts(FT_Library lib,char **fontlist, int *fontidx, int maxfonts)
+static void load_fonts(FT_Library lib, char **fontlist, int *fontidx, int maxfonts)
 {
-    char *home = getenv("HOME");
+    const char *home = getenv("HOME");
     char path[2048];
 
-    snprintf(path, sizeof(path), "%s/.veejay/fonts", home ); 
-    find_fonts(lib,path, fontlist, fontidx,maxfonts);
+    if(home && *home) {
+        snprintf(path, sizeof(path), "%s/.veejay/fonts", home);
+        find_fonts(lib, path, fontlist, fontidx, maxfonts);
 
-    snprintf(path, sizeof(path), "%s/.fonts", home );
-    find_fonts(lib, path, fontlist, fontidx, maxfonts);
+        snprintf(path, sizeof(path), "%s/.fonts", home);
+        find_fonts(lib, path, fontlist, fontidx, maxfonts);
+    }
 
-    find_fonts(lib,"/usr/share/fonts/truetype", fontlist, fontidx, maxfonts);
-    find_fonts(lib,"/usr/share/fonts/opentype", fontlist, fontidx, maxfonts);
-    find_fonts(lib,"/usr/local/share/fonts", fontlist, fontidx, maxfonts );
+    find_fonts(lib, "/usr/share/fonts/truetype", fontlist, fontidx, maxfonts);
+    find_fonts(lib, "/usr/share/fonts/opentype", fontlist, fontidx, maxfonts);
+    find_fonts(lib, "/usr/local/share/fonts", fontlist, fontidx, maxfonts);
 }
 
 static int load_font(lvd_aa_t *s)
@@ -241,135 +242,132 @@ static int load_font(lvd_aa_t *s)
     return 0;
 }
 
+static void deinit(lvd_aa_t *s);
+
 static int load_glyph(lvd_aa_t *s, uint32_t code, Glyph *glyph)
 {
-    int err;
-    FT_BitmapGlyph bitmapglyph;
-
-    if (FT_Load_Char(s->face, code, FT_LOAD_DEFAULT)) {
+    if(FT_Load_Char(s->face, code, FT_LOAD_DEFAULT))
         return 1;
-    }
 
-    glyph->glyph = livido_malloc(sizeof(Glyph));
-    if(!glyph->glyph) {
-        return 1;
-    }
     glyph->code = code;
+    glyph->glyph = NULL;
+    if(FT_Get_Glyph(s->face->glyph, &glyph->glyph))
+        return 1;
 
-    if (FT_Get_Glyph(s->face->glyph, glyph->glyph)) {
-        err = 1;
-        goto glyph_cleanup;
+    if(FT_Glyph_To_Bitmap(&glyph->glyph, FT_RENDER_MODE_NORMAL, 0, 1)) {
+        FT_Done_Glyph(glyph->glyph);
+        glyph->glyph = NULL;
+        return 1;
     }
 
-    if (FT_Glyph_To_Bitmap(glyph->glyph, FT_RENDER_MODE_NORMAL, 0, 1)) {
-        err = 1;
-        goto glyph_cleanup;
-    }
-
-    bitmapglyph = (FT_BitmapGlyph) *glyph->glyph;
+    const FT_BitmapGlyphRec *bitmapglyph =
+        (const FT_BitmapGlyphRec*)glyph->glyph;
     glyph->bitmap = bitmapglyph->bitmap;
     glyph->bitmap_left = bitmapglyph->left;
     glyph->bitmap_top = bitmapglyph->top;
-
-    FT_Glyph_Get_CBox(*glyph->glyph, ft_glyph_bbox_pixels, &glyph->bbox);
-
+    FT_Glyph_Get_CBox(glyph->glyph, ft_glyph_bbox_pixels, &glyph->bbox);
     return 0;
-
-glyph_cleanup:
-    if (glyph->glyph)
-        livido_free(&glyph->glyph);
-    return err;
 }
 
-static int init(lvd_aa_t *s, font_param_t *fp)
+static int init(lvd_aa_t *s, const font_param_t *fp)
 {
-    int err;
-    int i;
+    int err = 1;
 
-    s->fontfile = fp->fontlist[ s->font ];
-
-    if (!s->fontfile) {
-        return 1; 
-    }
-
-    err = FT_Init_FreeType(&s->library);
-
-    if (err) {
+    s->fontfile = fp->fontlist[s->font];
+    if(!s->fontfile)
         return 1;
-    }
 
-    err = load_font(s);
+    if(FT_Init_FreeType(&s->library))
+        goto init_cleanup;
+    if(load_font(s))
+        goto init_cleanup;
+    if(FT_Set_Pixel_Sizes(s->face, 0, s->fontsize))
+        goto init_cleanup;
 
-    if (err) {
-        return err;
-    }
+    s->glyphs = (Glyph**)livido_malloc(sizeof(Glyph*) * NUM_GLYPHS);
+    if(!s->glyphs)
+        goto init_cleanup;
+    livido_memset(s->glyphs, 0, sizeof(Glyph*) * NUM_GLYPHS);
 
-    err = FT_Set_Pixel_Sizes(s->face, 0, s->fontsize);
-
-    if (err) {
-        return 1;
-    }
-
-    s->glyphs = (Glyph**) livido_malloc(sizeof(Glyph*) * NUM_GLYPHS);
-
-    for (i = 0; i < NUM_GLYPHS; i++) {
-        s->glyphs[i] = (Glyph*) livido_malloc(sizeof(Glyph));
-        err = load_glyph(s, i, s->glyphs[i]);
-        if (!err) {
+    for(int i = 0; i < NUM_GLYPHS; i++) {
+        s->glyphs[i] = (Glyph*)livido_malloc(sizeof(Glyph));
+        if(!s->glyphs[i])
             continue;
-        }
+        livido_memset(s->glyphs[i], 0, sizeof(Glyph));
+        if(load_glyph(s, (uint32_t)i, s->glyphs[i]) == 0)
+            continue;
         livido_free(s->glyphs[i]);
         s->glyphs[i] = NULL;
     }
 
-    s->initialized = 1;
-
+    s->runtime.initialized = 1;
     return 0;
+
+init_cleanup:
+    deinit(s);
+    return err;
 }
 
 static void deinit(lvd_aa_t *s)
 {
-    int i;
-    s->aa->driverdata = 0;
-    aa_close(s->aa);
+    if(!s)
+        return;
 
-    for( i = 0; i < NUM_GLYPHS; i ++ ) {
-        if(s->glyphs[i] == NULL)
-            continue;
-        if(s->glyphs[i]->glyph) {
-            FT_Done_Glyph(*(s->glyphs[i]->glyph));
-            livido_free(s->glyphs[i]->glyph);
+    if(s->aa) {
+        s->aa->driverdata = NULL;
+        aa_close(s->aa);
+        s->aa = NULL;
+    }
+
+    if(s->glyphs) {
+        for(int i = 0; i < NUM_GLYPHS; i++) {
+            if(!s->glyphs[i])
+                continue;
+            if(s->glyphs[i]->glyph)
+                FT_Done_Glyph(s->glyphs[i]->glyph);
+            livido_free(s->glyphs[i]);
         }
-        livido_free(s->glyphs[i]);
-    }   
+        livido_free(s->glyphs);
+        s->glyphs = NULL;
+    }
 
-    FT_Done_Face(s->face);
-    FT_Done_FreeType(s->library);
+    if(s->face) {
+        FT_Done_Face(s->face);
+        s->face = NULL;
+    }
+    if(s->library) {
+        FT_Done_FreeType(s->library);
+        s->library = NULL;
+    }
 
-    s->initialized = 0;
-    s->aa = NULL;
+    s->runtime.initialized = 0;
 }
 
 static int vf_driver_init(const struct aa_hardware_params *source, const void *data, struct aa_hardware_params *dest, void **params)
 {
+    (void)data;
+    (void)params;
     *dest = *source;
     return 1;
 }
 
 static void vf_driver_uninit(struct aa_context *context)
 {
+    (void)context;
 }
 
-static void vf_driver_setattr(aa_context *context, int attr) 
+static void vf_driver_setattr(aa_context *context, int attr)
 {
+    (void)context;
+    (void)attr;
 }
 
 static void vf_driver_getsize(aa_context *context, int *width, int *height)
 {
     lvd_aa_t *s = context->driverdata;
     if (s) {
-        *width = s->w;
-        *height = s->h;
+        *width = s->runtime.w;
+        *height = s->runtime.h;
     }
 }
 
@@ -377,141 +375,127 @@ static void vf_driver_gotoxy(aa_context *context, int x, int y)
 {
     lvd_aa_t *s = context->driverdata;
     if (s) {
-        s->x = x;
-        s->y = y;
+        s->runtime.x = x;
+        s->runtime.y = y;
     }
 }
 
 // Average
-static void draw_glyph_Y(int width, int height, uint8_t *bitbuffer, uint32_t bitmap_rows, uint32_t bitmap_wid, uint32_t bitmap_pitch, uint8_t *Y, int x, int y)
+static void draw_glyph_Y(const lvd_glyph_region_t *region, lvd_glyph_planes_t *planes)
 {
-    int r,c,p,pos;
-    for (r=0; (r < bitmap_rows) && (r+y < height); r++)
-    {
-        for (c=0; (c < bitmap_wid) && (c+x < width); c++)
-        {
-            pos = r * bitmap_pitch + c; 
-            p  = (c+x) + ((y+r)*width);
-
-            if( Y[p] < 16 )
-                Y[p] = bitbuffer[pos];
+    for(uint32_t r = 0; r < region->bitmap_rows && (int)r + region->y < region->height; r++) {
+        for(uint32_t c = 0; c < region->bitmap_width && (int)c + region->x < region->width; c++) {
+            const uint32_t pos = r * region->bitmap_pitch + c;
+            const int pixel = (int)c + region->x + ((region->y + (int)r) * region->width);
+            if(planes->y[pixel] < 16)
+                planes->y[pixel] = region->bitbuffer[pos];
             else
-                Y[ p ] = ( bitbuffer[pos] + Y[p] ) >> 1;
+                planes->y[pixel] = (region->bitbuffer[pos] + planes->y[pixel]) >> 1;
         }
     }
 }
 
-// Use Y as opacity channel (each pixel equals opacity value)
-static void draw_glyph_YasAlpha(int width, int height, uint8_t *bitbuffer, uint32_t bitmap_rows, uint32_t bitmap_wid, uint32_t bitmap_pitch, uint8_t *Y, int x, int y, uint8_t *L)
+static void draw_glyph_YasAlpha(const lvd_glyph_region_t *region, lvd_glyph_planes_t *planes)
 {
-    int r,c, p, pos;
-    for (r=0; (r < bitmap_rows) && (r+y < height); r++)
-    {
-        for (c=0; (c < bitmap_wid) && (c+x < width); c++)
-        {
-            pos = r * bitmap_pitch + c;
-            p  = (c+x) + ((y+r)*width);
-
-            uint8_t op1 = L[p];
-            uint8_t op0 = 0xff - op1;
-
-            Y[p] = ( op0 * Y[p] + op1 * bitbuffer[pos] ) >> 8;
+    for(uint32_t r = 0; r < region->bitmap_rows && (int)r + region->y < region->height; r++) {
+        for(uint32_t c = 0; c < region->bitmap_width && (int)c + region->x < region->width; c++) {
+            const uint32_t pos = r * region->bitmap_pitch + c;
+            const int pixel = (int)c + region->x + ((region->y + (int)r) * region->width);
+            const uint8_t op1 = planes->opacity[pixel];
+            const uint8_t op0 = 0xff - op1;
+            planes->y[pixel] = (op0 * planes->y[pixel] + op1 * region->bitbuffer[pos]) >> 8;
         }
     }
 }
 
-// Use Y as opacity channel (each pixel equals opacity value) and copy-in chroma channels
-static void draw_glyph_op(int width, int height, uint8_t *bitbuffer, uint32_t bitmap_rows, uint32_t bitmap_wid, uint32_t bitmap_pitch, uint8_t *Y, uint8_t *U, uint8_t *V, int x, int y, uint8_t *L, uint8_t *L1, uint8_t *L2)
+static void draw_glyph_op(const lvd_glyph_region_t *region, lvd_glyph_planes_t *planes)
 {
-    int r,c, p, pos;
-    for (r=0; (r < bitmap_rows) && (r+y < height); r++)
-    {
-        for (c=0; (c < bitmap_wid) && (c+x < width); c++)
-        {
-            pos = r * bitmap_pitch + c;
-            p  = (c+x) + ((y+r)*width);
-
-            uint8_t op1 = L[p];
-            uint8_t op0 = 0xff - op1;
-
-            Y[p] = ( op0 * Y[p] + op1 * bitbuffer[pos] ) >> 8;
-            U[ p ] = L1[p];
-            V[ p ] = L2[p];
+    for(uint32_t r = 0; r < region->bitmap_rows && (int)r + region->y < region->height; r++) {
+        for(uint32_t c = 0; c < region->bitmap_width && (int)c + region->x < region->width; c++) {
+            const uint32_t pos = r * region->bitmap_pitch + c;
+            const int pixel = (int)c + region->x + ((region->y + (int)r) * region->width);
+            const uint8_t op1 = planes->opacity[pixel];
+            const uint8_t op0 = 0xff - op1;
+            planes->y[pixel] = (op0 * planes->y[pixel] + op1 * region->bitbuffer[pos]) >> 8;
+            planes->u[pixel] = planes->source_u[pixel];
+            planes->v[pixel] = planes->source_v[pixel];
         }
     }
 }
 
-
-// Use Y as opacity channel (each pixel equals opacity value) and copy-in chroma channels (ignore black)
-static void draw_glyph_op_nb(int width, int height, uint8_t *bitbuffer, uint32_t bitmap_rows, uint32_t bitmap_wid, uint32_t bitmap_pitch, uint8_t *Y, uint8_t *U, uint8_t *V, int x, int y, uint8_t *L, uint8_t *L1, uint8_t *L2)
+static void draw_glyph_op_nb(const lvd_glyph_region_t *region, lvd_glyph_planes_t *planes)
 {
-    int r,c, p, pos;
-    for (r=0; (r < bitmap_rows) && (r+y < height); r++)
-    {
-        for (c=0; (c < bitmap_wid) && (c+x < width); c++)
-        {
-            pos = r * bitmap_pitch + c;
-            p  = (c+x) + ((y+r)*width);
-
-            uint8_t op1 = L[p];
-            uint8_t op0 = 0xff - op1;
-
-            Y[p] = ( op0 * Y[p] + op1 * bitbuffer[pos] ) >> 8;
-
-            if( bitbuffer[pos] > 0 ) {
-                U[ p ] = L1[p];
-                V[ p ] = L2[p];
+    for(uint32_t r = 0; r < region->bitmap_rows && (int)r + region->y < region->height; r++) {
+        for(uint32_t c = 0; c < region->bitmap_width && (int)c + region->x < region->width; c++) {
+            const uint32_t pos = r * region->bitmap_pitch + c;
+            const int pixel = (int)c + region->x + ((region->y + (int)r) * region->width);
+            const uint8_t op1 = planes->opacity[pixel];
+            const uint8_t op0 = 0xff - op1;
+            planes->y[pixel] = (op0 * planes->y[pixel] + op1 * region->bitbuffer[pos]) >> 8;
+            if(region->bitbuffer[pos] > 0) {
+                planes->u[pixel] = planes->source_u[pixel];
+                planes->v[pixel] = planes->source_v[pixel];
             }
         }
     }
 }
 
-static void draw_glyph( 
-    FT_Bitmap *bitmap,
-    int x,
-    int y,
-    int width,
-    int height, 
-    uint8_t *Y, uint8_t *U, uint8_t *V, int rollover, int mode, uint8_t *buffer[3])
+static void draw_glyph(lvd_aa_t *s, const FT_Bitmap *bitmap, int x, int y)
 {
-    if( x < 0 || x > width ) {
-        if(!rollover)
-            return;
+    const int width = s->curframe_width;
+    const int height = s->curframe_height;
 
-        if( x > width )
-            x = x % width;
-        if( x < 0 )
+    if(x < 0 || x > width) {
+        if(!s->runtime.rollover)
+            return;
+        if(x > width)
+            x %= width;
+        if(x < 0)
             x += width;
     }
-    if( y < 0 || y > height ) {
-        if(!rollover)
+    if(y < 0 || y > height) {
+        if(!s->runtime.rollover)
             return;
-
-        if( y > height )
-            y = y % height;
-        if( y < 0 )
+        if(y > height)
+            y %= height;
+        if(y < 0)
             y += height;
     }
 
-    uint8_t *bitbuffer = bitmap->buffer;
-    uint32_t bitmap_rows = bitmap->rows;
-    uint32_t bitmap_wid  = bitmap->width;
-    uint32_t bitmap_pitch = bitmap->pitch;
+    const lvd_glyph_region_t region = {
+        .width = width,
+        .height = height,
+        .x = x,
+        .y = y,
+        .bitbuffer = bitmap->buffer,
+        .bitmap_rows = bitmap->rows,
+        .bitmap_width = bitmap->width,
+        .bitmap_pitch = bitmap->pitch
+    };
+    lvd_glyph_planes_t planes = {
+        .y = s->curframe_data[0],
+        .u = s->curframe_data[1],
+        .v = s->curframe_data[2],
+        .opacity = s->buf[0],
+        .source_u = s->buf[1],
+        .source_v = s->buf[2]
+    };
 
-    switch(mode) {
+    switch(s->runtime.mode) {
         case 0:
-            draw_glyph_Y(width,height,bitbuffer,bitmap_rows,bitmap_wid,bitmap_pitch,Y,x,y);
+            draw_glyph_Y(&region, &planes);
             break;
         case 1:
-            draw_glyph_YasAlpha(width,height,bitbuffer,bitmap_rows,bitmap_wid,bitmap_pitch,Y,x,y,buffer[0]);
+            draw_glyph_YasAlpha(&region, &planes);
             break;
         case 2:
-            draw_glyph_op(width,height,bitbuffer,bitmap_rows,bitmap_wid,bitmap_pitch,Y,U,V,x,y,buffer[0],buffer[1],buffer[2]);
+            draw_glyph_op(&region, &planes);
             break;
         case 3:
-            draw_glyph_op_nb(width,height,bitbuffer,bitmap_rows,bitmap_wid,bitmap_pitch,Y,U,V,x,y,buffer[0],buffer[1],buffer[2]);
+            draw_glyph_op_nb(&region, &planes);
             break;
-
+        default:
+            break;
     }
 }
 
@@ -520,37 +504,30 @@ static void vf_driver_print(aa_context *context, const char *text)
     lvd_aa_t *s = context->driverdata;
     const char *c = text;
     Glyph *glyph = NULL;
-    int cx, cy;
-    if (s) {
-        while(*c) {
+    int cx;
+    int cy;
+    if(!s)
+        return;
+
+    while(*c) {
             Glyph dummy = { 0 };
             dummy.code = (uint32_t) *c;
 
             glyph = s->glyphs[ (dummy.code % 0xff) ];
 
             if (!glyph) {
-                s->x += 1;
+                s->runtime.x += 1;
                 c++;
                 continue;
             }
 
-            cx = (s->x * s->xadvance) + glyph->bitmap_left;
-            cy = (s->y * s->yadvance) - glyph->bitmap_top;
+            cx = (s->runtime.x * s->xadvance) + glyph->bitmap_left;
+            cy = (s->runtime.y * s->yadvance) - glyph->bitmap_top;
 
-            draw_glyph( 
-                    &(glyph->bitmap),
-                    cx, cy,
-                    s->curframe_width, s->curframe_height,
-                    s->curframe_data[0],s->curframe_data[1],s->curframe_data[2],
-                    s->rollover,
-                    s->mode,
-                    s->buf
-                );
+            draw_glyph(s, &glyph->bitmap, cx, cy);
 
-            s->x += 1;
-            c++;
-
-        }
+        s->runtime.x += 1;
+        c++;
     }
 }
 
@@ -568,12 +545,12 @@ static struct aa_driver vf_driver = {
 static int config_props_in(lvd_aa_t *s, int w, int h, int density)
 {
     if (!s->aa) {
-        s->w = w/density;
-        s->h = h/density;
+        s->runtime.w = w/density;
+        s->runtime.h = h/density;
 
-        s->aa_params.supported = s->aa_flags;
-        s->aa_params.width = s->w;
-        s->aa_params.height = s->h;
+        s->aa_params.supported = s->runtime.aa_flags;
+        s->aa_params.width = s->runtime.w;
+        s->aa_params.height = s->runtime.h;
 
         s->aa = aa_init(&vf_driver, &s->aa_params, 0);
 
@@ -588,7 +565,8 @@ static int config_props_in(lvd_aa_t *s, int w, int h, int density)
 
 int init_instance( livido_port_t *my_instance )
 {
-    int w = 0, h = 0;
+    int w = 0;
+    int h = 0;
     
     lvd_extract_dimensions( my_instance, "out_channels", &w, &h );
 
@@ -609,14 +587,19 @@ int init_instance( livido_port_t *my_instance )
     aa->scale.w = -1;
     aa->scale.h = -1;
 
-    aa->fontsize = -1.0;
-    aa->density = -1;
+    aa->fontsize = -1;
+    aa->runtime.density = -1;
     aa->font = -1;
-    aa->aa_flags = 0;
+    aa->runtime.aa_flags = 0;
 
-    aa->buf[0] = (uint8_t*) livido_malloc (sizeof(uint8_t) * (w * h * 3 ) );
-    aa->buf[1] = aa->buf[0] + w*h;
-    aa->buf[2] = aa->buf[1] + w*h;
+    aa->buf[0] = (uint8_t*)livido_malloc(sizeof(uint8_t) * (w * h * 3));
+    if(!aa->buf[0]) {
+        livido_free(aa->scale.buf[0]);
+        livido_free(aa);
+        return LIVIDO_ERROR_MEMORY_ALLOCATION;
+    }
+    aa->buf[1] = aa->buf[0] + w * h;
+    aa->buf[2] = aa->buf[1] + w * h;
 
     livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &aa);
 
@@ -624,13 +607,13 @@ int init_instance( livido_port_t *my_instance )
 }
 
 
-livido_deinit_f deinit_instance( livido_port_t *my_instance )
+int deinit_instance( livido_port_t *my_instance )
 {
     lvd_aa_t *aa = NULL;
     if( livido_property_get( my_instance, "PLUGIN_private", 0, &aa ) == LIVIDO_NO_ERROR ) {
         if( aa ) {
 
-            if(aa->initialized)
+            if(aa->runtime.initialized || aa->aa || aa->glyphs || aa->face || aa->library)
                 deinit(aa);
             
             if(aa->scale.buf[0]) {
@@ -655,6 +638,7 @@ livido_deinit_f deinit_instance( livido_port_t *my_instance )
 
 int     process_instance( livido_port_t *my_instance, double timecode )
 {
+    (void)timecode;
     uint8_t *A[4] = {NULL,NULL,NULL,NULL};
     uint8_t *O[4]= {NULL,NULL,NULL,NULL};
 
@@ -695,19 +679,19 @@ int     process_instance( livido_port_t *my_instance, double timecode )
     if( livido_property_get( font_port, "PLUGIN_param_private", 0, &fp ) != LIVIDO_NO_ERROR )
         return LIVIDO_ERROR_INTERNAL;
 
-    int re_init = !aa->initialized;
+    int re_init = !aa->runtime.initialized;
 
     int aa_flag = AA_NORMAL_MASK | AA_REVERSE_MASK;
     if( aaflagmode == 1 )
         aa_flag = AA_NORMAL_MASK | AA_REVERSE_MASK | AA_EXTENDED;
 
-    if( aa_flag != aa->aa_flags ) {
-        aa->aa_flags = aa_flag;
+    if( aa_flag != aa->runtime.aa_flags ) {
+        aa->runtime.aa_flags = aa_flag;
         re_init = 1;
     }
 
-    if( density != aa->density ) {
-        aa->density = density;
+    if( density != aa->runtime.density ) {
+        aa->runtime.density = density;
         re_init = 1;
     }
 
@@ -723,11 +707,11 @@ int     process_instance( livido_port_t *my_instance, double timecode )
  
     aa->xadvance = density * 2;
     aa->yadvance = density * 4;
-    aa->rollover = rollover;
-    aa->mode = mode;
+    aa->runtime.rollover = rollover;
+    aa->runtime.mode = mode;
 
     if(re_init) {
-        if( aa->initialized )
+        if( aa->runtime.initialized )
             deinit(aa);
 
         if(aa->scale.sws) {
@@ -792,7 +776,7 @@ int     process_instance( livido_port_t *my_instance, double timecode )
 
     aa->curframe_width = w;
     aa->curframe_height = h;
-    aa_render(aa->aa, &aa->renderparams, 0, 0, aa->w, aa->h);
+    aa_render(aa->aa, &aa->renderparams, 0, 0, aa->runtime.w, aa->runtime.h);
     aa_flush(aa->aa);
 
     return LIVIDO_NO_ERROR;

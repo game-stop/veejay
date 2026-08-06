@@ -169,7 +169,6 @@ livido_port_t *livido_get_portptr_value (livido_port_t *port, const char *key, i
 ////////////////////////////////////////////////////////////
 
 int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
-  int i;
   int num_elems;
   int *retval;
 
@@ -185,7 +184,7 @@ int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
     return NULL;
   }
 
-  for (i=0;i<num_elems;i++) {
+  for (int i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
       livido_free (retval);
       return NULL;
@@ -195,7 +194,6 @@ int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
 }
 
 double *livido_get_double_array (livido_port_t *port, const char *key, int *error) {
-  int i;
   int num_elems;
   double *retval;
 
@@ -210,7 +208,7 @@ double *livido_get_double_array (livido_port_t *port, const char *key, int *erro
     return NULL;
   }
 
-  for (i=0;i<num_elems;i++) {
+  for (int i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
       livido_free (retval);
       return NULL;
@@ -220,7 +218,6 @@ double *livido_get_double_array (livido_port_t *port, const char *key, int *erro
 }
 
 int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error) {
-  int i;
   int num_elems;
   int *retval;
 
@@ -236,7 +233,7 @@ int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error)
     return NULL;
   }
 
-  for (i=0;i<num_elems;i++) {
+  for (int i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
       livido_free (retval);
       return NULL;
@@ -246,7 +243,6 @@ int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error)
 }
 
 char **livido_get_string_array (livido_port_t *port, const char *key, int *error) {
-  int i;
   int num_elems;
   char **retval;
 
@@ -262,15 +258,18 @@ char **livido_get_string_array (livido_port_t *port, const char *key, int *error
     return NULL;
   }
 
-  for (i=0;i<num_elems;i++) {
+  for (int i=0;i<num_elems;i++) {
     if ((retval[i]=(char *)livido_malloc(livido_property_element_size(port,key,i)+1))==NULL) {
-      for (--i;i>=0;i--) livido_free(retval[i]);
+      for (int j=0;j<i;j++)
+        livido_free(retval[j]);
       *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
       livido_free (retval);
       return NULL;
     }
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      for (--i;i>=0;i--) livido_free(retval[i]);
+      livido_free(retval[i]);
+      for (int j=0;j<i;j++)
+        livido_free(retval[j]);
       livido_free (retval);
       return NULL;
     }
@@ -279,7 +278,6 @@ char **livido_get_string_array (livido_port_t *port, const char *key, int *error
 }
 
 void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *error) {
-  int i;
   int num_elems;
   void **retval;
 
@@ -295,7 +293,7 @@ void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *erro
     return NULL;
   }
 
-  for (i=0;i<num_elems;i++) {
+  for (int i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
       livido_free (retval);
       return NULL;
@@ -305,7 +303,6 @@ void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *erro
 }
 
 livido_port_t **livido_get_portptr_array (livido_port_t *port, const char *key, int *error) {
-  int i;
   int num_elems;
   livido_port_t **retval;
 
@@ -321,7 +318,7 @@ livido_port_t **livido_get_portptr_array (livido_port_t *port, const char *key, 
     return NULL;
   }
 
-  for (i=0;i<num_elems;i++) {
+  for (int i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
       livido_free (retval);
       return NULL;
