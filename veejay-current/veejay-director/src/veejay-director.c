@@ -23196,6 +23196,8 @@ int main(int argc, char **argv)
     DirectorApp app;
     memset(&app, 0, sizeof(app));
 
+    const gboolean plain_launch = argc == 1;
+
     gboolean option_discover = FALSE;
     gboolean option_connect_all = FALSE;
     gboolean option_resume = FALSE;
@@ -23224,8 +23226,8 @@ int main(int argc, char **argv)
 
     GOptionContext *context = g_option_context_new("[SHOW.vjd]");
     g_option_context_set_summary(context,
-        "VeeJay Director resumes the last saved show by default. "
-        "When no saved show is available it opens a discovery workspace.");
+        "With no command-line arguments, VeeJay Director opens the Start Director window. "
+        "Use --discover, --resume or --show for direct non-interactive startup.");
     g_option_context_add_main_entries(context, options, NULL);
     g_option_context_set_ignore_unknown_options(context, TRUE);
 
@@ -23263,6 +23265,7 @@ int main(int argc, char **argv)
         option_discover ? DIRECTOR_START_DISCOVER :
         option_resume ? DIRECTOR_START_RESUME :
         option_setup ? DIRECTOR_START_SETUP :
+        plain_launch ? DIRECTOR_START_SETUP :
                        DIRECTOR_START_AUTOMATIC;
     app.startup_patchbay = option_patchbay || option_discover;
     app.startup_no_discovery = option_no_discovery;
