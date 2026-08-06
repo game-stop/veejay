@@ -1177,7 +1177,7 @@ static void gvr_sample_bank_view_init(GvrSampleBankView *view)
     view->layout_rows = view->rows;
 
     gtk_widget_set_can_focus(GTK_WIDGET(view), TRUE);
-    gtk_widget_set_has_tooltip(GTK_WIDGET(view), TRUE);
+    vj_gui_widget_set_has_tooltip(GTK_WIDGET(view), TRUE);
     gtk_widget_add_events(GTK_WIDGET(view),
                           GDK_BUTTON_PRESS_MASK |
                           GDK_POINTER_MOTION_MASK |

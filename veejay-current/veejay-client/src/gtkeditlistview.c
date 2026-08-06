@@ -811,7 +811,7 @@ static void gvr_edit_list_update_clipboard_label(GvrEditListView *view)
 
     if(!view->clipboard_valid || view->clipboard_frames <= 0) {
         gtk_label_set_text(GTK_LABEL(view->clipboard_label), "Clipboard empty");
-        gtk_widget_set_tooltip_text(view->clipboard_label,
+        vj_gui_widget_set_tooltip_text(view->clipboard_label,
                                     "The edit-list clipboard is empty.");
         return;
     }
@@ -828,7 +828,7 @@ static void gvr_edit_list_update_clipboard_label(GvrEditListView *view)
                              view->clipboard_source_out);
 
     gtk_label_set_text(GTK_LABEL(view->clipboard_label), label);
-    gtk_widget_set_tooltip_text(view->clipboard_label, detail);
+    vj_gui_widget_set_tooltip_text(view->clipboard_label, detail);
 
     g_free(detail);
     g_free(label);
@@ -1156,7 +1156,7 @@ static GtkWidget *gvr_edit_list_image_button(const char *filename,
 
     gtk_container_add(GTK_CONTAINER(button), child);
     gtk_widget_show(child);
-    gtk_widget_set_tooltip_text(button, tooltip);
+    vj_gui_widget_set_tooltip_text(button, tooltip);
     gvr_edit_list_button_set_accessible_name(button, fallback);
     return button;
 }
@@ -1197,7 +1197,7 @@ static GtkWidget *gvr_edit_list_text_toolbar_button(GtkWidget *toolbar,
     g_object_set_data(G_OBJECT(button),
                       "gvr-edit-action",
                       GINT_TO_POINTER(action));
-    gtk_widget_set_tooltip_text(button, tooltip);
+    vj_gui_widget_set_tooltip_text(button, tooltip);
     gvr_edit_list_button_set_accessible_name(button, label);
     g_signal_connect(button,
                      "clicked",
@@ -1217,7 +1217,7 @@ static GtkWidget *gvr_edit_list_menu_item(GtkWidget *menu,
 {
     GtkWidget *item = gtk_menu_item_new_with_label(label);
 
-    gtk_widget_set_tooltip_text(item, tooltip);
+    vj_gui_widget_set_tooltip_text(item, tooltip);
     g_signal_connect(item, "activate", callback, data);
     gtk_menu_shell_append(GTK_MENU_SHELL(menu), item);
     gtk_widget_show(item);
@@ -1280,7 +1280,7 @@ static void gvr_edit_list_paste_target(GtkWidget *widget, gpointer user_data)
                                       MAX(0, view->total_frames));
             gtk_spin_button_set_value(GTK_SPIN_BUTTON(view->paste_frame_spin),
                                       view->playhead);
-            gtk_popover_popup(GTK_POPOVER(view->paste_popover));
+            gtk_widget_show(view->paste_popover);
             return;
 
         case GVR_EDIT_LIST_PASTE_PLAYHEAD:
@@ -1313,7 +1313,7 @@ static void gvr_edit_list_paste_explicit_clicked(GtkWidget *widget, gpointer use
     int position = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(view->paste_frame_spin));
 
     (void)widget;
-    gtk_popover_popdown(GTK_POPOVER(view->paste_popover));
+    gtk_widget_hide(view->paste_popover);
     gvr_edit_list_paste_emit(view, position);
 }
 
@@ -2903,6 +2903,7 @@ static gboolean gvr_edit_list_navigator_query_tooltip(GtkWidget *widget,
     int frame;
     gchar *time;
     gchar *text;
+    gboolean result = FALSE;
     (void)y;
 
     if(keyboard_mode || view->total_frames <= 0)
@@ -2913,10 +2914,10 @@ static gboolean gvr_edit_list_navigator_query_tooltip(GtkWidget *widget,
                 gvr_edit_list_navigator_x_to_boundary(view, x, allocation.width));
     time = gvr_edit_list_format_time(view, frame);
     text = g_strdup_printf("Timeline overview\nFrame %d · %s\nDrag the viewport to pan", frame, time);
-    vj_gui_tooltip_set_text(widget, tooltip, text);
+    result = vj_gui_tooltip_set_text(widget, tooltip, text);
     g_free(text);
     g_free(time);
-    return TRUE;
+    return result;
 }
 
 static void gvr_edit_list_update_playing_rows(GvrEditListView *view)
@@ -3282,7 +3283,9 @@ static gboolean gvr_edit_list_overview_context_menu(GvrEditListView *view,
 
     g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
     gtk_widget_show_all(menu);
-    gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
+    gtk_menu_popup(GTK_MENU(menu),
+                       NULL, NULL, NULL, NULL,
+                       event->button, event->time);
     return TRUE;
 }
 
@@ -3819,6 +3822,7 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
     GvrEditListSegmentData *segment;
     int frame;
     gchar *text;
+    gboolean result = FALSE;
 
     if(keyboard_mode || view->total_frames <= 0)
         return FALSE;
@@ -3835,10 +3839,10 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
             text = g_strdup_printf("%s\nSeparator at boundary %d · %s\nDrag to move · double-click to rename · Delete removes it",
                                    separator->name ? separator->name : "Separator",
                                    separator->frame, time);
-            vj_gui_tooltip_set_text(widget, tooltip, text);
+            result = vj_gui_tooltip_set_text(widget, tooltip, text);
             g_free(text);
             g_free(time);
-            return TRUE;
+            return result;
         }
 
         if(y >= (gint)gvr_edit_list_region_top(view)) {
@@ -3853,11 +3857,11 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
                                        start_frame, end_boundary - 1,
                                        end_boundary - start_frame,
                                        start_time, end_time);
-                vj_gui_tooltip_set_text(widget, tooltip, text);
+                result = vj_gui_tooltip_set_text(widget, tooltip, text);
                 g_free(text);
                 g_free(start_time);
                 g_free(end_time);
-                return TRUE;
+                return result;
             }
         }
     }
@@ -3889,9 +3893,9 @@ static gboolean gvr_edit_list_overview_query_tooltip(GtkWidget *widget,
                                edge_hint);
         g_free(time);
     }
-    vj_gui_tooltip_set_text(widget, tooltip, text);
+    result = vj_gui_tooltip_set_text(widget, tooltip, text);
     g_free(text);
-    return TRUE;
+    return result;
 }
 
 static void gvr_edit_list_cell_data(GtkTreeViewColumn *column,
@@ -4100,7 +4104,9 @@ static gboolean gvr_edit_list_tree_button_press(GtkWidget *widget,
 
     g_signal_connect(menu, "selection-done", G_CALLBACK(gtk_widget_destroy), NULL);
     gtk_widget_show_all(menu);
-    gtk_menu_popup_at_pointer(GTK_MENU(menu), (GdkEvent *)event);
+    gtk_menu_popup(GTK_MENU(menu),
+                       NULL, NULL, NULL, NULL,
+                       event->button, event->time);
     return TRUE;
 }
 
@@ -4420,7 +4426,7 @@ static GtkWidget *gvr_edit_list_menu_button(const char *filename,
     gtk_container_add(GTK_CONTAINER(button), box);
     gtk_widget_show_all(box);
     gtk_menu_button_set_popup(GTK_MENU_BUTTON(button), menu);
-    gtk_widget_set_tooltip_text(button, tooltip);
+    vj_gui_widget_set_tooltip_text(button, tooltip);
     gvr_edit_list_button_set_accessible_name(button, fallback);
     return button;
 }
@@ -4682,7 +4688,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     g_object_set(G_OBJECT(view->target_label), "xalign", 0.0f, NULL);
     gtk_label_set_single_line_mode(GTK_LABEL(view->target_label), TRUE);
     gtk_label_set_ellipsize(GTK_LABEL(view->target_label), PANGO_ELLIPSIZE_END);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->target_label,
         "Source files are opened media files. Segments are timeline ranges; several "
         "segments may reference the same source file.");
@@ -4813,13 +4819,13 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gtk_box_pack_start(GTK_BOX(timeline_controls), item, TRUE, TRUE, 3);
 
     view->separator_add_button = gtk_button_new_with_label("M+");
-    gtk_widget_set_tooltip_text(view->separator_add_button, "Add a separator at the playhead (M).");
+    vj_gui_widget_set_tooltip_text(view->separator_add_button, "Add a separator at the playhead (M).");
     g_signal_connect(view->separator_add_button, "clicked",
                      G_CALLBACK(gvr_edit_list_separator_add_clicked), view);
     gtk_box_pack_start(GTK_BOX(timeline_controls), view->separator_add_button, FALSE, FALSE, 0);
 
     view->separator_remove_button = gtk_button_new_with_label("M−");
-    gtk_widget_set_tooltip_text(view->separator_remove_button, "Delete the selected separator.");
+    vj_gui_widget_set_tooltip_text(view->separator_remove_button, "Delete the selected separator.");
     gtk_widget_set_sensitive(view->separator_remove_button, FALSE);
     g_signal_connect(view->separator_remove_button, "clicked",
                      G_CALLBACK(gvr_edit_list_separator_remove_clicked), view);
@@ -4827,7 +4833,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
 
     view->snap_toggle = gtk_toggle_button_new_with_label("Snap");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(view->snap_toggle), TRUE);
-    gtk_widget_set_tooltip_text(view->snap_toggle, "Snap to cuts, separators and the playhead (S; hold Alt to bypass).");
+    vj_gui_widget_set_tooltip_text(view->snap_toggle, "Snap to cuts, separators and the playhead (S; hold Alt to bypass).");
     g_signal_connect(view->snap_toggle, "toggled",
                      G_CALLBACK(gvr_edit_list_snap_toggled), view);
     gtk_box_pack_start(GTK_BOX(timeline_controls), view->snap_toggle, FALSE, FALSE, 2);
@@ -4837,19 +4843,19 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gtk_box_pack_end(GTK_BOX(timeline_controls), view->zoom_label, FALSE, FALSE, 2);
 
     view->zoom_frame_button = gtk_button_new_with_label("Frame");
-    gtk_widget_set_tooltip_text(view->zoom_frame_button, "Zoom to approximately 8 pixels per frame.");
+    vj_gui_widget_set_tooltip_text(view->zoom_frame_button, "Zoom to approximately 8 pixels per frame.");
     g_signal_connect(view->zoom_frame_button, "clicked",
                      G_CALLBACK(gvr_edit_list_zoom_frame_clicked), view);
     gtk_box_pack_end(GTK_BOX(timeline_controls), view->zoom_frame_button, FALSE, FALSE, 0);
 
     view->zoom_selection_button = gtk_button_new_with_label("Sel");
-    gtk_widget_set_tooltip_text(view->zoom_selection_button, "Fit the current selection in the timeline.");
+    vj_gui_widget_set_tooltip_text(view->zoom_selection_button, "Fit the current selection in the timeline.");
     g_signal_connect(view->zoom_selection_button, "clicked",
                      G_CALLBACK(gvr_edit_list_zoom_selection_clicked), view);
     gtk_box_pack_end(GTK_BOX(timeline_controls), view->zoom_selection_button, FALSE, FALSE, 0);
 
     view->zoom_fit_button = gtk_button_new_with_label("Fit");
-    gtk_widget_set_tooltip_text(view->zoom_fit_button, "Fit the complete edit list in the timeline.");
+    vj_gui_widget_set_tooltip_text(view->zoom_fit_button, "Fit the complete edit list in the timeline.");
     g_signal_connect(view->zoom_fit_button,
                      "clicked",
                      G_CALLBACK(gvr_edit_list_zoom_fit_clicked),
@@ -4857,7 +4863,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gtk_box_pack_end(GTK_BOX(timeline_controls), view->zoom_fit_button, FALSE, FALSE, 0);
 
     view->zoom_in_button = gtk_button_new_with_label("+");
-    gtk_widget_set_tooltip_text(view->zoom_in_button, "Zoom into the timeline.");
+    vj_gui_widget_set_tooltip_text(view->zoom_in_button, "Zoom into the timeline.");
     g_signal_connect(view->zoom_in_button,
                      "clicked",
                      G_CALLBACK(gvr_edit_list_zoom_in_clicked),
@@ -4870,7 +4876,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
                                                 0.25);
     gtk_scale_set_draw_value(GTK_SCALE(view->zoom_scale), FALSE);
     gtk_widget_set_size_request(view->zoom_scale, 116, -1);
-    gtk_widget_set_tooltip_text(view->zoom_scale,
+    vj_gui_widget_set_tooltip_text(view->zoom_scale,
                                 "Timeline zoom. Ctrl+mouse wheel zooms around the pointer; wheel pans.");
     g_signal_connect(view->zoom_scale,
                      "value-changed",
@@ -4879,7 +4885,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gtk_box_pack_end(GTK_BOX(timeline_controls), view->zoom_scale, FALSE, FALSE, 2);
 
     view->zoom_out_button = gtk_button_new_with_label("−");
-    gtk_widget_set_tooltip_text(view->zoom_out_button, "Zoom out of the timeline.");
+    vj_gui_widget_set_tooltip_text(view->zoom_out_button, "Zoom out of the timeline.");
     g_signal_connect(view->zoom_out_button,
                      "clicked",
                      G_CALLBACK(gvr_edit_list_zoom_out_clicked),
@@ -4894,7 +4900,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
             (int)ceil(gvr_edit_list_clip_top(view) +
                       gvr_edit_list_min_clip_height(view) + 2.0)));
     gtk_widget_set_can_focus(view->overview, TRUE);
-    gtk_widget_set_has_tooltip(view->overview, TRUE);
+    vj_gui_widget_set_has_tooltip(view->overview, TRUE);
     gtk_widget_add_events(view->overview,
                           GDK_BUTTON_PRESS_MASK |
                           GDK_BUTTON_RELEASE_MASK |
@@ -4951,7 +4957,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
 
     view->navigator = gtk_drawing_area_new();
     gtk_widget_set_size_request(view->navigator, 480, gvr_edit_list_navigator_height(view));
-    gtk_widget_set_has_tooltip(view->navigator, TRUE);
+    vj_gui_widget_set_has_tooltip(view->navigator, TRUE);
     gtk_widget_add_events(view->navigator,
                           GDK_BUTTON_PRESS_MASK |
                           GDK_BUTTON_RELEASE_MASK |
@@ -4994,7 +5000,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     view->pan_scrollbar = gtk_scrollbar_new(GTK_ORIENTATION_HORIZONTAL,
                                             view->pan_adjustment);
     gtk_widget_set_size_request(view->pan_scrollbar, -1, 11);
-    gtk_widget_set_tooltip_text(view->pan_scrollbar, "Pan the zoomed timeline.");
+    vj_gui_widget_set_tooltip_text(view->pan_scrollbar, "Pan the zoomed timeline.");
     gtk_box_pack_start(GTK_BOX(timeline_box), view->pan_scrollbar, FALSE, TRUE, 0);
 
     view->store = gtk_list_store_new(MODEL_N_COLUMNS,
@@ -5023,7 +5029,7 @@ static void gvr_edit_list_view_init(GvrEditListView *view)
     gvr_edit_list_append_text_column(view, "Length", MODEL_LENGTH, FALSE, 68);
     gvr_edit_list_append_text_column(view, "Format", MODEL_FOURCC, FALSE, 58);
 
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->tree,
         "Each row is a timeline segment. Copy, paste, cut and move operations may "
         "create several segments that all reference the same source file. Drag a "

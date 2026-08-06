@@ -840,7 +840,7 @@ static void gvr_shape_selector_init(GvrShapeSelector *selector)
     gtk_label_set_ellipsize(GTK_LABEL(selector->selected_label),
                             PANGO_ELLIPSIZE_END);
     gtk_widget_set_halign(selector->count_label, GTK_ALIGN_END);
-    gtk_widget_set_tooltip_text(selector->count_label,
+    vj_gui_widget_set_tooltip_text(selector->count_label,
                                 "Press Ctrl+F to search shapes by name or number.");
     gtk_box_pack_start(GTK_BOX(header),
                        selector->selected_label,
@@ -862,7 +862,7 @@ static void gvr_shape_selector_init(GvrShapeSelector *selector)
     gtk_style_context_add_class(gtk_widget_get_style_context(search_box),
                                 "shape-selector-search");
     selector->search_entry = gtk_entry_new();
-    gtk_widget_set_tooltip_text(selector->search_entry,
+    vj_gui_widget_set_tooltip_text(selector->search_entry,
                                 "Search shape name or #");
     gtk_widget_set_hexpand(selector->search_entry, TRUE);
     gtk_widget_set_vexpand(selector->search_entry, FALSE);
@@ -893,7 +893,7 @@ static void gvr_shape_selector_init(GvrShapeSelector *selector)
         "shape-selector-grid");
     gtk_icon_view_set_pixbuf_column(GTK_ICON_VIEW(selector->icon_view),
                                     MODEL_PIXBUF);
-    gtk_widget_set_has_tooltip(selector->icon_view, TRUE);
+    vj_gui_widget_set_has_tooltip(selector->icon_view, TRUE);
     gtk_icon_view_set_selection_mode(GTK_ICON_VIEW(selector->icon_view),
                                      GTK_SELECTION_SINGLE);
     gtk_icon_view_set_item_width(GTK_ICON_VIEW(selector->icon_view),

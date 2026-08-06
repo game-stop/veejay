@@ -4694,666 +4694,142 @@ static void scan_generators( const char *name)
     gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
 
-#define RELOADED_TOOLTIP_EVENT_MASK \
-    (GDK_POINTER_MOTION_MASK | GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK)
+#define VJ_TOOLTIP_WANTED_DATA "gvr-tooltip-wanted"
 
-#define RELOADED_TOOLTIP_WINDOW_DATA "reloaded-tooltip-window"
-#define RELOADED_TOOLTIP_LABEL_DATA "reloaded-tooltip-label"
-#define RELOADED_TOOLTIP_HIDE_SOURCE_DATA "reloaded-tooltip-hide-source"
-#define RELOADED_TOOLTIP_LIFECYCLE_DATA "reloaded-tooltip-lifecycle"
-#define RELOADED_TOOLTIP_PARENT_HOOK_DATA "reloaded-tooltip-parent-hook"
+static gboolean tooltips_enabled_ = TRUE;
 
-
-static GtkWidget *tooltip_custom_label(GtkWindow *window)
+static void vj_gui_tooltip_apply_widget(GtkWidget *widget, gboolean enabled)
 {
-    if(!GTK_IS_WINDOW(window))
-        return NULL;
+    gpointer wanted_data;
+    gboolean wanted;
+    GtkWidget *submenu = NULL;
 
-    return GTK_WIDGET(g_object_get_data(G_OBJECT(window),
-                                        RELOADED_TOOLTIP_LABEL_DATA));
-}
-
-static GtkWindow *tooltip_custom_window_new(void)
-{
-    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    GtkWidget *label = gtk_label_new(NULL);
-    GtkStyleContext *window_context;
-    GtkStyleContext *label_context;
-
-    g_object_ref_sink(window);
-
-    gtk_widget_set_name(window, "gtk-tooltip");
-    gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
-    gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
-    gtk_window_set_skip_taskbar_hint(GTK_WINDOW(window), TRUE);
-    gtk_window_set_skip_pager_hint(GTK_WINDOW(window), TRUE);
-    gtk_window_set_accept_focus(GTK_WINDOW(window), FALSE);
-    gtk_window_set_focus_on_map(GTK_WINDOW(window), FALSE);
-    gtk_window_set_modal(GTK_WINDOW(window), FALSE);
-    gtk_window_set_keep_above(GTK_WINDOW(window), FALSE);
-    gtk_window_set_type_hint(GTK_WINDOW(window), GDK_WINDOW_TYPE_HINT_TOOLTIP);
-    gtk_window_set_gravity(GTK_WINDOW(window), GDK_GRAVITY_NORTH_WEST);
-
-    window_context = gtk_widget_get_style_context(window);
-    gtk_style_context_add_class(window_context, "reloaded-tooltip-window");
-
-    gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
-    gtk_label_set_yalign(GTK_LABEL(label), 0.5f);
-    gtk_label_set_line_wrap(GTK_LABEL(label), TRUE);
-    gtk_label_set_line_wrap_mode(GTK_LABEL(label), PANGO_WRAP_WORD_CHAR);
-    gtk_label_set_max_width_chars(GTK_LABEL(label), 80);
-    gtk_widget_set_margin_start(label, 0);
-    gtk_widget_set_margin_end(label, 0);
-    gtk_widget_set_margin_top(label, 0);
-    gtk_widget_set_margin_bottom(label, 0);
-
-    label_context = gtk_widget_get_style_context(label);
-    gtk_style_context_add_class(label_context, "reloaded-tooltip-label");
-
-    gtk_container_add(GTK_CONTAINER(window), label);
-    gtk_widget_show(label);
-
-    g_object_set_data(G_OBJECT(window),
-                      RELOADED_TOOLTIP_LABEL_DATA,
-                      label);
-
-    return GTK_WINDOW(window);
-}
-
-static void tooltip_custom_cancel_hide(GtkWindow *window)
-{
-    guint source_id;
-
-    if(!GTK_IS_WINDOW(window))
-        return;
-
-    source_id = GPOINTER_TO_UINT(
-        g_object_get_data(G_OBJECT(window),
-                          RELOADED_TOOLTIP_HIDE_SOURCE_DATA));
-
-    if(source_id != 0) {
-        g_source_remove(source_id);
-        g_object_set_data(G_OBJECT(window),
-                          RELOADED_TOOLTIP_HIDE_SOURCE_DATA,
-                          NULL);
-    }
-}
-
-static gboolean tooltip_custom_hide_timeout(gpointer data)
-{
-    GtkWindow *window = GTK_WINDOW(data);
-
-    if(GTK_IS_WINDOW(window)) {
-        g_object_set_data(G_OBJECT(window),
-                          RELOADED_TOOLTIP_HIDE_SOURCE_DATA,
-                          NULL);
-        gtk_widget_hide(GTK_WIDGET(window));
-    }
-
-    return G_SOURCE_REMOVE;
-}
-
-static void tooltip_custom_schedule_hide(GtkWindow *window)
-{
-    guint source_id;
-
-    if(!GTK_IS_WINDOW(window))
-        return;
-
-    tooltip_custom_cancel_hide(window);
-
-    source_id = g_timeout_add_full(G_PRIORITY_DEFAULT,
-                                   120,
-                                   tooltip_custom_hide_timeout,
-                                   g_object_ref(window),
-                                   g_object_unref);
-
-    g_object_set_data(G_OBJECT(window),
-                      RELOADED_TOOLTIP_HIDE_SOURCE_DATA,
-                      GUINT_TO_POINTER(source_id));
-}
-
-static gboolean tooltip_custom_widget_leave(GtkWidget *widget,
-                                            GdkEventCrossing *event,
-                                            gpointer user_data)
-{
-    GtkWindow *window = gtk_widget_get_tooltip_window(widget);
-
-    (void)event;
-    (void)user_data;
-
-    if(GTK_IS_WINDOW(window))
-        tooltip_custom_schedule_hide(window);
-
-    return FALSE;
-}
-
-static void tooltip_custom_install_lifecycle(GtkWidget *widget)
-{
     if(!GTK_IS_WIDGET(widget))
         return;
 
-    if(g_object_get_data(G_OBJECT(widget),
-                         RELOADED_TOOLTIP_LIFECYCLE_DATA))
-        return;
-
-    gtk_widget_add_events(widget,
-                          GDK_POINTER_MOTION_MASK |
-                          GDK_ENTER_NOTIFY_MASK |
-                          GDK_LEAVE_NOTIFY_MASK);
-
-    g_signal_connect(widget,
-                     "leave-notify-event",
-                     G_CALLBACK(tooltip_custom_widget_leave),
-                     NULL);
-
-    g_object_set_data(G_OBJECT(widget),
-                      RELOADED_TOOLTIP_LIFECYCLE_DATA,
-                      GINT_TO_POINTER(1));
-}
-
-static void tooltip_custom_parent_active_changed(GObject *object,
-                                                 GParamSpec *pspec,
-                                                 gpointer user_data)
-{
-    GtkWindow *parent = GTK_WINDOW(object);
-    GtkWindow *tooltip_window = GTK_WINDOW(user_data);
-
-    (void)pspec;
-
-    if(!GTK_IS_WINDOW(parent))
-        return;
-    if(!GTK_IS_WINDOW(tooltip_window))
-        return;
-    if(!gtk_window_is_active(parent)) {
-        tooltip_custom_cancel_hide(tooltip_window);
-        gtk_widget_hide(GTK_WIDGET(tooltip_window));
-    }
-}
-
-static void tooltip_custom_parent_unmapped(GtkWidget *widget,
-                                           gpointer user_data)
-{
-    GtkWindow *tooltip_window = GTK_WINDOW(user_data);
-
-    (void)widget;
-
-    if(GTK_IS_WINDOW(tooltip_window)) {
-        tooltip_custom_cancel_hide(tooltip_window);
-        gtk_widget_hide(GTK_WIDGET(tooltip_window));
-    }
-}
-
-static void tooltip_custom_bind_parent(GtkWindow *tooltip_window,
-                                       GtkWindow *parent)
-{
-    if(!GTK_IS_WINDOW(tooltip_window))
-        return;
-    if(!GTK_IS_WINDOW(parent))
-        return;
-
-    gtk_window_set_transient_for(tooltip_window, parent);
-
-    if(g_object_get_data(G_OBJECT(parent),
-                         RELOADED_TOOLTIP_PARENT_HOOK_DATA))
-        return;
-
-    g_signal_connect_object(parent,
-                            "notify::is-active",
-                            G_CALLBACK(tooltip_custom_parent_active_changed),
-                            tooltip_window,
-                            0);
-    g_signal_connect_object(parent,
-                            "unmap",
-                            G_CALLBACK(tooltip_custom_parent_unmapped),
-                            tooltip_window,
-                            0);
-
-    g_object_set_data(G_OBJECT(parent),
-                      RELOADED_TOOLTIP_PARENT_HOOK_DATA,
-                      GINT_TO_POINTER(1));
-}
-
-static void tooltip_custom_show_now(GtkWidget *widget,
-                                    GtkWindow *window)
-{
-    GtkWidget *toplevel;
-    GdkWindow *toplevel_window;
-    GtkRequisition minimum;
-    GtkRequisition natural;
-    GdkDisplay *display;
-    GdkMonitor *monitor;
-    GdkRectangle workarea;
-    gint widget_x = 0;
-    gint widget_y = 0;
-    gint root_x = 0;
-    gint root_y = 0;
-    gint popup_width;
-    gint popup_height;
-    gint target_x;
-    gint target_y;
-    gint work_left;
-    gint work_top;
-    gint work_right;
-    gint work_bottom;
-    const gint edge_margin = 6;
-    const gint widget_gap = 6;
-    const gint x_inset = 8;
-
-    if(!GTK_IS_WIDGET(widget))
-        return;
-    if(!GTK_IS_WINDOW(window))
-        return;
-
-    toplevel = gtk_widget_get_toplevel(widget);
-    if(!GTK_IS_WINDOW(toplevel))
-        return;
-
-    toplevel_window = gtk_widget_get_window(toplevel);
-    if(!GDK_IS_WINDOW(toplevel_window))
-        return;
-
-    tooltip_custom_cancel_hide(window);
-
-    tooltip_custom_bind_parent(window, GTK_WINDOW(toplevel));
-    gtk_window_set_screen(window, gtk_widget_get_screen(widget));
-
-    if(!gtk_window_is_active(GTK_WINDOW(toplevel))) {
-        gtk_widget_hide(GTK_WIDGET(window));
-        return;
-    }
-
-    if(!gtk_widget_translate_coordinates(widget,
-                                         toplevel,
-                                         0,
-                                         0,
-                                         &widget_x,
-                                         &widget_y))
-    {
-        widget_x = 0;
-        widget_y = 0;
-    }
-
-    gdk_window_get_origin(toplevel_window, &root_x, &root_y);
-    widget_x += root_x;
-    widget_y += root_y;
-
-    gtk_widget_get_preferred_size(GTK_WIDGET(window), &minimum, &natural);
-    popup_width = MAX(1, natural.width);
-    popup_height = MAX(1, natural.height);
-
-    display = gtk_widget_get_display(widget);
-    monitor = gdk_display_get_monitor_at_point(
-        display,
-        widget_x + MAX(1, gtk_widget_get_allocated_width(widget)) / 2,
-        widget_y + MAX(1, gtk_widget_get_allocated_height(widget)) / 2);
-
-    if(monitor) {
-        gdk_monitor_get_workarea(monitor, &workarea);
-    }
+    wanted_data = g_object_get_data(G_OBJECT(widget), VJ_TOOLTIP_WANTED_DATA);
+    if(wanted_data)
+        wanted = GPOINTER_TO_INT(wanted_data) == 2;
     else {
-        GdkScreen *screen = gtk_widget_get_screen(widget);
-        workarea.x = 0;
-        workarea.y = 0;
-        workarea.width = gdk_screen_get_width(screen);
-        workarea.height = gdk_screen_get_height(screen);
+        wanted = gtk_widget_get_has_tooltip(widget);
+        g_object_set_data(G_OBJECT(widget),
+                          VJ_TOOLTIP_WANTED_DATA,
+                          GINT_TO_POINTER(wanted ? 2 : 1));
     }
 
-    work_left = workarea.x + edge_margin;
-    work_top = workarea.y + edge_margin;
-    work_right = workarea.x + workarea.width - edge_margin;
-    work_bottom = workarea.y + workarea.height - edge_margin;
+    gtk_widget_set_has_tooltip(widget, enabled && wanted);
 
-    target_x = widget_x + x_inset;
-    target_y = widget_y +
-               MAX(1, gtk_widget_get_allocated_height(widget)) +
-               widget_gap;
+    if(GTK_IS_MENU_ITEM(widget))
+        submenu = gtk_menu_item_get_submenu(GTK_MENU_ITEM(widget));
+    if(GTK_IS_WIDGET(submenu))
+        vj_gui_tooltip_apply_widget(submenu, enabled);
 
-    if(target_y + popup_height > work_bottom)
-        target_y = widget_y - popup_height - widget_gap;
+    if(GTK_IS_CONTAINER(widget)) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
+        for(GList *node = children; node; node = node->next)
+            vj_gui_tooltip_apply_widget(GTK_WIDGET(node->data), enabled);
+        g_list_free(children);
+    }
+}
 
-    if(popup_width <= work_right - work_left)
-        target_x = CLAMP(target_x, work_left, work_right - popup_width);
-    else
-        target_x = work_left;
+static void vj_gui_tooltip_apply_all(gboolean enabled)
+{
+    GList *windows = gtk_window_list_toplevels();
 
-    if(popup_height <= work_bottom - work_top)
-        target_y = CLAMP(target_y, work_top, work_bottom - popup_height);
-    else
-        target_y = work_top;
+    for(GList *node = windows; node; node = node->next)
+        vj_gui_tooltip_apply_widget(GTK_WIDGET(node->data), enabled);
 
-    gtk_window_resize(window, popup_width, popup_height);
-    gtk_window_move(window, target_x, target_y);
-    gtk_widget_show(GTK_WIDGET(window));
-    gtk_window_move(window, target_x, target_y);
+    g_list_free(windows);
+}
 
+gboolean vj_gui_tooltips_enabled(void)
+{
+    return tooltips_enabled_;
+}
+
+void vj_gui_tooltips_set_enabled(gboolean enabled)
+{
+    tooltips_enabled_ = enabled ? TRUE : FALSE;
+    vj_gui_tooltip_apply_all(tooltips_enabled_);
+}
+
+void vj_gui_widget_set_has_tooltip(GtkWidget *widget, gboolean has_tooltip)
+{
+    gboolean wanted;
+
+    if(!GTK_IS_WIDGET(widget))
+        return;
+
+    wanted = has_tooltip ? TRUE : FALSE;
+    g_object_set_data(G_OBJECT(widget),
+                      VJ_TOOLTIP_WANTED_DATA,
+                      GINT_TO_POINTER(wanted ? 2 : 1));
+    gtk_widget_set_has_tooltip(widget, tooltips_enabled_ && wanted);
+}
+
+void vj_gui_widget_set_tooltip_text(GtkWidget *widget, const char *text)
+{
+    gboolean wanted;
+
+    if(!GTK_IS_WIDGET(widget))
+        return;
+
+    wanted = text && text[0];
+    gtk_widget_set_tooltip_text(widget, wanted ? text : NULL);
+    g_object_set_data(G_OBJECT(widget),
+                      VJ_TOOLTIP_WANTED_DATA,
+                      GINT_TO_POINTER(wanted ? 2 : 1));
+
+    if(!tooltips_enabled_)
+        gtk_widget_set_has_tooltip(widget, FALSE);
+}
+
+void vj_gui_widget_set_tooltip_markup(GtkWidget *widget, const char *markup)
+{
+    gboolean wanted;
+
+    if(!GTK_IS_WIDGET(widget))
+        return;
+
+    wanted = markup && markup[0];
+    gtk_widget_set_tooltip_markup(widget, wanted ? markup : NULL);
+    g_object_set_data(G_OBJECT(widget),
+                      VJ_TOOLTIP_WANTED_DATA,
+                      GINT_TO_POINTER(wanted ? 2 : 1));
+
+    if(!tooltips_enabled_)
+        gtk_widget_set_has_tooltip(widget, FALSE);
 }
 
 gboolean vj_gui_tooltip_set_text(GtkWidget *widget,
                                  GtkTooltip *tooltip,
                                  const char *text)
 {
-    GtkWindow *window;
-    GtkWidget *label;
+    (void)widget;
 
-    if(!GTK_IS_WIDGET(widget) || !text || !text[0])
+    if(!tooltips_enabled_ || !tooltip || !text || !text[0])
         return FALSE;
 
-    window = gtk_widget_get_tooltip_window(widget);
-    label = tooltip_custom_label(window);
-
-    if(GTK_IS_LABEL(label)) {
-        gtk_label_set_text(GTK_LABEL(label), text);
-        gtk_widget_show(label);
-        tooltip_custom_show_now(widget, window);
-        return TRUE;
-    }
-
-    if(tooltip) {
-        gtk_tooltip_set_text(tooltip, text);
-        return TRUE;
-    }
-
-    return FALSE;
+    gtk_tooltip_set_text(tooltip, text);
+    return TRUE;
 }
 
 gboolean vj_gui_tooltip_set_markup(GtkWidget *widget,
                                    GtkTooltip *tooltip,
                                    const char *markup)
 {
-    GtkWindow *window;
-    GtkWidget *label;
+    (void)widget;
 
-    if(!GTK_IS_WIDGET(widget) || !markup || !markup[0])
+    if(!tooltips_enabled_ || !tooltip || !markup || !markup[0])
         return FALSE;
 
-    window = gtk_widget_get_tooltip_window(widget);
-    label = tooltip_custom_label(window);
-
-    if(GTK_IS_LABEL(label)) {
-        gtk_label_set_markup(GTK_LABEL(label), markup);
-        gtk_widget_show(label);
-        tooltip_custom_show_now(widget, window);
-        return TRUE;
-    }
-
-    if(tooltip) {
-        gtk_tooltip_set_markup(tooltip, markup);
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-static gboolean tooltip_static_query(GtkWidget *widget,
-                                     gint x,
-                                     gint y,
-                                     gboolean keyboard_mode,
-                                     GtkTooltip *tooltip,
-                                     gpointer user_data)
-{
-    gchar *markup;
-    gchar *text;
-    gboolean result = FALSE;
-
-    (void)x;
-    (void)y;
-    (void)keyboard_mode;
-    (void)user_data;
-
-    markup = gtk_widget_get_tooltip_markup(widget);
-    if(markup && markup[0])
-        result = vj_gui_tooltip_set_markup(widget, tooltip, markup);
-    g_free(markup);
-
-    if(result)
-        return TRUE;
-
-    text = gtk_widget_get_tooltip_text(widget);
-    if(text && text[0])
-        result = vj_gui_tooltip_set_text(widget, tooltip, text);
-    g_free(text);
-
-    return result;
-}
-
-static void tooltip_install_static_fallback(GtkWidget *widget)
-{
-    gchar *markup;
-    gchar *text;
-    gboolean has_static = FALSE;
-
-    if(!GTK_IS_WIDGET(widget))
-        return;
-    if(g_object_get_data(G_OBJECT(widget), "reloaded-tooltip-static-fallback"))
-        return;
-
-    markup = gtk_widget_get_tooltip_markup(widget);
-    if(markup && markup[0])
-        has_static = TRUE;
-    g_free(markup);
-
-    text = gtk_widget_get_tooltip_text(widget);
-    if(text && text[0])
-        has_static = TRUE;
-    g_free(text);
-
-    if(!has_static)
-        return;
-
-    g_signal_connect(widget,
-                     "query-tooltip",
-                     G_CALLBACK(tooltip_static_query),
-                     NULL);
-    g_object_set_data(G_OBJECT(widget),
-                      "reloaded-tooltip-static-fallback",
-                      GINT_TO_POINTER(1));
-}
-
-static void tooltip_prepare_widget_tree(GtkWidget *widget,
-                                        GtkWindow *tooltip_window,
-                                        GHashTable *visited,
-                                        int *prepared)
-{
-    if(!GTK_IS_WIDGET(widget))
-        return;
-    if(g_hash_table_contains(visited, widget))
-        return;
-
-    g_hash_table_add(visited, widget);
-
-    if(gtk_widget_get_has_tooltip(widget)) {
-        gtk_widget_add_events(widget, RELOADED_TOOLTIP_EVENT_MASK);
-        if(GTK_IS_WINDOW(tooltip_window))
-            gtk_widget_set_tooltip_window(widget, tooltip_window);
-        tooltip_custom_install_lifecycle(widget);
-        tooltip_install_static_fallback(widget);
-        (*prepared)++;
-    }
-
-    if(GTK_IS_CONTAINER(widget)) {
-        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
-        for(GList *node = children; node; node = node->next)
-            tooltip_prepare_widget_tree(GTK_WIDGET(node->data),
-                                        tooltip_window,
-                                        visited,
-                                        prepared);
-        g_list_free(children);
-    }
-}
-
-static void tooltip_rearm_widget_tree(GtkWidget *widget,
-                                      GtkWindow *tooltip_window,
-                                      GHashTable *visited,
-                                      int *rearmed)
-{
-    if(!GTK_IS_WIDGET(widget))
-        return;
-    if(g_hash_table_contains(visited, widget))
-        return;
-
-    g_hash_table_add(visited, widget);
-
-    if(gtk_widget_get_has_tooltip(widget)) {
-        gtk_widget_add_events(widget, RELOADED_TOOLTIP_EVENT_MASK);
-        if(GTK_IS_WINDOW(tooltip_window))
-            gtk_widget_set_tooltip_window(widget, tooltip_window);
-        gtk_widget_set_has_tooltip(widget, FALSE);
-        gtk_widget_set_has_tooltip(widget, TRUE);
-        tooltip_custom_install_lifecycle(widget);
-        tooltip_install_static_fallback(widget);
-        (*rearmed)++;
-    }
-
-    if(GTK_IS_CONTAINER(widget)) {
-        GList *children = gtk_container_get_children(GTK_CONTAINER(widget));
-        for(GList *node = children; node; node = node->next)
-            tooltip_rearm_widget_tree(GTK_WIDGET(node->data),
-                                      tooltip_window,
-                                      visited,
-                                      rearmed);
-        g_list_free(children);
-    }
-}
-
-typedef struct {
-    GtkWidget *root;
-    GtkWindow *tooltip_window;
-} ReloadedTooltipRearm;
-
-static void tooltip_rearm_data_free(gpointer data)
-{
-    ReloadedTooltipRearm *rearm = data;
-
-    if(!rearm)
-        return;
-    if(rearm->root)
-        g_object_unref(rearm->root);
-    if(rearm->tooltip_window)
-        g_object_unref(rearm->tooltip_window);
-    g_free(rearm);
-}
-
-static gboolean tooltip_rearm_widget_idle(gpointer data)
-{
-    ReloadedTooltipRearm *rearm = data;
-    GtkWidget *root = rearm->root;
-    GtkWindow *tooltip_window = rearm->tooltip_window;
-    GHashTable *visited = g_hash_table_new(g_direct_hash, g_direct_equal);
-    int rearmed = 0;
-
-    tooltip_rearm_widget_tree(root, tooltip_window, visited, &rearmed);
-
-
-    g_hash_table_destroy(visited);
-    return G_SOURCE_REMOVE;
-}
-
-static void tooltip_schedule_rearm(GtkWidget *root,
-                                   GtkWindow *tooltip_window)
-{
-    ReloadedTooltipRearm *rearm;
-
-    if(!GTK_IS_WIDGET(root))
-        return;
-    if(!GTK_IS_WINDOW(tooltip_window))
-        return;
-
-    rearm = g_new0(ReloadedTooltipRearm, 1);
-    rearm->root = g_object_ref(root);
-    rearm->tooltip_window = g_object_ref(tooltip_window);
-
-    g_idle_add_full(G_PRIORITY_DEFAULT_IDLE,
-                    tooltip_rearm_widget_idle,
-                    rearm,
-                    tooltip_rearm_data_free);
-}
-
-static void tooltip_rearm_toplevel_map(GtkWidget *widget,
-                                       gpointer user_data)
-{
-    GtkBuilder *builder = GTK_BUILDER(user_data);
-    GtkWindow *tooltip_window;
-
-    if(!builder)
-        return;
-
-    tooltip_window = GTK_WINDOW(g_object_get_data(G_OBJECT(builder),
-                                                   RELOADED_TOOLTIP_WINDOW_DATA));
-    if(!GTK_IS_WINDOW(tooltip_window))
-        return;
-
-
-    tooltip_schedule_rearm(widget, tooltip_window);
-}
-
-
-static void tooltip_rearm_install(GtkBuilder *builder)
-{
-    GSList *objects;
-    int prepared = 0;
-    GHashTable *visited;
-    GtkWindow *tooltip_window;
-
-    if(!builder)
-        return;
-
-    tooltip_window = tooltip_custom_window_new();
-    g_object_set_data_full(G_OBJECT(builder),
-                           RELOADED_TOOLTIP_WINDOW_DATA,
-                           tooltip_window,
-                           g_object_unref);
-
-    visited = g_hash_table_new(g_direct_hash, g_direct_equal);
-    objects = gtk_builder_get_objects(builder);
-    for(GSList *node = objects; node; node = node->next) {
-        if(GTK_IS_WINDOW(node->data))
-            tooltip_prepare_widget_tree(GTK_WIDGET(node->data),
-                                        tooltip_window,
-                                        visited,
-                                        &prepared);
-    }
-    g_hash_table_destroy(visited);
-
-    for(GSList *node = objects; node; node = node->next) {
-        if(!GTK_IS_WINDOW(node->data))
-            continue;
-
-        GtkWidget *window = GTK_WIDGET(node->data);
-        g_signal_connect_after(window,
-                               "map",
-                               G_CALLBACK(tooltip_rearm_toplevel_map),
-                               builder);
-
-        if(gtk_widget_get_mapped(window))
-            tooltip_rearm_toplevel_map(window, builder);
-    }
-
-
-    g_slist_free(objects);
+    gtk_tooltip_set_markup(tooltip, markup);
+    return TRUE;
 }
 
 static void set_tooltip_by_widget(GtkWidget *w, const char *text)
 {
-    GtkWindow *tooltip_window = NULL;
-
-    if(!w)
-        return;
-
-    gtk_widget_set_tooltip_text(w, (text && *text) ? text : NULL);
-
-    if(!text || !*text)
-        return;
-
-    gtk_widget_add_events(w, RELOADED_TOOLTIP_EVENT_MASK);
-
-    if(info && info->main_window)
-        tooltip_window = GTK_WINDOW(g_object_get_data(
-            G_OBJECT(info->main_window),
-            RELOADED_TOOLTIP_WINDOW_DATA));
-
-    if(GTK_IS_WINDOW(tooltip_window))
-        gtk_widget_set_tooltip_window(w, tooltip_window);
+    vj_gui_widget_set_tooltip_text(w, text);
 }
 
 static int combo_model_string_column(GtkTreeModel *model)
@@ -5973,7 +5449,7 @@ static GtkWidget *ui_transition_shape_selector_replace(int cache_id)
                      "shape-changed",
                      G_CALLBACK(on_transition_shape_selected),
                      NULL);
-    gtk_widget_set_tooltip_text(selector,
+    vj_gui_widget_set_tooltip_text(selector,
                                 "Select the Shape Wipe mask used when this source transitions to the next source.");
     gtk_widget_show_all(selector);
     return selector;
@@ -10478,7 +9954,7 @@ static void fx_chain_panel_toggle_mount(void)
     gtk_widget_show(image);
     gtk_widget_set_size_request(toggle, 28, 26);
     gtk_widget_set_valign(toggle, GTK_ALIGN_CENTER);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         toggle,
         "Enable or disable the current Sample or Stream/Tag FX chain");
 
@@ -20870,7 +20346,7 @@ static void fx_beat_owner_set_guarded(int param, int active, int sensitive, int 
              (name && name[0]) ? " — " : "",
              (name && name[0]) ? name : "");
 
-    gtk_widget_set_tooltip_text(w, tip);
+    vj_gui_widget_set_tooltip_text(w, tip);
 }
 
 static void fx_beat_owner_clear_all(void)
@@ -20908,7 +20384,7 @@ static void fx_auto_clear_param_beat_ui(int param)
     if(GTK_IS_LABEL(glyph))
     {
         gtk_label_set_text(GTK_LABEL(glyph), " ");
-        gtk_widget_set_tooltip_text(glyph,
+        vj_gui_widget_set_tooltip_text(glyph,
             "Auto FX beat hint glyph. Colored sliders are controlled by Auto FX.\n\n"
             "● Bass\n"
             "▬ Mid\n"
@@ -20986,7 +20462,7 @@ static void fx_auto_update_param_beat_ui(int effect_id,
             hint->soft_min,
             hint->soft_max);
 
-        gtk_widget_set_tooltip_text(glyph, tip);
+        vj_gui_widget_set_tooltip_text(glyph, tip);
     }
 }
 
@@ -21107,7 +20583,7 @@ static void disable_fx_entry(void) {
     {
         update_slider_range2( widget_cache[WIDGET_SLIDER_P0 + i], min,max, value, 0 );
         gtk_widget_set_sensitive_( widget_cache[WIDGET_SLIDER_BOX_P0 + i], FALSE );
-        gtk_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], NULL);
+        vj_gui_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], NULL);
 
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 +i ]), "");
 
@@ -21135,17 +20611,17 @@ static void update_source_fx_entry_tooltip(int fx_id)
         return;
 
     if(fx_is_alpha_blend(fx_id)) {
-        gtk_widget_set_tooltip_text(
+        vj_gui_widget_set_tooltip_text(
             w,
             "Render B through its FX chain before blending. Enable this when B's Alpha / Matte effects create the mask; B is fully opaque when no mask exists.");
     }
     else if(_effect_get_mix(fx_id)) {
-        gtk_widget_set_tooltip_text(
+        vj_gui_widget_set_tooltip_text(
             w,
             "Render the selected mixing source through its own FX chain before it is used as source B. The global source-FX master is enabled automatically.");
     }
     else {
-        gtk_widget_set_tooltip_text(
+        vj_gui_widget_set_tooltip_text(
             w,
             "Source-FX rendering is available only for effects that use a mixing source.");
     }
@@ -21257,7 +20733,7 @@ static void enable_fx_entry(void) {
             gtk_widget_show_all(widget_cache[WIDGET_FRAME_P0 + i]);
 
         gchar *tt1 = _effect_get_param_description(entry_tokens[ENTRY_FXID],i);
-        gtk_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], tt1 );
+        vj_gui_widget_set_tooltip_text( widget_cache[WIDGET_SLIDER_P0 + i], tt1 );
         gtk_label_set_text( GTK_LABEL( widget_cache[WIDGET_LABEL_P0 + i ] ), tt1 );
 
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
@@ -21306,7 +20782,7 @@ static void enable_fx_entry(void) {
         if(faster_ui_ || i >= MAX_VISIBLE_FX_PARAMETERS)
             gtk_widget_hide(widget_cache[WIDGET_FRAME_P0 + i]);
 
-        gtk_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], NULL);
+        vj_gui_widget_set_tooltip_text(widget_cache[WIDGET_SLIDER_P0 + i], NULL);
         gtk_label_set_text(GTK_LABEL(widget_cache[WIDGET_LABEL_P0 + i]), "");
 
         if(i < AUTO_FX_BEAT_UI_PARAMETERS)
@@ -21666,7 +21142,7 @@ void vj_gui_update_sync_samplelist_sensitivity(void)
 
     if(w) {
         gtk_widget_set_sensitive(w, sync_possible);
-        gtk_widget_set_tooltip_text(w,
+        vj_gui_widget_set_tooltip_text(w,
             master ?
             "Network samplelist sync is disabled on the master output instance. Connect Reloaded to the preview/editor instance." :
             upstream ?
@@ -23796,7 +23272,7 @@ static GtkWidget *detachable_make_tab_label(GtkWidget *page, const gchar *title)
     gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
     gtk_label_set_single_line_mode(GTK_LABEL(label), TRUE);
     gtk_container_add(GTK_CONTAINER(event_box), label);
-    gtk_widget_set_tooltip_text(event_box, "Right click to detach or reattach this panel");
+    vj_gui_widget_set_tooltip_text(event_box, "Right click to detach or reattach this panel");
     g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_TAB_READY, GINT_TO_POINTER(1));
     g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_TAB_PAGE, page);
     g_signal_connect(event_box, "button-press-event", G_CALLBACK(detachable_tab_button_press), page);
@@ -23963,7 +23439,7 @@ static GtkWidget *detachable_make_placeholder(GtkWidget *page, const gchar *titl
     gtk_widget_set_vexpand(event_box, TRUE);
     gtk_widget_set_halign(event_box, GTK_ALIGN_FILL);
     gtk_widget_set_valign(event_box, GTK_ALIGN_FILL);
-    gtk_widget_set_tooltip_text(event_box, "This page is detached. Left click to show it, right click to reattach it.");
+    vj_gui_widget_set_tooltip_text(event_box, "This page is detached. Left click to show it, right click to reattach it.");
     g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_IS_PLACEHOLDER, GINT_TO_POINTER(1));
     g_object_set_data(G_OBJECT(event_box), VJ_DETACH_DATA_PLACEHOLDER_PAGE, page);
     g_signal_connect(event_box, "button-press-event", G_CALLBACK(detachable_placeholder_press), page);
@@ -25076,11 +24552,14 @@ static void detachable_restore_default_window_configuration(GtkMenuItem *item, g
 #define APPEARANCE_CONFIG_GROUP "Appearance"
 #define APPEARANCE_CONFIG_FONT_FAMILY "FontFamily"
 #define APPEARANCE_CONFIG_FONT_SIZE "FontSize"
+#define APPEARANCE_CONFIG_TOOLTIPS "Tooltips"
 #define APPEARANCE_FONT_SIZE_MIN 6
 #define APPEARANCE_FONT_SIZE_MAX 32
 
 static gchar *appearance_default_font_name_ = NULL;
 static gchar *appearance_saved_font_name_ = NULL;
+static gboolean appearance_saved_tooltips_ = TRUE;
+static gboolean appearance_saved_tooltips_valid_ = FALSE;
 
 typedef struct
 {
@@ -25089,7 +24568,9 @@ typedef struct
     GtkWidget *size_spin;
     GtkWidget *preview_label;
     GtkWidget *live_toggle;
+    GtkWidget *tooltip_toggle;
     gchar *baseline_font_name;
+    gboolean baseline_tooltips;
     gboolean updating;
 } appearance_dialog_t;
 
@@ -25247,6 +24728,49 @@ static gchar *appearance_load_saved_font_name(void)
     return font_name;
 }
 
+static gboolean appearance_load_saved_tooltips(gboolean *found)
+{
+    GKeyFile *key_file = g_key_file_new();
+    gchar *path = appearance_config_path();
+    GError *error = NULL;
+    gboolean enabled = TRUE;
+
+    if(found)
+        *found = FALSE;
+
+    if(!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, &error)) {
+        g_clear_error(&error);
+        g_key_file_free(key_file);
+        g_free(path);
+        return TRUE;
+    }
+
+    if(g_key_file_has_key(key_file,
+                          APPEARANCE_CONFIG_GROUP,
+                          APPEARANCE_CONFIG_TOOLTIPS,
+                          NULL)) {
+        enabled = g_key_file_get_boolean(key_file,
+                                         APPEARANCE_CONFIG_GROUP,
+                                         APPEARANCE_CONFIG_TOOLTIPS,
+                                         &error);
+        if(error) {
+            vj_msg(VEEJAY_MSG_WARNING,
+                   "Invalid tooltip setting in interface appearance file %s: %s",
+                   path,
+                   error->message);
+            g_clear_error(&error);
+            enabled = TRUE;
+        }
+        else if(found)
+            *found = TRUE;
+    }
+
+    g_key_file_free(key_file);
+    g_free(path);
+    return enabled;
+}
+
+
 static gboolean appearance_save_font_name(const gchar *font_name)
 {
     GKeyFile *key_file;
@@ -25264,7 +24788,7 @@ static gboolean appearance_save_font_name(const gchar *font_name)
     key_file = g_key_file_new();
     path = appearance_config_path();
 
-    g_key_file_set_string(key_file, APPEARANCE_CONFIG_GROUP, "Format", "1");
+    g_key_file_set_string(key_file, APPEARANCE_CONFIG_GROUP, "Format", "2");
     g_key_file_set_string(key_file,
                           APPEARANCE_CONFIG_GROUP,
                           APPEARANCE_CONFIG_FONT_FAMILY,
@@ -25273,11 +24797,17 @@ static gboolean appearance_save_font_name(const gchar *font_name)
                            APPEARANCE_CONFIG_GROUP,
                            APPEARANCE_CONFIG_FONT_SIZE,
                            size);
+    g_key_file_set_boolean(key_file,
+                           APPEARANCE_CONFIG_GROUP,
+                           APPEARANCE_CONFIG_TOOLTIPS,
+                           vj_gui_tooltips_enabled());
 
     data = g_key_file_to_data(key_file, &length, &error);
     if(data && g_file_set_contents(path, data, length, &error)) {
         g_free(appearance_saved_font_name_);
         appearance_saved_font_name_ = g_strdup(font_name);
+        appearance_saved_tooltips_ = vj_gui_tooltips_enabled();
+        appearance_saved_tooltips_valid_ = TRUE;
         vj_msg(VEEJAY_MSG_INFO, "Saved interface appearance to %s", path);
         saved = TRUE;
     }
@@ -25306,6 +24836,12 @@ static void appearance_preferences_bootstrap(void)
 
     if(appearance_saved_font_name_)
         appearance_apply_font_name(appearance_saved_font_name_);
+
+    appearance_saved_tooltips_ =
+        appearance_load_saved_tooltips(&appearance_saved_tooltips_valid_);
+    vj_gui_tooltips_set_enabled(appearance_saved_tooltips_valid_
+                                    ? appearance_saved_tooltips_
+                                    : TRUE);
 }
 
 static gchar *appearance_dialog_font_name(appearance_dialog_t *ctx)
@@ -25389,6 +24925,33 @@ static void appearance_dialog_live_toggled(GtkToggleButton *toggle, gpointer use
         appearance_apply_font_name(ctx->baseline_font_name);
 }
 
+static gboolean appearance_dialog_tooltips_enabled(appearance_dialog_t *ctx)
+{
+    return gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(ctx->tooltip_toggle));
+}
+
+static void appearance_dialog_set_tooltips(appearance_dialog_t *ctx,
+                                           gboolean enabled)
+{
+    ctx->updating = TRUE;
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ctx->tooltip_toggle),
+                                 enabled ? TRUE : FALSE);
+    ctx->updating = FALSE;
+    vj_gui_tooltips_set_enabled(enabled);
+}
+
+static void appearance_dialog_tooltips_toggled(GtkToggleButton *toggle,
+                                               gpointer user_data)
+{
+    appearance_dialog_t *ctx = (appearance_dialog_t *) user_data;
+
+    if(!ctx || ctx->updating)
+        return;
+
+    vj_gui_tooltips_set_enabled(gtk_toggle_button_get_active(toggle));
+}
+
+
 static appearance_dialog_t *appearance_dialog_new(GtkWindow *parent)
 {
     appearance_dialog_t *ctx = g_new0(appearance_dialog_t, 1);
@@ -25469,6 +25032,14 @@ static appearance_dialog_t *appearance_dialog_new(GtkWindow *parent)
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ctx->live_toggle), TRUE);
     gtk_box_pack_start(GTK_BOX(content), ctx->live_toggle, FALSE, FALSE, 0);
 
+    ctx->tooltip_toggle = gtk_check_button_new_with_label("Show tooltips");
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(ctx->tooltip_toggle),
+                                 vj_gui_tooltips_enabled());
+    vj_gui_widget_set_tooltip_text(
+        ctx->tooltip_toggle,
+        "Enable or disable all Reloaded tooltips, including dynamic timeline and bank tooltips.");
+    gtk_box_pack_start(GTK_BOX(content), ctx->tooltip_toggle, FALSE, FALSE, 0);
+
     hint = gtk_label_new("Saved in ~/.veejay/reloaded-ui.ini. Controls with an explicit monospace font keep that font.");
     gtk_label_set_line_wrap(GTK_LABEL(hint), TRUE);
     g_object_set(hint, "xalign", 0.0f, NULL);
@@ -25476,6 +25047,7 @@ static appearance_dialog_t *appearance_dialog_new(GtkWindow *parent)
     gtk_box_pack_start(GTK_BOX(content), hint, FALSE, FALSE, 0);
 
     ctx->baseline_font_name = appearance_current_font_name();
+    ctx->baseline_tooltips = vj_gui_tooltips_enabled();
     appearance_dialog_set_font(ctx, ctx->baseline_font_name);
 
     g_signal_connect(ctx->font_button,
@@ -25490,10 +25062,14 @@ static appearance_dialog_t *appearance_dialog_new(GtkWindow *parent)
                      "toggled",
                      G_CALLBACK(appearance_dialog_live_toggled),
                      ctx);
+    g_signal_connect(ctx->tooltip_toggle,
+                     "toggled",
+                     G_CALLBACK(appearance_dialog_tooltips_toggled),
+                     ctx);
 
     GtkWidget *saved_button = gtk_dialog_get_widget_for_response(GTK_DIALOG(ctx->dialog),
                                                                  APPEARANCE_RESPONSE_SAVED);
-    gtk_widget_set_sensitive(saved_button, appearance_saved_font_name_ != NULL);
+    gtk_widget_set_sensitive(saved_button, appearance_saved_font_name_ != NULL || appearance_saved_tooltips_valid_);
 
     gtk_widget_show_all(content);
     return ctx;
@@ -25524,28 +25100,39 @@ static void appearance_preferences_show(GtkMenuItem *item, gpointer user_data)
         switch(response) {
             case APPEARANCE_RESPONSE_DEFAULTS:
                 appearance_dialog_set_font(ctx, appearance_default_font_name_);
+                appearance_dialog_set_tooltips(ctx, TRUE);
                 break;
             case APPEARANCE_RESPONSE_SAVED: {
                 gchar *saved = appearance_load_saved_font_name();
+                gboolean found = FALSE;
+                gboolean saved_tooltips = appearance_load_saved_tooltips(&found);
+
                 if(saved) {
                     g_free(appearance_saved_font_name_);
                     appearance_saved_font_name_ = g_strdup(saved);
                     appearance_dialog_set_font(ctx, saved);
                     g_free(saved);
                 }
+
+                appearance_saved_tooltips_ = saved_tooltips;
+                appearance_saved_tooltips_valid_ = found;
+                appearance_dialog_set_tooltips(ctx, found ? saved_tooltips : TRUE);
                 break;
             }
             case APPEARANCE_RESPONSE_APPLY: {
                 gchar *font_name = appearance_dialog_font_name(ctx);
                 appearance_apply_font_name(font_name);
+                vj_gui_tooltips_set_enabled(appearance_dialog_tooltips_enabled(ctx));
                 g_free(ctx->baseline_font_name);
                 ctx->baseline_font_name = g_strdup(font_name);
+                ctx->baseline_tooltips = vj_gui_tooltips_enabled();
                 g_free(font_name);
                 break;
             }
             case GTK_RESPONSE_ACCEPT: {
                 gchar *font_name = appearance_dialog_font_name(ctx);
                 appearance_apply_font_name(font_name);
+                vj_gui_tooltips_set_enabled(appearance_dialog_tooltips_enabled(ctx));
                 appearance_save_font_name(font_name);
                 g_free(font_name);
                 done = TRUE;
@@ -25553,6 +25140,7 @@ static void appearance_preferences_show(GtkMenuItem *item, gpointer user_data)
             }
             default:
                 appearance_apply_font_name(ctx->baseline_font_name);
+                vj_gui_tooltips_set_enabled(ctx->baseline_tooltips);
                 done = TRUE;
                 break;
         }
@@ -25597,7 +25185,7 @@ static GtkWidget *window_configuration_menu_item_new(const char *name,
 {
     GtkWidget *item = gtk_menu_item_new_with_label(label);
     gtk_widget_set_name(item, name);
-    gtk_widget_set_tooltip_text(item, tooltip);
+    vj_gui_widget_set_tooltip_text(item, tooltip);
     g_signal_connect(item, "activate", cb, NULL);
     return item;
 }
@@ -25655,7 +25243,7 @@ static void init_window_configuration_menu(void)
         gtk_widget_set_name(sep, "window_layout_menu_separator");
         layout_item = gtk_menu_item_new_with_label("Window Layout");
         gtk_widget_set_name(layout_item, "window_layout_menu_item");
-        gtk_widget_set_tooltip_text(layout_item, "Save or restore detached panel window layout");
+        vj_gui_widget_set_tooltip_text(layout_item, "Save or restore detached panel window layout");
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), sep);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), layout_item);
         gtk_widget_show(sep);
@@ -25963,7 +25551,7 @@ void vj_gui_init(const char *glade_file,
     gtk_window_set_default(GTK_WINDOW(connection_dial), vj_button);
 
     gtk_builder_connect_signals( gui->main_window , NULL);
-    tooltip_rearm_install(gui->main_window);
+    vj_gui_tooltips_set_enabled(vj_gui_tooltips_enabled());
     fx_chain_panel_toggle_mount();
     fx_chain_controls_sync_from_status(info->status_tokens[PLAY_MODE],
                                        info->status_tokens[SAMPLE_FX]);
@@ -26431,7 +26019,7 @@ static void veejay_show_main_ui(vj_gui_t *gui)
     if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
         gtk_window_move( GTK_WINDOW(mw), geo_pos_[0], geo_pos_[1] );
     reloaded_present_window(mw);
-    tooltip_rearm_toplevel_map(mw, info->main_window);
+    vj_gui_tooltips_set_enabled(vj_gui_tooltips_enabled());
     ui_window_set_startup_size(mw);
 
     if(info->client &&
@@ -28174,7 +27762,7 @@ static void create_sequencer_slots(int nx, int ny)
     if(button) {
         add_class(button, "sequence-play-grid");
         gtk_button_set_label(GTK_BUTTON(button), "Play Grid");
-        gtk_widget_set_tooltip_text(button,
+        vj_gui_widget_set_tooltip_text(button,
             "Start or stop playback of the checked sequence-bank chain. Playback begins with the active bank and repeats the checked banks.");
     }
 
@@ -28182,7 +27770,7 @@ static void create_sequencer_slots(int nx, int ny)
     add_class(button, "sequence-queue-toggle");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "toggled", G_CALLBACK(on_sequence_queue_mode_toggled), NULL);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
         "Off: selecting a bank switches immediately. On: while Play Grid is running, selecting a populated non-active bank queues it until the current bank completes; selecting another bank replaces the queue, and selecting the queued bank again cancels it. When Play Grid is stopped, selecting a populated bank starts it immediately. Empty banks cannot be queued.");
     gtk_widget_show_all(button);
 
@@ -28196,7 +27784,7 @@ static void create_sequencer_slots(int nx, int ny)
         sequence_ui_bank_buttons[bank] = button;
         gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
         g_signal_connect(G_OBJECT(button), "toggled", G_CALLBACK(on_sequence_bank_button_toggled), GINT_TO_POINTER(bank));
-        gtk_widget_set_tooltip_text(button,
+        vj_gui_widget_set_tooltip_text(button,
             "Check to include this bank in Play Grid. Checking also selects it. With Wait End enabled during playback, a populated non-active bank is queued; selecting another replaces it, and unchecking the queued bank cancels it. When Play Grid is stopped, checking a populated bank starts it immediately. Empty banks cannot be queued. The active bank remains checked.");
         gtk_widget_show(button);
     }
@@ -28207,7 +27795,7 @@ static void create_sequencer_slots(int nx, int ny)
     add_class(button, "sequence-clear-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_clear_clicked), NULL);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
         "Erase every slot in the selected bank. Other banks are unchanged; an armed queue to this bank is cancelled when it becomes empty.");
     gtk_widget_show(button);
 
@@ -28215,7 +27803,7 @@ static void create_sequencer_slots(int nx, int ny)
     add_class(button, "sequence-delete-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_delete_clicked), NULL);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
         "Remove the selected non-active bank from the checked playback chain without erasing its slots. The active bank cannot be removed; removing the queued bank cancels the queue.");
     gtk_widget_show(button);
 
@@ -28223,7 +27811,7 @@ static void create_sequencer_slots(int nx, int ny)
     add_class(button, "sequence-copy-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_copy_clicked), NULL);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
         "Copy all slots from the selected bank to the sequence-bank clipboard.");
     gtk_widget_show(button);
 
@@ -28231,7 +27819,7 @@ static void create_sequencer_slots(int nx, int ny)
     add_class(button, "sequence-paste-bank");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_paste_clicked), NULL);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
         "Replace the selected bank with the copied bank contents.");
     gtk_widget_show(button);
 
@@ -28239,7 +27827,7 @@ static void create_sequencer_slots(int nx, int ny)
     add_class(button, "sequence-refresh");
     gtk_box_pack_start(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(G_OBJECT(button), "clicked", G_CALLBACK(on_sequence_bank_refresh_clicked), NULL);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
         "Reload all four sequence banks and their active, checked, playing, and queued state from the backend.");
     gtk_widget_show(button);
 
@@ -28290,14 +27878,14 @@ static void create_sequencer_slots(int nx, int ny)
     button = sequence_toolbar_pack_existing(progress_row, "rec_seq_start", FALSE, FALSE, 0);
     if(button) {
         add_class(button, "sequence-record-start");
-        gtk_widget_set_tooltip_text(button,
+        vj_gui_widget_set_tooltip_text(button,
             "Start Play Grid and record its output to a new sample.");
     }
 
     button = sequence_toolbar_pack_existing(progress_row, "seq_rec_stop", FALSE, FALSE, 0);
     if(button) {
         add_class(button, "sequence-record-stop");
-        gtk_widget_set_tooltip_text(button,
+        vj_gui_widget_set_tooltip_text(button,
             "Stop the current sequence recording. Play Grid playback continues until stopped separately.");
     }
 
@@ -28305,7 +27893,7 @@ static void create_sequencer_slots(int nx, int ny)
     if(button) {
         add_class(button, "sequence-record-progress");
         gtk_widget_set_size_request(button, -1, -1);
-        gtk_widget_set_tooltip_text(button,
+        vj_gui_widget_set_tooltip_text(button,
             "Progress of the current Play Grid recording.");
     }
     g_signal_connect(G_OBJECT(info->sequence_bank_view), "bank-selected", G_CALLBACK(on_sequence_bank_view_bank_selected), NULL);

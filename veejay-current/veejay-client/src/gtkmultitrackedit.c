@@ -902,6 +902,24 @@ static void gvr_mt_update_transition_ui(GvrMultiTrackEdit *view)
         gvr_mt_remove_class(view->transition_progress, "multi-track-transition-active");
 }
 
+static void gvr_mt_set_tooltip_if_changed(GtkWidget *widget, const char *text)
+{
+    const char *cached;
+
+    if(!widget)
+        return;
+
+    cached = g_object_get_data(G_OBJECT(widget), "gvr-mt-tooltip-cache");
+    if(g_strcmp0(cached, text) == 0)
+        return;
+
+    vj_gui_widget_set_tooltip_text(widget, text);
+    g_object_set_data_full(G_OBJECT(widget),
+                           "gvr-mt-tooltip-cache",
+                           g_strdup(text),
+                           g_free);
+}
+
 static void gvr_mt_update_lane_header(GvrMultiTrackEdit *view, int track)
 {
     GvrMultiTrackLane *lane;
@@ -1002,7 +1020,7 @@ static void gvr_mt_update_lane_header(GvrMultiTrackEdit *view, int track)
 
     gtk_label_set_text(GTK_LABEL(lane->title_label), title);
     gtk_label_set_text(GTK_LABEL(lane->status_label), status);
-    gtk_widget_set_tooltip_text(lane->row_event, tip);
+    gvr_mt_set_tooltip_if_changed(lane->row_event, tip);
 
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(lane->a_button),
                                  lane->project_master);
@@ -1025,10 +1043,10 @@ static void gvr_mt_update_lane_header(GvrMultiTrackEdit *view, int track)
                              !lane->project_master &&
                              !view->transition_active &&
                              view->active_bus == 0);
-    gtk_widget_set_tooltip_text(
+    gvr_mt_set_tooltip_if_changed(
         lane->a_button,
         "Bus A is fixed to the Video 1 project master and dry compositor source. This is separate from VeeJay's --master output role.");
-    gtk_widget_set_tooltip_text(
+    gvr_mt_set_tooltip_if_changed(
         lane->b_button,
         lane->connected ?
             (view->active_bus == 1 ?
@@ -1041,7 +1059,7 @@ static void gvr_mt_update_lane_header(GvrMultiTrackEdit *view, int track)
                                  lane->preview_enabled);
     gvr_mt_set_preview_icon(lane->preview_toggle, lane->preview_enabled);
     gtk_widget_set_sensitive(lane->preview_toggle, lane->connected);
-    gtk_widget_set_tooltip_text(
+    gvr_mt_set_tooltip_if_changed(
         lane->preview_toggle,
         lane->connected ?
             "Toggle this lane preview. The eye button does not affect the on-air output." :
@@ -1051,14 +1069,14 @@ static void gvr_mt_update_lane_header(GvrMultiTrackEdit *view, int track)
     if(lane->current_control) {
         gvr_mt_set_switch_icon(lane->switch_button, TRUE);
         gtk_widget_set_sensitive(lane->switch_button, FALSE);
-        gtk_widget_set_tooltip_text(
+        gvr_mt_set_tooltip_if_changed(
             lane->switch_button,
             "The main Reloaded controls already operate this VeeJay instance.");
     }
     else {
         gvr_mt_set_switch_icon(lane->switch_button, FALSE);
         gtk_widget_set_sensitive(lane->switch_button, lane->connected);
-        gtk_widget_set_tooltip_text(
+        gvr_mt_set_tooltip_if_changed(
             lane->switch_button,
             "Switch the main Reloaded controls to this VeeJay instance. "
             "The on-air output and project-master clock remain unchanged.");
@@ -2916,10 +2934,15 @@ static gboolean gvr_mt_query_tooltip(GtkWidget *widget,
     char timecode[32];
     char text[256];
 
-    (void)keyboard_mode;
     gtk_widget_get_allocation(widget, &allocation);
-    frame = gvr_mt_x_to_frame(view, x, allocation.width);
-    track = gvr_mt_track_at_y(view, y);
+    if(keyboard_mode) {
+        frame = view->playhead_active ? view->playhead : view->timeline_view_start;
+        track = view->selected_track;
+    }
+    else {
+        frame = gvr_mt_x_to_frame(view, x, allocation.width);
+        track = gvr_mt_track_at_y(view, y);
+    }
     gvr_mt_timecode(view, frame, timecode, sizeof(timecode));
 
     if(track >= 0 && track < view->max_tracks) {
@@ -3837,9 +3860,9 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     view->bus_b_label = gtk_label_new("B  —");
     gvr_mt_add_class(view->bus_a_label, "multi-track-transition-a");
     gvr_mt_add_class(view->bus_b_label, "multi-track-transition-b");
-    gtk_widget_set_tooltip_text(view->bus_a_label,
+    vj_gui_widget_set_tooltip_text(view->bus_a_label,
                                 "Source assigned to Bus A. The on-air bus is marked explicitly.");
-    gtk_widget_set_tooltip_text(view->bus_b_label,
+    vj_gui_widget_set_tooltip_text(view->bus_b_label,
                                 "Source assigned to Bus B. The on-air bus is marked explicitly.");
     gtk_box_pack_start(GTK_BOX(transition_bar), view->bus_a_label, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(transition_bar), gtk_label_new("⇄"), FALSE, FALSE, 0);
@@ -3853,7 +3876,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     gtk_combo_box_set_active(GTK_COMBO_BOX(view->transition_method_combo),
                              VJ_MULTITRACK_TRANSITION_DISSOLVE);
     gvr_mt_add_class(view->transition_method_combo, "multi-track-transition-method");
-    gtk_widget_set_tooltip_text(view->transition_method_combo,
+    vj_gui_widget_set_tooltip_text(view->transition_method_combo,
                                 "Select the A/B transition operator.");
     g_signal_connect(view->transition_method_combo,
                      "changed",
@@ -3881,7 +3904,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     gtk_entry_set_width_chars(GTK_ENTRY(view->transition_duration_spin), 4);
     view->transition_duration_time = gtk_label_new("1.00 s");
     gvr_mt_add_class(view->transition_duration_time, "multi-track-transition-time");
-    gtk_widget_set_tooltip_text(view->transition_duration_spin,
+    vj_gui_widget_set_tooltip_text(view->transition_duration_spin,
                                 "Transition duration measured in rendered output frames.");
     g_signal_connect(view->transition_duration_spin,
                      "value-changed",
@@ -3895,9 +3918,9 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     view->transition_take_button = gtk_button_new_with_label("TAKE");
     gvr_mt_add_class(view->transition_cut_button, "multi-track-transition-cut");
     gvr_mt_add_class(view->transition_take_button, "multi-track-transition-take");
-    gtk_widget_set_tooltip_text(view->transition_cut_button,
+    vj_gui_widget_set_tooltip_text(view->transition_cut_button,
                                 "Cut immediately from the on-air bus to the other assigned bus.");
-    gtk_widget_set_tooltip_text(view->transition_take_button,
+    vj_gui_widget_set_tooltip_text(view->transition_take_button,
                                 "Run the selected operator from the on-air bus to the other assigned bus.");
     g_signal_connect(view->transition_cut_button,
                      "clicked",
@@ -3918,7 +3941,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
 
     view->drift_toggle = gtk_check_button_new_with_label("Drift Lock");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(view->drift_toggle), TRUE);
-    gtk_widget_set_tooltip_text(view->drift_toggle,
+    vj_gui_widget_set_tooltip_text(view->drift_toggle,
                                 "Preserve each follower's relative phase against the project-master clock. Small accumulated timing errors are nudged without forcing matching start positions.");
     g_signal_connect(view->drift_toggle,
                      "toggled",
@@ -3947,10 +3970,10 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     gtk_range_set_value(GTK_RANGE(view->zoom_scale), 1.0);
     gtk_widget_set_size_request(view->zoom_scale, 180, -1);
     view->zoom_label = gtk_label_new("1.0x");
-    gtk_widget_set_tooltip_text(view->zoom_out_button, "Zoom out on the project timeline.");
-    gtk_widget_set_tooltip_text(view->zoom_in_button, "Zoom in on the project timeline.");
-    gtk_widget_set_tooltip_text(view->zoom_fit_button, "Fit the complete sequence bank.");
-    gtk_widget_set_tooltip_text(view->zoom_scale, "Timeline zoom. Ctrl+mouse wheel also zooms.");
+    vj_gui_widget_set_tooltip_text(view->zoom_out_button, "Zoom out on the project timeline.");
+    vj_gui_widget_set_tooltip_text(view->zoom_in_button, "Zoom in on the project timeline.");
+    vj_gui_widget_set_tooltip_text(view->zoom_fit_button, "Fit the complete sequence bank.");
+    vj_gui_widget_set_tooltip_text(view->zoom_scale, "Timeline zoom. Ctrl+mouse wheel also zooms.");
     g_signal_connect(view->zoom_out_button, "clicked", G_CALLBACK(gvr_mt_zoom_out), view);
     g_signal_connect(view->zoom_in_button, "clicked", G_CALLBACK(gvr_mt_zoom_in), view);
     g_signal_connect(view->zoom_fit_button, "clicked", G_CALLBACK(gvr_mt_zoom_fit), view);
@@ -3991,7 +4014,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
         gtk_label_new("VeeJay instances · Switch = full control");
     gtk_widget_set_halign(instance_label, GTK_ALIGN_START);
     gtk_label_set_ellipsize(GTK_LABEL(instance_label), PANGO_ELLIPSIZE_END);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         instance_label,
         "Switch changes which VeeJay instance is operated by the main Reloaded controls. "
         "It does not change the project-master timeline.");
@@ -4009,7 +4032,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     gtk_widget_set_vexpand(view->timeline_scroll, TRUE);
     view->timeline_area = gtk_drawing_area_new();
     gtk_widget_set_can_focus(view->timeline_area, TRUE);
-    gtk_widget_set_has_tooltip(view->timeline_area, TRUE);
+    vj_gui_widget_set_has_tooltip(view->timeline_area, TRUE);
     gtk_widget_add_events(view->timeline_area,
                           GDK_BUTTON_PRESS_MASK |
                           GDK_BUTTON_RELEASE_MASK |
@@ -4082,7 +4105,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
                      "button-press-event",
                      G_CALLBACK(gvr_mt_navigator_button),
                      view);
-    gtk_widget_set_tooltip_text(view->navigator,
+    vj_gui_widget_set_tooltip_text(view->navigator,
                                 "Sequence-bank overview. Click to move the visible timeline window.");
     gtk_box_pack_start(GTK_BOX(view), view->navigator, FALSE, TRUE, 0);
 
@@ -4099,7 +4122,7 @@ static void gvr_multi_track_edit_init(GvrMultiTrackEdit *view)
     view->pan_scrollbar = gtk_scrollbar_new(GTK_ORIENTATION_HORIZONTAL,
                                             view->pan_adjustment);
     gtk_widget_set_size_request(view->pan_scrollbar, -1, 11);
-    gtk_widget_set_tooltip_text(view->pan_scrollbar,
+    vj_gui_widget_set_tooltip_text(view->pan_scrollbar,
                                 "Pan the zoomed project timeline.");
     gtk_box_pack_start(GTK_BOX(view), view->pan_scrollbar, FALSE, TRUE, 0);
 
@@ -4261,9 +4284,9 @@ void gvr_multi_track_edit_set_connection_topology(
     gtk_label_set_markup(GTK_LABEL(view->connection_role_label), role);
     gtk_label_set_text(GTK_LABEL(view->connection_path_label), path);
     gtk_label_set_text(GTK_LABEL(view->connection_state_label), state);
-    gtk_widget_set_tooltip_text(view->connection_role_label, tip);
-    gtk_widget_set_tooltip_text(view->connection_path_label, tip);
-    gtk_widget_set_tooltip_text(view->connection_state_label, tip);
+    gvr_mt_set_tooltip_if_changed(view->connection_role_label, tip);
+    gvr_mt_set_tooltip_if_changed(view->connection_path_label, tip);
+    gvr_mt_set_tooltip_if_changed(view->connection_state_label, tip);
 }
 
 void gvr_multi_track_edit_set_shape_catalog(GtkWidget *widget,
@@ -4502,7 +4525,7 @@ void gvr_multi_track_edit_set_seekability(GtkWidget *widget,
             gtk_grab_remove(view->timeline_area);
     }
 
-    gtk_widget_set_tooltip_text(
+    gvr_mt_set_tooltip_if_changed(
         view->timeline_area,
         view->transport_seekable ?
             "Click or drag the playhead to seek the active transport." :

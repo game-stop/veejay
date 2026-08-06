@@ -1089,6 +1089,7 @@ static gboolean gvr_vims_list_query_tooltip(GtkWidget *widget,
     int index = -1;
     gpointer entry;
     gchar *text;
+    gboolean result;
     (void)widget;
     (void)x;
 
@@ -1142,9 +1143,9 @@ static gboolean gvr_vims_list_query_tooltip(GtkWidget *widget,
                                item->widget && item->widget[0] ? item->widget : "none",
                                item->message && item->message[0] ? item->message : "none");
     }
-    vj_gui_tooltip_set_text(widget, tooltip, text);
+    result = vj_gui_tooltip_set_text(widget, tooltip, text);
     g_free(text);
-    return TRUE;
+    return result;
 }
 
 static void gvr_vims_list_size_allocate(GtkWidget *widget,
@@ -1177,7 +1178,7 @@ static GtkWidget *gvr_vims_list_new(GvrVimsView *view,
     list->selected_index = -1;
     list->area = gtk_drawing_area_new();
     gtk_widget_set_can_focus(list->area, TRUE);
-    gtk_widget_set_has_tooltip(list->area, TRUE);
+    vj_gui_widget_set_has_tooltip(list->area, TRUE);
     gtk_widget_set_size_request(list->area, -1, height);
     gtk_widget_add_events(list->area,
                           GDK_BUTTON_PRESS_MASK |
@@ -1262,7 +1263,7 @@ static GtkWidget *gvr_vims_view_button(GvrVimsView *view,
 {
     GtkWidget *button = gtk_button_new_with_label(label);
     gtk_widget_set_can_focus(button, FALSE);
-    gtk_widget_set_tooltip_text(button, tooltip);
+    vj_gui_widget_set_tooltip_text(button, tooltip);
     gtk_style_context_add_class(gtk_widget_get_style_context(button),
                                 "vims-history-button");
     g_object_set_data(G_OBJECT(button),
@@ -1311,7 +1312,7 @@ static GtkWidget *gvr_vims_view_search_bar(GvrVimsView *view)
     gtk_box_pack_start(GTK_BOX(box), label, FALSE, FALSE, 0);
 
     view->search_entry = gtk_entry_new();
-    gtk_widget_set_tooltip_text(view->search_entry,
+    vj_gui_widget_set_tooltip_text(view->search_entry,
                                 "VIMS number or description");
     gtk_widget_set_hexpand(view->search_entry, TRUE);
     gtk_box_pack_start(GTK_BOX(box), view->search_entry, TRUE, TRUE, 0);
@@ -1323,7 +1324,7 @@ static GtkWidget *gvr_vims_view_search_bar(GvrVimsView *view)
 
     button = gtk_button_new_with_label("Previous");
     gtk_widget_set_can_focus(button, FALSE);
-    gtk_widget_set_tooltip_text(button, "Find the previous match (Shift+F3)");
+    vj_gui_widget_set_tooltip_text(button, "Find the previous match (Shift+F3)");
     gtk_style_context_add_class(gtk_widget_get_style_context(button),
                                 "vims-history-button");
     gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 0);
@@ -1334,7 +1335,7 @@ static GtkWidget *gvr_vims_view_search_bar(GvrVimsView *view)
 
     button = gtk_button_new_with_label("Next");
     gtk_widget_set_can_focus(button, FALSE);
-    gtk_widget_set_tooltip_text(button, "Find the next match (F3)");
+    vj_gui_widget_set_tooltip_text(button, "Find the next match (F3)");
     gtk_style_context_add_class(gtk_widget_get_style_context(button),
                                 "vims-history-button");
     gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 0);
@@ -1345,7 +1346,7 @@ static GtkWidget *gvr_vims_view_search_bar(GvrVimsView *view)
 
     button = gtk_button_new_with_label("Close");
     gtk_widget_set_can_focus(button, FALSE);
-    gtk_widget_set_tooltip_text(button, "Close search (Escape)");
+    vj_gui_widget_set_tooltip_text(button, "Close search (Escape)");
     gtk_style_context_add_class(gtk_widget_get_style_context(button),
                                 "vims-history-button");
     gtk_box_pack_start(GTK_BOX(box), button, FALSE, FALSE, 0);
@@ -1457,7 +1458,7 @@ static GtkWidget *gvr_vims_view_command_bar(GvrVimsView *view)
     gtk_box_pack_start(GTK_BOX(row), label, FALSE, FALSE, 0);
 
     view->command_entry = gtk_entry_new();
-    gtk_widget_set_tooltip_text(view->command_entry,
+    vj_gui_widget_set_tooltip_text(view->command_entry,
                                 "Select a VIMS event");
     gtk_widget_set_hexpand(view->command_entry, TRUE);
     gtk_widget_set_sensitive(view->command_entry, FALSE);
@@ -1484,7 +1485,7 @@ static GtkWidget *gvr_vims_view_command_bar(GvrVimsView *view)
     view->command_copy_button = gtk_button_new_with_label("Copy");
     gtk_widget_set_can_focus(view->command_copy_button, FALSE);
     gtk_widget_set_sensitive(view->command_copy_button, FALSE);
-    gtk_widget_set_tooltip_text(view->command_copy_button,
+    vj_gui_widget_set_tooltip_text(view->command_copy_button,
                                 "Copy the pattern-ready VIMS row");
     gtk_style_context_add_class(
         gtk_widget_get_style_context(view->command_copy_button),
@@ -1551,7 +1552,7 @@ static GtkWidget *gvr_vims_view_text_page(GvrVimsView *view,
         view->copy_request_button = gtk_button_new_with_label("Copy Request");
         gtk_widget_set_can_focus(view->copy_request_button, FALSE);
         gtk_widget_set_sensitive(view->copy_request_button, FALSE);
-        gtk_widget_set_tooltip_text(view->copy_request_button,
+        vj_gui_widget_set_tooltip_text(view->copy_request_button,
                                     "Copy the exact VIMS request shown below");
         gtk_style_context_add_class(
             gtk_widget_get_style_context(view->copy_request_button),
@@ -1705,7 +1706,7 @@ static void gvr_vims_view_init(GvrVimsView *view)
     toolbar = gvr_vims_view_toolbar(view, "VIMS Browser");
     button = gtk_button_new_with_label("Find");
     gtk_widget_set_can_focus(button, FALSE);
-    gtk_widget_set_tooltip_text(button,
+    vj_gui_widget_set_tooltip_text(button,
                                 "Find a VIMS event by number or description (Ctrl+F)");
     gtk_style_context_add_class(gtk_widget_get_style_context(button),
                                 "vims-history-button");
@@ -1783,7 +1784,7 @@ static void gvr_vims_view_init(GvrVimsView *view)
     toolbar = gvr_vims_view_toolbar(view, "Learned MIDI Events");
     button = gtk_button_new_with_label("Refresh");
     gtk_widget_set_can_focus(button, FALSE);
-    gtk_widget_set_tooltip_text(button, "Reload learned MIDI mappings");
+    vj_gui_widget_set_tooltip_text(button, "Reload learned MIDI mappings");
     gtk_style_context_add_class(gtk_widget_get_style_context(button),
                                 "vims-history-button");
     gtk_box_pack_end(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
@@ -1794,7 +1795,7 @@ static void gvr_vims_view_init(GvrVimsView *view)
     view->midi_unbind_button = gtk_button_new_with_label("Unbind");
     gtk_widget_set_can_focus(view->midi_unbind_button, FALSE);
     gtk_widget_set_sensitive(view->midi_unbind_button, FALSE);
-    gtk_widget_set_tooltip_text(view->midi_unbind_button,
+    vj_gui_widget_set_tooltip_text(view->midi_unbind_button,
                                 "Remove the selected learned MIDI mapping");
     gtk_style_context_add_class(
         gtk_widget_get_style_context(view->midi_unbind_button),

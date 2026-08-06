@@ -1593,40 +1593,6 @@ static int multitrack_next_port_hint(multitracker_t *mt, const char *host)
     return base;
 }
 
-static void calculate_img_dimension(int w,
-                                    int h,
-                                    int *dst_w,
-                                    int *dst_h,
-                                    float *result,
-                                    int max_w,
-                                    int max_h,
-                                    int quality)
-{
-    int tmp_w = w;
-    int tmp_h = h;
-    float ratio = (float)tmp_w / (float)tmp_h;
-
-    *result = ratio;
-
-    if(quality > 0) {
-        while(quality-- > 0) {
-            tmp_w /= 2;
-            tmp_h /= 2;
-        }
-    }
-
-    if(tmp_h > max_h) {
-        tmp_h = max_h;
-        tmp_w = (int)((float)tmp_h * ratio);
-    }
-    else if(tmp_w > max_w) {
-        tmp_w = max_w;
-        tmp_h = (int)((float)tmp_w / ratio);
-    }
-
-    *dst_w = tmp_w;
-    *dst_h = tmp_h;
-}
 
 void multitrack_get_preview_dimensions(int w,
                                        int h,

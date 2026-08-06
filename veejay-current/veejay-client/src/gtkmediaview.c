@@ -454,14 +454,14 @@ static void gvr_media_view_init(GvrMediaView *view)
     gtk_box_pack_start(GTK_BOX(toolbar), title, FALSE, FALSE, 4);
 
     view->search_entry = gtk_entry_new();
-    gtk_widget_set_tooltip_text(view->search_entry,
+    vj_gui_widget_set_tooltip_text(view->search_entry,
                                 "Filter media files");
     gtk_widget_set_hexpand(view->search_entry, TRUE);
     gvr_media_view_add_class(view->search_entry, "media-view-search");
     gtk_box_pack_start(GTK_BOX(toolbar), view->search_entry, TRUE, TRUE, 0);
 
     view->refresh_button = gtk_button_new_with_label("Refresh");
-    gtk_widget_set_tooltip_text(view->refresh_button,
+    vj_gui_widget_set_tooltip_text(view->refresh_button,
                                 "Fetch video files from VeeJay's working directory");
     gtk_box_pack_end(GTK_BOX(toolbar), view->refresh_button, FALSE, FALSE, 0);
 
@@ -484,7 +484,7 @@ static void gvr_media_view_init(GvrMediaView *view)
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(view->tree), TRUE);
     gtk_tree_view_set_enable_search(GTK_TREE_VIEW(view->tree), TRUE);
     gtk_tree_view_set_search_column(GTK_TREE_VIEW(view->tree), MEDIA_COL_NAME);
-    gtk_widget_set_has_tooltip(view->tree, TRUE);
+    vj_gui_widget_set_has_tooltip(view->tree, TRUE);
     gvr_media_view_add_class(view->tree, "media-view-tree");
 
     gvr_media_view_append_column(view, "File", MEDIA_COL_NAME, TRUE, 180);

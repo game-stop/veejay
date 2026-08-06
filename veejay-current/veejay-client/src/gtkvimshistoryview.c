@@ -794,12 +794,6 @@ static void gvr_vims_history_drag_data_get(GtkWidget *widget,
     }
 }
 
-static void gvr_vims_history_clear_clicked(GtkButton *button,
-                                           gpointer user_data)
-{
-    (void)button;
-    gvr_vims_history_view_clear(GTK_WIDGET(user_data));
-}
 
 static void gvr_vims_history_view_finalize(GObject *object)
 {
@@ -870,7 +864,7 @@ static void gvr_vims_history_view_init(GvrVimsHistoryView *view)
 
     view->area = gtk_drawing_area_new();
     gtk_widget_set_can_focus(view->area, TRUE);
-    gtk_widget_set_has_tooltip(view->area, TRUE);
+    vj_gui_widget_set_has_tooltip(view->area, TRUE);
     gtk_widget_add_events(view->area,
                           GDK_BUTTON_PRESS_MASK |
                           GDK_BUTTON_RELEASE_MASK |

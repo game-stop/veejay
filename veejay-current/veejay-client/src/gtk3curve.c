@@ -315,9 +315,6 @@ static void gtk3_curve_live_trace_disable_for_user_edit(GtkWidget *widget);
 static void gtk3_curve_class_init           (Gtk3CurveClass       *klass);
 static void gtk3_curve_init                 (Gtk3Curve            *self);
 
-static void gtk3_curve_get_cursor_coord     (GtkWidget            *widget,
-                                             gint                 *tx,
-                                             gint                 *ty);
 static gboolean gtk3_curve_get_position_marker(GtkWidget *widget,
                                              gint       width,
                                              gint       height,
@@ -3893,24 +3890,10 @@ gtk3_curve_leave(GtkWidget        *widget,
   return FALSE;
 }
 
-static
-void gtk3_curve_get_cursor_coord(GtkWidget *widget, gint *tx, gint *ty)
-{
-  GdkSeat          *user_seat;
-  GdkDevice        *device_pointer;
-
-  user_seat = gdk_display_get_default_seat (gtk_widget_get_display (widget));
-  device_pointer = gdk_seat_get_pointer (user_seat);
-  gdk_window_get_device_position (gtk_widget_get_window (widget),
-                                  device_pointer,
-                                  tx, ty, NULL);
-}
 
 static gboolean
 gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
 {
-  (void) event;
-
   Gtk3CurvePrivate *priv = GTK3_CURVE(widget)->priv;
   GtkAllocation allocation;
   gint x, y, width, height;
@@ -3929,7 +3912,8 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
   if (width <= 1 || height <= 1)
     return FALSE;
 
-  gtk3_curve_get_cursor_coord(widget, &tx, &ty);
+  tx = (gint)event->x;
+  ty = (gint)event->y;
 
   {
     gboolean hit_left = FALSE;
@@ -3973,7 +3957,6 @@ gtk3_curve_button_press(GtkWidget *widget, GdkEventButton *event)
   x = CLAMP((tx - RADIUS), 0, width);
   y = CLAMP((ty - RADIUS), 0, height);
 
-  gfloat min_x = priv->min_x;
 
   for (int i = 0; i < priv->curve_data.n_cpoints; ++i) {
     gint cx = gtk3_curve_project_cpoint_x(priv, priv->curve_data.d_cpoints[i].x, width);
@@ -4134,7 +4117,8 @@ gtk3_curve_motion_notify(GtkWidget *widget, GdkEventMotion *event)
   if (width <= 1 || height <= 1)
     return FALSE;
 
-  gtk3_curve_get_cursor_coord(widget, &tx, &ty);
+  tx = (gint)event->x;
+  ty = (gint)event->y;
 
   {
     gboolean hit_left = FALSE;

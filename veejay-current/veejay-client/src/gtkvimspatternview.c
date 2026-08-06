@@ -4606,7 +4606,7 @@ static gboolean gvr_pattern_inline_commit(GvrVimsPatternView *view)
         g_free(message);
         context = gtk_widget_get_style_context(view->command_entry);
         gtk_style_context_add_class(context, "error");
-        gtk_widget_set_tooltip_text(
+        vj_gui_widget_set_tooltip_text(
             view->command_entry,
             "Enter one VIMS message, for example 123:arguments;");
         return FALSE;
@@ -6109,7 +6109,7 @@ static GtkWidget *gvr_pattern_toolbar_button(GtkWidget *toolbar,
                        FALSE,
                        FALSE,
                        0);
-    gtk_widget_set_tooltip_text(button, tooltip);
+    vj_gui_widget_set_tooltip_text(button, tooltip);
     g_signal_connect(button, "clicked", callback, data);
     gtk_widget_show(button);
     return button;
@@ -6249,7 +6249,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
                        FALSE,
                        FALSE,
                        1);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         label,
         "FastTracker row step: display every Nth frame and use the same interval for row insertion and Learn advancement.");
     gtk_widget_show(label);
@@ -6265,7 +6265,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_spin_button_set_value(
         GTK_SPIN_BUTTON(view->step_spin),
         1);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->step_spin,
         "Step 4 displays frames 0, 4, 8, 12... Orange markers expose hidden events; right-click to reveal or quantize them.");
     g_signal_connect(
@@ -6289,7 +6289,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_style_context_add_class(
         gtk_widget_get_style_context(view->loop_toggle),
         "vims-pattern-loop-toggle");
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->loop_toggle,
         "Enable or disable the stored VIMS pattern loop range for the current target. Playback remains backend-authoritative; the editor follows the reported frame without remapping or seeking.");
     g_signal_connect(view->loop_toggle,
@@ -6330,7 +6330,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_widget_show(editbar);
 
     view->command_entry = gtk_entry_new();
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->command_entry,
         "VIMS command, e.g. 123:arguments;");
     gtk_entry_set_width_chars(
@@ -6409,7 +6409,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
         gtk_widget_get_style_context(
             view->paste_mode_combo),
         "vims-pattern-paste-mode");
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->paste_mode_combo,
         "Replace clears destination cells matching empty clipboard cells. Merge writes only copied events. Insert first opens enough timeline rows, then pastes.");
     g_signal_connect(
@@ -6488,7 +6488,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
         label,
         GVR_PATTERN_FRAME_WIDTH,
         -1);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         label,
         "Orange ·N markers show how many stored events are hidden between stepped rows. Green horizontal rules mark the pattern loop boundaries.");
     gtk_box_pack_start(GTK_BOX(track_header),
@@ -6528,7 +6528,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
             GTK_TOGGLE_BUTTON(
                 view->track_toggle[column]),
             TRUE);
-        gtk_widget_set_tooltip_text(
+        vj_gui_widget_set_tooltip_text(
             view->track_toggle[column],
             "Toggle to mute this VIMS track; Ctrl-click solos it; Shift-click enables all tracks.");
         g_object_set_data(
@@ -6563,7 +6563,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
         GVR_VIMS_PATTERN_COLUMNS * 34,
         -1);
     gtk_widget_set_can_focus(view->area, TRUE);
-    gtk_widget_set_has_tooltip(view->area, TRUE);
+    vj_gui_widget_set_has_tooltip(view->area, TRUE);
     gtk_widget_add_events(
         view->area,
         GDK_BUTTON_PRESS_MASK |
@@ -6630,7 +6630,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
         "drag-data-received",
         G_CALLBACK(gvr_pattern_drag_data_received),
         view);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->area,
         "Edit the VIMS pattern or drag a pattern-safe command from VIMS History onto any visible V1-V8 cell.");
     gtk_widget_show(view->area);
@@ -6667,7 +6667,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_style_context_add_class(
         gtk_widget_get_style_context(label),
         "vims-pattern-learn-label");
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         label,
         "Learn controls remain visible below the scrolling pattern grid.");
     gtk_box_pack_start(GTK_BOX(learnbar),
@@ -6679,7 +6679,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
 
     view->learn_toggle =
         gtk_toggle_button_new_with_label("Capture");
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->learn_toggle,
         "Capture user-triggered VIMS commands using the selected placement policy.");
     gtk_box_pack_start(GTK_BOX(learnbar),
@@ -6715,7 +6715,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_style_context_add_class(
         gtk_widget_get_style_context(view->learn_policy_combo),
         "vims-pattern-policy");
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->learn_policy_combo,
         "Choose how learned commands are placed in V1 through V8.");
     g_signal_connect(view->learn_policy_combo,
@@ -6734,7 +6734,7 @@ static void gvr_vims_pattern_view_init(GvrVimsPatternView *view)
     gtk_toggle_button_set_active(
         GTK_TOGGLE_BUTTON(view->follow_toggle),
         TRUE);
-    gtk_widget_set_tooltip_text(
+    vj_gui_widget_set_tooltip_text(
         view->follow_toggle,
         "Follow the live source row. Learn temporarily owns the edit cursor while capture is active.");
     gtk_box_pack_start(GTK_BOX(learnbar),

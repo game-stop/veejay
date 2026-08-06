@@ -20,7 +20,7 @@
 #ifndef VJAPI_H
 #define VJAPI_H
 
-#include <gdk/gdk.h>
+#include <gtk/gtk.h>
 
 #define DEFAULT_PORT_NUM 3490
 
@@ -76,6 +76,11 @@ void vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
 void vj_gui_set_timeout(int timer);
 int vj_gui_sleep_time( void );
 void vj_gui_style_setup(void);
+gboolean vj_gui_tooltips_enabled(void);
+void vj_gui_tooltips_set_enabled(gboolean enabled);
+void vj_gui_widget_set_has_tooltip(GtkWidget *widget, gboolean has_tooltip);
+void vj_gui_widget_set_tooltip_text(GtkWidget *widget, const char *text);
+void vj_gui_widget_set_tooltip_markup(GtkWidget *widget, const char *markup);
 gboolean vj_gui_tooltip_set_text(GtkWidget *widget, GtkTooltip *tooltip, const char *text);
 gboolean vj_gui_tooltip_set_markup(GtkWidget *widget, GtkTooltip *tooltip, const char *markup);
 void vj_gui_plain_sample_attention_start(void);

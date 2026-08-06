@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "gtksequencebankview.h"
+#include "vj-api.h"
 
 #ifndef GVR_SEQUENCE_BANKS
 #define GVR_SEQUENCE_BANKS 4
@@ -2453,7 +2454,7 @@ static void gvr_sequence_bank_view_init(GvrSequenceBankView *view)
     view->bank_copy_source = -1;
     view->sequence_active = FALSE;
 
-    gtk_widget_set_has_tooltip(GTK_WIDGET(view), TRUE);
+    vj_gui_widget_set_has_tooltip(GTK_WIDGET(view), TRUE);
 
     for(int bank = 0; bank < GVR_SEQUENCE_BANKS; bank++) {
         view->banks[bank].current = -1;
