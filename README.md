@@ -236,8 +236,6 @@ $HOME/.veejay/frei0r/
 $HOME/.veejay/livido/
 ```
 
-See [`HOWTO.plugins.md`](./veejay-server/doc/HOWTO.plugins.md).
-
 ## Development and debugging
 
 Build a component with debug support:
@@ -259,14 +257,14 @@ When reporting a crash, include:
 
 Useful documentation:
 
-- [`README.whatis.md`](./veejay-server/doc/README.whatis.md)
-- [`README.quickstart.md`](./veejay-server/doc/README.quickstart.md)
-- [`HOWTO.compile.md`](./veejay-server/doc/HOWTO.compile.md)
-- [`HOWTO.debugging.md`](./veejay-server/doc/HOWTO.debugging.md)
-- [`README.audio.md`](./veejay-server/doc/README.audio.md)
-- [`README.network.md`](./veejay-server/doc/README.network.md)
-- [`README.performance.md`](./veejay-server/doc/README.performance.md)
-- [`HOWTO.plugins.md`](./veejay-server/doc/HOWTO.plugins.md)
+- [`README.whatis.md`](./veejay-current/veejay-server/doc/README.whatis.md)
+- [`README.quickstart.md`](./veejay-current/veejay-server/doc/README.quickstart.md)
+- [`HOWTO.compile.md`](./veejay-current/veejay-server/doc/HOWTO.compile.md)
+- [`HOWTO.debugging.md`](./veejay-current/veejay-server/doc/HOWTO.debugging.md)
+- [`README.audio.md`](./veejay-current/veejay-server/doc/README.audio.md)
+- [`README.network.md`](./veejay-current/veejay-server/doc/README.network.md)
+- [`README.performance.md`](./veejay-current/veejay-server/doc/README.performance.md)
+- [`HOWTO.plugins.md`](./veejay-current/veejay-server/doc/HOWTO.plugins.md)
 
 ## Bug reports and contributions
 
