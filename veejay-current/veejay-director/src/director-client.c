@@ -305,7 +305,8 @@ static gboolean director_refresh_all(DirectorClient *client, DirectorWire *wire)
                        &output_ms))
         return FALSE;
     if((client->instance->role == DIRECTOR_ROLE_OUTPUT ||
-        client->instance->legacy_viewport) &&
+        client->instance->legacy_viewport ||
+        !client->instance->managed) &&
        !director_query_framed(client, wire, "007:;",
                               DIRECTOR_CLIENT_PROJECTION_STATUS, 8))
         return FALSE;

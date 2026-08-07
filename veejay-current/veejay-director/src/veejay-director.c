@@ -57,12 +57,16 @@
 #define DIRECTOR_OVERVIEW_ACTIVE_INTERVAL_US 220000LL
 #define DIRECTOR_OVERVIEW_IDLE_INTERVAL_US 250000LL
 #define DIRECTOR_OVERVIEW_FRESH_US 5000000LL
+#define DIRECTOR_PREVIEW_DEFAULT_QUALITY_DIVISOR 8
+#define DIRECTOR_PREVIEW_DEFAULT_FRAME_STRIDE 4
 #define DIRECTOR_ROUTE_APPLY_RETRY_US 2500000LL
 #define DIRECTOR_ROUTE_SELECT_RETRY_US 1000000LL
 #define DIRECTOR_SHM_ENABLE_RETRY_US 2500000LL
 #define DIRECTOR_NDI_CHANGE_TIMEOUT_US 8000000LL
 #define DIRECTOR_NDI_SOURCE_STALE_EXPIRE_US 10000000LL
 #define DIRECTOR_NDI_SOURCE_CLASSIFY_GRACE_US 2000000LL
+#define DIRECTOR_ENGINE_THUMB_MAX_WIDTH 144
+#define DIRECTOR_ENGINE_THUMB_MAX_HEIGHT 82
 
 enum {
     INSTANCE_COL_PREVIEW = 0,
@@ -163,6 +167,7 @@ typedef struct {
     gint width;
     gint height;
     gint mode;
+    gint64 interval_us;
     gboolean priority;
 } DirectorOverviewPreviewTarget;
 
@@ -170,6 +175,7 @@ typedef struct {
     DirectorApp *app;
     gchar *id;
     GdkPixbuf *pixbuf;
+    GdkPixbuf *thumbnail;
     guint64 generation;
 } DirectorOverviewPreviewDispatch;
 
@@ -197,6 +203,7 @@ typedef struct {
 
 typedef struct {
     GdkPixbuf *pixbuf;
+    GdkPixbuf *thumbnail;
     gint64 frame_us;
 } DirectorOverviewPreviewFrame;
 
@@ -428,7 +435,7 @@ struct _DirectorApp {
     GtkWidget *stage_button_projection;
     GtkWidget *stage_grid_all_button;
     GtkWidget *stage_program_all_button;
-    GtkWidget *stage_forward_switch;
+    GtkWidget *stage_forward_check;
     GtkWidget *stage_sync_button;
     GtkWidget *stage_black_all_button;
     GtkWidget *stage_identify_all_button;
@@ -482,7 +489,7 @@ struct _DirectorApp {
     GtkWidget *stage_mode_wiring;
     GtkWidget *stage_pattern_combo;
     GtkWidget *stage_calibration_box;
-    GtkWidget *stage_projection_switch;
+    GtkWidget *stage_projection_check;
     GtkWidget *stage_projection_save_button;
     GtkWidget *stage_wiring_autolayout_button;
     GtkWidget *stage_wiring_ndi_refresh_button;
@@ -688,19 +695,23 @@ struct _DirectorApp {
     GtkWidget *mapping_inspector;
     GtkWidget *canvas;
     GtkWidget *combo_slice;
-    GtkWidget *switch_slice_enabled;
+    GtkWidget *check_slice_enabled;
     GtkWidget *source_spin[4];
     GtkWidget *dest_spin[4];
     GtkWidget *blend_spin[4];
     GtkWidget *spin_gamma;
     GtkWidget *screen_setup_notebook;
     GtkWidget *projection_mesh;
-    GtkWidget *projection_runtime_switch;
-    GtkWidget *projection_startup_switch;
+    GtkWidget *projection_runtime_check;
+    GtkWidget *projection_startup_check;
     GtkWidget *projection_columns_spin;
     GtkWidget *projection_rows_spin;
     GtkWidget *projection_preset_combo;
     GtkWidget *projection_view_combo;
+    GtkWidget *preview_quality_buttons[4];
+    GtkWidget *preview_rate_combo;
+    gint preview_quality_divisor;
+    gint preview_frame_stride;
     gboolean projection_grid_dirty;
 
     GtkWidget *perf_canvas;
@@ -718,6 +729,7 @@ struct _DirectorApp {
     gboolean reloaded_running;
     guint reloaded_force_stop_timer;
     gboolean shutting_down;
+    gboolean stop_managed_on_exit;
     gboolean suppress_startup_chooser;
     DirectorStartupIntent startup_intent;
     gboolean startup_patchbay;
@@ -750,6 +762,7 @@ struct _DirectorApp {
     gint source_preview_width;
     gint source_preview_height;
     gint source_preview_mode;
+    gint64 source_preview_interval_us;
     guint64 source_preview_generation;
     GdkPixbuf *source_preview_pixbuf;
     gint64 source_preview_frame_us;
@@ -840,6 +853,8 @@ static void director_overview_previews_sync(DirectorApp *app);
 static GdkPixbuf *director_overview_preview_ref(DirectorApp *app,
                                                    const gchar *id,
                                                    gboolean *live);
+static GdkPixbuf *director_overview_thumbnail_ref(DirectorApp *app,
+                                                   const gchar *id);
 static GdkPixbuf *director_overview_preview_ref_after(DirectorApp *app,
                                                        const gchar *id,
                                                        gint64 minimum_frame_us);
@@ -1020,8 +1035,7 @@ static void director_reconcile_live_routes(DirectorApp *app, DirectorInstance *i
                 if(configured->type == DIRECTOR_INPUT_ROUTE_SHM && live->shm_key > 0)
                     configured->shm_key = live->shm_key;
 
-                if(configured->select_when_ready &&
-                   instance->role != DIRECTOR_ROLE_OUTPUT) {
+                if(configured->select_when_ready) {
                     if(configured->live_current) {
                         configured->select_when_ready = FALSE;
                         configured->select_requested_us = 0;
@@ -1418,8 +1432,7 @@ static void director_ndi_update_discovery_status(DirectorApp *app)
     g_free(status);
 
     if(app->button_ndi_refresh) {
-        const gboolean discovery_allowed = app->selected &&
-            app->selected->role != DIRECTOR_ROLE_OUTPUT;
+        const gboolean discovery_allowed = app->selected != NULL;
         gtk_button_set_label(GTK_BUTTON(app->button_ndi_refresh),
                              app->ndi_refresh_pending ? "Refreshing…" : "Refresh NDI");
         gtk_widget_set_sensitive(app->button_ndi_refresh,
@@ -2763,7 +2776,8 @@ static gboolean director_screen_runtime_available(const DirectorInstance *instan
 static gboolean director_projection_role_supported(const DirectorInstance *instance)
 {
     return director_screen_layout_supported(instance) &&
-           (instance->role == DIRECTOR_ROLE_OUTPUT || instance->legacy_viewport);
+           (instance->role == DIRECTOR_ROLE_OUTPUT || instance->legacy_viewport ||
+            !instance->managed);
 }
 
 static gboolean director_live_output_status_available(const DirectorInstance *instance)
@@ -2930,6 +2944,8 @@ static void director_cancel_log_readers(DirectorApp *app)
 
 static void director_error_dialog(DirectorApp *app, const gchar *message)
 {
+    if(!app || app->shutting_down || !app->window)
+        return;
     GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(app->window),
                                                GTK_DIALOG_MODAL |
                                                GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -3004,6 +3020,18 @@ static gboolean director_any_process_running(DirectorApp *app)
     return FALSE;
 }
 
+static gboolean director_any_managed_veejay_running(DirectorApp *app)
+{
+    if(!app || !app->show)
+        return FALSE;
+    for(guint i = 0; i < app->show->instances->len; i++) {
+        DirectorInstance *instance = g_ptr_array_index(app->show->instances, i);
+        if(instance->process_running && instance->process)
+            return TRUE;
+    }
+    return FALSE;
+}
+
 static gboolean director_backend_identity_matches(const DirectorInstance *instance)
 {
     return instance && instance->last_instance_status && *instance->last_instance_status &&
@@ -3060,14 +3088,14 @@ static void director_set_instance_row(DirectorApp *app,
     gchar *video = NULL;
     if(video_source)
         video = g_strdup_printf(instance->role == DIRECTOR_ROLE_OUTPUT ?
-                                "Primary feed ← %s · %s" : "Managed feed ← %s · %s",
+                                "Selected input ← %s · %s" : "Managed feed ← %s · %s",
                                 video_source->id,
                                 director_video_wire_is_local(video_source, instance) ? "SHM" : "TCP");
     else if(instance->role == DIRECTOR_ROLE_OUTPUT && instance->source_host &&
             *instance->source_host && instance->source_port > 0)
-        video = g_strdup_printf("Primary feed ← %s:%d", instance->source_host, instance->source_port);
+        video = g_strdup_printf("Selected input ← %s:%d", instance->source_host, instance->source_port);
     else if(instance->role == DIRECTOR_ROLE_OUTPUT)
-        video = g_strdup("Primary feed · not configured");
+        video = g_strdup("Video input · not configured");
     else
         video = g_strdup("Video · own engine frame");
     const gchar *ownership = instance->discovered_transient ? "Discovered LAN" :
@@ -3079,7 +3107,7 @@ static void director_set_instance_row(DirectorApp *app,
                                      director_role_name(instance->role),
                                      ownership,
                                      endpoint, control, video);
-    GdkPixbuf *preview = director_overview_preview_ref(app, instance->id, NULL);
+    GdkPixbuf *preview = director_overview_thumbnail_ref(app, instance->id);
     gtk_list_store_set(app->instance_store, iter,
                        INSTANCE_COL_PREVIEW, preview,
                        INSTANCE_COL_SUMMARY, summary,
@@ -3148,7 +3176,7 @@ static void director_populate_source_combo(DirectorApp *app)
         (app->selected ? app->selected->role : DIRECTOR_ROLE_STANDALONE);
     gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(app->combo_source_instance), "",
                               role == DIRECTOR_ROLE_OUTPUT ?
-                              "Manual primary endpoint" : "No managed feed");
+                              "Manual video endpoint" : "No managed feed");
     if(app->show) {
         for(guint i = 0; i < app->show->instances->len; i++) {
             DirectorInstance *instance = g_ptr_array_index(app->show->instances, i);
@@ -3232,7 +3260,7 @@ static void director_update_runtime_labels(DirectorApp *app)
                                    (source_instance ? source_instance->host : NULL);
         const gchar *transport = director_host_is_local(source_host) ?
                                  "local SHM" : "remote TCP";
-        source = g_strdup_printf("Primary feed: %s · %s · sequence %" G_GUINT64_FORMAT " · %s",
+        source = g_strdup_printf("Selected input: %s · %s · sequence %" G_GUINT64_FORMAT " · %s",
                                  instance->live_source && *instance->live_source ?
                                  instance->live_source : "not attached",
                                  transport, instance->source_sequence, display);
@@ -3461,7 +3489,7 @@ static void director_refresh_media_bank(DirectorApp *app)
     if(!instance)
         summary = g_strdup("No instance selected");
     else if(instance->role == DIRECTOR_ROLE_OUTPUT)
-        summary = g_strdup("Output instances consume one primary video feed and do not load startup media files.");
+        summary = g_strdup("Output instances can receive SHM, TCP, or NDI video routes directly and do not load startup media files.");
     else if(count == 0)
         summary = g_strdup("No startup clips. Add video files or use a blank canvas.");
     else
@@ -3512,7 +3540,7 @@ static void director_update_role_sensitivity(DirectorApp *app)
     const gboolean preview = have && !output && control_mode == DIRECTOR_CONTROL_PREVIEW;
     const gboolean preview_headless = preview && app->check_preview_headless &&
         gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_preview_headless));
-    const gboolean ndi_input = have && !output && app->check_ndi_input &&
+    const gboolean ndi_input = have && app->check_ndi_input &&
         gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_input));
     const gboolean ndi_output = have && app->check_ndi_output &&
         gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_output));
@@ -3526,20 +3554,20 @@ static void director_update_role_sensitivity(DirectorApp *app)
     if(app->combo_startup_source)
         gtk_widget_set_sensitive(app->combo_startup_source, have && !output && !ndi_input);
     if(app->check_ndi_input)
-        gtk_widget_set_sensitive(app->check_ndi_input, have && !output);
+        gtk_widget_set_sensitive(app->check_ndi_input, have);
     if(app->combo_ndi_source)
-        gtk_widget_set_sensitive(app->combo_ndi_source, have && !output && ndi_input);
+        gtk_widget_set_sensitive(app->combo_ndi_source, have && ndi_input);
     if(app->button_ndi_refresh)
         gtk_widget_set_sensitive(app->button_ndi_refresh,
-                                 have && !output && !app->ndi_refresh_pending);
+                                 have && !app->ndi_refresh_pending);
     if(app->check_ndi_output)
         gtk_widget_set_sensitive(app->check_ndi_output, have);
     if(app->entry_ndi_output_name)
         gtk_widget_set_sensitive(app->entry_ndi_output_name, have && ndi_output);
     if(app->check_ndi_tally)
-        gtk_widget_set_sensitive(app->check_ndi_tally, have && !output && ndi_input);
+        gtk_widget_set_sensitive(app->check_ndi_tally, have && ndi_input);
     if(app->check_ndi_follow_clock)
-        gtk_widget_set_sensitive(app->check_ndi_follow_clock, have && !output && ndi_input);
+        gtk_widget_set_sensitive(app->check_ndi_follow_clock, have && ndi_input);
     if(app->spin_input_width)
         gtk_widget_set_sensitive(app->spin_input_width, blank || ndi_input);
     if(app->spin_input_height)
@@ -3644,8 +3672,9 @@ static void director_update_role_sensitivity(DirectorApp *app)
     const gchar *video_source_id = app->combo_source_instance ?
         gtk_combo_box_get_active_id(GTK_COMBO_BOX(app->combo_source_instance)) : NULL;
     if(app->combo_source_instance)
-        gtk_widget_set_sensitive(app->combo_source_instance, have && !ndi_input);
-    const gboolean manual_output_feed = output && !ndi_input && (!video_source_id || !*video_source_id);
+        gtk_widget_set_sensitive(app->combo_source_instance,
+                                 have && (!ndi_input || output));
+    const gboolean manual_output_feed = output && (!video_source_id || !*video_source_id);
     if(app->entry_source_host)
         gtk_widget_set_sensitive(app->entry_source_host, manual_output_feed);
     if(app->spin_source_port)
@@ -3861,7 +3890,7 @@ static void director_slice_controls_from_model(DirectorApp *app)
                               0.0, MAX(0, slice->dest_height));
     gtk_spin_button_set_range(GTK_SPIN_BUTTON(app->blend_spin[3]),
                               0.0, MAX(0, slice->dest_height));
-    gtk_switch_set_active(GTK_SWITCH(app->switch_slice_enabled), slice->enabled);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->check_slice_enabled), slice->enabled);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(app->source_spin[0]), slice->source_x / 100.0);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(app->source_spin[1]), slice->source_y / 100.0);
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(app->source_spin[2]), slice->source_width / 100.0);
@@ -4018,14 +4047,38 @@ static gboolean director_projection_send(DirectorApp *app, const gchar *command)
     return TRUE;
 }
 
+static void director_projection_output_size(const DirectorInstance *instance,
+                                            gint *width,
+                                            gint *height)
+{
+    gint output_width = instance ? MAX(1, instance->output_width) : 1;
+    gint output_height = instance ? MAX(1, instance->output_height) : 1;
+
+    if(instance && instance->live_projection_valid &&
+       instance->live_projection_output_width > 0 &&
+       instance->live_projection_output_height > 0) {
+        output_width = instance->live_projection_output_width;
+        output_height = instance->live_projection_output_height;
+    }
+    else if(instance && instance->live_graph_width > 0 &&
+            instance->live_graph_height > 0) {
+        output_width = instance->live_graph_width;
+        output_height = instance->live_graph_height;
+    }
+
+    *width = output_width;
+    *height = output_height;
+}
+
 static GdkPixbuf *director_projection_layout_preview(DirectorApp *app)
 {
     DirectorInstance *instance = app ? app->selected : NULL;
     if(!instance)
         return NULL;
 
-    const int ow = MAX(1, instance->output_width);
-    const int oh = MAX(1, instance->output_height);
+    gint ow = 1;
+    gint oh = 1;
+    director_projection_output_size(instance, &ow, &oh);
     const double preview_scale = MIN(480.0 / ow, 270.0 / oh);
     const int pw = MAX(32, (int)lrint(ow * preview_scale));
     const int ph = MAX(24, (int)lrint(oh * preview_scale));
@@ -4109,6 +4162,15 @@ static void director_update_projection_ui(DirectorApp *app)
     const gboolean supported = director_projection_role_supported(instance);
     gtk_widget_set_sensitive(app->projection_mesh, supported);
 
+    if(instance) {
+        gint output_width = 1;
+        gint output_height = 1;
+        director_projection_output_size(instance, &output_width, &output_height);
+        gvr_viewport_mesh_set_content_aspect(GVR_VIEWPORT_MESH(app->projection_mesh),
+                                             (gdouble)output_width /
+                                             (gdouble)output_height);
+    }
+
     GdkPixbuf *background = director_projection_layout_preview(app);
     gvr_viewport_mesh_set_background_pixbuf(GVR_VIEWPORT_MESH(app->projection_mesh), background);
     if(background)
@@ -4140,17 +4202,14 @@ static void director_update_projection_ui(DirectorApp *app)
     if(!gvr_viewport_mesh_is_dragging(GVR_VIEWPORT_MESH(app->projection_mesh)))
         gvr_viewport_mesh_set_mesh(GVR_VIEWPORT_MESH(app->projection_mesh),
                                    columns, rows, points, selected);
-    gvr_viewport_mesh_set_content_aspect(GVR_VIEWPORT_MESH(app->projection_mesh),
-        (double)MAX(1, instance->live_projection_output_width) /
-        (double)MAX(1, instance->live_projection_output_height));
     if(!app->projection_grid_dirty) {
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(app->projection_columns_spin), columns);
         gtk_spin_button_set_value(GTK_SPIN_BUTTON(app->projection_rows_spin), rows);
     }
-    gtk_switch_set_active(GTK_SWITCH(app->projection_runtime_switch),
-                          instance->live_projection_enabled);
-    gtk_switch_set_active(GTK_SWITCH(app->projection_startup_switch),
-                          instance->live_projection_startup_enabled);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->projection_runtime_check),
+                                 instance->live_projection_enabled);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->projection_startup_check),
+                                 instance->live_projection_startup_enabled);
     app->syncing = FALSE;
 
 
@@ -4203,30 +4262,28 @@ static void on_projection_point_changed(GvrViewportMesh *mesh, gint point,
     g_free(command);
 }
 
-static gboolean on_projection_runtime_changed(GtkSwitch *widget, gboolean state, gpointer data)
+static void on_projection_runtime_changed(GtkToggleButton *toggle, gpointer data)
 {
     DirectorApp *app = data;
-    (void)widget;
     if(app->syncing)
-        return FALSE;
+        return;
+    const gboolean state = gtk_toggle_button_get_active(toggle);
     gchar *command = g_strdup_printf("164:%d 0;", state ? 1 : 0);
     if(director_projection_send(app, command) && app->selected->client)
         director_client_refresh(app->selected->client);
     g_free(command);
-    return FALSE;
 }
 
-static gboolean on_projection_startup_changed(GtkSwitch *widget, gboolean state, gpointer data)
+static void on_projection_startup_changed(GtkToggleButton *toggle, gpointer data)
 {
     DirectorApp *app = data;
-    (void)widget;
     if(app->syncing)
-        return FALSE;
+        return;
+    const gboolean state = gtk_toggle_button_get_active(toggle);
     gchar *command = g_strdup_printf("165:%d;", state ? 1 : 0);
     if(director_projection_send(app, command) && app->selected->client)
         director_client_refresh(app->selected->client);
     g_free(command);
-    return FALSE;
 }
 
 static void director_projection_send_regular(DirectorApp *app,
@@ -4474,7 +4531,7 @@ static void director_update_output_live_status(DirectorApp *app)
     if(app->canvas) {
         gtk_widget_set_tooltip_text(app->canvas,
             mapping_supported ?
-            "The source card is the primary feed entering this Output engine. Drag it onto the screen to add areas, then move or resize each destination rectangle." :
+            "The source card is the selected video input on this Output engine. Drag it onto the screen to add areas, then move or resize each destination rectangle." :
             "Live presentation preview for this engine. The current backend applies multi-area Screen Mapping on Output engines; test images and supported projection controls remain available here.");
     }
 
@@ -4530,7 +4587,7 @@ static void director_update_output_live_status(DirectorApp *app)
     else {
         help = g_strdup(
             mapping_supported ?
-            "Choose a test image to show it immediately on this Output screen. Use Alignment Grid for geometry, Color Bars for colour verification, Identify Areas for placement, and Blend Ramp for overlaps. Live video returns to the primary feed." :
+            "Choose a test image to show it immediately on this Output screen. Use Alignment Grid for geometry, Color Bars for colour verification, Identify Areas for placement, and Blend Ramp for overlaps. Live video returns to the selected input." :
             "Choose a test image to show it immediately on this engine's presentation output. Live video returns to the rendered engine frame. Multi-area Screen Mapping is available on Output engines.");
         if(!mapping_supported) {
             if(pattern_matches)
@@ -5079,7 +5136,7 @@ static void director_commit_ndi_input_configuration(DirectorApp *app,
         instance->startup_mode = DIRECTOR_STARTUP_BLANK;
         instance->capture_device = -1;
         instance->generator_stream = -1;
-        director_discovery_pin_instance(app, instance, "configured in Wiring");
+        director_discovery_pin_instance(app, instance, "configured in Patch bay");
     } else {
         if(previous && *previous)
             director_instance_remove_input_route(instance, DIRECTOR_INPUT_ROUTE_NDI,
@@ -5127,8 +5184,8 @@ static void director_commit_pending_native_input(DirectorApp *app,
                              target->ndi_input_pending_native_host : "");
     target->source_port = target->ndi_input_pending_native_port > 0 ?
                           target->ndi_input_pending_native_port : source->port;
-    director_discovery_pin_instance(app, source, "used in Wiring");
-    director_discovery_pin_instance(app, target, "configured in Wiring");
+    director_discovery_pin_instance(app, source, "used in Patch bay");
+    director_discovery_pin_instance(app, target, "configured in Patch bay");
 
     if(target->role == DIRECTOR_ROLE_OUTPUT) {
         gboolean any_area = FALSE;
@@ -5220,6 +5277,8 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
             now - instance->ndi_output_change_requested_us >= DIRECTOR_NDI_CHANGE_TIMEOUT_US;
 
         if(matched) {
+            DirectorInstance *pending_target = NULL;
+            gchar *pending_source = NULL;
             director_commit_ndi_output_configuration(app, instance,
                                                      desired_enabled, desired_name);
             configuration_changed = TRUE;
@@ -5234,12 +5293,17 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
                 const gchar *published = instance->live_ndi_tx_source &&
                     *instance->live_ndi_tx_source ? instance->live_ndi_tx_source :
                     instance->live_ndi_tx_name;
-                if(target && published && *published)
-                    director_stage_connect_ndi(app, published, target);
+                if(target && published && *published) {
+                    pending_target = target;
+                    pending_source = g_strdup(published);
+                }
                 g_clear_pointer(&app->stage_pending_ndi_sender_id, g_free);
                 g_clear_pointer(&app->stage_pending_ndi_target_id, g_free);
             }
             director_clear_ndi_output_pending(instance);
+            if(pending_target && pending_source)
+                director_stage_connect_ndi(app, pending_source, pending_target);
+            g_free(pending_source);
         } else if(timed_out) {
             if(app->stage_pending_ndi_sender_id &&
                g_strcmp0(app->stage_pending_ndi_sender_id, instance->id) == 0) {
@@ -11659,7 +11723,7 @@ static gboolean director_choose_workbench(DirectorApp *app, gboolean startup_act
 
         GtkWidget *discover = gtk_button_new_with_label("Discover & connect");
         gtk_widget_set_tooltip_text(discover,
-            "Discover all VeeJay instances advertising on the LAN, connect to them automatically, and open Stage → Wiring.");
+            "Discover all VeeJay instances advertising on the LAN, connect to them automatically, and open Stage → Patch bay.");
         g_object_set_data(G_OBJECT(discover), "director-response",
                           GINT_TO_POINTER(DIRECTOR_RESPONSE_DISCOVER));
         g_signal_connect(discover, "clicked",
@@ -12572,7 +12636,7 @@ static void on_apply_instance(GtkButton *button, gpointer data)
         GTK_TOGGLE_BUTTON(app->check_preview_headless));
     gboolean new_managed = gtk_toggle_button_get_active(
         GTK_TOGGLE_BUTTON(app->check_managed));
-    const gboolean requested_ndi_input = new_role != DIRECTOR_ROLE_OUTPUT &&
+    const gboolean requested_ndi_input =
         gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_ndi_input));
     const gchar *requested_ndi_source = director_ndi_source_text(app);
     const gboolean requested_ndi_output =
@@ -12923,14 +12987,6 @@ static void on_apply_instance(GtkButton *button, gpointer data)
                          new_source_id ? new_source_id : "");
     replace_owned_string(&instance->source_host, configured_source_host);
     instance->source_port = configured_source_port;
-    if(new_role == DIRECTOR_ROLE_OUTPUT) {
-        if(instance->input_routes) {
-            for(guint route_i = 0; route_i < instance->input_routes->len; route_i++)
-                director_remove_runtime_input_route(app, instance,
-                    g_ptr_array_index(instance->input_routes, route_i));
-        }
-        director_instance_clear_input_routes(instance);
-    }
     if(configured_source) {
         const DirectorInputRouteType route_type =
             director_hosts_equivalent(configured_source->host, instance->host) ?
@@ -13115,7 +13171,7 @@ static void on_start_selected(GtkButton *button, gpointer data)
     if(app->selected && app->selected->role == DIRECTOR_ROLE_OUTPUT &&
        !director_source_ready(app, app->selected)) {
         director_error_dialog(app,
-                              "The selected Output's configured primary source is not ready on this host yet.");
+                              "The selected Output's configured input is not ready on this host yet.");
         return;
     }
     if(app->selected && app->selected->control_mode == DIRECTOR_CONTROL_PREVIEW &&
@@ -13246,7 +13302,7 @@ static void director_slice_model_from_controls(DirectorApp *app)
     if(!director_screen_mapping_supported(instance))
         return;
     DirectorSlice *slice = &instance->slices[app->selected_slice];
-    slice->enabled = gtk_switch_get_active(GTK_SWITCH(app->switch_slice_enabled));
+    slice->enabled = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(app->check_slice_enabled));
     slice->source_x = (gint)llround(gtk_spin_button_get_value(GTK_SPIN_BUTTON(app->source_spin[0])) * 100.0);
     slice->source_y = (gint)llround(gtk_spin_button_get_value(GTK_SPIN_BUTTON(app->source_spin[1])) * 100.0);
     slice->source_width = (gint)llround(gtk_spin_button_get_value(GTK_SPIN_BUTTON(app->source_spin[2])) * 100.0);
@@ -13279,24 +13335,20 @@ static void on_slice_control_value_changed(GtkSpinButton *spin, gpointer data)
         gtk_widget_queue_draw(app->canvas);
 }
 
-static gboolean on_slice_enabled_state_set(GtkSwitch *widget,
-                                           gboolean state,
-                                           gpointer data)
+static void on_slice_enabled_toggled(GtkToggleButton *toggle, gpointer data)
 {
-    (void)widget;
     DirectorApp *app = data;
     if(!app || app->syncing || !app->selected ||
        !director_screen_mapping_supported(app->selected))
-        return FALSE;
+        return;
 
     DirectorSlice *slice = &app->selected->slices[app->selected_slice];
-    slice->enabled = state;
+    slice->enabled = gtk_toggle_button_get_active(toggle);
     app->show->dirty = TRUE;
     director_update_header(app);
     director_update_output_live_status(app);
     if(app->canvas)
         gtk_widget_queue_draw(app->canvas);
-    return FALSE;
 }
 
 static void director_send_slice(DirectorApp *app)
@@ -13825,6 +13877,7 @@ static gpointer director_source_preview_worker(gpointer data)
         gint request_width = 0;
         gint request_height = 0;
         gint request_mode = 0;
+        gint64 request_interval_us = 0;
         guint64 generation = 0;
 
         g_mutex_lock(&app->source_preview_lock);
@@ -13845,8 +13898,11 @@ static gpointer director_source_preview_worker(gpointer data)
         request_width = app->source_preview_width;
         request_height = app->source_preview_height;
         request_mode = app->source_preview_mode;
+        request_interval_us = app->source_preview_interval_us;
         generation = app->source_preview_generation;
         g_mutex_unlock(&app->source_preview_lock);
+
+        const gint64 cycle_started_us = g_get_monotonic_time();
 
         if(wire_generation != generation) {
             director_wire_close(&wire);
@@ -13870,10 +13926,11 @@ static gpointer director_source_preview_worker(gpointer data)
         gint frame_width = 0;
         gint frame_height = 0;
         gint full_range = 0;
+        const gint preview_timeout_ms = request_interval_us > 0 ? 1000 : 450;
         const gboolean ok = director_wire_query_preview(&wire, command,
                                                         &payload, &payload_size,
                                                         &frame_width, &frame_height,
-                                                        &full_range, 450);
+                                                        &full_range, preview_timeout_ms);
         g_free(host);
 
         if(!ok) {
@@ -13896,7 +13953,14 @@ static gpointer director_source_preview_worker(gpointer data)
             dispatch->generation = generation;
             g_main_context_invoke(NULL, director_source_preview_dispatch_main, dispatch);
         }
-        director_source_preview_wait(app, 150000);
+        if(request_interval_us > 0) {
+            const gint64 elapsed_us = g_get_monotonic_time() - cycle_started_us;
+            const gint64 remaining_us = request_interval_us - elapsed_us;
+            if(remaining_us > 0)
+                director_source_preview_wait(app, remaining_us);
+        }
+        else
+            director_source_preview_wait(app, 150000);
     }
 
     director_wire_close(&wire);
@@ -13919,6 +13983,100 @@ static void director_source_preview_request_size(gint source_width,
     if(h < 16) h = 16;
     *width = w;
     *height = h;
+}
+
+static gboolean director_screen_preview_controls_active(DirectorApp *app)
+{
+    return app && app->notebook &&
+           gtk_notebook_get_current_page(GTK_NOTEBOOK(app->notebook)) == DIRECTOR_PAGE_SCREEN;
+}
+
+static void director_screen_preview_request_size(gint source_width,
+                                                 gint source_height,
+                                                 gint divisor,
+                                                 gint *width,
+                                                 gint *height)
+{
+    if(divisor != 1 && divisor != 2 && divisor != 4 && divisor != 8)
+        divisor = DIRECTOR_PREVIEW_DEFAULT_QUALITY_DIVISOR;
+
+    gdouble scale = 1.0 / divisor;
+    if(source_width * scale > 4096.0)
+        scale = 4096.0 / MAX(1, source_width);
+    if(source_height * scale > 4096.0)
+        scale = MIN(scale, 4096.0 / MAX(1, source_height));
+
+    gint w = MAX(16, (gint)floor(source_width * scale)) & ~1;
+    gint h = MAX(16, (gint)floor(source_height * scale)) & ~1;
+    *width = MAX(16, w);
+    *height = MAX(16, h);
+}
+
+static gint64 director_screen_preview_interval_us(DirectorApp *app,
+                                                   const DirectorInstance *instance)
+{
+    gint stride = app ? app->preview_frame_stride : DIRECTOR_PREVIEW_DEFAULT_FRAME_STRIDE;
+    if(stride != 1 && stride != 2 && stride != 4 && stride != 8)
+        stride = DIRECTOR_PREVIEW_DEFAULT_FRAME_STRIDE;
+
+    gdouble fps = 25.0;
+    if(instance && instance->budget_us > 0)
+        fps = 1000000.0 / instance->budget_us;
+    else if(instance && instance->fps > 0.0)
+        fps = instance->fps;
+    fps = CLAMP(fps, 1.0, 240.0);
+    return MAX((gint64)1000, (gint64)llround((1000000.0 * stride) / fps));
+}
+
+static void director_preview_quality_ui_sync(DirectorApp *app)
+{
+    static const gint divisors[] = {8, 4, 2, 1};
+    if(!app)
+        return;
+    for(guint i = 0; i < G_N_ELEMENTS(divisors); i++) {
+        if(!app->preview_quality_buttons[i])
+            continue;
+        GtkStyleContext *context = gtk_widget_get_style_context(app->preview_quality_buttons[i]);
+        if(app->preview_quality_divisor == divisors[i])
+            gtk_style_context_add_class(context, "preview-quality-active");
+        else
+            gtk_style_context_remove_class(context, "preview-quality-active");
+    }
+}
+
+static void director_preview_controls_changed(DirectorApp *app)
+{
+    director_source_preview_sync_target(app);
+    director_overview_previews_sync(app);
+    if(app->canvas)
+        gtk_widget_queue_draw(app->canvas);
+    if(app->screen_setup_notebook &&
+       gtk_notebook_get_current_page(GTK_NOTEBOOK(app->screen_setup_notebook)) == 1)
+        director_update_projection_ui(app);
+}
+
+static void on_preview_quality_clicked(GtkButton *button, gpointer data)
+{
+    DirectorApp *app = data;
+    const gint divisor = GPOINTER_TO_INT(
+        g_object_get_data(G_OBJECT(button), "preview-quality-divisor"));
+    if(!app || (divisor != 1 && divisor != 2 && divisor != 4 && divisor != 8))
+        return;
+    app->preview_quality_divisor = divisor;
+    director_preview_quality_ui_sync(app);
+    director_preview_controls_changed(app);
+}
+
+static void on_preview_rate_changed(GtkComboBox *combo, gpointer data)
+{
+    DirectorApp *app = data;
+    if(!app || app->syncing)
+        return;
+    const gint active = gtk_combo_box_get_active(combo);
+    if(active < 0 || active > 3)
+        return;
+    app->preview_frame_stride = 1 << active;
+    director_preview_controls_changed(app);
 }
 
 static void director_calibration_preview_request_size(gint source_width,
@@ -13951,9 +14109,11 @@ static void director_source_preview_sync_target(DirectorApp *app)
     gint request_width = 0;
     gint request_height = 0;
     const gint request_mode = 2;
+    gint64 request_interval_us = 0;
+    const gboolean screen_preview = director_screen_preview_controls_active(app);
 
     /* Managed show nodes are previewed by the always-on overview worker.
-     * This dedicated socket exists only for an Output whose primary feed is
+     * This dedicated socket exists only for an Output whose selected input is
      * a manually configured endpoint rather than another Director node. */
     if(app && app->selected && app->selected->role == DIRECTOR_ROLE_OUTPUT &&
        (!app->selected->source_instance_id || !*app->selected->source_instance_id) &&
@@ -13963,34 +14123,45 @@ static void director_source_preview_sync_target(DirectorApp *app)
         port = app->selected->source_port;
         source_width = MAX(1, app->selected->input_width);
         source_height = MAX(1, app->selected->input_height);
-        director_source_preview_request_size(source_width, source_height,
-                                             &request_width, &request_height);
+        if(screen_preview) {
+            director_screen_preview_request_size(source_width, source_height,
+                                                 app->preview_quality_divisor,
+                                                 &request_width, &request_height);
+            request_interval_us = director_screen_preview_interval_us(app, app->selected);
+        }
+        else
+            director_source_preview_request_size(source_width, source_height,
+                                                 &request_width, &request_height);
     }
 
     GdkPixbuf *old = NULL;
     g_mutex_lock(&app->source_preview_lock);
-    const gboolean changed = g_strcmp0(app->source_preview_host, host) != 0 ||
-                             app->source_preview_port != port ||
-                             app->source_preview_width != request_width ||
-                             app->source_preview_height != request_height ||
-                             app->source_preview_mode != request_mode;
-    if(changed) {
+    const gboolean identity_changed = g_strcmp0(app->source_preview_host, host) != 0 ||
+                                      app->source_preview_port != port ||
+                                      app->source_preview_width != request_width ||
+                                      app->source_preview_height != request_height ||
+                                      app->source_preview_mode != request_mode;
+    const gboolean timing_changed = app->source_preview_interval_us != request_interval_us;
+    if(identity_changed || timing_changed) {
         g_free(app->source_preview_host);
         app->source_preview_host = host ? g_strdup(host) : NULL;
         app->source_preview_port = host ? port : 0;
         app->source_preview_width = request_width;
         app->source_preview_height = request_height;
         app->source_preview_mode = request_mode;
-        app->source_preview_generation++;
-        old = app->source_preview_pixbuf;
-        app->source_preview_pixbuf = NULL;
-        app->source_preview_frame_us = 0;
+        app->source_preview_interval_us = request_interval_us;
+        if(identity_changed) {
+            app->source_preview_generation++;
+            old = app->source_preview_pixbuf;
+            app->source_preview_pixbuf = NULL;
+            app->source_preview_frame_us = 0;
+        }
         g_cond_signal(&app->source_preview_cond);
     }
     g_mutex_unlock(&app->source_preview_lock);
     if(old)
         g_object_unref(old);
-    if(changed && app->canvas)
+    if((identity_changed || timing_changed) && app->canvas)
         gtk_widget_queue_draw(app->canvas);
 }
 
@@ -14032,7 +14203,25 @@ static void director_overview_frame_free(gpointer data)
         return;
     if(frame->pixbuf)
         g_object_unref(frame->pixbuf);
+    if(frame->thumbnail)
+        g_object_unref(frame->thumbnail);
     g_free(frame);
+}
+
+static GdkPixbuf *director_overview_make_thumbnail(GdkPixbuf *pixbuf)
+{
+    const gint width = gdk_pixbuf_get_width(pixbuf);
+    const gint height = gdk_pixbuf_get_height(pixbuf);
+    if(width <= DIRECTOR_ENGINE_THUMB_MAX_WIDTH &&
+       height <= DIRECTOR_ENGINE_THUMB_MAX_HEIGHT)
+        return g_object_ref(pixbuf);
+
+    const gdouble scale = MIN((gdouble)DIRECTOR_ENGINE_THUMB_MAX_WIDTH / width,
+                              (gdouble)DIRECTOR_ENGINE_THUMB_MAX_HEIGHT / height);
+    const gint thumb_width = MAX(1, (gint)floor(width * scale + 0.5));
+    const gint thumb_height = MAX(1, (gint)floor(height * scale + 0.5));
+    return gdk_pixbuf_scale_simple(pixbuf, thumb_width, thumb_height,
+                                   GDK_INTERP_BILINEAR);
 }
 
 static void director_overview_wire_free(gpointer data)
@@ -14053,6 +14242,7 @@ static DirectorOverviewPreviewTarget *director_overview_target_copy(const Direct
     copy->width = src->width;
     copy->height = src->height;
     copy->mode = src->mode;
+    copy->interval_us = src->interval_us;
     copy->priority = src->priority;
     return copy;
 }
@@ -14067,6 +14257,7 @@ static gboolean director_overview_target_equal(const DirectorOverviewPreviewTarg
            a->width == b->width &&
            a->height == b->height &&
            a->mode == b->mode &&
+           a->interval_us == b->interval_us &&
            a->priority == b->priority;
 }
 
@@ -14118,6 +14309,7 @@ static gboolean director_overview_preview_dispatch_main(gpointer data)
        dispatch->generation == app->overview_preview_generation) {
         DirectorOverviewPreviewFrame *frame = g_new0(DirectorOverviewPreviewFrame, 1);
         frame->pixbuf = g_object_ref(dispatch->pixbuf);
+        frame->thumbnail = g_object_ref(dispatch->thumbnail);
         frame->frame_us = g_get_monotonic_time();
         g_hash_table_replace(app->overview_preview_frames, g_strdup(dispatch->id), frame);
         if(app->workspace_store) {
@@ -14129,7 +14321,7 @@ static gboolean director_overview_preview_dispatch_main(gpointer data)
                                    WORKSPACE_COL_POINTER, &instance, -1);
                 if(instance && g_strcmp0(instance->id, dispatch->id) == 0) {
                     gtk_list_store_set(app->workspace_store, &iter,
-                                       WORKSPACE_COL_PREVIEW, dispatch->pixbuf, -1);
+                                       WORKSPACE_COL_PREVIEW, dispatch->thumbnail, -1);
                     break;
                 }
                 valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(app->workspace_store), &iter);
@@ -14144,7 +14336,7 @@ static gboolean director_overview_preview_dispatch_main(gpointer data)
                                    INSTANCE_COL_POINTER, &instance, -1);
                 if(instance && g_strcmp0(instance->id, dispatch->id) == 0) {
                     gtk_list_store_set(app->instance_store, &iter,
-                                       INSTANCE_COL_PREVIEW, dispatch->pixbuf, -1);
+                                       INSTANCE_COL_PREVIEW, dispatch->thumbnail, -1);
                     break;
                 }
                 valid = gtk_tree_model_iter_next(GTK_TREE_MODEL(app->instance_store), &iter);
@@ -14179,6 +14371,7 @@ static gboolean director_overview_preview_dispatch_main(gpointer data)
         }
     }
     g_object_unref(dispatch->pixbuf);
+    g_object_unref(dispatch->thumbnail);
     g_free(dispatch->id);
     g_free(dispatch);
     return G_SOURCE_REMOVE;
@@ -14210,10 +14403,12 @@ static gboolean director_overview_preview_fetch(DirectorApp *app,
     gint frame_width = 0;
     gint frame_height = 0;
     gint full_range = 0;
+    const gint preview_timeout_ms = target->priority && target->interval_us > 0 ?
+                                    1000 : 350;
     if(!director_wire_query_preview(&holder->wire, command,
                                     &payload, &payload_size,
                                     &frame_width, &frame_height,
-                                    &full_range, 350)) {
+                                    &full_range, preview_timeout_ms)) {
         director_wire_close(&holder->wire);
         return FALSE;
     }
@@ -14226,11 +14421,17 @@ static gboolean director_overview_preview_fetch(DirectorApp *app,
     free(payload);
     if(!pixbuf)
         return FALSE;
+    GdkPixbuf *thumbnail = director_overview_make_thumbnail(pixbuf);
+    if(!thumbnail) {
+        g_object_unref(pixbuf);
+        return FALSE;
+    }
 
     DirectorOverviewPreviewDispatch *dispatch = g_new0(DirectorOverviewPreviewDispatch, 1);
     dispatch->app = app;
     dispatch->id = g_strdup(target->id);
     dispatch->pixbuf = pixbuf;
+    dispatch->thumbnail = thumbnail;
     dispatch->generation = generation;
     g_main_context_invoke(NULL, director_overview_preview_dispatch_main, dispatch);
     return TRUE;
@@ -14242,6 +14443,7 @@ static gpointer director_overview_preview_worker(gpointer data)
     GHashTable *wires = g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
                                               director_overview_wire_free);
     guint background_cursor = 0;
+    gint64 next_background_us = 0;
 
     for(;;) {
         GPtrArray *targets = NULL;
@@ -14252,6 +14454,7 @@ static gpointer director_overview_preview_worker(gpointer data)
             g_mutex_unlock(&app->overview_preview_lock);
             g_hash_table_remove_all(wires);
             background_cursor = 0;
+            next_background_us = 0;
             g_mutex_lock(&app->overview_preview_lock);
             if(!app->overview_preview_stop &&
                (!app->overview_preview_targets || app->overview_preview_targets->len == 0))
@@ -14267,6 +14470,8 @@ static gpointer director_overview_preview_worker(gpointer data)
             g_ptr_array_add(targets, director_overview_target_copy(
                 g_ptr_array_index(app->overview_preview_targets, i)));
         g_mutex_unlock(&app->overview_preview_lock);
+
+        const gint64 cycle_started_us = g_get_monotonic_time();
 
         GHashTable *active_wires = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
         for(guint i = 0; i < targets->len; i++) {
@@ -14285,23 +14490,33 @@ static gpointer director_overview_preview_worker(gpointer data)
         g_hash_table_destroy(active_wires);
 
         guint priority_count = 0;
+        gint64 requested_priority_interval_us = 0;
         for(guint i = 0; i < targets->len; i++) {
             DirectorOverviewPreviewTarget *target = g_ptr_array_index(targets, i);
             if(!target->priority)
                 continue;
             priority_count++;
+            if(target->interval_us > 0 &&
+               (requested_priority_interval_us == 0 ||
+                target->interval_us < requested_priority_interval_us))
+                requested_priority_interval_us = target->interval_us;
             director_overview_preview_fetch(app, wires, target, generation);
         }
 
         if(targets->len > priority_count) {
-            for(guint attempt = 0; attempt < targets->len; attempt++) {
-                const guint index = (background_cursor + attempt) % targets->len;
-                DirectorOverviewPreviewTarget *target = g_ptr_array_index(targets, index);
-                if(target->priority)
-                    continue;
-                director_overview_preview_fetch(app, wires, target, generation);
-                background_cursor = (index + 1) % targets->len;
-                break;
+            const gint64 now_us = g_get_monotonic_time();
+            if(requested_priority_interval_us == 0 || now_us >= next_background_us) {
+                for(guint attempt = 0; attempt < targets->len; attempt++) {
+                    const guint index = (background_cursor + attempt) % targets->len;
+                    DirectorOverviewPreviewTarget *target = g_ptr_array_index(targets, index);
+                    if(target->priority)
+                        continue;
+                    director_overview_preview_fetch(app, wires, target, generation);
+                    background_cursor = (index + 1) % targets->len;
+                    break;
+                }
+                if(requested_priority_interval_us > 0)
+                    next_background_us = g_get_monotonic_time() + DIRECTOR_OVERVIEW_IDLE_INTERVAL_US;
             }
         }
         else if(targets->len > 0) {
@@ -14309,11 +14524,20 @@ static gpointer director_overview_preview_worker(gpointer data)
         }
 
         const gint64 interval_us = priority_count > 0 ?
-            DIRECTOR_OVERVIEW_ACTIVE_INTERVAL_US : DIRECTOR_OVERVIEW_IDLE_INTERVAL_US;
+            (requested_priority_interval_us > 0 ? requested_priority_interval_us :
+                                                 DIRECTOR_OVERVIEW_ACTIVE_INTERVAL_US) :
+            DIRECTOR_OVERVIEW_IDLE_INTERVAL_US;
         g_ptr_array_free(targets, TRUE);
 
         g_mutex_lock(&app->overview_preview_lock);
-        if(!app->overview_preview_stop)
+        if(!app->overview_preview_stop && requested_priority_interval_us > 0) {
+            const gint64 deadline_us = cycle_started_us + interval_us;
+            if(deadline_us > g_get_monotonic_time())
+                g_cond_wait_until(&app->overview_preview_cond,
+                                  &app->overview_preview_lock,
+                                  deadline_us);
+        }
+        else if(!app->overview_preview_stop)
             g_cond_wait_until(&app->overview_preview_cond,
                               &app->overview_preview_lock,
                               g_get_monotonic_time() + interval_us);
@@ -14330,6 +14554,7 @@ static void director_overview_previews_sync(DirectorApp *app)
 
     GPtrArray *desired = g_ptr_array_new_with_free_func(director_overview_target_free);
     const gchar *priority_id = NULL;
+    gboolean screen_preview = FALSE;
 
     DirectorInstance *active_calibration_camera = director_calibration_camera(app);
     if(active_calibration_camera &&
@@ -14343,6 +14568,7 @@ static void director_overview_previews_sync(DirectorApp *app)
             priority_id = app->selected->id;
         }
         else if(page == DIRECTOR_PAGE_SCREEN) {
+            screen_preview = TRUE;
             const gint screen_page = app->screen_setup_notebook ?
                 gtk_notebook_get_current_page(GTK_NOTEBOOK(app->screen_setup_notebook)) : 0;
             if(screen_page == 0 && app->selected->role == DIRECTOR_ROLE_OUTPUT &&
@@ -14367,6 +14593,19 @@ static void director_overview_previews_sync(DirectorApp *app)
                 director_calibration_preview_request_size(MAX(1, instance->output_width),
                                                           MAX(1, instance->output_height),
                                                           &target->width, &target->height);
+            }
+            else if(screen_preview && priority_id &&
+                    g_strcmp0(priority_id, instance->id) == 0) {
+                const gint source_width = instance->live_graph_width > 0 ?
+                                          instance->live_graph_width :
+                                          MAX(1, instance->output_width);
+                const gint source_height = instance->live_graph_height > 0 ?
+                                           instance->live_graph_height :
+                                           MAX(1, instance->output_height);
+                director_screen_preview_request_size(source_width, source_height,
+                                                     app->preview_quality_divisor,
+                                                     &target->width, &target->height);
+                target->interval_us = director_screen_preview_interval_us(app, instance);
             }
             else {
                 director_source_preview_request_size(MAX(1, instance->output_width),
@@ -14433,6 +14672,14 @@ static GdkPixbuf *director_overview_preview_ref(DirectorApp *app,
         *live = frame && frame->pixbuf &&
             (g_get_monotonic_time() - frame->frame_us) < DIRECTOR_OVERVIEW_FRESH_US;
     return frame && frame->pixbuf ? g_object_ref(frame->pixbuf) : NULL;
+}
+
+static GdkPixbuf *director_overview_thumbnail_ref(DirectorApp *app,
+                                                   const gchar *id)
+{
+    DirectorOverviewPreviewFrame *frame = app && app->overview_preview_frames && id ?
+        g_hash_table_lookup(app->overview_preview_frames, id) : NULL;
+    return frame && frame->thumbnail ? g_object_ref(frame->thumbnail) : NULL;
 }
 
 static GdkPixbuf *director_overview_preview_ref_after(DirectorApp *app,
@@ -14667,13 +14914,13 @@ static void director_draw_source_crop_inset(DirectorApp *app, cairo_t *cr,
     gchar *title = NULL;
     if(output) {
         if(source && source->id)
-            title = g_strdup_printf("Primary feed · %s", source->id);
+            title = g_strdup_printf("Selected input · %s", source->id);
         else if(manual_feed)
-            title = g_strdup_printf("Primary feed · %s:%d",
+            title = g_strdup_printf("Selected input · %s:%d",
                                     app->selected->source_host,
                                     app->selected->source_port);
         else
-            title = g_strdup("Primary feed · disconnected");
+            title = g_strdup("Selected input · disconnected");
     }
     else
         title = g_strdup(app->selected->role == DIRECTOR_ROLE_PROGRAM ?
@@ -14700,18 +14947,18 @@ static void director_draw_source_crop_inset(DirectorApp *app, cairo_t *cr,
     if(director_preview_pattern(app->selected) != 0)
         director_cairo_show_text(cr, "Click to return to source and edit");
     else if(output && !configured_feed)
-        director_cairo_show_text(cr, "No primary feed · connect one in Wiring");
+        director_cairo_show_text(cr, "No selected input · connect one in Patch bay");
     else if(live)
         director_cairo_show_text(cr, output ?
-                        "Live primary feed · blue = source crop · drag to create a screen area" :
+                        "Live selected input · blue = source crop · drag to create a screen area" :
                         "Live engine frame · blue = source crop · drag to create a screen area");
     else if(preview)
         director_cairo_show_text(cr, output ?
-                        "Primary feed preview is stale · reconnecting" :
+                        "Selected-input preview is stale · reconnecting" :
                         "Engine preview is stale · reconnecting");
     else
         director_cairo_show_text(cr, output ?
-                        "Waiting for primary feed frame" :
+                        "Waiting for selected-input frame" :
                         "Waiting for live engine frame");
 
     if(preview)
@@ -14954,7 +15201,7 @@ static gboolean on_canvas_draw(GtkWidget *widget, cairo_t *cr, gpointer data)
     gchar *caption = NULL;
     if(pattern == 0) {
         if(mapping_supported)
-            caption = g_strdup_printf("Screen Mapping · %dx%d · drag primary feed to add an area · drag edges to resize",
+            caption = g_strdup_printf("Screen Mapping · %dx%d · drag selected input to add an area · drag edges to resize",
                                       output_w, output_h);
         else
             caption = g_strdup_printf("Live %s output · %dx%d · area mapping is available on Output engines",
@@ -15403,7 +15650,7 @@ static gchar *director_workspace_route(const DirectorShow *show,
                 DirectorInstance *source = input->source_instance_id && *input->source_instance_id ?
                     director_show_find_instance((DirectorShow*)show, input->source_instance_id) : NULL;
                 const gchar *transport = input->type == DIRECTOR_INPUT_ROUTE_SHM ? "SHM" : "TCP";
-                const gchar *kind = instance->role == DIRECTOR_ROLE_OUTPUT ? "Primary feed" : "Input";
+                const gchar *kind = "Input";
                 if(source)
                     g_string_append_printf(route, "%s ← %s · %s", kind, source->id, transport);
                 else if(input->source_instance_id && *input->source_instance_id)
@@ -15423,7 +15670,7 @@ static gchar *director_workspace_route(const DirectorShow *show,
             g_string_append(route, " · ");
         DirectorInstance *source = director_show_find_instance((DirectorShow*)show,
                                                                 instance->source_instance_id);
-        const gchar *input = instance->role == DIRECTOR_ROLE_OUTPUT ? "Primary feed" : "Managed feed";
+        const gchar *input = instance->role == DIRECTOR_ROLE_OUTPUT ? "Selected input" : "Managed feed";
         if(source)
             g_string_append_printf(route, "%s ← %s · %s", input, source->id,
                                    director_hosts_equivalent(source->host, instance->host) ? "SHM" : "TCP");
@@ -15434,7 +15681,7 @@ static gchar *director_workspace_route(const DirectorShow *show,
             instance->source_host && *instance->source_host && instance->source_port > 0) {
         if(route->len)
             g_string_append(route, " · ");
-        g_string_append_printf(route, "Primary feed ← %s:%d",
+        g_string_append_printf(route, "Selected input ← %s:%d",
                                instance->source_host, instance->source_port);
     }
 
@@ -15522,7 +15769,7 @@ static void director_workspace_rebuild_store(DirectorApp *app)
                                WORKSPACE_COL_PREVIEW, NULL,
                                WORKSPACE_COL_POINTER, instance,
                                -1);
-            GdkPixbuf *preview = director_overview_preview_ref(app, instance->id, NULL);
+            GdkPixbuf *preview = director_overview_thumbnail_ref(app, instance->id);
             if(preview) {
                 gtk_list_store_set(app->workspace_store, &iter, WORKSPACE_COL_PREVIEW, preview, -1);
                 g_object_unref(preview);
@@ -17630,9 +17877,7 @@ static void director_stage_draw_wiring(DirectorApp *app, cairo_t *cr, GtkWidget 
             pending_input ? pending_input_label :
             route_count_label ? route_count_label :
             ndi_input ? ndi_input_label :
-            instance->role == DIRECTOR_ROLE_OUTPUT ?
-            (manual_input ? "PRIMARY IN · manual" :
-             video_input ? "PRIMARY IN · connected" : "PRIMARY IN") :
+            manual_input ? "INPUT ROUTE · manual" :
             (video_input ? "INPUT ROUTE · connected" : "INPUT ROUTE");
         cairo_move_to(cr, x + 16.0, y + 86.0);
         gchar *input_display = director_stage_wiring_ellipsize(cr, input_label, w - 122.0);
@@ -17914,7 +18159,7 @@ static gboolean on_stage_canvas_draw(GtkWidget *widget, cairo_t *cr, gpointer da
                     (instance->source_host && *instance->source_host && instance->source_port > 0 ?
                      g_strdup_printf("%s:%d", instance->source_host, instance->source_port) :
                      g_strdup("not configured"));
-                label = g_strdup_printf("%s  ·  %dx%d\nPrimary feed ← %s%s",
+                label = g_strdup_printf("%s  ·  %dx%d\nSelected input ← %s%s",
                                         instance->id,
                                         instance->output_width,
                                         instance->output_height,
@@ -18308,8 +18553,7 @@ static gboolean director_apply_video_wire(DirectorApp *app,
     replace_owned_string(&route->host, route_host ? route_host : "");
     route->port = source->port;
     route->shm_key = local ? source_shm_key : 0;
-    if(target->role != DIRECTOR_ROLE_OUTPUT &&
-       target->source_instance_id && *target->source_instance_id &&
+    if(target->source_instance_id && *target->source_instance_id &&
        g_strcmp0(target->source_instance_id, source->id) == 0)
         route->select_when_ready = TRUE;
 
@@ -18357,15 +18601,13 @@ static gboolean director_apply_video_wire(DirectorApp *app,
     director_client_send(target->client, command);
     g_free(command);
 
-    route->applied_connection = target->role == DIRECTOR_ROLE_OUTPUT;
-    route->apply_pending = target->role != DIRECTOR_ROLE_OUTPUT;
+    route->applied_connection = FALSE;
+    route->apply_pending = TRUE;
     route->apply_requested_us = now;
     target->wire_source_shm_key = local ? source_shm_key : 0;
-    target->wire_applied_connection =
-        target->role == DIRECTOR_ROLE_OUTPUT || director_native_routes_applied(target);
+    target->wire_applied_connection = director_native_routes_applied(target);
 
-    director_log(app, "%s video route %s → %s (%s)",
-                 target->role == DIRECTOR_ROLE_OUTPUT ? "Switched" : "Requested",
+    director_log(app, "Requested video route %s → %s (%s)",
                  source->id, target->id, local ? "shared memory" : "unicast TCP");
     return TRUE;
 }
@@ -18528,11 +18770,6 @@ static gboolean director_stage_connect_ndi(DirectorApp *app,
     }
     if(strlen(source_name) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
         director_error_dialog(app, "The selected NDI source name exceeds 253 characters.");
-        return FALSE;
-    }
-    if(target->role == DIRECTOR_ROLE_OUTPUT) {
-        director_error_dialog(app,
-            "Output instances consume their primary VeeJay feed. Patch NDI into a Program or Standalone engine; each VeeJay can publish its own NDI TX independently.");
         return FALSE;
     }
     if(target->split_master_instance_id && *target->split_master_instance_id) {
@@ -18880,7 +19117,7 @@ static gboolean director_stage_connect_video(DirectorApp *app,
     if(target->split_master_instance_id && *target->split_master_instance_id) {
         director_error_dialog(app,
             "This screen is fed by the native video-wall splitter. "
-            "Its wall input is owned by the split master, not by a manual Wiring connection.");
+            "Its wall input is owned by the split master, not by a manual Patch bay connection.");
         return FALSE;
     }
     if(director_video_wire_would_cycle(app, source, target)) {
@@ -18902,15 +19139,7 @@ static gboolean director_stage_connect_video(DirectorApp *app,
     const DirectorInputRouteType type = local ? DIRECTOR_INPUT_ROUTE_SHM :
                                                 DIRECTOR_INPUT_ROUTE_TCP;
     DirectorInputRoute *route = director_native_route_for_source(target, source);
-    if(target->role == DIRECTOR_ROLE_OUTPUT) {
-        if(target->input_routes) {
-            for(guint i = 0; i < target->input_routes->len; i++)
-                director_remove_runtime_input_route(app, target,
-                    g_ptr_array_index(target->input_routes, i));
-        }
-        director_instance_clear_input_routes(target);
-        route = NULL;
-    } else if(route) {
+    if(route) {
         const gboolean changed_transport = route->type != type;
         const gboolean changed_tcp_endpoint =
             type == DIRECTOR_INPUT_ROUTE_TCP &&
@@ -18937,7 +19166,7 @@ static gboolean director_stage_connect_video(DirectorApp *app,
         route->applied_connection = FALSE;
         route->apply_pending = FALSE;
         route->apply_requested_us = 0;
-        route->select_when_ready = target->role != DIRECTOR_ROLE_OUTPUT;
+        route->select_when_ready = TRUE;
         route->select_requested_us = 0;
     }
 
@@ -18946,8 +19175,8 @@ static gboolean director_stage_connect_video(DirectorApp *app,
     target->source_port = source->port;
     target->wire_applied_connection = FALSE;
     target->wire_source_shm_key = 0;
-    director_discovery_pin_instance(app, source, "used in Wiring");
-    director_discovery_pin_instance(app, target, "configured in Wiring");
+    director_discovery_pin_instance(app, source, "used in Patch bay");
+    director_discovery_pin_instance(app, target, "configured in Patch bay");
 
     if(target->role == DIRECTOR_ROLE_OUTPUT) {
         gboolean any_area = FALSE;
@@ -19806,7 +20035,6 @@ static gboolean on_stage_canvas_motion(GtkWidget *widget, GdkEventMotion *event,
                 app->stage_wire_hover_target = target &&
                     target != app->stage_wire_source &&
                     !target->ndi_input_change_pending &&
-                    target->role != DIRECTOR_ROLE_OUTPUT &&
                     (!target->split_master_instance_id || !*target->split_master_instance_id) ?
                     target : NULL;
             }
@@ -21143,7 +21371,7 @@ static void director_update_workspace_ui(DirectorApp *app)
     }
     DirectorInstance *instance = app->selected;
     const gchar *mode_name = app->stage_mode == DIRECTOR_STAGE_MODE_PROJECTION ? "Projection" :
-                             app->stage_mode == DIRECTOR_STAGE_MODE_WIRING ? "Wiring" : "Arrange";
+                             app->stage_mode == DIRECTOR_STAGE_MODE_WIRING ? "Patch bay" : "Arrange";
     gchar *route = instance ? director_workspace_route(app->show, instance) : NULL;
     GPtrArray *wiring_ndi_nodes = app->stage_mode == DIRECTOR_STAGE_MODE_WIRING ?
         director_stage_wiring_collect_ndi_nodes(app) : NULL;
@@ -21182,13 +21410,13 @@ static void director_update_workspace_ui(DirectorApp *app)
                                  pattern_target && app->stage_mode != DIRECTOR_STAGE_MODE_WIRING);
         if(instance)
             gtk_combo_box_set_active(GTK_COMBO_BOX(app->stage_pattern_combo), instance->pattern);
-        if(app->stage_projection_switch)
-            gtk_switch_set_active(GTK_SWITCH(app->stage_projection_switch),
-                                  projection && instance->live_projection_enabled);
+        if(app->stage_projection_check)
+            gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->stage_projection_check),
+                                         projection && instance->live_projection_enabled);
         app->syncing = old_syncing;
     }
-    if(app->stage_projection_switch)
-        gtk_widget_set_sensitive(app->stage_projection_switch,
+    if(app->stage_projection_check)
+        gtk_widget_set_sensitive(app->stage_projection_check,
                                  projection && app->stage_mode != DIRECTOR_STAGE_MODE_WIRING &&
                                  instance->connected && instance->backend_ready);
     if(app->stage_projection_save_button)
@@ -21207,13 +21435,13 @@ static void director_update_workspace_ui(DirectorApp *app)
         gtk_widget_set_sensitive(app->stage_grid_all_button, pattern_targets > 0);
     if(app->stage_program_all_button)
         gtk_widget_set_sensitive(app->stage_program_all_button, pattern_targets > 0);
-    if(app->stage_forward_switch) {
+    if(app->stage_forward_check) {
         const gboolean old_syncing = app->syncing;
         app->syncing = TRUE;
-        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->stage_forward_switch),
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(app->stage_forward_check),
                                      preview && instance->preview_forward_vims);
         app->syncing = old_syncing;
-        gtk_widget_set_sensitive(app->stage_forward_switch,
+        gtk_widget_set_sensitive(app->stage_forward_check,
                                  preview && instance->connected && instance->backend_ready);
     }
     if(app->stage_sync_button)
@@ -21238,6 +21466,7 @@ static void director_update_workspace_ui(DirectorApp *app)
 static GtkWidget *director_build_show_page(DirectorApp *app)
 {
     GtkWidget *scroll = gtk_scrolled_window_new(NULL, NULL);
+    gtk_style_context_add_class(gtk_widget_get_style_context(scroll), "director-theme");
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
                                    GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
     GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
@@ -21254,7 +21483,7 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     app->stage_mode_projection = gtk_radio_button_new_with_label_from_widget(
         GTK_RADIO_BUTTON(app->stage_mode_arrange), "Projection");
     app->stage_mode_wiring = gtk_radio_button_new_with_label_from_widget(
-        GTK_RADIO_BUTTON(app->stage_mode_arrange), "Wiring");
+        GTK_RADIO_BUTTON(app->stage_mode_arrange), "Patch bay");
     g_object_set_data(G_OBJECT(app->stage_mode_arrange), "stage-mode",
                       GINT_TO_POINTER(DIRECTOR_STAGE_MODE_ARRANGE));
     g_object_set_data(G_OBJECT(app->stage_mode_projection), "stage-mode",
@@ -21278,7 +21507,7 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     gtk_widget_set_tooltip_text(app->stage_pattern_combo,
         "Choose live video or a calibration image for the selected screen. Changes apply immediately when the engine is connected.");
     app->stage_button_fit = gtk_button_new_with_label("Fit stage");
-    app->stage_wiring_autolayout_button = gtk_button_new_with_label("Auto-layout wiring");
+    app->stage_wiring_autolayout_button = gtk_button_new_with_label("Auto-layout patch bay");
     gtk_widget_set_tooltip_text(app->stage_wiring_autolayout_button,
         "Arrange the current graph into a readable starting layout. Every box remains freely movable afterward.");
     gtk_widget_set_no_show_all(app->stage_wiring_autolayout_button, TRUE);
@@ -21381,14 +21610,11 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     gtk_box_pack_start(GTK_BOX(app->stage_visual_tools_box), app->stage_button_projection, FALSE, FALSE, 0);
 
     GtkWidget *projection_quick = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    GtkWidget *projection_quick_label = gtk_label_new("Projection");
-    gtk_widget_set_halign(projection_quick_label, GTK_ALIGN_START);
-    app->stage_projection_switch = gtk_switch_new();
+    app->stage_projection_check = director_check_button_new("Projection enabled");
     app->stage_projection_save_button = gtk_button_new_with_label("Apply & save mesh");
     gtk_widget_set_tooltip_text(app->stage_projection_save_button,
         "Save the current mesh, restore it on startup, then explicitly enable live projection on the selected engine. Runtime state is confirmed by the backend.");
-    gtk_box_pack_start(GTK_BOX(projection_quick), projection_quick_label, TRUE, TRUE, 0);
-    gtk_box_pack_end(GTK_BOX(projection_quick), app->stage_projection_switch, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(projection_quick), app->stage_projection_check, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(app->stage_visual_tools_box), projection_quick, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(app->stage_visual_tools_box), app->stage_projection_save_button, FALSE, FALSE, 0);
 
@@ -21466,9 +21692,9 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     GtkWidget *control_frame = gtk_frame_new("Master / Preview");
     GtkWidget *control_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
     gtk_container_set_border_width(GTK_CONTAINER(control_box), 8);
-    app->stage_forward_switch = director_check_button_new("Forward live controls");
+    app->stage_forward_check = director_check_button_new("Forward live controls");
     app->stage_sync_button = gtk_button_new_with_label("Push Sample Bank to Master");
-    gtk_box_pack_start(GTK_BOX(control_box), app->stage_forward_switch, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(control_box), app->stage_forward_check, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(control_box), app->stage_sync_button, FALSE, FALSE, 0);
     gtk_container_add(GTK_CONTAINER(control_frame), control_box);
     gtk_box_pack_end(GTK_BOX(workspace_side), control_frame, FALSE, FALSE, 0);
@@ -21501,7 +21727,7 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     g_signal_connect(app->stage_mode_projection, "toggled", G_CALLBACK(on_stage_mode_toggled), app);
     g_signal_connect(app->stage_mode_wiring, "toggled", G_CALLBACK(on_stage_mode_toggled), app);
     g_signal_connect(app->stage_pattern_combo, "changed", G_CALLBACK(on_pattern_changed), app);
-    g_signal_connect(app->stage_projection_switch, "state-set",
+    g_signal_connect(app->stage_projection_check, "toggled",
                      G_CALLBACK(on_projection_runtime_changed), app);
     g_signal_connect(app->stage_projection_save_button, "clicked",
                      G_CALLBACK(on_projection_save), app);
@@ -21523,7 +21749,7 @@ static GtkWidget *director_build_show_page(DirectorApp *app)
     g_signal_connect(app->button_snapshot_save, "clicked", G_CALLBACK(on_snapshot_save), app);
     g_signal_connect(app->button_snapshot_restore, "clicked", G_CALLBACK(on_snapshot_restore), app);
     g_signal_connect(app->button_snapshot_delete, "clicked", G_CALLBACK(on_snapshot_delete), app);
-    g_signal_connect(app->stage_forward_switch, "toggled", G_CALLBACK(on_stage_forward_toggled), app);
+    g_signal_connect(app->stage_forward_check, "toggled", G_CALLBACK(on_stage_forward_toggled), app);
     g_signal_connect(app->stage_sync_button, "clicked", G_CALLBACK(on_stage_sync_samplebank), app);
     GtkWidget *workstation_expander = gtk_expander_new("Local workstation tools");
     GtkWidget *workstation_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -21634,6 +21860,7 @@ static gboolean on_engine_preview_draw(GtkWidget *widget, cairo_t *cr, gpointer 
 static GtkWidget *director_build_instance_page(DirectorApp *app)
 {
     GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    gtk_style_context_add_class(gtk_widget_get_style_context(outer), "director-theme");
     gtk_container_set_border_width(GTK_CONTAINER(outer), 8);
 
 
@@ -21700,7 +21927,7 @@ static GtkWidget *director_build_instance_page(DirectorApp *app)
     gtk_widget_set_tooltip_text(app->combo_role,
         "Standalone — a self-contained VeeJay engine for traditional direct use.\n"
         "Program — the normal playback/compositing engine; it can present directly or feed Output engines.\n"
-        "Output — a presentation/mapping engine; it starts blank or receives one primary feed, then applies crop, blend and projection. Output does not participate in Master/Preview control.");
+        "Output — a presentation/mapping engine; it starts blank or receives SHM, TCP, or NDI video routes directly, then applies crop, blend and projection. Output does not participate in Master/Preview control.");
     app->entry_host = gtk_entry_new();
     app->spin_port = director_spin(1, 65530, 1, 0);
     app->spin_output_width = director_spin(16, 32768, 1, 0);
@@ -21758,7 +21985,7 @@ static GtkWidget *director_build_instance_page(DirectorApp *app)
     director_grid_attach(source_grid, director_labeled_widget("Manual video host", app->entry_source_host), 0, 1, 1);
     director_grid_attach(source_grid, director_labeled_widget("Manual video port", app->spin_source_port), 1, 1, 1);
     gtk_widget_set_tooltip_text(source_frame,
-        "Stage → Wiring is the primary way to create video routes. For an Output this route is its single primary feed: the current backend does not yet mix several upstream feeds inside one Output. For Program/Standalone engines Director opens the source as a managed stream; it does not replace the engine's own playback model. Master/Preview control is configured separately below and never implies a video route. Same-host routes use shared memory; cross-host routes use VeeJay's reconnecting unicast transport. Outputs may also use a manual endpoint.");
+        "Stage → Patch bay is the primary way to create video routes. Every VeeJay instance, including an Output, can be a direct SHM, TCP, or NDI target. For Program/Standalone engines Director opens native sources as managed streams; it does not replace the engine's own playback model. Master/Preview control is configured separately below and never implies a video route. Same-host native routes use shared memory; cross-host native routes use VeeJay's reconnecting unicast transport; NDI routes connect by sender name.");
     gtk_container_add(GTK_CONTAINER(source_frame), source_grid);
     gtk_box_pack_start(GTK_BOX(general), source_frame, FALSE, FALSE, 0);
 
@@ -22217,6 +22444,7 @@ static GtkWidget *director_build_instance_page(DirectorApp *app)
 static GtkWidget *director_build_output_page(DirectorApp *app)
 {
     GtkWidget *outer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_style_context_add_class(gtk_widget_get_style_context(outer), "director-theme");
     gtk_container_set_border_width(GTK_CONTAINER(outer), 8);
 
 
@@ -22246,6 +22474,53 @@ static GtkWidget *director_build_output_page(DirectorApp *app)
     gtk_box_pack_end(GTK_BOX(graph_toolbar), app->button_apply_graph, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(outer), graph_toolbar, FALSE, FALSE, 0);
 
+    GtkWidget *preview_toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    GtkWidget *preview_label = gtk_label_new("Preview");
+    GtkWidget *quality_label = gtk_label_new("Quality");
+    gtk_style_context_add_class(gtk_widget_get_style_context(preview_label), "section-title");
+    gtk_style_context_add_class(gtk_widget_get_style_context(quality_label), "dim-label");
+    gtk_box_pack_start(GTK_BOX(preview_toolbar), preview_label, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(preview_toolbar), quality_label, FALSE, FALSE, 4);
+    static const gchar *quality_labels[] = {"1/8", "1/4", "1/2", "1/1"};
+    static const gint quality_divisors[] = {8, 4, 2, 1};
+    for(guint i = 0; i < G_N_ELEMENTS(quality_divisors); i++) {
+        app->preview_quality_buttons[i] = gtk_button_new_with_label(quality_labels[i]);
+        g_object_set_data(G_OBJECT(app->preview_quality_buttons[i]),
+                          "preview-quality-divisor",
+                          GINT_TO_POINTER(quality_divisors[i]));
+        gtk_widget_set_tooltip_text(app->preview_quality_buttons[i],
+            i == 0 ? "1/8 resolution · lowest preview bandwidth" :
+            i == 1 ? "1/4 resolution" :
+            i == 2 ? "1/2 resolution" :
+                     "Native preview resolution · highest bandwidth and CPU use");
+        g_signal_connect(app->preview_quality_buttons[i], "clicked",
+                         G_CALLBACK(on_preview_quality_clicked), app);
+        gtk_box_pack_start(GTK_BOX(preview_toolbar), app->preview_quality_buttons[i],
+                           FALSE, FALSE, 0);
+    }
+    director_preview_quality_ui_sync(app);
+
+    GtkWidget *preview_separator = gtk_separator_new(GTK_ORIENTATION_VERTICAL);
+    gtk_box_pack_start(GTK_BOX(preview_toolbar), preview_separator, FALSE, FALSE, 6);
+    GtkWidget *rate_label = gtk_label_new("Update");
+    gtk_style_context_add_class(gtk_widget_get_style_context(rate_label), "dim-label");
+    gtk_box_pack_start(GTK_BOX(preview_toolbar), rate_label, FALSE, FALSE, 0);
+    app->preview_rate_combo = gtk_combo_box_text_new();
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->preview_rate_combo), "Every frame");
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->preview_rate_combo), "Every 2 frames");
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->preview_rate_combo), "Every 4 frames");
+    gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->preview_rate_combo), "Every 8 frames");
+    const gint rate_index = app->preview_frame_stride == 1 ? 0 :
+                            app->preview_frame_stride == 2 ? 1 :
+                            app->preview_frame_stride == 8 ? 3 : 2;
+    gtk_combo_box_set_active(GTK_COMBO_BOX(app->preview_rate_combo), rate_index);
+    gtk_widget_set_tooltip_text(app->preview_rate_combo,
+        "Preview cadence for the selected Screen engine. Every frame follows its current frame budget/FPS; background engine thumbnails stay throttled.");
+    g_signal_connect(app->preview_rate_combo, "changed",
+                     G_CALLBACK(on_preview_rate_changed), app);
+    gtk_box_pack_start(GTK_BOX(preview_toolbar), app->preview_rate_combo, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(outer), preview_toolbar, FALSE, FALSE, 0);
+
     GtkWidget *paned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
     app->canvas = gtk_drawing_area_new();
     gtk_widget_set_hexpand(app->canvas, TRUE);
@@ -22274,13 +22549,10 @@ static GtkWidget *director_build_output_page(DirectorApp *app)
         gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->combo_slice), label);
         g_free(label);
     }
-    app->switch_slice_enabled = gtk_switch_new();
     GtkWidget *slice_head = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    GtkWidget *enabled_label = gtk_label_new("On screen");
-    gtk_style_context_add_class(gtk_widget_get_style_context(enabled_label), "dim-label");
+    app->check_slice_enabled = director_check_button_new("On screen");
     gtk_box_pack_start(GTK_BOX(slice_head), app->combo_slice, TRUE, TRUE, 0);
-    gtk_box_pack_end(GTK_BOX(slice_head), app->switch_slice_enabled, FALSE, FALSE, 0);
-    gtk_box_pack_end(GTK_BOX(slice_head), enabled_label, FALSE, FALSE, 0);
+    gtk_box_pack_end(GTK_BOX(slice_head), app->check_slice_enabled, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(inspector), slice_head, FALSE, FALSE, 0);
 
     GtkWidget *presets = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 5);
@@ -22371,9 +22643,8 @@ static GtkWidget *director_build_output_page(DirectorApp *app)
     gtk_container_set_border_width(GTK_CONTAINER(projection), 8);
 
     GtkWidget *projection_toolbar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    GtkWidget *runtime_label = gtk_label_new("Apply projection");
-    app->projection_runtime_switch = gtk_switch_new();
-    app->projection_startup_switch = gtk_switch_new();
+    app->projection_runtime_check = director_check_button_new("Apply projection");
+    app->projection_startup_check = director_check_button_new("Restore at startup");
     app->projection_view_combo = gtk_combo_box_text_new();
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->projection_view_combo), "Video + mesh");
     gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(app->projection_view_combo), "Video only");
@@ -22382,14 +22653,11 @@ static GtkWidget *director_build_output_page(DirectorApp *app)
     GtkWidget *refresh_projection = gtk_button_new_with_label("Refresh");
     GtkWidget *save_projection = gtk_button_new_with_label("Apply & Save");
     gtk_widget_set_tooltip_text(save_projection,
-        "Save this mesh for the selected engine, enable it for startup, then explicitly enable live projection now. The switches update from backend-confirmed state.");
+        "Save this mesh for the selected engine, enable it for startup, then explicitly enable live projection now. The checkbuttons update from backend-confirmed state.");
     GtkWidget *reset_projection = gtk_button_new_with_label("Reset mesh");
     gtk_style_context_add_class(gtk_widget_get_style_context(save_projection), "suggested-action");
-    GtkWidget *startup_label = gtk_label_new("Restore at startup");
-    gtk_box_pack_start(GTK_BOX(projection_toolbar), runtime_label, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(projection_toolbar), app->projection_runtime_switch, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(projection_toolbar), startup_label, FALSE, FALSE, 8);
-    gtk_box_pack_start(GTK_BOX(projection_toolbar), app->projection_startup_switch, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(projection_toolbar), app->projection_runtime_check, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(projection_toolbar), app->projection_startup_check, FALSE, FALSE, 8);
     gtk_box_pack_start(GTK_BOX(projection_toolbar), app->projection_view_combo, FALSE, FALSE, 8);
     gtk_box_pack_end(GTK_BOX(projection_toolbar), reset_projection, FALSE, FALSE, 0);
     gtk_box_pack_end(GTK_BOX(projection_toolbar), save_projection, FALSE, FALSE, 0);
@@ -22451,9 +22719,9 @@ static GtkWidget *director_build_output_page(DirectorApp *app)
                      G_CALLBACK(on_projection_point_selected), app);
     g_signal_connect(app->projection_mesh, "point-changed",
                      G_CALLBACK(on_projection_point_changed), app);
-    g_signal_connect(app->projection_runtime_switch, "state-set",
+    g_signal_connect(app->projection_runtime_check, "toggled",
                      G_CALLBACK(on_projection_runtime_changed), app);
-    g_signal_connect(app->projection_startup_switch, "state-set",
+    g_signal_connect(app->projection_startup_check, "toggled",
                      G_CALLBACK(on_projection_startup_changed), app);
     g_signal_connect(app->projection_view_combo, "changed",
                      G_CALLBACK(on_projection_view_changed), app);
@@ -22475,8 +22743,8 @@ static GtkWidget *director_build_output_page(DirectorApp *app)
     g_signal_connect(app->button_reset_graph, "clicked", G_CALLBACK(on_reset_graph), app);
     g_signal_connect(app->button_apply_slice, "clicked", G_CALLBACK(on_apply_slice), app);
     g_signal_connect(app->button_remove_slice, "clicked", G_CALLBACK(on_remove_slice), app);
-    g_signal_connect(app->switch_slice_enabled, "state-set",
-                     G_CALLBACK(on_slice_enabled_state_set), app);
+    g_signal_connect(app->check_slice_enabled, "toggled",
+                     G_CALLBACK(on_slice_enabled_toggled), app);
     for(gint i = 0; i < 4; i++) {
         g_signal_connect(app->source_spin[i], "value-changed",
                          G_CALLBACK(on_slice_control_value_changed), app);
@@ -22637,9 +22905,13 @@ static gboolean on_window_delete(GtkWidget *widget, GdkEvent *event, gpointer da
     if(app->show && app->show->dirty &&
        !director_confirm(app, "Exit and discard unsaved Director show changes?"))
         return TRUE;
-    if(director_any_process_running(app) &&
-       !director_confirm(app, "Exit and stop all locally managed VeeJay instances?"))
-        return TRUE;
+    app->stop_managed_on_exit = TRUE;
+    if(director_any_managed_veejay_running(app))
+        app->stop_managed_on_exit = director_confirm(
+            app,
+            "Exit and stop all locally managed VeeJay instances?\n\n"
+            "Choose No to exit Director and leave them running.");
+    app->shutting_down = TRUE;
     return FALSE;
 }
 
@@ -22667,6 +22939,7 @@ static void on_main_page_changed(GtkNotebook *notebook, GtkWidget *page,
 static void director_build_ui(DirectorApp *app)
 {
     app->window = gtk_application_window_new(app->application);
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->window), "director-window");
     g_signal_connect(app->window, "delete-event", G_CALLBACK(on_window_delete), app);
     gtk_window_set_default_size(GTK_WINDOW(app->window),
                                 DIRECTOR_DEFAULT_WIDTH,
@@ -22695,15 +22968,18 @@ static void director_build_ui(DirectorApp *app)
     GtkWidget *root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_style_context_add_class(gtk_widget_get_style_context(root), "reloaded");
     gtk_style_context_add_class(gtk_widget_get_style_context(app->header_title), "director-headerbar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->header_title), "director-theme");
     gtk_container_add(GTK_CONTAINER(app->window), root);
 
     GtkWidget *main_paned = gtk_paned_new(GTK_ORIENTATION_HORIZONTAL);
+    gtk_style_context_add_class(gtk_widget_get_style_context(main_paned), "director-shell");
     gtk_box_pack_start(GTK_BOX(root), main_paned, TRUE, TRUE, 0);
 
     GtkWidget *left = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     gtk_container_set_border_width(GTK_CONTAINER(left), 6);
     gtk_widget_set_size_request(left, 365, -1);
     gtk_style_context_add_class(gtk_widget_get_style_context(left), "director-sidebar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(left), "director-theme");
     GtkWidget *engines_title = gtk_label_new("Show engines");
     gtk_widget_set_halign(engines_title, GTK_ALIGN_START);
     gtk_style_context_add_class(gtk_widget_get_style_context(engines_title), "section-title");
@@ -22752,7 +23028,7 @@ static void director_build_ui(DirectorApp *app)
     gtk_style_context_add_class(gtk_widget_get_style_context(lan_title), "section-title");
     GtkWidget *lan_patchbay = gtk_button_new_with_label("Open patch bay");
     gtk_widget_set_tooltip_text(lan_patchbay,
-        "Open Stage → Wiring to see discovered VeeJays and create or remove video routes.");
+        "Open Stage → Patch bay to see discovered VeeJays and create or remove video routes.");
     gtk_box_pack_start(GTK_BOX(lan_header), lan_title, TRUE, TRUE, 0);
     gtk_box_pack_end(GTK_BOX(lan_header), lan_patchbay, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(left), lan_header, FALSE, FALSE, 0);
@@ -22763,7 +23039,7 @@ static void director_build_ui(DirectorApp *app)
     app->discovery_view = gtk_tree_view_new_with_model(GTK_TREE_MODEL(app->discovery_store));
     gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(app->discovery_view), FALSE);
     gtk_widget_set_tooltip_text(app->discovery_view,
-        "LAN discovery groups advertisements by VeeJay instance identity. Backends connect automatically and appear in the Engine list; double-click a row to open Stage → Wiring.");
+        "LAN discovery groups advertisements by VeeJay instance identity. Backends connect automatically and appear in the Engine list; double-click a row to open Stage → Patch bay.");
     GtkCellRenderer *lan_summary = gtk_cell_renderer_text_new();
     g_object_set(lan_summary, "wrap-mode", PANGO_WRAP_WORD_CHAR, "wrap-width", 285,
                  "xpad", 6, "ypad", 6, NULL);
@@ -22786,6 +23062,8 @@ static void director_build_ui(DirectorApp *app)
     gtk_paned_pack1(GTK_PANED(main_paned), left, FALSE, FALSE);
 
     app->notebook = gtk_notebook_new();
+    gtk_style_context_add_class(gtk_widget_get_style_context(app->notebook),
+                                "director-main-notebook");
     gtk_notebook_append_page(GTK_NOTEBOOK(app->notebook),
                              director_build_show_page(app),
                              gtk_label_new("Stage"));
@@ -22807,6 +23085,7 @@ static void director_build_ui(DirectorApp *app)
     GtkWidget *status_bar = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     gtk_container_set_border_width(GTK_CONTAINER(status_bar), 2);
     gtk_style_context_add_class(gtk_widget_get_style_context(status_bar), "director-statusbar");
+    gtk_style_context_add_class(gtk_widget_get_style_context(status_bar), "director-theme");
     app->status_text = gtk_label_new("Ready");
     gtk_widget_set_halign(app->status_text, GTK_ALIGN_START);
     gtk_widget_set_hexpand(app->status_text, TRUE);
@@ -22847,74 +23126,75 @@ static void director_build_ui(DirectorApp *app)
         "@define-color playing-bg #3a2614;"
         "@define-color record-color #8a4848;"
         "@define-color warn-color #a88a48;"
-        "* { background-image: none; border-color: @border-color; color: @text-color; font-size: 100%; }"
-        "window, box, grid, stack, paned, overlay, viewport, treeview, list, textview, scrolledwindow { background-color: @bg-color; }"
-        "scrolledwindow > viewport, notebook > stack, frame, frame > border { background-color: @bg-color; }"
-        "scrolledwindow.director-settings-scroll, viewport.director-settings-viewport, .director-settings-viewport, eventbox.director-settings-surface, .director-settings-surface { background-color: @bg-color; background-image: none; border: none; box-shadow: none; padding: 0; margin: 0; }"
-        "viewport.director-settings-viewport { background-color: @bg-color; border: none; box-shadow: none; padding: 0; margin: 0; }"
-        "scrolledwindow.director-settings-scroll undershoot.top, scrolledwindow.director-settings-scroll undershoot.bottom, scrolledwindow.director-settings-scroll undershoot.left, scrolledwindow.director-settings-scroll undershoot.right, scrolledwindow.director-settings-scroll overshoot.top, scrolledwindow.director-settings-scroll overshoot.bottom, scrolledwindow.director-settings-scroll overshoot.left, scrolledwindow.director-settings-scroll overshoot.right { background: none; background-image: none; background-color: transparent; border: none; box-shadow: none; min-width: 0; min-height: 0; }"
-        "scrolledwindow.director-settings-scroll junction { background-color: @bg-color; border: none; box-shadow: none; }"
-        "scrolledwindow.director-settings-scroll scrollbar, scrolledwindow.director-settings-scroll scrollbar.vertical, scrolledwindow.director-settings-scroll scrollbar.horizontal { background-color: @bg-color; border: none; box-shadow: none; padding: 0; margin: 0; }"
-        "scrolledwindow.director-settings-scroll scrollbar contents, scrolledwindow.director-settings-scroll scrollbar trough { background-color: @bg-color; border: none; box-shadow: none; }"
-        "scrolledwindow.director-settings-scroll scrollbar slider { background-color: #454f60; border: none; box-shadow: none; min-width: 7px; min-height: 7px; margin: 2px; }"
-        "scrolledwindow.director-settings-scroll scrollbar slider:hover { background-color: @accent-color; }"
-        ".reloaded { background-color: @bg-color; color: @text-color; }"
+        ".director-window, .reloaded, .director-shell { background-color: @bg-color; }"
+        ".director-theme { background-color: @bg-color; color: @text-color; font-size: 100%; }"
+        ".director-theme box, .director-theme grid, .director-theme overlay, .director-theme revealer, .director-theme eventbox { background-color: transparent; color: @text-color; }"
+        ".director-theme scrolledwindow, .director-theme viewport, .director-theme stack, .director-theme paned { background-color: @bg-color; color: @text-color; }"
+        ".director-shell > separator, .director-theme paned > separator, .director-theme separator { background-color: @border-color; min-width: 1px; min-height: 1px; }"
+        ".director-theme scrolledwindow.director-settings-scroll, .director-theme viewport.director-settings-viewport, .director-theme .director-settings-viewport, .director-theme eventbox.director-settings-surface, .director-theme .director-settings-surface { background-color: @bg-color; background-image: none; border: none; box-shadow: none; padding: 0; margin: 0; }"
+        ".director-theme scrolledwindow.director-settings-scroll undershoot.top, .director-theme scrolledwindow.director-settings-scroll undershoot.bottom, .director-theme scrolledwindow.director-settings-scroll undershoot.left, .director-theme scrolledwindow.director-settings-scroll undershoot.right, .director-theme scrolledwindow.director-settings-scroll overshoot.top, .director-theme scrolledwindow.director-settings-scroll overshoot.bottom, .director-theme scrolledwindow.director-settings-scroll overshoot.left, .director-theme scrolledwindow.director-settings-scroll overshoot.right { background: none; background-image: none; background-color: transparent; border: none; box-shadow: none; min-width: 0; min-height: 0; }"
+        ".director-theme scrolledwindow.director-settings-scroll junction { background-color: @bg-color; border: none; box-shadow: none; }"
+        ".director-theme scrolledwindow.director-settings-scroll scrollbar, .director-theme scrolledwindow.director-settings-scroll scrollbar.vertical, .director-theme scrolledwindow.director-settings-scroll scrollbar.horizontal { background-color: @bg-color; border: none; box-shadow: none; padding: 0; margin: 0; }"
+        ".director-theme scrolledwindow.director-settings-scroll scrollbar contents, .director-theme scrolledwindow.director-settings-scroll scrollbar trough { background-color: @bg-color; border: none; box-shadow: none; }"
+        ".director-theme scrolledwindow.director-settings-scroll scrollbar slider { background-color: #454f60; border: none; box-shadow: none; min-width: 7px; min-height: 7px; margin: 2px; }"
+        ".director-theme scrolledwindow.director-settings-scroll scrollbar slider:hover { background-color: @accent-color; }"
         "headerbar.director-headerbar { background-color: #1b1c20; border-bottom: 2px solid @border-color; padding: 2px; }"
         "headerbar.director-headerbar button { min-height: 27px; }"
-        "button { background-color: @panel-color; border: 1px solid @border-color; border-radius: 0; min-width: 20px; min-height: 27px; padding: 2px 5px; transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; }"
-        "button:hover, entry:hover, spinbutton:hover, combobox:hover, notebook header tabs tab:hover, treeview:hover, list row:hover { background-color: @hover-color; }"
-        "button:hover image, button:hover label { background-color: @accent-color; }"
-        "button:active { background-color: @playing-bg; border-color: @playing-color; }"
-        "button:checked, button.toggle:checked, .toggle:checked { background-color: @playing-bg; border: 1px solid @playing-color; border-radius: 4px; }"
-        "button:active image, button:active label, button:checked image, button:checked label, button.toggle:checked image, button.toggle:checked label, .toggle:checked image, .toggle:checked label { background-color: transparent; color: @text-color; }"
-        "button.suggested-action { background-color: @fill-color; border-color: @accent-color; color: @text-color; }"
-        "button.suggested-action:hover { background-color: @accent-color; border-color: @accent-hover; }"
-        "button.destructive-action { background-color: #3b2020; border-color: @record-color; color: @text-color; }"
-        "button.destructive-action:hover { background-color: #4b2828; border-color: #aa5a5a; }"
-        "button:disabled, entry:disabled, spinbutton:disabled, checkbutton:disabled, radiobutton:disabled { border-color: #4a4a4e; color: @text-muted; background-color: #37383f; }"
-        "button:disabled image, button:disabled label, checkbutton:disabled label, radiobutton:disabled label { color: @text-muted; background-color: transparent; }"
-        "entry, spinbutton { background-color: @panel-color; border: 1px solid @border-color; border-radius: 0; min-width: 50px; min-height: 28px; padding: 2px 4px; }"
-        "entry:focus { background-color: #626580; color: @text-color; }"
-        "combobox button { min-height: 27px; }"
-        "checkbutton, radiobutton { background-color: transparent; border: none; padding: 0 2px; min-height: 0; }"
-        "checkbutton label, radiobutton label { background-color: transparent; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; min-height: 0; }"
-        "checkbutton check, radiobutton radio { background-color: @raised-color; border: 1px solid @border-color; min-width: 14px; min-height: 14px; }"
-        "radiobutton radio { border-radius: 50%; }"
-        "checkbutton check { border-radius: 3px; }"
-        "checkbutton check:checked, radiobutton radio:checked { background-color: @playing-color; border-color: @playing-color; }"
-        "checkbutton:checked label, radiobutton:checked label { color: @playing-color; background-color: transparent; }"
-        "radiobutton radio:checked { background-image: radial-gradient(circle, @text-color 30%, transparent 40%); }"
-        "notebook, notebook stack, notebook > stack, notebook > stack > * { background-color: @bg-color; }"
-        "notebook header { background-color: @bg-color; border: none; box-shadow: none; }"
-        "notebook header tabs { background-color: @bg-color; border: none; box-shadow: none; }"
-        "notebook header tabs tab { min-width: 80px; min-height: 0; margin: 1px 2px 0 2px; padding: 3px 6px; background-color: @panel-color; border: 1px solid @border-color; box-shadow: none; }"
-        "notebook header tabs tab:checked { background-color: @fill-color; border-color: @accent-color; border-radius: 4px; box-shadow: none; }"
-        "notebook header tabs tab:hover { background-color: @hover-color; border-color: @accent-color; box-shadow: none; }"
-        "notebook header tabs tab:hover label, notebook header tabs tab:checked label { background-color: transparent; font-weight: normal; }"
-        "treeview, list { background-color: @bg-color; border: 1px solid @border-color; color: @text-color; font-feature-settings: 'tnum'; }"
-        "treeview header button { background-color: @panel-color; color: @text-muted; font-weight: bold; text-shadow: none; padding: 3px; border: none; border-bottom: 2px solid @border-color; border-right: 1px solid @border-color; }"
-        "treeview:selected, list row:selected { background-color: @fill-color; color: @text-color; }"
-        "treeview row:hover, list row:hover { background-color: @hover-color; }"
-        "scrollbar contents slider { background-color: #454f60; border-radius: 4px; }"
-        "scrollbar contents slider:hover { background-color: @accent-color; }"
-        "paned > separator, separator { background-color: @border-color; min-width: 1px; min-height: 1px; }"
-        "frame { background-color: @bg-color; border: none; padding: 0; margin: 0; }"
-        "frame > border { background-color: @bg-color; border: none; padding: 0; margin: 0; box-shadow: none; }"
-        "frame > label { background-color: @bg-color; color: @text-muted; padding: 0 2px; margin: 0; }"
-        "frame.director-section-frame, frame.director-section-frame > border { background-color: @bg-color; border: 0; border-style: none; box-shadow: none; padding: 0; margin: 0; }"
-        "frame.director-section-frame > label { background-color: @bg-color; color: @text-muted; padding: 0 2px; margin: 0; }"
-        "expander, expander title { background-color: @bg-color; color: @text-color; }"
+        ".director-theme button, dialog button, popover button { background-image: none; background-color: @panel-color; color: @text-color; border: 1px solid @border-color; border-radius: 0; min-width: 20px; min-height: 27px; padding: 2px 5px; box-shadow: none; text-shadow: none; transition: background-color 120ms ease-out, border-color 120ms ease-out, color 120ms ease-out; }"
+        ".director-theme button image, .director-theme button label, dialog button image, dialog button label, popover button image, popover button label { background-color: transparent; color: @text-color; }"
+        ".director-theme button:hover, .director-theme entry:hover, .director-theme spinbutton:hover, .director-theme combobox:hover, dialog button:hover, popover button:hover { background-color: @hover-color; border-color: @accent-color; }"
+        ".director-theme button:active, dialog button:active, popover button:active { background-color: @playing-bg; border-color: @playing-color; }"
+        ".director-theme button:checked, .director-theme button.toggle:checked { background-color: @playing-bg; border: 1px solid @playing-color; border-radius: 4px; }"
+        ".director-theme button.preview-quality-active { background-color: @playing-bg; border-color: @playing-color; }"
+        ".director-theme button:active image, .director-theme button:active label, .director-theme button:checked image, .director-theme button:checked label { background-color: transparent; color: @text-color; }"
+        ".director-theme button.suggested-action, dialog button.suggested-action { background-color: @fill-color; border-color: @accent-color; color: @text-color; }"
+        ".director-theme button.suggested-action:hover, dialog button.suggested-action:hover { background-color: @accent-color; border-color: @accent-hover; }"
+        ".director-theme button.destructive-action, dialog button.destructive-action { background-color: #3b2020; border-color: @record-color; color: @text-color; }"
+        ".director-theme button.destructive-action:hover, dialog button.destructive-action:hover { background-color: #4b2828; border-color: #aa5a5a; }"
+        ".director-theme button:disabled, .director-theme entry:disabled, .director-theme spinbutton:disabled, .director-theme checkbutton:disabled, .director-theme radiobutton:disabled, dialog button:disabled { border-color: #4a4a4e; color: @text-muted; background-color: #37383f; }"
+        ".director-theme button:disabled image, .director-theme button:disabled label, .director-theme checkbutton:disabled label, .director-theme radiobutton:disabled label { color: @text-muted; background-color: transparent; }"
+        ".director-theme entry, .director-theme spinbutton, dialog entry, dialog spinbutton, popover entry { background-image: none; background-color: @panel-color; color: @text-color; border: 1px solid @border-color; border-radius: 0; min-width: 50px; min-height: 28px; padding: 2px 4px; }"
+        ".director-theme entry:focus, .director-theme spinbutton:focus, dialog entry:focus { background-color: #626580; color: @text-color; border-color: @accent-color; }"
+        ".director-theme entry selection, dialog entry selection { background-color: @fill-color; color: @text-color; }"
+        ".director-theme combobox button { min-height: 27px; }"
+        ".director-theme checkbutton, .director-theme radiobutton, dialog checkbutton, dialog radiobutton { background-color: transparent; border: none; padding: 0 2px; min-height: 0; color: @text-color; }"
+        ".director-theme checkbutton label, .director-theme radiobutton label, dialog checkbutton label, dialog radiobutton label { background-color: transparent; padding-top: 0; padding-bottom: 0; margin-top: 0; margin-bottom: 0; min-height: 0; }"
+        ".director-theme checkbutton check, .director-theme radiobutton radio, dialog checkbutton check, dialog radiobutton radio { background-color: @raised-color; border: 1px solid @border-color; min-width: 14px; min-height: 14px; }"
+        ".director-theme radiobutton radio, dialog radiobutton radio { border-radius: 50%; }"
+        ".director-theme checkbutton check, dialog checkbutton check { border-radius: 3px; }"
+        ".director-theme checkbutton check:checked, .director-theme radiobutton radio:checked, dialog checkbutton check:checked, dialog radiobutton radio:checked { background-color: @playing-color; border-color: @playing-color; }"
+        ".director-theme checkbutton:checked label, .director-theme radiobutton:checked label { color: @playing-color; background-color: transparent; }"
+        ".director-theme radiobutton radio:checked, dialog radiobutton radio:checked { background-image: radial-gradient(circle, @text-color 30%, transparent 40%); }"
+        ".director-theme notebook, .director-theme notebook > stack { background-color: @bg-color; color: @text-color; }"
+        ".director-theme notebook > header, notebook.director-main-notebook > header { background-color: @bg-color; border: none; box-shadow: none; }"
+        ".director-theme notebook > header tabs, notebook.director-main-notebook > header tabs { background-color: @bg-color; border: none; box-shadow: none; }"
+        ".director-theme notebook > header tabs tab, notebook.director-main-notebook > header tabs tab { min-width: 80px; min-height: 0; margin: 1px 2px 0 2px; padding: 3px 6px; background-color: @panel-color; color: @text-color; border: 1px solid @border-color; box-shadow: none; }"
+        ".director-theme notebook > header tabs tab:checked, notebook.director-main-notebook > header tabs tab:checked { background-color: @fill-color; border-color: @accent-color; border-radius: 4px; box-shadow: none; }"
+        ".director-theme notebook > header tabs tab:hover, notebook.director-main-notebook > header tabs tab:hover { background-color: @hover-color; border-color: @accent-color; box-shadow: none; }"
+        ".director-theme notebook > header tabs tab:hover label, .director-theme notebook > header tabs tab:checked label, notebook.director-main-notebook > header tabs tab:hover label, notebook.director-main-notebook > header tabs tab:checked label { background-color: transparent; color: @text-color; font-weight: normal; }"
+        ".director-theme treeview, .director-theme list, .director-theme flowbox { background-color: @bg-color; border: 1px solid @border-color; color: @text-color; font-feature-settings: 'tnum'; }"
+        ".director-theme treeview header button { background-color: @panel-color; color: @text-muted; font-weight: bold; text-shadow: none; padding: 3px; border: none; border-bottom: 2px solid @border-color; border-right: 1px solid @border-color; }"
+        ".director-theme treeview:selected, .director-theme list row:selected, .director-theme flowbox flowboxchild:selected { background-color: @fill-color; color: @text-color; }"
+        ".director-theme list row:hover, .director-theme flowbox flowboxchild:hover { background-color: @hover-color; }"
+        ".director-theme scrollbar contents slider { background-color: #454f60; border-radius: 4px; }"
+        ".director-theme scrollbar contents slider:hover { background-color: @accent-color; }"
+        ".director-theme frame { background-color: @bg-color; border: none; padding: 0; margin: 0; }"
+        ".director-theme frame > border { background-color: transparent; border: none; padding: 0; margin: 0; box-shadow: none; }"
+        ".director-theme frame > label { background-color: @bg-color; color: @text-muted; padding: 0 2px; margin: 0; }"
+        ".director-theme frame.director-section-frame, .director-theme frame.director-section-frame > border { background-color: @bg-color; border: 0; border-style: none; box-shadow: none; padding: 0; margin: 0; }"
+        ".director-theme frame.director-section-frame > label { background-color: @bg-color; color: @text-muted; padding: 0 2px; margin: 0; }"
+        ".director-theme expander, .director-theme expander title { background-color: @bg-color; color: @text-color; }"
         "dialog, popover, popover > contents { background-color: @panel-color; color: @text-color; }"
         "popover > contents { border: 1px solid @border-color; border-radius: 4px; padding: 3px; }"
-        "switch { background-color: @raised-color; border: 1px solid @border-color; border-radius: 4px; }"
-        "switch slider { background-color: @accent-color; border-radius: 3px; }"
-        "switch:checked { background-color: @playing-bg; border-color: @playing-color; }"
-        "switch:checked slider { background-color: @playing-color; }"
-        "tooltip { background-color: @panel-color; border: 1px solid @accent-color; border-radius: 4px; color: @text-color; }"
+        ".director-theme progressbar trough, dialog progressbar trough { background-color: @raised-color; border: 1px solid @border-color; border-radius: 3px; }"
+        ".director-theme progressbar progress, dialog progressbar progress { background-color: @accent-color; border-radius: 3px; }"
+        ".director-theme spinner, dialog spinner { color: @accent-hover; }"
+        "tooltip, tooltip.background { background-color: #20242b; color: #f5f5f5; border: 1px solid #69717c; border-radius: 4px; padding: 4px 6px; }"
+        "tooltip label { color: #f5f5f5; background-color: transparent; }"
         ".title-label { font-size: 118%; font-weight: bold; color: @text-color; }"
         ".section-title { font-size: 100%; font-weight: bold; color: @text-muted; }"
         ".dim-label { color: @text-muted; font-size: 90%; }"
-        ".director-card { background-color: @panel-color; border: 1px solid @border-color; border-radius: 4px; padding: 4px; }"
+        ".director-card, .director-theme .director-card { background-color: @panel-color; border: 1px solid @border-color; border-radius: 4px; padding: 4px; }"
         ".director-sidebar { background-color: @panel-color; border-right: 2px solid @border-color; }"
         ".director-statusbar { background-color: #1b1c20; border-top: 1px solid @border-color; padding: 0; margin: 0; min-height: 0; }"
         ".director-statusbar label { color: @text-muted; padding: 1px 3px; margin: 0; min-height: 0; }"
@@ -23047,6 +23327,11 @@ static void director_activate(GtkApplication *application, gpointer data)
 
     app->application = application;
     app->shutting_down = FALSE;
+    app->stop_managed_on_exit = TRUE;
+    if(app->preview_quality_divisor == 0)
+        app->preview_quality_divisor = DIRECTOR_PREVIEW_DEFAULT_QUALITY_DIVISOR;
+    if(app->preview_frame_stride == 0)
+        app->preview_frame_stride = DIRECTOR_PREVIEW_DEFAULT_FRAME_STRIDE;
     if(!app->log_readers)
         app->log_readers = g_ptr_array_new();
 
@@ -23185,7 +23470,7 @@ static void director_shutdown(GApplication *application, gpointer data)
             if(instance->reloaded_process)
                 g_subprocess_force_exit(instance->reloaded_process);
             director_stop_client(instance);
-            if(instance->process_running && instance->process)
+            if(app->stop_managed_on_exit && instance->process_running && instance->process)
                 g_subprocess_force_exit(instance->process);
         }
     }
@@ -23208,7 +23493,7 @@ int main(int argc, char **argv)
 
     GOptionEntry options[] = {
         { "discover", 'd', 0, G_OPTION_ARG_NONE, &option_discover,
-          "Discover and connect to all running VeeJay instances, then open Stage -> Wiring.", NULL },
+          "Discover and connect to all running VeeJay instances, then open Stage -> Patch bay.", NULL },
         { "connect-all", 0, 0, G_OPTION_ARG_NONE, &option_connect_all,
           "Alias for --discover.", NULL },
         { "resume", 'r', 0, G_OPTION_ARG_NONE, &option_resume,
@@ -23218,7 +23503,7 @@ int main(int argc, char **argv)
         { "show", 'f', 0, G_OPTION_ARG_FILENAME, &option_show,
           "Open a Director .vjd show at startup.", "FILE" },
         { "patchbay", 0, 0, G_OPTION_ARG_NONE, &option_patchbay,
-          "Open Stage → Wiring at startup.", NULL },
+          "Open Stage → Patch bay at startup.", NULL },
         { "no-discovery", 0, 0, G_OPTION_ARG_NONE, &option_no_discovery,
           "Disable VeeJay LAN discovery for this session.", NULL },
         { NULL }
@@ -23324,4 +23609,3 @@ int main(int argc, char **argv)
     g_object_unref(application);
     return status;
 }
-

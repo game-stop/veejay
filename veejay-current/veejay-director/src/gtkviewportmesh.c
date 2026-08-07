@@ -733,7 +733,9 @@ static void gvr_viewport_mesh_init(GvrViewportMesh *mesh)
     mesh->selected_point = 0;
     mesh->hover_point = -1;
     mesh->drag_point = -1;
-    mesh->content_aspect = 4.0 / 3.0;
+    /* Prefer the preview image's native aspect until the controller supplies
+     * the selected output's authoritative dimensions. */
+    mesh->content_aspect = 0.0;
     mesh->background_opacity = 1.0;
     mesh->show_background = TRUE;
     mesh->show_mesh = TRUE;

@@ -2681,12 +2681,6 @@ static gboolean director_instance_routes_valid(const DirectorShow *show,
 {
     if(!instance || !instance->input_routes)
         return TRUE;
-    if(instance->role == DIRECTOR_ROLE_OUTPUT && instance->input_routes->len > 1) {
-        g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
-                    "Output instance '%s' can have only one primary input route",
-                    instance->id);
-        return FALSE;
-    }
 
     for(guint i = 0; i < instance->input_routes->len; i++) {
         const DirectorInputRoute *route = g_ptr_array_index(instance->input_routes, i);
@@ -2697,8 +2691,7 @@ static gboolean director_instance_routes_valid(const DirectorShow *show,
             return FALSE;
         }
         if(route->type == DIRECTOR_INPUT_ROUTE_NDI) {
-            if(instance->role == DIRECTOR_ROLE_OUTPUT ||
-               !route->ndi_source_name || !*route->ndi_source_name ||
+            if(!route->ndi_source_name || !*route->ndi_source_name ||
                strlen(route->ndi_source_name) > DIRECTOR_NDI_SOURCE_NAME_MAX) {
                 g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
                             "Instance '%s' contains an invalid NDI input route", instance->id);
@@ -2830,11 +2823,6 @@ gchar **director_instance_build_argv(const DirectorShow *show,
     }
 
     if(instance->ndi_input_enabled) {
-        if(instance->role == DIRECTOR_ROLE_OUTPUT) {
-            g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
-                        "Output instance '%s' cannot use an NDI source directly", instance->id);
-            return NULL;
-        }
         if(!instance->ndi_source_name || !*instance->ndi_source_name) {
             g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
                         "Instance '%s' has NDI input enabled but no source selected", instance->id);
@@ -2971,6 +2959,10 @@ gchar **director_instance_build_argv(const DirectorShow *show,
     if(instance->role == DIRECTOR_ROLE_OUTPUT) {
         const gchar *host = instance->source_host;
         gint port = instance->source_port;
+        const gint input_width = instance->ndi_input_enabled && instance->input_width > 0 ?
+                                 instance->input_width : instance->output_width;
+        const gint input_height = instance->ndi_input_enabled && instance->input_height > 0 ?
+                                  instance->input_height : instance->output_height;
         if(video_source) {
             if(director_control_hosts_equivalent(instance->host, video_source->host))
                 host = "127.0.0.1";
@@ -2984,9 +2976,9 @@ gchar **director_instance_build_argv(const DirectorShow *show,
         }
         argv_add(argv, "--blank");
         argv_add(argv, "--source-width");
-        argv_add_int(argv, instance->output_width);
+        argv_add_int(argv, input_width);
         argv_add(argv, "--source-height");
-        argv_add_int(argv, instance->output_height);
+        argv_add_int(argv, input_height);
         if(video_source &&
            director_control_hosts_equivalent(instance->host, video_source->host) &&
            video_source->shm_key > 0) {
@@ -2998,23 +2990,26 @@ gchar **director_instance_build_argv(const DirectorShow *show,
             g_ptr_array_add(argv, g_strdup_printf("%s:%d", host, port));
         }
     }
-    else if(instance->ndi_input_enabled) {
+    if(instance->ndi_input_enabled) {
         const gint input_width = instance->input_width > 0 ?
                                  instance->input_width : instance->output_width;
         const gint input_height = instance->input_height > 0 ?
                                   instance->input_height : instance->output_height;
         argv_add(argv, "--ndi-receive");
         argv_add(argv, instance->ndi_source_name);
-        argv_add(argv, "--source-width");
-        argv_add_int(argv, input_width);
-        argv_add(argv, "--source-height");
-        argv_add_int(argv, input_height);
+        if(instance->role != DIRECTOR_ROLE_OUTPUT) {
+            argv_add(argv, "--source-width");
+            argv_add_int(argv, input_width);
+            argv_add(argv, "--source-height");
+            argv_add_int(argv, input_height);
+        }
         if(!instance->ndi_tally_enabled)
             argv_add(argv, "--ndi-no-tally");
         if(instance->ndi_follow_clock)
             argv_add(argv, "--ndi-follow-clock");
     }
-    else if(instance->startup_mode == DIRECTOR_STARTUP_MEDIA) {
+    else if(instance->role != DIRECTOR_ROLE_OUTPUT &&
+            instance->startup_mode == DIRECTOR_STARTUP_MEDIA) {
         if(!instance->media_files || instance->media_files->len == 0) {
             g_set_error(error, DIRECTOR_ERROR, DIRECTOR_ERROR_INVALID,
                         "Instance '%s' is configured for startup media but its Media Bank is empty",
@@ -3032,7 +3027,7 @@ gchar **director_instance_build_argv(const DirectorShow *show,
             }
         }
     }
-    else {
+    else if(instance->role != DIRECTOR_ROLE_OUTPUT) {
         const gint input_width = instance->input_width > 0 ?
                                  instance->input_width : instance->output_width;
         const gint input_height = instance->input_height > 0 ?
@@ -3788,7 +3783,7 @@ gboolean director_instance_parse_routing_status(DirectorInstance *instance,
         value = 0;
         if(parse_signed(g_hash_table_lookup(values, shm_key), &value))
             route->shm_key = value;
-        route->applied_connection = route->live_stream_id > 0 || instance->role == DIRECTOR_ROLE_OUTPUT;
+        route->applied_connection = route->live_stream_id > 0;
         g_free(id_key);
         g_free(active_key);
         g_free(current_key);
