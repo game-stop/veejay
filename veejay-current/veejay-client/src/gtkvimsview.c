@@ -1256,16 +1256,71 @@ static void gvr_vims_view_action_clicked(GtkButton *button, gpointer user_data)
                       0);
 }
 
+static GtkWidget *gvr_vims_view_icon_image(const char *icon_name)
+{
+    GtkWidget *image;
+    gchar *path;
+
+    if(!icon_name || !icon_name[0])
+        return NULL;
+    path = g_build_filename(RELOADED_DATADIR, icon_name, NULL);
+    if(!g_file_test(path, G_FILE_TEST_EXISTS)) {
+        g_free(path);
+        return NULL;
+    }
+    image = gtk_image_new_from_file(path);
+    g_free(path);
+    return image;
+}
+
+static const char *gvr_vims_view_action_icon(GvrVimsViewAction action,
+                                              const char *label)
+{
+    switch(action) {
+        case GVR_VIMS_VIEW_RUN:
+            return label && !strcmp(label, "Send") ? "icon_send.png" : "icon_launch.png";
+        case GVR_VIMS_VIEW_ADD: return "icon_bundle.png";
+        case GVR_VIMS_VIEW_BIND: return "icon_keybind.png";
+        case GVR_VIMS_VIEW_UNBIND: return "icon_keydetach.png";
+        case GVR_VIMS_VIEW_NEW_BUNDLE: return "icon_new.png";
+        case GVR_VIMS_VIEW_UPDATE_BUNDLE: return "icon_apply.png";
+        case GVR_VIMS_VIEW_DELETE_BUNDLE: return "icon_trash.png";
+        case GVR_VIMS_VIEW_LOAD: return "icon_open.png";
+        case GVR_VIMS_VIEW_SAVE: return "icon_save.png";
+        case GVR_VIMS_VIEW_CLEAR_EDITOR:
+        case GVR_VIMS_VIEW_CLEAR_RESPONSE:
+            return "icon_clear.png";
+        default:
+            return NULL;
+    }
+}
+
+static GtkWidget *gvr_vims_view_plain_button(const char *label,
+                                              const char *icon_name,
+                                              const char *tooltip)
+{
+    GtkWidget *image = gvr_vims_view_icon_image(icon_name);
+    GtkWidget *button = image ? gtk_button_new() : gtk_button_new_with_label(label);
+
+    gtk_widget_set_can_focus(button, FALSE);
+    if(image) {
+        gtk_button_set_image(GTK_BUTTON(button), image);
+        gtk_button_set_always_show_image(GTK_BUTTON(button), TRUE);
+    }
+    vj_gui_widget_set_tooltip_text(button, tooltip);
+    gtk_style_context_add_class(gtk_widget_get_style_context(button),
+                                "vims-history-button");
+    return button;
+}
+
 static GtkWidget *gvr_vims_view_button(GvrVimsView *view,
                                        GvrVimsViewAction action,
                                        const char *label,
                                        const char *tooltip)
 {
-    GtkWidget *button = gtk_button_new_with_label(label);
-    gtk_widget_set_can_focus(button, FALSE);
-    vj_gui_widget_set_tooltip_text(button, tooltip);
-    gtk_style_context_add_class(gtk_widget_get_style_context(button),
-                                "vims-history-button");
+    const char *icon_name = gvr_vims_view_action_icon(action, label);
+    GtkWidget *button = gvr_vims_view_plain_button(label, icon_name, tooltip);
+
     g_object_set_data(G_OBJECT(button),
                       "gvr-vims-action",
                       GINT_TO_POINTER(action));
@@ -1482,14 +1537,11 @@ static GtkWidget *gvr_vims_view_command_bar(GvrVimsView *view)
     gtk_widget_set_sensitive(button, FALSE);
     gtk_box_pack_start(GTK_BOX(row), button, FALSE, FALSE, 0);
 
-    view->command_copy_button = gtk_button_new_with_label("Copy");
-    gtk_widget_set_can_focus(view->command_copy_button, FALSE);
+    view->command_copy_button = gvr_vims_view_plain_button(
+        "Copy",
+        "icon_copy.png",
+        "Copy the pattern-ready VIMS row");
     gtk_widget_set_sensitive(view->command_copy_button, FALSE);
-    vj_gui_widget_set_tooltip_text(view->command_copy_button,
-                                "Copy the pattern-ready VIMS row");
-    gtk_style_context_add_class(
-        gtk_widget_get_style_context(view->command_copy_button),
-        "vims-history-button");
     gtk_box_pack_start(GTK_BOX(row),
                        view->command_copy_button,
                        FALSE,
@@ -1549,14 +1601,11 @@ static GtkWidget *gvr_vims_view_text_page(GvrVimsView *view,
     gtk_container_add(GTK_CONTAINER(scroll), text_view);
 
     if(response) {
-        view->copy_request_button = gtk_button_new_with_label("Copy Request");
-        gtk_widget_set_can_focus(view->copy_request_button, FALSE);
+        view->copy_request_button = gvr_vims_view_plain_button(
+            "Copy Request",
+            "icon_copy.png",
+            "Copy the exact VIMS request shown below");
         gtk_widget_set_sensitive(view->copy_request_button, FALSE);
-        vj_gui_widget_set_tooltip_text(view->copy_request_button,
-                                    "Copy the exact VIMS request shown below");
-        gtk_style_context_add_class(
-            gtk_widget_get_style_context(view->copy_request_button),
-            "vims-history-button");
         gtk_box_pack_end(GTK_BOX(toolbar),
                          view->copy_request_button,
                          FALSE,
@@ -1782,24 +1831,19 @@ static void gvr_vims_view_init(GvrVimsView *view)
                                 GVR_VIMS_ACTIONS_MIN_HEIGHT);
 
     toolbar = gvr_vims_view_toolbar(view, "Learned MIDI Events");
-    button = gtk_button_new_with_label("Refresh");
-    gtk_widget_set_can_focus(button, FALSE);
-    vj_gui_widget_set_tooltip_text(button, "Reload learned MIDI mappings");
-    gtk_style_context_add_class(gtk_widget_get_style_context(button),
-                                "vims-history-button");
+    button = gvr_vims_view_plain_button("Refresh",
+                                        "icon_refresh.png",
+                                        "Reload learned MIDI mappings");
     gtk_box_pack_end(GTK_BOX(toolbar), button, FALSE, FALSE, 0);
     g_signal_connect(button,
                      "clicked",
                      G_CALLBACK(gvr_vims_view_midi_refresh_clicked),
                      view);
-    view->midi_unbind_button = gtk_button_new_with_label("Unbind");
-    gtk_widget_set_can_focus(view->midi_unbind_button, FALSE);
+    view->midi_unbind_button = gvr_vims_view_plain_button(
+        "Unbind",
+        "icon_keydetach.png",
+        "Remove the selected learned MIDI mapping");
     gtk_widget_set_sensitive(view->midi_unbind_button, FALSE);
-    vj_gui_widget_set_tooltip_text(view->midi_unbind_button,
-                                "Remove the selected learned MIDI mapping");
-    gtk_style_context_add_class(
-        gtk_widget_get_style_context(view->midi_unbind_button),
-        "vims-history-button");
     gtk_box_pack_end(GTK_BOX(toolbar),
                      view->midi_unbind_button,
                      FALSE,
@@ -1843,43 +1887,46 @@ static void gvr_vims_view_init(GvrVimsView *view)
                             "* { font-family: monospace; }");
     gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view->editor_view), GTK_WRAP_NONE);
 
-    view->workspace = gtk_notebook_new();
-    gtk_notebook_set_scrollable(GTK_NOTEBOOK(view->workspace), TRUE);
-    gtk_widget_set_size_request(view->workspace,
+    GtkWidget *response_panel = gvr_vims_view_text_page(view,
+                                                          view->response_view,
+                                                          TRUE);
+    GtkWidget *editor_panel = gvr_vims_view_text_page(view,
+                                                       view->editor_view,
+                                                       FALSE);
+    GtkWidget *lower_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+
+    view->workspace = NULL;
+    gtk_widget_set_size_request(response_panel,
                                 -1,
                                 GVR_VIMS_WORKSPACE_MIN_HEIGHT);
-    gtk_notebook_append_page(GTK_NOTEBOOK(view->workspace),
-                             gvr_vims_view_text_page(view,
-                                                     view->response_view,
-                                                     TRUE),
-                             gtk_label_new("Response"));
-    gtk_notebook_append_page(GTK_NOTEBOOK(view->workspace),
-                             gvr_vims_view_text_page(view,
-                                                     view->editor_view,
-                                                     FALSE),
-                             gtk_label_new("Bundle Editor"));
+    gtk_box_pack_start(GTK_BOX(lower_box), response_panel, FALSE, TRUE, 0);
 
     view->lower_paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    gtk_paned_set_wide_handle(GTK_PANED(view->lower_paned), TRUE);
     gtk_paned_pack1(GTK_PANED(view->lower_paned),
                     view->registry_notebook,
                     TRUE,
                     FALSE);
     gtk_paned_pack2(GTK_PANED(view->lower_paned),
-                    view->workspace,
+                    editor_panel,
                     TRUE,
                     FALSE);
-    gtk_paned_set_position(GTK_PANED(view->lower_paned), 190);
+    gtk_paned_set_position(GTK_PANED(view->lower_paned), 230);
+    gtk_box_pack_start(GTK_BOX(lower_box), view->lower_paned, TRUE, TRUE, 0);
 
     view->main_paned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    gtk_paned_set_wide_handle(GTK_PANED(view->main_paned), TRUE);
+    vj_gui_widget_set_tooltip_text(view->main_paned,
+                                  "Drag to balance VIMS Namespace against Backend Response, Actions/Bundles, MIDI and the Bundle Editor.");
     gtk_paned_pack1(GTK_PANED(view->main_paned),
                     namespace_section,
                     TRUE,
                     FALSE);
     gtk_paned_pack2(GTK_PANED(view->main_paned),
-                    view->lower_paned,
+                    lower_box,
                     TRUE,
                     FALSE);
-    gtk_paned_set_position(GTK_PANED(view->main_paned), 250);
+    gtk_paned_set_position(GTK_PANED(view->main_paned), 300);
     gtk_box_pack_start(GTK_BOX(view), view->main_paned, TRUE, TRUE, 0);
 
     g_signal_connect(view,
@@ -2284,7 +2331,8 @@ GtkWidget *gvr_vims_view_get_editor_view(GtkWidget *widget)
 
 GtkWidget *gvr_vims_view_get_workspace_notebook(GtkWidget *widget)
 {
-    return GVR_IS_VIMS_VIEW(widget) ? GVR_VIMS_VIEW(widget)->workspace : NULL;
+    (void)widget;
+    return NULL;
 }
 
 void gvr_vims_view_set_action_sensitive(GtkWidget *widget,
@@ -2311,9 +2359,35 @@ void gvr_vims_view_set_action_sensitive(GtkWidget *widget,
 
 void gvr_vims_view_show_workspace(GtkWidget *widget, int page)
 {
-    GtkWidget *notebook = gvr_vims_view_get_workspace_notebook(widget);
-    if(notebook)
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), page);
+    GvrVimsView *view;
+
+    if(!GVR_IS_VIMS_VIEW(widget))
+        return;
+    view = GVR_VIMS_VIEW(widget);
+
+    if(page == 0) {
+        if(view->response_view)
+            gtk_widget_queue_draw(view->response_view);
+        return;
+    }
+
+    if(page == 1 && view->editor_view) {
+        if(view->lower_paned) {
+            GtkAllocation allocation;
+            int position;
+
+            gtk_widget_get_allocation(view->lower_paned, &allocation);
+            position = gtk_paned_get_position(GTK_PANED(view->lower_paned));
+            if(allocation.height > GVR_VIMS_WORKSPACE_MIN_HEIGHT &&
+               allocation.height - position < GVR_VIMS_WORKSPACE_MIN_HEIGHT) {
+                gtk_paned_set_position(
+                    GTK_PANED(view->lower_paned),
+                    MAX(GVR_VIMS_ACTIONS_MIN_HEIGHT,
+                        allocation.height - GVR_VIMS_WORKSPACE_MIN_HEIGHT));
+            }
+        }
+        gtk_widget_queue_draw(view->editor_view);
+    }
 }
 
 static void gvr_vims_view_set_text(GtkWidget *view, const char *text)

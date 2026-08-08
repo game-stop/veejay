@@ -4873,90 +4873,6 @@
                       </object>
                     </child>
                     <child>
-                      <object class="GtkMenuItem" id="menuitem_midi">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">_Midi</property>
-                        <property name="use-underline">True</property>
-                        <child type="submenu">
-                          <object class="GtkMenu" id="menu_midi">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <child>
-                              <object class="GtkCheckMenuItem" id="midi_learn">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">_Learn MIDI</property>
-                                <property name="use-underline">True</property>
-                                <signal name="toggled" handler="on_midilearn_toggled" swapped="no"/>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkCheckMenuItem" id="midi_enabled">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">_Enable MIDI</property>
-                                <property name="use-underline">True</property>
-                                <signal name="toggled" handler="on_midievent_toggled" swapped="no"/>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkImageMenuItem" id="clear_midi_layout">
-                                <property name="label" translatable="yes">_Clear MIDI layout</property>
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="use-underline">True</property>
-                                <property name="image">img_clear</property>
-                                <property name="use-stock">False</property>
-                                <signal name="activate" handler="on_clear_midi_layout_activate" swapped="no"/>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object class="GtkMenuItem" id="menuitem_save">
-                        <property name="visible">True</property>
-                        <property name="can-focus">False</property>
-                        <property name="label" translatable="yes">S_ave</property>
-                        <property name="use-underline">True</property>
-                        <child type="submenu">
-                          <object class="GtkMenu" id="menu_save">
-                            <property name="visible">True</property>
-                            <property name="can-focus">False</property>
-                            <child>
-                              <object class="GtkMenuItem" id="save_samplelist">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">_Save sample list</property>
-                                <property name="use-underline">True</property>
-                                <signal name="activate" handler="on_button_samplelist_save_clicked" swapped="no"/>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkMenuItem" id="save_actionfile">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Save _action file</property>
-                                <property name="use-underline">True</property>
-                                <signal name="activate" handler="on_button_saveconfigfile_clicked" swapped="no"/>
-                              </object>
-                            </child>
-                            <child>
-                              <object class="GtkMenuItem" id="save_midi_layout">
-                                <property name="visible">True</property>
-                                <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Save _MIDI layout</property>
-                                <property name="use-underline">True</property>
-                                <signal name="activate" handler="on_save_midi_layout_activate" swapped="no"/>
-                              </object>
-                            </child>
-                          </object>
-                        </child>
-                      </object>
-                    </child>
-                    <child>
                       <object class="GtkMenuItem" id="menuitem_load">
                         <property name="visible">True</property>
                         <property name="can-focus">False</property>
@@ -4967,10 +4883,26 @@
                             <property name="visible">True</property>
                             <property name="can-focus">False</property>
                             <child>
+                              <object class="GtkMenuItem" id="load_actionfile">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Load _Liveset…</property>
+                                <property name="use-underline">True</property>
+                                <property name="tooltip-text" translatable="yes">Load a VeeJay liveset, including backend set state.</property>
+                                <signal name="activate" handler="on_button_loadconfigfile_clicked" swapped="no"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkSeparatorMenuItem">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                              </object>
+                            </child>
+                            <child>
                               <object class="GtkMenuItem" id="load_samplelist">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Load _sample list</property>
+                                <property name="label" translatable="yes">Load _Sample List…</property>
                                 <property name="use-underline">True</property>
                                 <signal name="activate" handler="on_button_samplelist_open_clicked" swapped="no"/>
                               </object>
@@ -4979,25 +4911,31 @@
                               <object class="GtkMenuItem" id="append_samplelist">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">A_ppend sample list</property>
+                                <property name="label" translatable="yes">_Append Sample List…</property>
                                 <property name="use-underline">True</property>
                                 <signal name="activate" handler="on_button_samplelist_append_clicked" swapped="no"/>
                               </object>
                             </child>
                             <child>
-                              <object class="GtkMenuItem" id="load_actionfile">
+                              <object class="GtkSeparatorMenuItem">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Load _action file</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="load_vims_actions">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Load _VIMS Actions &amp; Bundles…</property>
                                 <property name="use-underline">True</property>
-                                <signal name="activate" handler="on_button_loadconfigfile_clicked" swapped="no"/>
+                                <signal name="activate" handler="on_button_openactionfile_clicked" swapped="no"/>
                               </object>
                             </child>
                             <child>
                               <object class="GtkMenuItem" id="load_midi_layout">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Load _MIDI layout</property>
+                                <property name="label" translatable="yes">Load _MIDI Mappings…</property>
                                 <property name="use-underline">True</property>
                                 <signal name="activate" handler="on_load_midi_layout_activate" swapped="no"/>
                               </object>
@@ -5006,13 +4944,91 @@
                               <object class="GtkMenuItem" id="load_calibration">
                                 <property name="visible">True</property>
                                 <property name="can-focus">False</property>
-                                <property name="label" translatable="yes">Load _Calibration</property>
+                                <property name="label" translatable="yes">Load _Calibration…</property>
                                 <property name="use-underline">True</property>
                                 <signal name="activate" handler="on_load_calibration_activate" swapped="no"/>
                               </object>
                             </child>
                           </object>
                         </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="menuitem_save">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">_Save</property>
+                        <property name="use-underline">True</property>
+                        <child type="submenu">
+                          <object class="GtkMenu" id="menu_save">
+                            <property name="visible">True</property>
+                            <property name="can-focus">False</property>
+                            <child>
+                              <object class="GtkMenuItem" id="save_actionfile">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Save _Liveset…</property>
+                                <property name="use-underline">True</property>
+                                <property name="tooltip-text" translatable="yes">Save the backend liveset, including edit-list/sample-list state.</property>
+                                <signal name="activate" handler="on_button_saveconfigfile_clicked" swapped="no"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkSeparatorMenuItem">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="save_samplelist">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Save _Sample List…</property>
+                                <property name="use-underline">True</property>
+                                <signal name="activate" handler="on_button_samplelist_save_clicked" swapped="no"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkSeparatorMenuItem">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="save_vims_actions">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Save _VIMS Actions &amp; Bundles…</property>
+                                <property name="use-underline">True</property>
+                                <signal name="activate" handler="on_button_saveactionfile_clicked" swapped="no"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="save_midi_layout">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Save _MIDI Mappings…</property>
+                                <property name="use-underline">True</property>
+                                <signal name="activate" handler="on_save_midi_layout_activate" swapped="no"/>
+                              </object>
+                            </child>
+                            <child>
+                              <object class="GtkMenuItem" id="save_calibration">
+                                <property name="visible">True</property>
+                                <property name="can-focus">False</property>
+                                <property name="label" translatable="yes">Save _Calibration…</property>
+                                <property name="use-underline">True</property>
+                                <signal name="activate" handler="on_save_calibration_activate" swapped="no"/>
+                              </object>
+                            </child>
+                          </object>
+                        </child>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
                       </object>
                     </child>
                     <child>
@@ -5023,6 +5039,56 @@
                         <property name="use-underline">True</property>
                         <property name="use-stock">True</property>
                         <signal name="activate" handler="on_quit_activate" swapped="no"/>
+                      </object>
+                    </child>
+                  </object>
+                </child>
+              </object>
+            </child>
+            <child>
+              <object class="GtkMenuItem" id="menuitem_midi">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="label" translatable="yes">_MIDI</property>
+                <property name="use-underline">True</property>
+                <child type="submenu">
+                  <object class="GtkMenu" id="menu_midi">
+                    <property name="visible">True</property>
+                    <property name="can-focus">False</property>
+                    <child>
+                      <object class="GtkCheckMenuItem" id="midi_learn">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">_MIDI Learn</property>
+                        <property name="use-underline">True</property>
+                        <property name="tooltip-text" translatable="yes">Arm MIDI Learn: move a MIDI control, then operate a Reloaded control.</property>
+                        <signal name="toggled" handler="on_midilearn_toggled" swapped="no"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="open_midi_control">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">Open MIDI _Control…</property>
+                        <property name="use-underline">True</property>
+                        <property name="tooltip-text" translatable="yes">Open the MIDI Sources, Mappings and Live MIDI panel.</property>
+                        <signal name="activate" handler="on_open_midi_control_activate" swapped="no"/>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkSeparatorMenuItem">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                      </object>
+                    </child>
+                    <child>
+                      <object class="GtkMenuItem" id="clear_midi_layout">
+                        <property name="visible">True</property>
+                        <property name="can-focus">False</property>
+                        <property name="label" translatable="yes">_Clear MIDI Mappings</property>
+                        <property name="use-underline">True</property>
+                        <property name="tooltip-text" translatable="yes">Remove all learned MIDI mappings.</property>
+                        <signal name="activate" handler="on_clear_midi_layout_activate" swapped="no"/>
                       </object>
                     </child>
                   </object>

@@ -47,7 +47,12 @@ reloaded_SOURCES = \
     gtkmediaview.c \
     gtkpreviewcache.c \
     utils-gtk.c \
-    vj-midi.c \ 
+    vj-midi-engine.c \
+    vj-midi-engine.h \
+    vj-midi-map.c \
+    vj-midi-map.h \
+    gtkmidicontrol.c \
+    gtkmidicontrol.h \
     $(reloaded_headers)
 
 reloaded_LDFLAGS = \

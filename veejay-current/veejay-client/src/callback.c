@@ -103,6 +103,7 @@ extern void vj_midi_learning_vims_toggle2(void *vv, char *widget, int id, int ar
 extern void vj_midi_learning_vims_toggle3(void *vv, char *widget, int id, int arg0, int arg1);
 extern void vj_midi_learning_vims_dual_toggle(void *vv, char *widget, int off_id, int on_id, int arg);
 extern void vj_gui_vims_pattern_set_stream_length(int frame_count);
+extern void vj_midi_show_control(void *vv);
 
 
 static int current_stream_selected(void)
@@ -5995,18 +5996,18 @@ void on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_save_file( "Save Bundles", "veejay-vimsbundle.xml");
+	gchar *filename = dialog_save_file( "Save VIMS Actions & Bundles", "veejay-vimsbundle.xml");
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_SAVE, "%d %s",0, filename );
-		vj_msg(VEEJAY_MSG_INFO, "Save Bundles and Keybindings to %s", filename );
+		vj_msg(VEEJAY_MSG_INFO, "Saved VIMS Actions & Bundles to %s", filename );
 		g_free(filename);
 	}
 }
 
 void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Load liveset / configfile",FILE_FILTER_XML);
+	gchar *filename = dialog_open_file( "Load Liveset",FILE_FILTER_XML);
 
 	if(!filename)
 		return;
@@ -6018,7 +6019,7 @@ void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_saveconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_save_file( "Save liveset / configfile", "veejay-liveset.xml");
+	gchar *filename = dialog_save_file( "Save Liveset", "veejay-liveset.xml");
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_SAVE, "%d %s", 1, filename );
@@ -6045,7 +6046,7 @@ void on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Load Bundles", FILE_FILTER_XML);
+	gchar *filename = dialog_open_file( "Load VIMS Actions & Bundles", FILE_FILTER_XML);
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
@@ -6790,6 +6791,12 @@ void	on_load_calibration_activate( GtkMenuItem     *menuitem,
 		vj_msg(VEEJAY_MSG_INFO ,"Loaded calibration file %s",filename);
 		g_free(filename);
 	}
+}
+
+void on_save_calibration_activate(GtkMenuItem *menuitem, gpointer user_data)
+{
+    (void)menuitem;
+    on_cali_save_button_clicked(NULL, user_data);
 }
 
 void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
@@ -9745,23 +9752,21 @@ void    on_macro_bank_select_value_changed( GtkWidget *w, gpointer data)
 
 void	on_midilearn_toggled( GtkWidget *w, gpointer data )
 {
+    (void)data;
     vj_midi_learn(info->midi,
-                  gtk_check_menu_item_get_active( GTK_CHECK_MENU_ITEM(w) )
-                 );
+                  gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(w)));
 }
 
-void	on_midievent_toggled( GtkWidget *w, gpointer data )
+void	on_open_midi_control_activate(GtkWidget *w, gpointer data)
 {
-    int midi_play = gtk_check_menu_item_get_active( GTK_CHECK_MENU_ITEM(w));
-    GtkWidget *midi_learn = glade_xml_get_widget_( info->main_window, "midi_learn");
-    gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(midi_learn), FALSE);
-    gtk_widget_set_sensitive( midi_learn, !midi_play );
-    vj_midi_play( info->midi, midi_play);
+    (void)w;
+    (void)data;
+    vj_midi_show_control(info->midi);
 }
 
 void	on_load_midi_layout_activate( GtkWidget *w , gpointer data )
 {
-	gchar *filename = dialog_open_file( "Select MIDI configuration file to load",FILE_FILTER_CFG);
+	gchar *filename = dialog_open_file( "Load MIDI Mappings",FILE_FILTER_CFG);
 	if( filename ) {
 		vj_midi_load( info->midi, filename );
 		g_free(filename);
@@ -9769,7 +9774,7 @@ void	on_load_midi_layout_activate( GtkWidget *w , gpointer data )
 }
 void	on_save_midi_layout_activate( GtkWidget *w, gpointer data )
 {
-	gchar *filename = dialog_save_file( "Save MIDI configuration to file", "veejay-midi.cfg");
+	gchar *filename = dialog_save_file( "Save MIDI Mappings", "veejay-midi.cfg");
 	if(filename){
 		vj_midi_save( info->midi, filename );
         g_free(filename);

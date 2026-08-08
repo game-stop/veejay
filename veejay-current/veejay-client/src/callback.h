@@ -78,6 +78,13 @@ void on_vims_clear_clicked(GtkWidget *widget, gpointer user_data);
 void on_vims_delete_clicked(GtkWidget *widget, gpointer user_data);
 void on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data);
 void on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data);
+void on_open_midi_control_activate(GtkWidget *widget, gpointer user_data);
+void on_midilearn_toggled(GtkWidget *widget, gpointer user_data);
+void on_load_midi_layout_activate(GtkWidget *widget, gpointer user_data);
+void on_save_midi_layout_activate(GtkWidget *widget, gpointer user_data);
+void on_clear_midi_layout_activate(GtkWidget *widget, gpointer user_data);
+void on_save_calibration_activate(GtkMenuItem *menuitem, gpointer user_data);
+void on_load_calibration_activate(GtkMenuItem *menuitem, gpointer user_data);
 
 gboolean boxbg_draw ( GtkWidget *w,  cairo_t *cr);
 gboolean boxfg_draw ( GtkWidget *w, cairo_t *cr );

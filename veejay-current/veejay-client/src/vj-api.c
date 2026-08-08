@@ -6654,6 +6654,126 @@ void vj_msg(int type, const char format[], ...)
     va_end(args);
 }
 
+static int vj_midi_fx_slider_index(GtkWidget *origin)
+{
+    if(!origin || !slider_names_)
+        return -1;
+
+    for(int i = 0; i < MAX_UI_PARAMETERS; i++) {
+        GtkWidget *slider = glade_xml_get_widget_(info->main_window, slider_names_[i].text);
+        if(slider && (origin == slider || gtk_widget_is_ancestor(origin, slider)))
+            return i;
+    }
+    return -1;
+}
+
+static gboolean vj_midi_observe_fx_parameter(GtkWidget *origin,
+                                               const char *message,
+                                               int id)
+{
+    if(id != VIMS_CHAIN_ENTRY_SET_ARG_VAL && id != VIMS_CHAIN_ENTRY_SET_NARG_VAL)
+        return FALSE;
+
+    const int slider_index = vj_midi_fx_slider_index(origin);
+    if(slider_index < 0)
+        return FALSE;
+
+    int a = 0;
+    int b = 0;
+    int c = 0;
+    if(sscanf(message + 4, "%d %d %d", &a, &b, &c) != 3)
+        return FALSE;
+
+    vj_midi_learning_vims_fx(info->midi, slider_index, id, a, b, c, 1);
+    return TRUE;
+}
+
+static GtkWidget *vj_midi_observe_dynamic_widget(GtkWidget *origin)
+{
+    for(GtkWidget *widget = origin; widget; widget = gtk_widget_get_parent(widget)) {
+        if(GTK_IS_RANGE(widget) || GTK_IS_SPIN_BUTTON(widget))
+            return widget;
+    }
+    return NULL;
+}
+
+static char *vj_midi_dynamic_prefix_from_message(const char *message, int event_id)
+{
+    if(!message || strlen(message) < 5)
+        return NULL;
+
+    if(event_id > 0 && event_id < VIMS_EVENT_LIST_SIZE &&
+       vj_event_list[event_id].event_id == event_id &&
+       vj_event_list[event_id].params <= 0)
+        return NULL;
+
+    char *copy = g_strdup(message);
+    g_strstrip(copy);
+    size_t len = strlen(copy);
+    while(len > 0 && copy[len - 1] == ';')
+        copy[--len] = '\0';
+    g_strchomp(copy);
+
+    char *colon = strchr(copy, ':');
+    if(!colon) {
+        g_free(copy);
+        return NULL;
+    }
+
+    char *payload = colon + 1;
+    while(g_ascii_isspace(*payload))
+        payload++;
+    if(!*payload) {
+        g_free(copy);
+        return NULL;
+    }
+
+    char *last = copy + strlen(copy);
+    while(last > payload && g_ascii_isspace(last[-1]))
+        *--last = '\0';
+    while(last > payload && !g_ascii_isspace(last[-1]))
+        last--;
+
+    char *end = NULL;
+    (void)g_ascii_strtoll(last, &end, 10);
+    if(end == last || *end != '\0') {
+        g_free(copy);
+        return NULL;
+    }
+
+    if(last == payload) {
+        colon[1] = '\0';
+    } else {
+        while(last > payload && g_ascii_isspace(last[-1]))
+            last--;
+        *last = '\0';
+    }
+    return copy;
+}
+
+static gboolean vj_midi_observe_dynamic_control(GtkWidget *origin,
+                                                 const char *message,
+                                                 int event_id)
+{
+    GtkWidget *widget = vj_midi_observe_dynamic_widget(origin);
+    if(!widget)
+        return FALSE;
+
+    const char *name = gtk_buildable_get_name(GTK_BUILDABLE(widget));
+    if(!name || !*name ||
+       glade_xml_get_widget_(info->main_window, name) != widget)
+        return FALSE;
+
+    char *prefix = vj_midi_dynamic_prefix_from_message(message, event_id);
+    if(!prefix)
+        return FALSE;
+
+    const int extra = GTK_IS_RANGE(widget) ? 1 : 2;
+    vj_midi_learning_vims(info->midi, (char *)name, prefix, extra);
+    g_free(prefix);
+    return TRUE;
+}
+
 static void vj_midi_observe_user_message(const char *message)
 {
     GdkEvent *event;
@@ -6670,7 +6790,15 @@ static void vj_midi_observe_user_message(const char *message)
     if(!event)
         return;
 
+    GtkWidget *origin = gtk_get_event_widget(event);
+    gboolean handled = vj_midi_observe_fx_parameter(origin, message, id);
+    if(!handled)
+        handled = vj_midi_observe_dynamic_control(origin, message, id);
     gdk_event_free(event);
+
+    if(handled)
+        return;
+
     vj_midi_learning_vims(info->midi, NULL, (char *)message, 0);
 }
 
@@ -15539,6 +15667,29 @@ static const char *vims_format_for_event(int event_id)
     return "";
 }
 
+int vj_gui_vims_get_event_metadata(int event_id, int *params,
+                                   const char **format, const char **description)
+{
+    if(params)
+        *params = 0;
+    if(format)
+        *format = "";
+    if(description)
+        *description = "";
+
+    if(event_id <= 0 || event_id >= VIMS_EVENT_LIST_SIZE ||
+       vj_event_list[event_id].event_id != event_id)
+        return 0;
+
+    if(params)
+        *params = vj_event_list[event_id].params;
+    if(format)
+        *format = vj_event_list[event_id].format ? vj_event_list[event_id].format : "";
+    if(description)
+        *description = vj_event_list[event_id].descr ? vj_event_list[event_id].descr : "";
+    return 1;
+}
+
 static const char *vims_key_text(int key)
 {
 #ifdef HAVE_SDL
@@ -21230,6 +21381,11 @@ const char *vj_gui_connected_host(void)
     if(!info || info->connected_host[0] == '\0')
         return "localhost";
     return info->connected_host;
+}
+
+double vj_gui_video_fps(void)
+{
+    return info ? (double) info->el.fps : 0.0;
 }
 
 void vj_gui_set_title(char *remote, int port) {
