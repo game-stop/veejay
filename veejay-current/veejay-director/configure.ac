@@ -183,25 +183,51 @@ have_ndi=false
 NDI_CFLAGS=""
 NDI_LIBS=""
 if test "x$with_ndi" != "xno"; then
-  ndi_saved_CPPFLAGS="$CPPFLAGS"
-  if test "x$with_ndi" != "xauto" && test "x$with_ndi" != "xyes"; then
-    NDI_CFLAGS="-I$with_ndi -I$with_ndi/include -I$with_ndi/include/ndi"
-    CPPFLAGS="$CPPFLAGS $NDI_CFLAGS"
-  fi
-  AC_CHECK_HEADER([Processing.NDI.Lib.h], [ndi_header=yes], [ndi_header=no])
+  ndi_header=no
   ndi_api=no
-  if test "x$ndi_header" = "xyes"; then
-    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <Processing.NDI.Lib.h>]], [[
-      const NDIlib_v5 *api = 0;
-      (void)api->find_create_v2;
-      (void)api->recv_create_v3;
-      (void)api->recv_capture_v3;
-      (void)api->recv_free_audio_v3;
-      (void)api->send_send_video_async_v2;
-      (void)api->util_send_send_audio_interleaved_16s;
-    ]])], [ndi_api=yes], [ndi_api=no])
+  ndi_header_path=""
+  ndi_include_dir=""
+  if test "x$with_ndi" != "xauto" && test "x$with_ndi" != "xyes"; then
+    AC_MSG_CHECKING([for Processing.NDI.Lib.h below $with_ndi])
+    for ndi_include_dir in "$with_ndi" "$with_ndi/include" "$with_ndi/include/ndi"; do
+      if test -f "$ndi_include_dir/Processing.NDI.Lib.h"; then
+        ndi_header_path="$ndi_include_dir/Processing.NDI.Lib.h"
+        ndi_header=yes
+        break
+      fi
+    done
+    if test "x$ndi_header" = "xyes"; then
+      AC_MSG_RESULT([$ndi_header_path])
+      NDI_CFLAGS="-I\"$ndi_include_dir\""
+    else
+      AC_MSG_RESULT([not found])
+    fi
+  else
+    AC_CHECK_HEADER([Processing.NDI.Lib.h], [ndi_header=yes], [ndi_header=no])
   fi
-  CPPFLAGS="$ndi_saved_CPPFLAGS"
+  if test "x$ndi_header" = "xyes"; then
+    if test -n "$ndi_header_path"; then
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include "$ndi_header_path"]], [[
+        const NDIlib_v5 *api = 0;
+        (void)api->find_create_v2;
+        (void)api->recv_create_v3;
+        (void)api->recv_capture_v3;
+        (void)api->recv_free_audio_v3;
+        (void)api->send_send_video_async_v2;
+        (void)api->util_send_send_audio_interleaved_16s;
+      ]])], [ndi_api=yes], [ndi_api=no])
+    else
+      AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <Processing.NDI.Lib.h>]], [[
+        const NDIlib_v5 *api = 0;
+        (void)api->find_create_v2;
+        (void)api->recv_create_v3;
+        (void)api->recv_capture_v3;
+        (void)api->recv_free_audio_v3;
+        (void)api->send_send_video_async_v2;
+        (void)api->util_send_send_audio_interleaved_16s;
+      ]])], [ndi_api=yes], [ndi_api=no])
+    fi
+  fi
   if test "x$ndi_header" = "xyes" && test "x$ndi_api" = "xyes" && test "x$have_dl_dlopen" = "xtrue"; then
     have_ndi=true
     NDI_LIBS="-ldl"
