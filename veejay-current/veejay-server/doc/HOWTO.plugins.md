@@ -1,8 +1,6 @@
 Video Plugins FX
 ========
 
-Veejay contain more than 160 built-in FX, many unique and original FX filters.  
-But you can have more !
 
 Plugin-packs available with veejay
 -----------------
@@ -17,7 +15,7 @@ To compile and install a plugin-pack:
 ```bash
 $ cd veejay-source/plugin-packs/lvdgmic
 $ ./autogen.sh
-$ ./configure && make
+$ ./configure && make && sudo make install
 ```
 
 How veejay will find installed plugins ?
@@ -38,14 +36,6 @@ $ mkdir ~/.veejay
 $ vi ~/.veejay/plugins.cfg
 ```
 
-Apart from the differences due to your OS, the contents of the file can look like:
-```
-/usr/local/lib/frei0r
-```
 
-Veejay will pick up the plugins configured in the `plugins.cfg` file the next time you start it.
+Veejay will load the plugins from the locations specified in the `plugins.cfg` file the next time you start it.
 
-Plugins default values
-------------------
-You can change the default parameter values by editing the files in
-`$HOME/.veejay/frei0r/` and `$HOME/.veejay/livido/`
