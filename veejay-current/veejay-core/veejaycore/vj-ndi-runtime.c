@@ -118,6 +118,34 @@ static int vj_ndi_runtime_emit_dir(const char *folder,
     return 0;
 }
 
+static int vj_ndi_runtime_emit_sdk_root(const char *folder,
+                                        const char *const *names,
+                                        int name_count,
+                                        vj_ndi_runtime_candidate_func callback,
+                                        void *opaque)
+{
+    char lib_dir[PATH_MAX];
+    const char *triplet = vj_ndi_runtime_arch_triplet();
+    int written;
+
+    if(!folder || !*folder)
+        return 0;
+
+    if(triplet && *triplet) {
+        written = snprintf(lib_dir, sizeof(lib_dir), "%s/lib/%s", folder, triplet);
+        if(written > 0 && (size_t)written < sizeof(lib_dir) &&
+           vj_ndi_runtime_emit_dir(lib_dir, names, name_count, callback, opaque))
+            return 1;
+    }
+
+    written = snprintf(lib_dir, sizeof(lib_dir), "%s/lib", folder);
+    if(written > 0 && (size_t)written < sizeof(lib_dir) &&
+       vj_ndi_runtime_emit_dir(lib_dir, names, name_count, callback, opaque))
+        return 1;
+
+    return 0;
+}
+
 int vj_ndi_runtime_foreach_candidate(const char *preferred_library,
                                      const char *preferred_env_name,
                                      vj_ndi_runtime_candidate_func callback,
@@ -161,9 +189,13 @@ int vj_ndi_runtime_foreach_candidate(const char *preferred_library,
 
     for(int i = 0; i < env_count; i++) {
         const char *folder = getenv(env_names[i]);
-        if(folder && *folder &&
-           vj_ndi_runtime_emit_dir(folder, names, name_count, callback, opaque))
-            return 1;
+        if(folder && *folder) {
+            if(vj_ndi_runtime_emit_dir(folder, names, name_count, callback, opaque))
+                return 1;
+            if(vj_ndi_runtime_emit_sdk_root(folder, names, name_count,
+                                            callback, opaque))
+                return 1;
+        }
     }
 
     for(int i = 0; i < name_count; i++) {
