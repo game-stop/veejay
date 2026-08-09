@@ -8466,10 +8466,12 @@ void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
     if(GTK_IS_COMBO_BOX(source_combo)) {
         gtk_combo_box_set_active(GTK_COMBO_BOX(source_combo), INPUTSTREAM_SOURCE_NDI);
         on_inputstream_source_type_changed(GTK_COMBO_BOX(source_combo), NULL);
+        inputstream_ndi_tree_ensure();
+        inputstream_refresh_ndi_sources();
+    } else {
+        scan_devices("tree_v4ldevices");
     }
 
-    inputstream_ndi_tree_ensure();
-    inputstream_refresh_ndi_sources();
     gtk_window_present(GTK_WINDOW(inputstream_window));
 }
 
