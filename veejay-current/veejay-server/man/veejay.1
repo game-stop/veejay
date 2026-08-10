@@ -1,6 +1,6 @@
 .TH "VEEJAY" "1" "August 2026" "Veejay" "User Commands"
 .SH NAME
-veejay \- a visual video instrument and video sampler for GNU/Linux
+veejay - a visual video instrument and video sampler for GNU/Linux
 
 .SH SYNOPSIS
 .B veejay
@@ -161,9 +161,9 @@ A typical local Program and Output pair is:
 .RS
 .nf
 \fBveejay --instance-role program --instance-id main-program -p 3490 movie.avi\fR
-\fBveejay --instance-role output --instance-id projector-left -p 4490 \\
-        --output-source 127.0.0.1:3490 --project-width 1920 \\
-        --project-height 1080 --fullscreen\fR
+\fBveejay --instance-role output --instance-id projector-left -p 4490 \
+--output-source 127.0.0.1:3490 --project-width 1920 \
+--project-height 1080 --fullscreen\fR
 .fi
 .RE
 
@@ -199,19 +199,21 @@ to follow received NDI timestamps when the source clock is healthy.
 
 .SH SUPPORTED VIDEO CONTAINERS AND INPUTS
 
-.IP \(bu 2
+.IP (bu 2
+Any video file format supported by FFmpeg.
+.IP (bu 2
 AVI, including OpenDML AVI.
-.IP \(bu 2
+.IP (bu 2
 QuickTime, when veejay is built with libquicktime support.
-.IP \(bu 2
+.IP (bu 2
 Raw DV / DVVideo, when veejay is built with DV support.
-.IP \(bu 2
+.IP (bu 2
 Still image files through GDK Pixbuf, when image loading support is compiled in.
 The exact image extensions depend on the installed GDK Pixbuf loaders.
 
 .SH SUPPORTED VIDEO CODECS AND FORMATS
 
-.IP \(bu 2
+.IP (bu 2
 MJPEG AVI / QuickTime, fourcc:
 .BR mjpg ,
 .BR mjpb ,
@@ -223,11 +225,11 @@ MJPEG AVI / QuickTime, fourcc:
 and
 .BR dmb1 .
 
-.IP \(bu 2
+.IP (bu 2
 Lossless JPEG AVI, fourcc:
 .B ljpg
 
-.IP \(bu 2
+.IP (bu 2
 DV / DVVideo, NTSC/PAL, AVI / QuickTime / raw DV, fourcc:
 .BR dv ,
 .BR dvsd ,
@@ -237,14 +239,14 @@ DV / DVVideo, NTSC/PAL, AVI / QuickTime / raw DV, fourcc:
 and
 .BR dvcp .
 
-.IP \(bu 2
+.IP (bu 2
 Planar YUV 4:2:0, fourcc:
 .BR iyuv ,
 .BR yv12 ,
 and
 .BR i420 .
 
-.IP \(bu 2
+.IP (bu 2
 Planar YUV 4:2:2, fourcc:
 .BR yv16 ,
 .BR i422 ,
@@ -255,30 +257,30 @@ and full-range or internal variants
 and
 .BR y42x .
 
-.IP \(bu 2
+.IP (bu 2
 YUV4MPEG stream output, 4:2:2 or 4:2:0, selected with
 .BR -O/--output .
 
-.IP \(bu 2
+.IP (bu 2
 Motion PNG, fourcc:
 .BR mpng
 and
 .BR png .
 
-.IP \(bu 2
+.IP (bu 2
 HuffYUV, fourcc:
 .BR hfyu .
 
-.IP \(bu 2
+.IP (bu 2
 MLZO, YUV 4:2:2 planar compressed with OberHumer's LZO real-time data
 compression library, fourcc:
 .BR mlzo .
 
-.IP \(bu 2
+.IP (bu 2
 QOI/YUV experimental storage, fourcc:
 .BR qoiy .
 
-.IP \(bu 2
+.IP (bu 2
 HAP streams, fourcc:
 .BR hap1 ,
 .BR hap5 ,
@@ -287,7 +289,7 @@ HAP streams, fourcc:
 and
 .BR hapm .
 
-.IP \(bu 2
+.IP (bu 2
 Older QuickTime/video codecs handled by the input path when available, including
 .BR svq1 ,
 .BR svq3 ,
@@ -450,10 +452,10 @@ chain entries can also have beat control enabled or disabled at runtime.
 
 Veejay has a console and a video window.
 
-.IP \(bu 2
+.IP (bu 2
 The console is used for displaying messages only.
 
-.IP \(bu 2
+.IP (bu 2
 When the mouse is over the video window, you can use the keyboard like a piano
 to play and manipulate the video.
 
@@ -509,91 +511,91 @@ and connect them to external systems.
 .SH OPTIONS
 
 .TP
-.B \-v/--verbose
+.B -v/--verbose
 Enable verbose/debugging output. Default is off.
 
 .TP
-.B \-n/--no-color
+.B -n/--no-color
 Do not use coloured text in console output.
 
 .TP
-.B \-u/--dump-events
+.B -u/--dump-events
 Dump veejay's VIMS, OSC, effect, and environment documentation to stdout.
 
 .TP
-.B \-B/--features
+.B -B/--features
 List compiled-in features and exit.
 
 .TP
-.B \--version
+.B --version
 Print veejay version and exit.
 
 .TP
-.B \-?/--help
+.B -?/--help
 Print command-line help and exit.
 
 .TP
-.B \-D/--composite/--no-viewport
+.B -D/--composite/--no-viewport
 Do not start with the legacy camera/projection calibration viewport. The
 .B --no-viewport
 name is an alias for the same option.
 
 .TP
-.B \-p/--port <num>
+.B -p/--port 
 Set the TCP port used to accept and send VIMS messages. Default is 3490.
 
 .TP
-.B \-M/--multicast-osc <multicast address>
+.B -M/--multicast-osc 
 Start the OSC receiver in multicast mode.
 
 .TP
-.B \-T/--multicast-vims <multicast address>
+.B -T/--multicast-vims 
 Set up multicast VIMS. The multicast frame sender transmits on port offset + 3.
 Commands are received on port offset + 4.
 
 .TP
-.B \-m/--memory <num>
+.B -m/--memory 
 Set maximum memory to use for cache, as a percentage of total system RAM.
 Use 0 to disable. Valid range is 0-100. Default is 30.
 
 .TP
-.B \-j/--max_cache/--max-cache <num>
+.B -j/--max_cache/--max-cache 
 Divide cache memory over at most N samples. Valid range is 0-100. Default is 0.
 
 .TP
-.B \-Y/--yuv [0|1|2]
+.B -Y/--yuv [0|1|2]
 Force YCbCr mode. Use 0 for the default detected/output mode, 1 for limited-range YUV 4:2:2 Rec. 601, or 2 for full-range YUV 4:2:2 JPEG/JFIF.
 
 .TP
-.B \-t/--timer <num>
+.B -t/--timer 
 Select timer. Use 0 for none or 1 for the default timer. Default is 1.
 
 .TP
-.B \-P/--preserve-pathnames
+.B -P/--preserve-pathnames
 Do not canonicalise pathnames in editlists.
 
 .TP
-.B \-e/--swap-range
+.B -e/--swap-range
 Swap YUV range 0-255 with 16-235 on video files. This option enables range
 swapping; it does not take an argument.
 
 .TP
-.B \-L/--auto-loop
+.B -L/--auto-loop
 Start with the default sample loop.
 
 .TP
-.B \-b/--bezerk
+.B -b/--bezerk
 Enable bezerk mode. This allows you to change input channels on the fly without
 restarting the samples.
 
 .TP
-.B \-K/--master
+.B -K/--master
 Start this veejay instance as the master or main video output. A master owns
 the projection/output role. Preview or editing instances can connect to it with
 .BR --connect .
 
 .TP
-.B \-C/--connect <ip address:port>
+.B -C/--connect 
 Connect this veejay instance to a master veejay. If no port is given, the
 default VIMS port is used. This is typically used for a preview or editing
 instance that forwards selected VIMS playback or trickplay commands to the main
@@ -604,7 +606,7 @@ for example
 .BR "-p 4490 --connect 127.0.0.1:3490" .
 
 .TP
-.B \--instance-role <standalone|program|output>
+.B --instance-role <standalone|program|output>
 Select the backend rendering role. The default is
 .BR standalone .
 The
@@ -613,24 +615,24 @@ role cannot load startup media files or use
 .BR --ndi-receive .
 
 .TP
-.B \--instance-id <name>
+.B --instance-id 
 Set a non-empty stable identity for discovery, performance reporting, NDI
 metadata, and show topology. Without this option, the runtime ID is generated
 from the role and VIMS port.
 
 .TP
-.B \--output-source <host:port>
+.B --output-source [host:port](https://www.google.com/search?q=host:port)
 For an Output role, consume the Program feed exposed by the backend at the given
 host and TCP port. A local endpoint uses shared-memory discovery; a remote
 endpoint uses VIMS TCP frames. The port must be in the range 1 to 65535.
 
 .TP
-.B \--output-source-pid <pid>
+.B --output-source-pid 
 For an Output role, attach to the local Program shared-memory publisher owned by
 the positive process ID.
 
 .TP
-.B \--output-source-shm <key>
+.B --output-source-shm 
 For an Output role, attach to the positive System V shared-memory key.
 Only one of
 .BR --output-source ,
@@ -640,7 +642,7 @@ and
 may be supplied.
 
 .TP
-.B \-l/--sample-file <filename>
+.B -l/--sample-file 
 Load a samplelist file at startup. The samplelist file stores your project,
 including samples, FX chains, loop and play modes, the currently playing sample,
 and sequencer information. In a master/preview setup, startup samplelists may be
@@ -649,17 +651,17 @@ the current samplelist over VIMS, so both instances do not need to load the same
 samplelist file for that sync action.
 
 .TP
-.B \-F/--action-file <filename>
+.B -F/--action-file 
 Load an action file at startup. The action file stores custom keybindings,
 custom bundles, available VIMS events, editlists, samplelists, streamlists, and
 command-line options.
 
 .TP
-.B \-g/--clip-as-sample
+.B -g/--clip-as-sample
 Load every video file on the command line as a new sample.
 
 .TP
-.B \-a/--audio [0|1]
+.B -a/--audio [0|1]
 Enable or disable source/media audio playback output. Use 0 to start without
 playing the original media audio, or 1 to enable source/media audio playback
 output. Default is 1.
@@ -671,70 +673,70 @@ align, WAV playback, beat analysis, and audio sync may still be used with
 .BR "-a 0" .
 
 .TP
-.B \--audio-muted
+.B --audio-muted
 Start with all audio playback output muted. This is equivalent to starting with
 the global audio mute toggle enabled. It does not disable JACK input capture,
 beat analysis, or audio sync. In dummy mode the result is still silent output.
 
 .TP
-.B \--audio-sync-thread [0|1]
+.B --audio-sync-thread [0|1]
 Enable or disable the audio sync/control worker. Use 0 to keep the sync/control
 worker from starting; this disables JACK/WAV analysis, monitor passthrough,
 tempo bridge, track align, tempo-follow control, and target-clock control
 requests for that backend. Use 1 to allow them. Default is 1.
 
 .TP
-.B \--no-audio-sync-thread
+.B --no-audio-sync-thread
 Disable the audio sync/control worker. This is equivalent to
 .BR "--audio-sync-thread 0" .
 
 .TP
-.B \--audio-beat-thread [0|1]
+.B --audio-beat-thread [0|1]
 Enable or disable the audio beat detector worker. Use 0 to prevent beat
 analysis, beat state reporting, break-beat transport actions, and auto-FX beat
 modulation from starting in that backend. Use 1 to allow them. Default is 1.
 
 .TP
-.B \--no-audio-beat-thread
+.B --no-audio-beat-thread
 Disable the audio beat detector worker. This is equivalent to
 .BR "--audio-beat-thread 0" .
 
 .TP
-.B \--pace-correction <ms>
+.B --pace-correction 
 Set audio pace correction offset in milliseconds. The value must be
 non-negative. This is a startup timing offset, not a volume or mixer control.
 
 .TP
-.B \-c/--synchronization [0|1]
+.B -c/--synchronization [0|1]
 Disable or enable sync correction. Default is on.
 
 .TP
-.B \--ndi-send
+.B --ndi-send
 Publish the Program or final Output as NDI video/audio. Program instances send
 the composed Program frame before physical-output mapping; standalone and
 Output instances send the final mapped frame.
 
 .TP
-.B \--ndi-name <name>
+.B --ndi-name 
 Set the advertised NDI sender name. The name must be non-empty. When omitted,
 the instance ID is used.
 
 .TP
-.B \--ndi-no-tally
+.B --ndi-no-tally
 Disable NDI program/preview tally output for the active NDI input.
 
 .TP
-.B \--ndi-follow-clock
+.B --ndi-follow-clock
 Follow received NDI timestamps while the source clock is healthy.
 
 .TP
-.B \-G/--graphics-driver <num>
+.B -G/--graphics-driver 
 Alias for
 .BR --output .
 Select the video output driver.
 
 .TP
-.B \-O/--output [0..8]
+.B -O/--output [0..8]
 Specify video output:
 .RS
 .IP 0 3
@@ -759,154 +761,154 @@ Vloopback device, BGR, requires
 .RE
 
 .TP
-.B \-o/--output-file <file>
+.B -o/--output-file 
 Write video output to file or device. This is used with
 .BR -O/--output .
 
 .TP
-.B \-s/--size/--window-size WxH
+.B -s/--size/--window-size WxH
 Set display dimensions for the SDL video window.
 
 .TP
-.B \-x/--geometry-x/--window-x <num>
+.B -x/--geometry-x/--window-x 
 Set the top-left X offset for the SDL video window.
 
 .TP
-.B \-y/--geometry-y/--window-y <num>
+.B -y/--geometry-y/--window-y 
 Set the top-left Y offset for the SDL video window.
 
 .TP
-.B \--fullscreen
+.B --fullscreen
 Start SDL output in fullscreen-desktop mode.
 
 .TP
-.B \--windowed
+.B --windowed
 Start SDL output in windowed mode. If both window mode options are present, the
 last one on the command line takes effect.
 
 .TP
-.B \--borderless
+.B --borderless
 Open the SDL video window without a title bar.
 
 .TP
-.B \--no-keyboard
+.B --no-keyboard
 Disable keyboard input for the SDL video window.
 
 .TP
-.B \--no-mouse
+.B --no-mouse
 Disable mouse input for the SDL video window.
 
 .TP
-.B \--show-cursor
+.B --show-cursor
 Show the mouse cursor in the SDL video window.
 
 .TP
-.B \--ndi-list
+.B --ndi-list
 Discover available NDI sources, print their advertised names and URLs, and
 exit. This requires an available NDI runtime.
 
 .TP
-.B \--ndi-receive <source-name>
+.B --ndi-receive 
 Start the advertised NDI source as the active live video/audio input. The source
 name must be non-empty. This option cannot be combined with startup media files
 or with
 .BR "--instance-role output" .
 
 .TP
-.B \-A/--capture-device <num>
+.B -A/--capture-device 
 Start with capture device
-.BR <num> .
+.BR  .
 This replaces the older
 .B --all
 description.
 
 .TP
-.B \-d/--dummy/--blank
+.B -d/--dummy/--blank
 Start without video files and render a blank source. Startup media files cannot
 be combined with this mode.
 
 .TP
-.B \-Z/--load-generators <num>
+.B -Z/--load-generators 
 Load all generator plugins as streams and start playing generator stream
-.BR <num> .
+.BR  .
 
 .TP
-.B \-W/--input-width/--source-width <num>
+.B -W/--input-width/--source-width 
 Set the blank-source width. The value must be greater than zero.
 
 .TP
-.B \-H/--input-height/--source-height <num>
+.B -H/--input-height/--source-height 
 Set the blank-source height. The value must be greater than zero.
 
 .TP
-.B \-f/--fps <num>
+.B -f/--fps 
 Override the frame rate. The value must be greater than 0 and at most 240.
 Overriding the frame rate disables source-media audio synchronization. External
 JACK/WAV sync and beat services are controlled separately.
 
 .TP
-.B \-r/--audiorate <num>
+.B -r/--audiorate 
 Set dummy/sample audio rate. The value must be greater than zero. Default is 48 kHz.
 
 .TP
-.B \--audio-channels <num>
+.B --audio-channels 
 Set dummy/sample audio channel count. The value must be greater than zero.
 
 .TP
-.B \--audio-bits <num>
+.B --audio-bits 
 Set dummy/sample audio bits per sample. The value must be greater than zero.
 
 .TP
-.B \-I/--deinterlace
+.B -I/--deinterlace
 Deinterlace video if it is interlaced.
 
 .TP
-.B \-N/--norm <num>
+.B -N/--norm 
 Set video norm. Use 0 for PAL, 1 for NTSC, or 2 for SECAM. Default is PAL.
 
 .TP
-.B \-w/--output-width/--project-width <num>
+.B -w/--output-width/--project-width 
 Set project/output canvas width. The value must be greater than zero.
 
 .TP
-.B \-h/--output-height/--project-height <num>
+.B -h/--output-height/--project-height 
 Set project/output canvas height. The value must be greater than zero.
 
 .TP
-.B \--benchmark WxH
+.B --benchmark WxH
 Run veejay benchmark using the given resolution.
 
 .TP
-.B \--qrcode-connection-info
+.B --qrcode-connection-info
 Encode veejay's external IP address and port number into a QR code image. This
 is available only when built with QR code support.
 
 .TP
-.B \-S/--scene-detection <threshold>
+.B -S/--scene-detection 
 Create new samples based on scene detection threshold
-.BR <threshold> .
+.BR  .
 
 .TP
-.B \-X/--dynamic-fx-chain
+.B -X/--dynamic-fx-chain
 Do not keep FX chain buffers in RAM. Use this option if you prefer dynamic
 allocation instead. This is slower, but reserves less RAM.
 
 .TP
-.B \--split-screen <file>
+.B --split-screen 
 Load a video-wall split-screen configuration file. The master instance divides
 the rendered output into tiles and sends each tile to the veejay instance
 listed for that screen. Localhost screens use shared memory; remote hosts use
 the configured host and port.
 
 .TP
-.B \--fx-custom-default-values
+.B --fx-custom-default-values
 Read FX custom default values from
 .B ~/.veejay/livido
 and
 .BR ~/.veejay/frei0r .
 
 .TP
-.B \-q/--quit
+.B -q/--quit
 Quit at the end of the file.
 
 .TP
@@ -939,7 +941,7 @@ layout as rows by columns:
 .PP
 .RS
 .nf
-\fBscreen=<rows>x<columns>\fR
+\fBscreen=x\fR
 .fi
 .RE
 
@@ -949,7 +951,7 @@ veejay output instance:
 .PP
 .RS
 .nf
-\fBrow=<row> col=<column> port=<port> hostname=<host>\fR
+\fBrow= col= port= hostname=\fR
 .fi
 .RE
 
@@ -1143,6 +1145,16 @@ before creating the SDL renderer, for example
 .BR opengl .
 
 .TP
+.B VEEJAY_SDL_HINT_FRAMEBUFFER_ACCELERATION
+Set
+.B SDL_HINT_FRAMEBUFFER_ACCELERATION
+before creating the SDL renderer.
+
+.TP
+.B VEEJAY_SDL_DIRECT_LOCK
+Control SDL texture direct locking/updating behavior. Set to 0, false, or off to disable direct lock and use update-only streaming textures (default safe behavior on Vulkan renderers), or 1, true, or on to force direct lock.
+
+.TP
 .B VEEJAY_SDL_KEY_REPEAT_DELAY
 Set key repeat delay in milliseconds.
 
@@ -1168,7 +1180,7 @@ recorded AVI files and other file processing limits.
 
 .TP
 .B VEEJAY_NUM_DECODE_THREADS
-Set the number of avcodec/MJPEG decode threads to spawn.
+Set the number of avcodec/FFmpeg/MJPEG decode threads to spawn.
 
 .TP
 .B VEEJAY_MULTITHREAD_TASKS
@@ -1760,7 +1772,6 @@ Enable
 to mirror selected playback controls to the master output. This is independent
 from samplelist sync.
 
-
 .TP
 .B veejay -d -p 3490 --audio-muted --no-audio-beat-thread
 Start a silent dummy backend with global output mute enabled and without the
@@ -1775,12 +1786,12 @@ beat-driven FX commands.
 
 .SH REFERENCES
 
-.I http://veejayhq.net
+.I [http://veejayhq.net](http://veejayhq.net)
 
 .SH BUGS
 
 See
-.I https://github.com/game-stop/veejay/issues
+.I [https://github.com/game-stop/veejay/issues](https://github.com/game-stop/veejay/issues)
 
 .SH SEE ALSO
 
