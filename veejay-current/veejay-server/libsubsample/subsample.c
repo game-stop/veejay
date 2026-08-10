@@ -748,8 +748,8 @@ void ss_444_to_422_drop_avx2(uint8_t *restrict U, uint8_t *restrict V, int width
     const int stride = width >> 1;
 
     __m256i shuffle_mask = _mm256_setr_epi8(
-        0, 2, 4, 6, 8, 10, 12, 14, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0, 2, 4, 6, 8, 10, 12, 14, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
+        0, 2, 4, 6, 8, 10, 12, 14, -1, -1, -1, -1, -1, -1, -1, -1,
+        0, 2, 4, 6, 8, 10, 12, 14, -1, -1, -1, -1, -1, -1, -1, -1
     );
 
     for (int y = 0; y < height; y++) {
@@ -929,81 +929,46 @@ static inline uint8_t clamp_u8(int v) {
 }
 
 void tr_422_to_444_dup(uint8_t *restrict chromaChannel, const int width,const int height) {
-  const int src_width = width >> 1;
-  const int hei = height - 1;
-  const int wid = src_width - 1;
+    const int src_width = width >> 1;
 
-  // duplicate the last pixel in the row
-  chromaChannel[hei * width + 1] = chromaChannel[hei * src_width + wid];
-
-  for (int y = hei; y >= 0; y--) {
-    int x = wid - 1;
-    // upsample the pixels using a nearest-neighbour filter.
-    chromaChannel[y * width + 2 * wid + 1] = (chromaChannel[y * src_width + wid] + chromaChannel[y * src_width + wid + 1]) >> 1;
-    chromaChannel[y * width + 2 * wid] = (chromaChannel[y * src_width + wid] + chromaChannel[y * src_width + wid - 1]) >> 1;
-
-#ifdef HAVE_ASM_SSE2
-    for (; x >= 0; x -= 8) {
-        __m128i pixels = _mm_loadl_epi64((__m128i*)&chromaChannel[y * src_width + x]);
-        __m128i duplicated_pixels = _mm_unpacklo_epi8(pixels, pixels);
-        _mm_storeu_si128((__m128i*)&chromaChannel[y * width + 2 * x], duplicated_pixels);
+    for(int y = height - 1; y >= 0; y--) {
+        uint8_t *src = chromaChannel + (size_t)y * src_width;
+        uint8_t *dst = chromaChannel + (size_t)y * width;
+        for(int x = src_width - 1; x >= 0; x--) {
+            const uint8_t pixel = src[x];
+            dst[2 * x] = pixel;
+            dst[2 * x + 1] = pixel;
+        }
     }
-#else
-#ifdef HAVE_ARM_ASIMD
-    for (; x >= 0; x -= 8) {
-        uint8x8_t pixels = vld1_u8(&chromaChannel[y * src_width + x]);
-        uint8x8x2_t duplicated_pixels;
-        duplicated_pixels.val[0] = pixels;
-        duplicated_pixels.val[1] = pixels;
-        vst2_u8(&chromaChannel[y * width + 2 * x], duplicated_pixels);
-    }
-#endif
-#endif
-
-    for ( ; x >= 0; x--) {
-      const uint8_t pixel = chromaChannel[y * src_width + x];
-      chromaChannel[y * width + 2 * x + 1] = pixel;
-      chromaChannel[y * width + 2 * x] = pixel;
-    }
-  }
 }
 
 #ifdef HAVE_ASM_AVX2
 void tr_422_to_444_dup_avx2(uint8_t *restrict chromaChannel, const int width, const int height) {
     const int src_width = width >> 1;
-    const int hei = height - 1;
-    const int wid = src_width - 1;
 
-    chromaChannel[hei * width + 1] = chromaChannel[hei * src_width + wid];
-
-    __m256i dup_mask = _mm256_setr_epi8(
+    const __m256i dup_mask = _mm256_setr_epi8(
         0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7,
         8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13, 14, 14, 15, 15
     );
 
-    for (int y = hei; y >= 0; y--) {
-        uint8_t *row_src = &chromaChannel[y * src_width];
-        uint8_t *row_dst = &chromaChannel[y * width];
+    for(int y = height - 1; y >= 0; y--) {
+        uint8_t *row_src = chromaChannel + (size_t)y * src_width;
+        uint8_t *row_dst = chromaChannel + (size_t)y * width;
+        int x = src_width;
 
-        row_dst[2 * wid + 1] = (row_src[wid] + row_src[wid + 1]) >> 1;
-        row_dst[2 * wid] = (row_src[wid] + row_src[wid - 1]) >> 1;
-
-        int x = wid - 1;
-
-        for (; x >= 15; x -= 16) {
-
-            __m128i pixels128 = _mm_loadu_si128((__m128i*)&row_src[x - 15]);
-
+        while(x >= 16) {
+            x -= 16;
+            __m128i pixels128 = _mm_loadu_si128((const __m128i*)(row_src + x));
             __m256i pixels256 = _mm256_broadcastsi128_si256(pixels128);
-            
             __m256i duplicated = _mm256_shuffle_epi8(pixels256, dup_mask);
-            
-            _mm256_storeu_si256((__m256i*)&row_dst[2 * (x - 15)], duplicated);
+            _mm256_storeu_si256((__m256i*)(row_dst + 2 * x), duplicated);
         }
-        for (; x >= 0; x--) {
+
+        while(x > 0) {
+            x--;
             const uint8_t pixel = row_src[x];
-            row_dst[2 * x + 1] = pixel;
             row_dst[2 * x] = pixel;
+            row_dst[2 * x + 1] = pixel;
         }
     }
 }
@@ -1015,58 +980,40 @@ void tr_422_to_444_dup_avx2(uint8_t *restrict chromaChannel, const int width, co
 #define UTAP_2 29
 #define UTAP_3 -3
 
-void ss_422_to_444_mitchell(uint8_t *restrict chroma, const int in_w, const int h)  // FIXME
+void ss_422_to_444_mitchell(uint8_t *restrict chroma, const int width, const int h)
 {
-//#if defined(__GNUC__) || defined(__clang__)
-//    chroma = __builtin_assume_aligned(chroma, 32);
-//#endif
+    const int in_w = width >> 1;
+    const int out_w = width;
 
-    const int out_w = in_w * 2;
+    for(int y = h - 1; y >= 0; y--) {
+        uint8_t *src = chroma + (size_t)y * in_w;
+        uint8_t *dst = chroma + (size_t)y * out_w;
+        uint8_t right1 = src[in_w - 1];
+        uint8_t right2 = right1;
 
-    for (int i = 0; i < h; i++) {
-        uint8_t *row = &chroma[i * out_w];
-        uint8_t *src = row;
+        for(int j = in_w - 1; j >= 0; j--) {
+            const uint8_t current = src[j];
+            const uint8_t left1 = src[j > 0 ? j - 1 : 0];
+            const uint8_t left2 = src[j > 1 ? j - 2 : 0];
+            int value;
 
+            if(j == 0) {
+                value = UTAP_0 * current + UTAP_1 * current +
+                        UTAP_2 * right1 + UTAP_3 * right2;
+            }
+            else if(j == in_w - 1) {
+                value = UTAP_0 * left2 + UTAP_1 * left1 +
+                        UTAP_2 * current + UTAP_3 * current;
+            }
+            else {
+                value = UTAP_0 * left1 + UTAP_1 * current +
+                        UTAP_2 * right1 + UTAP_3 * right2;
+            }
 
-        {
-            int j = in_w - 1;
-            row[2 * j] = src[j]; // even sample
-
-            int j0 = (j >= 2) ? j - 2 : 0;
-            int j1 = (j >= 1) ? j - 1 : 0;
-            int j2 = j;
-            int j3 = j; // clamp
-            int val = (UTAP_0 * src[j0] + UTAP_1 * src[j1] +
-                       UTAP_2 * src[j2] + UTAP_3 * src[j3] + 64) >> 7;
-            row[2 * j + 1] = clamp_u8(val);
-        }
-
-        for (int j = in_w - 2; j >= 1; j--) {
-            row[2 * j] = src[j]; // even sample
-
-            int j0 = j - 1;
-            int j1 = j;
-            int j2 = j + 1;
-            int j3 = j + 2;
-            if (j3 >= in_w) j3 = in_w - 1; // clamp right boundary
-
-            int val = (UTAP_0 * src[j0] + UTAP_1 * src[j1] +
-                       UTAP_2 * src[j2] + UTAP_3 * src[j3] + 64) >> 7;
-            row[2 * j + 1] = clamp_u8(val);
-        }
-
-
-        {
-            int j = 0;
-            row[0] = src[0]; // even sample
-
-            int j0 = 0;
-            int j1 = 0;
-            int j2 = 1;
-            int j3 = 2;
-            int val = (UTAP_0 * src[j0] + UTAP_1 * src[j1] +
-                       UTAP_2 * src[j2] + UTAP_3 * src[j3] + 64) >> 7;
-            row[1] = clamp_u8(val);
+            dst[2 * j] = current;
+            dst[2 * j + 1] = clamp_u8((value + 64) >> 7);
+            right2 = right1;
+            right1 = current;
         }
     }
 }
@@ -1167,7 +1114,11 @@ static supersample_422_to_444 supersample_422_to_444_out;
 
 void chroma_subsample_init(void) {
     const char *mode = getenv("VEEJAY_SUBSAMPLE_MODE");
+#ifdef HAVE_ASM_AVX2
+    subsample_444_to_422 f = ss_444_to_422_drop_avx2;
+#else
     subsample_444_to_422 f = ss_444_to_422_drop;
+#endif
     const char *selected = "drop";
 
     if (mode == NULL) {
@@ -1202,6 +1153,11 @@ void chroma_subsample_init(void) {
     }
     else {
         veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE='%s', falling back to 'drop'", mode);
+#ifdef HAVE_ASM_AVX2
+        f = ss_444_to_422_drop_avx2;
+#else
+        f = ss_444_to_422_drop;
+#endif
     }
 
     subsample_444_to_422_in = f;
@@ -1212,7 +1168,11 @@ void chroma_subsample_init(void) {
 void chroma_supersample_init(void)
 {
     const char *mode = getenv("VEEJAY_SUPERSAMPLE_MODE");
+#ifdef HAVE_ASM_AVX2
+    supersample_422_to_444 f = tr_422_to_444_dup_avx2;
+#else
     supersample_422_to_444 f = tr_422_to_444_dup;
+#endif
     const char *selected = "dup";   // default
 
     if (mode == NULL) {
@@ -1235,6 +1195,11 @@ void chroma_supersample_init(void)
     }
     else {
         veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUPERSAMPLE_MODE='%s', falling back to 'dup'", mode);
+#ifdef HAVE_ASM_AVX2
+        f = tr_422_to_444_dup_avx2;
+#else
+        f = tr_422_to_444_dup;
+#endif
     }
 
     supersample_422_to_444_out = f;
@@ -1275,8 +1240,8 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
     switch (mode) {
         // optimized path
         case SSM_422_444:
-            supersample_422_to_444_out(ycbcr[1], frame->width,frame->height);
-            supersample_422_to_444_out(ycbcr[2],frame->width,frame->height);
+            supersample_422_to_444_out(ycbcr[1], frame->width, frame->height);
+            supersample_422_to_444_out(ycbcr[2], frame->width, frame->height);
         break;
         case SSM_420_JPEG_BOX:
             ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
