@@ -254,7 +254,7 @@ static inline void softblur3_v(const uint8_t *restrict tmp,
 
 static inline void softblur3_core(const uint8_t *restrict src,
                                       uint8_t *restrict tmp,
-                                      uint8_t *restrict dst,
+                                      uint8_t *dst,
                                       int w,
                                       int h)
 {
