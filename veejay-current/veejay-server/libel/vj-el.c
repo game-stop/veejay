@@ -843,10 +843,6 @@ static void el_cache_note_result(global_raw_frame_cache_t *cache,
         el_cache_owner_begin_streaming(cache, owner);
 }
 
-static void free_node(raw_frame_node_t *node) {
-    free(node);
-}
-
 static void unlink_cache_node(global_raw_frame_cache_t *cache, raw_frame_node_t *node)
 {
     if(node->prev)
@@ -1026,8 +1022,12 @@ static void el_cache_drop_node(global_raw_frame_cache_t *cache,
                                raw_frame_node_t *node,
                                int count_eviction)
 {
+    el_cache_owner_t *owner;
+
     if(!cache || !node)
         return;
+
+    owner = node->owner;
 
     if(count_eviction && node->key_kind == EL_CACHE_KEY_MEDIA)
         cache->generic_evictions++;
@@ -1035,43 +1035,71 @@ static void el_cache_drop_node(global_raw_frame_cache_t *cache,
     el_cache_index_remove(cache, node);
     unlink_cache_node(cache, node);
 
-    if(node->owner)
-        el_cache_owner_detach(node->owner, node, 1);
+    if(owner)
+        el_cache_owner_detach(owner, node, 1);
 
-    free_node(node);
-
-    cache->size--;
+    if(cache->size > 0)
+        cache->size--;
 
     if(count_eviction)
         cache->evictions++;
+
+    node->owner = NULL;
+    node->hash_next = NULL;
+    node->prev = NULL;
+    node->next = NULL;
+    node->owner_prev = NULL;
+    node->owner_next = NULL;
+
+    node->planes[0] = NULL;
+    node->planes[1] = NULL;
+    node->planes[2] = NULL;
+    node->planes[3] = NULL;
+
+    free(node);
 }
 
 static void evict_oldest_frame(global_raw_frame_cache_t *cache)
 {
-    if(!cache || !cache->tail)
+    raw_frame_node_t *node;
+
+    if(!cache)
         return;
 
-    el_cache_drop_node(cache, cache->tail, 1);
+    node = cache->tail;
+
+    if(!node)
+        return;
+
+    el_cache_drop_node(cache, node, 1);
 }
+
 static void evict_oldest_frame_for_owner(global_raw_frame_cache_t *cache,
                                          el_cache_owner_t *owner)
 {
-    if(owner && owner->resident_tail) {
-        el_cache_drop_node(cache, owner->resident_tail, 1);
+    raw_frame_node_t *node = NULL;
+
+    if(owner)
+        node = owner->resident_tail;
+
+    if(node) {
+        el_cache_drop_node(cache, node, 1);
         return;
     }
 
     evict_oldest_frame(cache);
 }
+
 static long el_cache_purge_owner(global_raw_frame_cache_t *cache,
                                  el_cache_owner_t *owner)
 {
+    long removed = 0;
+    raw_frame_node_t *node;
+
     if(!cache || !owner || owner->resident <= 0)
         return 0;
 
-    long removed = 0;
-
-    raw_frame_node_t *node = owner->resident_head;
+    node = owner->resident_head;
 
     while(node) {
         raw_frame_node_t *next = node->owner_next;
@@ -1082,6 +1110,10 @@ static long el_cache_purge_owner(global_raw_frame_cache_t *cache,
 
         node = next;
     }
+
+    owner->resident = 0;
+    owner->resident_head = NULL;
+    owner->resident_tail = NULL;
 
     if(removed > 0) {
         cache->purges++;
@@ -1125,8 +1157,19 @@ static long el_cache_borrow(global_raw_frame_cache_t *cache,
         cache->generic_max_borrowed = granted;
     long normal_limit = cache->capacity - granted;
 
-    while(cache->size > normal_limit)
+    while(cache->size > normal_limit && cache->size > 0) {
+        raw_frame_node_t *candidate = NULL;
+
+        if(owner && owner->resident_tail)
+            candidate = owner->resident_tail;
+        else
+            candidate = cache->tail;
+
+        if(!candidate)
+            break;
+
         evict_oldest_frame_for_owner(cache, owner);
+    }
     return granted;
 }
 
