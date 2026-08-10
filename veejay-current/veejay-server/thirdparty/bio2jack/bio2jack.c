@@ -2731,6 +2731,35 @@ JACK_GetPlayedFramesFromDriver(int deviceID)
   return JACK_get_played_frames_from_driver(drv);
 }
 
+double
+JACK_GetClockTime(int deviceID)
+{
+  jack_driver_t *drv = JACK_GetDriverRaw(deviceID);
+
+  if (!drv || !drv->client || drv->jack_sample_rate <= 0)
+    return 0.0;
+
+  /*
+   * last_hw_frame_count is intentionally a JACK process-cycle counter.  It
+   * advances by one complete JACK period at callback entry and is useful for
+   * queue accounting, but it is too coarse to be a video presentation clock.
+   *
+   * jack_frame_time() gives non-process threads JACK's continuously estimated
+   * current frame time.  Convert that frame time through JACK's own time map
+   * so callers get a continuous clock in seconds without involving the client
+   * sample rate (and therefore without per-period resampling/rounding error).
+   */
+  {
+    const jack_nframes_t frame = jack_frame_time(drv->client);
+    const jack_time_t usecs = jack_frames_to_time(drv->client, frame);
+
+    if (usecs == 0)
+      return 0.0;
+
+    return (double)usecs / 1000000.0;
+  }
+}
+
 long JACK_GetUnderruns(int deviceID)
 {
   jack_driver_t *drv = JACK_GetDriverRaw(deviceID);

@@ -83,6 +83,7 @@ unsigned long JACK_GetBytesFreeSpace(int deviceID);
 unsigned long JACK_GetBytesPerOutputFrame(int deviceID);
 unsigned long JACK_GetBytesPerInputFrame(int deviceID);
 unsigned long JACK_GetPlayedFramesFromDriver(int deviceID);
+double JACK_GetClockTime(int deviceID);
 void JACK_ResetBuffer(int deviceID);
 void JACK_ResetInputBuffer(int deviceID);
 long JACK_GetSampleRateJack(int deviceID);
