@@ -33,7 +33,8 @@ typedef enum {
     DIRECTOR_CLIENT_NDI_STATUS,
     DIRECTOR_CLIENT_DEVICE_LIST,
     DIRECTOR_CLIENT_V4L_STATUS,
-    DIRECTOR_CLIENT_ERROR
+    DIRECTOR_CLIENT_ERROR,
+    DIRECTOR_CLIENT_EXPIRED
 } DirectorClientEvent;
 
 typedef void (*DirectorClientEventFunc)(DirectorClient *client,

@@ -20,6 +20,7 @@
 #include "director-compat.h"
 #include "director-wire.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #ifndef VJ_CMD_PORT
@@ -27,7 +28,9 @@
 #endif
 
 #define DIRECTOR_QUERY_INTERVAL_US 1000000
-#define DIRECTOR_RECONNECT_INTERVAL_US 1000000
+#define DIRECTOR_RECONNECT_INITIAL_US 1000000LL
+#define DIRECTOR_RECONNECT_MAX_US 30000000LL
+#define DIRECTOR_FAILURE_EXPIRE_US 300000000LL
 #define DIRECTOR_CONNECT_TIMEOUT_MS 1000
 #define DIRECTOR_SEND_TIMEOUT_MS 600
 #define DIRECTOR_RESPONSE_MAX 65536
@@ -74,6 +77,65 @@ struct _DirectorClient {
 static gint64 director_now_us(void)
 {
     return g_get_monotonic_time();
+}
+
+static gint64 director_reconnect_delay_us(guint failure_count)
+{
+    gint64 delay = DIRECTOR_RECONNECT_INITIAL_US;
+    for(guint i = 1; i < failure_count && delay < DIRECTOR_RECONNECT_MAX_US; i++)
+        delay = MIN(delay * 2, DIRECTOR_RECONNECT_MAX_US);
+    return delay;
+}
+
+static void director_vims_stderr(DirectorClient *client,
+                                 const gchar *command,
+                                 const gchar *reason)
+{
+    if(!client)
+        return;
+    fprintf(stderr,
+            "veejay-director: VIMS request failed: instance=%s endpoint=%s:%d command=%s reason=%s\n",
+            client->instance && client->instance->id ? client->instance->id : "unknown",
+            client->host ? client->host : "unknown",
+            client->port,
+            command && *command ? command : "unknown",
+            reason && *reason ? reason : "request or response failed");
+    fflush(stderr);
+}
+
+static void director_control_connect_stderr(DirectorClient *client,
+                                            const gchar *reason)
+{
+    if(!client)
+        return;
+    fprintf(stderr,
+            "veejay-director: control connection failed: instance=%s endpoint=%s:%d reason=%s\n",
+            client->instance && client->instance->id ? client->instance->id : "unknown",
+            client->host ? client->host : "unknown",
+            client->port,
+            reason && *reason ? reason : "connection failed");
+    fflush(stderr);
+}
+
+static void director_register_control_failure(gint64 *failure_since,
+                                              guint *failure_count,
+                                              gint64 *reconnect_at)
+{
+    const gint64 now = director_now_us();
+    if(*failure_since == 0)
+        *failure_since = now;
+    if(*failure_count < G_MAXUINT)
+        (*failure_count)++;
+    *reconnect_at = now + director_reconnect_delay_us(*failure_count);
+}
+
+static void director_reset_control_failures(gint64 *failure_since,
+                                            guint *failure_count,
+                                            gint64 *reconnect_at)
+{
+    *failure_since = 0;
+    *failure_count = 0;
+    *reconnect_at = 0;
 }
 
 static void director_request_free(DirectorRequest *request)
@@ -210,19 +272,25 @@ static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
     if(!director_wire_connect(wire,
                               client->host,
                               client->port + VJ_CMD_PORT,
-                              DIRECTOR_CONNECT_TIMEOUT_MS))
+                              DIRECTOR_CONNECT_TIMEOUT_MS)) {
+        director_control_connect_stderr(client, "connect failed or timed out");
         return FALSE;
+    }
 
     gchar response[DIRECTOR_RESPONSE_MAX];
     if(!director_wire_query_timed(wire, "488:;", response, sizeof(response),
                                   DIRECTOR_RESPONSE_TIMEOUT_MS,
                                   DIRECTOR_RESPONSE_IDLE_MS, NULL)) {
+        director_vims_stderr(client, "488:;", "identity query failed or timed out");
         director_wire_close(wire);
         return FALSE;
     }
 
     gchar *identity_error = NULL;
     if(!director_identity_response_matches(client, response, &identity_error)) {
+        director_vims_stderr(client, "488:;",
+                             identity_error ? identity_error :
+                             "control endpoint identity did not match");
         if(!client->identity_error_reported) {
             director_dispatch(client, DIRECTOR_CLIENT_ERROR,
                               identity_error ? identity_error :
@@ -241,9 +309,14 @@ static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
     return TRUE;
 }
 
-static gboolean director_send_raw(DirectorWire *wire, const gchar *command)
+static gboolean director_send_raw(DirectorClient *client,
+                                  DirectorWire *wire,
+                                  const gchar *command)
 {
-    return director_wire_send(wire, command, DIRECTOR_SEND_TIMEOUT_MS) != 0;
+    if(director_wire_send(wire, command, DIRECTOR_SEND_TIMEOUT_MS) != 0)
+        return TRUE;
+    director_vims_stderr(client, command, "send failed or timed out");
+    return FALSE;
 }
 
 static gboolean director_query_timeout(DirectorClient *client,
@@ -260,8 +333,10 @@ static gboolean director_query_timeout(DirectorClient *client,
                                   sizeof(response),
                                   timeout_ms,
                                   DIRECTOR_RESPONSE_IDLE_MS,
-                                  first_response_ms))
+                                  first_response_ms)) {
+        director_vims_stderr(client, command, "query failed or response timed out");
         return FALSE;
+    }
     g_strstrip(response);
     director_dispatch(client, event, response);
     return TRUE;
@@ -285,8 +360,10 @@ static gboolean director_query_framed(DirectorClient *client,
 {
     gchar response[DIRECTOR_RESPONSE_MAX];
     if(!director_wire_query_framed(wire, command, response, sizeof(response),
-                                   header_digits, DIRECTOR_RESPONSE_TIMEOUT_MS))
+                                   header_digits, DIRECTOR_RESPONSE_TIMEOUT_MS)) {
+        director_vims_stderr(client, command, "framed query failed or response timed out");
         return FALSE;
+    }
     g_strstrip(response);
     director_dispatch(client, event, response);
     return TRUE;
@@ -333,7 +410,7 @@ static gboolean director_process_request(DirectorClient *client,
             ok = director_refresh_all(client, wire);
             break;
         case DIRECTOR_REQUEST_COMMAND:
-            ok = director_send_raw(wire, request->command);
+            ok = director_send_raw(client, wire, request->command);
             break;
         case DIRECTOR_REQUEST_QUERY_FRAMED:
             ok = director_query_framed(client, wire, request->command,
@@ -353,20 +430,37 @@ static gpointer director_client_worker(gpointer data)
     GQueue pending = G_QUEUE_INIT;
     gint64 reconnect_at = 0;
     gint64 refresh_at = 0;
+    gint64 failure_since = 0;
+    guint failure_count = 0;
     director_wire_init(&wire);
 
     while(!director_should_stop(client)) {
         gint64 now = director_now_us();
+        if(failure_since > 0 && now - failure_since >= DIRECTOR_FAILURE_EXPIRE_US) {
+            fprintf(stderr,
+                    "veejay-director: control endpoint retired: instance=%s endpoint=%s:%d continuous_failure_seconds=300\n",
+                    client->instance && client->instance->id ? client->instance->id : "unknown",
+                    client->host ? client->host : "unknown", client->port);
+            fflush(stderr);
+            director_dispatch(client, DIRECTOR_CLIENT_EXPIRED,
+                              "Control endpoint failed continuously for 5 minutes; removing instance");
+            break;
+        }
         if(wire.fd < 0) {
             if(now >= reconnect_at) {
                 if(director_connect(client, &wire))
                     refresh_at = 0;
                 else
-                    reconnect_at = now + DIRECTOR_RECONNECT_INTERVAL_US;
+                    director_register_control_failure(&failure_since,
+                                                      &failure_count,
+                                                      &reconnect_at);
             }
             if(wire.fd < 0) {
                 now = director_now_us();
-                gint64 wait_us = MAX((gint64)1000, reconnect_at - now);
+                gint64 wake_at = reconnect_at;
+                if(failure_since > 0)
+                    wake_at = MIN(wake_at, failure_since + DIRECTOR_FAILURE_EXPIRE_US);
+                gint64 wait_us = MAX((gint64)1000, wake_at - now);
                 DirectorRequest *request = g_async_queue_timeout_pop(client->requests, wait_us);
                 if(!request)
                     continue;
@@ -374,13 +468,7 @@ static gpointer director_client_worker(gpointer data)
                     director_request_free(request);
                     break;
                 }
-                if(request->type == DIRECTOR_REQUEST_REFRESH) {
-                    director_clear_refresh_pending(client);
-                    director_request_free(request);
-                }
-                else {
-                    g_queue_push_tail(&pending, request);
-                }
+                g_queue_push_tail(&pending, request);
                 continue;
             }
         }
@@ -397,29 +485,44 @@ static gpointer director_client_worker(gpointer data)
                 break;
             }
             const gboolean manual_refresh = request->type == DIRECTOR_REQUEST_REFRESH;
-            if(manual_refresh)
-                director_clear_refresh_pending(client);
             if(!director_process_request(client, &wire, request)) {
+                if(manual_refresh)
+                    director_clear_refresh_pending(client);
                 director_request_free(request);
                 director_wire_close(&wire);
                 director_set_connected(client, FALSE);
-                reconnect_at = director_now_us() + DIRECTOR_RECONNECT_INTERVAL_US;
+                director_register_control_failure(&failure_since,
+                                                  &failure_count,
+                                                  &reconnect_at);
                 continue;
             }
-            if(manual_refresh)
+            if(manual_refresh) {
+                director_clear_refresh_pending(client);
+                director_reset_control_failures(&failure_since,
+                                                &failure_count,
+                                                &reconnect_at);
                 refresh_at = director_now_us() + DIRECTOR_QUERY_INTERVAL_US;
+            }
             director_request_free(request);
         }
+
+        if(director_should_stop(client))
+            break;
 
         now = director_now_us();
         if(now >= refresh_at) {
             if(!director_refresh_all(client, &wire)) {
                 director_wire_close(&wire);
                 director_set_connected(client, FALSE);
-                reconnect_at = director_now_us() + DIRECTOR_RECONNECT_INTERVAL_US;
+                director_register_control_failure(&failure_since,
+                                                  &failure_count,
+                                                  &reconnect_at);
                 continue;
             }
-            refresh_at = now + DIRECTOR_QUERY_INTERVAL_US;
+            director_reset_control_failures(&failure_since,
+                                            &failure_count,
+                                            &reconnect_at);
+            refresh_at = director_now_us() + DIRECTOR_QUERY_INTERVAL_US;
         }
     }
 
@@ -516,8 +619,11 @@ static gboolean director_client_queue_command(DirectorClient *client,
     g_mutex_lock(&client->mutex);
     const gboolean ready = client->started && client->connected && !client->stop;
     g_mutex_unlock(&client->mutex);
-    if(!ready)
+    if(!ready) {
+        director_vims_stderr(client, command,
+                             "not sent: control connection is unavailable");
         return FALSE;
+    }
 
     DirectorRequest *request = g_new0(DirectorRequest, 1);
     request->type = DIRECTOR_REQUEST_COMMAND;
@@ -627,8 +733,11 @@ static void director_client_query_framed_async(DirectorClient *client,
     g_mutex_lock(&client->mutex);
     const gboolean ready = client->started && client->connected && !client->stop;
     g_mutex_unlock(&client->mutex);
-    if(!ready)
+    if(!ready) {
+        director_vims_stderr(client, command,
+                             "not sent: control connection is unavailable");
         return;
+    }
     DirectorRequest *request = g_new0(DirectorRequest, 1);
     request->type = DIRECTOR_REQUEST_QUERY_FRAMED;
     request->command = g_strdup(command);

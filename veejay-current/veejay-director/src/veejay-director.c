@@ -57,6 +57,9 @@
 #define DIRECTOR_OVERVIEW_ACTIVE_INTERVAL_US 220000LL
 #define DIRECTOR_OVERVIEW_IDLE_INTERVAL_US 250000LL
 #define DIRECTOR_OVERVIEW_FRESH_US 5000000LL
+#define DIRECTOR_PREVIEW_RETRY_INITIAL_US 250000LL
+#define DIRECTOR_PREVIEW_RETRY_MAX_US 30000000LL
+#define DIRECTOR_RETIRE_POLL_MS 100
 #define DIRECTOR_PREVIEW_DEFAULT_QUALITY_DIVISOR 8
 #define DIRECTOR_PREVIEW_DEFAULT_FRAME_STRIDE 4
 #define DIRECTOR_ROUTE_APPLY_RETRY_US 2500000LL
@@ -109,6 +112,55 @@ typedef struct _DirectorApp DirectorApp;
 typedef struct _DirectorEidolonView DirectorEidolonView;
 
 static gboolean director_instance_ndi_runtime_unavailable(const DirectorInstance *instance);
+
+static gint64 director_preview_retry_delay_us(guint failure_count)
+{
+    gint64 delay = DIRECTOR_PREVIEW_RETRY_INITIAL_US;
+    for(guint i = 1; i < failure_count && delay < DIRECTOR_PREVIEW_RETRY_MAX_US; i++)
+        delay = MIN(delay * 2, DIRECTOR_PREVIEW_RETRY_MAX_US);
+    return delay;
+}
+
+static void director_preview_register_failure(guint *failure_count,
+                                              gint64 *retry_at_us)
+{
+    if(*failure_count < G_MAXUINT)
+        (*failure_count)++;
+    *retry_at_us = g_get_monotonic_time() +
+                   director_preview_retry_delay_us(*failure_count);
+}
+
+static void director_vims_request_stderr(const gchar *instance_id,
+                                         const gchar *host,
+                                         gint port,
+                                         const gchar *command,
+                                         const gchar *reason)
+{
+    fprintf(stderr,
+            "veejay-director: VIMS request failed: instance=%s endpoint=%s:%d command=%s reason=%s\n",
+            instance_id && *instance_id ? instance_id : "unknown",
+            host && *host ? host : "unknown",
+            port,
+            command && *command ? command : "unknown",
+            reason && *reason ? reason : "request or response failed");
+    fflush(stderr);
+}
+
+static void director_connection_stderr(const gchar *context,
+                                       const gchar *instance_id,
+                                       const gchar *host,
+                                       gint port,
+                                       const gchar *reason)
+{
+    fprintf(stderr,
+            "veejay-director: %s connection failed: instance=%s endpoint=%s:%d reason=%s\n",
+            context && *context ? context : "backend",
+            instance_id && *instance_id ? instance_id : "unknown",
+            host && *host ? host : "unknown",
+            port,
+            reason && *reason ? reason : "connection failed");
+    fflush(stderr);
+}
 
 typedef struct {
     DirectorApp *app;
@@ -209,7 +261,16 @@ typedef struct {
 
 typedef struct {
     DirectorWire wire;
+    guint failure_count;
+    gint64 retry_at_us;
 } DirectorOverviewWire;
+
+typedef struct {
+    DirectorApp *app;
+    DirectorShow *show;
+    DirectorInstance *instance;
+    gchar *id;
+} DirectorRetireWait;
 
 typedef struct {
     gchar *name;
@@ -413,6 +474,7 @@ struct _DirectorApp {
     GtkWidget *header_subtitle;
     GtkListStore *discovery_store;
     GHashTable *discovery_records;
+    GHashTable *retired_instance_ids;
     GtkWidget *discovery_view;
     GtkWidget *status_text;
     GtkWidget *status_lan;
@@ -790,6 +852,8 @@ static void director_ensure_client(DirectorApp *app, DirectorInstance *instance)
 static void director_stop_client(DirectorInstance *instance);
 static void director_start_instance(DirectorApp *app, DirectorInstance *instance);
 static void director_stop_instance(DirectorApp *app, DirectorInstance *instance);
+static void director_remove_instance_completely(DirectorApp *app,
+                                                DirectorInstance *instance);
 static void director_apply_graph(DirectorApp *app, DirectorInstance *instance);
 static gboolean director_apply_video_wire(DirectorApp *app,
                                            DirectorInstance *source,
@@ -1960,58 +2024,6 @@ static DirectorInstance *director_discovery_attach_external(DirectorApp *app,
     return instance;
 }
 
-static gboolean director_discovery_instance_referenced(DirectorApp *app,
-                                                       DirectorInstance *instance)
-{
-    if(!app || !app->show || !instance)
-        return FALSE;
-    for(guint i = 0; i < app->show->instances->len; i++) {
-        DirectorInstance *other = g_ptr_array_index(app->show->instances, i);
-        if(other == instance)
-            continue;
-        if(other->source_instance_id &&
-           g_strcmp0(other->source_instance_id, instance->id) == 0)
-            return TRUE;
-        if(other->input_routes) {
-            for(guint r = 0; r < other->input_routes->len; r++) {
-                DirectorInputRoute *route = g_ptr_array_index(other->input_routes, r);
-                if(route->type != DIRECTOR_INPUT_ROUTE_NDI &&
-                   route->source_instance_id &&
-                   g_strcmp0(route->source_instance_id, instance->id) == 0)
-                    return TRUE;
-            }
-        }
-        if(other->master_instance_id &&
-           g_strcmp0(other->master_instance_id, instance->id) == 0)
-            return TRUE;
-    }
-    return FALSE;
-}
-
-static void director_discovery_remove_transient(DirectorApp *app,
-                                                DirectorInstance *instance)
-{
-    if(!app || !app->show || !instance || !instance->discovered_transient ||
-       instance->connected || instance->process_running || instance->eidolon_running ||
-       instance->reloaded_running || director_discovery_instance_referenced(app, instance))
-        return;
-
-    gchar *id = g_strdup(instance->id);
-    const gboolean previous_dirty = app->show->dirty;
-    if(app->selected == instance)
-        app->selected = NULL;
-    director_calibration_abort_for_instance(app, instance, "was removed from the show");
-    director_eidolon_close_views_for_instance(app, instance);
-    director_stop_client(instance);
-    director_show_remove_instance(app->show, instance);
-    app->show->dirty = previous_dirty;
-    if(!app->selected && app->show->instances->len > 0)
-        app->selected = g_ptr_array_index(app->show->instances, 0);
-    director_refresh_all_ui(app);
-    director_log(app, "Removed offline auto-discovered backend %s", id);
-    g_free(id);
-}
-
 static void director_discovery_endpoint_free(gpointer data)
 {
     DirectorDiscoveryEndpoint *endpoint = data;
@@ -2444,7 +2456,9 @@ static gboolean director_discovery_dispatch_main(gpointer data)
                                     dispatch->role, dispatch->port, g_get_monotonic_time());
 
     DirectorInstance *id_match = director_show_find_instance(app->show, dispatch->id);
-    if(!id_match)
+    const gboolean retired = app->retired_instance_ids &&
+        g_hash_table_contains(app->retired_instance_ids, dispatch->id);
+    if(!id_match && !retired)
         director_discovery_attach_external(app, dispatch->id, dispatch->host,
                                            dispatch->role, dispatch->port, TRUE);
 
@@ -2557,7 +2571,6 @@ static gboolean director_discovery_prune(gpointer data)
         return G_SOURCE_REMOVE;
 
     const gint64 now = g_get_monotonic_time();
-    GPtrArray *expired = g_ptr_array_new();
     gboolean changed = FALSE;
     GHashTableIter iter;
     gpointer value = NULL;
@@ -2567,9 +2580,10 @@ static gboolean director_discovery_prune(gpointer data)
         if(director_discovery_record_prune(record, now))
             changed = TRUE;
         if(g_hash_table_size(record->endpoints) == 0) {
-            DirectorInstance *instance = director_show_find_instance(app->show, record->id);
-            if(instance && instance->discovered_transient)
-                g_ptr_array_add(expired, instance);
+            /* Advertisement expiry only retires discovery state. The control
+             * client owns backend liveness and the five-minute removal policy. */
+            if(app->retired_instance_ids)
+                g_hash_table_remove(app->retired_instance_ids, record->id);
             g_hash_table_iter_remove(&iter);
             changed = TRUE;
         }
@@ -2577,9 +2591,6 @@ static gboolean director_discovery_prune(gpointer data)
 
     if(changed)
         director_discovery_refresh_store(app);
-    for(guint i = 0; i < expired->len; i++)
-        director_discovery_remove_transient(app, g_ptr_array_index(expired, i));
-    g_ptr_array_free(expired, TRUE);
     return G_SOURCE_CONTINUE;
 }
 
@@ -5333,6 +5344,103 @@ static void director_reconcile_ndi_runtime_changes(DirectorApp *app,
         gtk_widget_queue_draw(app->stage_canvas);
 }
 
+static gboolean director_instance_pointer_in_show(const DirectorShow *show,
+                                                  const DirectorInstance *instance)
+{
+    if(!show || !instance || !show->instances)
+        return FALSE;
+    for(guint i = 0; i < show->instances->len; i++)
+        if(g_ptr_array_index(show->instances, i) == instance)
+            return TRUE;
+    return FALSE;
+}
+
+static void director_retire_wait_free(gpointer data)
+{
+    DirectorRetireWait *wait = data;
+    if(!wait)
+        return;
+    g_free(wait->id);
+    g_free(wait);
+}
+
+static gboolean director_retire_wait_cb(gpointer data)
+{
+    DirectorRetireWait *wait = data;
+    DirectorApp *app = wait ? wait->app : NULL;
+    if(!wait || !app || app->shutting_down || app->show != wait->show)
+        return G_SOURCE_REMOVE;
+    if(!director_instance_pointer_in_show(wait->show, wait->instance))
+        return G_SOURCE_REMOVE;
+
+    DirectorInstance *instance = wait->instance;
+    if(instance->process_running || instance->eidolon_running || instance->reloaded_running)
+        return G_SOURCE_CONTINUE;
+
+    director_remove_instance_completely(app, instance);
+    director_log(app, "Removed %s after 5 minutes of continuous control failure", wait->id);
+    return G_SOURCE_REMOVE;
+}
+
+static void director_expire_instance(DirectorApp *app,
+                                     DirectorInstance *instance,
+                                     const gchar *reason)
+{
+    if(!app || !app->show || !instance ||
+       !director_instance_pointer_in_show(app->show, instance))
+        return;
+
+    gchar *id = g_strdup(instance->id);
+    DirectorDiscoveryRecord *record = app->discovery_records ?
+        g_hash_table_lookup(app->discovery_records, id) : NULL;
+    if(app->retired_instance_ids && record &&
+       g_hash_table_size(record->endpoints) > 0)
+        g_hash_table_add(app->retired_instance_ids, g_strdup(id));
+    director_log(app, "%s: %s", id,
+                 reason && *reason ? reason :
+                 "control endpoint failed continuously for 5 minutes");
+
+    if(instance->restart_timer) {
+        g_source_remove(instance->restart_timer);
+        instance->restart_timer = 0;
+    }
+    instance->restart_pending = FALSE;
+    instance->recovery_stop_requested = TRUE;
+    director_stop_client(instance);
+    director_stop_instance(app, instance);
+
+    if(!instance->process_running && !instance->eidolon_running &&
+       !instance->reloaded_running) {
+        director_remove_instance_completely(app, instance);
+        director_log(app, "Removed %s after 5 minutes of continuous control failure", id);
+        g_free(id);
+        return;
+    }
+
+    DirectorRetireWait *wait = g_new0(DirectorRetireWait, 1);
+    wait->app = app;
+    wait->show = app->show;
+    wait->instance = instance;
+    wait->id = id;
+    g_timeout_add_full(G_PRIORITY_DEFAULT, DIRECTOR_RETIRE_POLL_MS,
+                       director_retire_wait_cb, wait, director_retire_wait_free);
+}
+
+static const gchar *director_client_event_command(DirectorClientEvent event)
+{
+    switch(event) {
+        case DIRECTOR_CLIENT_INSTANCE_STATUS: return "488:;";
+        case DIRECTOR_CLIENT_ROUTING_STATUS: return "494:;";
+        case DIRECTOR_CLIENT_OUTPUT_STATUS: return "484:;";
+        case DIRECTOR_CLIENT_PROJECTION_STATUS: return "007:;";
+        case DIRECTOR_CLIENT_PERF_STATUS: return "482:;";
+        case DIRECTOR_CLIENT_NDI_STATUS: return "490:;";
+        case DIRECTOR_CLIENT_DEVICE_LIST: return "415:;";
+        case DIRECTOR_CLIENT_V4L_STATUS: return "409:*;";
+        default: return "unknown";
+    }
+}
+
 static void director_client_event(DirectorClient *client,
                                   DirectorClientEvent event,
                                   const gchar *payload,
@@ -5369,6 +5477,9 @@ static void director_client_event(DirectorClient *client,
             instance->connected = FALSE;
             director_clear_live_connection_state(instance);
             sync_preview_targets = TRUE;
+            if(instance->managed && instance->recovery_stop_requested &&
+               instance->client)
+                director_stop_client(instance);
             break;
         }
         case DIRECTOR_CLIENT_INSTANCE_STATUS:
@@ -5382,6 +5493,8 @@ static void director_client_event(DirectorClient *client,
                     instance->live_id && *instance->live_id ? instance->live_id : "unknown",
                     instance->live_port,
                     director_role_name(instance->role), instance->id, instance->port);
+                director_vims_request_stderr(instance->id, instance->host,
+                                             instance->port, "488:;", message);
                 if(g_strcmp0(instance->last_error, message) != 0)
                     director_log(app, "%s: %s", instance->id, message);
                 replace_owned_string(&instance->last_error, message);
@@ -5523,6 +5636,9 @@ static void director_client_event(DirectorClient *client,
             if(instance->calibration_camera)
                 director_calibration_handle_v4l_status(app, instance, payload);
             break;
+        case DIRECTOR_CLIENT_EXPIRED:
+            director_expire_instance(app, instance, payload);
+            return;
         case DIRECTOR_CLIENT_ERROR:
             g_free(instance->last_error);
             instance->last_error = g_strdup(payload);
@@ -5533,6 +5649,9 @@ static void director_client_event(DirectorClient *client,
     return;
 
 parse_error:
+    director_vims_request_stderr(instance->id, instance->host, instance->port,
+                                 director_client_event_command(event),
+                                 error ? error->message : "invalid response");
     director_log(app, "%s protocol error: %s",
                  instance->id, error ? error->message : "invalid response");
     if(event == DIRECTOR_CLIENT_INSTANCE_STATUS)
@@ -5790,6 +5909,7 @@ static void director_process_waited(GObject *source, GAsyncResult *result, gpoin
         instance->process = NULL;
     }
     if(instance->restart_pending && !watch->app->shutting_down) {
+        director_stop_client(instance);
         instance->restart_pending = FALSE;
         instance->recovery_stop_requested = FALSE;
         director_log(watch->app, "Restarting %s after controlled stop", instance->id);
@@ -6948,6 +7068,10 @@ static void director_calibration_handle_device_list(DirectorApp *app,
                                                       const gchar *payload)
 {
     if(!director_calibration_parse_device_payload(app, instance, payload)) {
+        director_vims_request_stderr(instance ? instance->id : NULL,
+                                     instance ? instance->host : NULL,
+                                     instance ? instance->port : 0,
+                                     "415:;", "invalid V4L2 device-list response");
         director_log(app, "Calibration camera: invalid V4L2 device-list response");
         return;
     }
@@ -7000,6 +7124,8 @@ static void director_calibration_handle_v4l_status(DirectorApp *app,
     const gsize expected = DIRECTOR_V4L_CONTROL_COUNT * 5u;
     if(strlen(payload) != expected) {
         instance->live_v4l_valid = FALSE;
+        director_vims_request_stderr(instance->id, instance->host, instance->port,
+                                     "409:*;", "unexpected V4L2 status response length");
         director_log(app, "Calibration camera: unexpected V4L2 status length %zu", strlen(payload));
         director_calibration_update_ui(app);
         return;
@@ -7012,6 +7138,8 @@ static void director_calibration_handle_v4l_status(DirectorApp *app,
         gint64 value = g_ascii_strtoll(field, &end, 10);
         if(end == field || *end != '\0' || value < -1 || value > 65535) {
             instance->live_v4l_valid = FALSE;
+            director_vims_request_stderr(instance->id, instance->host, instance->port,
+                                         "409:*;", "invalid V4L2 status response field");
             director_log(app, "Calibration camera: invalid V4L2 control field %d", i);
             director_calibration_update_ui(app);
             return;
@@ -10887,6 +11015,7 @@ static void director_stop_instance(DirectorApp *app, DirectorInstance *instance)
 
     const gboolean confirmed = instance->client && instance->connected &&
                                director_backend_identity_matches(instance);
+    const gboolean stop_control_client = !confirmed && instance->client != NULL;
     if(confirmed) {
         director_client_send(instance->client, "600:;");
         director_log(app, "Sent quit request to %s", instance->id);
@@ -10901,6 +11030,12 @@ static void director_stop_instance(DirectorApp *app, DirectorInstance *instance)
                      instance->id);
         return;
     }
+
+    /* An intentional stop is not a control failure. If there is no live VIMS
+     * link, stop monitoring now. With a confirmed link the disconnect event
+     * stops the client after the queued 600:; has had a chance to be sent. */
+    if(stop_control_client)
+        director_stop_client(instance);
 
     if(instance->process_running && instance->process) {
         if(instance->force_stop_timer)
@@ -11142,9 +11277,47 @@ static void director_shutdown_clients(DirectorApp *app)
     }
 }
 
+static void director_canonicalize_single_veejay_preset(DirectorShow *show)
+{
+    if(!show || !show->instances || show->instances->len != 1)
+        return;
+
+    DirectorInstance *instance = g_ptr_array_index(show->instances, 0);
+    if(!instance || instance->role != DIRECTOR_ROLE_STANDALONE ||
+       g_strcmp0(instance->id, "veejay") != 0)
+        return;
+
+    gchar *canonical_id = g_strdup_printf("%s-%d",
+                                           director_role_name(instance->role),
+                                           instance->port);
+    gchar *old_default_directory = g_build_filename(g_get_home_dir(),
+                                                      ".veejay", "director",
+                                                      instance->id, NULL);
+    if(g_strcmp0(instance->working_directory, old_default_directory) == 0) {
+        gchar *new_default_directory = g_build_filename(g_get_home_dir(),
+                                                          ".veejay", "director",
+                                                          canonical_id, NULL);
+        replace_owned_string(&instance->working_directory, new_default_directory);
+        g_free(new_default_directory);
+    }
+    gchar *old_ndi_name = g_strdup_printf("VeeJay %s", instance->id);
+    if(g_strcmp0(instance->ndi_output_name, old_ndi_name) == 0) {
+        gchar *new_ndi_name = g_strdup_printf("VeeJay %s", canonical_id);
+        replace_owned_string(&instance->ndi_output_name, new_ndi_name);
+        g_free(new_ndi_name);
+    }
+    replace_owned_string(&instance->id, canonical_id);
+    g_free(old_ndi_name);
+    g_free(old_default_directory);
+    g_free(canonical_id);
+}
+
 static DirectorShow *director_default_show(void)
 {
-    return director_preset_create(DIRECTOR_PRESET_SINGLE_VEEJAY, 1280, 720, NULL);
+    DirectorShow *show = director_preset_create(DIRECTOR_PRESET_SINGLE_VEEJAY,
+                                                 1280, 720, NULL);
+    director_canonicalize_single_veejay_preset(show);
+    return show;
 }
 
 static gboolean director_replace_show(DirectorApp *app, DirectorShow *show)
@@ -11948,6 +12121,8 @@ static gboolean director_choose_workbench(DirectorApp *app, gboolean startup_act
     }
     else {
         show = director_preset_create(preset, width, height, &error);
+        if(preset == DIRECTOR_PRESET_SINGLE_VEEJAY)
+            director_canonicalize_single_veejay_preset(show);
         created_label = g_strdup(director_preset_name(preset));
     }
 
@@ -12108,15 +12283,23 @@ static gboolean director_probe_instance_identity(const DirectorInstance *instanc
 
     DirectorWire wire;
     director_wire_init(&wire);
-    if(!director_wire_connect(&wire, instance->host, port, 250))
+    if(!director_wire_connect(&wire, instance->host, port, 250)) {
+        director_connection_stderr("identity probe", instance->id,
+                                   instance->host, port,
+                                   "connect failed or timed out");
         return FALSE;
+    }
 
     gchar response[1024];
     const gboolean queried = director_wire_query(&wire, "488:;", response, 
                                                   sizeof(response), 300, 40); // VIMS_INSTANCE_STATUS
     director_wire_close(&wire);
-    if(!queried)
+    if(!queried) {
+        director_vims_request_stderr(instance->id, instance->host, port,
+                                     "488:;",
+                                     "identity probe query failed or timed out");
         return FALSE;
+    }
 
     gchar *copy = g_strdup(response);
     g_strstrip(copy);
@@ -12315,17 +12498,16 @@ static void on_add_output(GtkButton *button, gpointer data)
     director_add_engine((DirectorApp*)data, DIRECTOR_ROLE_OUTPUT);
 }
 
-static void on_remove_instance(GtkButton *button, gpointer data)
+static void director_remove_instance_completely(DirectorApp *app,
+                                                DirectorInstance *instance)
 {
-    (void)button;
-    DirectorApp *app = data;
-    DirectorInstance *instance = app->selected;
-    if(!instance)
+    if(!app || !app->show || !instance ||
+       !director_instance_pointer_in_show(app->show, instance))
         return;
-    if(instance->process_running || instance->eidolon_running || instance->reloaded_running) {
-        director_error_dialog(app, "Stop this instance and its attached tools before removing it.");
-        return;
-    }
+    const gboolean preserve_dirty = instance->discovered_transient;
+    const gboolean previous_dirty = app->show->dirty;
+    if(app->selected == instance)
+        app->selected = NULL;
     director_calibration_abort_for_instance(app, instance, "was removed from the show");
     director_eidolon_close_views_for_instance(app, instance);
     for(guint i = 0; i < app->show->instances->len; i++) {
@@ -12377,9 +12559,25 @@ static void on_remove_instance(GtkButton *button, gpointer data)
     }
     director_stop_client(instance);
     director_show_remove_instance(app->show, instance);
-    app->selected = app->show->instances->len ?
-                    g_ptr_array_index(app->show->instances, 0) : NULL;
+    if(preserve_dirty)
+        app->show->dirty = previous_dirty;
+    if(!app->selected && app->show->instances->len)
+        app->selected = g_ptr_array_index(app->show->instances, 0);
     director_refresh_all_ui(app);
+}
+
+static void on_remove_instance(GtkButton *button, gpointer data)
+{
+    (void)button;
+    DirectorApp *app = data;
+    DirectorInstance *instance = app->selected;
+    if(!instance)
+        return;
+    if(instance->process_running || instance->eidolon_running || instance->reloaded_running) {
+        director_error_dialog(app, "Stop this instance and its attached tools before removing it.");
+        return;
+    }
+    director_remove_instance_completely(app, instance);
 }
 
 static void on_start_all(GtkButton *button, gpointer data)
@@ -13868,7 +14066,9 @@ static gpointer director_source_preview_worker(gpointer data)
 {
     DirectorApp *app = data;
     DirectorWire wire;
-    guint64 wire_generation = 0;
+    guint64 target_generation = 0;
+    guint failure_count = 0;
+    gint64 retry_at_us = 0;
     director_wire_init(&wire);
 
     for(;;) {
@@ -13884,7 +14084,9 @@ static gpointer director_source_preview_worker(gpointer data)
         while(!app->source_preview_stop && !app->source_preview_host) {
             g_mutex_unlock(&app->source_preview_lock);
             director_wire_close(&wire);
-            wire_generation = 0;
+            target_generation = 0;
+            failure_count = 0;
+            retry_at_us = 0;
             g_mutex_lock(&app->source_preview_lock);
             if(!app->source_preview_stop && !app->source_preview_host)
                 g_cond_wait(&app->source_preview_cond, &app->source_preview_lock);
@@ -13904,18 +14106,32 @@ static gpointer director_source_preview_worker(gpointer data)
 
         const gint64 cycle_started_us = g_get_monotonic_time();
 
-        if(wire_generation != generation) {
+        if(target_generation != generation) {
             director_wire_close(&wire);
-            wire_generation = 0;
+            target_generation = generation;
+            failure_count = 0;
+            retry_at_us = 0;
         }
 
         if(wire.fd < 0) {
-            if(!director_wire_connect(&wire, host, port, 350)) {
+            const gint64 now_us = g_get_monotonic_time();
+            if(retry_at_us > now_us) {
+                const gint64 wait_us = retry_at_us - now_us;
                 g_free(host);
-                director_source_preview_wait(app, 450000);
+                director_source_preview_wait(app, wait_us);
                 continue;
             }
-            wire_generation = generation;
+            if(!director_wire_connect(&wire, host, port, 350)) {
+                director_connection_stderr("source preview", "source-preview",
+                                           host, port,
+                                           "connect failed or timed out");
+                director_preview_register_failure(&failure_count, &retry_at_us);
+                const gint64 wait_us = MAX((gint64)1000,
+                    retry_at_us - g_get_monotonic_time());
+                g_free(host);
+                director_source_preview_wait(app, wait_us);
+                continue;
+            }
         }
 
         gchar command[64];
@@ -13931,12 +14147,16 @@ static gpointer director_source_preview_worker(gpointer data)
                                                         &payload, &payload_size,
                                                         &frame_width, &frame_height,
                                                         &full_range, preview_timeout_ms);
-        g_free(host);
 
         if(!ok) {
+            director_vims_request_stderr("source-preview", host, port, command,
+                                         "preview query failed or response timed out");
             director_wire_close(&wire);
-            wire_generation = 0;
-            director_source_preview_wait(app, 300000);
+            director_preview_register_failure(&failure_count, &retry_at_us);
+            const gint64 wait_us = MAX((gint64)1000,
+                retry_at_us - g_get_monotonic_time());
+            g_free(host);
+            director_source_preview_wait(app, wait_us);
             continue;
         }
 
@@ -13946,13 +14166,25 @@ static gpointer director_source_preview_worker(gpointer data)
                                                                  frame_height,
                                                                  full_range != 0);
         free(payload);
-        if(pixbuf) {
-            DirectorPreviewDispatch *dispatch = g_new0(DirectorPreviewDispatch, 1);
-            dispatch->app = app;
-            dispatch->pixbuf = pixbuf;
-            dispatch->generation = generation;
-            g_main_context_invoke(NULL, director_source_preview_dispatch_main, dispatch);
+        if(!pixbuf) {
+            director_vims_request_stderr("source-preview", host, port, command,
+                                         "preview response could not be decoded");
+            director_wire_close(&wire);
+            director_preview_register_failure(&failure_count, &retry_at_us);
+            const gint64 wait_us = MAX((gint64)1000,
+                retry_at_us - g_get_monotonic_time());
+            g_free(host);
+            director_source_preview_wait(app, wait_us);
+            continue;
         }
+        failure_count = 0;
+        retry_at_us = 0;
+        g_free(host);
+        DirectorPreviewDispatch *dispatch = g_new0(DirectorPreviewDispatch, 1);
+        dispatch->app = app;
+        dispatch->pixbuf = pixbuf;
+        dispatch->generation = generation;
+        g_main_context_invoke(NULL, director_source_preview_dispatch_main, dispatch);
         if(request_interval_us > 0) {
             const gint64 elapsed_us = g_get_monotonic_time() - cycle_started_us;
             const gint64 remaining_us = request_interval_us - elapsed_us;
@@ -14391,9 +14623,19 @@ static gboolean director_overview_preview_fetch(DirectorApp *app,
     }
     g_free(key);
 
-    if(holder->wire.fd < 0 &&
-       !director_wire_connect(&holder->wire, target->host, target->port, 250))
-        return FALSE;
+    if(holder->wire.fd < 0) {
+        const gint64 now_us = g_get_monotonic_time();
+        if(holder->retry_at_us > now_us)
+            return FALSE;
+        if(!director_wire_connect(&holder->wire, target->host, target->port, 250)) {
+            director_connection_stderr("overview preview", target->id,
+                                       target->host, target->port,
+                                       "connect failed or timed out");
+            director_preview_register_failure(&holder->failure_count,
+                                              &holder->retry_at_us);
+            return FALSE;
+        }
+    }
 
     gchar command[64];
     g_snprintf(command, sizeof(command), "433:%d %d %d;",
@@ -14409,7 +14651,12 @@ static gboolean director_overview_preview_fetch(DirectorApp *app,
                                     &payload, &payload_size,
                                     &frame_width, &frame_height,
                                     &full_range, preview_timeout_ms)) {
+        director_vims_request_stderr(target->id, target->host, target->port,
+                                     command,
+                                     "preview query failed or response timed out");
         director_wire_close(&holder->wire);
+        director_preview_register_failure(&holder->failure_count,
+                                          &holder->retry_at_us);
         return FALSE;
     }
 
@@ -14419,8 +14666,17 @@ static gboolean director_overview_preview_fetch(DirectorApp *app,
                                                              frame_height,
                                                              full_range != 0);
     free(payload);
-    if(!pixbuf)
+    if(!pixbuf) {
+        director_vims_request_stderr(target->id, target->host, target->port,
+                                     command,
+                                     "preview response could not be decoded");
+        director_wire_close(&holder->wire);
+        director_preview_register_failure(&holder->failure_count,
+                                          &holder->retry_at_us);
         return FALSE;
+    }
+    holder->failure_count = 0;
+    holder->retry_at_us = 0;
     GdkPixbuf *thumbnail = director_overview_make_thumbnail(pixbuf);
     if(!thumbnail) {
         g_object_unref(pixbuf);
@@ -23565,6 +23821,8 @@ int main(int argc, char **argv)
                                                         director_overview_frame_free);
     app.discovery_records = g_hash_table_new_full(g_str_hash, g_str_equal, g_free,
                                                    director_discovery_record_free);
+    app.retired_instance_ids = g_hash_table_new_full(g_str_hash, g_str_equal,
+                                                      g_free, NULL);
 
     GtkApplication *application = gtk_application_new(DIRECTOR_APP_ID,
                                                        G_APPLICATION_HANDLES_OPEN);
@@ -23586,6 +23844,8 @@ int main(int argc, char **argv)
         g_hash_table_destroy(app.overview_preview_frames);
     if(app.discovery_records)
         g_hash_table_destroy(app.discovery_records);
+    if(app.retired_instance_ids)
+        g_hash_table_destroy(app.retired_instance_ids);
     if(app.stage_ndi_positions)
         g_hash_table_destroy(app.stage_ndi_positions);
     g_free(app.stage_ndi_drag_key);
