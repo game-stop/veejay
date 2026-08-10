@@ -19,6 +19,7 @@ VeeJay can be used interactively, remotely over the network, as a headless rende
 - Multi-threaded processing, including OpenMP acceleration in many built-in effects.
 - Architecture-targeted builds for performance-sensitive installations.
 - Runtime performance telemetry for frame timing, load and output monitoring.
+- Hardware accelerated video decoding via Vulkan, VAAPI or NVIDIA Cuda (nvjpeg)
 
 ### Live sampling and playback
 
