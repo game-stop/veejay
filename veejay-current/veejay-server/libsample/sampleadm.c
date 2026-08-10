@@ -3998,6 +3998,22 @@ int sample_read_edl( sample_info *sample, SampleLoadMode load_mode )
 
     if(sample->edit_list)
     {
+        if(plain_editlist && plain_editlist->has_audio && sample->edit_list->has_audio) {
+            int audio_target = vj_el_retarget_audio(sample->edit_list,
+                                                    plain_editlist->audio_rate,
+                                                    plain_editlist->audio_chans,
+                                                    plain_editlist->audio_bits);
+            if(audio_target < 0) {
+                veejay_msg(VEEJAY_MSG_WARNING,
+                           "Silencing sample audio that cannot match the project PCM format");
+                sample->edit_list->has_audio = 0;
+                sample->edit_list->audio_rate = 0;
+                sample->edit_list->audio_chans = 0;
+                sample->edit_list->audio_bits = 0;
+                sample->edit_list->audio_bps = 0;
+            }
+        }
+
         sample->soft_edl = 0;
 
         if( old && load_mode == SAMPLE_LOAD_REPLACE ) {
