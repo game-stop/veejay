@@ -120,6 +120,13 @@
 
 #define MAX_ARGUMENTS (SAMPLE_MAX_PARAMETERS + 8)
 
+/* Implemented by liblavplayvj.c. Keep preview demand and lifetime handling at
+ * the output instance, where the projection source storage is owned. */
+void veejay_output_request_pre_projection_preview(veejay_t *info);
+void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info,
+                                                       VJFrame *frame);
+void veejay_output_unlock_pre_projection_preview_frame(void *token);
+
 #ifndef VIMS_SAMPLE_SYNC_SAMPLELIST
 #define VIMS_SAMPLE_SYNC_SAMPLELIST 122
 #endif
@@ -14068,6 +14075,78 @@ static int vj_event_build_preview_header(char *header,
                                                full_range);
 }
 
+/* Copy a locked producer snapshot into tightly packed request-owned storage.
+ * Preview scaling/compression can then run without stalling the render thread
+ * on the snapshot mutex. The pre-projection protocol does not carry alpha. */
+static int vj_event_clone_preview_frame3(const VJFrame *src,
+                                         VJFrame *dst,
+                                         uint8_t **storage)
+{
+    size_t y_len;
+    size_t uv_len;
+    size_t total;
+    uint8_t *buffer;
+
+    if(!src || !dst || !storage || !src->data[0] ||
+       src->width <= 0 || src->height <= 0 ||
+       src->uv_width <= 0 || src->uv_height <= 0 ||
+       src->stride[0] < src->width ||
+       (src->data[1] && src->stride[1] < src->uv_width) ||
+       (src->data[2] && src->stride[2] < src->uv_width))
+        return 0;
+
+    y_len = (size_t)src->width * (size_t)src->height;
+    uv_len = (size_t)src->uv_width * (size_t)src->uv_height;
+    if(y_len > SIZE_MAX - uv_len || y_len + uv_len > SIZE_MAX - uv_len)
+        return 0;
+    if(y_len > INT_MAX || uv_len > INT_MAX)
+        return 0;
+    total = y_len + uv_len * 2u;
+
+    buffer = (uint8_t*)vj_malloc(total);
+    if(!buffer)
+        return 0;
+
+    veejay_memcpy(dst, src, sizeof(*dst));
+    dst->data[0] = buffer;
+    dst->data[1] = buffer + y_len;
+    dst->data[2] = dst->data[1] + uv_len;
+    dst->data[3] = NULL;
+    dst->format = alpha_fmt_to_yuv(src->format);
+    dst->yuv_fmt = alpha_fmt_to_yuv(src->yuv_fmt);
+    dst->stride[0] = src->width;
+    dst->stride[1] = src->uv_width;
+    dst->stride[2] = src->uv_width;
+    dst->stride[3] = 0;
+    dst->len = (int)y_len;
+    dst->uv_len = (int)uv_len;
+
+    for(int y = 0; y < src->height; y++)
+        veejay_memcpy(dst->data[0] + (size_t)y * (size_t)src->width,
+                      src->data[0] + (size_t)y * (size_t)src->stride[0],
+                      (size_t)src->width);
+
+    for(int y = 0; y < src->uv_height; y++) {
+        uint8_t *dst_u = dst->data[1] + (size_t)y * (size_t)src->uv_width;
+        uint8_t *dst_v = dst->data[2] + (size_t)y * (size_t)src->uv_width;
+        if(src->data[1])
+            veejay_memcpy(dst_u,
+                          src->data[1] + (size_t)y * (size_t)src->stride[1],
+                          (size_t)src->uv_width);
+        else
+            veejay_memset(dst_u, 128, (size_t)src->uv_width);
+        if(src->data[2])
+            veejay_memcpy(dst_v,
+                          src->data[2] + (size_t)y * (size_t)src->stride[2],
+                          (size_t)src->uv_width);
+        else
+            veejay_memset(dst_v, 128, (size_t)src->uv_width);
+    }
+
+    *storage = buffer;
+    return 1;
+}
+
 void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    va_list ap  )
 {
     veejay_t *v = (veejay_t*)ptr;
@@ -14104,19 +14183,44 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
 
     size_t dstlen = 0;
     VJFrame frame;
+    VJFrame locked_frame;
+    uint8_t *snapshot_storage = NULL;
     int preview_locked = 0;
     void *output_preview_token = NULL;
     if(view_mode == 2) {
         if(v->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
-            output_preview_token = veejay_output_lock_pre_projection_preview_frame(v, &frame);
+            veejay_output_request_pre_projection_preview(v);
+            output_preview_token = veejay_output_lock_pre_projection_preview_frame(v,
+                                                                                    &locked_frame);
             preview_locked = output_preview_token != NULL;
         }
-        else
-            preview_locked = vj_perform_lock_pre_projection_preview_frame(v, &frame);
+        else {
+            vj_perform_request_pre_projection_preview(v);
+            preview_locked = vj_perform_lock_pre_projection_preview_frame(v,
+                                                                           &locked_frame);
+        }
         if(!preview_locked) {
             vj_event_send_preview_error(v, extended_preview);
             return;
         }
+
+        if(!vj_event_clone_preview_frame3(&locked_frame,
+                                          &frame,
+                                          &snapshot_storage)) {
+            if(output_preview_token)
+                veejay_output_unlock_pre_projection_preview_frame(output_preview_token);
+            else
+                vj_perform_unlock_pre_projection_preview_frame(v);
+            vj_event_send_preview_error(v, extended_preview);
+            return;
+        }
+
+        if(output_preview_token)
+            veejay_output_unlock_pre_projection_preview_frame(output_preview_token);
+        else
+            vj_perform_unlock_pre_projection_preview_frame(v);
+        preview_locked = 0;
+        output_preview_token = NULL;
     }
     else {
         veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
@@ -14135,6 +14239,8 @@ void    vj_event_get_scaled_image       (   void *ptr,  const char format[],    
         dstlen = vj_fast_picture_save_to_mem(&frame, w, h,
                                              vj_perform_get_preview_buffer(v));
     }
+
+    free(snapshot_storage);
 
     if(preview_locked) {
         if(output_preview_token)

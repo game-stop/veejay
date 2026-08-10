@@ -34,6 +34,7 @@ int vj_jack_get_space(void);
 long vj_jack_get_status(long int *sec, long int *nsec);
 double vj_jack_get_played_position(void);
 unsigned long vj_jack_get_played_frames(void);
+double vj_jack_get_clock_time(void);
 long vj_jack_get_written_frames(void);
 void vj_jack_reset(void);
 void vj_jack_reset_input(void);

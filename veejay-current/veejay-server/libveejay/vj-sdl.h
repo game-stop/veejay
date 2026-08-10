@@ -20,7 +20,19 @@
 #define VJ_SDL_H
 
 #include <config.h>
+#include <stddef.h>
+#include <stdint.h>
 #ifdef HAVE_SDL
+typedef struct vj_sdl_present_timing_t {
+    uint64_t convert_ns;
+    uint64_t upload_ns;
+    uint64_t present_block_ns;
+    uint64_t completed_ns;
+    double refresh_interval_s;
+    unsigned int timing_generation;
+    int vsync_enabled;
+} vj_sdl_present_timing_t;
+
 void *vj_sdl_allocate(VJFrame *frame, int k, int m, int s, int borderless);
 void vj_sdl_resize( void *ptr ,int x, int y, int scaled_width, int scaled_height, int fs );
 int vj_sdl_init(void *ptr, int x, int y,int w, int h, int scaled_width, int scaled_height, char *caption, int show, int fs,int vjfmt, float fps, double *vsync);
@@ -32,6 +44,14 @@ void vj_sdl_process_pending(void *ptr);
 void vj_sdl_set_perf(void *ptr, void *perf);
 void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixels);
 int vj_sdl_present_frame(void *ptr, VJFrame *frame);
+int vj_sdl_prepare_frame(void *ptr, VJFrame *frame, vj_sdl_present_timing_t *timing);
+int vj_sdl_present_prepared(void *ptr, vj_sdl_present_timing_t *timing);
+void vj_sdl_discard_prepared(void *ptr);
+int vj_sdl_get_present_mode(void *ptr, int *vsync_enabled,
+                            double *refresh_interval_s,
+                            unsigned int *timing_generation);
+int vj_sdl_get_backend(void *ptr, char *name, size_t name_size,
+                       int *direct_lock_disabled);
 void vj_sdl_shutdown(void *ptr);
 void vj_sdl_quit();
 void vj_sdl_free(void *ptr);

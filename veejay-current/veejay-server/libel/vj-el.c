@@ -26,14 +26,18 @@
 */
 #include <config.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <ctype.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <veejaycore/defs.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vims.h>
 #include <libel/lav_io.h>
 #include <libel/vj-el.h>
+#include <libel/vj-ffmpeg-input.h>
+#include <libel/vj-nvjpeg.h>
 #include <libvje/vje.h>
 #include <libel/vj-avcodec.h>
 #include <libel/elcache.h>
@@ -125,6 +129,12 @@ typedef struct
 	vj_dv_decoder *dv_decoder;
 #endif
 	void	      *lzo_decoder;
+	vj_nvjpeg_decoder *nvjpeg_decoder;
+	char          nvjpeg_reason[256];
+	int           nvjpeg_forced;
+	int           nvjpeg_probe_pending;
+	int           nvjpeg_444_logged;
+	int           nvjpeg_444_fallback_logged;
 } vj_decoder;
 
 extern int el_width_;
@@ -133,22 +143,111 @@ extern int el_pixel_format_;
 
 #define MAX_PLANES 4
 
+typedef struct el_cache_owner_t el_cache_owner_t;
+
 typedef struct raw_frame_node_t {
-    uint64_t source_hash;
+    uint64_t source_id;
     uint64_t source_frame_ref;
+    uint8_t key_kind;
     uint8_t *planes[MAX_PLANES];
+    el_cache_owner_t *owner;
+    struct raw_frame_node_t *hash_next;
     struct raw_frame_node_t *prev;
     struct raw_frame_node_t *next;
+    struct raw_frame_node_t *owner_prev;
+    struct raw_frame_node_t *owner_next;
 } raw_frame_node_t;
+
+enum {
+    EL_CACHE_PROBATION = 0,
+    EL_CACHE_ACTIVE = 1,
+    EL_CACHE_STREAMING = 2
+};
+
+struct el_cache_owner_t {
+    uint64_t source_id;
+    uint64_t source_frames;
+    uint64_t last_frame;
+    uint64_t run_min;
+    uint64_t run_max;
+    uint64_t probe_min;
+    uint64_t probe_max;
+    uint64_t window_min;
+    uint64_t window_max;
+    uint64_t requests;
+    uint64_t hits;
+    uint64_t misses;
+    uint64_t admissions;
+    uint64_t bypasses;
+    uint64_t promotions;
+    uint64_t demotions;
+    long resident;
+    long probation_admitted;
+    long streaming_run;
+    int direction;
+    uint8_t key_kind;
+    uint8_t state;
+    uint8_t has_last;
+    uint8_t probe_valid;
+    uint8_t window_valid;
+    uint8_t fixed_fit;
+    raw_frame_node_t *resident_head;
+    raw_frame_node_t *resident_tail;
+    el_cache_owner_t *next;
+};
+
+typedef struct {
+    el_cache_owner_t *owner;
+    int lookup;
+    int admit;
+    int admit_preroll;
+    int exhaust_on_miss;
+    long preroll_limit;
+} el_cache_decision_t;
 
 typedef struct {
     long capacity;
+    long usable_capacity;
+    long probe_limit;
     long size;
+    long borrowed;
+    el_cache_owner_t *borrow_owner;
+    uint64_t requests;
+    uint64_t hits;
+    uint64_t misses;
+    uint64_t admissions;
+    uint64_t bypasses;
+    uint64_t promotions;
+    uint64_t demotions;
+    uint64_t purges;
+    uint64_t purged_frames;
+    uint64_t evictions;
+    uint64_t generic_requests;
+    uint64_t generic_hits;
+    uint64_t generic_misses;
+    uint64_t generic_inserts;
+    uint64_t generic_updates;
+    uint64_t generic_evictions;
+    uint64_t generic_preroll_stores;
+    uint64_t generic_borrow_events;
+    long generic_max_borrowed;
+    long owner_count;
+    el_cache_owner_t *owners;
+    size_t index_bucket_count;
+    raw_frame_node_t **index_buckets;
     raw_frame_node_t *head;
     raw_frame_node_t *tail;
 } global_raw_frame_cache_t;
 
+enum {
+    EL_CACHE_KEY_LEGACY = 0,
+    EL_CACHE_KEY_MEDIA = 1
+};
+
 static global_raw_frame_cache_t *global_cache = NULL;
+
+static long el_cache_purge_owner(global_raw_frame_cache_t *cache,
+                                 el_cache_owner_t *owner);
 
 static int memory_threshold = 30;
 
@@ -176,6 +275,40 @@ static inline uint64_t editlist_source_hash(const editlist *e)
     return h;
 }
 
+static inline uint64_t el_hash_u64(uint64_t h, uint64_t value)
+{
+    for(int i = 0; i < 8; i++) {
+        h ^= (unsigned char)(value & 0xffu);
+        h *= 1099511628211ULL;
+        value >>= 8;
+    }
+    return h;
+}
+
+static uint64_t media_source_hash(const char *filename)
+{
+    uint64_t h = 1469598103934665603ULL;
+    char canonical[PATH_MAX];
+    const char *identity = filename;
+    if(filename && realpath(filename, canonical))
+        identity = canonical;
+
+    const unsigned char *s = (const unsigned char *)identity;
+    while(s && *s) {
+        h ^= *s++;
+        h *= 1099511628211ULL;
+    }
+
+    struct stat st;
+    if(identity && stat(identity, &st) == 0) {
+        h = el_hash_u64(h, (uint64_t)st.st_dev);
+        h = el_hash_u64(h, (uint64_t)st.st_ino);
+        h = el_hash_u64(h, (uint64_t)st.st_size);
+        h = el_hash_u64(h, (uint64_t)st.st_mtime);
+    }
+    return h;
+}
+
 static inline int editlist_same_source(const editlist *a, const editlist *b)
 {
     if (a == b) return 1;
@@ -194,6 +327,9 @@ void el_cache_configure(int t) {
 	}
 
 	memory_threshold = t;
+	veejay_msg(VEEJAY_MSG_DEBUG,
+	           "[ELCACHE] configured memory_percent=%d",
+	           memory_threshold);
 }
 
 static long get_available_cache_capacity(void) {
@@ -208,8 +344,26 @@ static long get_available_cache_capacity(void) {
     unsigned long available_bytes = (unsigned long)available_pages * (unsigned long)page_size;
     unsigned long cache_budget = available_bytes * memory_threshold / 100;
     
-    size_t frame_size = el_out_->len + (2 * el_out_->uv_len);
+    size_t frame_size = sizeof(raw_frame_node_t) + el_out_->len + (2 * el_out_->uv_len);
     return (long)(cache_budget / frame_size);
+}
+
+static size_t el_cache_index_size(long capacity)
+{
+    if(capacity <= 0)
+        return 0;
+
+    size_t target = (size_t)capacity;
+    if(target <= SIZE_MAX / 2)
+        target *= 2;
+
+    size_t buckets = 256;
+    while(buckets < target && buckets <= SIZE_MAX / 2)
+        buckets <<= 1;
+
+    if(buckets < target || buckets > SIZE_MAX / sizeof(raw_frame_node_t *))
+        return 0;
+    return buckets;
 }
 
 static global_raw_frame_cache_t *get_global_cache(void) {
@@ -224,9 +378,68 @@ static global_raw_frame_cache_t *get_global_cache(void) {
 			return NULL;
 		}
         global_cache->capacity = get_available_cache_capacity();
+        long reserve = global_cache->capacity / 16;
+        if(reserve < 32)
+            reserve = 32;
+        global_cache->usable_capacity = global_cache->capacity > reserve ?
+                                        global_cache->capacity - reserve :
+                                        global_cache->capacity;
         global_cache->size = 0;
+        global_cache->borrowed = 0;
+        global_cache->borrow_owner = NULL;
+        global_cache->owners = NULL;
         global_cache->head = NULL;
         global_cache->tail = NULL;
+
+        global_cache->index_bucket_count = el_cache_index_size(global_cache->capacity);
+        if(global_cache->index_bucket_count > 0)
+            global_cache->index_buckets = (raw_frame_node_t **)vj_calloc(
+                global_cache->index_bucket_count * sizeof(raw_frame_node_t *));
+        if(global_cache->capacity > 0 && !global_cache->index_buckets) {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "Unable to allocate raw frame cache index; disabling raw frame cache");
+            free(global_cache);
+            global_cache = NULL;
+            return NULL;
+        }
+
+        size_t frame_size = sizeof(raw_frame_node_t) + el_out_->len + (2 * el_out_->uv_len);
+        long probe_mb = 32;
+        const char *probe_setting = getenv("VEEJAY_CACHE_PROBE_MB");
+        if(probe_setting && *probe_setting) {
+            char *end = NULL;
+            long configured = strtol(probe_setting, &end, 10);
+            if(end != probe_setting && *end == '\0' &&
+               configured >= 4 && configured <= 512)
+                probe_mb = configured;
+            else
+                veejay_msg(VEEJAY_MSG_WARNING,
+                           "[ELCACHE] ignoring invalid VEEJAY_CACHE_PROBE_MB='%s' (expected 4..512)",
+                           probe_setting);
+        }
+        const size_t probe_bytes = (size_t)probe_mb * 1024u * 1024u;
+        long probe_limit = frame_size > 0 ? (long)(probe_bytes / frame_size) : 0;
+        if(probe_limit < 8)
+            probe_limit = 8;
+        if(probe_limit > 128)
+            probe_limit = 128;
+        if(probe_limit > global_cache->usable_capacity)
+            probe_limit = global_cache->usable_capacity;
+        global_cache->probe_limit = probe_limit;
+
+        double total_mb = ((double)global_cache->capacity * (double)frame_size) /
+                          (1024.0 * 1024.0);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[ELCACHE] initialized memory_percent=%d capacity=%ld usable=%ld probe=%ld probe_budget=%ldMB buckets=%zu frame_bytes=%zu budget=%.2fMB borrow_limit=%ld",
+                   memory_threshold,
+                   global_cache->capacity,
+                   global_cache->usable_capacity,
+                   global_cache->probe_limit,
+                   probe_mb,
+                   global_cache->index_bucket_count,
+                   frame_size,
+                   total_mb,
+                   global_cache->capacity > 1 ? global_cache->capacity / 2 : global_cache->capacity);
 
     }
     return global_cache;
@@ -236,109 +449,835 @@ void vj_cache_print_status(void) {
     global_raw_frame_cache_t *cache = get_global_cache();
     if (cache == NULL) return;
 
-    size_t frame_size = el_out_->len + (2 * el_out_->uv_len);
+    size_t frame_size = sizeof(raw_frame_node_t) + el_out_->len + (2 * el_out_->uv_len);
     float total_mb = (cache->capacity * frame_size) / (1024.0f * 1024.0f);
+    long probation = 0;
+    long active = 0;
+    long streaming = 0;
 
-    veejay_msg(VEEJAY_MSG_INFO, 
-        "[CACHE] Capacity: %ld frames | Memory Budget: %.2f MB",
-        cache->capacity, 
-        total_mb
-	);
+    for(el_cache_owner_t *owner = cache->owners; owner; owner = owner->next) {
+        if(owner->state == EL_CACHE_ACTIVE)
+            active++;
+        else if(owner->state == EL_CACHE_STREAMING)
+            streaming++;
+        else
+            probation++;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[ELCACHE] capacity=%ld usable=%ld probe=%ld used=%ld memory_budget=%.2fMB owners=%ld probation=%ld active=%ld streaming=%ld hits=%" PRIu64 " misses=%" PRIu64 " admissions=%" PRIu64 " bypasses=%" PRIu64 " promotions=%" PRIu64 " demotions=%" PRIu64 " evictions=%" PRIu64 " purges=%" PRIu64 " purged_frames=%" PRIu64,
+               cache->capacity,
+               cache->usable_capacity,
+               cache->probe_limit,
+               cache->size,
+               total_mb,
+               cache->owner_count,
+               probation,
+               active,
+               streaming,
+               cache->hits,
+               cache->misses,
+               cache->admissions,
+               cache->bypasses,
+               cache->promotions,
+               cache->demotions,
+               cache->evictions,
+               cache->purges,
+               cache->purged_frames);
+}
+
+int vj_cache_get_stats(vj_el_cache_stats *stats)
+{
+    global_raw_frame_cache_t *cache;
+
+    if(!stats)
+        return 0;
+
+    memset(stats, 0, sizeof(*stats));
+    cache = global_cache;
+    if(!cache)
+        return 0;
+
+    stats->capacity = cache->capacity;
+    stats->usable_capacity = cache->usable_capacity;
+    stats->size = cache->size;
+    stats->owner_count = cache->owner_count;
+    stats->requests = cache->requests;
+    stats->hits = cache->hits;
+    stats->misses = cache->misses;
+    stats->admissions = cache->admissions;
+    stats->bypasses = cache->bypasses;
+    stats->promotions = cache->promotions;
+    stats->demotions = cache->demotions;
+    stats->evictions = cache->evictions;
+    stats->purges = cache->purges;
+    stats->purged_frames = cache->purged_frames;
+    return 1;
+}
+
+static int el_cache_span_fits(global_raw_frame_cache_t *cache,
+                              uint64_t minimum,
+                              uint64_t maximum)
+{
+    if(!cache || cache->usable_capacity <= 0 || maximum < minimum)
+        return 0;
+    return maximum - minimum < (uint64_t)cache->usable_capacity;
+}
+
+static el_cache_owner_t *el_cache_owner_get(global_raw_frame_cache_t *cache,
+                                             uint8_t key_kind,
+                                             uint64_t source_id,
+                                             long source_frames)
+{
+    for(el_cache_owner_t *owner = cache->owners; owner; owner = owner->next)
+        if(owner->key_kind == key_kind && owner->source_id == source_id)
+            return owner;
+
+    el_cache_owner_t *owner = (el_cache_owner_t *)vj_calloc(sizeof(el_cache_owner_t));
+    if(!owner)
+        return NULL;
+
+    owner->key_kind = key_kind;
+    owner->source_id = source_id;
+    owner->source_frames = source_frames > 0 ? (uint64_t)source_frames : 0;
+    owner->state = EL_CACHE_PROBATION;
+
+    if(owner->source_frames > 0 &&
+       owner->source_frames <= (uint64_t)cache->usable_capacity) {
+        owner->state = EL_CACHE_ACTIVE;
+        owner->fixed_fit = 1;
+        owner->window_valid = 1;
+        owner->window_min = 0;
+        owner->window_max = owner->source_frames - 1;
+    }
+
+    owner->next = cache->owners;
+    cache->owners = owner;
+    cache->owner_count++;
+    return owner;
+}
+
+static void el_cache_owner_set_sequence(el_cache_owner_t *owner,
+                                        uint64_t source_frame)
+{
+    owner->last_frame = source_frame;
+    owner->run_min = source_frame;
+    owner->run_max = source_frame;
+    owner->direction = 0;
+    owner->has_last = 1;
+}
+
+static void el_cache_owner_begin_probation(global_raw_frame_cache_t *cache,
+                                           el_cache_owner_t *owner,
+                                           uint64_t source_frame)
+{
+    if(owner->state == EL_CACHE_ACTIVE) {
+        owner->demotions++;
+        cache->demotions++;
+    }
+    owner->state = EL_CACHE_PROBATION;
+    owner->fixed_fit = 0;
+    owner->window_valid = 0;
+    owner->probe_valid = 0;
+    owner->probation_admitted = 0;
+    owner->streaming_run = 0;
+    el_cache_owner_set_sequence(owner, source_frame);
+}
+
+static void el_cache_owner_activate(global_raw_frame_cache_t *cache,
+                                    el_cache_owner_t *owner,
+                                    uint64_t minimum,
+                                    uint64_t maximum)
+{
+    if(!el_cache_span_fits(cache, minimum, maximum))
+        return;
+    if(owner->state == EL_CACHE_ACTIVE && owner->window_valid &&
+       minimum >= owner->window_min && maximum <= owner->window_max)
+        return;
+
+    if(owner->state != EL_CACHE_ACTIVE) {
+        owner->promotions++;
+        cache->promotions++;
+    }
+    owner->state = EL_CACHE_ACTIVE;
+    owner->window_valid = 1;
+    owner->fixed_fit = 0;
+    owner->window_min = minimum;
+    owner->window_max = maximum;
+    owner->streaming_run = 0;
+}
+
+static void el_cache_owner_begin_streaming(global_raw_frame_cache_t *cache,
+                                           el_cache_owner_t *owner)
+{
+    if(owner->state != EL_CACHE_STREAMING) {
+        owner->demotions++;
+        cache->demotions++;
+    }
+    owner->state = EL_CACHE_STREAMING;
+    owner->fixed_fit = 0;
+    owner->window_valid = 0;
+    owner->streaming_run = 0;
+}
+
+static int el_cache_frame_direction(uint64_t previous,
+                                    uint64_t current,
+                                    int *contiguous)
+{
+    *contiguous = 0;
+    if(current == previous)
+        return 0;
+    if(current > previous) {
+        if(current - previous == 1)
+            *contiguous = 1;
+        return 1;
+    }
+    if(previous - current == 1)
+        *contiguous = 1;
+    return -1;
+}
+
+static el_cache_decision_t el_cache_prepare_request(global_raw_frame_cache_t *cache,
+                                                     uint8_t key_kind,
+                                                     uint64_t source_id,
+                                                     uint64_t source_frame,
+                                                     long source_frames)
+{
+    el_cache_decision_t decision;
+    memset(&decision, 0, sizeof(decision));
+
+    if(!cache || cache->capacity <= 0)
+        return decision;
+
+    el_cache_owner_t *owner = el_cache_owner_get(cache,
+                                                 key_kind,
+                                                 source_id,
+                                                 source_frames);
+    if(!owner)
+        return decision;
+
+    decision.owner = owner;
+    owner->requests++;
+    cache->requests++;
+    if(key_kind == EL_CACHE_KEY_MEDIA)
+        cache->generic_requests++;
+
+    if(owner->state == EL_CACHE_ACTIVE && owner->window_valid &&
+       (source_frame < owner->window_min || source_frame > owner->window_max)) {
+        el_cache_purge_owner(cache, owner);
+        el_cache_owner_begin_probation(cache, owner, source_frame);
+    }
+    else if(!owner->has_last) {
+        el_cache_owner_set_sequence(owner, source_frame);
+    }
+    else {
+        uint64_t previous = owner->last_frame;
+        uint64_t old_run_min = owner->run_min;
+        uint64_t old_run_max = owner->run_max;
+        int old_direction = owner->direction;
+        int contiguous = 0;
+        int direction = el_cache_frame_direction(previous,
+                                                 source_frame,
+                                                 &contiguous);
+        int fitting_boundary = 0;
+        int oversized_boundary = 0;
+        uint64_t boundary_min = source_frame;
+        uint64_t boundary_max = source_frame;
+
+        if(direction == 0) {
+            fitting_boundary = 1;
+        }
+        else if(old_direction != 0 && direction != old_direction) {
+            boundary_min = old_run_min < source_frame ? old_run_min : source_frame;
+            boundary_max = old_run_max > source_frame ? old_run_max : source_frame;
+            if(el_cache_span_fits(cache, boundary_min, boundary_max))
+                fitting_boundary = 1;
+            else
+                oversized_boundary = 1;
+        }
+
+        if(fitting_boundary)
+            el_cache_owner_activate(cache, owner, boundary_min, boundary_max);
+        else if(oversized_boundary) {
+            el_cache_purge_owner(cache, owner);
+            el_cache_owner_begin_streaming(cache, owner);
+        }
+
+        if(direction == 0) {
+            owner->run_min = source_frame;
+            owner->run_max = source_frame;
+            owner->direction = 0;
+        }
+        else if(contiguous && (old_direction == 0 || direction == old_direction)) {
+            owner->run_min = old_run_min < source_frame ? old_run_min : source_frame;
+            owner->run_max = old_run_max > source_frame ? old_run_max : source_frame;
+            owner->direction = direction;
+        }
+        else if(contiguous) {
+            owner->run_min = previous < source_frame ? previous : source_frame;
+            owner->run_max = previous > source_frame ? previous : source_frame;
+            owner->direction = direction;
+        }
+        else {
+            owner->run_min = source_frame;
+            owner->run_max = source_frame;
+            owner->direction = 0;
+        }
+        owner->last_frame = source_frame;
+
+        if(owner->state == EL_CACHE_STREAMING && !fitting_boundary) {
+            int sequential = contiguous &&
+                             (old_direction == 0 || direction == old_direction);
+            if(oversized_boundary) {
+                owner->streaming_run = 0;
+            }
+            else if(sequential) {
+                owner->streaming_run++;
+            }
+            else if(owner->streaming_run >= cache->probe_limit) {
+                el_cache_purge_owner(cache, owner);
+                el_cache_owner_begin_probation(cache, owner, source_frame);
+            }
+            else {
+                decision.lookup = 1;
+                owner->streaming_run = 0;
+            }
+        }
+    }
+
+    if(owner->state == EL_CACHE_ACTIVE) {
+        decision.lookup = 1;
+        decision.admit = 1;
+        if(owner->window_valid && source_frame > owner->window_min) {
+            uint64_t available = source_frame - owner->window_min;
+            decision.preroll_limit = available > (uint64_t)LONG_MAX ?
+                                     LONG_MAX : (long)available;
+            decision.admit_preroll = decision.preroll_limit > 0;
+        }
+    }
+    else if(owner->state == EL_CACHE_PROBATION) {
+        decision.lookup = 1;
+        long remaining = cache->probe_limit - owner->probation_admitted;
+        if(remaining > 0) {
+            decision.admit = 1;
+            if(remaining > 1) {
+                decision.admit_preroll = 1;
+                decision.preroll_limit = remaining - 1;
+            }
+        }
+        else {
+            decision.exhaust_on_miss = 1;
+        }
+    }
+    else {
+        owner->bypasses++;
+        cache->bypasses++;
+    }
+
+    return decision;
+}
+
+static void el_cache_note_admission(global_raw_frame_cache_t *cache,
+                                    el_cache_owner_t *owner,
+                                    uint64_t source_frame)
+{
+    owner->admissions++;
+    cache->admissions++;
+
+    if(owner->state != EL_CACHE_PROBATION)
+        return;
+
+    owner->probation_admitted++;
+    if(!owner->probe_valid) {
+        owner->probe_min = source_frame;
+        owner->probe_max = source_frame;
+        owner->probe_valid = 1;
+    }
+    else {
+        if(source_frame < owner->probe_min)
+            owner->probe_min = source_frame;
+        if(source_frame > owner->probe_max)
+            owner->probe_max = source_frame;
+    }
+}
+
+static void el_cache_note_result(global_raw_frame_cache_t *cache,
+                                 el_cache_decision_t *decision,
+                                 uint64_t source_frame,
+                                 int hit)
+{
+    el_cache_owner_t *owner = decision->owner;
+    if(!cache || !owner)
+        return;
+
+    if(hit) {
+        owner->hits++;
+        cache->hits++;
+        if(owner->key_kind == EL_CACHE_KEY_MEDIA)
+            cache->generic_hits++;
+
+        if(owner->state != EL_CACHE_ACTIVE) {
+            uint64_t minimum = source_frame;
+            uint64_t maximum = source_frame;
+            if(owner->probe_valid) {
+                uint64_t candidate_min = owner->probe_min < source_frame ?
+                                         owner->probe_min : source_frame;
+                uint64_t candidate_max = owner->probe_max > source_frame ?
+                                         owner->probe_max : source_frame;
+                if(el_cache_span_fits(cache, candidate_min, candidate_max)) {
+                    minimum = candidate_min;
+                    maximum = candidate_max;
+                }
+            }
+            el_cache_owner_activate(cache, owner, minimum, maximum);
+        }
+        return;
+    }
+
+    owner->misses++;
+    cache->misses++;
+    if(owner->key_kind == EL_CACHE_KEY_MEDIA)
+        cache->generic_misses++;
+
+    if(decision->exhaust_on_miss && owner->state == EL_CACHE_PROBATION)
+        el_cache_owner_begin_streaming(cache, owner);
 }
 
 static void free_node(raw_frame_node_t *node) {
-    for (int i = 0; i < MAX_PLANES; i++) {
-        if (node->planes[i]) {
-            free(node->planes[i]);
-        }
-    }
     free(node);
 }
 
-static void evict_oldest_frame(global_raw_frame_cache_t *cache) {
-    if (cache->tail == NULL) return;
+static void unlink_cache_node(global_raw_frame_cache_t *cache, raw_frame_node_t *node)
+{
+    if(node->prev)
+        node->prev->next = node->next;
+    else
+        cache->head = node->next;
 
-    raw_frame_node_t *to_remove = cache->tail;
-
-    if (to_remove->prev) {
-        to_remove->prev->next = NULL;
-        cache->tail = to_remove->prev;
-    } else {
-        cache->head = NULL;
-        cache->tail = NULL;
-    }
-
-    free_node(to_remove);
-    cache->size--;
+    if(node->next)
+        node->next->prev = node->prev;
+    else
+        cache->tail = node->prev;
 }
 
-static void el_cache_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, uint64_t source_frame_ref, uint8_t *src[4]) {
+static void el_cache_owner_detach(el_cache_owner_t *owner,
+                                  raw_frame_node_t *node,
+                                  int update_resident)
+{
+    if(!owner || node->owner != owner)
+        return;
+
+    if(node->owner_prev)
+        node->owner_prev->owner_next = node->owner_next;
+    else
+        owner->resident_head = node->owner_next;
+
+    if(node->owner_next)
+        node->owner_next->owner_prev = node->owner_prev;
+    else
+        owner->resident_tail = node->owner_prev;
+
+    node->owner_prev = NULL;
+    node->owner_next = NULL;
+
+    if(update_resident && owner->resident > 0)
+        owner->resident--;
+}
+
+static void el_cache_owner_attach_head(el_cache_owner_t *owner,
+                                       raw_frame_node_t *node,
+                                       int update_resident)
+{
+    if(!owner)
+        return;
+
+    node->owner = owner;
+    node->owner_prev = NULL;
+    node->owner_next = owner->resident_head;
+
+    if(owner->resident_head)
+        owner->resident_head->owner_prev = node;
+
+    owner->resident_head = node;
+
+    if(!owner->resident_tail)
+        owner->resident_tail = node;
+
+    if(update_resident)
+        owner->resident++;
+}
+
+static void el_cache_owner_move_to_head(el_cache_owner_t *owner,
+                                        raw_frame_node_t *node)
+{
+    if(!owner || node->owner != owner || node == owner->resident_head)
+        return;
+
+    el_cache_owner_detach(owner, node, 0);
+    el_cache_owner_attach_head(owner, node, 0);
+}
+
+static void move_cache_node_to_head(global_raw_frame_cache_t *cache,
+                                    raw_frame_node_t *node)
+{
+    if(!cache || !node)
+        return;
+
+    if(node != cache->head) {
+        unlink_cache_node(cache, node);
+
+        node->prev = NULL;
+        node->next = cache->head;
+
+        if(cache->head)
+            cache->head->prev = node;
+
+        cache->head = node;
+
+        if(!cache->tail)
+            cache->tail = node;
+    }
+
+    if(node->owner)
+        el_cache_owner_move_to_head(node->owner, node);
+}
+
+static uint64_t el_cache_mix64(uint64_t value)
+{
+    value ^= value >> 30;
+    value *= UINT64_C(0xbf58476d1ce4e5b9);
+    value ^= value >> 27;
+    value *= UINT64_C(0x94d049bb133111eb);
+    value ^= value >> 31;
+    return value;
+}
+
+static size_t el_cache_bucket(global_raw_frame_cache_t *cache,
+                              uint8_t key_kind,
+                              uint64_t source_id,
+                              uint64_t source_frame_ref)
+{
+    uint64_t key = source_id ^
+                   el_cache_mix64(source_frame_ref + UINT64_C(0x9e3779b97f4a7c15)) ^
+                   ((uint64_t)key_kind << 56);
+    return (size_t)(el_cache_mix64(key) &
+                    (uint64_t)(cache->index_bucket_count - 1));
+}
+
+static void el_cache_index_insert(global_raw_frame_cache_t *cache,
+                                  raw_frame_node_t *node)
+{
+    if(!cache->index_buckets)
+        return;
+    size_t bucket = el_cache_bucket(cache,
+                                    node->key_kind,
+                                    node->source_id,
+                                    node->source_frame_ref);
+    node->hash_next = cache->index_buckets[bucket];
+    cache->index_buckets[bucket] = node;
+}
+
+static void el_cache_index_remove(global_raw_frame_cache_t *cache,
+                                  raw_frame_node_t *node)
+{
+    if(!cache->index_buckets)
+        return;
+    size_t bucket = el_cache_bucket(cache,
+                                    node->key_kind,
+                                    node->source_id,
+                                    node->source_frame_ref);
+    raw_frame_node_t **link = &cache->index_buckets[bucket];
+    while(*link && *link != node)
+        link = &(*link)->hash_next;
+    if(*link == node)
+        *link = node->hash_next;
+    node->hash_next = NULL;
+}
+
+static raw_frame_node_t *find_cache_node(global_raw_frame_cache_t *cache,
+                                         uint8_t key_kind,
+                                         uint64_t source_id,
+                                         uint64_t source_frame_ref)
+{
+    if(cache->index_buckets) {
+        size_t bucket = el_cache_bucket(cache,
+                                        key_kind,
+                                        source_id,
+                                        source_frame_ref);
+        for(raw_frame_node_t *node = cache->index_buckets[bucket];
+            node;
+            node = node->hash_next)
+            if(node->key_kind == key_kind &&
+               node->source_id == source_id &&
+               node->source_frame_ref == source_frame_ref)
+                return node;
+        return NULL;
+    }
+
+    for(raw_frame_node_t *node = cache->head; node; node = node->next)
+        if(node->key_kind == key_kind &&
+           node->source_id == source_id &&
+           node->source_frame_ref == source_frame_ref)
+            return node;
+    return NULL;
+}
+
+static void el_cache_drop_node(global_raw_frame_cache_t *cache,
+                               raw_frame_node_t *node,
+                               int count_eviction)
+{
+    if(!cache || !node)
+        return;
+
+    if(count_eviction && node->key_kind == EL_CACHE_KEY_MEDIA)
+        cache->generic_evictions++;
+
+    el_cache_index_remove(cache, node);
+    unlink_cache_node(cache, node);
+
+    if(node->owner)
+        el_cache_owner_detach(node->owner, node, 1);
+
+    free_node(node);
+
+    cache->size--;
+
+    if(count_eviction)
+        cache->evictions++;
+}
+
+static void evict_oldest_frame(global_raw_frame_cache_t *cache)
+{
+    if(!cache || !cache->tail)
+        return;
+
+    el_cache_drop_node(cache, cache->tail, 1);
+}
+static void evict_oldest_frame_for_owner(global_raw_frame_cache_t *cache,
+                                         el_cache_owner_t *owner)
+{
+    if(owner && owner->resident_tail) {
+        el_cache_drop_node(cache, owner->resident_tail, 1);
+        return;
+    }
+
+    evict_oldest_frame(cache);
+}
+static long el_cache_purge_owner(global_raw_frame_cache_t *cache,
+                                 el_cache_owner_t *owner)
+{
+    if(!cache || !owner || owner->resident <= 0)
+        return 0;
+
+    long removed = 0;
+
+    raw_frame_node_t *node = owner->resident_head;
+
+    while(node) {
+        raw_frame_node_t *next = node->owner_next;
+
+        el_cache_drop_node(cache, node, 0);
+
+        removed++;
+
+        node = next;
+    }
+
+    if(removed > 0) {
+        cache->purges++;
+        cache->purged_frames += (uint64_t)removed;
+    }
+
+    return removed;
+}
+
+static long el_cache_borrow(global_raw_frame_cache_t *cache,
+                            el_cache_owner_t *owner,
+                            long requested)
+{
+    if(!cache || requested <= 0 || cache->capacity <= 0)
+        return 0;
+
+    if(owner && owner->state == EL_CACHE_PROBATION) {
+        long free_slots = cache->capacity - cache->size;
+        if(free_slots <= 1)
+            return 0;
+        if(requested >= free_slots)
+            requested = free_slots - 1;
+
+        cache->borrowed = requested;
+        cache->borrow_owner = owner;
+        cache->generic_borrow_events++;
+        if(requested > cache->generic_max_borrowed)
+            cache->generic_max_borrowed = requested;
+        return requested;
+    }
+
+    long max_borrow = cache->capacity > 1 ? cache->capacity / 2 : 1;
+    long granted = requested < max_borrow ? requested : max_borrow;
+    if(granted < 1)
+        granted = 1;
+
+    cache->borrowed = granted;
+    cache->borrow_owner = owner;
+    cache->generic_borrow_events++;
+    if(granted > cache->generic_max_borrowed)
+        cache->generic_max_borrowed = granted;
+    long normal_limit = cache->capacity - granted;
+
+    while(cache->size > normal_limit)
+        evict_oldest_frame_for_owner(cache, owner);
+    return granted;
+}
+
+static void el_cache_release_borrow(global_raw_frame_cache_t *cache)
+{
+    if(!cache || cache->borrowed <= 0)
+        return;
+    cache->borrowed = 0;
+    cache->borrow_owner = NULL;
+}
+
+static int el_cache_frame(global_raw_frame_cache_t *cache,
+                          el_cache_owner_t *owner,
+                          uint8_t key_kind,
+                          uint64_t source_id,
+                          uint64_t source_frame_ref,
+                          uint8_t *src[4],
+                          int update_existing) {
+    if(!cache || cache->capacity <= 0)
+        return 0;
+
+    size_t plane_sizes[3] = {el_out_->len, el_out_->uv_len, el_out_->uv_len};
+    raw_frame_node_t *existing = update_existing ?
+                                 find_cache_node(cache,
+                                                 key_kind,
+                                                 source_id,
+                                                 source_frame_ref) : NULL;
+    if(existing) {
+        if(key_kind == EL_CACHE_KEY_MEDIA)
+            cache->generic_updates++;
+        for(int i = 0; i < 3; i++)
+            veejay_memcpy(existing->planes[i], src[i], plane_sizes[i]);
+        move_cache_node_to_head(cache, existing);
+        return 0;
+    }
+
     if (cache->size >= cache->capacity) {
-        evict_oldest_frame(cache);
+        if(owner && owner->state == EL_CACHE_PROBATION)
+            return 0;
+        if(cache->borrowed > 0)
+            evict_oldest_frame_for_owner(cache, cache->borrow_owner);
+        else
+            evict_oldest_frame(cache);
     }
 
-    raw_frame_node_t *new_node = (raw_frame_node_t *)vj_malloc(sizeof(raw_frame_node_t));
-	if(!new_node) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add frame to cache, memory full");
-		return;
-	}
-    new_node->source_hash = source_hash;
+    size_t frame_bytes = plane_sizes[0] + plane_sizes[1] + plane_sizes[2];
+
+    raw_frame_node_t *new_node =
+        (raw_frame_node_t *)vj_malloc(sizeof(raw_frame_node_t) + frame_bytes);
+
+    if(!new_node) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Cannot add frame to cache, memory full");
+        return 0;
+    }
+
+    new_node->key_kind = key_kind;
+    new_node->source_id = source_id;
     new_node->source_frame_ref = source_frame_ref;
+    new_node->owner = owner;
+    new_node->hash_next = NULL;
+    new_node->owner_prev = NULL;
+    new_node->owner_next = NULL;
 
-    size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
-    for (int i = 0; i < 3; i++) {
-        new_node->planes[i] = (uint8_t *)vj_malloc(plane_sizes[i]);
+    uint8_t *pixels = (uint8_t *)(new_node + 1);
+
+    for(int i = 0; i < 3; i++) {
+        new_node->planes[i] = pixels;
         veejay_memcpy(new_node->planes[i], src[i], plane_sizes[i]);
+        pixels += plane_sizes[i];
     }
+
     new_node->planes[3] = NULL;
+
+    el_cache_index_insert(cache, new_node);
 
     new_node->next = cache->head;
     new_node->prev = NULL;
-    if (cache->head) {
+
+    if(cache->head)
         cache->head->prev = new_node;
-    }
+
     cache->head = new_node;
 
-    if (cache->tail == NULL) {
+    if(cache->tail == NULL)
         cache->tail = new_node;
-    }
+
+    if(owner)
+        el_cache_owner_attach_head(owner, new_node, 1);
 
     cache->size++;
+
+    if(key_kind == EL_CACHE_KEY_MEDIA)
+        cache->generic_inserts++;
+
+    if(owner)
+        el_cache_note_admission(cache, owner, source_frame_ref);
+
+    return 1;
+
 }
 
-static int find_cached_frame(global_raw_frame_cache_t *cache, uint64_t source_hash, uint64_t source_frame_ref, uint8_t *dst[4]) {
-    raw_frame_node_t *current = cache->head;
+static int find_cached_frame(global_raw_frame_cache_t *cache,
+                             uint8_t key_kind,
+                             uint64_t source_id,
+                             uint64_t source_frame_ref,
+                             uint8_t *dst[4]) {
     size_t plane_sizes[4] = {el_out_->len, el_out_->uv_len, el_out_->uv_len, 0};
+    raw_frame_node_t *node = find_cache_node(cache, key_kind, source_id, source_frame_ref);
+    if(!node)
+        return 0;
 
-    while (current != NULL) {
-        if (current->source_hash == source_hash && current->source_frame_ref == source_frame_ref) {
-            for (int i = 0; i < 3; i++) {
-                if (current->planes[i] && dst[i]) {
-                    veejay_memcpy(dst[i], current->planes[i], plane_sizes[i]);
-                }
-            }
+    for (int i = 0; i < 3; i++)
+        if(node->planes[i] && dst[i])
+            veejay_memcpy(dst[i], node->planes[i], plane_sizes[i]);
 
-            if (current != cache->head) {
-                current->prev->next = current->next;
-                if (current->next) {
-                    current->next->prev = current->prev;
-                } else {
-                    cache->tail = current->prev;
-                }
+    move_cache_node_to_head(cache, node);
+    return 1;
+}
 
-                current->next = cache->head;
-                current->prev = NULL;
-                if (cache->head) {
-                    cache->head->prev = current;
-                }
-                cache->head = current;
-            }
+typedef struct
+{
+    global_raw_frame_cache_t *cache;
+    el_cache_owner_t *owner;
+    uint64_t source_id;
+    long remaining;
+} ffmpeg_cache_sink_t;
 
-            return 1;
-        }
-        current = current->next;
+static void el_cache_store_ffmpeg_preroll(void *opaque,
+                                          int64_t frame_number,
+                                          uint8_t *planes[4])
+{
+    ffmpeg_cache_sink_t *sink = (ffmpeg_cache_sink_t *)opaque;
+    if(!sink || !sink->cache || !sink->owner ||
+       sink->remaining <= 0 || frame_number < 0)
+        return;
+    if(sink->owner->state == EL_CACHE_ACTIVE &&
+       sink->owner->window_valid &&
+       ((uint64_t)frame_number < sink->owner->window_min ||
+        (uint64_t)frame_number > sink->owner->window_max))
+        return;
+
+    if(el_cache_frame(sink->cache,
+                      sink->owner,
+                      EL_CACHE_KEY_MEDIA,
+                      sink->source_id,
+                      (uint64_t)frame_number,
+                      planes,
+                      1)) {
+        sink->remaining--;
+        sink->cache->generic_preroll_stores++;
     }
-    return 0;
 }
 
 
@@ -377,6 +1316,8 @@ static void	_el_free_decoder( vj_decoder *d )
 {
 	if(d)
 	{
+		if(d->nvjpeg_decoder)
+			vj_nvjpeg_decoder_destroy(d->nvjpeg_decoder);
 		if(d->tmp_buffer)
 			free( d->tmp_buffer );
 #ifdef SUPPORT_READ_DV2
@@ -438,7 +1379,9 @@ void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 
 	if(should_enable_drop_frame_timecode(fps)) {
         setenv("MJPEG_DROP_FRAME_TIME_CODE", "1",1 );
-		veejay_msg(VEEJAY_MSG_INFO, "Drop-frame ENABLED (%f) fps correction active", fps);
+		veejay_msg(VEEJAY_MSG_INFO,
+		           "Fractional-rate timecode correction enabled (%.6f fps)",
+		           fps);
     } else {
         setenv("MJPEG_DROP_FRAME_TIME_CODE", "0",1 );
 		veejay_msg(VEEJAY_MSG_INFO, "Timecode is linear (frame accurate)");
@@ -461,7 +1404,76 @@ int	vj_el_is_dv(editlist *el)
 #define GREMLIN_GUARDIAN (128*1024)-1
 #endif
 
-static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fps, int pixel_format, int out_fmt, long max_frame_size)
+enum {
+	VJ_MJPEG_DECODER_AUTO = 0,
+	VJ_MJPEG_DECODER_NVJPEG,
+	VJ_MJPEG_DECODER_SOFTWARE
+};
+
+static int vj_mjpeg_decoder_mode(void)
+{
+	const char *setting = getenv("VEEJAY_MJPEG_DECODER");
+
+	if(!setting || !setting[0] || strcasecmp(setting, "auto") == 0)
+		return VJ_MJPEG_DECODER_AUTO;
+	if(strcasecmp(setting, "nvjpeg") == 0)
+		return VJ_MJPEG_DECODER_NVJPEG;
+	if(strcasecmp(setting, "software") == 0 ||
+	   strcasecmp(setting, "legacy") == 0)
+		return VJ_MJPEG_DECODER_SOFTWARE;
+
+	veejay_msg(VEEJAY_MSG_WARNING,
+	           "Unknown VEEJAY_MJPEG_DECODER value '%s'; using auto",
+	           setting);
+	return VJ_MJPEG_DECODER_AUTO;
+}
+
+static const char *vj_el_pixfmt_name(int pixfmt)
+{
+	switch(pixfmt) {
+		case PIX_FMT_YUVJ422P: return "yuvj422p";
+		case PIX_FMT_YUVA422P: return "yuva422p";
+		case PIX_FMT_YUV422P: return "yuv422p";
+		case PIX_FMT_YUVJ420P: return "yuvj420p";
+		case PIX_FMT_YUV420P: return "yuv420p";
+		case PIX_FMT_YUV444P: return "yuv444p";
+		default: return "unknown";
+	}
+}
+
+static int vj_nvjpeg_decoder_eligible(int source_width,
+	                                  int source_height,
+	                                  int output_pixfmt,
+	                                  char *reason,
+	                                  size_t reason_size)
+{
+	int output_width = el_width_ > 0 ? el_width_ : source_width;
+	int output_height = el_height_ > 0 ? el_height_ : source_height;
+
+	if(output_pixfmt != PIX_FMT_YUVJ422P &&
+	   output_pixfmt != PIX_FMT_YUVA422P) {
+		snprintf(reason, reason_size,
+		         "internal format %s is not a supported planar 4:2:2 layout",
+		         vj_el_pixfmt_name(output_pixfmt));
+		return 0;
+	}
+	if(source_width != output_width || source_height != output_height) {
+		snprintf(reason, reason_size,
+		         "source geometry %dx%d requires scaling to %dx%d",
+		         source_width, source_height, output_width, output_height);
+		return 0;
+	}
+	if((source_width & 1) != 0) {
+		snprintf(reason, reason_size,
+		         "odd source width %d is incompatible with VeeJay 4:2:2 buffers",
+		         source_width);
+		return 0;
+	}
+
+	return 1;
+}
+
+static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, float fps, int out_fmt, long max_frame_size)
 {
    vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
    if(!d) {
@@ -486,6 +1498,28 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 		d->frame = avhelper_alloc_frame();
 	}
 
+	if(id == CODEC_ID_MJPEG && ctx) {
+		int mode = vj_mjpeg_decoder_mode();
+		d->nvjpeg_forced = (mode == VJ_MJPEG_DECODER_NVJPEG);
+
+		if(mode == VJ_MJPEG_DECODER_SOFTWARE) {
+			snprintf(d->nvjpeg_reason, sizeof(d->nvjpeg_reason),
+			         "disabled by VEEJAY_MJPEG_DECODER=software");
+		}
+		else if(vj_nvjpeg_decoder_eligible(width,
+		                                   height,
+		                                   out_fmt,
+		                                   d->nvjpeg_reason,
+		                                   sizeof(d->nvjpeg_reason))) {
+			d->nvjpeg_decoder = vj_nvjpeg_decoder_create(
+				width,
+				height,
+				d->nvjpeg_reason,
+				sizeof(d->nvjpeg_reason));
+			d->nvjpeg_probe_pending = d->nvjpeg_decoder != NULL;
+		}
+	}
+
 	
 	size_t safe_max_frame_size = ( AV_INPUT_BUFFER_PADDING_SIZE  + max_frame_size + GREMLIN_GUARDIAN );
 	
@@ -493,9 +1527,115 @@ static vj_decoder *_el_new_decoder( void *ctx, int id , int width, int height, f
 	
 
 	d->tmp_buffer = (uint8_t*) vj_malloc( sizeof(uint8_t) * safe_max_frame_size );
-   	d->fmt = id;
+	if(!d->tmp_buffer) {
+		_el_free_decoder(d);
+		return NULL;
+	}
+	d->fmt = id;
 
 	return d;
+}
+
+static int vj_el_decode_mjpeg(vj_decoder *decoder,
+	                          void *software_context,
+	                          const uint8_t *data,
+	                          int data_size,
+	                          uint8_t *dst[4],
+	                          const char *source,
+	                          vj_el_chroma requested_chroma,
+	                          vj_el_chroma *actual_chroma)
+{
+	int request_444 = requested_chroma == VJ_EL_CHROMA_444 &&
+		vj_nvjpeg_decoder_supports_444(decoder ? decoder->nvjpeg_decoder : NULL);
+	vj_nvjpeg_output requested_output = request_444
+		? VJ_NVJPEG_OUTPUT_444
+		: VJ_NVJPEG_OUTPUT_422;
+	vj_nvjpeg_output actual_output = VJ_NVJPEG_OUTPUT_422;
+
+	if(actual_chroma)
+		*actual_chroma = VJ_EL_CHROMA_422;
+	if(!decoder || !data || data_size <= 0)
+		return -1;
+
+	if(vj_nvjpeg_decoder_is_active(decoder->nvjpeg_decoder)) {
+		size_t dst_pitch[3] = {
+			(size_t)el_width_,
+			request_444
+				? (size_t)el_width_
+				: (size_t)((el_width_ + 1) / 2),
+			request_444
+				? (size_t)el_width_
+				: (size_t)((el_width_ + 1) / 2)
+		};
+		int nvjpeg_result = vj_nvjpeg_decoder_decode(
+			decoder->nvjpeg_decoder,
+			data,
+			(size_t)data_size,
+			requested_output,
+			&actual_output,
+			dst,
+			dst_pitch);
+
+		if(nvjpeg_result == 1) {
+			if(actual_chroma)
+				*actual_chroma = actual_output == VJ_NVJPEG_OUTPUT_444
+					? VJ_EL_CHROMA_444
+					: VJ_EL_CHROMA_422;
+			if(decoder->nvjpeg_probe_pending) {
+				veejay_msg(VEEJAY_MSG_INFO,
+				           "[VIDEO-DECODE] source='%s' mode=accelerated backend=nvjpeg engine=%s codec=mjpeg sourcefmt=%s outputfmt=%s conversion=%s range=full",
+				           source ? source : "unknown",
+				           vj_nvjpeg_decoder_engine(decoder->nvjpeg_decoder),
+				           vj_nvjpeg_decoder_source_format(decoder->nvjpeg_decoder),
+				           actual_output == VJ_NVJPEG_OUTPUT_444
+				               ? "planar-yuv444"
+				               : "planar-yuv422",
+				           vj_nvjpeg_decoder_conversion(decoder->nvjpeg_decoder));
+				decoder->nvjpeg_probe_pending = 0;
+			}
+			if(actual_output == VJ_NVJPEG_OUTPUT_444 &&
+			   !decoder->nvjpeg_444_logged) {
+				veejay_msg(VEEJAY_MSG_INFO,
+				           "[VIDEO-DECODE] source='%s' backend=nvjpeg output=planar-yuv444 upsample=gpu/%s",
+				           source ? source : "unknown",
+				           vj_nvjpeg_decoder_upsampler(decoder->nvjpeg_decoder));
+				decoder->nvjpeg_444_logged = 1;
+			}
+			else if(requested_chroma == VJ_EL_CHROMA_444 &&
+			        actual_output == VJ_NVJPEG_OUTPUT_422 &&
+			        !decoder->nvjpeg_444_fallback_logged) {
+				veejay_msg(VEEJAY_MSG_INFO,
+				           "[VIDEO-DECODE] source='%s' backend=nvjpeg output=planar-yuv422 gpu444=unavailable; FX chroma supersampling remains on CPU",
+				           source ? source : "unknown");
+				decoder->nvjpeg_444_fallback_logged = 1;
+			}
+			return 1;
+		}
+
+		char failure_reason[256];
+		snprintf(failure_reason, sizeof(failure_reason), "%s",
+		         vj_nvjpeg_decoder_last_error(decoder->nvjpeg_decoder));
+		veejay_msg(VEEJAY_MSG_WARNING,
+		           "[VIDEO-DECODE] source='%s' backend=nvjpeg retired reason='%s'; retrying with software backend=legacy",
+		           source ? source : "unknown",
+		           failure_reason);
+		vj_nvjpeg_decoder_retire(decoder->nvjpeg_decoder);
+	}
+
+	if(!software_context)
+		return -1;
+
+	int result = avhelper_decode_video_direct(software_context,
+	                                          (uint8_t *)data,
+	                                          data_size,
+	                                          dst,
+	                                          el_pixel_format_,
+	                                          el_width_,
+	                                          el_height_);
+	avhelper_decode_finish(software_context);
+	if(actual_chroma)
+		*actual_chroma = VJ_EL_CHROMA_422;
+	return result;
 }
 
 int	get_ffmpeg_pixfmt( int pf )
@@ -532,7 +1672,7 @@ static long get_max_frame_size( lav_file_t *fd )
 	return (((res)+8)&~8);
 }
 
-int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm, int out_format, int width, int height )
+static int open_video_file_legacy(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm, int out_format, int width, int height )
 {
 	int i, n, nerr;
 	int chroma=0;
@@ -645,6 +1785,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	el->lav_fd[n] = elfd;
     	el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
     	el->video_file_list[n] = vj_strndup(realname, strlen(realname));
+	el->media_id[n] = media_source_hash(realname);
 	
 	    /* Debug Output */
 	if(n == 0 )
@@ -818,7 +1959,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			max_frame_size = get_max_frame_size( el->lav_fd[n] );
 
 		el->decoders[n] = 
-			_el_new_decoder( el->ctx[n], decoder_id, el->video_width, el->video_height, el->video_fps, el->pixfmt[ n ],el_pixel_format_, max_frame_size );
+			_el_new_decoder( el->ctx[n], decoder_id, el->video_width, el->video_height, el->video_fps, el_pixel_format_, max_frame_size );
 		if( el->decoders[n] == NULL ) {
 			veejay_msg(VEEJAY_MSG_ERROR,"Unsupported video compression type: %s", compr_type );
 			if( el->lav_fd[n] ) 
@@ -860,6 +2001,354 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	return n;
 }
 
+static void configure_ffmpeg_audio(editlist *el,
+                                   vj_ffmpeg_input *input,
+                                   const vj_ffmpeg_input_info *info,
+                                   int file_index,
+                                   const char *filename)
+{
+    if(file_index == 0) {
+        el->has_audio = 0;
+        el->audio_rate = 0;
+        el->audio_chans = 0;
+        el->audio_bits = 0;
+        el->audio_bps = 0;
+
+        if(!info->has_audio)
+            return;
+
+        int rate = info->audio_rate >= 44000 ? info->audio_rate : 48000;
+        int channels = info->audio_channels == 1 ? 1 : 2;
+        if(vj_ffmpeg_input_configure_audio(input, rate, channels)) {
+            el->has_audio = 1;
+            el->audio_rate = rate;
+            el->audio_chans = channels;
+            el->audio_bits = 16;
+            el->audio_bps = channels * 2;
+            veejay_msg(VEEJAY_MSG_DEBUG,
+                       "[FFMPEG-AUDIO] EDL PCM established source='%s' rate=%ld channels=%d bits=16",
+                       filename,
+                       el->audio_rate,
+                       el->audio_chans);
+        }
+        else {
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "Unable to configure audio for generic FFmpeg input '%s'; video remains available",
+                       filename);
+        }
+        return;
+    }
+
+    if(!el->has_audio)
+        return;
+
+    if(!info->has_audio) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-AUDIO] no audio stream source='%s'; this EDL segment will be silent",
+                   filename);
+        return;
+    }
+
+    if(el->audio_bits != 16 || el->audio_rate <= 0 ||
+       el->audio_chans < 1 || el->audio_chans > 2) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Generic FFmpeg audio in '%s' cannot match the current EDL PCM format; this segment will be silent",
+                   filename);
+        return;
+    }
+
+    if(!vj_ffmpeg_input_configure_audio(input,
+                                        (int)el->audio_rate,
+                                        el->audio_chans)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Unable to normalize generic FFmpeg audio in '%s'; this EDL segment will be silent",
+                   filename);
+        return;
+    }
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[FFMPEG-AUDIO] normalized source='%s' %dHz/%dch -> %ldHz/%dch s16le",
+               filename,
+               info->audio_rate,
+               info->audio_channels,
+               el->audio_rate,
+               el->audio_chans);
+}
+
+int vj_el_retarget_audio(editlist *el,
+                         long sample_rate,
+                         int channels,
+                         int bits)
+{
+    if(!el || !el->has_audio || sample_rate <= 0 ||
+       channels < 1 || channels > 2)
+        return 0;
+
+    int has_ffmpeg = 0;
+    for(int i = 0; i < el->num_video_files; i++)
+        if(el->backend[i] == VJ_EL_BACKEND_FFMPEG)
+            has_ffmpeg = 1;
+
+    if(!has_ffmpeg)
+        return 0;
+    if(bits != 16)
+        return -1;
+
+    for(int i = 0; i < el->num_video_files; i++) {
+        if(el->backend[i] == VJ_EL_BACKEND_FFMPEG)
+            continue;
+        if(!el->lav_fd[i] || lav_audio_channels(el->lav_fd[i]) <= 0)
+            continue;
+        if(lav_audio_rate(el->lav_fd[i]) != sample_rate ||
+           lav_audio_channels(el->lav_fd[i]) != channels ||
+           lav_audio_bits(el->lav_fd[i]) != bits)
+            return -1;
+    }
+
+    long old_rate = el->audio_rate;
+    int old_channels = el->audio_chans;
+    int old_bits = el->audio_bits;
+
+    for(int i = 0; i < el->num_video_files; i++) {
+        if(el->backend[i] != VJ_EL_BACKEND_FFMPEG || !el->ffmpeg_input[i])
+            continue;
+
+        const vj_ffmpeg_input_info *info =
+            vj_ffmpeg_input_get_info(el->ffmpeg_input[i]);
+        if(!info || !info->has_audio)
+            continue;
+
+        if(!vj_ffmpeg_input_configure_audio(el->ffmpeg_input[i],
+                                            (int)sample_rate,
+                                            channels)) {
+            if(old_rate > 0 && old_channels > 0 && old_channels <= 2 &&
+               old_bits == 16) {
+                for(int j = 0; j < i; j++) {
+                    if(el->backend[j] != VJ_EL_BACKEND_FFMPEG ||
+                       !el->ffmpeg_input[j])
+                        continue;
+                    const vj_ffmpeg_input_info *old_info =
+                        vj_ffmpeg_input_get_info(el->ffmpeg_input[j]);
+                    if(old_info && old_info->has_audio)
+                        vj_ffmpeg_input_configure_audio(el->ffmpeg_input[j],
+                                                        (int)old_rate,
+                                                        old_channels);
+                }
+            }
+            return -1;
+        }
+    }
+
+    el->audio_rate = sample_rate;
+    el->audio_chans = channels;
+    el->audio_bits = 16;
+    el->audio_bps = channels * 2;
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[FFMPEG-AUDIO] retargeted EDL PCM to %ldHz/%dch/s16le",
+               el->audio_rate,
+               el->audio_chans);
+    return 1;
+}
+
+static int open_video_file_ffmpeg(char *filename, editlist *el, int preserve_pathname,
+                                  int deinter, char override_norm, int out_format,
+                                  int width, int height)
+{
+    char *realname = preserve_pathname ? vj_strdup(filename) : canonicalize_file_name(filename);
+    if(!realname)
+        return -1;
+
+    for(int i = 0; i < el->num_video_files; i++) {
+        if(el->video_file_list[i] && strcmp(realname, el->video_file_list[i]) == 0) {
+            free(realname);
+            return -1;
+        }
+    }
+
+    if(el->num_video_files >= MAX_EDIT_LIST_FILES) {
+        free(realname);
+        return -1;
+    }
+
+    int n = el->num_video_files;
+    el->lav_fd[n] = NULL;
+    el->ctx[n] = NULL;
+    el->decoders[n] = NULL;
+    el->ffmpeg_input[n] = NULL;
+    el->backend[n] = VJ_EL_BACKEND_LEGACY;
+
+    vj_ffmpeg_input *input = vj_ffmpeg_input_open(filename, out_format, width, height);
+    if(!input) {
+        free(realname);
+        return -1;
+    }
+
+    const vj_ffmpeg_input_info *info = vj_ffmpeg_input_get_info(input);
+    if(!info || info->frame_count <= 0 || info->frame_count > LONG_MAX ||
+       info->width <= 0 || info->height <= 0) {
+        vj_ffmpeg_input_close(input);
+        free(realname);
+        return -1;
+    }
+
+    if(n == 0) {
+        el->video_width = info->width;
+        el->video_height = info->height;
+        el->video_inter = info->interlaced ? LAV_INTER_TOP_FIRST : LAV_NOT_INTERLACED;
+        el->video_fps = info->fps > 0.0 ? (float)info->fps : el_fps_;
+        el->video_sar_width = info->sar_num;
+        el->video_sar_height = info->sar_den;
+        if(!el->video_norm)
+            el->video_norm = vj_el_get_default_norm(el->video_fps);
+        if(!el->video_norm && (override_norm == 'p' || override_norm == 'n' || override_norm == 's'))
+            el->video_norm = override_norm;
+        if(!el->video_norm)
+            el->video_norm = 'p';
+        if(deinter && info->interlaced)
+            el->auto_deinter = 1;
+    }
+    else {
+        if(el->video_width != info->width || el->video_height != info->height) {
+            veejay_msg(require_same_resolution ? VEEJAY_MSG_ERROR : VEEJAY_MSG_WARNING,
+                       "Geometry %dx%d does not match %dx%d (performance penalty).",
+                       info->width, info->height, el->video_width, el->video_height);
+            if(require_same_resolution) {
+                vj_ffmpeg_input_close(input);
+                free(realname);
+                return -1;
+            }
+        }
+        if(info->fps > 0.0 && fabs(el->video_fps - info->fps) > 0.0000001)
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "FPS is %3.2f, but playing at %3.2f",
+                       info->fps, el->video_fps);
+    }
+
+    configure_ffmpeg_audio(el, input, info, n, realname);
+
+    el->video_file_list[n] = vj_strdup(realname);
+    if(!el->video_file_list[n]) {
+        vj_ffmpeg_input_close(input);
+        free(realname);
+        return -1;
+    }
+
+    el->ffmpeg_input[n] = input;
+    el->backend[n] = VJ_EL_BACKEND_FFMPEG;
+    el->media_id[n] = media_source_hash(realname);
+    el->num_frames[n] = (long)info->frame_count;
+    el->pixfmt[n] = out_format;
+    int target_width = width > 0 ? width : info->width;
+    int target_height = height > 0 ? height : info->height;
+    if(target_width > 0 && target_height > 0 &&
+       (long)target_width <= LONG_MAX / (long)target_height / 4L)
+        el->max_frame_sizes[n] = (long)target_width * (long)target_height * 4L;
+    else
+        el->max_frame_sizes[n] = LONG_MAX;
+
+    el->is_empty = 0;
+    el->has_video = 1;
+    el->num_video_files++;
+    el->source_hash = editlist_source_hash(el);
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[FFMPEG-IN] generic input accepted file=%s slot=%d frames=%ld",
+               realname, n, el->num_frames[n]);
+
+    free(realname);
+    return n;
+}
+
+int open_video_file(char *filename, editlist *el, int preserve_pathname, int deinter,
+                    int force, char override_norm, int out_format, int width, int height)
+{
+    int generic_tried = 0;
+    if(vj_ffmpeg_input_prefers_generic(filename)) {
+        generic_tried = 1;
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-IN] non-intra media '%s'; trying generic FFmpeg input first",
+                   filename);
+        int ffmpeg_n = open_video_file_ffmpeg(filename, el, preserve_pathname, deinter,
+                                              override_norm, out_format, width, height);
+        if(ffmpeg_n >= 0)
+            return ffmpeg_n;
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-IN] preferred generic input rejected '%s'; trying legacy input",
+                   filename);
+    }
+
+    int n = open_video_file_legacy(filename, el, preserve_pathname, deinter, force,
+                                   override_norm, out_format, width, height);
+    if(n >= 0) {
+        el->backend[n] = VJ_EL_BACKEND_LEGACY;
+        const char *codec = lav_video_compressor(el->lav_fd[n]);
+        const char *source = el->video_file_list[n]
+            ? el->video_file_list[n]
+            : filename;
+        int codec_id = lav_video_compressor_type(el->lav_fd[n]);
+        vj_decoder *decoder = (vj_decoder *)el->decoders[n];
+
+        if(codec_id == CODEC_ID_MJPEG && decoder &&
+           vj_nvjpeg_decoder_is_active(decoder->nvjpeg_decoder)) {
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[VIDEO-DECODE] source='%s' mode=probing backend=nvjpeg engine=%s codec=mjpeg containerfmt=%s validation=jpeg-header gpu444=%s upsampler=%s",
+                       source,
+                       vj_nvjpeg_decoder_engine(decoder->nvjpeg_decoder),
+                       vj_el_pixfmt_name(el->pixfmt[n]),
+                       vj_nvjpeg_decoder_supports_444(decoder->nvjpeg_decoder)
+                           ? "available"
+                           : "unavailable",
+                       vj_nvjpeg_decoder_upsampler(decoder->nvjpeg_decoder));
+        }
+        else {
+            const char *reason = codec_id == CODEC_ID_MJPEG && decoder &&
+                                 decoder->nvjpeg_reason[0]
+                ? decoder->nvjpeg_reason
+                : "nvJPEG is not eligible for this stream";
+
+            if(codec_id == CODEC_ID_MJPEG && decoder && decoder->nvjpeg_forced)
+                veejay_msg(VEEJAY_MSG_WARNING,
+                           "[VIDEO-DECODE] requested backend=nvjpeg unavailable source='%s' reason='%s'; using software",
+                           source,
+                           reason);
+
+            if(codec_id == CODEC_ID_MJPEG)
+                veejay_msg(VEEJAY_MSG_INFO,
+                           "[VIDEO-DECODE] source='%s' mode=software backend=legacy codec=mjpeg reason='%s'",
+                           source,
+                           reason);
+            else
+                veejay_msg(VEEJAY_MSG_INFO,
+                           "[VIDEO-DECODE] source='%s' mode=software backend=legacy codec=%s",
+                           source,
+                           codec ? codec : "unknown");
+        }
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-IN] legacy input retained for '%s' slot=%d",
+                   filename, n);
+        return n;
+    }
+
+    if(generic_tried) {
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-IN] generic and legacy inputs rejected '%s'",
+                   filename);
+        return -1;
+    }
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[FFMPEG-IN] legacy input rejected '%s'; trying generic FFmpeg fallback",
+               filename);
+
+    n = open_video_file_ffmpeg(filename, el, preserve_pathname, deinter,
+                               override_norm, out_format, width, height);
+    if(n < 0)
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-IN] generic FFmpeg fallback also rejected '%s'",
+                   filename);
+    return n;
+}
+
 static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 {
 	const int uv_len = (el->video_width * el->video_height) / ( ( (pix_fmt==FMT_422||pix_fmt==FMT_422F) ? 2 : 4));
@@ -878,6 +2367,14 @@ int vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
 
     if (num < 0 || num >= el->num_video_files)
         return 0;
+
+    if(el->backend[num] == VJ_EL_BACKEND_FFMPEG) {
+        const vj_ffmpeg_input_info *info = vj_ffmpeg_input_get_info(el->ffmpeg_input[num]);
+        if(!info)
+            return 0;
+        memcpy(fourcc, info->fourcc, 5);
+        return 1;
+    }
 
     const char *compr = lav_video_compressor(el->lav_fd[num]);
     if (!compr)
@@ -912,6 +2409,8 @@ int	vj_el_bogus_length( editlist *el, long nframe )
 		nframe = el->total_frames;
 
 	n = el->frame_list[nframe];
+	if(el->backend[N_EL_FILE(n)] == VJ_EL_BACKEND_FFMPEG)
+		return 0;
 
 	return lav_bogus_video_length( el->lav_fd[ N_EL_FILE(n) ] );
 }
@@ -932,6 +2431,8 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 		nframe = el->total_frames;
 
 	n = el->frame_list[nframe];
+	if(el->backend[N_EL_FILE(n)] == VJ_EL_BACKEND_FFMPEG)
+		return 0;
 
 	if( !lav_bogus_video_length( el->lav_fd[N_EL_FILE(n)] ) )
 		return 0;
@@ -962,6 +2463,11 @@ int	vj_el_get_video_frame1(editlist *el, long nframe, uint8_t *dst[4])
     }
 
 	n = el->frame_list[nframe];;
+
+	if(el->backend[N_EL_FILE(n)] == VJ_EL_BACKEND_FFMPEG)
+		return vj_ffmpeg_input_get_frame(el->ffmpeg_input[N_EL_FILE(n)],
+		                                 (int64_t)N_EL_FRAME(n), dst,
+		                                 0, NULL, NULL);
 
 	int decoder_id = lav_video_compressor_type( el->lav_fd[N_EL_FILE(n)] );
 
@@ -1058,9 +2564,21 @@ int	vj_el_get_video_frame1(editlist *el, long nframe, uint8_t *dst[4])
 			break;		
 		default:
 			{
-			int ret = avhelper_decode_video_direct( el->ctx[ N_EL_FILE(n) ], data, res, dst, el_pixel_format_,el_width_,el_height_ );
-
-			avhelper_decode_finish( el->ctx[ N_EL_FILE(n)] );
+			int ret;
+			if(decoder_id == CODEC_ID_MJPEG)
+				ret = vj_el_decode_mjpeg(
+					d,
+					el->ctx[N_EL_FILE(n)],
+					data,
+					res,
+					dst,
+					el->video_file_list[N_EL_FILE(n)],
+					VJ_EL_CHROMA_422,
+					NULL);
+			else {
+				ret = avhelper_decode_video_direct( el->ctx[ N_EL_FILE(n) ], data, res, dst, el_pixel_format_,el_width_,el_height_ );
+				avhelper_decode_finish( el->ctx[ N_EL_FILE(n)] );
+			}
 
 			return ret;
 			}
@@ -1071,8 +2589,20 @@ int	vj_el_get_video_frame1(editlist *el, long nframe, uint8_t *dst[4])
 }
 
 
-int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
+int vj_el_get_video_frame_ex(editlist *el,
+                             long nframe,
+                             uint8_t *dst[4],
+                             vj_el_chroma requested_chroma,
+                             vj_el_chroma *actual_chroma)
 {
+    vj_el_chroma decoded_chroma = VJ_EL_CHROMA_422;
+
+    if(actual_chroma)
+        *actual_chroma = VJ_EL_CHROMA_422;
+    if(requested_chroma != VJ_EL_CHROMA_422 &&
+       requested_chroma != VJ_EL_CHROMA_444)
+        requested_chroma = VJ_EL_CHROMA_422;
+
     if (el->has_video == 0 || el->is_empty)
     {
         vj_el_dummy_frame(dst, el, el->pixel_format);
@@ -1090,9 +2620,94 @@ int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
 
     int res = 0;
     uint64_t n = el->frame_list[nframe];
-
+    int file_index = (int)N_EL_FILE(n);
     global_raw_frame_cache_t *cache = get_global_cache();
-    if (cache && find_cached_frame(cache, el->source_hash, n, dst)) {
+
+    if(el->backend[file_index] == VJ_EL_BACKEND_FFMPEG) {
+        uint64_t source_frame = N_EL_FRAME(n);
+        uint64_t media_id = el->media_id[file_index];
+        el_cache_decision_t decision = el_cache_prepare_request(cache,
+                                                                EL_CACHE_KEY_MEDIA,
+                                                                media_id,
+                                                                source_frame,
+                                                                el->num_frames[file_index]);
+
+        int cache_hit = decision.lookup &&
+                        find_cached_frame(cache,
+                                          EL_CACHE_KEY_MEDIA,
+                                          media_id,
+                                          source_frame,
+                                          dst);
+        if(cache_hit) {
+            el_cache_note_result(cache, &decision, source_frame, 1);
+            return 1;
+        }
+
+        vj_ffmpeg_input *input = el->ffmpeg_input[file_index];
+        long borrowed = 0;
+        if(decision.admit_preroll) {
+            int64_t requested = vj_ffmpeg_input_preroll_requirement(input,
+                                                                    (int64_t)source_frame);
+            long request_frames = requested > LONG_MAX ? LONG_MAX : (long)requested;
+            if(request_frames > decision.preroll_limit)
+                request_frames = decision.preroll_limit;
+
+            if( vj_ffmpeg_input_is_hardware(input)) {
+                request_frames = 0; // decode GOP in VRAM and only fetch the target frame to system RAM
+            }
+
+            borrowed = el_cache_borrow(cache, decision.owner, request_frames);
+        }
+
+        ffmpeg_cache_sink_t sink = {
+            cache,
+            decision.owner,
+            media_id,
+            borrowed
+        };
+        int ret = vj_ffmpeg_input_get_frame(input,
+                                            (int64_t)source_frame,
+                                            dst,
+                                            borrowed,
+                                            borrowed > 0 ? el_cache_store_ffmpeg_preroll : NULL,
+                                            &sink);
+
+        if(borrowed > 0)
+            el_cache_release_borrow(cache);
+
+        if(ret == 1 && decision.admit) {
+            el_cache_frame(cache,
+                           decision.owner,
+                           EL_CACHE_KEY_MEDIA,
+                           media_id,
+                           source_frame,
+                           dst,
+                           0);
+        }
+
+        if(ret == 1 && el->video_fps > 0.0f)
+            vj_ffmpeg_input_check_seek_latency(input,
+                                            vj_el_get_usec_per_frame(el->video_fps));
+
+        el_cache_note_result(cache, &decision, source_frame, 0);
+        return ret;
+    }
+
+    uint64_t source_frame = N_EL_FRAME(n);
+    uint64_t media_id = el->media_id[file_index];
+    el_cache_decision_t decision = el_cache_prepare_request(cache,
+                                                            EL_CACHE_KEY_LEGACY,
+                                                            media_id,
+                                                            source_frame,
+                                                            el->num_frames[file_index]);
+
+    if (decision.lookup &&
+        find_cached_frame(cache,
+                          EL_CACHE_KEY_LEGACY,
+                          media_id,
+                          source_frame,
+                          dst)) {
+        el_cache_note_result(cache, &decision, source_frame, 1);
         return 1;
     }
 
@@ -1190,19 +2805,51 @@ int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
                 break;
             default:
                 {
-                    int ret = avhelper_decode_video_direct(el->ctx[N_EL_FILE(n)], data, res, dst, el_pixel_format_, el_width_, el_height_);
-                    avhelper_decode_finish(el->ctx[N_EL_FILE(n)]);
+                    int ret;
+                    if(decoder_id == CODEC_ID_MJPEG)
+                        ret = vj_el_decode_mjpeg(
+                            d,
+                            el->ctx[N_EL_FILE(n)],
+                            data,
+                            res,
+                            dst,
+                            el->video_file_list[file_index],
+                            requested_chroma,
+                            &decoded_chroma);
+                    else {
+                        ret = avhelper_decode_video_direct(el->ctx[N_EL_FILE(n)], data, res, dst, el_pixel_format_, el_width_, el_height_);
+                        avhelper_decode_finish(el->ctx[N_EL_FILE(n)]);
+                    }
                     ret_code = ret;
                 }
                 break;
         }
     }
 
-    if (ret_code == 1 && cache) {
-        el_cache_frame(cache, el->source_hash, n, dst);
+    if (ret_code == 1 && decision.admit &&
+        decoded_chroma == VJ_EL_CHROMA_422) {
+        el_cache_frame(cache,
+                       decision.owner,
+                       EL_CACHE_KEY_LEGACY,
+                       media_id,
+                       source_frame,
+                       dst,
+                       0);
     }
 
+    el_cache_note_result(cache, &decision, source_frame, 0);
+    if(actual_chroma)
+        *actual_chroma = decoded_chroma;
     return ret_code;
+}
+
+int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4])
+{
+    return vj_el_get_video_frame_ex(el,
+                                    nframe,
+                                    dst,
+                                    VJ_EL_CHROMA_422,
+                                    NULL);
 }
 
 
@@ -1253,7 +2900,6 @@ int	test_video_frame( editlist *el, int n, lav_file_t *lav,int out_pix_fmt)
 				lav_video_width( lav),
 				lav_video_height( lav),
 			   	(float) lav_frame_rate( lav ),
-				in_pix_fmt,
 				out_pix_fmt,
 				max_frame_size );
 
@@ -1354,7 +3000,30 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
     ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
-    ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
+    int file_index = (int)N_EL_FILE(n);
+    if(el->backend[file_index] == VJ_EL_BACKEND_FFMPEG) {
+        int samples = ns1 - ns0;
+        if(samples <= 0)
+            return 0;
+        int got = 0;
+        if(el->ffmpeg_input[file_index])
+            got = vj_ffmpeg_input_get_audio_samples(el->ffmpeg_input[file_index],
+                                                     ns0,
+                                                     samples,
+                                                     dst);
+        if(got == samples)
+            return samples;
+
+        veejay_memset(dst, 0, (size_t)samples * (size_t)el->audio_bps);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[FFMPEG-AUDIO] unavailable EDL audio file=%d sample=%d count=%d; using silence",
+                   file_index,
+                   ns0,
+                   samples);
+        return samples;
+    }
+
+    ret = lav_set_audio_position(el->lav_fd[file_index], ns0);
 
     if (ret < 0)
     {
@@ -1362,7 +3031,7 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 		return -1;
 	}
 
-    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
+    ret = lav_read_audio(el->lav_fd[file_index], dst, (ns1 - ns0));
     if (ret < 0) {
 	    veejay_msg(0, "Error reading audio data at frame position %ld", ns0);
 		int ns = el->audio_rate / el->video_fps;
@@ -1441,12 +3110,29 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
     ns1 = (double) (N_EL_FRAME(n) + num) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
-    ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
+    int file_index = (int)N_EL_FILE(n);
+    if(el->backend[file_index] == VJ_EL_BACKEND_FFMPEG) {
+        int samples = ns1 - ns0;
+        if(samples <= 0)
+            return 0;
+        int got = 0;
+        if(el->ffmpeg_input[file_index])
+            got = vj_ffmpeg_input_get_audio_samples(el->ffmpeg_input[file_index],
+                                                     ns0,
+                                                     samples,
+                                                     dst);
+        if(got == samples)
+            return samples;
+        veejay_memset(dst, 0, (size_t)samples * (size_t)el->audio_bps);
+        return samples;
+    }
+
+    ret = lav_set_audio_position(el->lav_fd[file_index], ns0);
 
     if (ret < 0)
 		return -1;
 
-    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
+    ret = lav_read_audio(el->lav_fd[file_index], dst, (ns1 - ns0));
     if (ret < 0)
 		return -1;
 
@@ -1977,6 +3663,8 @@ editlist *vj_el_init_with_args(char **filename,
 
     if (cur_max_frame_size == 0) {
         for (long i = 0; i < el->num_video_files; i++) {
+            if(el->backend[i] == VJ_EL_BACKEND_FFMPEG)
+                continue;
             long tmp = get_max_frame_size(el->lav_fd[i]);
 
             if (tmp > cur_max_frame_size)
@@ -2011,6 +3699,12 @@ void	vj_el_free(editlist *el)
 		if( el->is_clone )
 			continue;
 
+		if(el->backend[i] == VJ_EL_BACKEND_FFMPEG) {
+			vj_ffmpeg_input_close(el->ffmpeg_input[i]);
+			el->ffmpeg_input[i] = NULL;
+			continue;
+		}
+
 		if( el->ctx[i] ) {
 			avhelper_close_decoder( el->ctx[i] );
 		}
@@ -2044,6 +3738,20 @@ void	vj_el_print(editlist *el)
 		el->audio_rate, el->audio_chans, el->audio_bits);
 	for(i=0; i < el->num_video_files ; i++)
 	{
+		if(el->backend[i] == VJ_EL_BACKEND_FFMPEG) {
+			const vj_ffmpeg_input_info *info = vj_ffmpeg_input_get_info(el->ffmpeg_input[i]);
+			if(info) {
+				MPEG_timecode_t tc;
+				mpeg_timecode(&tc, info->frame_count,
+						mpeg_framerate_code(mpeg_conform_framerate(el->video_fps)),
+						el->video_fps);
+				snprintf(timecode, sizeof(timecode), "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+				veejay_msg(VEEJAY_MSG_INFO,
+					"\tFile %s (FFmpeg/%s) with %ld frames (total duration %s)",
+					el->video_file_list[i], info->codec_name, (long)info->frame_count, timecode);
+			}
+			continue;
+		}
 		long num_frames = lav_video_frames(el->lav_fd[i]);
 		MPEG_timecode_t tc;
 		switch( lav_video_interlacing(el->lav_fd[i]))
@@ -2443,12 +4151,16 @@ editlist	*vj_el_soft_clone(editlist *el)
 	{
 		clone->video_file_list[i] = NULL;
 		clone->lav_fd[i] = NULL;
+		clone->ffmpeg_input[i] = NULL;
+		clone->backend[i] = el->backend[i];
+		clone->media_id[i] = el->media_id[i];
 		clone->num_frames[i] = 0;
 		clone->pixfmt[i] = 0;
-		if( el->lav_fd[i] && el->video_file_list[i])
+		if( (el->lav_fd[i] || el->ffmpeg_input[i]) && el->video_file_list[i])
 		{
 			clone->video_file_list[i] = vj_strdup( el->video_file_list[i] );
 			clone->lav_fd[i] = el->lav_fd[i];
+			clone->ffmpeg_input[i] = el->ffmpeg_input[i];
 			clone->num_frames[i] = el->num_frames[i];
 			clone->pixfmt[i] =el->pixfmt[i];
 		}
@@ -2505,6 +4217,9 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
             }
 
             clone->lav_fd[file_idx] = el->lav_fd[file_idx];
+            clone->ffmpeg_input[file_idx] = el->ffmpeg_input[file_idx];
+            clone->backend[file_idx] = el->backend[file_idx];
+            clone->media_id[file_idx] = el->media_id[file_idx];
             clone->num_frames[file_idx] = el->num_frames[file_idx];
             clone->max_frame_sizes[file_idx] = el->max_frame_sizes[file_idx];
             clone->pixfmt[file_idx] = el->pixfmt[file_idx];

@@ -5,6 +5,7 @@
 
 /* multithreaded code, what starts in queue belongs to playback_thread */
 uint8_t *vj_perform_get_preview_buffer(veejay_t *info);
+void vj_perform_request_pre_projection_preview(veejay_t *info);
 int vj_perform_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *frame);
 void vj_perform_unlock_pre_projection_preview_frame(veejay_t *info);
 int vj_perform_preview_max_width(veejay_t *info);
@@ -120,11 +121,7 @@ long vj_calc_next_subframe(veejay_t *info, int b);
 void vj_perform_global_chain_reset(veejay_t *info);
 
 void vj_perform_record_audio_source_reset(veejay_t *info);
-
-void vj_perform_record_audio_source_reset(veejay_t *info);
 void vj_perform_record_output_audio_tap_configure(veejay_t *info, int frame_bytes, int sample_rate);
-
-void vj_perform_record_audio_source_reset(veejay_t *info);
 
 #ifdef HAVE_JACK
 int vj_perform_audio_sync_sample_seek_rearm(veejay_t *info, int sample_id, long target_frame, const char *reason);

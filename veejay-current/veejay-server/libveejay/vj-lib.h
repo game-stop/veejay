@@ -211,6 +211,7 @@ typedef struct {
 #define VJ_VIDEO_PACKET_DISCONTINUITY (1u << 0)
 #define VJ_VIDEO_PACKET_HELD_FRAME    (1u << 1)
 #define VJ_VIDEO_PACKET_COMPOSITE     (1u << 2)
+#define VJ_VIDEO_PACKET_CLOCKED_SOURCE (1u << 3)
 
 typedef struct {
     VJFrame *frame;
@@ -220,7 +221,9 @@ typedef struct {
     double pts_s;
     double duration_s;
     int fps_generation;
+    int present_epoch;
     int transport_epoch;
+    int video_mapping_epoch;
     unsigned int flags;
     int queue_index;
 } vj_video_packet_t;
@@ -474,6 +477,10 @@ typedef struct {
 	volatile long long fps_epoch_frame;
 	volatile int fps_generation;
 	volatile int transport_epoch;
+	volatile int video_mapping_epoch;
+	volatile long long video_mapping_frame;
+	volatile int video_present_epoch;
+	volatile double video_present_ready_lead_s;
 	volatile int sync_start_armed;
 	volatile long long sync_start_realtime_us;
 	volatile int sync_start_speed;

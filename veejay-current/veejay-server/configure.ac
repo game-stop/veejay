@@ -92,7 +92,15 @@ AC_ARG_WITH([jpeg-mmx],
             AS_HELP_STRING([--with-jpegmmx=PFX],[Prefix where jpeg-mmx is installed (optional).]))
 
 AC_ARG_WITH([v4l2], AS_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
-		[],	[with_v4l2=yes])
+			[],	[with_v4l2=yes])
+
+AC_ARG_WITH([nvjpeg],
+	[AS_HELP_STRING([--with-nvjpeg@<:@=DIR@:>@],
+		[enable optional nvJPEG MJPEG decode; look for CUDA headers, nvcc and libraries below DIR])],
+	[with_nvjpeg="$withval"], [with_nvjpeg=auto])
+AC_ARG_VAR([CUDA_HOME], [CUDA toolkit prefix used for nvJPEG detection])
+AC_ARG_VAR([CUDA_PATH], [CUDA toolkit prefix used for nvJPEG detection])
+AC_ARG_VAR([NVCC], [path to the NVIDIA CUDA compiler])
 
 arch_target="auto"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, auto or user defined],
@@ -840,6 +848,218 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
  have_dl_dlopen=true
 fi
 
+dnl *********************************************************************
+dnl Optional nvJPEG/CUDA MJPEG decoder.  The native 4:2:2 path resolves
+dnl libnvjpeg and libcudart dynamically.  Direct GPU 4:4:4 additionally needs
+dnl nvcc and a linkable CUDA runtime for the small chroma-upsample kernel.
+have_nvjpeg=false
+have_nvjpeg_kernel=false
+NVJPEG_CFLAGS=""
+NVJPEG_LIBS=""
+NVJPEG_KERNEL_LIBS=""
+NVJPEG_NVCCFLAGS=""
+if test "x$with_nvjpeg" != "xno"; then
+  nvjpeg_cuda_header=no
+  nvjpeg_header=no
+  nvjpeg_api=no
+  nvjpeg_include_dir=""
+  nvjpeg_cuda_root=""
+  nvjpeg_headers_seen=no
+  nvjpeg_versioned_roots=""
+
+  case "$host_cpu" in
+    x86_64|amd64) nvjpeg_cuda_target=x86_64-linux ;;
+    aarch64|arm64) nvjpeg_cuda_target=sbsa-linux ;;
+    ppc64le) nvjpeg_cuda_target=ppc64le-linux ;;
+    *) nvjpeg_cuda_target=$host_cpu-linux ;;
+  esac
+
+  if test "x$with_nvjpeg" != "xauto" && test "x$with_nvjpeg" != "xyes"; then
+    nvjpeg_search_roots="$with_nvjpeg"
+  else
+    for nvjpeg_versioned_root in /usr/local/cuda-*; do
+      if test -d "$nvjpeg_versioned_root"; then
+        nvjpeg_versioned_roots="$nvjpeg_versioned_root $nvjpeg_versioned_roots"
+      fi
+    done
+    nvjpeg_search_roots="$CUDA_HOME $CUDA_PATH /usr/local/cuda $nvjpeg_versioned_roots /opt/cuda /usr"
+  fi
+
+  AC_MSG_CHECKING([for compatible CUDA/nvJPEG headers])
+  vj_nvjpeg_save_CPPFLAGS="$CPPFLAGS"
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <stddef.h>
+#include <cuda_runtime_api.h>
+#include <nvjpeg.h>
+  ]], [[
+    nvjpegHandle_t handle = (nvjpegHandle_t)0;
+    nvjpegJpegState_t state = (nvjpegJpegState_t)0;
+    nvjpegImage_t image;
+    nvjpegChromaSubsampling_t css = NVJPEG_CSS_422;
+    nvjpegOutputFormat_t output = NVJPEG_OUTPUT_UNCHANGED;
+    cudaStream_t stream = (cudaStream_t)0;
+    (void)handle; (void)state; (void)image; (void)css;
+    (void)output; (void)stream;
+    (void)nvjpegCreateSimple;
+    (void)nvjpegJpegStateCreate;
+    (void)nvjpegGetImageInfo;
+    (void)nvjpegDecode;
+    (void)cudaGetDevice;
+    (void)cudaSetDevice;
+    (void)cudaStreamCreateWithFlags;
+    (void)cudaMallocPitch;
+    (void)cudaHostAlloc;
+    (void)cudaMemcpy2DAsync;
+  ]])], [
+    nvjpeg_cuda_header=yes
+    nvjpeg_header=yes
+    nvjpeg_api=yes
+    nvjpeg_include_dir="compiler default search path"
+  ], [nvjpeg_api=no])
+
+  if test "x$nvjpeg_api" != "xyes"; then
+    for nvjpeg_cuda_root_try in $nvjpeg_search_roots; do
+      test -d "$nvjpeg_cuda_root_try" || continue
+      for nvjpeg_try_dir in \
+        "$nvjpeg_cuda_root_try" \
+        "$nvjpeg_cuda_root_try/include" \
+        "$nvjpeg_cuda_root_try/targets/$nvjpeg_cuda_target/include" \
+        "$nvjpeg_cuda_root_try/targets/$host_cpu-linux/include"; do
+        if test -f "$nvjpeg_try_dir/nvjpeg.h" && \
+           test -f "$nvjpeg_try_dir/cuda_runtime_api.h"; then
+          nvjpeg_headers_seen=yes
+          CPPFLAGS="$vj_nvjpeg_save_CPPFLAGS -I$nvjpeg_try_dir"
+          AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <stddef.h>
+#include <cuda_runtime_api.h>
+#include <nvjpeg.h>
+          ]], [[
+            nvjpegHandle_t handle = (nvjpegHandle_t)0;
+            nvjpegJpegState_t state = (nvjpegJpegState_t)0;
+            nvjpegImage_t image;
+            nvjpegChromaSubsampling_t css = NVJPEG_CSS_422;
+            nvjpegOutputFormat_t output = NVJPEG_OUTPUT_UNCHANGED;
+            cudaStream_t stream = (cudaStream_t)0;
+            (void)handle; (void)state; (void)image; (void)css;
+            (void)output; (void)stream;
+            (void)nvjpegCreateSimple;
+            (void)nvjpegJpegStateCreate;
+            (void)nvjpegGetImageInfo;
+            (void)nvjpegDecode;
+            (void)cudaGetDevice;
+            (void)cudaSetDevice;
+            (void)cudaStreamCreateWithFlags;
+            (void)cudaMallocPitch;
+            (void)cudaHostAlloc;
+            (void)cudaMemcpy2DAsync;
+          ]])], [nvjpeg_api=yes], [nvjpeg_api=no])
+          if test "x$nvjpeg_api" = "xyes"; then
+            nvjpeg_cuda_root="$nvjpeg_cuda_root_try"
+            nvjpeg_include_dir="$nvjpeg_try_dir"
+            NVJPEG_CFLAGS="-I$nvjpeg_include_dir"
+            nvjpeg_cuda_header=yes
+            nvjpeg_header=yes
+            break 2
+          fi
+        fi
+      done
+    done
+  fi
+  CPPFLAGS="$vj_nvjpeg_save_CPPFLAGS"
+
+  if test "x$nvjpeg_api" = "xyes"; then
+    AC_MSG_RESULT([$nvjpeg_include_dir])
+  elif test "x$nvjpeg_headers_seen" = "xyes"; then
+    AC_MSG_RESULT([headers found but API compile failed])
+  else
+    AC_MSG_RESULT([not found])
+  fi
+
+  if test "x$nvjpeg_cuda_header" = "xyes" && \
+     test "x$nvjpeg_header" = "xyes" && \
+     test "x$nvjpeg_api" = "xyes" && \
+     test "x$have_dl_dlopen" = "xtrue"; then
+    have_nvjpeg=true
+    NVJPEG_LIBS="-ldl"
+    AC_DEFINE([HAVE_NVJPEG], [1],
+      [Compile optional dynamically loaded nvJPEG MJPEG support])
+  elif test "x$with_nvjpeg" != "xauto"; then
+    AC_MSG_ERROR([nvJPEG support requested, but compatible CUDA/nvJPEG headers or dlopen support are unavailable; see config.log])
+  else
+    AC_MSG_NOTICE([Compatible CUDA/nvJPEG headers not found; checked compiler defaults, CUDA_HOME, CUDA_PATH, /usr/local/cuda, versioned CUDA roots, /opt/cuda and /usr])
+  fi
+
+  if test "x$have_nvjpeg" = "xtrue"; then
+    nvjpeg_nvcc_path="$PATH"
+    for nvjpeg_cuda_root_try in $nvjpeg_search_roots; do
+      if test -d "$nvjpeg_cuda_root_try/bin"; then
+        nvjpeg_nvcc_path="$nvjpeg_cuda_root_try/bin:$nvjpeg_nvcc_path"
+      fi
+    done
+    AC_PATH_PROG([NVCC], [nvcc], [], [$nvjpeg_nvcc_path])
+
+    if test -n "$NVCC"; then
+      nvjpeg_cuda_ldflags=""
+      nvjpeg_cuda_lib_dir=""
+      for nvjpeg_cuda_root_try in $nvjpeg_search_roots; do
+        for nvjpeg_lib_dir in \
+          "$nvjpeg_cuda_root_try/lib64" \
+          "$nvjpeg_cuda_root_try/lib" \
+          "$nvjpeg_cuda_root_try/lib/$host_cpu-linux-gnu" \
+          "$nvjpeg_cuda_root_try/targets/$nvjpeg_cuda_target/lib" \
+          "$nvjpeg_cuda_root_try/targets/$host_cpu-linux/lib"; do
+          if test -f "$nvjpeg_lib_dir/libcudart.so" || \
+             test -f "$nvjpeg_lib_dir/libcudart.a"; then
+            nvjpeg_cuda_lib_dir="$nvjpeg_lib_dir"
+            nvjpeg_cuda_ldflags="-L$nvjpeg_lib_dir"
+            break 2
+          fi
+        done
+      done
+
+      if test -z "$nvjpeg_cuda_lib_dir"; then
+        for nvjpeg_lib_dir in \
+          "/usr/lib/$host" \
+          "/usr/lib/$host_cpu-linux-gnu" \
+          "/usr/lib/x86_64-linux-gnu"; do
+          if test -f "$nvjpeg_lib_dir/libcudart.so" || \
+             test -f "$nvjpeg_lib_dir/libcudart.a"; then
+            nvjpeg_cuda_lib_dir="$nvjpeg_lib_dir"
+            nvjpeg_cuda_ldflags="-L$nvjpeg_lib_dir"
+            break
+          fi
+        done
+      fi
+
+      vj_nvjpeg_save_LDFLAGS="$LDFLAGS"
+      vj_nvjpeg_save_LIBS="$LIBS"
+      LDFLAGS="$LDFLAGS $nvjpeg_cuda_ldflags"
+      AC_CHECK_LIB([cudart], [cudaGetDevice],
+        [AC_CHECK_LIB([stdc++], [__cxa_guard_acquire],
+           [have_nvjpeg_kernel=true], [have_nvjpeg_kernel=false])],
+        [have_nvjpeg_kernel=false])
+      LDFLAGS="$vj_nvjpeg_save_LDFLAGS"
+      LIBS="$vj_nvjpeg_save_LIBS"
+
+      if test "x$have_nvjpeg_kernel" = "xtrue"; then
+        NVJPEG_KERNEL_LIBS="$nvjpeg_cuda_ldflags -lcudart -lstdc++"
+        NVJPEG_NVCCFLAGS="-std=c++11"
+        AC_DEFINE([HAVE_NVJPEG_CUDA_KERNEL], [1],
+          [Compile CUDA 4:2:2 to 4:4:4 chroma upsampling kernel])
+      else
+        AC_MSG_NOTICE([CUDA runtime or C++ ABI library not linkable; checked toolkit and Ubuntu multiarch paths; nvJPEG remains available for native 4:2:2 only])
+      fi
+    else
+      AC_MSG_NOTICE([nvcc not found; nvJPEG remains available for native 4:2:2 only])
+    fi
+  fi
+fi
+AC_SUBST([NVJPEG_CFLAGS])
+AC_SUBST([NVJPEG_LIBS])
+AC_SUBST([NVJPEG_KERNEL_LIBS])
+AC_SUBST([NVJPEG_NVCCFLAGS])
+AC_SUBST([NVCC])
+
 AC_ARG_WITH([ndi],
   [AS_HELP_STRING([--with-ndi@<:@=DIR@:>@],
                   [enable optional NDI network video/audio support; look for the SDK headers below DIR])],
@@ -1181,6 +1401,8 @@ AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
 AM_CONDITIONAL(HAVE_V4L2, test x$have_v4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
+AM_CONDITIONAL(HAVE_NVJPEG, test x$have_nvjpeg = xtrue)
+AM_CONDITIONAL(HAVE_NVJPEG_CUDA_KERNEL, test x$have_nvjpeg_kernel = xtrue)
 AM_CONDITIONAL(HAVE_NDI, test x$have_ndi = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
@@ -1328,4 +1550,6 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
+AC_MSG_NOTICE([  - nvJPEG MJPEG decode           : ${have_nvjpeg}])
+AC_MSG_NOTICE([  - nvJPEG GPU 4:4:4 output        : ${have_nvjpeg_kernel}])
 AC_MSG_NOTICE([  - NDI network video/audio       : ${have_ndi}])

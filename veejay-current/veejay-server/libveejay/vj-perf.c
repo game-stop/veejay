@@ -232,7 +232,12 @@ const char *vj_perf_stage_name(vj_perf_stage_t stage)
         "source", "fx", "transition", "composite", "osd", "output_graph",
         "queue_copy", "producer_total", "queue_wait", "sync_wait", "split",
         "network", "shm_read", "shm_write", "convert", "upload_present",
-        "renderer_total"
+        "renderer_total", "decode", "cuda_decode", "cuda_chroma", "cuda_d2h",
+        "decode_copy", "raw_cache", "sample_snapshot", "preview_snapshot",
+        "sdl_pack", "sdl_upload", "sdl_texture_lock", "sdl_texture_unlock",
+        "sdl_texture_update", "sdl_render_copy", "present_block",
+        "video_control", "video_pace", "video_queue_reserve", "audio_decode",
+        "audio_write", "audio_pace", "audio_total"
     };
     return (stage >= 0 && stage < VJ_PERF_STAGE_COUNT) ? names[stage] : "unknown";
 }

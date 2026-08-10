@@ -444,6 +444,13 @@ unsigned long vj_jack_get_played_frames(void)
     return JACK_GetPlayedFramesFromDriver(driver);
 }
 
+double vj_jack_get_clock_time(void)
+{
+    if(!driver_open || driver_output_channels <= 0)
+        return 0.0;
+    return JACK_GetClockTime(driver);
+}
+
 long vj_jack_get_written_frames(void)
 {
     if(!driver_open || driver_output_channels <= 0)

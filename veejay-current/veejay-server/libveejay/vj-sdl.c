@@ -39,7 +39,9 @@
 #include <libveejay/libveejay.h>
 #include <veejaycore/avcommon.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <pthread.h>
 #include <libveejay/vj-perf.h>
 
@@ -82,6 +84,11 @@ typedef struct vj_sdl_t {
     int target_display_x;
     int target_display_y;
     int identify_overlay;
+    int frame_prepared;
+    int direct_lock_disabled;
+    char renderer_name[64];
+    double refresh_interval_s;
+    unsigned int timing_generation;
     vj_perf_context *perf;
 } vj_sdl;
 
@@ -108,7 +115,6 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
     VJFrame *dst;
     sws_template templ;
     size_t bufsize;
-    size_t total_size;
 
     if (!frame)
         return NULL;
@@ -161,14 +167,8 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
     vjsdl->src_frame = (void*) src;
     vjsdl->dst_frame = (void*) dst;
 
-    /* SDL texture is YUYV/YUY2: 2 bytes per source pixel.  Allocate one
-     * packed display buffer per queue slot; the renderer rotates through
-     * VIDEO_QUEUE_LEN indices, not just two.
-     */
     bufsize = (size_t) frame->width * (size_t) frame->height * 2u;
-    total_size = bufsize * (size_t) VIDEO_QUEUE_LEN;
-
-    vjsdl->pixels = (uint8_t*) vj_calloc(total_size);
+    vjsdl->pixels = (uint8_t*) vj_calloc(bufsize);
     if (!vjsdl->pixels) {
         yuv_free_swscaler(vjsdl->scaler);
         free(src);
@@ -177,10 +177,8 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
         return NULL;
     }
 
-    for (int i = 0; i < VIDEO_QUEUE_LEN; i++) {
-        vjsdl->buf[i] = vjsdl->pixels + ((size_t)i * bufsize);
-        fill_yuyv_black(vjsdl->buf[i], vjsdl->width, vjsdl->height);
-    }
+    vjsdl->buf[0] = vjsdl->pixels;
+    fill_yuyv_black(vjsdl->buf[0], vjsdl->width, vjsdl->height);
 
     if(pthread_mutex_init(&vjsdl->command_mutex, NULL) != 0) {
         free(vjsdl->pixels);
@@ -197,6 +195,7 @@ void *vj_sdl_allocate(VJFrame *frame, int use_key, int use_mouse, int show_curso
     vjsdl->target_display_x = -1;
     vjsdl->target_display_y = -1;
     vjsdl->identify_overlay = 0;
+    vjsdl->refresh_interval_s = 1.0 / 60.0;
     return (void*) vjsdl;
 }
 
@@ -315,6 +314,43 @@ static int vj_sdl_is_owner(vj_sdl *vjsdl)
 {
     return vjsdl && vjsdl->owner_valid &&
            pthread_equal(vjsdl->owner_thread, pthread_self());
+}
+
+static void vj_sdl_update_display_timing(vj_sdl *vjsdl,
+                                         int display_index,
+                                         int log_interval)
+{
+    SDL_DisplayMode mode;
+    double refresh_interval_s = 1.0 / 60.0;
+
+    if(display_index >= 0 &&
+       SDL_GetCurrentDisplayMode(display_index, &mode) == 0)
+    {
+        const int hz = mode.refresh_rate > 0 ? mode.refresh_rate : 60;
+        refresh_interval_s = 1.0 / (double)hz;
+    }
+
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    if(vjsdl->display_index != display_index ||
+       vjsdl->refresh_interval_s != refresh_interval_s)
+    {
+        vjsdl->timing_generation++;
+    }
+    vjsdl->display_index = display_index;
+    vjsdl->refresh_interval_s = refresh_interval_s;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+
+    if(log_interval)
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[DISPLAY] SDL display refresh interval is %f",
+                   refresh_interval_s);
+}
+
+static void vj_sdl_bump_timing_generation(vj_sdl *vjsdl)
+{
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->timing_generation++;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
 }
 
 static void vj_sdl_apply_grab(vj_sdl *vjsdl, int status)
@@ -462,10 +498,13 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     }
     else {
         if(strcasecmp("software",sdl_driver) == 0 ) {
+            vjsdl->flags = SDL_RENDERER_SOFTWARE;
             vjsdl->renderer = SDL_CreateRenderer(vjsdl->screen, -1, SDL_RENDERER_SOFTWARE );
         } else if(strcasecmp("accelerated", sdl_driver) == 0 ) {
+            vjsdl->flags = SDL_RENDERER_ACCELERATED;
             vjsdl->renderer = SDL_CreateRenderer(vjsdl->screen, -1, SDL_RENDERER_ACCELERATED );
         } else if (strcasecmp("vsync", sdl_driver) == 0 ) {
+            vjsdl->flags = SDL_RENDERER_PRESENTVSYNC;
             vjsdl->renderer = SDL_CreateRenderer(vjsdl->screen, -1, SDL_RENDERER_PRESENTVSYNC );
         } else {
             veejay_msg(VEEJAY_MSG_ERROR, "[DISPLAY] Valid values for VEEJAY_SDL_DRIVER are: \"software\", \"accelerated\", \"vsync\"");
@@ -482,11 +521,57 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     
     SDL_RendererInfo info;
     if(SDL_GetRendererInfo(vjsdl->renderer, &info) == 0 ) {
-        veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Using SDL renderer %s", info.name);
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] The renderer uses hardware acceleration: %s", (info.flags & SDL_RENDERER_ACCELERATED) ? "yes" : "no");
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Present is synchronized with the refresh rate: %s", (info.flags & SDL_RENDERER_PRESENTVSYNC) ? "yes": "no" );
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Set VEEJAY_SDL_DRIVER to select another driver");
+        pthread_mutex_lock(&vjsdl->command_mutex);
+        vjsdl->flags = info.flags;
+        pthread_mutex_unlock(&vjsdl->command_mutex);
+        snprintf(vjsdl->renderer_name, sizeof(vjsdl->renderer_name), "%s",
+                 info.name ? info.name : "unknown");
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "[DISPLAY] SDL renderer=%s accelerated=%s vsync=%s",
+                   info.name,
+                   (info.flags & SDL_RENDERER_ACCELERATED) ? "yes" : "no",
+                   (info.flags & SDL_RENDERER_PRESENTVSYNC) ? "yes" : "no");
     }
+    else {
+        snprintf(vjsdl->renderer_name, sizeof(vjsdl->renderer_name), "%s",
+                 "unknown");
+    }
+    const char *direct_lock = getenv("VEEJAY_SDL_DIRECT_LOCK");
+    const int renderer_is_vulkan =
+        strcasecmp(vjsdl->renderer_name, "vulkan") == 0;
+    const int direct_lock_forced =
+        direct_lock &&
+        (strcmp(direct_lock, "1") == 0 ||
+         strcasecmp(direct_lock, "true") == 0 ||
+         strcasecmp(direct_lock, "on") == 0);
+    const int direct_lock_forbidden =
+        direct_lock &&
+        (strcmp(direct_lock, "0") == 0 ||
+         strcasecmp(direct_lock, "false") == 0 ||
+         strcasecmp(direct_lock, "off") == 0);
+
+    /*
+     * SDL's Vulkan streaming-texture lock can serialize staging-buffer work
+     * at UnlockTexture and move the remaining cost into driver worker threads.
+     * SAMPLE playback reaches this planar-frame fast path while the established
+     * packed path uses UpdateTexture, making the regression mode-specific and
+     * invisible to the producer-only OSD timing.  Keep the fast path on other
+     * renderers, but use the stable update path on Vulkan unless explicitly
+     * forced for comparison.
+     */
+    vjsdl->direct_lock_disabled =
+        direct_lock_forbidden || (renderer_is_vulkan && !direct_lock_forced);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "[DISPLAY] SDL texture=YUY2 access=streaming upload=%s reason=%s "
+               "(VEEJAY_SDL_DIRECT_LOCK=0|1 overrides)",
+               vjsdl->direct_lock_disabled ? "update-only" : "direct-lock",
+               direct_lock_forbidden ? "environment" :
+               (renderer_is_vulkan && !direct_lock_forced) ?
+                   "vulkan-safe-default" :
+               direct_lock_forced ? "environment" : "renderer-default");
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    vjsdl->timing_generation++;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
 
     SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "linear" );
  
@@ -520,13 +605,6 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 
 #if SDL_VERSION_ATLEAST(2,0,8)
     int sdlmode = vj_get_sdl_yuv_mode(vjfmt, vjsdl->width);
-    if(sdlmode == SDL_YUV_CONVERSION_JPEG) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL YUV conversion mode: JPEG (full range)");
-    }
-    if(sdlmode == SDL_YUV_CONVERSION_AUTOMATIC) {
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] BT.601 for SD content, BT.709 for HD content (limited range)");
-    }
-
     SDL_SetYUVConversionMode( sdlmode );
 #else
     veejay_msg(VEEJAY_MSG_WARNING, "[DISPLAY] Please update SDL2 to a more recent version.");
@@ -539,11 +617,7 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
 
     vjsdl->fs = fs;
 
-    SDL_DisplayMode mode;
     int display_index = SDL_GetWindowDisplayIndex(vjsdl->screen);
-    pthread_mutex_lock(&vjsdl->command_mutex);
-    vjsdl->display_index = display_index;
-    pthread_mutex_unlock(&vjsdl->command_mutex);
     if(target_display >= 0) {
         if(display_index == target_display)
             veejay_msg(VEEJAY_MSG_INFO,
@@ -553,18 +627,9 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
                        "[DISPLAY] Requested SDL display %d but compositor placed the window on display %d",
                        target_display, display_index);
     }
-    double vsync_interval = 1.0 / 60.0;
-
+    vj_sdl_update_display_timing(vjsdl, display_index, 1);
     if(vsync)
-        *vsync = vsync_interval;
-
-    if(display_index >= 0 && SDL_GetDisplayMode(display_index, 0, &mode) == 0) {
-        int hz = (mode.refresh_rate > 0) ? mode.refresh_rate : 60;
-        vsync_interval = 1.0 / (double) hz;
-        if(vsync)
-            *vsync = vsync_interval;
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] SDL V-Sync refresh interval is %f", vsync_interval);
-    }
+        *vsync = vjsdl->refresh_interval_s;
 
     pthread_mutex_lock(&vjsdl->command_mutex);
     vjsdl->initialized = 1;
@@ -587,6 +652,7 @@ static int vj_sdl_apply_window_size(vj_sdl *vjsdl,
 
     if(w == 0 && h == 0) {
         SDL_HideWindow(vjsdl->screen);
+        vj_sdl_bump_timing_generation(vjsdl);
         veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL video window hidden");
         return 1;
     }
@@ -646,13 +712,14 @@ static int vj_sdl_apply_window_size(vj_sdl *vjsdl,
         SDL_GetWindowPosition(vjsdl->screen, &current_x, &current_y);
     }
     const int actual_display = SDL_GetWindowDisplayIndex(vjsdl->screen);
+    vj_sdl_update_display_timing(vjsdl, actual_display, 0);
 
     pthread_mutex_lock(&vjsdl->command_mutex);
-    vjsdl->display_index = actual_display;
     vjsdl->x = current_x;
     vjsdl->y = current_y;
     vjsdl->sw_scale_width = actual_w;
     vjsdl->sw_scale_height = actual_h;
+    vjsdl->timing_generation++;
     pthread_mutex_unlock(&vjsdl->command_mutex);
 
     veejay_msg(VEEJAY_MSG_INFO,
@@ -707,9 +774,10 @@ static int vj_sdl_apply_fullscreen(vj_sdl *vjsdl, int enabled)
                        "[DISPLAY] Fullscreen locked to display %d", actual_display);
     }
 
+    vj_sdl_update_display_timing(vjsdl, actual_display, 0);
     pthread_mutex_lock(&vjsdl->command_mutex);
-    vjsdl->display_index = actual_display;
     vjsdl->fs = enabled ? 1 : 0;
+    vjsdl->timing_generation++;
     width = vjsdl->sw_scale_width;
     height = vjsdl->sw_scale_height;
     x = vjsdl->x;
@@ -812,6 +880,15 @@ void vj_sdl_process_pending(void *ptr)
 
     if(grab >= 0)
         vj_sdl_apply_grab(vjsdl, grab);
+
+    if(vjsdl->screen) {
+        const int actual_display = SDL_GetWindowDisplayIndex(vjsdl->screen);
+        pthread_mutex_lock(&vjsdl->command_mutex);
+        const int cached_display = vjsdl->display_index;
+        pthread_mutex_unlock(&vjsdl->command_mutex);
+        if(actual_display != cached_display)
+            vj_sdl_update_display_timing(vjsdl, actual_display, 1);
+    }
 }
 
 void    vj_sdl_enable_screensaver(void)
@@ -819,10 +896,28 @@ void    vj_sdl_enable_screensaver(void)
     SDL_EnableScreenSaver();
 }
 
-static int vj_sdl_present_pixels(vj_sdl *vjsdl, uint8_t *pixels_to_render)
+static void vj_sdl_timing_snapshot(vj_sdl *vjsdl,
+                                   vj_sdl_present_timing_t *timing)
+{
+    if(!timing)
+        return;
+
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    timing->vsync_enabled =
+        (vjsdl->flags & SDL_RENDERER_PRESENTVSYNC) ? 1 : 0;
+    timing->refresh_interval_s = vjsdl->refresh_interval_s;
+    timing->timing_generation = vjsdl->timing_generation;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+}
+
+static int vj_sdl_prepare_pixels(vj_sdl *vjsdl,
+                                 uint8_t *pixels_to_render,
+                                 vj_sdl_present_timing_t *timing)
 {
     if(!vjsdl || !vj_sdl_is_owner(vjsdl))
         return 0;
+
+    vjsdl->frame_prepared = 0;
 
     vj_sdl_process_pending(vjsdl);
 
@@ -838,24 +933,73 @@ static int vj_sdl_present_pixels(vj_sdl *vjsdl, uint8_t *pixels_to_render)
         return 0;
     }
 
-    if(SDL_UpdateTexture(vjsdl->texture, NULL,
-                         pixels_to_render,
-                         vjsdl->width * 2) != 0) {
+    const uint64_t upload_started_ns = vj_perf_now_ns();
+    const int update_result = SDL_UpdateTexture(vjsdl->texture, NULL,
+                                                 pixels_to_render,
+                                                 vjsdl->width * 2);
+    const uint64_t update_completed_ns = vj_perf_now_ns();
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_TEXTURE_UPDATE,
+                   upload_started_ns, update_completed_ns);
+    if(update_result != 0) {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[DISPLAY] SDL texture update failed: %s",
                    SDL_GetError());
         return 0;
     }
 
-    if(SDL_RenderClear(vjsdl->renderer) != 0 ||
-       SDL_RenderCopy(vjsdl->renderer, vjsdl->texture, NULL, NULL) != 0) {
+    const uint64_t render_copy_started_ns = update_completed_ns;
+    int render_result = SDL_RenderClear(vjsdl->renderer);
+    if(render_result == 0)
+        render_result = SDL_RenderCopy(vjsdl->renderer,
+                                       vjsdl->texture, NULL, NULL);
+    const uint64_t render_copy_completed_ns = vj_perf_now_ns();
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_RENDER_COPY,
+                   render_copy_started_ns, render_copy_completed_ns);
+    if(render_result != 0) {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[DISPLAY] SDL render failed: %s", SDL_GetError());
         return 0;
     }
 
-    SDL_RenderPresent(vjsdl->renderer);
+    const uint64_t upload_completed_ns = render_copy_completed_ns;
+    vjsdl->frame_prepared = 1;
+    if(timing)
+        timing->upload_ns = upload_completed_ns - upload_started_ns;
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_UPLOAD,
+                   upload_started_ns, upload_completed_ns);
+    vj_sdl_timing_snapshot(vjsdl, timing);
     return 1;
+}
+
+static int vj_sdl_present_prepared_internal(vj_sdl *vjsdl,
+                                            vj_sdl_present_timing_t *timing)
+{
+    if(!vjsdl || !vj_sdl_is_owner(vjsdl) ||
+       !vjsdl->renderer || !vjsdl->frame_prepared)
+        return 0;
+
+    const uint64_t present_started_ns = vj_perf_now_ns();
+    SDL_RenderPresent(vjsdl->renderer);
+    const uint64_t present_completed_ns = vj_perf_now_ns();
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_PRESENT_BLOCK,
+                   present_started_ns, present_completed_ns);
+
+    vjsdl->frame_prepared = 0;
+    if(timing) {
+        timing->present_block_ns = present_completed_ns - present_started_ns;
+        timing->completed_ns = present_completed_ns;
+    }
+    vj_sdl_timing_snapshot(vjsdl, timing);
+    return 1;
+}
+
+static int vj_sdl_present_pixels(vj_sdl *vjsdl, uint8_t *pixels_to_render)
+{
+    vj_sdl_present_timing_t timing;
+    memset(&timing, 0, sizeof(timing));
+    if(!vj_sdl_prepare_pixels(vjsdl, pixels_to_render, &timing))
+        return 0;
+    return vj_sdl_present_prepared_internal(vjsdl, &timing);
 }
 
 void vj_sdl_put_to_screen(void *ptr, uint8_t *pixels_to_render)
@@ -887,7 +1031,6 @@ void vj_sdl_preroll(void *ptr, int frame_count)
             return;
         }
 
-        veejay_msg(VEEJAY_MSG_DEBUG, "[DISPLAY] Pushed warm-up frame %d", i);
         SDL_RenderClear(vjsdl->renderer);
         SDL_RenderCopy(vjsdl->renderer, vjsdl->texture, NULL, NULL);
         SDL_RenderPresent(vjsdl->renderer);
@@ -927,7 +1070,7 @@ void vj_sdl_convert_to_screen(void *ptr, VJFrame *frame_to_dsplay, uint8_t *pixe
     vj_sdl_convert_frame((vj_sdl*)ptr, frame_to_dsplay, pixels);
 }
 
-static void vj_sdl_yuy2_rect(uint8_t *pixels, int width, int height,
+static void vj_sdl_yuy2_rect(uint8_t *pixels, int pitch, int width, int height,
                              int x, int y, int w, int h, uint8_t luma)
 {
     if(!pixels || w <= 0 || h <= 0)
@@ -940,7 +1083,7 @@ static void vj_sdl_yuy2_rect(uint8_t *pixels, int width, int height,
         return;
 
     for(int py = y0; py < y1; py++) {
-        uint8_t *row = pixels + (size_t)py * (size_t)width * 2u;
+        uint8_t *row = pixels + (size_t)py * (size_t)pitch;
         for(int px = x0; px < x1; px++) {
             const size_t off = (size_t)px * 2u;
             row[off] = luma;
@@ -949,7 +1092,7 @@ static void vj_sdl_yuy2_rect(uint8_t *pixels, int width, int height,
     }
 }
 
-static void vj_sdl_identify_digit(uint8_t *pixels, int width, int height,
+static void vj_sdl_identify_digit(uint8_t *pixels, int pitch, int width, int height,
                                   int x, int y, int digit, int scale)
 {
     static const uint8_t masks[10] = {
@@ -966,7 +1109,7 @@ static void vj_sdl_identify_digit(uint8_t *pixels, int width, int height,
     const uint8_t mask = masks[digit];
     for(int i = 0; i < 7; i++) {
         if(mask & (1u << i))
-            vj_sdl_yuy2_rect(pixels, width, height,
+            vj_sdl_yuy2_rect(pixels, pitch, width, height,
                              x + segments[i][0] * scale,
                              y + segments[i][1] * scale,
                              segments[i][2] * scale,
@@ -974,7 +1117,7 @@ static void vj_sdl_identify_digit(uint8_t *pixels, int width, int height,
     }
 }
 
-static void vj_sdl_overlay_identify(vj_sdl *vjsdl, uint8_t *pixels)
+static void vj_sdl_overlay_identify(vj_sdl *vjsdl, uint8_t *pixels, int pitch)
 {
     int identify;
     int display;
@@ -1005,31 +1148,199 @@ static void vj_sdl_overlay_identify(vj_sdl *vjsdl, uint8_t *pixels)
     const int x0 = (vjsdl->width - total_w) / 2;
     const int y0 = (vjsdl->height - digit_h) / 2;
 
-    vj_sdl_yuy2_rect(pixels, vjsdl->width, vjsdl->height,
+    vj_sdl_yuy2_rect(pixels, pitch, vjsdl->width, vjsdl->height,
                      x0 - panel_pad, y0 - panel_pad,
                      total_w + panel_pad * 2, digit_h + panel_pad * 2, 16);
     for(int i = 0; i < digits; i++)
-        vj_sdl_identify_digit(pixels, vjsdl->width, vjsdl->height,
+        vj_sdl_identify_digit(pixels, pitch, vjsdl->width, vjsdl->height,
                               x0 + i * (digit_w + gap), y0,
                               text[i] - '0', scale);
 }
 
-int vj_sdl_present_frame(void *ptr, VJFrame *frame)
+static int vj_sdl_direct_pack_supported(vj_sdl *vjsdl, const VJFrame *frame)
+{
+    const int format = alpha_fmt_to_yuv(frame->format);
+    return !vjsdl->direct_lock_disabled &&
+           frame->data[0] && frame->data[1] && frame->data[2] &&
+           frame->width == vjsdl->width && frame->height == vjsdl->height &&
+           (frame->width & 1) == 0 &&
+           frame->stride[0] >= frame->width &&
+           frame->stride[1] >= (frame->width >> 1) &&
+           frame->stride[2] >= (frame->width >> 1) &&
+           (format == PIX_FMT_YUV422P || format == PIX_FMT_YUVJ422P);
+}
+
+static int vj_sdl_prepare_direct_frame(vj_sdl *vjsdl, VJFrame *frame,
+                                       vj_sdl_present_timing_t *timing)
+{
+    if(!vjsdl || !vj_sdl_is_owner(vjsdl))
+        return 0;
+
+    vj_sdl_process_pending(vjsdl);
+    if(!vjsdl->renderer || !vjsdl->texture)
+        return 0;
+
+    const uint64_t prepare_start = vj_perf_now_ns();
+    void *locked = NULL;
+    int pitch = 0;
+    const int lock_result =
+        SDL_LockTexture(vjsdl->texture, NULL, &locked, &pitch);
+    const uint64_t lock_end = vj_perf_now_ns();
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_TEXTURE_LOCK,
+                   prepare_start, lock_end);
+    if(lock_result != 0) {
+        pthread_mutex_lock(&vjsdl->command_mutex);
+        vjsdl->direct_lock_disabled = 1;
+        pthread_mutex_unlock(&vjsdl->command_mutex);
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[DISPLAY] Direct texture lock unavailable, retaining swscale/update fallback: %s",
+                   SDL_GetError());
+        return -1;
+    }
+
+    const uint8_t *src[3] = { frame->data[0], frame->data[1], frame->data[2] };
+    const int src_stride[3] = { frame->stride[0], frame->stride[1], frame->stride[2] };
+    const uint64_t pack_start = vj_perf_now_ns();
+    const int converted = vj_yuv422p_to_yuy2(src, src_stride,
+                                              (uint8_t*)locked, pitch,
+                                              frame->width, frame->height);
+    if(converted)
+        vj_sdl_overlay_identify(vjsdl, (uint8_t*)locked, pitch);
+    const uint64_t pack_end = vj_perf_now_ns();
+    const uint64_t unlock_start = pack_end;
+    SDL_UnlockTexture(vjsdl->texture);
+    const uint64_t unlock_end = vj_perf_now_ns();
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_TEXTURE_UNLOCK,
+                   unlock_start, unlock_end);
+
+    if(!converted)
+        return -1;
+
+    const uint64_t render_copy_start = unlock_end;
+    int render_result = SDL_RenderClear(vjsdl->renderer);
+    if(render_result == 0)
+        render_result = SDL_RenderCopy(vjsdl->renderer,
+                                       vjsdl->texture, NULL, NULL);
+    const uint64_t render_copy_end = vj_perf_now_ns();
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_RENDER_COPY,
+                   render_copy_start, render_copy_end);
+    if(render_result != 0) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[DISPLAY] SDL render failed: %s", SDL_GetError());
+        return 0;
+    }
+
+    const uint64_t prepare_end = render_copy_end;
+    vjsdl->frame_prepared = 1;
+    if(timing) {
+        timing->convert_ns = pack_end - pack_start;
+        timing->upload_ns = (pack_start - prepare_start) +
+                            (prepare_end - pack_end);
+    }
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_CONVERT,
+                   pack_start, pack_end);
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_PACK,
+                   pack_start, pack_end);
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_UPLOAD,
+                   pack_end, prepare_end);
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_UPLOAD_PRESENT,
+                   prepare_start, prepare_end);
+    vj_sdl_timing_snapshot(vjsdl, timing);
+    return 1;
+}
+
+int vj_sdl_prepare_frame(void *ptr, VJFrame *frame,
+                         vj_sdl_present_timing_t *timing)
 {
     vj_sdl *vjsdl = (vj_sdl*)ptr;
-    if(!vjsdl || !vjsdl->buf[0])
+    if(!vjsdl || !frame || !vjsdl->buf[0])
         return 0;
+    if(timing)
+        memset(timing, 0, sizeof(*timing));
+
+    if(vj_sdl_direct_pack_supported(vjsdl, frame)) {
+        const int direct = vj_sdl_prepare_direct_frame(vjsdl, frame, timing);
+        if(direct >= 0)
+            return direct;
+    }
+
     const uint64_t convert_start = vj_perf_now_ns();
     if(!vj_sdl_convert_frame(vjsdl, frame, vjsdl->buf[0]))
         return 0;
-    vj_sdl_overlay_identify(vjsdl, vjsdl->buf[0]);
+    vj_sdl_overlay_identify(vjsdl, vjsdl->buf[0], vjsdl->width * 2);
+    const uint64_t convert_end = vj_perf_now_ns();
+    if(timing)
+        timing->convert_ns = convert_end - convert_start;
     vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_CONVERT,
-                   convert_start, vj_perf_now_ns());
-    const uint64_t present_start = vj_perf_now_ns();
-    const int result = vj_sdl_present_pixels(vjsdl, vjsdl->buf[0]);
+                   convert_start, convert_end);
+    vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_SDL_PACK,
+                   convert_start, convert_end);
+    const uint64_t upload_start = vj_perf_now_ns();
+    const int result =
+        vj_sdl_prepare_pixels(vjsdl, vjsdl->buf[0], timing);
     vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_UPLOAD_PRESENT,
-                   present_start, vj_perf_now_ns());
+                   upload_start, vj_perf_now_ns());
     return result;
+}
+
+int vj_sdl_present_prepared(void *ptr, vj_sdl_present_timing_t *timing)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    return vj_sdl_present_prepared_internal(vjsdl, timing);
+}
+
+void vj_sdl_discard_prepared(void *ptr)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    if(vjsdl && vj_sdl_is_owner(vjsdl))
+        vjsdl->frame_prepared = 0;
+}
+
+int vj_sdl_get_present_mode(void *ptr, int *vsync_enabled,
+                            double *refresh_interval_s,
+                            unsigned int *timing_generation)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    if(!vjsdl)
+        return 0;
+
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    const int initialized = vjsdl->initialized;
+    if(vsync_enabled)
+        *vsync_enabled =
+            (vjsdl->flags & SDL_RENDERER_PRESENTVSYNC) ? 1 : 0;
+    if(refresh_interval_s)
+        *refresh_interval_s = vjsdl->refresh_interval_s;
+    if(timing_generation)
+        *timing_generation = vjsdl->timing_generation;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    return initialized;
+}
+
+int vj_sdl_get_backend(void *ptr, char *name, size_t name_size,
+                       int *direct_lock_disabled)
+{
+    vj_sdl *vjsdl = (vj_sdl*)ptr;
+    if(!vjsdl)
+        return 0;
+
+    pthread_mutex_lock(&vjsdl->command_mutex);
+    const int initialized = vjsdl->initialized;
+    if(name && name_size > 0)
+        snprintf(name, name_size, "%s",
+                 vjsdl->renderer_name[0] ? vjsdl->renderer_name : "unknown");
+    if(direct_lock_disabled)
+        *direct_lock_disabled = vjsdl->direct_lock_disabled;
+    pthread_mutex_unlock(&vjsdl->command_mutex);
+    return initialized;
+}
+
+int vj_sdl_present_frame(void *ptr, VJFrame *frame)
+{
+    vj_sdl_present_timing_t timing;
+    if(!vj_sdl_prepare_frame(ptr, frame, &timing))
+        return 0;
+    return vj_sdl_present_prepared(ptr, &timing);
 }
 
 int vj_sdl_set_identify(void *ptr, int display_number)
@@ -1111,6 +1422,9 @@ void vj_sdl_shutdown(void *ptr)
     vjsdl->pending_grab = -1;
     vjsdl->display_index = -1;
     vjsdl->identify_overlay = 0;
+    vjsdl->frame_prepared = 0;
+    vjsdl->flags = 0;
+    vjsdl->timing_generation++;
     pthread_mutex_unlock(&vjsdl->command_mutex);
 
     SDL_EnableScreenSaver();

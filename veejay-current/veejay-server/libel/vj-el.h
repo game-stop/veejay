@@ -46,6 +46,38 @@
 #define VIDEO_MODE_SECAM    2
 #define VIDEO_MODE_AUTO     3
 
+typedef enum
+{
+    VJ_EL_BACKEND_LEGACY = 0,
+    VJ_EL_BACKEND_FFMPEG = 1
+} vj_el_backend;
+
+typedef enum
+{
+    VJ_EL_CHROMA_422 = 0,
+    VJ_EL_CHROMA_444 = 1
+} vj_el_chroma;
+
+typedef struct
+{
+    long capacity;
+    long usable_capacity;
+    long size;
+    long owner_count;
+    uint64_t requests;
+    uint64_t hits;
+    uint64_t misses;
+    uint64_t admissions;
+    uint64_t bypasses;
+    uint64_t promotions;
+    uint64_t demotions;
+    uint64_t evictions;
+    uint64_t purges;
+    uint64_t purged_frames;
+} vj_el_cache_stats;
+
+struct vj_ffmpeg_input;
+
 typedef struct
 {
     int has_video;
@@ -72,6 +104,9 @@ typedef struct
 
     char        *(video_file_list[MAX_EDIT_LIST_FILES]);
     lav_file_t  *(lav_fd[MAX_EDIT_LIST_FILES]);
+    struct vj_ffmpeg_input *(ffmpeg_input[MAX_EDIT_LIST_FILES]);
+    vj_el_backend backend[MAX_EDIT_LIST_FILES];
+    uint64_t     media_id[MAX_EDIT_LIST_FILES];
     int          pixfmt[MAX_EDIT_LIST_FILES];
     void        *ctx[MAX_EDIT_LIST_FILES];
     void        *decoders[MAX_EDIT_LIST_FILES];
@@ -91,6 +126,7 @@ typedef struct
 
 void el_cache_configure(int t);
 void vj_cache_print_status(void);
+int vj_cache_get_stats(vj_el_cache_stats *stats);
 
 int test_video_frame(editlist *el, int n, lav_file_t *lav, int out_pix_fmt);
 
@@ -118,8 +154,17 @@ int vj_el_append_video_file(editlist *el, char *filename);
 int vj_el_write_editlist(char *filename, long start, long end, editlist *el);
 
 int vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[4]);
+int vj_el_get_video_frame_ex(editlist *el,
+                             long nframe,
+                             uint8_t *dst[4],
+                             vj_el_chroma requested_chroma,
+                             vj_el_chroma *actual_chroma);
 
 int vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst);
+int vj_el_retarget_audio(editlist *el,
+                         long sample_rate,
+                         int channels,
+                         int bits);
 
 int vj_el_get_file_fourcc(editlist *el, int num, char *buf);
 

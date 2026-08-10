@@ -641,7 +641,7 @@ vj_output_graph *vj_output_graph_create(int output_width, int output_height,
     }
     graph->frame = yuv_yuv_template(NULL, NULL, NULL,
                                     output_width, output_height,
-                                    prototype->format);
+                                    alpha_fmt_to_yuv(prototype->format));
     if(!graph->frame) {
         pthread_mutex_destroy(&graph->mutex);
         free(graph);
@@ -862,20 +862,21 @@ VJFrame *vj_output_graph_process_ex(vj_output_graph *graph, const VJFrame *input
         const int ux = dx * graph->output_uv_width / graph->output_width;
         const int uy = dy * graph->output_uv_height / graph->output_height;
 
-        vj_output_render_plane(input->data[0], input->width,
+        vj_output_render_plane(input->data[0], input->stride[0],
                                input->width, input->height,
                                graph->frame->data[0], graph->output_width,
                                dx, dy, &slice->yx, &slice->yy, 0, graph->n_threads);
-        vj_output_render_plane(input->data[1], input->uv_width,
+        vj_output_render_plane(input->data[1], input->stride[1],
                                input->uv_width, input->uv_height,
                                graph->frame->data[1], graph->output_uv_width,
                                ux, uy, &slice->ux, &slice->uy, 1, graph->n_threads);
-        vj_output_render_plane(input->data[2], input->uv_width,
+        vj_output_render_plane(input->data[2], input->stride[2],
                                input->uv_width, input->uv_height,
                                graph->frame->data[2], graph->output_uv_width,
                                ux, uy, &slice->ux, &slice->uy, 1, graph->n_threads);
     }
     graph->frame->frame_num = input->frame_num;
+    graph->frame->fps = input->fps;
     VJFrame *result = graph->frame;
     pthread_mutex_unlock(&graph->mutex);
     return result;
