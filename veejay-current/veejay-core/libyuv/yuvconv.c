@@ -669,54 +669,31 @@ void    yuv_convert_any3( void *scaler, VJFrame *src, int src_stride[4], VJFrame
 }   
 
 
-/* convert 4:2:0 to yuv 4:2:2 packed */
-void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
-               int height)
+void yuv422p_to_yuv422(uint8_t *yuv422[3], uint8_t *dest, int width,
+                       int height)
 {
-    unsigned int x, y;
-    uint8_t *Cb = yuv420[1];
-    uint8_t *Cr = yuv420[2];
-    uint8_t *Y  = yuv420[0];
-#pragma omp simd
-    for (y = 0; y < height; ++y) {
-    for (x = 0; x < width; x +=2) {
-        *(dest + 0) = Y[0];
-        *(dest + 1) = Cb[0];
-        *(dest + 2) = Y[1];
-        *(dest + 3) = Cr[0];
-        dest += 4;
-        Y += 2;
-        ++Cb;
-        ++Cr;
-    }
-    Y += width;
-    Cb += (width>>1);
-    Cr += (height>>1);
-    }
+    const uint8_t *src[3] = { yuv422[0], yuv422[1], yuv422[2] };
+    const int stride[3] = { width, width >> 1, width >> 1 };
+    vj_yuv422p_to_yuy2(src, stride, dest, width * 2, width, height);
 }
 
 
 
-/* convert 4:2:0 to yuv 4:2:2 */
-void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
-               int height)
+void yuv420p_to_yuv422(uint8_t *yuv420[3], uint8_t *dest, int width,
+                       int height)
 {
-    unsigned int x, y;
-#pragma omp simd
-    for (y = 0; y < height; ++y) {
-    uint8_t *Y = yuv420[0] + y * width;
-    uint8_t *Cb = yuv420[1] + (y >> 1) * (width >> 1);
-    uint8_t *Cr = yuv420[2] + (y >> 1) * (width >> 1);
-    for (x = 0; x < width; x += 2) {
-        *(dest + 0) = Y[0];
-        *(dest + 1) = Cb[0];
-        *(dest + 2) = Y[1];
-        *(dest + 3) = Cr[0];
-        dest += 4;
-        Y += 2;
-        ++Cb;
-        ++Cr;
-    }
+    const int chroma_stride = (width + 1) >> 1;
+    for(int y = 0; y < height; y++) {
+        const uint8_t *Y = yuv420[0] + (size_t)y * (size_t)width;
+        const uint8_t *Cb = yuv420[1] + (size_t)(y >> 1) * (size_t)chroma_stride;
+        const uint8_t *Cr = yuv420[2] + (size_t)(y >> 1) * (size_t)chroma_stride;
+        uint8_t *row = dest + (size_t)y * (size_t)width * 2u;
+        for(int x = 0; x + 1 < width; x += 2) {
+            row[2 * x + 0] = Y[x + 0];
+            row[2 * x + 1] = Cb[x >> 1];
+            row[2 * x + 2] = Y[x + 1];
+            row[2 * x + 3] = Cr[x >> 1];
+        }
     }
 }
 
@@ -816,67 +793,6 @@ punpckhbw %%mm1, %%mm0  #                     v3 y7 u3 y6 v2 y5 u2 y4     \n\
 movq      %%mm0, 8(%0)  # Store high YUYV                                 \n\
 "
 */
-
-//inline this function from libswscale
-static inline void yuvPlanartoyuy2(const uint8_t *ysrc, const uint8_t *usrc, const uint8_t *vsrc, uint8_t *dst,
-                                           int width, int height,
-                                           int lumStride, int chromStride, int dstStride, int vertLumPerChroma)
-{
-    int y;
-    const x86_reg chromWidth= width>>1;
-
-    for (y=0; y<height; y++) {
-        __asm__ volatile(
-            "xor                 %%"REG_a", %%"REG_a"   \n\t"
-            ".p2align                    4              \n\t"
-            "1:                                         \n\t"
-            PREFETCH"    32(%1, %%"REG_a", 2)           \n\t"
-            PREFETCH"    32(%2, %%"REG_a")              \n\t"
-            PREFETCH"    32(%3, %%"REG_a")              \n\t"
-            "movq          (%2, %%"REG_a"), %%mm0       \n\t" // U(0)
-            "movq                    %%mm0, %%mm2       \n\t" // U(0)
-            "movq          (%3, %%"REG_a"), %%mm1       \n\t" // V(0)
-            "punpcklbw               %%mm1, %%mm0       \n\t" // UVUV UVUV(0)
-            "punpckhbw               %%mm1, %%mm2       \n\t" // UVUV UVUV(8)
-
-            "movq        (%1, %%"REG_a",2), %%mm3       \n\t" // Y(0)
-            "movq       8(%1, %%"REG_a",2), %%mm5       \n\t" // Y(8)
-            "movq                    %%mm3, %%mm4       \n\t" // Y(0)
-            "movq                    %%mm5, %%mm6       \n\t" // Y(8)
-            "punpcklbw               %%mm0, %%mm3       \n\t" // YUYV YUYV(0)
-            "punpckhbw               %%mm0, %%mm4       \n\t" // YUYV YUYV(4)
-            "punpcklbw               %%mm2, %%mm5       \n\t" // YUYV YUYV(8)
-            "punpckhbw               %%mm2, %%mm6       \n\t" // YUYV YUYV(12)
-
-            MOVNTQ"                  %%mm3,   (%0, %%"REG_a", 4)    \n\t"
-            MOVNTQ"                  %%mm4,  8(%0, %%"REG_a", 4)    \n\t"
-            MOVNTQ"                  %%mm5, 16(%0, %%"REG_a", 4)    \n\t"
-            MOVNTQ"                  %%mm6, 24(%0, %%"REG_a", 4)    \n\t"
-
-            "add                        $8, %%"REG_a"   \n\t"
-            "cmp                        %4, %%"REG_a"   \n\t"
-            " jb                        1b              \n\t"
-            ::"r"(dst), "r"(ysrc), "r"(usrc), "r"(vsrc), "g" (chromWidth)
-            : "%"REG_a
-        );
-        if ((y&(vertLumPerChroma-1)) == vertLumPerChroma-1) {
-            usrc += chromStride;
-            vsrc += chromStride;
-        }
-        ysrc += lumStride;
-        dst  += dstStride;
-    }
-    __asm__(_EMMS"       \n\t"
-            SFENCE"     \n\t"
-            :::"memory");
-}
-
-
-void    yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
-{
-    yuvPlanartoyuy2( src[0], src[1], src[2], dstI, w, h, w, w, w * 2, 2 );
-}
-
 
 void    yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, int w, int h )
 {
@@ -1009,70 +925,116 @@ void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
     }
 }
 
-void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
+#endif
+
+static inline void vj_yuv422p_to_yuy2_scalar_row(const uint8_t *y,
+                                                  const uint8_t *u,
+                                                  const uint8_t *v,
+                                                  uint8_t *dst,
+                                                  int x,
+                                                  int width)
 {
-    int x,y;
-    uint8_t *Y = yuv422[0];
-    uint8_t *U = yuv422[1];
-    uint8_t *V = yuv422[2]; // U Y V Y
-    for(y = 0; y < h; y ++ )
-    {
-        Y = yuv422[0] + y * w;
-        U = yuv422[1] + (y>>1) * w;
-        V = yuv422[2] + (y>>1) * w;
-        for( x = 0 ; x < w ; x += 4 )
-        {
-            *(pixels + 0) = Y[0];
-            *(pixels + 1) = U[0];
-            *(pixels + 2) = Y[1];
-            *(pixels + 3) = V[0];
-            *(pixels + 4) = Y[2];
-            *(pixels + 5) = U[1];
-            *(pixels + 6) = Y[3];
-            *(pixels + 7) = V[1];
-            pixels += 8;
-            Y+=4;
-            U+=2;
-            V+=2;
-        }
+    for(; x + 1 < width; x += 2) {
+        const int chroma = x >> 1;
+        dst[2 * x + 0] = y[x + 0];
+        dst[2 * x + 1] = u[chroma];
+        dst[2 * x + 2] = y[x + 1];
+        dst[2 * x + 3] = v[chroma];
     }
+}
+
+#ifdef HAVE_ASM_AVX2
+static void vj_yuv422p_to_yuy2_avx2(const uint8_t *src[3],
+                                     const int src_stride[3],
+                                     uint8_t *dst,
+                                     int dst_pitch,
+                                     int width,
+                                     int height)
+{
+    for(int row = 0; row < height; row++) {
+        const uint8_t *y = src[0] + (size_t)row * (size_t)src_stride[0];
+        const uint8_t *u = src[1] + (size_t)row * (size_t)src_stride[1];
+        const uint8_t *v = src[2] + (size_t)row * (size_t)src_stride[2];
+        uint8_t *out = dst + (size_t)row * (size_t)dst_pitch;
+        int x = 0;
+        for(; x + 31 < width; x += 32) {
+            const __m256i yy = _mm256_loadu_si256((const __m256i*)(y + x));
+            const __m128i uu = _mm_loadu_si128((const __m128i*)(u + (x >> 1)));
+            const __m128i vv = _mm_loadu_si128((const __m128i*)(v + (x >> 1)));
+            const __m128i uv0 = _mm_unpacklo_epi8(uu, vv);
+            const __m128i uv1 = _mm_unpackhi_epi8(uu, vv);
+            const __m128i y0 = _mm256_castsi256_si128(yy);
+            const __m128i y1 = _mm256_extracti128_si256(yy, 1);
+            _mm_storeu_si128((__m128i*)(out + 2 * x +  0), _mm_unpacklo_epi8(y0, uv0));
+            _mm_storeu_si128((__m128i*)(out + 2 * x + 16), _mm_unpackhi_epi8(y0, uv0));
+            _mm_storeu_si128((__m128i*)(out + 2 * x + 32), _mm_unpacklo_epi8(y1, uv1));
+            _mm_storeu_si128((__m128i*)(out + 2 * x + 48), _mm_unpackhi_epi8(y1, uv1));
+        }
+        vj_yuv422p_to_yuy2_scalar_row(y, u, v, out, x, width);
+    }
+    _mm256_zeroupper();
 }
 #endif
 
 #ifdef HAVE_ARM
-void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h) {
-    int x, y;
-    uint8_t *Y_plane = yuv422[0];
-    uint8_t *U_plane = yuv422[1];
-    uint8_t *V_plane = yuv422[2];
-
-    for (y = 0; y < h; y++) {
-        uint8_t *Y = Y_plane + y * w;
-        uint8_t *U = U_plane + (y >> 1) * w;
-        uint8_t *V = V_plane + (y >> 1) * w;
-        uint8_t *dst = pixels + y * w * 2;
-
-        for (x = 0; x < w; x += 16) {
-            uint8x16_t y_data = vld1q_u8(Y);
-            uint8x8_t u_data = vld1_u8(U);
-            uint8x8_t v_data = vld1_u8(V);
-
-            uint8x8x2_t uv_pair = vzip_u8(u_data, v_data);
-            
-            uint8x16x2_t yuyv_pair = vzipq_u8(y_data, vcombine_u8(uv_pair.val[0], uv_pair.val[1]));
-            
-            vst1q_u8(dst, yuyv_pair.val[0]);
-            vst1q_u8(dst + 16, yuyv_pair.val[1]);
-            
-            dst += 32;
-            Y += 16;
-            U += 8;
-            V += 8;
+static void vj_yuv422p_to_yuy2_neon(const uint8_t *src[3],
+                                     const int src_stride[3],
+                                     uint8_t *dst,
+                                     int dst_pitch,
+                                     int width,
+                                     int height)
+{
+    for(int row = 0; row < height; row++) {
+        const uint8_t *y = src[0] + (size_t)row * (size_t)src_stride[0];
+        const uint8_t *u = src[1] + (size_t)row * (size_t)src_stride[1];
+        const uint8_t *v = src[2] + (size_t)row * (size_t)src_stride[2];
+        uint8_t *out = dst + (size_t)row * (size_t)dst_pitch;
+        int x = 0;
+        for(; x + 15 < width; x += 16) {
+            const uint8x16_t yy = vld1q_u8(y + x);
+            const uint8x8_t uu = vld1_u8(u + (x >> 1));
+            const uint8x8_t vv = vld1_u8(v + (x >> 1));
+            const uint8x8x2_t uv = vzip_u8(uu, vv);
+            const uint8x16x2_t yuy2 = vzipq_u8(yy, vcombine_u8(uv.val[0], uv.val[1]));
+            vst1q_u8(out + 2 * x, yuy2.val[0]);
+            vst1q_u8(out + 2 * x + 16, yuy2.val[1]);
         }
+        vj_yuv422p_to_yuy2_scalar_row(y, u, v, out, x, width);
     }
 }
 #endif
 
+int vj_yuv422p_to_yuy2(const uint8_t *src[3], const int src_stride[3],
+                       uint8_t *dst, int dst_pitch, int width, int height)
+{
+    if(!src || !src_stride || !dst || !src[0] || !src[1] || !src[2] ||
+       width <= 0 || height <= 0 || (width & 1) ||
+       src_stride[0] < width || src_stride[1] < (width >> 1) ||
+       src_stride[2] < (width >> 1) || dst_pitch < width * 2)
+        return 0;
+
+#ifdef HAVE_ASM_AVX2
+    vj_yuv422p_to_yuy2_avx2(src, src_stride, dst, dst_pitch, width, height);
+#elif defined(HAVE_ARM)
+    vj_yuv422p_to_yuy2_neon(src, src_stride, dst, dst_pitch, width, height);
+#else
+    for(int row = 0; row < height; row++) {
+        const uint8_t *y = src[0] + (size_t)row * (size_t)src_stride[0];
+        const uint8_t *u = src[1] + (size_t)row * (size_t)src_stride[1];
+        const uint8_t *v = src[2] + (size_t)row * (size_t)src_stride[2];
+        uint8_t *out = dst + (size_t)row * (size_t)dst_pitch;
+        vj_yuv422p_to_yuy2_scalar_row(y, u, v, out, 0, width);
+    }
+#endif
+    return 1;
+}
+
+void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *dst, int width, int height)
+{
+    const uint8_t *src[3] = { yuv422[0], yuv422[1], yuv422[2] };
+    const int stride[3] = { width, width >> 1, width >> 1 };
+    vj_yuv422p_to_yuy2(src, stride, dst, width * 2, width, height);
+}
 
 /* lav_common - some general utility functionality used by multiple
     lavtool utilities. */
@@ -1359,8 +1321,8 @@ void    yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 {
     vj_sws *s = (vj_sws*) sws;
 
-    const int src_stride[3] = { src->width,src->uv_width,src->uv_width };
-    const int dst_stride[3] = { dst->width * 2,0,0 };
+    const int src_stride[3] = { src->stride[0], src->stride[1], src->stride[2] };
+    const int dst_stride[3] = { dst->stride[0], 0, 0 };
 #ifdef STRICT_CHECKING
     check_desired_alignment( src->data[0] );
     check_desired_alignment( src->data[1] );

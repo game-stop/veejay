@@ -38,13 +38,16 @@ int yuv_get_pixel_range();
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
 // yuv 4:2:2 packet to yuv 4:2:2 planar
 void yuy2toyv16( uint8_t *y, uint8_t *u, uint8_t *v, uint8_t *in, int w, int h);
-// yuv 4:2:2 planar to yuv 4:2:2 packed
+// yuv 4:2:2 planar to YUY2 with tightly packed planes
 void yuv422p_to_yuv422( uint8_t *yuv422[3], uint8_t *dst, int w, int h );
 
-// yuv 4:2:2 planar to yuv 4:2:0 planar
+// yuv 4:2:0 planar to YUY2 with nearest vertical chroma expansion
 void yuv420p_to_yuv422( uint8_t *yuv420[3], uint8_t *dst, int w, int h );
 
-// yuv 4:2:2 planar to YUYV
+int vj_yuv422p_to_yuy2(const uint8_t *src[3], const int src_stride[3],
+                       uint8_t *dst, int dst_pitch, int w, int h);
+
+// compatibility wrapper for tightly packed yuv 4:2:2 planar to YUY2
 void yuv422_to_yuyv( uint8_t *yuv422[3], uint8_t *dst, int w, int h );
 
 // scene detection
