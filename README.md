@@ -94,6 +94,15 @@ Optional legacy DV and QuickTime support can be enabled where these packages are
 sudo apt-get install libdv4-dev libquicktime-dev
 ```
 
+Optional CUDA toolkit (nvjpeg) fow hardware accelerated MJPEG encoding/decoding 
+```bash
+sudo apt-get install nvidia-cuda-toolkit
+```
+
+Optional NDI (network device interface from Vizrt/NewTek), available from ndi.video website
+
+
+
 Individual plugin packs may require additional libraries. Their `./configure` scripts report any pack-specific dependency that is still missing.
 
 ### Build order
@@ -117,6 +126,11 @@ do
         sudo make install
     )
 done
+```
+
+Note: For NDI and nvjpeg you should use
+```bash
+ ./configure --with-ndi=/path/to/ndi --with-nvjpeg=yes
 ```
 
 Refresh the shared-library cache after installing the core libraries when required by the system:
