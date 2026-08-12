@@ -46,6 +46,56 @@
 #include <assert.h>
 #endif
 
+#ifdef HAVE_NVJPEG
+#include <nvjpeg.h>
+#include <cuda_runtime_api.h>
+#ifdef HAVE_NVJPEG_CUDA_KERNEL
+#include <libel/vj-nvjpeg-kernel.h>
+#endif
+
+typedef struct {
+    nvjpegHandle_t         handle;
+    nvjpegEncoderState_t   enc_state;
+    nvjpegEncoderParams_t  enc_params;
+    cudaStream_t           stream;
+
+	size_t pitch_y;
+    size_t pitch_c_in;
+    size_t pitch_c_out;
+
+    int width;
+    int height;
+    int is_422;                     /* needs chroma upsample before encode */
+
+    /* device planes for the raw input */
+    uint8_t *d_y;
+    uint8_t *d_u;
+    uint8_t *d_v;
+
+    /* device planes for upsampled 4:4:4 chroma (only when is_422) */
+    uint8_t *d_u_444;
+    uint8_t *d_v_444;
+
+	uint8_t *registered_src[3];
+	
+	uint8_t *h_y;
+    uint8_t *h_u;
+    uint8_t *h_v;
+
+    vj_nvjpeg_upsample_mode upsample_mode;
+
+	int pin_thrash_count;
+	int disable_dynamic_pinning;
+
+} vj_nvjpeg_enc_state;
+#endif
+
+#define CODEC_ID_CUDA_MJPEG_422F 1000
+#define CODEC_ID_CUDA_MJPEG_422  1001
+#define CODEC_ID_CUDA_MJPEG_444F 1002
+#define CODEC_ID_CUDA_MJPEG_444  1003
+
+
 //from gst-ffmpeg, round up a number
 #define GEN_MASK(x) ((1<<(x))-1)
 #define ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) & ~GEN_MASK(x))
@@ -75,6 +125,18 @@ static char*	vj_avcodec_get_codec_name(int codec_id )
 		case CODEC_ID_THEORA: snprintf(name,sizeof(name),"Theora");break;
 		case CODEC_ID_H264: snprintf(name,sizeof(name), "H264");break;
 		case CODEC_ID_HUFFYUV: snprintf(name,sizeof(name),"HuffYUV");break;
+		case CODEC_ID_CUDA_MJPEG_422F: 
+            snprintf(name, sizeof(name), "CUDA MJPEG 4:2:2 Full Range "); 
+            break;
+        case CODEC_ID_CUDA_MJPEG_422:  
+            snprintf(name, sizeof(name), "CUDA MJPEG 4:2:2 Limited Range "); 
+            break;
+        case CODEC_ID_CUDA_MJPEG_444F: 
+            snprintf(name, sizeof(name), "CUDA MJPEG 4:4:4 Full Range "); 
+            break;
+        case CODEC_ID_CUDA_MJPEG_444:  
+            snprintf(name, sizeof(name), "CUDA MJPEG 4:4:4 Limited Range "); 
+            break;	
 		case 997 : snprintf(name,sizeof(name), "RAW YUV 4:2:2 Planar JPEG"); break;
 		case 996 : snprintf(name,sizeof(name), "RAW YUV 4:2:0 Planar JPEG"); break;
 		case 995 : snprintf(name,sizeof(name), "YUV4MPEG Stream 4:2:2"); break;
@@ -140,6 +202,18 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		case CODEC_ID_HUFFYUV:
 			selected_out_pixfmt = FMT_422;
 			break;
+		case CODEC_ID_CUDA_MJPEG_422F:
+            selected_out_pixfmt = FMT_422F;
+            break;
+        case CODEC_ID_CUDA_MJPEG_422:
+            selected_out_pixfmt = FMT_422;
+            break;
+        case CODEC_ID_CUDA_MJPEG_444F:
+            selected_out_pixfmt = FMT_444F;
+            break;
+        case CODEC_ID_CUDA_MJPEG_444:
+            selected_out_pixfmt = FMT_444;
+            break;
 		default:
 			break;
 	}
@@ -248,7 +322,8 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		}
 	}
 	
-	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996 && id != 995 && id != 994 && id != 993)
+	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996 && id != 995 && id != 994 && id != 993 && 
+		id != CODEC_ID_CUDA_MJPEG_422 && id != CODEC_ID_CUDA_MJPEG_422F && id != CODEC_ID_CUDA_MJPEG_444 && id != CODEC_ID_CUDA_MJPEG_444)
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
@@ -270,6 +345,167 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 #endif
 
 	}
+    
+	/* Initialize nvJPEG encoder */
+if(id == CODEC_ID_CUDA_MJPEG_422F || id == CODEC_ID_CUDA_MJPEG_422 ||
+   id == CODEC_ID_CUDA_MJPEG_444F || id == CODEC_ID_CUDA_MJPEG_444) {
+#ifdef HAVE_NVJPEG
+    nvjpegStatus_t nvs;
+    cudaError_t cus;
+
+    vj_nvjpeg_enc_state *state = (vj_nvjpeg_enc_state*) vj_calloc(sizeof(vj_nvjpeg_enc_state));
+    if(!state) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] Failed to allocate nvJPEG encoder state");
+        goto nvenc_fail;
+    }
+
+    state->width  = frame->width;
+    state->height = frame->height;
+    state->is_422 = (id == CODEC_ID_CUDA_MJPEG_422F || id == CODEC_ID_CUDA_MJPEG_422);
+
+#ifdef HAVE_NVJPEG_CUDA_KERNEL
+    {
+        const char *mode = getenv("VEEJAY_SUPERSAMPLE_MODE");
+        state->upsample_mode = (mode && strcmp(mode, "mitchell") == 0)
+            ? VJ_NVJPEG_UPSAMPLE_MITCHELL
+            : VJ_NVJPEG_UPSAMPLE_DUP;
+    }
+	if (state->is_422) {
+        veejay_msg(VEEJAY_MSG_INFO, 
+            "[NVJPEG encoder] CUDA Chroma upsampler is active (mode: %s)", 
+            state->upsample_mode == VJ_NVJPEG_UPSAMPLE_MITCHELL ? "mitchell" : "dup");
+    }
+#else
+    if(state->is_422) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+            "[AV] CUDA MJPEG 4:2:2 requires the chroma upsampling kernel (HAVE_NVJPEG_CUDA_KERNEL)");
+        free(state);
+        goto nvenc_fail;
+    }
+#endif
+
+    /* CREATE STREAM FIRST - before any encoder objects */
+    cus = cudaStreamCreateWithFlags(&state->stream, cudaStreamNonBlocking);
+    if(cus != cudaSuccess) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] cudaStreamCreate failed (%d)", (int)cus);
+        free(state); goto nvenc_fail;
+    }
+
+    nvs = nvjpegCreateSimple(&state->handle);
+    if(nvs != NVJPEG_STATUS_SUCCESS) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] nvjpegCreateSimple failed (%d)", (int)nvs);
+        cudaStreamDestroy(state->stream);
+        free(state); goto nvenc_fail;
+    }
+
+    /* Pass state->stream to all encoder creation calls */
+    nvs = nvjpegEncoderStateCreate(state->handle, &state->enc_state, state->stream);
+    if(nvs != NVJPEG_STATUS_SUCCESS) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] nvjpegEncoderStateCreate failed (%d)", (int)nvs);
+        nvjpegDestroy(state->handle);
+        cudaStreamDestroy(state->stream);
+        free(state); goto nvenc_fail;
+    }
+
+    nvs = nvjpegEncoderParamsCreate(state->handle, &state->enc_params, state->stream);
+    if(nvs != NVJPEG_STATUS_SUCCESS) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] nvjpegEncoderParamsCreate failed (%d)", (int)nvs);
+        nvjpegEncoderStateDestroy(state->enc_state);
+        nvjpegDestroy(state->handle);
+        cudaStreamDestroy(state->stream);
+        free(state); goto nvenc_fail;
+    }
+
+    nvs = nvjpegEncoderParamsSetQuality(state->enc_params, 90, state->stream);
+    if(nvs != NVJPEG_STATUS_SUCCESS)
+        veejay_msg(VEEJAY_MSG_WARNING, "[AV] nvjpegEncoderParamsSetQuality failed (%d)", (int)nvs);
+
+
+	// upsample to 4:4:4 so nvjpeg accepts the input
+     nvs = nvjpegEncoderParamsSetSamplingFactors(state->enc_params, NVJPEG_CSS_444, state->stream);
+     if(nvs != NVJPEG_STATUS_SUCCESS) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] nvjpegEncoderParamsSetSamplingFactors failed (%d)", (int)nvs);
+        nvjpegEncoderStateDestroy(state->enc_state);
+        nvjpegDestroy(state->handle);
+        cudaStreamDestroy(state->stream);
+        free(state); goto nvenc_fail;
+     }
+
+    /* Allocate pitched device planes for optimal 2D alignment */
+    size_t y_size = (size_t)state->width * state->height;
+    size_t chroma_in_w  = state->is_422 ? (state->width / 2) : state->width;
+    size_t chroma_in_sz = chroma_in_w * state->height;
+
+    if(cudaMallocPitch((void**)&state->d_y, &state->pitch_y, state->width, state->height) != cudaSuccess ||
+       cudaMallocPitch((void**)&state->d_u, &state->pitch_c_in, chroma_in_w, state->height) != cudaSuccess ||
+       cudaMallocPitch((void**)&state->d_v, &state->pitch_c_in, chroma_in_w, state->height) != cudaSuccess) {
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] cudaMallocPitch for encoder planes failed");
+        goto nvenc_fail_state;
+    }
+
+    if(state->is_422) {
+        if(cudaMallocPitch((void**)&state->d_u_444, &state->pitch_c_out, state->width, state->height) != cudaSuccess ||
+           cudaMallocPitch((void**)&state->d_v_444, &state->pitch_c_out, state->width, state->height) != cudaSuccess) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[AV] cudaMallocPitch for 4:4:4 chroma failed");
+            goto nvenc_fail_state;
+        }
+    } else {
+        state->pitch_c_out = state->pitch_c_in;
+    }
+
+	/* Initialize registered_src tracking */
+    state->registered_src[0] = NULL;
+    state->registered_src[1] = NULL;
+    state->registered_src[2] = NULL;
+
+    /* Allocate pinned host staging buffers as fallback if cudaHostRegister fails */
+    if(cudaHostAlloc((void**)&state->h_y, y_size, cudaHostAllocDefault) != cudaSuccess ||
+       cudaHostAlloc((void**)&state->h_u, chroma_in_sz, cudaHostAllocDefault) != cudaSuccess ||
+       cudaHostAlloc((void**)&state->h_v, chroma_in_sz, cudaHostAllocDefault) != cudaSuccess) {
+        veejay_msg(VEEJAY_MSG_WARNING, "[AV] cudaHostAlloc for pinned fallback buffers failed");
+        if(state->h_y) cudaFreeHost(state->h_y);
+        if(state->h_u) cudaFreeHost(state->h_u);
+        if(state->h_v) cudaFreeHost(state->h_v);
+        state->h_y = state->h_u = state->h_v = NULL;
+    }
+
+    e->nvjpeg = state;
+    e->encoder_id = id;
+    e->width  = frame->width;
+    e->height = frame->height;
+    e->len    = e->out_frame->len;
+    e->uv_len = e->out_frame->uv_len;
+
+    veejay_msg(VEEJAY_MSG_INFO,
+        "[AV] Initialized nvJPEG CUDA MJPEG encoder (%s, quality=90, stream=%p)",
+        state->is_422 ? "4:2:2 -> 4:4:4 upsample" : "4:4:4",
+        (void*)state->stream);
+    return e;
+
+nvenc_fail_state:
+    if(state->d_y)     cudaFree(state->d_y);
+    if(state->d_u)     cudaFree(state->d_u);
+    if(state->d_v)     cudaFree(state->d_v);
+    if(state->d_u_444) cudaFree(state->d_u_444);
+    if(state->d_v_444) cudaFree(state->d_v_444);
+    if(state->enc_params) nvjpegEncoderParamsDestroy(state->enc_params);
+    if(state->enc_state)  nvjpegEncoderStateDestroy(state->enc_state);
+    if(state->handle)     nvjpegDestroy(state->handle);
+    if(state->stream)     cudaStreamDestroy(state->stream);
+    free(state);
+nvenc_fail:
+    free(e->out_frame);
+    free(e->in_frame);
+    free(e->data[0]);
+    free(e);
+    return NULL;
+#else
+    veejay_msg(VEEJAY_MSG_ERROR, "[AV] CUDA MJPEG encoding not supported (nvJPEG not available)");
+    free(e->out_frame); free(e->in_frame); free(e->data[0]); free(e);
+    return NULL;
+#endif
+}
+
 
 	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996 && id != CODEC_ID_DVVIDEO && id != 995 && id != 994 && id != 993)
 	{
@@ -426,18 +662,51 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 		if(av->y4m)
 			vj_yuv4mpeg_free( (vj_yuv*) av->y4m );
 
+#ifdef HAVE_NVJPEG
+		if(av->nvjpeg) {
+			vj_nvjpeg_enc_state *state = (vj_nvjpeg_enc_state*) av->nvjpeg;
+			if(state->stream) cudaStreamSynchronize(state->stream);
+
+			for(int i = 0; i < 3; i++) {
+				if(state->registered_src[i]) {
+					cudaHostUnregister(state->registered_src[i]);
+					state->registered_src[i] = NULL;
+				}
+			}
+
+			if(state->d_y)     cudaFree(state->d_y);
+			if(state->d_u)     cudaFree(state->d_u);
+			if(state->d_v)     cudaFree(state->d_v);
+			if(state->d_u_444) cudaFree(state->d_u_444);
+			if(state->d_v_444) cudaFree(state->d_v_444);
+
+			if(state->h_y) cudaFreeHost(state->h_y);
+			if(state->h_u) cudaFreeHost(state->h_u);
+			if(state->h_v) cudaFreeHost(state->h_v);
+
+			if(state->stream)  cudaStreamDestroy(state->stream);
+			if(state->enc_params) nvjpegEncoderParamsDestroy(state->enc_params);
+			if(state->enc_state)  nvjpegEncoderStateDestroy(state->enc_state);
+			if(state->handle)     nvjpegDestroy(state->handle);
+			free(state);
+			av->nvjpeg = NULL;
+		}	
+#endif
+
 		free(av);
 	}
 	av = NULL;
 }
 
-int		vj_avcodec_is_internal(int format) {
-	if( format == ENCODER_MJPEG || format == ENCODER_QUICKTIME_MJPEG || format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV ||
-		format == ENCODER_HUFFYUV || format == ENCODER_LJPEG )
-		return 0;
-	return 1;
+int vj_avcodec_is_internal(int format) {
+    if(format == ENCODER_MJPEG || format == ENCODER_QUICKTIME_MJPEG || 
+       format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV ||
+       format == ENCODER_HUFFYUV || format == ENCODER_LJPEG ||
+       format == ENCODER_CUDA_MJPEG_422F || format == ENCODER_CUDA_MJPEG_422 ||
+       format == ENCODER_CUDA_MJPEG_444F || format == ENCODER_CUDA_MJPEG_444)
+        return 0;
+    return 1;
 }
-
 int		vj_avcodec_find_codec( int encoder )
 {
 	switch( encoder)
@@ -468,6 +737,10 @@ int		vj_avcodec_find_codec( int encoder )
 			return 995;
 		case ENCODER_YUV4MPEG420:
 			return 994;
+	    case ENCODER_CUDA_MJPEG_422F: return CODEC_ID_CUDA_MJPEG_422F;
+        case ENCODER_CUDA_MJPEG_422:  return CODEC_ID_CUDA_MJPEG_422;
+        case ENCODER_CUDA_MJPEG_444F: return CODEC_ID_CUDA_MJPEG_444F;
+        case ENCODER_CUDA_MJPEG_444:  return CODEC_ID_CUDA_MJPEG_444;	
 		default:
 			veejay_msg(VEEJAY_MSG_DEBUG, "[AV] Unknown format %d selected", encoder );
 			return 0;
@@ -480,6 +753,10 @@ char		vj_avcodec_find_lav( int encoder )
 	switch( encoder)
 	{
 		case ENCODER_MJPEG:
+        case ENCODER_CUDA_MJPEG_422F:
+        case ENCODER_CUDA_MJPEG_422:
+        case ENCODER_CUDA_MJPEG_444F:
+        case ENCODER_CUDA_MJPEG_444:		
 			return 'a';
 		case ENCODER_HUFFYUV:
 			return 'H';
@@ -515,25 +792,30 @@ char		vj_avcodec_find_lav( int encoder )
 
 
 static struct {
-	const char *descr;
-	int   encoder_id;
+    const char *descr;
+    int encoder_id;
 } encoder_names[] = {
-	{ "Invalid codec", -1 },
-	{ "DV2", ENCODER_DVVIDEO },
-	{ "MJPEG", ENCODER_MJPEG },
-	{ "HuffYUV", ENCODER_HUFFYUV },
-	{ "YUV 4:2:2 Planar, 0-255 full range", ENCODER_YUV422F },
-	{ "YUV 4:2:0 Planar, 0-255 full range", ENCODER_YUV420F },
-	{ "YUV 4:2:2 Planar, CCIR 601. 16-235/16-240", ENCODER_YUV422 },
-	{ "YUV 4:2:0 Planar, CCIR 601, 16-235/16-240", ENCODER_YUV420 },
-	{ "YUV 4:2:2 Planar, LZO compressed (experimental)", ENCODER_LZO },
-	{ "QOI grayscale, QOI (experimental)", ENCODER_QOI },
-	{ "DIVX",  ENCODER_DIVX },
-	{ "Quicktime DV", ENCODER_QUICKTIME_DV },
-	{ "Quicktime MJPEG", ENCODER_QUICKTIME_MJPEG },	
-	{ "YUV4MPEG Stream 4:2:2", ENCODER_YUV4MPEG },
-	{ "YUV4MPEG Stream 4:2:0 for MPEG2", ENCODER_YUV4MPEG420 },
-	{ NULL, 0 }
+    { "Invalid codec ", -1 },
+    { "DV2 ", ENCODER_DVVIDEO },
+    { "MJPEG ", ENCODER_MJPEG },
+    { "HuffYUV ", ENCODER_HUFFYUV },
+    { "YUV 4:2:2 Planar, 0-255 full range ", ENCODER_YUV422F },
+    { "YUV 4:2:0 Planar, 0-255 full range ", ENCODER_YUV420F },
+    { "YUV 4:2:2 Planar, CCIR 601. 16-235/16-240 ", ENCODER_YUV422 },
+    { "YUV 4:2:0 Planar, CCIR 601, 16-235/16-240 ", ENCODER_YUV420 },
+    { "YUV 4:2:2 Planar, LZO compressed (experimental) ", ENCODER_LZO },
+    { "QOI grayscale, QOI (experimental) ", ENCODER_QOI },
+    { "DIVX ", ENCODER_DIVX },
+    { "Quicktime DV ", ENCODER_QUICKTIME_DV },
+    { "Quicktime MJPEG ", ENCODER_QUICKTIME_MJPEG },
+    { "YUV4MPEG Stream 4:2:2 ", ENCODER_YUV4MPEG },
+    { "YUV4MPEG Stream 4:2:0 for MPEG2 ", ENCODER_YUV4MPEG420 },
+    { "CUDA MJPEG 4:2:2 Planar, 0-255 full range ", ENCODER_CUDA_MJPEG_422F },
+    { "CUDA MJPEG 4:2:2 Planar, CCIR 601, 16-235/16-240 ", ENCODER_CUDA_MJPEG_422 },
+    { "CUDA MJPEG 4:4:4 Planar, 0-255 full range ", ENCODER_CUDA_MJPEG_444F },
+    { "CUDA MJPEG 4:4:4 Planar, CCIR 601, 16-235/16-240 ", ENCODER_CUDA_MJPEG_444 },
+    
+    { NULL, 0 }
 };
 
 const char		*vj_avcodec_get_encoder_name( int encoder_id )
@@ -748,10 +1030,246 @@ void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len )
 #endif
 }
 
-int		vj_avcodec_encode_frame(void *encoder, long nframe,int format, uint8_t *src[4], uint8_t *buf, int buf_len,
-	int in_fmt)
+int vj_avcodec_encode_frame(void *encoder, long nframe, int format, 
+                            uint8_t *src[4], uint8_t *buf, int buf_len, int in_fmt)
 {
 	vj_encoder *av = (vj_encoder*) encoder;
+  
+/*
+    if(format == ENCODER_CUDA_MJPEG_422F || format == ENCODER_CUDA_MJPEG_422 ||
+       format == ENCODER_CUDA_MJPEG_444F || format == ENCODER_CUDA_MJPEG_444) {
+#ifdef HAVE_NVJPEG
+        vj_nvjpeg_enc_state *state = (vj_nvjpeg_enc_state*) av->nvjpeg;
+        if(!state || !state->enc_state) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[AV] nvJPEG encoder not initialized");
+            return -1;
+        }
+
+        size_t y_size       = (size_t)state->width * state->height;
+        size_t chroma_in_w  = state->is_422 ? (size_t)(state->width / 2) : (size_t)state->width;
+        size_t chroma_in_sz = chroma_in_w * state->height;
+
+        veejay_msg(VEEJAY_MSG_DEBUG, "[NVJPEG encoder] frame=%dx%d is_422=%d y_size=%zu chroma_in_w=%zu chroma_in_sz=%zu",
+                   state->width, state->height, state->is_422,
+                   y_size, chroma_in_w, chroma_in_sz);
+
+        cudaError_t cu0 = cudaMemcpyAsync(state->d_y, src[0], y_size,       cudaMemcpyHostToDevice, state->stream);
+        cudaError_t cu1 = cudaMemcpyAsync(state->d_u, src[1], chroma_in_sz, cudaMemcpyHostToDevice, state->stream);
+        cudaError_t cu2 = cudaMemcpyAsync(state->d_v, src[2], chroma_in_sz, cudaMemcpyHostToDevice, state->stream);
+
+        if(cu0 != cudaSuccess || cu1 != cudaSuccess || cu2 != cudaSuccess) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] H2D upload failed: y=%d u=%d v=%d", (int)cu0, (int)cu1, (int)cu2);
+            return -1;
+        }
+
+        uint8_t *enc_u = state->d_u;
+        uint8_t *enc_v = state->d_v;
+
+#ifdef HAVE_NVJPEG_CUDA_KERNEL
+        if(state->is_422) {
+            cudaError_t cus = vj_nvjpeg_upsample_chroma(
+                state->d_u, chroma_in_w,
+                state->d_v, chroma_in_w,
+                state->d_u_444, (size_t)state->width,
+                state->d_v_444, (size_t)state->width,
+                (int)chroma_in_w, state->height,
+                state->width,     state->height,
+                state->upsample_mode,
+                state->stream);
+            if(cus != cudaSuccess) {
+                veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] chroma upsample failed (%d): %s",
+                           (int)cus, cudaGetErrorString(cus));
+                return -1;
+            }
+            enc_u = state->d_u_444;
+            enc_v = state->d_v_444;
+            veejay_msg(VEEJAY_MSG_DEBUG, "[NVJPEG encoder] chroma upsampled %dx%d -> %dx%d (mode=%d)",
+                       (int)chroma_in_w, state->height, state->width, state->height,
+                       (int)state->upsample_mode);
+        }
+#endif
+
+        nvjpegImage_t img;
+        memset(&img, 0, sizeof(img));
+        img.channel[0] = state->d_y;   img.pitch[0] = (size_t)state->width;
+        img.channel[1] = enc_u;        img.pitch[1] = (size_t)state->width;
+        img.channel[2] = enc_v;        img.pitch[2] = (size_t)state->width;
+
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[NVJPEG encoder] EncodeYUV: css=444 w=%d h=%d pitch=[%zu,%zu,%zu] ptrs=[%p,%p,%p] handle=%p state=%p params=%p stream=%p",
+                   state->width, state->height,
+                   img.pitch[0], img.pitch[1], img.pitch[2],
+                   (void*)img.channel[0], (void*)img.channel[1], (void*)img.channel[2],
+                   (void*)state->handle, (void*)state->enc_state,
+                   (void*)state->enc_params, (void*)state->stream);
+
+        nvjpegStatus_t nvs = nvjpegEncodeYUV(
+            state->handle, state->enc_state, state->enc_params,
+            &img, NVJPEG_CSS_444, state->width, state->height, state->stream);
+        if(nvs != NVJPEG_STATUS_SUCCESS) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "[NVJPEG encoder] nvjpegEncodeYUV failed (status %d) w=%d h=%d css=%d",
+                       (int)nvs, state->width, state->height, (int)NVJPEG_CSS_444);
+            return -1;
+        }
+
+        size_t length = (size_t)buf_len;
+        nvs = nvjpegEncodeRetrieveBitstream(
+            state->handle, state->enc_state, buf, &length, state->stream);
+        if(nvs != NVJPEG_STATUS_SUCCESS) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] nvjpegEncodeRetrieveBitstream failed (status %d)", (int)nvs);
+            return -1;
+        }
+
+        cudaStreamSynchronize(state->stream);
+
+        veejay_msg(VEEJAY_MSG_DEBUG, "[NVJPEG encoder] encoded %zu bytes (buf_len=%d)", length, buf_len);
+        return (int)length;
+#else
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] CUDA MJPEG encoding not supported");
+        return -1;
+#endif
+    }
+*/
+    if(format == ENCODER_CUDA_MJPEG_422F || format == ENCODER_CUDA_MJPEG_422 ||
+       format == ENCODER_CUDA_MJPEG_444F || format == ENCODER_CUDA_MJPEG_444) {
+#ifdef HAVE_NVJPEG
+        vj_nvjpeg_enc_state *state = (vj_nvjpeg_enc_state*) av->nvjpeg;
+        if(!state || !state->enc_state) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[AV] nvJPEG encoder not initialized");
+            return -1;
+        }
+
+        /*size_t y_size       = (size_t)state->width * state->height;
+        size_t chroma_in_w  = state->is_422 ? (size_t)(state->width / 2) : (size_t)state->width;
+        size_t chroma_in_sz = chroma_in_w * state->height;
+
+        cudaError_t cu0 = cudaMemcpyAsync(state->d_y, src[0], y_size,       cudaMemcpyHostToDevice, state->stream);
+        cudaError_t cu1 = cudaMemcpyAsync(state->d_u, src[1], chroma_in_sz, cudaMemcpyHostToDevice, state->stream);
+        cudaError_t cu2 = cudaMemcpyAsync(state->d_v, src[2], chroma_in_sz, cudaMemcpyHostToDevice, state->stream);
+        if(cu0 != cudaSuccess || cu1 != cudaSuccess || cu2 != cudaSuccess) {
+            veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] H2D failed: y=%d u=%d v=%d", (int)cu0, (int)cu1, (int)cu2);
+            return -1;
+        }
+		*/
+
+		size_t y_size       = (size_t)state->width * state->height;
+        size_t chroma_in_w  = state->is_422 ? (size_t)(state->width / 2) : (size_t)state->width;
+        size_t chroma_in_sz = chroma_in_w * state->height;
+        
+        /* Packed CPU sizes for registration */
+        size_t sizes[3] = { y_size, chroma_in_sz, chroma_in_sz };
+        
+        /* 2D Dimensions for Transfer */
+        size_t widths[3]  = { (size_t)state->width, chroma_in_w, chroma_in_w };
+        size_t heights[3] = { (size_t)state->height, (size_t)state->height, (size_t)state->height };
+        size_t dpitch[3]  = { state->pitch_y, state->pitch_c_in, state->pitch_c_in };
+        
+        /* Assume CPU buffer stride equals width (packed) */
+        size_t spitch[3]  = { (size_t)state->width, chroma_in_w, chroma_in_w };
+
+        uint8_t *d_planes[3] = { state->d_y, state->d_u, state->d_v };
+        uint8_t *h_planes[3] = { state->h_y, state->h_u, state->h_v };
+
+        for(int i = 0; i < 3; i++) {
+            int use_fallback = 0;
+
+            if (!state->disable_dynamic_pinning) {
+                if(src[i] != state->registered_src[i]) {
+                    if(state->registered_src[i]) {
+                        cudaHostUnregister(state->registered_src[i]);
+                        state->registered_src[i] = NULL;
+                        state->pin_thrash_count++;
+                    }
+                    
+                    if (state->pin_thrash_count > 30) {
+                        veejay_msg(VEEJAY_MSG_WARNING, "[NVJPEG encoder] Pointer thrashing detected. Disabling dynamic pinning.");
+                        state->disable_dynamic_pinning = 1;
+                        use_fallback = 1;
+                    } else {
+                        cudaError_t reg_err = cudaHostRegister(src[i], sizes[i], cudaHostRegisterDefault);
+                        if(reg_err == cudaSuccess) {
+                            state->registered_src[i] = src[i];
+                            cudaMemcpy2DAsync(d_planes[i], dpitch[i], src[i], spitch[i], widths[i], heights[i], cudaMemcpyHostToDevice, state->stream);
+                        } else {
+                            veejay_msg(VEEJAY_MSG_DEBUG, "[NVJPEG encoder] cudaHostRegister failed for plane %d, using pinned fallback", i);
+                            use_fallback = 1;
+                        }
+                    }
+                } else {
+                    cudaMemcpy2DAsync(d_planes[i], dpitch[i], src[i], spitch[i], widths[i], heights[i], cudaMemcpyHostToDevice, state->stream);
+                }
+            } else {
+                use_fallback = 1;
+            }
+
+            if (use_fallback) {
+                if(h_planes[i]) {
+                    veejay_memcpy(h_planes[i], src[i], sizes[i]);
+                    cudaMemcpy2DAsync(d_planes[i], dpitch[i], h_planes[i], spitch[i], widths[i], heights[i], cudaMemcpyHostToDevice, state->stream);
+                } else {
+                    veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] H2D failed: cannot register and no fallback buffer for plane %d", i);
+                    return -1;
+                }
+            }
+        }
+
+		uint8_t *enc_u = state->d_u;
+        uint8_t *enc_v = state->d_v;
+
+#ifdef HAVE_NVJPEG_CUDA_KERNEL
+        if(state->is_422) {
+            cudaError_t cus = vj_nvjpeg_upsample_chroma(
+                state->d_u, state->pitch_c_in,
+                state->d_v, state->pitch_c_in,
+                state->d_u_444, state->pitch_c_out,
+                state->d_v_444, state->pitch_c_out,
+                (int)chroma_in_w, state->height,
+                state->width,     state->height,
+                state->upsample_mode,
+                state->stream);
+                
+            if(cus != cudaSuccess) {
+                veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] chroma upsample failed (%d)", (int)cus);
+                return -1;
+            }
+            enc_u = state->d_u_444;
+            enc_v = state->d_v_444;
+        }
+#endif
+
+        /* Describe the pitched 4:4:4 image for nvJPEG */
+        nvjpegImage_t img;
+        memset(&img, 0, sizeof(img));
+        img.channel[0] = state->d_y;   img.pitch[0] = state->pitch_y;
+        img.channel[1] = enc_u;        img.pitch[1] = state->pitch_c_out;
+        img.channel[2] = enc_v;        img.pitch[2] = state->pitch_c_out;
+
+        /* Encode directly as 4:4:4 */
+        nvjpegStatus_t nvs = nvjpegEncodeYUV(
+            state->handle, state->enc_state, state->enc_params,
+            &img, NVJPEG_CSS_444, state->width, state->height, state->stream);
+			
+		if(nvs != NVJPEG_STATUS_SUCCESS) {
+			veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] nvjpegEncodeYUV failed (status %d)", (int)nvs);
+			return -1;
+		}
+
+		size_t length = (size_t)buf_len;
+		nvs = nvjpegEncodeRetrieveBitstream(
+			state->handle, state->enc_state, buf, &length, state->stream);
+		if(nvs != NVJPEG_STATUS_SUCCESS) {
+			veejay_msg(VEEJAY_MSG_ERROR, "[NVJPEG encoder] nvjpegEncodeRetrieveBitstream failed (status %d)", (int)nvs);
+			return -1;
+		}
+
+		cudaStreamSynchronize(state->stream);
+		return (int)length;
+#else
+        veejay_msg(VEEJAY_MSG_ERROR, "[AV] CUDA MJPEG encoding not supported");
+        return -1;
+#endif
+    }
 
 	if(format == ENCODER_QOI) {
 		int res = 0;

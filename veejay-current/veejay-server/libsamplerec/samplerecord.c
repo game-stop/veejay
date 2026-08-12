@@ -176,6 +176,14 @@ static int sample_start_encoder(sample_info *si, VJFrame *frame, editlist *el, i
 		si->encoder_max_size = 2048 + tmp; break;
 		case ENCODER_DVVIDEO:
 		si->encoder_max_size = ( frame->height == 480 ? 120000: 144000); break;
+		case ENCODER_CUDA_MJPEG_422F:
+        case ENCODER_CUDA_MJPEG_422:
+        //    si->encoder_max_size = 2048 + tmp + tmp1 + tmp1;
+        //    break;
+        case ENCODER_CUDA_MJPEG_444F:
+        case ENCODER_CUDA_MJPEG_444:
+            si->encoder_max_size = 2048 + tmp + tmp + tmp;  /* 4:4:4 has full chroma */
+            break;
 		default:
 		si->encoder_max_size = vj_avcodec_get_buf_size( si->encoder );
 		break;

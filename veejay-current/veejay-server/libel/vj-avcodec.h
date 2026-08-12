@@ -37,7 +37,14 @@
 #define ENCODER_YUV4MPEG420 14
 #define ENCODER_HUFFYUV 15
 #define ENCODER_QOI 16
-#define NUM_ENCODERS 17
+
+#define ENCODER_CUDA_MJPEG_422F 17  /* YUV 4:2:2, full range (0-255) */
+#define ENCODER_CUDA_MJPEG_422  18  /* YUV 4:2:2, limited range (16-235/16-240) */
+#define ENCODER_CUDA_MJPEG_444F 19  /* YUV 4:4:4, full range (0-255) */
+#define ENCODER_CUDA_MJPEG_444  20  /* YUV 4:4:4, limited range (16-235/16-240) */
+
+
+#define NUM_ENCODERS 21
 
 typedef struct
 {
@@ -64,6 +71,7 @@ typedef struct
 	VJFrame *out_frame;
 	VJFrame *in_frame;
 	void *scaler;
+	void *nvjpeg;
 } vj_encoder;
 
 int	vj_avcodec_init(int pix, int verbose);

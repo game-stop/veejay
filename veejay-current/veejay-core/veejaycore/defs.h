@@ -28,6 +28,7 @@
 #define FMT_422 1
 #define FMT_422F 3
 #define FMT_444 4
+#define FMT_444F 5
 
 #define FMT_RGB24	2
 #define FMT_RGB32	1

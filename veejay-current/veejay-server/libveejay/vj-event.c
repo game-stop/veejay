@@ -11062,28 +11062,43 @@ void    vj_event_toggle_osd_extra( void *ptr, const char format[], va_list ap )
     }
 }
 
-static struct {
-    const char *name;
-    int   id;
-} recorder_formats[] = {
-    { "mlzo", ENCODER_LZO },
-    { "qoiy" , ENCODER_QOI },
-    { "y4m422", ENCODER_YUV4MPEG },
-    { "y4m420", ENCODER_YUV4MPEG420 },
-    { "yv16", ENCODER_YUV422 },
-    { "y422", ENCODER_YUV422 },
-    { "i420", ENCODER_YUV420 },
-    { "y420", ENCODER_YUV420 },
-#ifdef SUPPORT_READ_DV2
-    { "dvvideo", ENCODER_DVVIDEO },
+typedef struct {
+    const char *short_name;  /* CLI / Config identifier (e.g., "gpumjpeg") */
+    const char *label;       /* UI / Display label (e.g., "GPU MJPEG") */
+    int         id;          /* ENCODER_* enum value */
+} recorder_format_t;
+
+static const recorder_format_t recorder_formats[] = {
+    { "vj20",        "VJ20 (YUV 4:2:0 Planar)",       ENCODER_YUV420F },
+    { "vj22",        "VJ22 (YUV 4:2:2 Planar)",       ENCODER_YUV422F },
+    { "mjpeg",       "MJPEG",                          ENCODER_MJPEG },
+    { "qtmjpeg",     "QuickTime-MJPEG",                ENCODER_QUICKTIME_MJPEG },
+
+#ifdef HAVE_NVJPEG
+    { "gpumjpeg",    "NVJPEG (GPU MJPEG)",                ENCODER_CUDA_MJPEG_422F },
 #endif
-    { "dvsd", ENCODER_DVVIDEO },
-    { "mjpeg", ENCODER_MJPEG },
-    { "ljpeg", ENCODER_LJPEG },
-    { "vj20", ENCODER_YUV420F },
-    { "vj22", ENCODER_YUV422F },
-    { NULL , -1 }
+
+    { "ljpeg",       "HUFFYUV / LJPEG",                ENCODER_LJPEG },
+
+#ifdef SUPPORT_READ_DV2
+    { "dvvideo",     "DVVIDEO",                        ENCODER_DVVIDEO },
+#endif
+    { "dvsd",        "QuickTime-DV",                   ENCODER_QUICKTIME_DV },
+
+    { "yv16",        "YV16 (YCbCr 4:2:2 Planar)",     ENCODER_YUV422 },
+    { "y422",        "YUV 4:2:2",                      ENCODER_YUV422 },
+    { "i420",        "I420 (YCbCr 4:2:0 Planar)",     ENCODER_YUV420 },
+    { "y420",        "YUV 4:2:0",                      ENCODER_YUV420 },
+
+    { "mlzo",        "MLZO",                           ENCODER_LZO },
+    { "qoiy",        "QOIY",                           ENCODER_QOI },
+    { "y4m422",      "Y4M 4:2:2",                      ENCODER_YUV4MPEG },
+    { "y4m420",      "Y4M 4:2:0",                      ENCODER_YUV4MPEG420 },
+
+    { NULL,          NULL,                             -1 }
 };
+
+
 
 void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 {
@@ -11100,8 +11115,8 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 
     int i;
     if( strncasecmp(str, "list", 4 ) == 0 || strncasecmp( str, "help",4) == 0 ) {
-        for(i = 0; recorder_formats[i].name != NULL ; i ++ ) {
-            veejay_msg(VEEJAY_MSG_INFO,"%s", recorder_formats[i].name );
+        for(i = 0; recorder_formats[i].label != NULL ; i ++ ) {
+            veejay_msg(VEEJAY_MSG_INFO,"%s", recorder_formats[i].label );
         }
         return;
     }
@@ -11111,8 +11126,8 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
     veejay_msg(VEEJAY_MSG_DEBUG,"Current recording format is %s",
         vj_avcodec_get_encoder_name( old_format ));
         
-    for( i = 0; recorder_formats[i].name != NULL ; i ++ ) {
-        if(strncasecmp( str, recorder_formats[i].name, strlen(recorder_formats[i].name) ) == 0 ) {
+    for( i = 0; recorder_formats[i].label != NULL ; i ++ ) {
+        if(strncasecmp( str, recorder_formats[i].label, strlen(recorder_formats[i].label) ) == 0 ) {
             _recorder_format = recorder_formats[i].id;
         }
     }

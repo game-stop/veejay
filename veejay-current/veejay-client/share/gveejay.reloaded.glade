@@ -14030,18 +14030,20 @@
                       <property name="has-frame">False</property>
                       <property name="has-entry">True</property>
                       <items>
-                        <item>VJ20 (YUV 4:2:0 Planar)</item>
-                        <item>VJ22 (YUV 4:2:2 Planar)</item>
-                        <item>MJPEG</item>
-                        <item>HUFFYUV</item>
-                        <item>DVVIDEO</item>
-                        <item>YV16 (YCbCr 4:2:2 Planar)</item>
-                        <item>I420 (YCbCr 4:2:0 Planar)</item>
-                        <item>QuickTime-DV</item>
-                        <item>QuickTime-MJPEG</item>
-                        <item>MLZO</item>
-                        <item>QOIY</item>
-                        <item>YUV (current)</item>
+                        <item translatable="yes">VJ20 (YUV 4:2:0 Planar)</item>
+                        <item translatable="yes">VJ22 (YUV 4:2:2 Planar)</item>
+                        <item translatable="yes">MJPEG</item>
+                        <item translatable="yes">QuickTime-MJPEG</item>
+                        <item translatable="yes">NVJPEG (GPU MJPEG)</item>
+                        <item translatable="yes">HUFFYUV / LJPEG</item>
+                        <item translatable="yes">DVVIDEO</item>
+                        <item translatable="yes">QuickTime-DV</item>
+                        <item translatable="yes">YV16 (YCbCr 4:2:2 Planar)</item>
+                        <item translatable="yes">I420 (YCbCr 4:2:0 Planar)</item>
+                        <item translatable="yes">MLZO</item>
+                        <item translatable="yes">QOIY</item>
+                        <item translatable="yes">Y4M 4:2:2</item>
+                        <item translatable="yes">Y4M 4:2:0</item>
                       </items>
                       <child internal-child="entry">
                         <object class="GtkEntry">
