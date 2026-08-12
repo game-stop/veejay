@@ -13,6 +13,7 @@ The script also requires:
 - Autotools for projects using `autogen.sh`
 - `sudo` permission for `make install`
 
+
 ## Expected layout
 
 The script exists beside these directories:
@@ -49,6 +50,12 @@ Multiple configure arguments are supported:
 ```bash
 ./run-and-install-locally.sh --enable-debug --prefix=/usr/local
 ```
+
+Build with NDI and nvjpeg/CUDA toolkit enabled:
+```bash
+./run-and-install-locally.sh --with-ndi=/path/to/ndi --with-nvjpeg=yes
+```
+
 
 ## Build behavior
 
