@@ -649,6 +649,7 @@ typedef struct {
 	volatile int sequence_boundary;
 	int sequence_random_id;
 	int sequence_random_ticks_left;
+    volatile int sdl_visible;
 } video_playback_setup;
 
 typedef struct {

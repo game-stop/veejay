@@ -6052,7 +6052,8 @@ static int veejay_output_prepare_frame(veejay_t *info,
                                        long long timeline_frame,
                                        veejay_prepared_output_t *prepared)
 {
-    if(!info || !source_frame || !prepared)
+    video_playback_setup *settings = info->settings;
+    if(!source_frame || !prepared)
         return 0;
 
     veejay_memset(prepared, 0, sizeof(*prepared));
@@ -6086,7 +6087,7 @@ static int veejay_output_prepare_frame(veejay_t *info,
     prepared->frame = frame;
 
 #ifdef HAVE_SDL
-    if(veejay_output_sdl_active(info)) {
+    if(veejay_output_sdl_active(info) && atomic_load_int(&settings->sdl_visible)) {
         if(!vj_sdl_prepare_frame(info->sdl, frame, &prepared->sdl_timing)) {
             if(info->video_out == VIDEO_OUT_SDL)
                 return 0;
@@ -6102,13 +6103,14 @@ static int veejay_output_prepare_frame(veejay_t *info,
 static int veejay_output_present_prepared(veejay_t *info,
                                           veejay_prepared_output_t *prepared)
 {
-    if(!info || !prepared || !prepared->frame)
+    video_playback_setup *settings = info->settings;
+    if(!prepared || !prepared->frame)
         return 0;
 
 #ifdef HAVE_SDL
-    /* SDL is committed first when it is also enabled as an auxiliary output;
-     * a blocking file/pipe output must not make the local window miss PTS. */
+
     if(prepared->sdl_prepared &&
+        atomic_load_int(&settings->sdl_visible) &&
        !vj_sdl_present_prepared(info->sdl, &prepared->sdl_timing))
     {
         prepared->sdl_prepared = 0;
@@ -7243,8 +7245,58 @@ void vj_unlock(veejay_t *info)
 	video_playback_setup *settings = info->settings;
 	pthread_mutex_unlock(&(settings->control_mutex));
 }	 
-
 #ifdef HAVE_SDL
+
+static int veejay_sdl_window_event_is_visibility(const SDL_WindowEvent *wev)
+{
+    switch (wev->event) {
+        case SDL_WINDOWEVENT_SHOWN:
+        case SDL_WINDOWEVENT_HIDDEN:
+        case SDL_WINDOWEVENT_MINIMIZED:
+        case SDL_WINDOWEVENT_MAXIMIZED:
+        case SDL_WINDOWEVENT_RESTORED:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static void veejay_sdl_update_visibility(veejay_t *info, const SDL_Event *event)
+{
+    video_playback_setup *settings = (video_playback_setup*) info->settings;
+
+    if (event->type != SDL_WINDOWEVENT)
+        return;
+
+    if (!veejay_sdl_window_event_is_visibility(&event->window))
+        return;
+
+    int visible = atomic_load_int(&settings->sdl_visible);
+
+    switch (event->window.event) {
+        case SDL_WINDOWEVENT_SHOWN:
+        case SDL_WINDOWEVENT_RESTORED:
+        case SDL_WINDOWEVENT_MAXIMIZED:
+            visible = 1;
+            break;
+
+        case SDL_WINDOWEVENT_HIDDEN:
+        case SDL_WINDOWEVENT_MINIMIZED:
+            visible = 0;
+            break;
+
+        default:
+            return;
+    }
+
+    if (atomic_load_int(&settings->sdl_visible) != visible) {
+        atomic_store_int(&settings->sdl_visible, visible);
+        veejay_msg(VEEJAY_MSG_DEBUG,
+                   "[SDL] window visibility changed: %s",
+                   visible ? "visible" : "hidden");
+    }
+}
+
 static int veejay_sdl_event_wanted(veejay_t *info, const SDL_Event *event)
 {
     if(!info || !event)
@@ -7268,7 +7320,7 @@ static int veejay_sdl_event_wanted(veejay_t *info, const SDL_Event *event)
             return info->use_mouse ? 1 : 0;
 
         case SDL_WINDOWEVENT:
-            return event->window.event == SDL_WINDOWEVENT_CLOSE;
+            return 0;
 
         default:
             return 0;
@@ -7428,20 +7480,33 @@ void	veejay_event_handle(veejay_t *info)
 		{
 			int mod = SDL_GetModState();
 
+            if (event.type == SDL_WINDOWEVENT) {
+                veejay_sdl_update_visibility(info, &event);
+
+                if (event.window.event == SDL_WINDOWEVENT_HIDDEN ||
+                    event.window.event == SDL_WINDOWEVENT_MINIMIZED) {
+                    have_pending_motion = 0;
+                }
+
+                if (event.window.event == SDL_WINDOWEVENT_CLOSE) {
+                    SDL_Event quit_event;
+
+                    veejay_memset(&quit_event, 0, sizeof(SDL_Event));
+                    quit_event.type = SDL_QUIT;
+
+                    if (have_pending_motion) {
+                        veejay_sdl_push_event(&pending_motion, pending_motion_mod);
+                        have_pending_motion = 0;
+                    }
+
+                    veejay_sdl_push_event(&quit_event, mod);
+                }
+
+                continue;
+            }
+
 			if(!veejay_sdl_event_wanted(info, &event))
 				continue;
-
-			if(event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE) {
-				SDL_Event quit_event;
-				veejay_memset(&quit_event, 0, sizeof(SDL_Event));
-				quit_event.type = SDL_QUIT;
-				if(have_pending_motion) {
-					veejay_sdl_push_event(&pending_motion, pending_motion_mod);
-					have_pending_motion = 0;
-				}
-				veejay_sdl_push_event(&quit_event, mod);
-				continue;
-			}
 
 			if(event.type == SDL_MOUSEMOTION) {
 				pending_motion = event;
@@ -8996,6 +9061,7 @@ static int veejay_sdl_output_initialize_owner(veejay_t *info)
         return 0;
     }
     atomic_store_int(&info->sdl_output_initialized, 1);
+    atomic_store_int(&settings->sdl_visible,1);
     veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL output opened");
     return 1;
 }
@@ -9010,8 +9076,10 @@ static int veejay_sdl_output_sync_owner(veejay_t *info)
     if(enabled && !initialized)
         return veejay_sdl_output_initialize_owner(info);
     if(!enabled && initialized) {
+        atomic_store_int(&info->settings->sdl_visible, 0);
         vj_sdl_shutdown(info->sdl);
         atomic_store_int(&info->sdl_output_initialized, 0);
+        
         veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] SDL output closed");
     }
     return 1;
@@ -9426,8 +9494,11 @@ void *veejay_display_renderer_thread(void *arg)
     if(!output_ready) {
         veejay_change_state(info, LAVPLAY_STATE_STOP);
 #ifdef HAVE_SDL
-        if(info->sdl)
+        if(info->sdl) {
+            atomic_store_int(&info->settings->sdl_visible, 0);
             vj_sdl_shutdown(info->sdl);
+            atomic_store_int(&info->sdl_output_initialized, 0);
+        }
 #endif
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[DISPLAY] Renderer thread stopped during output initialization");
@@ -9781,6 +9852,7 @@ void *veejay_display_renderer_thread(void *arg)
     atomic_store_double(&settings->video_present_ready_lead_s, 0.0);
 #ifdef HAVE_SDL
     if(info->sdl && atomic_load_int(&info->sdl_output_initialized)) {
+        atomic_store_int(&info->settings->sdl_visible, 0);
         vj_sdl_shutdown(info->sdl);
         atomic_store_int(&info->sdl_output_initialized, 0);
     }
@@ -13886,7 +13958,10 @@ static void veejay_playback_close(veejay_t *info)
 	}
 	
 #ifdef HAVE_SDL
-	if(info->sdl)
+    
+    atomic_store_int(&info->settings->sdl_visible, 0);
+
+    if(info->sdl)
         vj_sdl_free(info->sdl);
     vj_sdl_quit();
 #endif

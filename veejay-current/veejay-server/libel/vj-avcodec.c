@@ -323,7 +323,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	}
 	
 	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996 && id != 995 && id != 994 && id != 993 && 
-		id != CODEC_ID_CUDA_MJPEG_422 && id != CODEC_ID_CUDA_MJPEG_422F && id != CODEC_ID_CUDA_MJPEG_444 && id != CODEC_ID_CUDA_MJPEG_444)
+		id != CODEC_ID_CUDA_MJPEG_422 && id != CODEC_ID_CUDA_MJPEG_422F && id != CODEC_ID_CUDA_MJPEG_444 && id != CODEC_ID_CUDA_MJPEG_444F)
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
