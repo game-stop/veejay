@@ -132,6 +132,13 @@ Then start Pure Data with the external directory in its search path:
 pd -path /usr/local/lib/pd/extra
 ```
 
+or from the sendVIMS folder:
+
+```sh
+pd -path . -lib sendVIMS -open help-sendVIMS.pd
+```
+
+
 Create a `sendVIMS` object:
 
 ```text

@@ -14,7 +14,8 @@ selectors.h: parse-vims.pl vims.h
 
 sendVIMS.pd_linux: selectors.h
 
-PD_CFLAGS = -DPD
+PDINCLUDE ?= /usr/include/pd
+PD_CFLAGS  = -DPD -fPIC -I$(PDINCLUDE)
 
 .c.pd_linux:
 	$(CC) $(PD_CFLAGS) $(OPTI_CFLAGS) $(DEBUG_CFLAGS) -DVERSION=\"$(VERSION)\" -o $*.o -c $*.c
