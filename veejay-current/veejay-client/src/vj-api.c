@@ -9150,8 +9150,8 @@ void vj_gui_process_pattern_status(const int *tokens)
                   tokens,
                   sizeof(int) * VJ_STATUS_ARRAY_SIZE);
 
-    sequence_vims_refresh_timing_signature();
-    sequence_vims_update_playback();
+    //sequence_vims_refresh_timing_signature();
+    //sequence_vims_update_playback();
 }
 
 static void vj_kf_reset_panel(void)
