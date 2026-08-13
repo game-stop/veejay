@@ -15848,6 +15848,7 @@ void vj_event_ndi_sources(void *ptr, const char format[], va_list ap)
     char *packet = (char*)vj_malloc(packet_len + 1u);
     if(!packet) {
         free(payload);
+        SEND_MSG(v, "00000000");
         return;
     }
 
@@ -17316,6 +17317,7 @@ void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap)
 
     if(!v)
         return;
+
     if(!v->seq) {
         SEND_MSG(v, "00000000");
         return;
@@ -17344,6 +17346,7 @@ void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap)
     char *body = (char*)vj_calloc(body_cap);
     if(!body) {
         SEND_MSG(v, "00000000");
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate %lu bytes memory for sequence timeline", body_cap);
         return;
     }
 
@@ -17395,6 +17398,7 @@ void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap)
         if(n != entry_len) {
             free(body);
             SEND_MSG(v, "00000000");
+            veejay_msg(VEEJAY_MSG_ERROR, "Unable to write sequence timeline entry (wrote %d, expected %d)", n, entry_len);
             return;
         }
 
@@ -17414,14 +17418,17 @@ void vj_event_sequence_timeline(void *ptr, const char format[], va_list ap)
     if(header_written != header_len) {
         free(body);
         SEND_MSG(v, "00000000");
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to write sequence timeline header (wrote %d, expected %d)", header_written, header_len);
         return;
     }
-    veejay_memcpy(body, header, (size_t)header_len);
+    memcpy(body, header, (size_t)header_len);
 
     const int body_len = header_len + (entries * entry_len);
-    char *packet = get_print_buf(body_len + 9);
+    char *packet = (char*) vj_malloc(body_len + 9);
     if(!packet) {
         free(body);
+        SEND_MSG(v, "00000000");
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to allocate memory for sequence timeline packet");
         return;
     }
     snprintf(packet, body_len + 9, "%08d%s", body_len, body);
