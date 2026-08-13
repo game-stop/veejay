@@ -848,12 +848,14 @@ static GtkWidget *director_spin(gdouble min, gdouble max, gdouble step, guint di
 static GtkWidget *director_check_button_new(const gchar *label);
 static GtkWidget *director_section_frame_new(const gchar *title);
 static void director_select_instance(DirectorApp *app, DirectorInstance *instance);
+static gboolean director_host_is_local(const gchar *host);
 static void director_ensure_client(DirectorApp *app, DirectorInstance *instance);
 static void director_stop_client(DirectorInstance *instance);
 static void director_start_instance(DirectorApp *app, DirectorInstance *instance);
 static void director_stop_instance(DirectorApp *app, DirectorInstance *instance);
 static void director_remove_instance_completely(DirectorApp *app,
                                                 DirectorInstance *instance);
+static void director_auto_connect_instance(DirectorApp *app, DirectorInstance *instance);
 static void director_apply_graph(DirectorApp *app, DirectorInstance *instance);
 static gboolean director_apply_video_wire(DirectorApp *app,
                                            DirectorInstance *source,
@@ -2013,7 +2015,8 @@ static DirectorInstance *director_discovery_attach_external(DirectorApp *app,
     if(transient)
         app->show->dirty = previous_dirty;
 
-    director_ensure_client(app, instance);
+    director_auto_connect_instance(app, instance);
+    
     director_rebuild_instance_store(app);
     if(app->overview_preview_thread)
         director_overview_previews_sync(app);
@@ -5684,6 +5687,39 @@ static void director_stop_client(DirectorInstance *instance)
     director_clear_live_connection_state(instance);
 }
 
+static gboolean
+director_instance_auto_connect_allowed(const DirectorInstance *instance)
+{
+    if(!instance)
+        return FALSE;
+
+    if(instance->client || instance->connected || instance->backend_ready)
+        return TRUE;
+
+    if(instance->process_running)
+        return TRUE;
+
+    if(instance->discovered_transient)
+        return TRUE;
+
+    if(instance->host && *instance->host &&
+       !director_host_is_local(instance->host))
+        return TRUE;
+
+    if(instance->managed && instance->autostart)
+        return TRUE;
+
+    return FALSE;
+}
+
+static void
+director_auto_connect_instance(DirectorApp *app, DirectorInstance *instance)
+{
+    if(!director_instance_auto_connect_allowed(instance))
+        return;
+
+    director_ensure_client(app, instance);
+}
 static void director_ensure_client(DirectorApp *app, DirectorInstance *instance)
 {
     if(!instance || instance->client)
@@ -11346,8 +11382,11 @@ static gboolean director_replace_show(DirectorApp *app, DirectorShow *show)
                              show->instances->len ?
                              g_ptr_array_index(show->instances, 0) : NULL);
     director_rebuild_instance_store(app);
+    //for(guint i = 0; i < show->instances->len; i++)
+    //    director_ensure_client(app, g_ptr_array_index(show->instances, i));
     for(guint i = 0; i < show->instances->len; i++)
-        director_ensure_client(app, g_ptr_array_index(show->instances, i));
+        director_auto_connect_instance(app, g_ptr_array_index(show->instances, i));
+
     director_refresh_all_ui(app);
     return TRUE;
 }
@@ -12480,7 +12519,8 @@ static void director_add_engine(DirectorApp *app, DirectorRole role)
         return;
     }
 
-    director_ensure_client(app, instance);
+    //director_ensure_client(app, instance);
+    director_auto_connect_instance(app, instance);
     director_select_instance(app, instance);
     app->show->dirty = TRUE;
     director_refresh_all_ui(app);
@@ -13349,7 +13389,7 @@ static void on_apply_instance(GtkButton *button, gpointer data)
 
     app->show->dirty = TRUE;
     director_stop_client(instance);
-    director_ensure_client(app, instance);
+    director_auto_connect_instance(app, instance);
     if(instance->process_running)
         director_log(app, "%s settings changed; process restart is required", instance->id);
     director_update_command_preview(app);
@@ -13964,59 +14004,133 @@ static guint8 director_preview_clamp_byte(gint value)
     return (guint8)(value < 0 ? 0 : (value > 255 ? 255 : value));
 }
 
+
+#define FAST_CLAMP_BYTE(val) ((guint8)((val) < 0 ? 0 : ((val) > 255 ? 255 : (val))))
 static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
-                                                       gsize payload_size,
-                                                       gint width,
-                                                       gint height,
-                                                       gboolean full_range)
+                                                      gsize payload_size,
+                                                      gint width,
+                                                      gint height,
+                                                      gboolean full_range)
 {
     const gsize y_size = (gsize)width * (gsize)height;
     const gsize uv_width = (gsize)(width + 1) / 2;
     const gsize uv_height = (gsize)(height + 1) / 2;
     const gsize uv_size = uv_width * uv_height;
-    const gboolean grayscale = payload_size == y_size;
+    const gboolean grayscale = (payload_size == y_size);
+    
     if(!payload || width <= 0 || height <= 0 ||
        (!grayscale && payload_size < y_size + uv_size * 2))
         return NULL;
 
-    GdkPixbuf *pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8,
-                                       width, height);
+    GdkPixbuf *pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, width, height);
     if(!pixbuf)
         return NULL;
 
-    guint8 *dst = gdk_pixbuf_get_pixels(pixbuf);
+    guint8 *restrict dst = gdk_pixbuf_get_pixels(pixbuf);
     const gint rowstride = gdk_pixbuf_get_rowstride(pixbuf);
-    const guint8 *plane_y = payload;
-    const guint8 *plane_u = grayscale ? NULL : payload + y_size;
-    const guint8 *plane_v = grayscale ? NULL : plane_u + uv_size;
+    
+    const guint8 *restrict plane_y = payload;
+    const guint8 *restrict plane_u = grayscale ? NULL : payload + y_size;
+    const guint8 *restrict plane_v = grayscale ? NULL : plane_u + uv_size;
 
-    for(gint y = 0; y < height; y++) {
-        guint8 *row = dst + (gsize)y * rowstride;
-        for(gint x = 0; x < width; x++) {
-            const gint yy = plane_y[(gsize)y * width + x];
-            gint r, g, b;
-            if(grayscale) {
-                r = g = b = yy;
+    const gint half_width = width / 2;
+    const gboolean is_odd_width = (width & 1);
+
+    // Hoist the invariants out of the loops
+    if (grayscale) {
+        for(gint y = 0; y < height; y++) {
+            guint8 *restrict row = dst + (gsize)y * rowstride;
+            const guint8 *restrict py_row = plane_y + (gsize)y * width;
+            
+            for(gint x = 0; x < width; x++) {
+                guint8 yy = py_row[x];
+                row[x * 3 + 0] = yy;
+                row[x * 3 + 1] = yy;
+                row[x * 3 + 2] = yy;
             }
-            else {
-                const gsize uv_index = (gsize)(y >> 1) * uv_width + (x >> 1);
-                const gint u = (gint)plane_u[uv_index] - 128;
-                const gint v = (gint)plane_v[uv_index] - 128;
-                if(full_range) {
-                    r = yy + ((359 * v) >> 8);
-                    g = yy - ((88 * u + 183 * v) >> 8);
-                    b = yy + ((454 * u) >> 8);
-                }
-                else {
-                    const gint c = MAX(0, yy - 16);
-                    r = (298 * c + 409 * v + 128) >> 8;
-                    g = (298 * c - 100 * u - 208 * v + 128) >> 8;
-                    b = (298 * c + 516 * u + 128) >> 8;
-                }
+        }
+    } 
+    else if (full_range) {
+        for(gint y = 0; y < height; y++) {
+            guint8 * __restrict row = dst + (gsize)y * rowstride;
+            const guint8 *restrict py_row = plane_y + (gsize)y * width;
+            const guint8 *restrict pu_row = plane_u + (gsize)(y >> 1) * uv_width;
+            const guint8 *restrict pv_row = plane_v + (gsize)(y >> 1) * uv_width;
+
+            for(gint x = 0; x < half_width; x++) {
+                gint u = (gint)pu_row[x] - 128;
+                gint v = (gint)pv_row[x] - 128;
+
+                gint r_uv = (359 * v) >> 8;
+                gint g_uv = -((88 * u + 183 * v) >> 8);
+                gint b_uv = (454 * u) >> 8;
+
+                gint y0 = py_row[x * 2 + 0];
+                row[x * 6 + 0] = FAST_CLAMP_BYTE(y0 + r_uv);
+                row[x * 6 + 1] = FAST_CLAMP_BYTE(y0 + g_uv);
+                row[x * 6 + 2] = FAST_CLAMP_BYTE(y0 + b_uv);
+
+                gint y1 = py_row[x * 2 + 1];
+                row[x * 6 + 3] = FAST_CLAMP_BYTE(y1 + r_uv);
+                row[x * 6 + 4] = FAST_CLAMP_BYTE(y1 + g_uv);
+                row[x * 6 + 5] = FAST_CLAMP_BYTE(y1 + b_uv);
             }
-            row[x * 3 + 0] = director_preview_clamp_byte(r);
-            row[x * 3 + 1] = director_preview_clamp_byte(g);
-            row[x * 3 + 2] = director_preview_clamp_byte(b);
+            
+            if (is_odd_width) {
+                gint x = half_width;
+                gint u = (gint)pu_row[x] - 128;
+                gint v = (gint)pv_row[x] - 128;
+                gint r_uv = (359 * v) >> 8;
+                gint g_uv = -((88 * u + 183 * v) >> 8);
+                gint b_uv = (454 * u) >> 8;
+                gint y0 = py_row[x * 2];
+                row[x * 6 + 0] = FAST_CLAMP_BYTE(y0 + r_uv);
+                row[x * 6 + 1] = FAST_CLAMP_BYTE(y0 + g_uv);
+                row[x * 6 + 2] = FAST_CLAMP_BYTE(y0 + b_uv);
+            }
+        }
+    } 
+    else {
+        for(gint y = 0; y < height; y++) {
+            guint8 * __restrict row = dst + (gsize)y * rowstride;
+            const guint8 *restrict py_row = plane_y + (gsize)y * width;
+            const guint8 *restrict pu_row = plane_u + (gsize)(y >> 1) * uv_width;
+            const guint8 *restrict pv_row = plane_v + (gsize)(y >> 1) * uv_width;
+
+            for(gint x = 0; x < half_width; x++) {
+                gint u = (gint)pu_row[x] - 128;
+                gint v = (gint)pv_row[x] - 128;
+
+                gint r_uv = 409 * v + 128;
+                gint g_uv = -100 * u - 208 * v + 128;
+                gint b_uv = 516 * u + 128;
+
+                gint y0 = py_row[x * 2 + 0];
+                gint c0 = 298 * MAX(0, y0 - 16);
+                row[x * 6 + 0] = FAST_CLAMP_BYTE((c0 + r_uv) >> 8);
+                row[x * 6 + 1] = FAST_CLAMP_BYTE((c0 + g_uv) >> 8);
+                row[x * 6 + 2] = FAST_CLAMP_BYTE((c0 + b_uv) >> 8);
+
+                gint y1 = py_row[x * 2 + 1];
+                gint c1 = 298 * MAX(0, y1 - 16);
+                row[x * 6 + 3] = FAST_CLAMP_BYTE((c1 + r_uv) >> 8);
+                row[x * 6 + 4] = FAST_CLAMP_BYTE((c1 + g_uv) >> 8);
+                row[x * 6 + 5] = FAST_CLAMP_BYTE((c1 + b_uv) >> 8);
+            }
+            
+            if (is_odd_width) {
+                gint x = half_width;
+                gint u = (gint)pu_row[x] - 128;
+                gint v = (gint)pv_row[x] - 128;
+                gint r_uv = 409 * v + 128;
+                gint g_uv = -100 * u - 208 * v + 128;
+                gint b_uv = 516 * u + 128;
+                gint y0 = py_row[x * 2];
+                gint c0 = 298 * MAX(0, y0 - 16);
+                row[x * 6 + 0] = FAST_CLAMP_BYTE((c0 + r_uv) >> 8);
+                row[x * 6 + 1] = FAST_CLAMP_BYTE((c0 + g_uv) >> 8);
+                row[x * 6 + 2] = FAST_CLAMP_BYTE((c0 + b_uv) >> 8);
+            }
         }
     }
     return pixbuf;
@@ -19738,7 +19852,7 @@ static void on_stage_tool_duplicate(GtkButton *button, gpointer data)
         return;
     }
     director_log(app, "Duplicated %s as %s on port %d", source->id, copy->id, copy->port);
-    director_ensure_client(app, copy);
+    director_auto_connect_instance(app, copy);
     director_select_instance(app, copy);
     director_refresh_all_ui(app);
     g_free(id);
@@ -23200,6 +23314,8 @@ static void director_build_ui(DirectorApp *app)
     gtk_window_set_default_size(GTK_WINDOW(app->window),
                                 DIRECTOR_DEFAULT_WIDTH,
                                 DIRECTOR_DEFAULT_HEIGHT);
+    gtk_window_set_title(GTK_WINDOW(app->window), "VeeJay Director");
+    gtk_window_set_role(GTK_WINDOW(app->window), "veejay-director");
 
     app->header_title = gtk_header_bar_new();
     gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(app->header_title), TRUE);
@@ -23616,8 +23732,10 @@ static void director_activate(GtkApplication *application, gpointer data)
         app->show && app->show->instances->len ?
         g_ptr_array_index(app->show->instances, 0) : NULL);
 
+    //for(guint i = 0; app->show && i < app->show->instances->len; i++)
+    //    director_ensure_client(app, g_ptr_array_index(app->show->instances, i));
     for(guint i = 0; app->show && i < app->show->instances->len; i++)
-        director_ensure_client(app, g_ptr_array_index(app->show->instances, i));
+        director_auto_connect_instance(app, g_ptr_array_index(app->show->instances, i));
 
     if(!app->startup_no_discovery)
         director_discovery_start(app);

@@ -36,7 +36,10 @@
 #define DIRECTOR_RESPONSE_MAX 65536
 #define DIRECTOR_RESPONSE_IDLE_MS 60
 #define DIRECTOR_RESPONSE_TIMEOUT_MS 600
-
+#define DIRECTOR_STARTUP_CONNECT_SETTLE_US   250000LL
+#define DIRECTOR_STARTUP_IDENTITY_RETRIES    8
+#define DIRECTOR_STARTUP_IDENTITY_RETRY_US   250000LL
+#define DIRECTOR_STARTUP_READY_SETTLE_US     250000LL
 typedef enum {
     DIRECTOR_REQUEST_COMMAND = 0,
     DIRECTOR_REQUEST_REFRESH,
@@ -199,6 +202,27 @@ static gboolean director_should_stop(DirectorClient *client)
     return stop;
 }
 
+static gboolean
+director_sleep_interruptible_us(DirectorClient *client,
+                                gint64 us)
+{
+    const gint64 deadline = director_now_us() + us;
+
+    while(!director_should_stop(client)) {
+        const gint64 now = director_now_us();
+
+        if(now >= deadline)
+            return TRUE;
+
+        const gint64 remaining = deadline - now;
+        const guint step = (guint)MIN(remaining, (gint64)100000);
+
+        g_usleep(step);
+    }
+
+    return FALSE;
+}
+
 static void director_set_connected(DirectorClient *client, gboolean connected)
 {
     gboolean changed;
@@ -266,9 +290,15 @@ static gboolean director_identity_response_matches(DirectorClient *client,
     return match;
 }
 
-static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
+// after connection is establish, veejay may not be entirely ready yet, so we give it a short settle moment before
+// we tell the Director UI that the instance is connected. 
+// This reduces early follow-up failures such as preview requests hitting a backend that has only just started answering VIMS.
+// FIXME: accept requests when ready in backend (veejay-server) 
+static gboolean
+director_connect(DirectorClient *client, DirectorWire *wire)
 {
     director_wire_close(wire);
+
     if(!director_wire_connect(wire,
                               client->host,
                               client->port + VJ_CMD_PORT,
@@ -277,35 +307,100 @@ static gboolean director_connect(DirectorClient *client, DirectorWire *wire)
         return FALSE;
     }
 
+    if(!director_sleep_interruptible_us(client,
+                                        DIRECTOR_STARTUP_CONNECT_SETTLE_US)) {
+        director_wire_close(wire);
+        return FALSE;
+    }
+
     gchar response[DIRECTOR_RESPONSE_MAX];
-    if(!director_wire_query_timed(wire, "488:;", response, sizeof(response),
-                                  DIRECTOR_RESPONSE_TIMEOUT_MS,
-                                  DIRECTOR_RESPONSE_IDLE_MS, NULL)) {
-        director_vims_stderr(client, "488:;", "identity query failed or timed out");
+    gboolean queried = FALSE;
+
+    for(guint attempt = 0;
+        attempt < DIRECTOR_STARTUP_IDENTITY_RETRIES;
+        attempt++) {
+
+        if(director_should_stop(client)) {
+            director_wire_close(wire);
+            return FALSE;
+        }
+
+        if(director_wire_query_timed(wire,
+                                     "488:;",
+                                     response,
+                                     sizeof(response),
+                                     DIRECTOR_RESPONSE_TIMEOUT_MS,
+                                     DIRECTOR_RESPONSE_IDLE_MS,
+                                     NULL)) {
+            queried = TRUE;
+            break;
+        }
+
+        if(attempt + 1 >= DIRECTOR_STARTUP_IDENTITY_RETRIES)
+            break;
+
+        director_wire_close(wire);
+
+        if(!director_sleep_interruptible_us(client,
+                                            DIRECTOR_STARTUP_IDENTITY_RETRY_US)) {
+            return FALSE;
+        }
+
+        if(!director_wire_connect(wire,
+                                  client->host,
+                                  client->port + VJ_CMD_PORT,
+                                  DIRECTOR_CONNECT_TIMEOUT_MS)) {
+            director_control_connect_stderr(client,
+                                            "connect failed or timed out during startup grace");
+            return FALSE;
+        }
+
+        if(!director_sleep_interruptible_us(client,
+                                            DIRECTOR_STARTUP_CONNECT_SETTLE_US)) {
+            director_wire_close(wire);
+            return FALSE;
+        }
+    }
+
+    if(!queried) {
+        director_vims_stderr(client,
+                             "488:;",
+                             "identity query failed or timed out during startup grace");
         director_wire_close(wire);
         return FALSE;
     }
 
     gchar *identity_error = NULL;
+
     if(!director_identity_response_matches(client, response, &identity_error)) {
         director_vims_stderr(client, "488:;",
                              identity_error ? identity_error :
                              "control endpoint identity did not match");
+
         if(!client->identity_error_reported) {
             director_dispatch(client, DIRECTOR_CLIENT_ERROR,
                               identity_error ? identity_error :
                               "Control endpoint identity did not match the configured VeeJay instance");
             client->identity_error_reported = TRUE;
         }
+
         g_free(identity_error);
         director_wire_close(wire);
         return FALSE;
     }
 
     client->identity_error_reported = FALSE;
+
+    if(!director_sleep_interruptible_us(client,
+                                        DIRECTOR_STARTUP_READY_SETTLE_US)) {
+        director_wire_close(wire);
+        return FALSE;
+    }
+
     director_set_connected(client, TRUE);
     g_strstrip(response);
     director_dispatch(client, DIRECTOR_CLIENT_INSTANCE_STATUS, response);
+
     return TRUE;
 }
 
