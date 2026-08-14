@@ -125,8 +125,6 @@ static void _vj_jack_set_open_state(int input_channels, int output_channels)
     driver_output_channels = output_channels;
 }
 
-/* vj-pjack.c */
-
 static void _vj_jack_report_open_error(int err,
                                        long audio_rate,
                                        int input_channels,
@@ -291,8 +289,6 @@ static int _vj_jack_start(int *dri, int bytes_per_frame, long audio_rate, int au
         CONNECT_OUTPUT
     );
 }
-
-/* vj-pjack.c */
 
 int vj_jack_init(editlist *el)
 {
