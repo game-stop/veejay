@@ -2204,6 +2204,26 @@ static inline int playback_dir(int speed)
     return (speed > 0) ? 1 : ((speed < 0) ? -1 : 0);
 }
 
+
+VJ_LIB_LOCAL int veejay_video_queue_flush(veejay_t *info)
+{
+    video_playback_setup *settings = info->settings;
+    int flushed = 0;
+
+    pthread_mutex_lock(&settings->mutex);
+    for (int i = 0; i < VIDEO_QUEUE_LEN; i++) {
+        if (settings->states[i] == BUFFER_FILLED) {
+            settings->states[i] = BUFFER_FREE;
+            flushed++;
+        }
+    }
+    if (flushed > 0)
+        pthread_cond_signal(&settings->producer_wait_cv);
+    pthread_mutex_unlock(&settings->mutex);
+
+    return flushed;
+}
+
 void veejay_transport_epoch_bump(veejay_t *info)
 {
     video_playback_setup *settings;
@@ -2226,6 +2246,7 @@ void veejay_transport_epoch_bump(veejay_t *info)
                                          0,
                                          __ATOMIC_RELAXED,
                                          __ATOMIC_RELAXED));
+    veejay_video_queue_flush(info);
 }
 
 int veejay_transport_epoch_get(veejay_t *info)
@@ -9123,10 +9144,21 @@ veejay_video_packet_state(video_playback_setup *settings,
            packet->video_mapping_epoch != mapping_epoch)
             return VJ_PACKET_STALE_MAPPING;
     }
-    else if(packet->transport_epoch !=
-            atomic_load_int(&settings->transport_epoch))
-    {
-        return VJ_PACKET_STALE_TRANSPORT;
+    else {
+        const int current_transport =
+            atomic_load_int(&settings->transport_epoch);
+        if (packet->transport_epoch != current_transport) {
+            /* Grace period: accept packets whose epoch is exactly
+             * one generation behind. This covers the in-flight
+             * packet that was stamped between the video producer
+             * reading the epoch and the audio producer bumping it. */
+            const int prev_transport =
+                ((current_transport - 1) & VJ_SEQUENCE_STATUS_TRANSPORT_EPOCH_BITS);
+            if (packet->transport_epoch != prev_transport || prev_transport == 0)
+                return VJ_PACKET_STALE_TRANSPORT;
+            /* Accept this one transitional packet. The next one
+             * must carry the new epoch. */
+        }
     }
 
     return VJ_PACKET_CURRENT;
@@ -13785,7 +13817,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         }
 
         long long current_frame = atomic_load_long_long(&settings->current_frame_num);
-        const int current_transport_epoch = atomic_load_int(&settings->transport_epoch);
+        //const int current_transport_epoch = atomic_load_int(&settings->transport_epoch);
         long long mapping_frame = current_frame;
         const int current_mapping_epoch =
             veejay_video_mapping_snapshot(settings, &mapping_frame);
@@ -13829,7 +13861,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         packet->fps_generation = atomic_load_int(&settings->fps_generation);
         packet->present_epoch =
             atomic_load_int(&settings->video_present_epoch);
-        packet->transport_epoch = current_transport_epoch;
+        packet->transport_epoch = atomic_load_int(&settings->transport_epoch);
         packet->video_mapping_epoch = current_mapping_epoch;
         if(plain_clocked_source)
             packet->flags |= VJ_VIDEO_PACKET_CLOCKED_SOURCE;
@@ -14357,7 +14389,7 @@ int veejay_main(veejay_t *info)
                        "[DISPLAY] Unable to initialize thread attributes, code %d", err);
             if (err == ENOMEM)
                 return 0;
-        } else {
+        } /*else {
             attr_inited = 1;
             attrp = &attr;
 
@@ -14366,7 +14398,7 @@ int veejay_main(veejay_t *info)
             } else {
                 veejay_msg(VEEJAY_MSG_INFO, "[DISPLAY] Thread affinity set to CPU #1.");
             }
-        }
+        }*/
     }
 
 	if(info->load_action_file)
