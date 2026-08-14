@@ -2896,53 +2896,88 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
     unsigned long bpf;
     static long last_fail_ms = 0;
 
-    if(!s)
+    if (!s)
         return 0;
 
     req_ch = sync_load_i(&s->input_channels_request);
-    if(req_ch < 1)
+
+    if (req_ch < 1)
         req_ch = 2;
-    else if(req_ch > 2)
+    else if (req_ch > 2)
         req_ch = 2;
 
-    if(!vj_jack_is_running()) {
-        vj_jack_initialize();
-        if(!vj_jack_init_capture(req_ch, 16, 0)) {
-            long now = sync_now_ms();
-            if(last_fail_ms == 0 || (now - last_fail_ms) >= 2000) {
-                last_fail_ms = now;
-                veejay_msg(VEEJAY_MSG_WARNING,
-                           "[AUDIO-SYNC] unable to initialize JACK capture ports (%d channel%s)",
-                           req_ch, req_ch == 1 ? "" : "s");
-            }
+    if (!vj_jack_is_running())
+    {
+        if (vj_jack_capture_open_failed())
+        {
             sync_store_i(&s->open, 0);
             return 0;
         }
+
+        vj_jack_initialize();
+
+        if (!vj_jack_init_capture(req_ch, 16, 0))
+        {
+            long now = sync_now_ms();
+
+            if (!vj_jack_capture_open_failed() &&
+                (last_fail_ms == 0 || (now - last_fail_ms) >= 2000))
+            {
+                last_fail_ms = now;
+                veejay_msg(VEEJAY_MSG_WARNING,
+                           "[AUDIO-SYNC] unable to initialize JACK capture ports (%d channel%s)",
+                           req_ch,
+                           req_ch == 1 ? "" : "s");
+            }
+
+            sync_store_i(&s->open, 0);
+            return 0;
+        }
+
         vj_jack_enable();
     }
-    else if(!vj_jack_has_input()) {
+    else if (!vj_jack_has_input())
+    {
         long now = sync_now_ms();
 
-        if(!vj_jack_has_output()) {
-            vj_jack_stop();
-            vj_jack_initialize();
-            if(!vj_jack_init_capture(req_ch, 16, 0)) {
-                if(last_fail_ms == 0 || (now - last_fail_ms) >= 2000) {
-                    last_fail_ms = now;
-                    veejay_msg(VEEJAY_MSG_WARNING,
-                               "[AUDIO-SYNC] unable to reopen JACK as capture-only client (%d channel%s)",
-                               req_ch, req_ch == 1 ? "" : "s");
-                }
+        if (!vj_jack_has_output())
+        {
+            if (vj_jack_capture_open_failed())
+            {
                 sync_store_i(&s->open, 0);
                 return 0;
             }
+
+            vj_jack_stop();
+            vj_jack_initialize();
+
+            if (!vj_jack_init_capture(req_ch, 16, 0))
+            {
+                if (!vj_jack_capture_open_failed() &&
+                    (last_fail_ms == 0 || (now - last_fail_ms) >= 2000))
+                {
+                    last_fail_ms = now;
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                               "[AUDIO-SYNC] unable to reopen JACK as capture-only client (%d channel%s)",
+                               req_ch,
+                               req_ch == 1 ? "" : "s");
+                }
+
+                sync_store_i(&s->open, 0);
+                return 0;
+            }
+
             vj_jack_enable();
-        } else {
-            if(last_fail_ms == 0 || (now - last_fail_ms) >= 2000) {
+        }
+        else
+        {
+            if (last_fail_ms == 0 || (now - last_fail_ms) >= 2000)
+            {
                 last_fail_ms = now;
                 veejay_msg(VEEJAY_MSG_WARNING,
                            "[AUDIO-SYNC] JACK is open for playback but has no capture ports; start JACK in duplex/capture mode");
             }
+
             sync_store_i(&s->open, 0);
             return 0;
         }
@@ -2951,31 +2986,42 @@ static int sync_configure_jack(vj_audio_sync_shared_t *s)
     ch = vj_jack_get_input_channels();
     bpf = vj_jack_get_bytes_per_input_frame();
     rate = vj_jack_get_client_samplerate();
-    if(rate <= 0)
+
+    if (rate <= 0)
         rate = vj_jack_get_rate();
 
-    if(ch <= 0 || bpf == 0 || rate <= 0) {
+    if (ch <= 0 || bpf == 0 || rate <= 0)
+    {
         sync_store_i(&s->open, 0);
         return 0;
     }
 
     bits = ((int)bpf * 8) / ch;
-    if(bits != 8 && bits != 16) {
+
+    if (bits != 8 && bits != 16)
+    {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[AUDIO-SYNC] unsupported JACK capture format: channels=%d bpf=%lu bits=%d",
-                   ch, bpf, bits);
+                   ch,
+                   bpf,
+                   bits);
+
         sync_store_i(&s->open, 0);
         return 0;
     }
 
-    if(!sync_prepare_ring(s, ch, bits, rate)) {
-        veejay_msg(VEEJAY_MSG_ERROR, "[AUDIO-SYNC] unable to allocate capture ring");
+    if (!sync_prepare_ring(s, ch, bits, rate))
+    {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "[AUDIO-SYNC] unable to allocate capture ring");
+
         sync_store_i(&s->open, 0);
         return 0;
     }
 
     sync_store_i(&s->open, 1);
     last_fail_ms = 0;
+
     return 1;
 }
 
@@ -4490,8 +4536,10 @@ void *vj_audio_sync_thread(void *arg)
             long stored;
             if(!vj_jack_is_running() || !vj_jack_has_input()) {
                 if(!sync_configure_jack(s)) {
-                    sync_sleep_us(250000);
-                    continue;
+                    if (vj_jack_capture_open_failed())
+                        sync_sleep_us(1000000); /* permanent failure: slow poll */
+                    else
+                        sync_sleep_us(250000);  /* temporary/backoff */
                 }
                 vj_jack_reset_input();
             }
@@ -4792,7 +4840,11 @@ void vj_audio_sync_set_input_channels(vj_audio_sync_shared_t *s, int channels)
         channels = 1;
     else if(channels > 2)
         channels = 2;
-    if(sync_load_i(&s->input_channels_request) != channels) {
+    if (sync_load_i(&s->input_channels_request) != channels)
+    {
+        if (sync_load_i(&s->source) == VJ_AUDIO_SYNC_SOURCE_JACK)
+            vj_jack_capture_open_reset();
+
         sync_store_i(&s->input_channels_request, channels);
         sync_store_i(&s->reset_seq, sync_load_i(&s->reset_seq) + 1);
     }
@@ -4813,6 +4865,8 @@ void vj_audio_sync_set_source_jack(vj_audio_sync_shared_t *s, int channels)
 
     old_source = sync_load_i(&s->source);
     old_channels = sync_load_i(&s->input_channels_request);
+
+    vj_jack_capture_open_reset();
 
     if(old_source == VJ_AUDIO_SYNC_SOURCE_JACK &&
        old_channels == channels)

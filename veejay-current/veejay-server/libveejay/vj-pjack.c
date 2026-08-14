@@ -24,7 +24,77 @@
 #include <veejaycore/defs.h>
 #include <bio2jack/bio2jack.h>
 #include <libel/vj-el.h>
+#include <veejaycore/vj-msg.h>
 #include "vj-jack.h"
+
+#include <time.h>
+#include <pthread.h>
+
+#define VJ_JACK_CAPTURE_OPEN_MAX_ATTEMPTS   6
+#define VJ_JACK_CAPTURE_OPEN_INITIAL_MS     250L
+#define VJ_JACK_CAPTURE_OPEN_MAX_MS         8000L
+
+static pthread_mutex_t capture_open_mutex = PTHREAD_MUTEX_INITIALIZER;
+static int capture_open_attempts = 0;
+static long capture_open_next_retry_ms = 0;
+static int capture_open_failed = 0;
+
+static int capture_open_quiet = 0;
+
+static long vj_jack_now_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ((long)ts.tv_sec * 1000L) + ((long)ts.tv_nsec / 1000000L);
+}
+
+static void vj_jack_capture_open_reset_locked(void)
+{
+    capture_open_attempts = 0;
+    capture_open_next_retry_ms = 0;
+    capture_open_failed = 0;
+}
+
+static int vj_jack_capture_open_allowed_locked(long now_ms)
+{
+    if (capture_open_failed)
+        return 0;
+
+    if (capture_open_attempts > 0 && now_ms < capture_open_next_retry_ms)
+        return 0;
+
+    return 1;
+}
+
+static void vj_jack_capture_open_record_failure_locked(long now_ms)
+{
+    long delay_ms;
+
+    capture_open_attempts++;
+
+    if (capture_open_attempts >= VJ_JACK_CAPTURE_OPEN_MAX_ATTEMPTS)
+    {
+        capture_open_failed = 1;
+        capture_open_next_retry_ms = 0;
+
+        veejay_msg(1,
+                   "[AUDIO] Giving up on JACK capture after %d failed attempts",
+                   capture_open_attempts);
+        return;
+    }
+
+    delay_ms = VJ_JACK_CAPTURE_OPEN_INITIAL_MS << (capture_open_attempts - 1);
+    if (delay_ms > VJ_JACK_CAPTURE_OPEN_MAX_MS)
+        delay_ms = VJ_JACK_CAPTURE_OPEN_MAX_MS;
+
+    capture_open_next_retry_ms = now_ms + delay_ms;
+
+    veejay_msg(2,
+               "[AUDIO] JACK capture open failed, attempt %d/%d, retrying in %ld ms",
+               capture_open_attempts,
+               VJ_JACK_CAPTURE_OPEN_MAX_ATTEMPTS,
+               delay_ms);
+}
 
 static int driver = -1;
 static int driver_open = 0;
@@ -55,32 +125,67 @@ static void _vj_jack_set_open_state(int input_channels, int output_channels)
     driver_output_channels = output_channels;
 }
 
-static void _vj_jack_report_open_error(int err, long audio_rate, int input_channels, int output_channels)
+/* vj-pjack.c */
+
+static void _vj_jack_report_open_error(int err,
+                                       long audio_rate,
+                                       int input_channels,
+                                       int output_channels)
 {
-    switch(err)
+    if (capture_open_quiet && err == ERR_OPENING_JACK)
+        return;
+
+    switch (err)
     {
         case ERR_OPENING_JACK:
             veejay_msg(0, "[AUDIO] Unable to connect with jack");
             break;
+
         case ERR_RATE_MISMATCH:
             veejay_msg(0, "[AUDIO] Samplerate mismatch %ld Hz", audio_rate);
             break;
+
         case ERR_TOO_MANY_OUTPUT_CHANNELS:
             veejay_msg(0, "[AUDIO] Too many output channels: %d", output_channels);
             break;
+
         case ERR_TOO_MANY_INPUT_CHANNELS:
             veejay_msg(0, "[AUDIO] Too many input channels: %d", input_channels);
             break;
+
         case ERR_TOO_MANY_CHANNELS:
-            veejay_msg(0, "[AUDIO] Too many channels: input=%d output=%d", input_channels, output_channels);
+            veejay_msg(0,
+                       "[AUDIO] Too many channels: input=%d output=%d",
+                       input_channels,
+                       output_channels);
             break;
+
         case ERR_PORT_NOT_FOUND:
             veejay_msg(0, "[AUDIO] Unable to find jack port");
             break;
+
         default:
             veejay_msg(0, "[AUDIO] Jack error %d", err);
             break;
     }
+}
+
+int vj_jack_capture_open_failed(void)
+{
+    int failed;
+
+    pthread_mutex_lock(&capture_open_mutex);
+    failed = capture_open_failed;
+    pthread_mutex_unlock(&capture_open_mutex);
+
+    return failed;
+}
+
+void vj_jack_capture_open_reset(void)
+{
+    pthread_mutex_lock(&capture_open_mutex);
+    vj_jack_capture_open_reset_locked();
+    pthread_mutex_unlock(&capture_open_mutex);
 }
 
 int vj_jack_initialize(void)
@@ -187,32 +292,43 @@ static int _vj_jack_start(int *dri, int bytes_per_frame, long audio_rate, int au
     );
 }
 
+/* vj-pjack.c */
+
 int vj_jack_init(editlist *el)
 {
-    if(!el)
+    int ok;
+
+    if (!el)
         return 0;
 
-    if(driver_open)
+    if (driver_open)
         vj_jack_stop();
 
-    return _vj_jack_start(
+    ok = _vj_jack_start(
         &driver,
         el->audio_bps,
         el->audio_rate,
         el->audio_chans,
         1.0 / (double)el->video_fps
     );
+
+    if (ok)
+        vj_jack_capture_open_reset();
+
+    return ok;
 }
 
 int vj_jack_init_input(editlist *el)
 {
-    if(!el)
+    int ok;
+
+    if (!el)
         return 0;
 
-    if(driver_open)
+    if (driver_open)
         vj_jack_stop();
 
-    return _vj_jack_start_ex(
+    ok = _vj_jack_start_ex(
         &driver,
         el->audio_bps,
         el->audio_rate,
@@ -223,17 +339,24 @@ int vj_jack_init_input(editlist *el)
         1.0 / (double)el->video_fps,
         CONNECT_NONE
     );
+
+    if (ok)
+        vj_jack_capture_open_reset();
+
+    return ok;
 }
 
 int vj_jack_init_duplex(editlist *el)
 {
-    if(!el)
+    int ok;
+
+    if (!el)
         return 0;
 
-    if(driver_open)
+    if (driver_open)
         vj_jack_stop();
 
-    return _vj_jack_start_ex(
+    ok = _vj_jack_start_ex(
         &driver,
         el->audio_bps,
         el->audio_rate,
@@ -244,24 +367,45 @@ int vj_jack_init_duplex(editlist *el)
         1.0 / (double)el->video_fps,
         CONNECT_OUTPUT
     );
+
+    if (ok)
+        vj_jack_capture_open_reset();
+
+    return ok;
 }
 
-int vj_jack_init_capture(int input_channels, unsigned int bits_per_channel, unsigned long jack_port_flags)
+int vj_jack_init_capture(int input_channels,
+                         unsigned int bits_per_channel,
+                         unsigned long jack_port_flags)
 {
     int bytes_per_frame;
+    int ok;
+    long now_ms;
 
-    if(input_channels < 1)
+    if (input_channels < 1)
         input_channels = 2;
 
-    if(bits_per_channel != 8 && bits_per_channel != 16)
+    if (bits_per_channel != 8 && bits_per_channel != 16)
         bits_per_channel = 16;
 
-    if(driver_open)
+    if (driver_open)
         return driver_input_channels > 0;
+
+    pthread_mutex_lock(&capture_open_mutex);
+
+    now_ms = vj_jack_now_ms();
+
+    if (!vj_jack_capture_open_allowed_locked(now_ms))
+    {
+        pthread_mutex_unlock(&capture_open_mutex);
+        return 0;
+    }
+
+    capture_open_quiet = 1;
 
     bytes_per_frame = input_channels * ((int)bits_per_channel / 8);
 
-    return _vj_jack_start_ex(
+    ok = _vj_jack_start_ex(
         &driver,
         bytes_per_frame,
         0,
@@ -272,6 +416,19 @@ int vj_jack_init_capture(int input_channels, unsigned int bits_per_channel, unsi
         1.0 / 25.0,
         CONNECT_NONE
     );
+
+    now_ms = vj_jack_now_ms();
+
+    if (ok)
+        vj_jack_capture_open_reset_locked();
+    else
+        vj_jack_capture_open_record_failure_locked(now_ms);
+
+    capture_open_quiet = 0;
+
+    pthread_mutex_unlock(&capture_open_mutex);
+
+    return ok;
 }
 
 int vj_jack_update_buffer(uint8_t *buff, int bps, int num_channels, int buf_len)

@@ -3129,8 +3129,8 @@ int vj_audio_beat_copy_record_audio(vj_audio_beat_shared_t *s,
 
     return out_frames;
 }
-
-static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_thread_t *t)
+static int ab_configure_from_jack(vj_audio_beat_shared_t *s,
+                                  vj_audio_beat_thread_t *t)
 {
     int ch;
     int rate;
@@ -3139,26 +3139,33 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     unsigned long bpf;
     static long last_capture_fail_log_ms = 0;
 
-    if(!s || !t)
+    if (!s || !t)
         return 0;
 
     req_ch = ab_load_i(&s->input_channels_request);
 
-    if(req_ch < 1)
+    if (req_ch < 1)
         req_ch = 2;
-    else if(req_ch > 2)
+    else if (req_ch > 2)
         req_ch = 2;
 
-    if(!vj_jack_is_running())
+    if (!vj_jack_is_running())
     {
+        if (vj_jack_capture_open_failed())
+        {
+            ab_store_i(&s->open, 0);
+            return 0;
+        }
+
         vj_jack_initialize();
 
-        if(!vj_jack_init_capture(req_ch, 16, 0))
+        if (!vj_jack_init_capture(req_ch, 16, 0))
         {
             long now = ab_now_ms();
 
-            if(last_capture_fail_log_ms == 0 ||
-               (now - last_capture_fail_log_ms) >= 2000)
+            if (!vj_jack_capture_open_failed() &&
+                (last_capture_fail_log_ms == 0 ||
+                 (now - last_capture_fail_log_ms) >= 2000))
             {
                 last_capture_fail_log_ms = now;
                 veejay_msg(VEEJAY_MSG_WARNING,
@@ -3173,19 +3180,26 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
 
         vj_jack_enable();
     }
-    else if(!vj_jack_has_input())
+    else if (!vj_jack_has_input())
     {
         long now = ab_now_ms();
 
-        if(!vj_jack_has_output())
+        if (!vj_jack_has_output())
         {
+            if (vj_jack_capture_open_failed())
+            {
+                ab_store_i(&s->open, 0);
+                return 0;
+            }
+
             vj_jack_stop();
             vj_jack_initialize();
 
-            if(!vj_jack_init_capture(req_ch, 16, 0))
+            if (!vj_jack_init_capture(req_ch, 16, 0))
             {
-                if(last_capture_fail_log_ms == 0 ||
-                   (now - last_capture_fail_log_ms) >= 2000)
+                if (!vj_jack_capture_open_failed() &&
+                    (last_capture_fail_log_ms == 0 ||
+                     (now - last_capture_fail_log_ms) >= 2000))
                 {
                     last_capture_fail_log_ms = now;
                     veejay_msg(VEEJAY_MSG_WARNING,
@@ -3202,12 +3216,12 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
         }
         else
         {
-            if(last_capture_fail_log_ms == 0 ||
-               (now - last_capture_fail_log_ms) >= 2000)
+            if (last_capture_fail_log_ms == 0 ||
+                (now - last_capture_fail_log_ms) >= 2000)
             {
                 last_capture_fail_log_ms = now;
                 veejay_msg(VEEJAY_MSG_WARNING,
-                           "[AUDIO-BEAT] JACK is already open for playback but has no capture input ports; this JACK wrapper cannot add inputs to an open output-only client, restart audio in duplex/capture mode");
+                           "[AUDIO-BEAT] JACK is already open for playback but has no capture input ports; restart audio in duplex/capture mode");
             }
 
             ab_store_i(&s->open, 0);
@@ -3218,17 +3232,24 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     {
         ch = vj_jack_get_input_channels();
 
-        if(ch > 0 && ch != req_ch && !vj_jack_has_output())
+        if (ch > 0 && ch != req_ch && !vj_jack_has_output())
         {
+            if (vj_jack_capture_open_failed())
+            {
+                ab_store_i(&s->open, 0);
+                return 0;
+            }
+
             vj_jack_stop();
             vj_jack_initialize();
 
-            if(!vj_jack_init_capture(req_ch, 16, 0))
+            if (!vj_jack_init_capture(req_ch, 16, 0))
             {
                 long now = ab_now_ms();
 
-                if(last_capture_fail_log_ms == 0 ||
-                   (now - last_capture_fail_log_ms) >= 2000)
+                if (!vj_jack_capture_open_failed() &&
+                    (last_capture_fail_log_ms == 0 ||
+                     (now - last_capture_fail_log_ms) >= 2000))
                 {
                     last_capture_fail_log_ms = now;
                     veejay_msg(VEEJAY_MSG_WARNING,
@@ -3243,12 +3264,12 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
 
             vj_jack_enable();
         }
-        else if(ch > 0 && ch != req_ch)
+        else if (ch > 0 && ch != req_ch)
         {
             long now = ab_now_ms();
 
-            if(last_capture_fail_log_ms == 0 ||
-               (now - last_capture_fail_log_ms) >= 2000)
+            if (last_capture_fail_log_ms == 0 ||
+                (now - last_capture_fail_log_ms) >= 2000)
             {
                 last_capture_fail_log_ms = now;
                 veejay_msg(VEEJAY_MSG_WARNING,
@@ -3259,12 +3280,12 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
         }
     }
 
-    if(!vj_jack_has_input())
+    if (!vj_jack_has_input())
     {
         long now = ab_now_ms();
 
-        if(last_capture_fail_log_ms == 0 ||
-           (now - last_capture_fail_log_ms) >= 2000)
+        if (last_capture_fail_log_ms == 0 ||
+            (now - last_capture_fail_log_ms) >= 2000)
         {
             last_capture_fail_log_ms = now;
             veejay_msg(VEEJAY_MSG_WARNING,
@@ -3279,15 +3300,15 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     bpf = vj_jack_get_bytes_per_input_frame();
     rate = vj_jack_get_client_samplerate();
 
-    if(rate <= 0)
+    if (rate <= 0)
         rate = vj_jack_get_rate();
 
-    if(ch <= 0 || bpf == 0 || rate <= 0)
+    if (ch <= 0 || bpf == 0 || rate <= 0)
     {
         long now = ab_now_ms();
 
-        if(last_capture_fail_log_ms == 0 ||
-           (now - last_capture_fail_log_ms) >= 2000)
+        if (last_capture_fail_log_ms == 0 ||
+            (now - last_capture_fail_log_ms) >= 2000)
         {
             last_capture_fail_log_ms = now;
             veejay_msg(VEEJAY_MSG_WARNING,
@@ -3303,11 +3324,12 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
 
     bits = ((int)bpf * 8) / ch;
 
-    if(bits != 16 && bits != 8)
+    if (bits != 16 && bits != 8)
     {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[AUDIO-BEAT] unsupported JACK capture format %d bit",
                    bits);
+
         ab_store_i(&s->open, 0);
         return 0;
     }
@@ -3317,10 +3339,11 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
     t->bits_per_channel = bits;
     t->sample_rate = rate;
 
-    if(!ab_thread_prepare_buffer(t))
+    if (!ab_thread_prepare_buffer(t))
     {
         veejay_msg(VEEJAY_MSG_ERROR,
                    "[AUDIO-BEAT] unable to allocate capture buffer");
+
         ab_store_i(&s->open, 0);
         return 0;
     }
@@ -3345,7 +3368,9 @@ static int ab_configure_from_jack(vj_audio_beat_shared_t *s, vj_audio_beat_threa
                ch,
                rate,
                bits);
+
     ab_log_config(s, "after JACK open");
+
     return 1;
 }
 
@@ -5755,7 +5780,10 @@ void *vj_audio_beat_thread(void *arg)
             }
             else if(!ab_configure_from_jack(s, &t))
             {
-                ab_sleep_us(250000);
+                if (vj_jack_capture_open_failed())
+                    ab_sleep_us(1000000); /* permanent failure: slow poll */
+                else
+                    ab_sleep_us(250000);  /* temporary/backoff */
                 continue;
             }
         }
@@ -9791,6 +9819,8 @@ void vj_audio_beat_set_input_channels(vj_audio_beat_shared_t *s, int channels)
 
     if(old_channels != channels)
     {
+        vj_jack_capture_open_reset();
+
         ab_store_i(&s->input_channels_request, channels);
 
         if(s->sync) {

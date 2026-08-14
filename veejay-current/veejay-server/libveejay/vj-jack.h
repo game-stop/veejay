@@ -61,6 +61,8 @@ int vj_jack_has_input(void);
 int vj_jack_has_output(void);
 int vj_jack_get_input_channels(void);
 int vj_jack_get_output_channels(void);
+int  vj_jack_capture_open_failed(void);
+void vj_jack_capture_open_reset(void);
 #endif
 
 #endif
