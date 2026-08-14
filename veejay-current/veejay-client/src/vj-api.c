@@ -5749,18 +5749,103 @@ static void clear_progress_bar(const char *name, gdouble val)
     (void)set_progress_bar_fraction_by_name(name, val);
 }
 
+typedef enum
+{
+    CONTENT_VIDEO,
+    CONTENT_IMAGE,
+} content_category_t;
+
 static struct
 {
     const char *descr;
     const char *filter;
+    content_category_t category;
 } content_file_filters[] = {
-    { "AVI Files (*.avi)", "*.avi", },
-    { "Digital Video Files (*.dv)", "*.dv" },
-    { "Edit Decision List Files (*.edl)", "*.edl" },
-    { "PNG (Portable Network Graphics) (*.png)", "*.png" },
-    { "JPG (Joint Photographic Experts Group) (*.jpg)", "*.jpg" },
-    { NULL, NULL },
+    /* Existing formats */
+    { "AVI Files (*.avi)", "*.avi", CONTENT_VIDEO },
+    { "Digital Video Files (*.dv)", "*.dv", CONTENT_VIDEO },
+    { "Edit Decision List Files (*.edl)", "*.edl", CONTENT_VIDEO },
+
+    /* FFmpeg-supported video formats */
+    { "Matroska Video Files (*.mkv)", "*.mkv", CONTENT_VIDEO },
+    { "MPEG-4 Video Files (*.mp4)", "*.mp4", CONTENT_VIDEO },
+    { "QuickTime Movie Files (*.mov)", "*.mov", CONTENT_VIDEO },
+    { "Flash Video Files (*.flv)", "*.flv", CONTENT_VIDEO },
+    { "WebM Video Files (*.webm)", "*.webm", CONTENT_VIDEO },
+    { "Raw H.264 Video Files (*.h264)", "*.h264", CONTENT_VIDEO },
+    { "MPEG-4 Video Files (*.m4v)", "*.m4v", CONTENT_VIDEO },
+    { "MPEG Video Files (*.mpg)", "*.mpg", CONTENT_VIDEO },
+    { "MPEG Video Files (*.mpeg)", "*.mpeg", CONTENT_VIDEO },
+    { "Windows Media Video Files (*.wmv)", "*.wmv", CONTENT_VIDEO },
+    { "Material Exchange Format Files (*.mxf)", "*.mxf", CONTENT_VIDEO },
+    { "Ogg Video Files (*.ogv)", "*.ogv", CONTENT_VIDEO },
+    { "3GPP Multimedia Files (*.3gp)", "*.3gp", CONTENT_VIDEO },
+    { "MPEG-2 Transport Stream Files (*.ts)", "*.ts", CONTENT_VIDEO },
+    { "DVD Video Object Files (*.vob)", "*.vob", CONTENT_VIDEO },
+
+    /* Existing image formats */
+    { "PNG (Portable Network Graphics) (*.png)", "*.png", CONTENT_IMAGE },
+    { "JPG (Joint Photographic Experts Group) (*.jpg)", "*.jpg", CONTENT_IMAGE },
+
+    /* GdkPixbuf-supported image formats */
+    { "JPEG Image Files (*.jpeg)", "*.jpeg", CONTENT_IMAGE },
+    { "Windows Bitmap Files (*.bmp)", "*.bmp", CONTENT_IMAGE },
+    { "Graphics Interchange Format Files (*.gif)", "*.gif", CONTENT_IMAGE },
+    { "Tagged Image File Format Files (*.tif)", "*.tif", CONTENT_IMAGE },
+    { "Tagged Image File Format Files (*.tiff)", "*.tiff", CONTENT_IMAGE },
+    { "Scalable Vector Graphics Files (*.svg)", "*.svg", CONTENT_IMAGE },
+    { "WebP Image Files (*.webp)", "*.webp", CONTENT_IMAGE },
+    { "Windows Icon Files (*.ico)", "*.ico", CONTENT_IMAGE },
+    { "Animated Cursor Files (*.ani)", "*.ani", CONTENT_IMAGE },
+    { "Apple Icon Image Files (*.icns)", "*.icns", CONTENT_IMAGE },
+    { "Portable Any Map Files (*.pnm)", "*.pnm", CONTENT_IMAGE },
+    { "Portable Pixmap Files (*.ppm)", "*.ppm", CONTENT_IMAGE },
+    { "Portable Graymap Files (*.pgm)", "*.pgm", CONTENT_IMAGE },
+    { "Portable Bitmap Files (*.pbm)", "*.pbm", CONTENT_IMAGE },
+    { "Truevision Graphics Adapter Files (*.tga)", "*.tga", CONTENT_IMAGE },
+    { "X BitMap Files (*.xbm)", "*.xbm", CONTENT_IMAGE },
+    { "X PixMap Files (*.xpm)", "*.xpm", CONTENT_IMAGE },
+    { "QuickTime Image Format Files (*.qtif)", "*.qtif", CONTENT_IMAGE },
+    { "JPEG XL Image Files (*.jxl)", "*.jxl", CONTENT_IMAGE },
+    { "High Efficiency Image Format Files (*.heic)", "*.heic", CONTENT_IMAGE },
+
+    { NULL, NULL, 0 },
 };
+
+
+static void add_content_category_filter(GtkWidget *dialog,
+                                        const char *name,
+                                        content_category_t category,
+                                        gboolean include_all_categories)
+{
+    int count = 0;
+
+    for (int i = 0; content_file_filters[i].filter != NULL; i++)
+    {
+        if (include_all_categories ||
+            content_file_filters[i].category == category)
+        {
+            count++;
+        }
+    }
+
+    if (count == 0)
+        return;
+
+    GtkFileFilter *filter = gtk_file_filter_new();
+    gtk_file_filter_set_name(filter, name);
+
+    for (int i = 0; content_file_filters[i].filter != NULL; i++)
+    {
+        if (include_all_categories ||
+            content_file_filters[i].category == category)
+        {
+            gtk_file_filter_add_pattern(filter, content_file_filters[i].filter);
+        }
+    }
+
+    gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+}
 
 static void add_file_filters(GtkWidget *dialog, file_filter_t type )
 {
@@ -5768,36 +5853,36 @@ static void add_file_filters(GtkWidget *dialog, file_filter_t type )
 
     switch(type) {
         case FILE_FILTER_DEFAULT:
-            for(int i = 0; content_file_filters[i].descr != NULL ; i ++ )
-            {
-                filter = gtk_file_filter_new();
-                gtk_file_filter_set_name( filter, content_file_filters[i].descr);
-                gtk_file_filter_add_pattern( filter, content_file_filters[i].filter);
-                gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter );
-            }
+            add_content_category_filter(dialog, "All Supported Files", 0, TRUE);
+            add_content_category_filter(dialog, "Video Files", CONTENT_VIDEO, FALSE);
+            add_content_category_filter(dialog,"Image Files", CONTENT_IMAGE, FALSE);
             break;
         case FILE_FILTER_SL:
             filter = gtk_file_filter_new();
             gtk_file_filter_set_name( filter, "Sample List Files (*.sl)");
             gtk_file_filter_add_pattern( filter, "*.sl");
+            gtk_file_filter_add_pattern( filter, "*.SL");
             gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
             break;
         case FILE_FILTER_XML:
             filter = gtk_file_filter_new();
             gtk_file_filter_set_name( filter, "Action Files (*.xml)");
             gtk_file_filter_add_pattern( filter, "*.xml");
+            gtk_file_filter_add_pattern( filter, "*.XML");
             gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
             break;
         case FILE_FILTER_YUV:
             filter = gtk_file_filter_new();
             gtk_file_filter_set_name( filter, "YUV4MPEG files (*.yuv)");
             gtk_file_filter_add_pattern( filter, "*.yuv" );
+            gtk_file_filter_add_pattern( filter, "*.YUV" );
             gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
             break;
         case FILE_FILTER_CFG:
             filter = gtk_file_filter_new();
             gtk_file_filter_set_name( filter, "MIDI config files (*.cfg)");
             gtk_file_filter_add_pattern( filter, "*.cfg" );
+            gtk_file_filter_add_pattern( filter, "*.CFG" );
             gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);
             break;
         case FILE_FILTER_WAV:
