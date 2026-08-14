@@ -25938,7 +25938,16 @@ void vj_gui_init(const char *glade_file,
         }
         update_spin_value2(widget_cache[WIDGET_BUTTON_PORTNUM], port_num);
 
-        reloaded_show_launcher ();
+        if(launcher > 0) {
+            info->watch.state = STATE_CONNECT;
+            veejay_msg(VEEJAY_MSG_INFO,
+                    "Auto-connecting to %s:%d from command line",
+                    hostname ? hostname : "localhost",
+                    port_num);
+        }
+        else if(!auto_connect) {
+            reloaded_show_launcher ();
+        }
     }
 
     if( user_preview ) {
