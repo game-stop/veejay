@@ -1258,6 +1258,103 @@ Set the maximum number of attempts before giving up on the capture device.
 Use 1 to query frames in the main loop instead of using a separate capture
 thread.
 
+
+.SS Override/Debugging
+
+.TP
+.B VEEJAY_NVJPEG_OUTPUT
+Allows overriding specific output formats or behaviors for NVJPEG processing.
+Valid values are
+.BR 422 ,
+.BR 444 ,
+and
+.BR native .
+Default is
+.BR native .
+
+.TP
+.B VEEJAY_SAMPLE_LOOP_DIAG
+Enables diagnostics for sample looping.
+
+.TP
+.B VEEJAY_SAMPLE_LOOP_DIAG_MS
+Sets the interval in milliseconds for sample loop diagnostics.
+
+.TP
+.B VEEJAY_PERFORM_SSM_DEBUG
+Toggles debugging output for the sample state machine's performance and transitions.
+
+.TP
+.B VEEJAY_PERFORM_SSM_DEBUG_EVERY
+Controls the frequency of debug logging for sample state machine performance.
+
+.TP
+.B VEEJAY_AUDIO_STATS
+Enables periodic reporting of audio performance statistics.
+
+.TP
+.B VEEJAY_FFMPEG_HW_BACKEND
+Selects the specific hardware acceleration backend for FFmpeg decoding.
+Valid values are
+.BR auto ,
+.BR software ,
+.BR vulkan ,
+and
+.BR vaapi .
+Default is
+.BR auto .
+
+.TP
+.B VEEJAY_FFMPEG_HW_MIN_PIXELS
+Defines the minimum pixel threshold to trigger hardware acceleration fallback.
+Default is
+.B 921600LL .
+
+.TP
+.B VEEJAY_FFMPEG_INDEX
+Manages FFmpeg indexing behavior.
+Valid values are
+.BR auto ,
+.BR sync ,
+and
+.BR off .
+Default is
+.BR auto .
+
+.TP
+.B VEEJAY_FFMPEG_INDEX_WAIT_MS
+Sets the timeout or wait interval in milliseconds during FFmpeg stream indexing.
+
+.TP
+.B VEEJAY_FFMPEG_VALIDATE_FRAME_COUNT
+Enables or disables frame count validation during stream probing.
+
+.TP
+.B VEEJAY_MJPEG_DECODER
+Selects the specific decoding backend for MJPEG streams.
+Valid values are
+.BR auto ,
+.BR nvjpeg ,
+and
+.BR software .
+
+.TP
+.B VEEJAY_CACHE_PROBE_MB
+Configures the editlist cache size.
+Valid range is from
+.BR 4
+to
+.BR 512
+MB.
+
+.TP
+.B VEEJAY_STRICT_PORT
+Enforces strict port binding and disables automatic port fallback.
+Valid values are
+.BR 1
+and
+.BR 0 .
+
 .SH ENVIRONMENT VARIABLE EXAMPLES
 
 .TP
@@ -1276,6 +1373,7 @@ on that screen.
 .TP
 .B VEEJAY_DEFAULT_CHANNEL
 Set the default Video4Linux channel ID for veejay.
+
 
 .SH HOME DIRECTORY
 
