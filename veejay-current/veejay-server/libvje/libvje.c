@@ -494,8 +494,8 @@ int vje_init(int w, int h)
 
 
 #ifdef _OPENMP
-    omp_set_dynamic(0);
-    omp_set_max_active_levels(1);
+    //omp_set_dynamic(0);
+    //omp_set_max_active_levels(1);
 #endif
 
     init_sqrt_map_pixel_values();
