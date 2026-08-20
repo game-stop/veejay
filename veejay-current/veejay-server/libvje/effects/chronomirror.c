@@ -47,6 +47,7 @@ typedef struct {
     int len;
     int seeded;
     int frame;
+    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -303,6 +304,7 @@ void *chronomirror_malloc(int w, int h)
     c->bleed_lut_valid = 0;
     c->render_lut_valid = 0;
 
+    c->n_threads = vje_advise_num_threads(w * h);
 
     for(i = 0; i < 256; i++) {
         int dx;
@@ -2193,11 +2195,8 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     int plume_gain;
     int color_energy;
 
-#pragma omp single
-    {
-        if(!c->seeded)
-            cs_seed(c, frame);
-    }
+    if(!c->seeded)
+        cs_seed(c, frame);
 
     trigger_gate = cs_param1000_to_u8(args[P_TRIGGER_GATE]);
     rise         = cs_param1000_to_u8(args[P_RISE]);
@@ -2210,22 +2209,20 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
     plume_gain   = cs_clampi(args[P_PLUME_GAIN], 0, 1000);
     color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, 1000);
 
-#pragma omp single
-    {
-        cs_build_luts_if_needed(
-            c,
-            trigger_gate,
-            rise,
-            curl,
-            decay,
-            density,
-            source_bleed,
-            turbulence,
-            plume_gain,
-            color_energy
-        );
-    }
+    cs_build_luts_if_needed(
+        c,
+        trigger_gate,
+        rise,
+        curl,
+        decay,
+        density,
+        source_bleed,
+        turbulence,
+        plume_gain,
+        color_energy
+    );
 
+#pragma omp parallel num_threads(c->n_threads)
     {
         cs_compute_smoke(
             c,
@@ -2246,12 +2243,8 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
             source_bleed,
             color_mode
         );
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        c->frame++;
-    }
+    c->frame++;
 }
 

@@ -35,6 +35,7 @@ typedef struct {
     int read_pos;
     int reverse;
     int seeded;
+    int n_threads;
 } magicscratcher_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -113,6 +114,7 @@ void *magicscratcher_malloc(int w, int h)
         return NULL;
     }
 
+    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }
@@ -185,14 +187,11 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp single
-    {
-        if(!m->seeded)
-            magicscratcher_seed(m, Y, len);
+    if(!m->seeded)
+        magicscratcher_seed(m, Y, len);
 
-        if(m->read_pos >= n)
-            m->read_pos = n - 1;
-    }
+    if(m->read_pos >= n)
+        m->read_pos = n - 1;
 
     int read_slot = m->write_pos - 1 - m->read_pos;
 
@@ -203,7 +202,7 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict write = m->mframe + (size_t)len * (size_t)m->write_pos;
     pix_func_Y func_y = get_pix_func_Y(mode);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(m->n_threads)
     for(int i = 0; i < len; i++) {
         const uint8_t src = Y[i];
 
@@ -211,20 +210,17 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
         write[i] = src;
     }
 
-#pragma omp single
-    {
-        m->write_pos++;
+    m->write_pos++;
 
-        if(m->write_pos >= MAX_SCRATCH_FRAMES)
-            m->write_pos = 0;
+    if(m->write_pos >= MAX_SCRATCH_FRAMES)
+        m->write_pos = 0;
 
-        if(grayscale) {
-            const int uv_len = frame->ssm ? len : frame->uv_len;
+    if(grayscale) {
+        const int uv_len = frame->ssm ? len : frame->uv_len;
 
-            veejay_memset(Cb, 128, uv_len);
-            veejay_memset(Cr, 128, uv_len);
-        }
-
-        magicscratcher_advance_depth(m, n, pingpong);
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
     }
+
+    magicscratcher_advance_depth(m, n, pingpong);
 }

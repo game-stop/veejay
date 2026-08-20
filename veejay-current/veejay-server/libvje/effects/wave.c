@@ -57,6 +57,7 @@ typedef struct {
     float factor_env;
     float speed_env;
     int env_init;
+    int n_threads;
 } wave_t;
 
 static inline int wave_clampi(int v, int lo, int hi)
@@ -183,6 +184,7 @@ void *wave_malloc(int w, int h)
     data->speed_env = 8.0f;
     data->env_init = 0;
 
+    data->n_threads = vje_advise_num_threads(len);
 
     return data;
 }
@@ -245,30 +247,24 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     if(!deform_x && !deform_y)
         return;
 
-#pragma omp single
-    {
-        if(!data->env_init) {
-            data->factor_env = (float)base_factor;
-            data->speed_env = (float)base_speed;
-            data->env_init = 1;
-        }
-
-        data->factor_env = wave_follow_f(data->factor_env, (float)base_factor, 0.115f, 0.060f);
-        data->speed_env  = wave_follow_f(data->speed_env,  (float)base_speed,  0.105f, 0.055f);
+    if(!data->env_init) {
+        data->factor_env = (float)base_factor;
+        data->speed_env = (float)base_speed;
+        data->env_init = 1;
     }
+
+    data->factor_env = wave_follow_f(data->factor_env, (float)base_factor, 0.115f, 0.060f);
+    data->speed_env  = wave_follow_f(data->speed_env,  (float)base_speed,  0.105f, 0.055f);
 
     const int factor = wave_clampi((int)(data->factor_env + 0.5f), 1, 100);
     const int speed = wave_clampi((int)(data->speed_env + 0.5f), 1, 100);
 
-#pragma omp single
-    {
-        data->phase += (float)speed * 0.0065f;
+    data->phase += (float)speed * 0.0065f;
 
-        if(data->phase > 4096.0f)
-            data->phase -= 4096.0f;
+    if(data->phase > 4096.0f)
+        data->phase -= 4096.0f;
 
-        wave_build_maps(data, width, height, factor, deform_x, deform_y);
-    }
+    wave_build_maps(data, width, height, factor, deform_x, deform_y);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -281,7 +277,7 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     const int *restrict map_x = data->map_x;
     const int *restrict map_y = data->map_y;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(data->n_threads)
     for(int y = 0; y < height; y++) {
         const int src_row = map_y[y] * width;
         const int dst_row = y * width;
@@ -296,10 +292,7 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-#pragma omp single
-    {
-        veejay_memcpy(Y, dstY, len);
-        veejay_memcpy(U, dstU, len);
-        veejay_memcpy(V, dstV, len);
-    }
+    veejay_memcpy(Y, dstY, len);
+    veejay_memcpy(U, dstU, len);
+    veejay_memcpy(V, dstV, len);
 }

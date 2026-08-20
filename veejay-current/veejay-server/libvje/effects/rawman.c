@@ -154,17 +154,15 @@ void rawman_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[P_MODE];
     const int value = args[P_VALUE];
     const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t lut[256];
 
-#pragma omp single
-    {
-        rawman_build_lut(lut, mode, value);
-    }
+    rawman_build_lut(lut, mode, value);
 
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++)
         Y[i] = lut[Y[i]];
 }

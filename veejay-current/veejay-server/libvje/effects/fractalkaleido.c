@@ -1155,25 +1155,22 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     eff[9]  = args[9];
 
 
-#pragma omp single
-    {
-        if (!s->smooth_init) {
-            for (int i = 0; i < 10; i++)
-                s->smooth_args[i] = eff[i];
+    if (!s->smooth_init) {
+        for (int i = 0; i < 10; i++)
+            s->smooth_args[i] = eff[i];
 
-            s->smooth_init = 1;
-        } else {
-            s->smooth_args[0] = eff[0];
-            s->smooth_args[1] = eff[1];
-            s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 5, 10);
-            s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 1, 10);
-            s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 1, 10);
-            s->smooth_args[5] = eff[5];
-            s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 4, 10);
-            s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 5, 10);
-            s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 5, 10);
-            s->smooth_args[9] = eff[9];
-        }
+        s->smooth_init = 1;
+    } else {
+        s->smooth_args[0] = eff[0];
+        s->smooth_args[1] = eff[1];
+        s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 5, 10);
+        s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 1, 10);
+        s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 1, 10);
+        s->smooth_args[5] = eff[5];
+        s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 4, 10);
+        s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 5, 10);
+        s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 5, 10);
+        s->smooth_args[9] = eff[9];
     }
 
     for (int i = 0; i < 10; i++)
@@ -1189,6 +1186,7 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
 
     needs_update = (!s->map_ready) || changed || (map_args[6] != 0);
 
+#pragma omp parallel num_threads(s->n_threads)
     {
         if(needs_update) {
             const int mode = map_args[9];
@@ -1231,13 +1229,9 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
             outU[i] = srcU[idx];
             outV[i] = srcV[idx];
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        veejay_memcpy(frame->data[0], outY, len);
-        veejay_memcpy(frame->data[1], outU, len);
-        veejay_memcpy(frame->data[2], outV, len);
-    }
+    veejay_memcpy(frame->data[0], outY, len);
+    veejay_memcpy(frame->data[1], outU, len);
+    veejay_memcpy(frame->data[2], outV, len);
 }

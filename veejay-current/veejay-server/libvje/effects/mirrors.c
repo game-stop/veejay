@@ -30,6 +30,7 @@
 typedef struct {
     int n__;
     int N__;
+    int n_threads;
     void *motionmap;
 } mirrors_t;
 
@@ -180,6 +181,7 @@ void *mirrors_malloc(int w, int h)
     if(!m)
         return NULL;
 
+    m->n_threads = vje_advise_num_threads(w * h);
 
     return m;
 }
@@ -214,25 +216,23 @@ void mirrors_apply(void *ptr, VJFrame *frame, int *args)
     int interpolate = 0;
     int motion = 0;
 
-    #pragma omp single copyprivate(factor, interpolate, motion)
-    {
-        if(motionmap_active(m->motionmap)) {
-            int tmp1 = 0;
-            int tmp2 = factor;
+    if(motionmap_active(m->motionmap)) {
+        int tmp1 = 0;
+        int tmp2 = factor;
 
-            motionmap_scale_to(m->motionmap, max_factor, max_factor, 0, 0, &tmp1, &tmp2, &(m->n__), &(m->N__));
-            factor = clampi(tmp2, 0, max_factor);
-            motion = 1;
+        motionmap_scale_to(m->motionmap, max_factor, max_factor, 0, 0, &tmp1, &tmp2, &(m->n__), &(m->N__));
+        factor = clampi(tmp2, 0, max_factor);
+        motion = 1;
 
-            if(m->N__ != m->n__ && m->n__ != 0)
-                interpolate = 1;
-        }
-        else {
-            m->n__ = 0;
-            m->N__ = 0;
-        }
+        if(m->N__ != m->n__ && m->n__ != 0)
+            interpolate = 1;
+    }
+    else {
+        m->n__ = 0;
+        m->N__ = 0;
     }
 
+#pragma omp parallel num_threads(m->n_threads)
     {
         switch(type) {
             case 0:
@@ -248,15 +248,11 @@ void mirrors_apply(void *ptr, VJFrame *frame, int *args)
                 mirrors_horizontal(frame->data, width, height, factor, 1);
                 break;
         }
-    #pragma omp barrier
     }
 
-    #pragma omp single
-    {
-        if(interpolate)
-            motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
+    if(interpolate)
+        motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
 
-        if(motion)
-            motionmap_store_frame(m->motionmap, frame);
-    }
+    if(motion)
+        motionmap_store_frame(m->motionmap, frame);
 }

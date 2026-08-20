@@ -97,6 +97,7 @@ void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     }
 
     const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y1 = frame->data[0];
     uint8_t *restrict U1 = frame->data[1];
@@ -109,7 +110,7 @@ void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(opacity <= 0)
         return;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
         const int y = Y1[i];
         int mask = 0;

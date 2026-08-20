@@ -35,6 +35,7 @@
 #define GREYSELECT_SCALE 4096
 
 typedef struct {
+    int n_threads;
     int last[GREYSELECT_PARAMS];
     int mag_fp;
     int cos_q_fp;
@@ -158,6 +159,7 @@ void *greyselect_malloc(int w, int h)
     g->inv_range_fp = 255 << 8;
     g->black_clip_fp = 0;
     g->swap = 0;
+    g->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) g;
 }
@@ -221,10 +223,7 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
 {
     greyselect_t *g = (greyselect_t*) ptr;
 
-#pragma omp single
-    {
-        greyselect_update_cache(g, args);
-    }
+    greyselect_update_cache(g, args);
 
     const int mag_fp = g->mag_fp;
     const int cos_q_fp = g->cos_q_fp;
@@ -238,7 +237,7 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(g->n_threads)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

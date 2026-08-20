@@ -35,6 +35,7 @@
 
 typedef struct {
     uint8_t *buf[3];
+    int n_threads;
     int w;
     int h;
 
@@ -223,6 +224,7 @@ void *squares_malloc(int w, int h)
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
+    s->n_threads = vje_advise_num_threads(len);
 
     s->w = w;
     s->h = h;
@@ -254,7 +256,8 @@ static void squares_apply_blocks(VJFrame *frame,
                                  int parity,
                                  int phase_x,
                                  int phase_y,
-                                 int source_mix_q8)
+                                 int source_mix_q8,
+                                 int n_threads)
 {
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -306,7 +309,7 @@ static void squares_apply_blocks(VJFrame *frame,
     const int nx = ((x_sup - x_inf) + radius - 1) / radius;
     const int ny = ((y_sup - y_inf) + radius - 1) / radius;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int by = 0; by < ny; by++) {
         const int y = y_inf + by * radius;
 
@@ -414,16 +417,14 @@ void squares_apply(void *ptr, VJFrame *frame, int *args)
     const int size_drive_arg = args[P_SIZE_DRIVE];
     const int mix_drive_arg = args[P_MIX_DRIVE];
 
-    #pragma omp single
-    {
-        veejay_memcpy(s->buf[0], frame->data[0], len);
-        veejay_memcpy(s->buf[1], frame->data[1], len);
-        veejay_memcpy(s->buf[2], frame->data[2], len);
-    }
+    veejay_memcpy(s->buf[0], frame->data[0], len);
+    veejay_memcpy(s->buf[1], frame->data[1], len);
+    veejay_memcpy(s->buf[2], frame->data[2], len);
 
     const uint8_t *srcY = s->buf[0];
     const uint8_t *srcU = s->buf[1];
     const uint8_t *srcV = s->buf[2];
+    const int n_threads = s->n_threads;
 
     int phase_x = 0;
     int phase_y = 0;
@@ -444,32 +445,22 @@ void squares_apply(void *ptr, VJFrame *frame, int *args)
     int phase_y_target = (phase_y_arg * target_radius + 500) / 1000;
     int mix_target = clampi(mix_drive_arg, 0, 1000);
 
-    #pragma omp single
-    {
-        if(!s->initialized) {
-            s->radius_state = (float)target_radius;
-            s->phase_x_state = (float)phase_x_target;
-            s->phase_y_state = (float)phase_y_target;
-            s->size_drive_state = (float)size_drive;
-            s->mix_drive_state = (float)mix_target;
-            s->initialized = 1;
-        }
+    if(!s->initialized) {
+        s->radius_state = (float)target_radius;
+        s->phase_x_state = (float)phase_x_target;
+        s->phase_y_state = (float)phase_y_target;
+        s->size_drive_state = (float)size_drive;
+        s->mix_drive_state = (float)mix_target;
+        s->initialized = 1;
     }
 
     const float fast = 0.172f;
     const float slow = 0.076f;
 
-    int radius;
-    #pragma omp single copyprivate(radius)
-    {
-        radius = squares_smooth_i(&s->radius_state, target_radius, fast, slow);
-    }
-    #pragma omp single copyprivate(mix_target, phase_x, phase_y)
-    {
-        phase_x = squares_smooth_i(&s->phase_x_state, phase_x_target, fast * 1.30f, slow);
-        phase_y = squares_smooth_i(&s->phase_y_state, phase_y_target, fast * 1.30f, slow);
-        mix_target = squares_smooth_i(&s->mix_drive_state, mix_target, fast * 1.18f, slow);
-    }
+    int radius = squares_smooth_i(&s->radius_state, target_radius, fast, slow);
+    phase_x = squares_smooth_i(&s->phase_x_state, phase_x_target, fast * 1.30f, slow);
+    phase_y = squares_smooth_i(&s->phase_y_state, phase_y_target, fast * 1.30f, slow);
+    mix_target = squares_smooth_i(&s->mix_drive_state, mix_target, fast * 1.18f, slow);
 
     radius = clampi(radius, 1, max_radius);
     source_mix_q8 = clampi((mix_target * 256 + 500) / 1000, 0, 256);
@@ -485,6 +476,7 @@ void squares_apply(void *ptr, VJFrame *frame, int *args)
         parity,
         phase_x,
         phase_y,
-        source_mix_q8
+        source_mix_q8,
+        n_threads
     );
 }

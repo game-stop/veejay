@@ -27,6 +27,7 @@ typedef struct {
     uint32_t *integral;
     int width;
     int height;
+    int n_threads;
 } feathermask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -101,6 +102,7 @@ void *feathermask_malloc(int width, int height)
         return NULL;
     }
 
+    f->n_threads = vje_advise_num_threads(width * height);
     return f;
 }
 
@@ -159,12 +161,9 @@ static void feathermask_box_blur(feathermask_t *f,
     const int stride = w + 1;
     const uint32_t *restrict I = f->integral;
 
-#pragma omp single
-    {
-        feathermask_build_integral(f, src);
-    }
+    feathermask_build_integral(f, src);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(f->n_threads)
     for(int y = 0; y < h; y++) {
         int y0 = y - radius;
         int y1 = y + radius;
@@ -206,10 +205,7 @@ void feathermask_apply(void *ptr, VJFrame *frame, int *args)
     const int radius = args[0];
     const int iter = args[1];
 
-    #pragma omp single
-    {
-        veejay_memcpy(f->mask, frame->data[3], len);
-    }
+    veejay_memcpy(f->mask, frame->data[3], len);
 
     uint8_t *restrict src = f->mask;
     uint8_t *restrict dst = f->tmp;
@@ -222,8 +218,5 @@ void feathermask_apply(void *ptr, VJFrame *frame, int *args)
         dst = swap;
     }
 
-    #pragma omp single
-    {
-        veejay_memcpy(frame->data[3], src, len);
-    }
+    veejay_memcpy(frame->data[3], src, len);
 }

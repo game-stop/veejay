@@ -24,6 +24,7 @@
 typedef struct {
     uint8_t *temp_Y;
     uint8_t *blur_Y;
+    int n_threads;
 } charcoal_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -84,6 +85,7 @@ void *charcoalsketch_malloc(int w, int h)
         return NULL;
     }
 
+    c->n_threads = vje_advise_num_threads(w * h);
 
     return c;
 }
@@ -121,6 +123,7 @@ void charcoalsketch_apply(void *ptr, VJFrame *frame, int *args)
 
     const int diameter = radius * 2 + 1;
 
+#pragma omp parallel num_threads(c->n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 0; y < height; y++)
@@ -188,17 +191,13 @@ void charcoalsketch_apply(void *ptr, VJFrame *frame, int *args)
                 Y[i] = (uint8_t)clampi(sketch, 0, 255);
             }
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
+    if(frame->data[1] && frame->data[2])
     {
-        if(frame->data[1] && frame->data[2])
-        {
-            const int uv_len = frame->uv_len;
+        const int uv_len = frame->uv_len;
 
-            veejay_memset(frame->data[1], 128, uv_len);
-            veejay_memset(frame->data[2], 128, uv_len);
-        }
+        veejay_memset(frame->data[1], 128, uv_len);
+        veejay_memset(frame->data[2], 128, uv_len);
     }
 }

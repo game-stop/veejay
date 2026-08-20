@@ -163,10 +163,7 @@ void lumakey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     uint16_t alpha_lut[256];
 
-#pragma omp single
-    {
-        lumakey_build_lut(alpha_lut, opacity, luma_min, luma_max, softness, invert);
-    }
+    lumakey_build_lut(alpha_lut, opacity, luma_min, luma_max, softness, invert);
 
     uint8_t *restrict Y1 = frame->data[0];
     uint8_t *restrict Cb1 = frame->data[1];
@@ -176,7 +173,7 @@ void lumakey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(lk->n_threads)
     for(int pos = 0; pos < len; pos++) {
         const int aq = alpha_lut[Y1[pos]];
 

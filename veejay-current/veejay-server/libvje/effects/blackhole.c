@@ -45,6 +45,7 @@ typedef struct {
     int len;
     int seeded;
     int frame;
+    int n_threads;
 
     void *region;
 
@@ -880,6 +881,7 @@ void *blackhole_malloc(int w, int h)
     t->len = (int) len;
     t->seeded = 0;
     t->frame = 0;
+    t->n_threads = vje_advise_num_threads(w * h);
 
     t->region = vj_malloc(total);
     if (!t->region) {
@@ -1133,14 +1135,11 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     strength_i = args[P_STRENGTH];
 
     if (lens <= 0) {
-        #pragma omp single
-        {
-            veejay_memcpy(fb_y, Y, process_len);
-            veejay_memcpy(fb_u, U, process_len);
-            veejay_memcpy(fb_v, V, process_len);
-            t->seeded = 1;
-            t->frame++;
-        }
+        veejay_memcpy(fb_y, Y, process_len);
+        veejay_memcpy(fb_u, U, process_len);
+        veejay_memcpy(fb_v, V, process_len);
+        t->seeded = 1;
+        t->frame++;
         return;
     }
 
@@ -1184,15 +1183,12 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     drag_local = drag_strength * core2;
     has_drag = (drag_local > 0.0000001f || drag_local < -0.0000001f);
 
-#pragma omp single
-    {
-        t->merger_phase = st_wrap_2pi(
-            t->merger_phase
-            + 0.00010f
-            + orbit_curve * 0.00090f
-            + collision_mix * collision_mix * 0.00650f
-        );
-    }
+    t->merger_phase = st_wrap_2pi(
+        t->merger_phase
+        + 0.00010f
+        + orbit_curve * 0.00090f
+        + collision_mix * collision_mix * 0.00650f
+    );
 
     merge_c = st_lut_cos_interp(t, t->merger_phase);
 
@@ -1201,20 +1197,17 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
 
     collision_pulse = collision_mix * st_smooth01((approach - 0.55f) / 0.45f);
 
-#pragma omp single
-    {
-        t->ringdown_amp *= 0.955f;
+    t->ringdown_amp *= 0.955f;
 
-        if (collision_pulse > t->ringdown_amp)
-            t->ringdown_amp = collision_pulse;
+    if (collision_pulse > t->ringdown_amp)
+        t->ringdown_amp = collision_pulse;
 
-        t->ringdown_phase = st_wrap_2pi(
-            t->ringdown_phase
-            + 0.040f
-            + collision_mix * 0.045f
-            + orbit_curve * 0.018f
-        );
-    }
+    t->ringdown_phase = st_wrap_2pi(
+        t->ringdown_phase
+        + 0.040f
+        + collision_mix * 0.045f
+        + orbit_curve * 0.018f
+    );
 
     ringdown_amp = t->ringdown_amp;
     ringdown_phase = t->ringdown_phase;
@@ -1260,12 +1253,9 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     tone_mix = (int) (lens_curve * 255.0f + 0.5f);
     tone_mix = clampi(tone_mix, 0, 255);
 
-#pragma omp single
-    {
-        for (i = 0; i < 256; i++) {
-            int g = t->gamma_lut[i];
-            tone_lut[i] = st_u8(i + (((g - i) * tone_mix + 127) / 255));
-        }
+    for (i = 0; i < 256; i++) {
+        int g = t->gamma_lut[i];
+        tone_lut[i] = st_u8(i + (((g - i) * tone_mix + 127) / 255));
     }
 
     ring_r2 = core2 * (5.10f - 1.55f * collision_pulse);
@@ -1292,12 +1282,9 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     max_disp = st_clampf(max_disp, 0.54f, 0.74f);
     max_disp2 = max_disp * max_disp;
 
-#pragma omp single
-    {
-        t->time  = st_wrap_2pi(t->time  + (float) speed * 0.00105f);
-        t->phase = st_wrap_2pi(t->phase + (float) speed * 0.00052f + spin_param * 0.000022f);
-        t->orbit = st_wrap_2pi(t->orbit + orbit_rate);
-    }
+    t->time  = st_wrap_2pi(t->time  + (float) speed * 0.00105f);
+    t->phase = st_wrap_2pi(t->phase + (float) speed * 0.00052f + spin_param * 0.000022f);
+    t->orbit = st_wrap_2pi(t->orbit + orbit_rate);
 
     cx = (float) w * 0.5f;
     cy = (float) rows * 0.5f;
@@ -1308,25 +1295,22 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     qcols = (w + 1) >> 1;
     qrows = (rows + 1) >> 1;
 
-#pragma omp single
-    {
-        veejay_memcpy(src_y, Y, process_len);
-        veejay_memcpy(src_u, U, process_len);
-        veejay_memcpy(src_v, V, process_len);
+    veejay_memcpy(src_y, Y, process_len);
+    veejay_memcpy(src_u, U, process_len);
+    veejay_memcpy(src_v, V, process_len);
 
-        if (!t->seeded) {
-            veejay_memcpy(fb_y, src_y, process_len);
-            veejay_memcpy(fb_u, src_u, process_len);
-            veejay_memcpy(fb_v, src_v, process_len);
-            t->seeded = 1;
-        }
+    if (!t->seeded) {
+        veejay_memcpy(fb_y, src_y, process_len);
+        veejay_memcpy(fb_u, src_u, process_len);
+        veejay_memcpy(fb_v, src_v, process_len);
+        t->seeded = 1;
+    }
 
-        if (saliency > 0) {
-            int saliency_mask = (lens > 65) ? 7 : 3;
+    if (saliency > 0) {
+        int saliency_mask = (lens > 65) ? 7 : 3;
 
-            if ((t->frame & saliency_mask) == 0)
-                st_update_saliency_poles(t, src_y, rows, saliency, pole_smooth);
-        }
+        if ((t->frame & saliency_mask) == 0)
+            st_update_saliency_poles(t, src_y, rows, saliency, pole_smooth);
     }
 
     p1x = (-base_sep * (1.0f - influence)) + (t->p1_x * influence);
@@ -1365,7 +1349,7 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
     bx = (p1x + p2x) * 0.5f;
     by = (p1y + p2y) * 0.5f;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (qy = 0; qy < qrows; qy++) {
         int y = qy << 1;
         int row = y * w;
@@ -1645,8 +1629,5 @@ void blackhole_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-#pragma omp single
-    {
-        t->frame++;
-    }
+    t->frame++;
 }

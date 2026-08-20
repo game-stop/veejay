@@ -280,30 +280,27 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
     const float fast = 0.245f;
     const float slow = 0.118f;
 
-            #pragma omp single
-    {
-        if(!vf->smooth_ready) {
-            vf->scratch_env = (float)scratch_arg;
-            vf->dust_env = (float)dust_arg;
-            vf->flicker_env = (float)flicker_arg;
-            vf->flicker_freq_env = (float)flicker_freq_arg;
-            vf->grain_env = (float)grain_arg;
-            vf->vignette_env = (float)vignette_arg;
-            vf->lifespan_env = (float)lifespan_arg;
-            vf->dirt_drive_env = (float)dirt_drive_arg;
-            vf->flicker_drive_env = (float)flicker_drive_arg;
-            vf->smooth_ready = 1;
-        } else {
-            vf->scratch_env = vintagefilm_smoothf(vf->scratch_env, (float)scratch_arg, fast, slow);
-            vf->dust_env = vintagefilm_smoothf(vf->dust_env, (float)dust_arg, fast, slow);
-            vf->flicker_env = vintagefilm_smoothf(vf->flicker_env, (float)flicker_arg, fast * 1.16f, slow);
-            vf->flicker_freq_env = vintagefilm_smoothf(vf->flicker_freq_env, (float)flicker_freq_arg, fast * 0.62f, slow);
-            vf->grain_env = vintagefilm_smoothf(vf->grain_env, (float)grain_arg, fast * 1.05f, slow);
-            vf->vignette_env = vintagefilm_smoothf(vf->vignette_env, (float)vignette_arg, fast * 0.62f, slow);
-            vf->lifespan_env = vintagefilm_smoothf(vf->lifespan_env, (float)lifespan_arg, fast * 0.72f, slow);
-            vf->dirt_drive_env = vintagefilm_smoothf(vf->dirt_drive_env, (float)dirt_drive_arg, fast * 1.22f, slow);
-            vf->flicker_drive_env = vintagefilm_smoothf(vf->flicker_drive_env, (float)flicker_drive_arg, fast * 1.36f, slow);
-        }
+    if(!vf->smooth_ready) {
+        vf->scratch_env = (float)scratch_arg;
+        vf->dust_env = (float)dust_arg;
+        vf->flicker_env = (float)flicker_arg;
+        vf->flicker_freq_env = (float)flicker_freq_arg;
+        vf->grain_env = (float)grain_arg;
+        vf->vignette_env = (float)vignette_arg;
+        vf->lifespan_env = (float)lifespan_arg;
+        vf->dirt_drive_env = (float)dirt_drive_arg;
+        vf->flicker_drive_env = (float)flicker_drive_arg;
+        vf->smooth_ready = 1;
+    } else {
+        vf->scratch_env = vintagefilm_smoothf(vf->scratch_env, (float)scratch_arg, fast, slow);
+        vf->dust_env = vintagefilm_smoothf(vf->dust_env, (float)dust_arg, fast, slow);
+        vf->flicker_env = vintagefilm_smoothf(vf->flicker_env, (float)flicker_arg, fast * 1.16f, slow);
+        vf->flicker_freq_env = vintagefilm_smoothf(vf->flicker_freq_env, (float)flicker_freq_arg, fast * 0.62f, slow);
+        vf->grain_env = vintagefilm_smoothf(vf->grain_env, (float)grain_arg, fast * 1.05f, slow);
+        vf->vignette_env = vintagefilm_smoothf(vf->vignette_env, (float)vignette_arg, fast * 0.62f, slow);
+        vf->lifespan_env = vintagefilm_smoothf(vf->lifespan_env, (float)lifespan_arg, fast * 0.72f, slow);
+        vf->dirt_drive_env = vintagefilm_smoothf(vf->dirt_drive_env, (float)dirt_drive_arg, fast * 1.22f, slow);
+        vf->flicker_drive_env = vintagefilm_smoothf(vf->flicker_drive_env, (float)flicker_drive_arg, fast * 1.36f, slow);
     }
 
     int scratch_intensity = clampi((int)(vf->scratch_env + 0.5f), 0, 100);
@@ -329,20 +326,13 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict scratch_map = vf->scratch_map;
     const uint16_t *restrict vignette = vf->vignette_lut;
 
-            #pragma omp single
-    {
-        vf->framecounter++;
-    }
+    vf->framecounter++;
 
     int global_gain = 256;
 
     if(flicker_intensity > 0 && flicker_freq > 0 && (vf->framecounter % flicker_freq) == 0) {
         const int range = flicker_intensity * 2 + 1;
-        int flick_mod;
-        #pragma omp single copyprivate(flick_mod)
-        {
-            flick_mod = (int)(vintagefilm_rng(&vf->rng_state) % (uint32_t)range) - flicker_intensity;
-        }
+        const int flick_mod = (int)(vintagefilm_rng(&vf->rng_state) % (uint32_t)range) - flicker_intensity;
 
         global_gain = (256 * (100 + flick_mod)) / 100;
     }
@@ -359,12 +349,9 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
 
     global_gain = clampi(global_gain, 72, 384);
 
-            #pragma omp single
-    {
-        for(int x = 0; x < width; x++) {
-            if(scratch_map[x] > 0)
-                scratch_map[x]--;
-        }
+    for(int x = 0; x < width; x++) {
+        if(scratch_map[x] > 0)
+            scratch_map[x]--;
     }
 
     if(scratch_intensity > 0) {
@@ -373,47 +360,29 @@ void vintagefilm_apply(void *ptr, VJFrame *frame, int *args)
         if(dirt_q > 0)
             num_scratches += (width * dirt_q + 8000) / 16000;
 
-        #pragma omp single copyprivate(num_scratches)
-        {
-            if(num_scratches < 1 && (int)(vintagefilm_rng(&vf->rng_state) % 100u) < scratch_intensity)
-                num_scratches = 1;
-        }
+        if(num_scratches < 1 && (int)(vintagefilm_rng(&vf->rng_state) % 100u) < scratch_intensity)
+            num_scratches = 1;
 
         if(num_scratches > (width >> 2))
             num_scratches = width >> 2;
 
         for(int i = 0; i < num_scratches; i++) {
-            int x;
-            #pragma omp single copyprivate(x)
-            {
-                x = (int)(vintagefilm_rng(&vf->rng_state) % (uint32_t)width);
-            }
-            int life;
-            #pragma omp single copyprivate(life)
-            {
-                life = 1 + scratch_lifespan + (int)(vintagefilm_rng(&vf->rng_state) % 3u);
-            }
+            const int x = (int)(vintagefilm_rng(&vf->rng_state) % (uint32_t)width);
+            int life = 1 + scratch_lifespan + (int)(vintagefilm_rng(&vf->rng_state) % 3u);
 
             if(dirt_q > 0)
                 life += (dirt_q * 4 + 500) / 1000;
 
-            #pragma omp single
-            {
-                scratch_map[x] = (uint8_t)clampi(life, 1, 255);
-            }
+            scratch_map[x] = (uint8_t)clampi(life, 1, 255);
         }
     }
 
-    uint32_t frame_seed;
-    #pragma omp single copyprivate(frame_seed)
-    {
-        frame_seed = vintagefilm_rng(&vf->rng_state);
-    }
+    const uint32_t frame_seed = vintagefilm_rng(&vf->rng_state);
     const int vignette_q8 = (vignette_strength * 256 + 50) / 100;
     const int dust_gate = dust_intensity * 5 + (dirt_q >> 2);
     const int scratch_cut = 46 - ((dirt_q * 18 + 500) / 1000);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(vf->n_threads)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const uint32_t line_noise = vintagefilm_hash(frame_seed ^ (uint32_t)y);

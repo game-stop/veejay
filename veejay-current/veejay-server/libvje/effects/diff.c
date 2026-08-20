@@ -187,11 +187,9 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict data = d->data;
     uint32_t *restrict dt_map = d->dt_map;
 
-#pragma omp single
-    {
-        veejay_memset(dt_map, 0, len * sizeof(uint32_t));
-    }
+    veejay_memset(dt_map, 0, len * sizeof(uint32_t));
 
+    #pragma omp parallel num_threads(d->n_threads)
     {
         diff_binarify_mask(data, Y, Y2, threshold, reverse, len);
 
@@ -245,6 +243,5 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                 Cr[i] = (uint8_t)((Cr2[i] & mask) | (128 & ~mask));
             }
         }
-    #pragma omp barrier
     }
 }

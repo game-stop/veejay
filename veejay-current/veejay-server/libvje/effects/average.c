@@ -23,6 +23,7 @@
 
 typedef struct {
     float *running_sum[3];
+    int n_threads;
     int seeded;
 } average_t;
 
@@ -72,6 +73,7 @@ void *average_malloc(int width, int height)
 
     a->running_sum[1] = a->running_sum[0] + (width * height);
     a->running_sum[2] = a->running_sum[1] + (width * height);
+    a->n_threads = vje_advise_num_threads(width * height);
     a->seeded = 0;
 
     return a;
@@ -106,6 +108,7 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
     int max_sum = args[0];
 
     const int len = frame->len;
+    const int n_threads = a->n_threads;
     const int need_seed = !a->seeded;
 
     uint8_t *restrict Y = frame->data[0];
@@ -119,6 +122,7 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
     const float w = 1.0f / (float)max_sum;
     const float iw = 1.0f - w;
 
+#pragma omp parallel num_threads(n_threads)
     {
         if(need_seed) {
 #pragma omp for schedule(static)
@@ -151,12 +155,8 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
             Cb[i] = clamp_u8f(128.0f + cb);
             Cr[i] = clamp_u8f(128.0f + cr);
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        if(need_seed)
-            a->seeded = 1;
-    }
+    if(need_seed)
+        a->seeded = 1;
 }

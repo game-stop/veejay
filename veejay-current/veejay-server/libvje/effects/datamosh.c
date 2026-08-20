@@ -48,6 +48,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
     int frame;
     int initialized;
     int hist_head;
@@ -443,6 +444,7 @@ void *datamosh_malloc(int w, int h)
     d->h = h;
     d->len = (int) len;
     d->max_blocks = (int) max_blocks;
+    d->n_threads = vje_advise_num_threads((int) len);
     d->region = region;
     d->last_block = 0;
     d->last_flow = -1;
@@ -489,22 +491,16 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int reset = args[P_RESET] > 0;
 
     if (!d->initialized) {
-        #pragma omp single
-        {
-            dm_fill_history(d, frame_y, frame_u, frame_v);
-            d->last_reset = reset;
-            d->frame++;
-        }
+        dm_fill_history(d, frame_y, frame_u, frame_v);
+        d->last_reset = reset;
+        d->frame++;
         return;
     }
 
-#pragma omp single
-    {
-        if (reset && !d->last_reset)
-            dm_fill_history(d, frame_y, frame_u, frame_v);
+    if (reset && !d->last_reset)
+        dm_fill_history(d, frame_y, frame_u, frame_v);
 
-        d->last_reset = reset;
-    }
+    d->last_reset = reset;
 
     const int strength = args[P_MOSH];
     const int history_depth = args[P_HISTORY];
@@ -517,38 +513,29 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int flow_strength = args[P_FLOW_AMT];
     const int source_opacity = args[P_SRC_OPAC];
 
-#pragma omp single
-    {
-        if (block != d->last_block || flow_mode != d->last_flow) {
-            dm_clear_fields(d);
-            d->last_block = block;
-            d->last_flow = flow_mode;
-        }
+    if (block != d->last_block || flow_mode != d->last_flow) {
+        dm_clear_fields(d);
+        d->last_block = block;
+        d->last_flow = flow_mode;
     }
 
     uint8_t *cur_y;
     uint8_t *cur_u;
     uint8_t *cur_v;
-#pragma omp single copyprivate(cur_u, cur_v, cur_y)
-    {
-        dm_push_history(d, frame_y, frame_u, frame_v, &cur_y, &cur_u, &cur_v);
-    }
+    dm_push_history(d, frame_y, frame_u, frame_v, &cur_y, &cur_u, &cur_v);
 
     const int prev_slot = (d->hist_head > 0) ? (d->hist_head - 1) : (DM_HISTORY_MAX - 1);
     const uint8_t * restrict prev_y = d->hist[0] + (size_t) prev_slot * llen;
 
     if (strength <= 0) {
-        #pragma omp single
-        {
-            for (int p = 0; p < 2; p++) {
-                veejay_memcpy(d->canvas[p][0], cur_y, llen);
-                veejay_memcpy(d->canvas[p][1], cur_u, llen);
-                veejay_memcpy(d->canvas[p][2], cur_v, llen);
-            }
-            dm_clear_fields(d);
-            d->canvas_ping = 0;
-            d->frame++;
+        for (int p = 0; p < 2; p++) {
+            veejay_memcpy(d->canvas[p][0], cur_y, llen);
+            veejay_memcpy(d->canvas[p][1], cur_u, llen);
+            veejay_memcpy(d->canvas[p][2], cur_v, llen);
         }
+        dm_clear_fields(d);
+        d->canvas_ping = 0;
+        d->frame++;
         return;
     }
 
@@ -613,7 +600,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int max_xfp_inner = ((w - 2) << DM_FP_SHIFT);
     const int max_yfp_inner = ((h - 2) << DM_FP_SHIFT);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(d->n_threads)
     for (int bi = 0; bi < bw * bh; bi++) {
         const int by = bi / bw;
         const int bx = bi - by * bw;
@@ -858,11 +845,8 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-#pragma omp single
-    {
-        d->canvas_ping = write_ping;
-        d->frame++;
-    }
+    d->canvas_ping = write_ping;
+    d->frame++;
 }
 
 #undef DM_RENDER_PIXEL

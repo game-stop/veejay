@@ -249,16 +249,13 @@ static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args
     int h = t->height;
     int size = w * h;
 
-#pragma omp single
-    {
-        if(mode == 0) {
-            t->time += args[0] * 0.0025f;
-            t->phase += args[4] * 0.00125f;
-        }
-        else {
-            t->time += args[0] * 0.000725f;
-            t->phase += args[4] * 0.000725f;
-        }
+    if(mode == 0) {
+        t->time += args[0] * 0.0025f;
+        t->phase += args[4] * 0.00125f;
+    }
+    else {
+        t->time += args[0] * 0.000725f;
+        t->phase += args[4] * 0.000725f;
     }
 
     const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
@@ -277,7 +274,7 @@ static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int i = 0; i < size; i++) {
         float a = mode == 2 ? FROM_FP(t->v_lut_rect[i]) : FROM_FP(t->v_lut[i]);
         float theta = mode == 2 ? FROM_FP(t->u_lut_rect[i]) : FROM_FP(t->u_lut[i]);
@@ -331,12 +328,9 @@ static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args
         t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
     }
 
-#pragma omp single
-    {
-        veejay_memcpy(srcY, t->dstY, size);
-        veejay_memcpy(srcU, t->dstU, size);
-        veejay_memcpy(srcV, t->dstV, size);
-    }
+    veejay_memcpy(srcY, t->dstY, size);
+    veejay_memcpy(srcU, t->dstU, size);
+    veejay_memcpy(srcV, t->dstV, size);
 }
 
 void escherdroste_apply(void *ptr, VJFrame *frame, int *args)

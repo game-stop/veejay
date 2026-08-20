@@ -24,6 +24,7 @@
 typedef struct {
     int w;
     int h;
+    int n_threads;
     uint8_t *tmpY;
     uint8_t *tmpU;
     uint8_t *tmpV;
@@ -115,6 +116,7 @@ void *chromawarp_malloc(int w, int h)
 
     c->w = w;
     c->h = h;
+    c->n_threads = vje_advise_num_threads(sz);
 
     c->tmpY = (uint8_t *) vj_malloc(sz * 3);
 
@@ -199,6 +201,7 @@ void chromawarp_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tmpU = c->tmpU;
     uint8_t *restrict tmpV = c->tmpV;
 
+#pragma omp parallel num_threads(c->n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 0; y < h; y++)
@@ -253,16 +256,12 @@ void chromawarp_apply(void *ptr, VJFrame *frame, int *args)
                 V[i] = (uint8_t)(((int)V[i] * inv_mix + (int)tmpV[i] * mix) >> 8);
             }
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
+    if(mix >= 255)
     {
-        if(mix >= 255)
-        {
-            veejay_memcpy(Y, tmpY, sz);
-            veejay_memcpy(U, tmpU, sz);
-            veejay_memcpy(V, tmpV, sz);
-        }
+        veejay_memcpy(Y, tmpY, sz);
+        veejay_memcpy(U, tmpU, sz);
+        veejay_memcpy(V, tmpV, sz);
     }
 }

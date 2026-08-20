@@ -77,18 +77,13 @@ void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ) {
 
 static void vjert_process_fx( sample_eff_chain *entry, VJFrame **frames, int chain_id, int chain_position, int *args )
 {
-    int process_fx;
-
-#pragma omp single copyprivate(process_fx)
-    {
-        process_fx = entry->e_flag && entry->effect_id > 0;
-
-        if(process_fx && entry->fx_instance == NULL)
-            process_fx = vjert_new_fx(entry, chain_id, chain_position, frames[0]);
-    }
-
-    if(!process_fx)
+    if(!entry->e_flag || entry->effect_id <= 0)
         return;
+
+    if(entry->fx_instance == NULL) {
+        if(!vjert_new_fx(entry, chain_id, chain_position, frames[0]))
+            return;
+    }
 
     vje_fx_apply(entry->effect_id, entry->fx_instance, frames[0], frames[1], args);
 }
@@ -134,10 +129,7 @@ void vjert_apply( void *ptr, VJFrame **frames, int chain_id, int chain_position,
 {
     sample_eff_chain *entry = (sample_eff_chain*) ptr;
     if( entry->effect_id >= VJ_PLUGIN ) {
-#pragma omp single
-        {
-            vjert_process_plugin( entry, frames,args );
-        }
+        vjert_process_plugin( entry, frames,args );
     }
     else {
         vjert_process_fx( entry, frames, chain_id, chain_position, args );
@@ -158,4 +150,5 @@ void vjert_update( void *ptr, VJFrame *frame )
         }
     }
 }
+
 

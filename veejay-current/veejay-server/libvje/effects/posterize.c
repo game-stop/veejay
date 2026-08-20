@@ -120,15 +120,13 @@ void posterize_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t lut[256];
 
-#pragma omp single
-    {
-        posterize_build_lut(lut, levels, tmin, tmax);
-    }
+    posterize_build_lut(lut, levels, tmin, tmax);
 
     uint8_t *restrict Y = frame->data[0];
     const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++)
         Y[i] = lut[Y[i]];
 }

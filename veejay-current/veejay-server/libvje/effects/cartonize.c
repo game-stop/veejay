@@ -76,11 +76,13 @@ void cartonize_apply(void *ptr, VJFrame *frame, int *args)
     const int vbase = cartonize_chroma_step(b3);
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
+    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -105,6 +107,5 @@ void cartonize_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[i] = (uint8_t)((p / vbase) * vbase + 128);
             }
         }
-    #pragma omp barrier
     }
 }

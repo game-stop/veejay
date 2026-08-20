@@ -105,7 +105,9 @@ void negatechannel_apply(void *ptr, VJFrame *frame, int *args)
     const int val = args[P_VALUE];
     const int len = frame->len;
     const int uv_len = frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
+#pragma omp parallel num_threads(n_threads)
     {
         switch(mode) {
             case 0:
@@ -124,6 +126,5 @@ void negatechannel_apply(void *ptr, VJFrame *frame, int *args)
                 negatechannel_uv_planes(frame->data[1], frame->data[2], uv_len, val);
                 break;
         }
-    #pragma omp barrier
     }
 }

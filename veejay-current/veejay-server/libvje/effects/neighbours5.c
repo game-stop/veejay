@@ -354,16 +354,14 @@ void neighbours5_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict src_v = n->src[2];
     uint8_t *restrict bin = n->bin;
 
-#pragma omp single
-    {
-        veejay_memcpy(src_y, dst_y, len);
+    veejay_memcpy(src_y, dst_y, len);
 
-        if(mode) {
-            veejay_memcpy(src_u, dst_u, len);
-            veejay_memcpy(src_v, dst_v, len);
-        }
+    if(mode) {
+        veejay_memcpy(src_u, dst_u, len);
+        veejay_memcpy(src_v, dst_v, len);
     }
 
+#pragma omp parallel num_threads(n->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -381,6 +379,5 @@ void neighbours5_apply(void *ptr, VJFrame *frame, int *args)
                 dst_v[i] = 128;
             }
         }
-    #pragma omp barrier
     }
 }

@@ -86,7 +86,7 @@ vj_effect *iris_init(int w, int h)
     return ve;
 }
 
-static void iris_copy_frame(VJFrame *frame, VJFrame *frame2)
+static void iris_copy_frame(VJFrame *frame, VJFrame *frame2, int n_threads)
 {
     const int len = frame->len;
     uint8_t *restrict Y0 = frame->data[0];
@@ -96,7 +96,7 @@ static void iris_copy_frame(VJFrame *frame, VJFrame *frame2)
     const uint8_t *restrict Cb1 = frame2->data[1];
     const uint8_t *restrict Cr1 = frame2->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
         Y0[i] = Y1[i];
         Cb0[i] = Cb1[i];
@@ -113,9 +113,10 @@ void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
     if(val <= 0) {
-        iris_copy_frame(frame, frame2);
+        iris_copy_frame(frame, frame2, n_threads);
         return;
     }
 
@@ -138,7 +139,7 @@ void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         const long long vv = (long long)val * (long long)val;
         const long long threshold_sq = (max_dist_sq * vv) / 10000LL;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
         for(int y = 0; y < height; y++) {
             const int dy = y - half_h;
             const long long dy_sq = (long long)dy * (long long)dy;
@@ -164,7 +165,7 @@ void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         const int x_hi = width - x_bound;
         const int y_hi = height - y_bound;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
         for(int y = 0; y < height; y++) {
             const int row = y * width;
             const int row_mask = (y < y_bound) | (y >= y_hi);

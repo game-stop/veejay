@@ -55,6 +55,7 @@ typedef struct {
     float phase;
     int initialized;
 
+    int n_threads;
 } rotate_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -238,6 +239,7 @@ void *rotate_malloc(int width, int height)
         r->cos_lut[i] = a_cos(rad);
     }
 
+    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -266,31 +268,25 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
     const int spin_drive_arg = args[P_SPIN_DRIVE];
     const int wobble_drive_arg = args[P_WOBBLE_DRIVE];
 
-#pragma omp single
-    {
-        if(!r->initialized) {
-            r->sm_rotate = (float)rotate_arg;
-            r->sm_duration = (float)duration_arg;
-            r->sm_mix = (float)mix_arg;
-            r->sm_chroma = (float)chroma_arg;
-            r->sm_spin_drive = (float)spin_drive_arg;
-            r->sm_wobble_drive = (float)wobble_drive_arg;
-            r->initialized = 1;
-        }
+    if(!r->initialized) {
+        r->sm_rotate = (float)rotate_arg;
+        r->sm_duration = (float)duration_arg;
+        r->sm_mix = (float)mix_arg;
+        r->sm_chroma = (float)chroma_arg;
+        r->sm_spin_drive = (float)spin_drive_arg;
+        r->sm_wobble_drive = (float)wobble_drive_arg;
+        r->initialized = 1;
     }
 
     const float fast_t = 0.34f;
     const float slow_t = 0.18f;
 
-#pragma omp single
-    {
-        r->sm_rotate = rotate_smoothf(r->sm_rotate, (float)rotate_arg, fast_t);
-        r->sm_duration = rotate_smoothf(r->sm_duration, (float)duration_arg, slow_t);
-        r->sm_mix = rotate_smoothf(r->sm_mix, (float)mix_arg, fast_t);
-        r->sm_chroma = rotate_smoothf(r->sm_chroma, (float)chroma_arg, fast_t);
-        r->sm_spin_drive = rotate_smoothf(r->sm_spin_drive, (float)spin_drive_arg, fast_t);
-        r->sm_wobble_drive = rotate_smoothf(r->sm_wobble_drive, (float)wobble_drive_arg, fast_t);
-    }
+    r->sm_rotate = rotate_smoothf(r->sm_rotate, (float)rotate_arg, fast_t);
+    r->sm_duration = rotate_smoothf(r->sm_duration, (float)duration_arg, slow_t);
+    r->sm_mix = rotate_smoothf(r->sm_mix, (float)mix_arg, fast_t);
+    r->sm_chroma = rotate_smoothf(r->sm_chroma, (float)chroma_arg, fast_t);
+    r->sm_spin_drive = rotate_smoothf(r->sm_spin_drive, (float)spin_drive_arg, fast_t);
+    r->sm_wobble_drive = rotate_smoothf(r->sm_wobble_drive, (float)wobble_drive_arg, fast_t);
 
     const int duration = clampi((int)(r->sm_duration + 0.5f), 1, 1500);
     double rotate_value;
@@ -298,38 +294,35 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
     const float spin_drive = rotate_clampf(r->sm_spin_drive * 0.001f, 0.0f, 1.0f);
     const float wobble_drive = rotate_clampf(r->sm_wobble_drive * 0.001f, 0.0f, 1.0f);
 
-#pragma omp single copyprivate(rotate_value)
-    {
-        if(automatic) {
-            rotate_value = r->rotate;
+    if(automatic) {
+        rotate_value = r->rotate;
 
-            const float speed_boost = 1.0f + spin_drive * 1.65f + wobble_drive * 0.35f;
+        const float speed_boost = 1.0f + spin_drive * 1.65f + wobble_drive * 0.35f;
 
-            r->rotate += (double)r->direction * (360.0 / (double)duration) * (double)speed_boost;
-            r->frameCount++;
+        r->rotate += (double)r->direction * (360.0 / (double)duration) * (double)speed_boost;
+        r->frameCount++;
 
-            if(r->frameCount >= duration || r->rotate <= 0.0 || r->rotate >= 360.0) {
-                r->direction *= -1;
-                r->frameCount = 0;
-
-                if(r->rotate < 0.0)
-                    r->rotate = 0.0;
-                else if(r->rotate > 360.0)
-                    r->rotate = 360.0;
-            }
-        }
-        else {
-            rotate_value = (double)r->sm_rotate;
-            r->rotate = rotate_value;
+        if(r->frameCount >= duration || r->rotate <= 0.0 || r->rotate >= 360.0) {
+            r->direction *= -1;
             r->frameCount = 0;
-            r->direction = 1;
+
+            if(r->rotate < 0.0)
+                r->rotate = 0.0;
+            else if(r->rotate > 360.0)
+                r->rotate = 360.0;
         }
-
-        r->phase += 0.015f + wobble_drive * 0.145f + spin_drive * 0.035f;
-
-        if(r->phase >= 360.0f)
-            r->phase -= 360.0f;
     }
+    else {
+        rotate_value = (double)r->sm_rotate;
+        r->rotate = rotate_value;
+        r->frameCount = 0;
+        r->direction = 1;
+    }
+
+    r->phase += 0.015f + wobble_drive * 0.145f + spin_drive * 0.035f;
+
+    if(r->phase >= 360.0f)
+        r->phase -= 360.0f;
 
     const int phase_idx = rotate_wrap360((double)r->phase);
     const float wobble = r->sin_lut[phase_idx] * wobble_drive * 128.0f;
@@ -345,12 +338,9 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = r->buf[1];
     uint8_t *restrict srcV = r->buf[2];
 
-#pragma omp single
-    {
-        veejay_memcpy(srcY, dstY, len);
-        veejay_memcpy(srcU, dstU, len);
-        veejay_memcpy(srcV, dstV, len);
-    }
+    veejay_memcpy(srcY, dstY, len);
+    veejay_memcpy(srcU, dstU, len);
+    veejay_memcpy(srcV, dstV, len);
 
     const float center_x = ((float)width - 1.0f) * 0.5f;
     const float center_y = ((float)height - 1.0f) * 0.5f;
@@ -371,7 +361,7 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
         chroma_q8 = clampi(chroma_q8 + (lift >> 1), 0, 256);
     }
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(r->n_threads)
     for(int y = 0; y < height; y++) {
         const float dy = (float)y - center_y;
         const int row = y * width;

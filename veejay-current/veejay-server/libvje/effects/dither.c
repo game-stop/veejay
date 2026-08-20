@@ -27,6 +27,7 @@ typedef struct {
     int last_size;
     int last_mode;
     uint32_t seed;
+    int n_threads;
 } dither_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -102,6 +103,7 @@ void *dither_malloc(int w, int h)
     d->last_size = -1;
     d->last_mode = -1;
     d->seed = 0x1234abcdU;
+    d->n_threads = vje_advise_num_threads(w * h);
     return d;
 }
 
@@ -151,15 +153,12 @@ void dither_apply(void *ptr, VJFrame *frame, int *args)
     
     uint8_t *restrict Y = frame->data[0];
 
-    #pragma omp single
-    {
-        if(dh->last_size != size || dh->last_mode != random_on || random_on)
-            dither_build_matrix(dh, size, random_on);
-    }
+    if(dh->last_size != size || dh->last_mode != random_on || random_on)
+        dither_build_matrix(dh, size, random_on);
 
     const int *restrict dith = dh->dith;
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(dh->n_threads)
     for(int y = 0; y < height; y++)
     {
         const int j = y % size;

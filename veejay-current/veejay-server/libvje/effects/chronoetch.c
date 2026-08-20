@@ -41,6 +41,7 @@ typedef struct {
     int len;
     int frame;
     int filled;
+    int n_threads;
 
     uint8_t *region;
 
@@ -482,6 +483,7 @@ void *chronoetch_malloc(int w, int h)
     c->len = w * h;
     c->frame = 0;
     c->filled = 0;
+    c->n_threads = vje_advise_num_threads(w * h);
 
     len = (size_t) c->len;
 
@@ -661,7 +663,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     motion_fracture_keep = 3 + (bone_density / 7) + (motion_age / 10);
     current_keep_base = 18 + (bone_density / 2);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for (int i = 0; i < process_len; i++) {
         int raw_y = Y[i];
         int old_stable = c->stable_y[i];
@@ -706,214 +708,211 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = (uint8_t) vv;
     }
 
-#pragma omp single
-    {
-        for (y = 1; y < rows - 1; y += step) {
-            int x;
-            int row = y * w;
-            int ycell = y / step;
-            int row_phase = (ycell & 1) ? (step >> 1) : 0;
-            int x_start = 1 + row_phase;
-            int xcell;
+    for (y = 1; y < rows - 1; y += step) {
+        int x;
+        int row = y * w;
+        int ycell = y / step;
+        int row_phase = (ycell & 1) ? (step >> 1) : 0;
+        int x_start = 1 + row_phase;
+        int xcell;
 
-            if (x_start >= w - 1)
-                x_start = 1;
+        if (x_start >= w - 1)
+            x_start = 1;
 
-            xcell = x_start / step;
+        xcell = x_start / step;
 
-            for (x = x_start; x < w - 1; x += step, xcell++) {
-                int idx = row + x;
+        for (x = x_start; x < w - 1; x += step, xcell++) {
+            int idx = row + x;
 
-                int l = edgeY[idx - 1];
-                int r = edgeY[idx + 1];
-                int u0 = edgeY[idx - w];
-                int d = edgeY[idx + w];
+            int l = edgeY[idx - 1];
+            int r = edgeY[idx + 1];
+            int u0 = edgeY[idx - w];
+            int d = edgeY[idx + w];
 
-                int gx = r - l;
-                int gy = d - u0;
+            int gx = r - l;
+            int gy = d - u0;
 
-                int edge = tas_absi(gx) + tas_absi(gy);
-                int motion = 0;
+            int edge = tas_absi(gx) + tas_absi(gy);
+            int motion = 0;
 
-                unsigned int spatial_hash = tas_hash3(xcell, ycell, 7331);
-                unsigned int shape_hash = tas_hash3(xcell, ycell, 9917);
+            unsigned int spatial_hash = tas_hash3(xcell, ycell, 7331);
+            unsigned int shape_hash = tas_hash3(xcell, ycell, 9917);
 
-                int hnoise;
-                int edge_threshold;
-                int edge_core;
-                int motion_boost;
-                int strength;
+            int hnoise;
+            int edge_threshold;
+            int edge_core;
+            int motion_boost;
+            int strength;
 
-                int accepted = 0;
-                int motion_fracture = 0;
+            int accepted = 0;
+            int motion_fracture = 0;
 
-                int age = 0;
-                int y_age;
-                int u_age;
-                int v_age;
+            int age = 0;
+            int y_age;
+            int u_age;
+            int v_age;
 
-                int y_slot;
-                int u_slot;
-                int v_slot;
+            int y_slot;
+            int u_slot;
+            int v_slot;
 
-                int draw_x = x;
-                int draw_y = y;
+            int draw_x = x;
+            int draw_y = y;
 
-                int local_length;
+            int local_length;
 
-                if (available > 1)
-                    motion = tas_absi((int)edgeY[idx] - (int)lastEdgeY[idx]);
+            if (available > 1)
+                motion = tas_absi((int)edgeY[idx] - (int)lastEdgeY[idx]);
 
-                hnoise = (int)(spatial_hash & 63) - 31;
+            hnoise = (int)(spatial_hash & 63) - 31;
 
-                edge_threshold = edge_threshold_base + hnoise;
-                edge_threshold = tas_clampi(edge_threshold, 32, 275);
+            edge_threshold = edge_threshold_base + hnoise;
+            edge_threshold = tas_clampi(edge_threshold, 32, 275);
 
-                if (edge >= seed_floor) {
-                    int keep;
-                    int density_hash;
+            if (edge >= seed_floor) {
+                int keep;
+                int density_hash;
 
-                    edge_core = edge - edge_threshold;
-                    motion_boost = (motion * motion_age) / 140;
+                edge_core = edge - edge_threshold;
+                motion_boost = (motion * motion_age) / 140;
 
-                    strength = tas_ramp255(edge_core + motion_boost, 180);
+                strength = tas_ramp255(edge_core + motion_boost, 180);
 
-                    keep = 10 + bone_density + (strength >> 2);
+                keep = 10 + bone_density + (strength >> 2);
 
-                    if (edge > 180)
-                        keep += (edge - 180) >> 2;
+                if (edge > 180)
+                    keep += (edge - 180) >> 2;
 
-                    if (strength > 210)
-                        keep += 28;
+                if (strength > 210)
+                    keep += 28;
 
-                    keep = tas_clampi(keep, 8, 230);
+                keep = tas_clampi(keep, 8, 230);
 
-                    density_hash = (int)((spatial_hash >> 8) & 255);
+                density_hash = (int)((spatial_hash >> 8) & 255);
 
-                    if (density_hash <= keep)
+                if (density_hash <= keep)
+                    accepted = 1;
+            } else {
+                if (available > 1 && motion_age > 0) {
+                    strength = 0;
+
+                    if (motion >= motion_min &&
+                        (int)((spatial_hash >> 8) & 255) <= motion_fracture_keep) {
                         accepted = 1;
+                        motion_fracture = 1;
+
+                        gx = (int)((shape_hash >> 16) & 255) - 128;
+                        gy = (int)((shape_hash >> 24) & 255) - 128;
+
+                        if (gx == 0 && gy == 0)
+                            gx = 1;
+
+                        strength = 48 + ((motion * motion_age) / 170);
+                        strength = tas_clampi(strength, 0, 140);
+                    }
                 } else {
-                    if (available > 1 && motion_age > 0) {
-                        strength = 0;
+                    strength = 0;
+                }
+            }
 
-                        if (motion >= motion_min &&
-                            (int)((spatial_hash >> 8) & 255) <= motion_fracture_keep) {
-                            accepted = 1;
-                            motion_fracture = 1;
+            if (!accepted || strength <= 0)
+                continue;
 
-                            gx = (int)((shape_hash >> 16) & 255) - 128;
-                            gy = (int)((shape_hash >> 24) & 255) - 128;
+            if (max_age > 0) {
+                int motion_part = (motion * motion_age * max_age) / 7600;
+                int jitter_part = 0;
 
-                            if (gx == 0 && gy == 0)
-                                gx = 1;
-
-                            strength = 48 + ((motion * motion_age) / 170);
-                            strength = tas_clampi(strength, 0, 140);
-                        }
-                    } else {
-                        strength = 0;
-                    }
+                if (motion > 3 &&
+                    (int)((spatial_hash >> 16) & 255) < (bone_density + 40)) {
+                    jitter_part = (int)((spatial_hash >> 24) & 3);
                 }
 
-                if (!accepted || strength <= 0)
-                    continue;
+                age = motion_part + jitter_part;
+                age = tas_clampi(age, 0, max_age);
+            } else {
+                age = 0;
+            }
 
-                if (max_age > 0) {
-                    int motion_part = (motion * motion_age * max_age) / 7600;
-                    int jitter_part = 0;
+            y_age = age;
 
-                    if (motion > 3 &&
-                        (int)((spatial_hash >> 16) & 255) < (bone_density + 40)) {
-                        jitter_part = (int)((spatial_hash >> 24) & 3);
-                    }
+            u_age = age + (((int)((spatial_hash >> 10) & 3) * chroma_tear) / 100);
+            v_age = age + (((int)((spatial_hash >> 12) & 3) * chroma_tear) / 85);
 
-                    age = motion_part + jitter_part;
-                    age = tas_clampi(age, 0, max_age);
-                } else {
-                    age = 0;
-                }
+            u_age = tas_clampi(u_age, 0, max_age);
+            v_age = tas_clampi(v_age, 0, max_age);
 
-                y_age = age;
+            y_slot = tas_slot_for_age(write_slot, y_age);
+            u_slot = tas_slot_for_age(write_slot, u_age);
+            v_slot = tas_slot_for_age(write_slot, v_age);
 
-                u_age = age + (((int)((spatial_hash >> 10) & 3) * chroma_tear) / 100);
-                v_age = age + (((int)((spatial_hash >> 12) & 3) * chroma_tear) / 85);
+            if (step > 3) {
+                int jlim = step / 3;
+                int jx = ((((int)(shape_hash & 15)) - 8) * jlim) / 8;
+                int jy = ((((int)((shape_hash >> 4) & 15)) - 8) * jlim) / 8;
 
-                u_age = tas_clampi(u_age, 0, max_age);
-                v_age = tas_clampi(v_age, 0, max_age);
+                draw_x = tas_clampi(x + jx, 1, w - 2);
+                draw_y = tas_clampi(y + jy, 1, rows - 2);
+            }
 
-                y_slot = tas_slot_for_age(write_slot, y_age);
-                u_slot = tas_slot_for_age(write_slot, u_age);
-                v_slot = tas_slot_for_age(write_slot, v_age);
+            local_length = rib_length + (((int)((shape_hash >> 6) & 15) - 7) * rib_length) / 64;
+            local_length = tas_clampi(local_length, 2, 96);
 
-                if (step > 3) {
-                    int jlim = step / 3;
-                    int jx = ((((int)(shape_hash & 15)) - 8) * jlim) / 8;
-                    int jy = ((((int)((shape_hash >> 4) & 15)) - 8) * jlim) / 8;
+            tas_draw_rib(
+                c,
+                Y, U, V,
+                c->ring_y[y_slot],
+                c->ring_u[u_slot],
+                c->ring_v[v_slot],
+                rows,
+                draw_x, draw_y,
+                gx, gy,
+                strength,
+                local_length,
+                opacity_q8,
+                age,
+                max_age,
+                age_violence,
+                chroma_tear,
+                chroma_gain_age_q8[age],
+                color_bias,
+                shape_hash ^ ((unsigned int)age * 0x45d9f3bU)
+            );
 
-                    draw_x = tas_clampi(x + jx, 1, w - 2);
-                    draw_y = tas_clampi(y + jy, 1, rows - 2);
-                }
+            if (age > 0 && !motion_fracture && strength > 150) {
+                if ((int)((spatial_hash >> 2) & 255) <= current_keep_base) {
+                    int cur_strength = (strength * 68) / 100;
+                    int cur_length = (local_length * 2) / 3;
 
-                local_length = rib_length + (((int)((shape_hash >> 6) & 15) - 7) * rib_length) / 64;
-                local_length = tas_clampi(local_length, 2, 96);
+                    if (cur_length < 2)
+                        cur_length = 2;
 
-                tas_draw_rib(
-                    c,
-                    Y, U, V,
-                    c->ring_y[y_slot],
-                    c->ring_u[u_slot],
-                    c->ring_v[v_slot],
-                    rows,
-                    draw_x, draw_y,
-                    gx, gy,
-                    strength,
-                    local_length,
-                    opacity_q8,
-                    age,
-                    max_age,
-                    age_violence,
-                    chroma_tear,
-                    chroma_gain_age_q8[age],
-                    color_bias,
-                    shape_hash ^ ((unsigned int)age * 0x45d9f3bU)
-                );
-
-                if (age > 0 && !motion_fracture && strength > 150) {
-                    if ((int)((spatial_hash >> 2) & 255) <= current_keep_base) {
-                        int cur_strength = (strength * 68) / 100;
-                        int cur_length = (local_length * 2) / 3;
-
-                        if (cur_length < 2)
-                            cur_length = 2;
-
-                        tas_draw_rib(
-                            c,
-                            Y, U, V,
-                            c->ring_y[write_slot],
-                            c->ring_u[write_slot],
-                            c->ring_v[write_slot],
-                            rows,
-                            draw_x, draw_y,
-                            gx, gy,
-                            cur_strength,
-                            cur_length,
-                            opacity_q8,
-                            0,
-                            max_age,
-                            age_violence / 2,
-                            chroma_tear / 2,
-                            chroma_gain_age_q8[0],
-                            color_bias,
-                            shape_hash ^ 0x91e10da5U
-                        );
-                    }
+                    tas_draw_rib(
+                        c,
+                        Y, U, V,
+                        c->ring_y[write_slot],
+                        c->ring_u[write_slot],
+                        c->ring_v[write_slot],
+                        rows,
+                        draw_x, draw_y,
+                        gx, gy,
+                        cur_strength,
+                        cur_length,
+                        opacity_q8,
+                        0,
+                        max_age,
+                        age_violence / 2,
+                        chroma_tear / 2,
+                        chroma_gain_age_q8[0],
+                        color_bias,
+                        shape_hash ^ 0x91e10da5U
+                    );
                 }
             }
         }
-
-        if (c->filled < TAS_MAX_FRAMES)
-            c->filled++;
-
-        c->frame++;
     }
+
+    if (c->filled < TAS_MAX_FRAMES)
+        c->filled++;
+
+    c->frame++;
 }

@@ -42,6 +42,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
     void *region;
     uint8_t *src_y;
     uint8_t *src_u;
@@ -276,6 +277,7 @@ void *shocksilk_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
+    t->n_threads = vje_advise_num_threads(w * h);
     t->region = vj_malloc(total);
     if (!t->region) {
         free(t);
@@ -331,14 +333,11 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
     const int mix = args[P_MIX];
     int cur = 0;
 
-#pragma omp single
-    {
-        veejay_memcpy(src_y, Y, len);
-        veejay_memcpy(src_u, U, len);
-        veejay_memcpy(src_v, V, len);
-    }
+    veejay_memcpy(src_y, Y, len);
+    veejay_memcpy(src_u, U, len);
+    veejay_memcpy(src_v, V, len);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;
@@ -358,7 +357,7 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
         const uint8_t *restrict in = t->field[cur];
         uint8_t *restrict out = t->field[cur ^ 1];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
         for (int y = 0; y < h; y++) {
             int ym = y > 0 ? y - 1 : 0;
             int yp = y + 1 < h ? y + 1 : h - 1;
@@ -418,16 +417,13 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
         cur ^= 1;
     }
 
-#pragma omp single
-    {
-        t->phase = ss_wrap(t->phase + ss_time_step(args[P_SPEED]));
-    }
+    t->phase = ss_wrap(t->phase + ss_time_step(args[P_SPEED]));
 
     {
         const uint8_t *restrict field = t->field[cur];
         uint8_t *restrict activity_map = t->field[cur ^ 1];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
         for (int y = 0; y < h; y++) {
             int ym = y > 2 ? y - 3 : 0;
             int yp = y + 3 < h ? y + 3 : h - 1;
@@ -456,7 +452,7 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
         const float mix_gain = (float) mix * 0.01f;
         const float phase = t->phase;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
         for (int y = 0; y < h; y++) {
             int ym = y > 11 ? y - 12 : 0;
             int yp = y + 12 < h ? y + 12 : h - 1;

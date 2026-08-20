@@ -217,11 +217,8 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
     if(curve_key == 0)
         curve_key = 1;
 
-#pragma omp single
-    {
-        if(curve_key != f->curve_key)
-            fisheye_rebuild_map(f, curve_key);
-    }
+    if(curve_key != f->curve_key)
+        fisheye_rebuild_map(f, curve_key);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -230,17 +227,14 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
     const int *restrict cached_coords = f->cached_coords;
     uint8_t **buf = f->buf;
 
-#pragma omp single
-    {
-        veejay_memcpy(buf[0], Y, len);
+    veejay_memcpy(buf[0], Y, len);
 
-        if(alpha == 0) {
-            veejay_memcpy(buf[1], Cb, len);
-            veejay_memcpy(buf[2], Cr, len);
-        }
+    if(alpha == 0) {
+        veejay_memcpy(buf[1], Cb, len);
+        veejay_memcpy(buf[2], Cr, len);
     }
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(f->n_threads)
     for(int i = 0; i < len; i++) {
         const int coord = cached_coords[i];
 

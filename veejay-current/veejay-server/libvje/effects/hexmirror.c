@@ -385,12 +385,9 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict outU = frame->data[1];
     uint8_t *restrict outV = frame->data[2];
 
-#pragma omp single
-    {
-        veejay_memcpy(s->buf[0], outY, len);
-        veejay_memcpy(s->buf[1], outU, len);
-        veejay_memcpy(s->buf[2], outV, len);
-    }
+    veejay_memcpy(s->buf[0], outY, len);
+    veejay_memcpy(s->buf[1], outU, len);
+    veejay_memcpy(s->buf[2], outV, len);
 
     const uint8_t *restrict srcY = s->buf[0];
     const uint8_t *restrict srcU = s->buf[1];
@@ -410,10 +407,7 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args)
     const float dir = args[P_ANTICLOCKWISE] ? 1.0f : -1.0f;
     const float rotation_step = norm_speed * norm_speed * 0.025f;
 
-#pragma omp single
-    {
-        s->xangle = hex_wrap_angle(s->xangle + rotation_step * dir);
-    }
+    s->xangle = hex_wrap_angle(s->xangle + rotation_step * dir);
 
     const float render_angle = hex_wrap_angle(s->xangle + ((float)hex_clampi(args[P_OFFSET_ANGLE], 0, 360) * (TWO_PI / 360.0f)));
     const float delta = render_angle - ONE_PI2;
@@ -426,7 +420,7 @@ void hexmirror_apply(void *ptr, VJFrame *frame, int *args)
     const float *restrict cos_lut = s->cos_lut;
     const float *restrict sin_lut = s->sin_lut;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for(int i = 0; i < height; i++) {
         const float fi = (float)(i - centerY);
         uint8_t *restrict pOutY = outY + width * i;

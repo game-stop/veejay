@@ -201,7 +201,8 @@ static void vbar_copy_region(VJFrame *frame,
                              int x0,
                              int x1,
                              int y_off,
-                             int x_off)
+                             int x_off,
+                             int n_threads)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -217,7 +218,7 @@ static void vbar_copy_region(VJFrame *frame,
     x0 = clampi(x0, 0, width);
     x1 = clampi(x1, 0, width);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int y = 0; y < height; y++) {
         const int dst_row = y * width;
         const int src_y = wrapi(y + y_off, height);
@@ -238,7 +239,8 @@ static void vbar_copy_region(VJFrame *frame,
 static void vbar_apply_divider_glow(VJFrame *frame,
                                     int divider_x,
                                     int glow_width,
-                                    int glow_strength)
+                                    int glow_strength,
+                                    int n_threads)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -248,7 +250,7 @@ static void vbar_apply_divider_glow(VJFrame *frame,
 
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -287,24 +289,21 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const float fast = 0.245f;
     const float slow = 0.112f;
 
-    #pragma omp single
-    {
-        if(!vbar->initialized) {
-            vbar->top_y_env = (float)top_y_delta;
-            vbar->bot_y_env = (float)bot_y_delta;
-            vbar->top_x_env = (float)top_x_delta;
-            vbar->bot_x_env = (float)bot_x_delta;
-            vbar->slide_env = (float)slide_drive;
-            vbar->glow_env = (float)edge_glow;
-            vbar->initialized = 1;
-        } else {
-            vbar->top_y_env = vbar_smooth(vbar->top_y_env, (float)top_y_delta, fast, slow);
-            vbar->bot_y_env = vbar_smooth(vbar->bot_y_env, (float)bot_y_delta, fast, slow);
-            vbar->top_x_env = vbar_smooth(vbar->top_x_env, (float)top_x_delta, fast * 0.90f, slow);
-            vbar->bot_x_env = vbar_smooth(vbar->bot_x_env, (float)bot_x_delta, fast * 0.90f, slow);
-            vbar->slide_env = vbar_smooth(vbar->slide_env, (float)slide_drive, fast * 1.18f, slow);
-            vbar->glow_env = vbar_smooth(vbar->glow_env, (float)edge_glow, fast, slow);
-        }
+    if(!vbar->initialized) {
+        vbar->top_y_env = (float)top_y_delta;
+        vbar->bot_y_env = (float)bot_y_delta;
+        vbar->top_x_env = (float)top_x_delta;
+        vbar->bot_x_env = (float)bot_x_delta;
+        vbar->slide_env = (float)slide_drive;
+        vbar->glow_env = (float)edge_glow;
+        vbar->initialized = 1;
+    } else {
+        vbar->top_y_env = vbar_smooth(vbar->top_y_env, (float)top_y_delta, fast, slow);
+        vbar->bot_y_env = vbar_smooth(vbar->bot_y_env, (float)bot_y_delta, fast, slow);
+        vbar->top_x_env = vbar_smooth(vbar->top_x_env, (float)top_x_delta, fast * 0.90f, slow);
+        vbar->bot_x_env = vbar_smooth(vbar->bot_x_env, (float)bot_x_delta, fast * 0.90f, slow);
+        vbar->slide_env = vbar_smooth(vbar->slide_env, (float)slide_drive, fast * 1.18f, slow);
+        vbar->glow_env = vbar_smooth(vbar->glow_env, (float)edge_glow, fast, slow);
     }
 
     const int top_y_base = clampi((int)(vbar->top_y_env + 0.5f), 0, height);
@@ -317,13 +316,10 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int slide_limit = width > height ? width : height;
     const int slide_depth_q = slide_q;
 
-    #pragma omp single
-    {
-        if(slide_depth_q > 0) {
-            vbar->slide_phase += 2.0f + (float)slide_depth_q * 0.072f;
-            if(vbar->slide_phase > 8192.0f)
-                vbar->slide_phase -= 8192.0f;
-        }
+    if(slide_depth_q > 0) {
+        vbar->slide_phase += 2.0f + (float)slide_depth_q * 0.072f;
+        if(vbar->slide_phase > 8192.0f)
+            vbar->slide_phase -= 8192.0f;
     }
 
     const int phase_i = (int)vbar->slide_phase;
@@ -342,13 +338,10 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int left_width = width / divider;
 
-    #pragma omp single
-    {
-        vbar->bar_top_auto = wrap_add(vbar->bar_top_auto, top_y_eff, height);
-        vbar->bar_top_vert = wrap_add(vbar->bar_top_vert, top_x_eff, width);
-        vbar->bar_bot_auto = wrap_add(vbar->bar_bot_auto, bot_y_eff, height);
-        vbar->bar_bot_vert = wrap_add(vbar->bar_bot_vert, bot_x_eff, width);
-    }
+    vbar->bar_top_auto = wrap_add(vbar->bar_top_auto, top_y_eff, height);
+    vbar->bar_top_vert = wrap_add(vbar->bar_top_vert, top_x_eff, width);
+    vbar->bar_bot_auto = wrap_add(vbar->bar_bot_auto, bot_y_eff, height);
+    vbar->bar_bot_vert = wrap_add(vbar->bar_bot_vert, bot_x_eff, width);
 
     vbar_copy_region(
         frame,
@@ -356,7 +349,8 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         0,
         left_width,
         vbar->bar_top_auto,
-        vbar->bar_top_vert
+        vbar->bar_top_vert,
+        vbar->n_threads
     );
 
     vbar_copy_region(
@@ -365,7 +359,8 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         left_width,
         width,
         vbar->bar_bot_auto,
-        vbar->bar_bot_vert
+        vbar->bar_bot_vert,
+        vbar->n_threads
     );
 
     if(glow_q > 0) {
@@ -374,6 +369,6 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
         glow_strength = clampi(glow_strength, 0, 240);
 
-        vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength);
+        vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength, vbar->n_threads);
     }
 }

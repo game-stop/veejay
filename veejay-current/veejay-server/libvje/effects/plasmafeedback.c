@@ -57,6 +57,7 @@ typedef struct {
     int ew;
     int eh;
     int initialized;
+    int n_threads;
     int last_phase_i;
     int last_false_i;
     int last_charge_i;
@@ -419,6 +420,7 @@ void *plasmafeedback_malloc(int w, int h)
     veejay_memset(p->buffer, 0, state_len);
     veejay_memset(p->grid, 0, sizeof(float) * (size_t)p->grid_capacity * 2u);
 
+    p->n_threads = vje_advise_num_threads((int)full_len);
     p->last_phase_i = -1;
     p->last_false_i = -1;
     p->last_charge_i = -1;
@@ -443,15 +445,12 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-#pragma omp single
-    {
-        if(!p->initialized) {
-            veejay_memcpy(p->prev_src_y, Y, full_len);
-            veejay_memset(p->energy, 0, (size_t)ew * (size_t)eh);
-            veejay_memset(p->next_energy, 0, (size_t)ew * (size_t)eh);
-            p->initialized = 1;
-            p->frame_no = 0;
-        }
+    if(!p->initialized) {
+        veejay_memcpy(p->prev_src_y, Y, full_len);
+        veejay_memset(p->energy, 0, (size_t)ew * (size_t)eh);
+        veejay_memset(p->next_energy, 0, (size_t)ew * (size_t)eh);
+        p->initialized = 1;
+        p->frame_no = 0;
     }
 
     const float charge_param = clampf_local((float)args[P_CHARGE] * 0.01f, 0.0f, 1.0f);
@@ -482,12 +481,7 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     if(cell > 22)
         cell = 22;
 
-    int vje_omp_return_condition;
-    #pragma omp single copyprivate(vje_omp_return_condition)
-    {
-        vje_omp_return_condition = !!(!plasmafeedback_ensure_grid(p, ew, eh, cell));
-    }
-    if (vje_omp_return_condition)
+    if(!plasmafeedback_ensure_grid(p, ew, eh, cell))
         return;
 
     float lut[23];
@@ -505,13 +499,10 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     const int phase_i = original_color_mode ? -2 : args[P_PALETTE_PHASE];
     const int false_i = args[P_PALETTE];
 
-#pragma omp single
-    {
-        if(!original_color_mode && (phase_i != p->last_phase_i || false_i != p->last_false_i)) {
-            build_plasma_lut(p, color_phase, false_color_param);
-            p->last_phase_i = phase_i;
-            p->last_false_i = false_i;
-        }
+    if(!original_color_mode && (phase_i != p->last_phase_i || false_i != p->last_false_i)) {
+        build_plasma_lut(p, color_phase, false_color_param);
+        p->last_phase_i = phase_i;
+        p->last_false_i = false_i;
     }
 
     const float charge_gain = charge_curve * 258.0f;
@@ -527,22 +518,16 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     const float motion_gain = motion_curve * 3.0f;
     const float brightness_gain = 0.10f + charge_curve * 0.50f;
 
-#pragma omp single
-    {
-        if(turbulence_gain > 0.0001f || noise_lap_gain > 0.0001f)
-            build_flow_grid(p, ew, eh, cell);
-    }
+    if(turbulence_gain > 0.0001f || noise_lap_gain > 0.0001f)
+        build_flow_grid(p, ew, eh, cell);
 
     const int charge_i = args[P_CHARGE];
     const int motion_i = args[P_MOTION_REACT];
 
-#pragma omp single
-    {
-        if(charge_i != p->last_charge_i || motion_i != p->last_motion_i) {
-            build_excitation_luts(p, charge_gain, brightness_gain, motion_gain);
-            p->last_charge_i = charge_i;
-            p->last_motion_i = motion_i;
-        }
+    if(charge_i != p->last_charge_i || motion_i != p->last_motion_i) {
+        build_excitation_luts(p, charge_gain, brightness_gain, motion_gain);
+        p->last_charge_i = charge_i;
+        p->last_motion_i = motion_i;
     }
 
     const uint8_t *restrict old_e = p->energy;
@@ -555,6 +540,7 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     const int plasma_mix_i = 256 - source_mix_i;
     const int motion_render_i = (int)(motion_curve * (42.0f * 256.0f / 255.0f) + 0.5f);
 
+#pragma omp parallel num_threads(p->n_threads)
     {
 #pragma omp for collapse(2) schedule(static)
         for(int gy = 0; gy < gh - 1; gy++) {
@@ -741,18 +727,14 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
     {
-        {
-            uint8_t *tmp = p->energy;
+        uint8_t *tmp = p->energy;
 
-            p->energy = p->next_energy;
-            p->next_energy = tmp;
-        }
-
-        p->frame_no++;
+        p->energy = p->next_energy;
+        p->next_energy = tmp;
     }
+
+    p->frame_no++;
 }

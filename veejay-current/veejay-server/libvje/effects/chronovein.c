@@ -46,6 +46,7 @@ typedef struct {
     int len;
     int seeded;
     int frame;
+    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -223,6 +224,7 @@ void *chronovein_malloc(int w, int h)
     c->frame = 0;
     c->lut_valid = 0;
 
+    c->n_threads = vje_advise_num_threads(w * h);
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
 
@@ -998,11 +1000,8 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
     int use_conduct;
     int use_branch;
 
-#pragma omp single
-    {
-        if(!c->seeded)
-            cv_seed(c, frame);
-    }
+    if(!c->seeded)
+        cv_seed(c, frame);
 
     threshold    = cv_param1000_to_u8(args[P_THRESHOLD]);
     growth       = cv_param1000_to_u8(args[P_GROWTH]);
@@ -1015,18 +1014,15 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
     vein_gain    = cv_clampi(args[P_VEIN_GAIN], 0, 1000);
     color_energy = cv_clampi(args[P_COLOR_ENERGY], 0, 1000);
 
-#pragma omp single
-    {
-        cv_build_luts_if_needed(
-            c,
-            threshold,
-            growth,
-            conductivity,
-            decay,
-            branch,
-            source_bleed
-        );
-    }
+    cv_build_luts_if_needed(
+        c,
+        threshold,
+        growth,
+        conductivity,
+        decay,
+        branch,
+        source_bleed
+    );
 
     {
         int growth_scale = (growth * 320 + 127) / 255;
@@ -1040,6 +1036,7 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
         use_branch  = (branch_power > 0);
     }
 
+#pragma omp parallel num_threads(c->n_threads)
     {
         cv_compute(c, frame, use_conduct, use_branch);
 
@@ -1057,12 +1054,8 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
             vein_gain,
             color_energy
         );
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        c->frame++;
-    }
+    c->frame++;
 }
 

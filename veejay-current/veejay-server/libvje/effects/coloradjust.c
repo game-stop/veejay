@@ -75,8 +75,10 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
     const int s = (int)rintf(a_sin(hue) * (1 << 16) * sat);
     const int c = (int)rintf(a_cos(hue) * (1 << 16) * sat);
     const int do_exp = exposureValue != 256;
+    const int n_threads = vje_advise_num_threads(len);
     const float powValue = exposureValue > 0 ? ((float)exposureValue / 256.0f) : 1.0f;
 
+#pragma omp parallel num_threads(n_threads)
     {
         if(do_exp) {
 #pragma omp for schedule(static)
@@ -97,6 +99,5 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
             Cb[i] = (uint8_t)clampi(new_u, 0, 255);
             Cr[i] = (uint8_t)clampi(new_v, 0, 255);
         }
-    #pragma omp barrier
     }
 }

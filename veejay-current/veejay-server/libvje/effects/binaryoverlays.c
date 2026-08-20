@@ -122,7 +122,7 @@ vj_effect *binaryoverlay_init(int w, int h)
 }
 
 #define APPLY_BINARY_OP(OP) do {                                       \
-    _Pragma("omp for schedule(static)") \
+    _Pragma("omp parallel for num_threads(n_threads) schedule(static)") \
     for(int i = 0; i < len; i++) {                                      \
         const uint8_t ya = Y[i];                                        \
         const uint8_t yb = Y2[i];                                       \
@@ -149,6 +149,7 @@ void binaryoverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     else if(mode > 14)
         mode = 14;
 
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];

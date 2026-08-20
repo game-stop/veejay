@@ -37,6 +37,7 @@ typedef struct {
     float eff_sat;
     float eff_chroma_drive;
     int initialized;
+    int n_threads;
 } stretch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -163,6 +164,7 @@ void *stretch_malloc(int w, int h)
     s->eff_chroma_drive = 0.0f;
     s->initialized = 0;
 
+    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }
@@ -190,46 +192,23 @@ void stretch_apply(void *ptr, VJFrame *frame, int *args)
         upper_target = t;
     }
 
-    #pragma omp single
-    {
-        if(!s->initialized) {
-            s->eff_upper = (float)upper_target;
-            s->eff_lower = (float)lower_target;
-            s->eff_gain = (float)gain_target;
-            s->eff_sat = (float)sat_target;
-            s->eff_chroma_drive = (float)chroma_drive_target;
-            s->initialized = 1;
-        }
+    if(!s->initialized) {
+        s->eff_upper = (float)upper_target;
+        s->eff_lower = (float)lower_target;
+        s->eff_gain = (float)gain_target;
+        s->eff_sat = (float)sat_target;
+        s->eff_chroma_drive = (float)chroma_drive_target;
+        s->initialized = 1;
     }
 
     const float fast = 0.165f;
     const float slow = 0.072f;
 
-    int upper;
-    #pragma omp single copyprivate(upper)
-    {
-        upper = stretch_smooth_i(&s->eff_upper, upper_target, fast, slow);
-    }
-    int lower;
-    #pragma omp single copyprivate(lower)
-    {
-        lower = stretch_smooth_i(&s->eff_lower, lower_target, fast, slow);
-    }
-    int gain;
-    #pragma omp single copyprivate(gain)
-    {
-        gain = stretch_smooth_i(&s->eff_gain, gain_target, fast, slow);
-    }
-    int gain_saturation;
-    #pragma omp single copyprivate(gain_saturation)
-    {
-        gain_saturation = stretch_smooth_i(&s->eff_sat, sat_target, fast, slow);
-    }
-    int chroma_drive;
-    #pragma omp single copyprivate(chroma_drive)
-    {
-        chroma_drive = stretch_smooth_i(&s->eff_chroma_drive, chroma_drive_target, fast, slow);
-    }
+    int upper = stretch_smooth_i(&s->eff_upper, upper_target, fast, slow);
+    int lower = stretch_smooth_i(&s->eff_lower, lower_target, fast, slow);
+    int gain = stretch_smooth_i(&s->eff_gain, gain_target, fast, slow);
+    int gain_saturation = stretch_smooth_i(&s->eff_sat, sat_target, fast, slow);
+    int chroma_drive = stretch_smooth_i(&s->eff_chroma_drive, chroma_drive_target, fast, slow);
 
     upper = clampi(upper, 0, 255);
     lower = clampi(lower, 0, 255);
@@ -273,7 +252,7 @@ void stretch_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
     for(int i = 0; i < len; i++) {
         const int y = Y[i];
 

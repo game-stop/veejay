@@ -114,12 +114,13 @@ void rainbowshift_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->len;
     const uint32_t phase_step = (uint32_t)((((uint64_t)frequency * RAINBOW_LUT_SIZE) << RAINBOW_FP_SHIFT) / (uint64_t)len);
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
         const uint32_t phase = (uint32_t)i * phase_step;
         const int wave = (amplitude * rainbow_sin_lut[(phase >> RAINBOW_FP_SHIFT) & RAINBOW_LUT_MASK]) >> 14;

@@ -198,6 +198,7 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
     const int mask_mode = args[P_MASK];
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
     if(threshold_max < threshold_min) {
         const int tmp = threshold_min;
@@ -209,6 +210,7 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
+#pragma omp parallel num_threads(n_threads)
     {
         if(mask_mode) {
 #pragma omp for schedule(static)
@@ -252,6 +254,5 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[i] = 128;
             }
         }
-    #pragma omp barrier
     }
 }

@@ -22,6 +22,7 @@ typedef struct {
     int plasma_pos1;
     int plasma_pos2;
     uint8_t *plasma_buf[4];
+    int n_threads;
 } distortion_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -134,6 +135,7 @@ void *distortion_malloc(int w, int h)
         d->plasma_table[i] = myround(sinf(rad) * 1024.0f);
     }
 
+    d->n_threads = vje_advise_num_threads(len);
 
     return d;
 }
@@ -171,10 +173,7 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
 
     int strides[4] = { len, len, len, 0 };
 
-    #pragma omp single
-    {
-        vj_frame_copy(frame->data, d->plasma_buf, strides);
-    }
+    vj_frame_copy(frame->data, d->plasma_buf, strides);
 
     const uint8_t *restrict srcY = d->plasma_buf[0];
     const uint8_t *restrict srcCb = d->plasma_buf[1];
@@ -190,7 +189,7 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
     const int plasma_pos1 = d->plasma_pos1 & DISTORT_TABLE_MASK;
     const int plasma_pos2 = d->plasma_pos2 & DISTORT_TABLE_MASK;
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(d->n_threads)
     for(int y = 0; y < h; y++)
     {
         int tpos1 = (plasma_pos1 + y * inc_val3) & DISTORT_TABLE_MASK;
@@ -221,9 +220,6 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
-    {
-        d->plasma_pos1 = (plasma_pos1 + inc_val5) & DISTORT_TABLE_MASK;
-        d->plasma_pos2 = (plasma_pos2 + inc_val6) & DISTORT_TABLE_MASK;
-    }
+    d->plasma_pos1 = (plasma_pos1 + inc_val5) & DISTORT_TABLE_MASK;
+    d->plasma_pos2 = (plasma_pos2 + inc_val6) & DISTORT_TABLE_MASK;
 }

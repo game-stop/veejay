@@ -37,6 +37,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
     void *region;
     uint8_t *src_y;
     uint8_t *blur1;
@@ -99,7 +100,7 @@ static void xr_box_blur2(
     uint8_t *restrict tmp1 = t->tmp1;
     uint8_t *restrict tmp2 = t->tmp2;
     int y;
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (y = 0; y < h; y++) {
         const uint8_t *row = src + y * w;
         uint8_t *out1 = tmp1 + y * w;
@@ -125,7 +126,7 @@ static void xr_box_blur2(
             sum2 += row[add2] - row[sub2];
         }
     }
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int x = 0; x < w; x++) {
         int sum1 = tmp1[x] * (r1 + 1);
         int sum2 = tmp2[x] * (r2 + 1);
@@ -158,10 +159,10 @@ static void xr_build_cdf(xraysolarization_t *t, const uint8_t *src_y, int len)
     uint64_t denom;
     int i;
 
-    #pragma omp for schedule(static)
     for (i = 0; i < 256; i++)
         t->hist[i] = 0;
 
+#pragma omp parallel num_threads(t->n_threads)
     {
         uint32_t local_hist[256];
         int k;
@@ -178,17 +179,13 @@ static void xr_build_cdf(xraysolarization_t *t, const uint8_t *src_y, int len)
             for (k = 0; k < 256; k++)
                 t->hist[k] += local_hist[k];
         }
-    #pragma omp barrier
     }
 
     for (i = 0; i < 256; i++) {
         accum += t->hist[i];
         if (min_cdf == 0 && accum > 0)
             min_cdf = (uint32_t) accum;
-        #pragma omp single
-        {
-            t->cdf_lut[i] = 0;
-        }
+        t->cdf_lut[i] = 0;
     }
 
     if (total == 0)
@@ -196,29 +193,25 @@ static void xr_build_cdf(xraysolarization_t *t, const uint8_t *src_y, int len)
 
     denom = (uint64_t) total - (uint64_t) min_cdf;
     if (denom == 0) {
-        #pragma omp for schedule(static)
         for (i = 0; i < 256; i++)
             t->cdf_lut[i] = (uint8_t) i;
         return;
     }
 
     accum = 0;
-#pragma omp single
-    {
-        for (i = 0; i < 256; i++) {
-            uint64_t num;
-            int v;
+    for (i = 0; i < 256; i++) {
+        uint64_t num;
+        int v;
 
-            accum += t->hist[i];
-            if (accum <= min_cdf) {
-                t->cdf_lut[i] = 0;
-                continue;
-            }
-
-            num = (accum - min_cdf) * 255ULL;
-            v = (int) ((num + denom / 2ULL) / denom);
-            t->cdf_lut[i] = (uint8_t) xr_clampi(v, 0, 255);
+        accum += t->hist[i];
+        if (accum <= min_cdf) {
+            t->cdf_lut[i] = 0;
+            continue;
         }
+
+        num = (accum - min_cdf) * 255ULL;
+        v = (int) ((num + denom / 2ULL) / denom);
+        t->cdf_lut[i] = (uint8_t) xr_clampi(v, 0, 255);
     }
 }
 
@@ -326,6 +319,7 @@ void *xraysolarization_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
+    t->n_threads = vje_advise_num_threads(w * h);
     t->phase = 0.0f;
 
     t->region = vj_malloc(total);
@@ -391,10 +385,7 @@ void xraysolarization_apply(void *ptr, VJFrame *frame, int *args)
     if (len <= 0 || len > t->len)
         len = t->len;
 
-#pragma omp single
-    {
-        veejay_memcpy(src_y, Y, len);
-    }
+    veejay_memcpy(src_y, Y, len);
 
     xr_build_cdf(t, src_y, len);
 
@@ -413,19 +404,16 @@ void xraysolarization_apply(void *ptr, VJFrame *frame, int *args)
     solar_gain = (float) solar * 0.01f;
     polarity_bias = (float) polarity * 0.010f;
 
-#pragma omp single
-    {
-        t->phase += xr_time_step(shimmer);
-        if (t->phase > 6.28318530718f)
-            t->phase -= 6.28318530718f;
-        else if (t->phase < 0.0f)
-            t->phase += 6.28318530718f;
-    }
+    t->phase += xr_time_step(shimmer);
+    if (t->phase > 6.28318530718f)
+        t->phase -= 6.28318530718f;
+    else if (t->phase < 0.0f)
+        t->phase += 6.28318530718f;
 
     threshold_base = 0.50f + polarity_bias * 0.34f + sinf(t->phase) * solar_gain * 0.17f;
     threshold_base = xr_clampf(threshold_base, 0.06f, 0.94f);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (i = 0; i < len; i++) {
         int y0 = src_y[i];
         int eq = t->cdf_lut[y0];

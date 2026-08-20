@@ -51,6 +51,7 @@ typedef struct {
     float sm_chroma;
     float sm_phase;
     int have_smooth;
+    int n_threads;
 } ripplewave_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -181,6 +182,7 @@ void *ripplewave_malloc(int w, int h)
     data->height = h;
     data->phase = 0.0f;
     data->have_smooth = 0;
+    data->n_threads = vje_advise_num_threads(len);
 
     return (void*)data;
 }
@@ -211,27 +213,24 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
 
     const float param_k = 0.34f;
 
-#pragma omp single
-    {
-        if(!data->have_smooth) {
-            data->sm_freq_x = (float)freq_x_arg;
-            data->sm_freq_y = (float)freq_y_arg;
-            data->sm_amp = (float)amp_arg;
-            data->sm_speed = (float)speed_arg;
-            data->sm_mix = (float)mix_arg;
-            data->sm_chroma = (float)chroma_arg;
-            data->sm_phase = (float)phase_arg;
-            data->have_smooth = 1;
-        }
-        else {
-            data->sm_freq_x = ripplewave_smooth_to(data->sm_freq_x, (float)freq_x_arg, param_k);
-            data->sm_freq_y = ripplewave_smooth_to(data->sm_freq_y, (float)freq_y_arg, param_k);
-            data->sm_amp = ripplewave_smooth_to(data->sm_amp, (float)amp_arg, param_k);
-            data->sm_speed = ripplewave_smooth_to(data->sm_speed, (float)speed_arg, param_k);
-            data->sm_mix = ripplewave_smooth_to(data->sm_mix, (float)mix_arg, param_k);
-            data->sm_chroma = ripplewave_smooth_to(data->sm_chroma, (float)chroma_arg, param_k);
-            data->sm_phase = ripplewave_smooth_to(data->sm_phase, (float)phase_arg, param_k);
-        }
+    if(!data->have_smooth) {
+        data->sm_freq_x = (float)freq_x_arg;
+        data->sm_freq_y = (float)freq_y_arg;
+        data->sm_amp = (float)amp_arg;
+        data->sm_speed = (float)speed_arg;
+        data->sm_mix = (float)mix_arg;
+        data->sm_chroma = (float)chroma_arg;
+        data->sm_phase = (float)phase_arg;
+        data->have_smooth = 1;
+    }
+    else {
+        data->sm_freq_x = ripplewave_smooth_to(data->sm_freq_x, (float)freq_x_arg, param_k);
+        data->sm_freq_y = ripplewave_smooth_to(data->sm_freq_y, (float)freq_y_arg, param_k);
+        data->sm_amp = ripplewave_smooth_to(data->sm_amp, (float)amp_arg, param_k);
+        data->sm_speed = ripplewave_smooth_to(data->sm_speed, (float)speed_arg, param_k);
+        data->sm_mix = ripplewave_smooth_to(data->sm_mix, (float)mix_arg, param_k);
+        data->sm_chroma = ripplewave_smooth_to(data->sm_chroma, (float)chroma_arg, param_k);
+        data->sm_phase = ripplewave_smooth_to(data->sm_phase, (float)phase_arg, param_k);
     }
 
     const float frequency_x = data->sm_freq_x * 0.01f;
@@ -239,14 +238,11 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
     const float amplitude = clampf(data->sm_amp, 0.0f, 45.0f);
     const float speed = clampf(data->sm_speed, 0.0f, 100.0f);
 
-#pragma omp single
-    {
-        if(speed > 0.0001f) {
-            data->phase += speed * 0.01f;
+    if(speed > 0.0001f) {
+        data->phase += speed * 0.01f;
 
-            if(data->phase > 628.3185f)
-                data->phase -= 628.3185f;
-        }
+        if(data->phase > 628.3185f)
+            data->phase -= 628.3185f;
     }
 
     const float phase_offset = data->sm_phase * 0.001f * RIPPLE_PI2;
@@ -267,6 +263,7 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
     float *restrict lut_x = data->lut_x;
     float *restrict lut_y = data->lut_y;
 
+#pragma omp parallel num_threads(data->n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 0; y < height; y++)
@@ -315,7 +312,6 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
                 V[i] = ripplewave_mix_u8(V[i], dstV[i], chroma_q8);
             }
         }
-    #pragma omp barrier
     }
 }
 

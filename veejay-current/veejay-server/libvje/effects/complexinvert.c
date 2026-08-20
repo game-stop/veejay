@@ -131,8 +131,9 @@ void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
     const int mag_fp = (int)(mag_f * (float)scale);
     const int ut_i = (int)ut_f;
     const int vt_i = (int)vt_f;
+    const int n_threads = vje_advise_num_threads(len);
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;

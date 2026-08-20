@@ -103,11 +103,12 @@ void rawval_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t new_cr = (uint8_t)args[P_NEW_CR];
 
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(uv_len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < uv_len; i++) {
         const int match = (Cb[i] == old_cb) & (Cr[i] == old_cr);
 

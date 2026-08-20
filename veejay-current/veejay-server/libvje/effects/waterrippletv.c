@@ -54,6 +54,7 @@ typedef struct {
 
     int tick;
     int last_fresh_rate;
+    int n_threads;
 
     unsigned int wfastrand_val;
 
@@ -223,6 +224,7 @@ void *waterrippletv_malloc(int width, int height)
     r->power_env = 620.0f;
     r->smooth_ready = 0;
 
+    r->n_threads = vje_advise_num_threads(len);
 
     return (void*) r;
 }
@@ -577,54 +579,32 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
     const float fast = 0.235f;
     const float slow = 0.118f;
 
-    #pragma omp single
-    {
-        if(!rip->smooth_ready) {
-            rip->wavespeed_env = (float)loopnum_arg;
-            rip->decay_env = (float)decay_arg;
-            rip->drops_env = (float)drop_drive_arg;
-            rip->power_env = (float)ripple_power_arg;
-            rip->smooth_ready = 1;
-        }
+    if(!rip->smooth_ready) {
+        rip->wavespeed_env = (float)loopnum_arg;
+        rip->decay_env = (float)decay_arg;
+        rip->drops_env = (float)drop_drive_arg;
+        rip->power_env = (float)ripple_power_arg;
+        rip->smooth_ready = 1;
     }
 
-    int loopnum;
-    #pragma omp single copyprivate(loopnum)
-    {
-        loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
-    }
-    int decay;
-    #pragma omp single copyprivate(decay)
-    {
-        decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
-    }
-    int drop_drive;
-    #pragma omp single copyprivate(drop_drive)
-    {
-        drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
-    }
-    int ripple_power;
-    #pragma omp single copyprivate(ripple_power)
-    {
-        ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
+    const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
+    const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
+    const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
+    const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
+
+    if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
+        rip->last_fresh_rate = fresh_rate;
+        rip->tick = 0;
+        rip->rain_period = 0;
+        waterripple_clear_maps(rip);
     }
 
-    #pragma omp single
-    {
-        if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
-            rip->last_fresh_rate = fresh_rate;
-            rip->tick = 0;
-            rip->rain_period = 0;
-            waterripple_clear_maps(rip);
-        }
+    rip->tick++;
 
-        rip->tick++;
+    veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
 
-        veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
-
-        raindrop(rip);
-        waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
-    }
+    raindrop(rip);
+    waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
 
     int effective_loopnum = loopnum + ((drop_drive * 3 + 500) / 1000);
     if(drop_drive > 760)
@@ -633,10 +613,10 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
     int effective_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
     effective_decay = clampi(effective_decay, 1, 31);
 
+#pragma omp parallel num_threads(rip->n_threads)
     {
         waterripple_simulate(rip, effective_loopnum, effective_decay);
         waterripple_calc_vtable(rip);
         waterripple_render(frame, rip);
-    #pragma omp barrier
     }
 }

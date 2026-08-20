@@ -42,6 +42,7 @@ typedef struct {
     int cx2;
     int n__;
     int N__;
+    int n_threads;
     void *motionmap;
 } magicmirror_t;
 
@@ -161,6 +162,7 @@ void *magicmirror_malloc(int w, int h)
 
     m->last_x_wave = -1;
     m->last_y_wave = -1;
+    m->n_threads = vje_advise_num_threads(len);
 
     return (void*) m;
 }
@@ -341,24 +343,21 @@ void magicmirror_apply(void *ptr, VJFrame *frame, int *args)
     int motion = 0;
     int interpolate = 1;
 
-#pragma omp single copyprivate(motion, x_wave, y_wave)
-    {
-        if(motionmap_active(m->motionmap)) {
-            if(motionmap_is_locked(m->motionmap)) {
-                x_wave = m->cx1;
-                y_wave = m->cx2;
-            }
-            else {
-                motionmap_scale_to(m->motionmap, 100, 100, 0, 0, &x_wave, &y_wave, &(m->n__), &(m->N__));
-                m->cx1 = x_wave;
-                m->cx2 = y_wave;
-            }
-            motion = 1;
+    if(motionmap_active(m->motionmap)) {
+        if(motionmap_is_locked(m->motionmap)) {
+            x_wave = m->cx1;
+            y_wave = m->cx2;
         }
         else {
-            m->n__ = 0;
-            m->N__ = 0;
+            motionmap_scale_to(m->motionmap, 100, 100, 0, 0, &x_wave, &y_wave, &(m->n__), &(m->N__));
+            m->cx1 = x_wave;
+            m->cx2 = y_wave;
         }
+        motion = 1;
+    }
+    else {
+        m->n__ = 0;
+        m->N__ = 0;
     }
 
     if(m->N__ == m->n__ || m->n__ == 0)
@@ -369,6 +368,7 @@ void magicmirror_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
     int strides[4] = { len, len, len, alpha ? len : 0 };
 
+#pragma omp parallel num_threads(m->n_threads)
     {
         if(update_x)
             magicmirror_update_wave_x(m, frame->width, x_wave);
@@ -391,17 +391,13 @@ void magicmirror_apply(void *ptr, VJFrame *frame, int *args)
         else {
             magicmirror_apply_alpha_only(m, frame);
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        if(interpolate)
-            motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
+    if(interpolate)
+        motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
 
-        if(motion)
-            motionmap_store_frame(m->motionmap, frame);
-    }
+    if(motion)
+        motionmap_store_frame(m->motionmap, frame);
 }
 
 int magicmirror_request_fx(void)

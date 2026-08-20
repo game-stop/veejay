@@ -43,6 +43,7 @@ typedef struct {
     float *nextX, *nextY;
 
     double time;
+    int n_threads;
     int w;
     int h;
 } liquid_fold_t;
@@ -227,6 +228,7 @@ void *edgefold_malloc(int w, int h)
     s->w = w;
     s->h = h;
 
+    s->n_threads = vje_advise_num_threads(size);
 
     return (void*) s;
 }
@@ -334,14 +336,11 @@ void edgefold_apply(void *ptr, VJFrame *frame, int *args)
     float *restrict NX = s->nextX;
     float *restrict NY = s->nextY;
 
-#pragma omp single
-    {
-        veejay_memcpy(s->srcY, srcY, plane_size);
-        veejay_memcpy(s->srcU, srcU, plane_size);
-        veejay_memcpy(s->srcV, srcV, plane_size);
-    }
+    veejay_memcpy(s->srcY, srcY, plane_size);
+    veejay_memcpy(s->srcU, srcU, plane_size);
+    veejay_memcpy(s->srcV, srcV, plane_size);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
     for(int y = 1; y < h - 1; y++) {
         for(int x = 1; x < w - 1; x++) {
             const int idx = y * w + x;
@@ -431,14 +430,11 @@ void edgefold_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-#pragma omp single
     {
-        {
-            float *tmp;
-            tmp = s->vecX; s->vecX = s->nextX; s->nextX = tmp;
-            tmp = s->vecY; s->vecY = s->nextY; s->nextY = tmp;
-        }
-
-        s->time += 1.0;
+        float *tmp;
+        tmp = s->vecX; s->vecX = s->nextX; s->nextX = tmp;
+        tmp = s->vecY; s->vecY = s->nextY; s->nextY = tmp;
     }
+
+    s->time += 1.0;
 }

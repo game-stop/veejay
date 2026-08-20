@@ -272,26 +272,20 @@ void flower_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-#pragma omp single
-    {
-        veejay_memcpy(bufY, srcY, len);
-        veejay_memcpy(bufU, srcU, len);
-        veejay_memcpy(bufV, srcV, len);
+    veejay_memcpy(bufY, srcY, len);
+    veejay_memcpy(bufU, srcU, len);
+    veejay_memcpy(bufV, srcV, len);
 
-        if(petal_count != s->last_petal_count)
-            flower_build_cos_lut(s, petal_count);
+    if(petal_count != s->last_petal_count)
+        flower_build_cos_lut(s, petal_count);
 
-        if(petal_length != s->last_petal_length)
-            flower_build_exp_lut(s, petal_length);
-    }
+    if(petal_length != s->last_petal_length)
+        flower_build_exp_lut(s, petal_length);
 
     const int bloom_fp = (FP_MULT >> 1) + (int)(((int64_t)bloom_i * FP_MULT + 500) / 1000);
     const float spin_step = (float)spin_i * 0.000070f;
 
-#pragma omp single
-    {
-        s->phase = flower_wrap_phase(s->phase + spin_step);
-    }
+    s->phase = flower_wrap_phase(s->phase + spin_step);
 
     const float base_phase = ((float)rotation_i * (TWO_PI_F / 360.0f)) + s->phase;
     const int phase_idx = (int)(base_phase * ((float)LUT_SIZE * INV_TWO_PI_F)) & LUT_MASK;
@@ -301,7 +295,7 @@ void flower_apply(void *ptr, VJFrame *frame, int *args)
     const int32_t *restrict cos_lut = s->cos_lut_1d;
     const int32_t *restrict exp_lut = s->exp_lut_1d;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for num_threads(s->n_threads) schedule(static)
     for(int y = 0; y < height; y++) {
         const int dy = y - cy;
         const int row = y * width;

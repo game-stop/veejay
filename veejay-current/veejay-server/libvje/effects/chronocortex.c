@@ -51,6 +51,7 @@ typedef struct {
     int len;
     int frame;
     int seeded;
+    int n_threads;
 
     uint8_t *ref_y;
 
@@ -237,6 +238,7 @@ void *chronocortex_malloc(int w, int h)
     c->seeded = 0;
     c->lut_valid = 0;
 
+    c->n_threads = vje_advise_num_threads(w * h);
 
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->on_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1036,12 +1038,7 @@ static void cf_compute_cortex(chronocortex_t *c,
     ymax = cf_mini(ymax, h - 1 + dy_on);
     ymax = cf_mini(ymax, h - 1 + dy_off);
 
-    int use_direct;
-
-#pragma omp single copyprivate(use_direct)
-    use_direct = xmin <= xmax && ymin <= ymax;
-
-    if(use_direct) {
+    if(xmin <= xmax && ymin <= ymax) {
         cf_compute_cortex_direct_rect(
             c,
             frame,
@@ -1438,11 +1435,8 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
 
     int prop_mode;
 
-#pragma omp single
-    {
-        if(!c->seeded)
-            cf_seed(c, frame);
-    }
+    if(!c->seeded)
+        cf_seed(c, frame);
 
     threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
     excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
@@ -1465,23 +1459,21 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
     cortex_gain    = cf_ui1000_to_u8(cortex_gain_ui);
     color_energy   = cf_ui1000_to_u8(color_energy_ui);
 
-#pragma omp single
-    {
-        cf_build_luts_if_needed(
-            c,
-            threshold,
-            excitation,
-            inhibition,
-            decay,
-            branching,
-            source_bleed,
-            cortex_gain,
-            color_energy
-        );
-    }
+    cf_build_luts_if_needed(
+        c,
+        threshold,
+        excitation,
+        inhibition,
+        decay,
+        branching,
+        source_bleed,
+        cortex_gain,
+        color_energy
+    );
 
     prop_mode = c->frame & 3;
 
+#pragma omp parallel num_threads(c->n_threads)
     {
         cf_compute_cortex(
             c,
@@ -1502,11 +1494,7 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
             source_bleed,
             color_mode
         );
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        c->frame++;
-    }
+    c->frame++;
 }

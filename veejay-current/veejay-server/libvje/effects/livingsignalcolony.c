@@ -38,6 +38,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
     int seeded;
     int ping;
     void *region;
@@ -156,7 +157,7 @@ static void lsc_seed(livingsignalcolony_t *t, VJFrame *frame, VJFrame *frame2)
     const int w = t->w;
     const int h = t->h;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;
@@ -184,15 +185,12 @@ static void lsc_seed(livingsignalcolony_t *t, VJFrame *frame, VJFrame *frame2)
         }
     }
 
-#pragma omp single
-    {
-        veejay_memcpy(t->life[1], t->life[0], t->len);
-        veejay_memcpy(t->nutrient[1], t->nutrient[0], t->len);
-        veejay_memcpy(t->charge[1], t->charge[0], t->len);
-        veejay_memcpy(t->pigment[1], t->pigment[0], t->len);
-        t->seeded = 1;
-        t->ping = 0;
-    }
+    veejay_memcpy(t->life[1], t->life[0], t->len);
+    veejay_memcpy(t->nutrient[1], t->nutrient[0], t->len);
+    veejay_memcpy(t->charge[1], t->charge[0], t->len);
+    veejay_memcpy(t->pigment[1], t->pigment[0], t->len);
+    t->seeded = 1;
+    t->ping = 0;
 }
 
 vj_effect *livingsignalcolony_init(int w, int h)
@@ -268,6 +266,7 @@ void *livingsignalcolony_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
+    t->n_threads = vje_advise_num_threads(w * h);
     t->region = vj_malloc(total);
     if (!t->region) {
         free(t);
@@ -341,17 +340,14 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
     uint8_t *restrict charge2 = t->charge[nxt];
     uint8_t *restrict pigment2 = t->pigment[nxt];
 
-#pragma omp single
-    {
-        veejay_memcpy(src_y, Y, len);
-        veejay_memcpy(src_u, U, len);
-        veejay_memcpy(src_v, V, len);
-    }
+    veejay_memcpy(src_y, Y, len);
+    veejay_memcpy(src_u, U, len);
+    veejay_memcpy(src_v, V, len);
 
     if (!t->seeded)
         lsc_seed(t, frame, frame2);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < h; y++) {
         int ym = y - radius;
         int yp = y + radius;
@@ -458,7 +454,7 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
         }
     }
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;
@@ -525,8 +521,5 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
         }
     }
 
-#pragma omp single
-    {
-        t->ping = nxt;
-    }
+    t->ping = nxt;
 }

@@ -76,6 +76,7 @@ void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int len = frame->len;
 
     const int mode = args[0];
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -89,49 +90,49 @@ void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     switch(mode)
     {
         case 0:
-            #pragma omp for schedule(static)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for(int i = 0; i < len; i++)
                 PROCESS_PIXEL_VALUE(Y2[i]);
             break;
 
         case 1:
-            #pragma omp for schedule(static)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for(int i = 0; i < len; i++)
                 PROCESS_PIXEL_VALUE(255 - Y2[i]);
             break;
 
         case 2:
-            #pragma omp for schedule(static)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for(int i = 0; i < len; i++)
                 PROCESS_PIXEL_VALUE(Cb2[i]);
             break;
 
         case 3:
-            #pragma omp for schedule(static)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for(int i = 0; i < len; i++)
                 PROCESS_PIXEL_VALUE(255 - Cb2[i]);
             break;
 
         case 4:
-            #pragma omp for schedule(static)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for(int i = 0; i < len; i++)
                 PROCESS_PIXEL_VALUE(Cr2[i]);
             break;
 
         case 5:
-            #pragma omp for schedule(static)
+            #pragma omp parallel for num_threads(n_threads) schedule(static)
             for(int i = 0; i < len; i++)
                 PROCESS_PIXEL_VALUE(255 - Cr2[i]);
             break;
 
         case 6:
             if(A2) {
-                #pragma omp for schedule(static)
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
                 for(int i = 0; i < len; i++)
                     PROCESS_PIXEL_VALUE(A2[i]);
             }
             else {
-                #pragma omp for schedule(static)
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
                 for(int i = 0; i < len; i++)
                     PROCESS_PIXEL_VALUE(255);
             }
@@ -139,12 +140,12 @@ void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
         case 7:
             if(A2) {
-                #pragma omp for schedule(static)
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
                 for(int i = 0; i < len; i++)
                     PROCESS_PIXEL_VALUE(255 - A2[i]);
             }
             else {
-                #pragma omp for schedule(static)
+                #pragma omp parallel for num_threads(n_threads) schedule(static)
                 for(int i = 0; i < len; i++)
                     PROCESS_PIXEL_VALUE(0);
             }

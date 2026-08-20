@@ -70,6 +70,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
 
     uint32_t histogram[256] = { 0 };
     uint32_t threshold = 0;
+    const int n_threads = vje_advise_num_threads(len);
     const int use_lookup = skew != 0xff;
     uint8_t lookup[256];
 
@@ -79,6 +80,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t low = invert ? 0xff : 0x00;
     const uint8_t high = invert ? 0x00 : 0xff;
 
+#pragma omp parallel num_threads(n_threads)
     {
         uint32_t local[256] = { 0 };
 
@@ -96,7 +98,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp barrier
 
-#pragma omp single copyprivate(threshold)
+#pragma omp single
         threshold = otsu_method(histogram);
 
 #pragma omp for schedule(static)
@@ -108,14 +110,10 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
             else
                 A[i] = (cond * high) | ((1 - cond) * low);
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        if(mode == 0) {
-            veejay_memset(Cb, 128, uv_len);
-            veejay_memset(Cr, 128, uv_len);
-        }
+    if(mode == 0) {
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
     }
 }

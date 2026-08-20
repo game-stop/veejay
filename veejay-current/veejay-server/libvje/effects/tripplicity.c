@@ -44,6 +44,7 @@ typedef struct {
     float chroma_drive_env;
     int initialized;
 
+    int n_threads;
 } tripplicity_t;
 
 static inline int tripplicity_clampi(int v, int lo, int hi)
@@ -146,6 +147,7 @@ void *tripplicity_malloc(int w, int h)
     t->chroma_drive_env = 0.0f;
     t->initialized = 0;
 
+    t->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) t;
 }
@@ -168,29 +170,23 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int mix_drive_arg = args[P_MIX_DRIVE];
     const int chroma_drive_arg = args[P_CHROMA_DRIVE];
 
-#pragma omp single
-    {
-        if(!t->initialized) {
-            t->op_y_env = (float)op_y_arg;
-            t->op_cb_env = (float)op_cb_arg;
-            t->op_cr_env = (float)op_cr_arg;
-            t->mix_drive_env = (float)mix_drive_arg;
-            t->chroma_drive_env = (float)chroma_drive_arg;
-            t->initialized = 1;
-        }
+    if(!t->initialized) {
+        t->op_y_env = (float)op_y_arg;
+        t->op_cb_env = (float)op_cb_arg;
+        t->op_cr_env = (float)op_cr_arg;
+        t->mix_drive_env = (float)mix_drive_arg;
+        t->chroma_drive_env = (float)chroma_drive_arg;
+        t->initialized = 1;
     }
 
     const float op_fast = 0.30f;
     const float drive_fast = 0.24f;
 
-#pragma omp single
-    {
-        t->op_y_env = tripplicity_slew(t->op_y_env, (float)op_y_arg, op_fast);
-        t->op_cb_env = tripplicity_slew(t->op_cb_env, (float)op_cb_arg, op_fast * 0.90f);
-        t->op_cr_env = tripplicity_slew(t->op_cr_env, (float)op_cr_arg, op_fast * 0.90f);
-        t->mix_drive_env = tripplicity_slew(t->mix_drive_env, (float)mix_drive_arg, drive_fast);
-        t->chroma_drive_env = tripplicity_slew(t->chroma_drive_env, (float)chroma_drive_arg, drive_fast);
-    }
+    t->op_y_env = tripplicity_slew(t->op_y_env, (float)op_y_arg, op_fast);
+    t->op_cb_env = tripplicity_slew(t->op_cb_env, (float)op_cb_arg, op_fast * 0.90f);
+    t->op_cr_env = tripplicity_slew(t->op_cr_env, (float)op_cr_arg, op_fast * 0.90f);
+    t->mix_drive_env = tripplicity_slew(t->mix_drive_env, (float)mix_drive_arg, drive_fast);
+    t->chroma_drive_env = tripplicity_slew(t->chroma_drive_env, (float)chroma_drive_arg, drive_fast);
 
     const int mix_drive = tripplicity_clampi((int)(t->mix_drive_env + 0.5f), 0, 1000);
     const int chroma_drive = tripplicity_clampi((int)(t->chroma_drive_env + 0.5f), 0, 1000);
@@ -215,6 +211,7 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
+#pragma omp parallel num_threads(t->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -225,6 +222,5 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             Cb1[i] = tripplicity_mix_u8(Cb1[i], Cb2[i], qCb);
             Cr1[i] = tripplicity_mix_u8(Cr1[i], Cr2[i], qCr);
         }
-    #pragma omp barrier
     }
 }

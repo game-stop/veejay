@@ -38,6 +38,7 @@ typedef struct
     int plane;
     int frame_size;
     int uv_size;
+    int n_threads;
 } baltantv_t;
 
 static inline int baltan_plane_index(int plane, int t, int stride)
@@ -101,6 +102,7 @@ void *baltantv_malloc(int w, int h)
         return NULL;
     }
 
+    b->n_threads = vje_advise_num_threads(len);
 
     return b;
 }
@@ -146,7 +148,7 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
     int16_t *restrict dstU = b->historyU + (plane * len);
     int16_t *restrict dstV = b->historyV + (plane * len);
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(b->n_threads)
     for(int i = 0; i < len; i++)
     {
         const int srcY = Y[i];
@@ -186,8 +188,5 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = CLAMP_UV(finalV + 128);
     }
 
-    #pragma omp single
-    {
-        b->plane = (plane + 1) & PLANE_MASK;
-    }
+    b->plane = (plane + 1) & PLANE_MASK;
 }

@@ -418,31 +418,30 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tU = s->lut[1];
     uint8_t *restrict tV = s->lut[2];
 
-        #pragma omp single
+    if(s->last_mode != mode)
     {
-        if(s->last_mode != mode)
+        const uint8_t *table = color_tables[mode];
+
+        s->last_mode = mode;
+
+        for(int i = 0; i < 256; i++)
         {
-            const uint8_t *table = color_tables[mode];
+            const int j = i * 3;
 
-            s->last_mode = mode;
-
-            for(int i = 0; i < 256; i++)
-            {
-                const int j = i * 3;
-
-                _rgb2yuv(
-                    table[j + 0],
-                    table[j + 1],
-                    table[j + 2],
-                    tY[i],
-                    tU[i],
-                    tV[i]
-                );
-            }
+            _rgb2yuv(
+                table[j + 0],
+                table[j + 1],
+                table[j + 2],
+                tY[i],
+                tU[i],
+                tV[i]
+            );
         }
     }
 
+    const int n_threads = vje_advise_num_threads(len);
 
+    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -454,6 +453,5 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
             U[i] = tU[U[i]];
             V[i] = tV[V[i]];
         }
-    #pragma omp barrier
     }
 }

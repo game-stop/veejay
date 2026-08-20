@@ -45,6 +45,7 @@ typedef struct {
     int len;
     int frame;
     int filled;
+    int n_threads;
 
     uint8_t *region;
 
@@ -627,6 +628,7 @@ void *meteorvector_malloc(int w, int h)
     c->len = w * h;
     c->frame = 0;
     c->filled = 0;
+    c->n_threads = vje_advise_num_threads(w * h);
 
     c->region = (uint8_t *) vj_malloc(total);
 
@@ -763,7 +765,7 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     motion_min = bca_clampi(motion_min, 4, 38);
     motion_only_keep = bca_clampi(motion_only_keep, 4, 84);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(c->n_threads)
     for(int i = 0; i < process_len; i++) {
         const int raw_y = Y[i];
         const int old_stable = c->stable_y[i];
@@ -810,222 +812,219 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     int ycell = 0;
-#pragma omp single
-    {
-        for(int y = 1; y < rows - 1; y += step, ycell++) {
-            const int row = y * w;
-            int row_phase = (ycell & 1) ? (step >> 1) : 0;
-            int x_start = 1 + row_phase;
-            int xcell = 0;
-            int row_comets_used = 0;
+    for(int y = 1; y < rows - 1; y += step, ycell++) {
+        const int row = y * w;
+        int row_phase = (ycell & 1) ? (step >> 1) : 0;
+        int x_start = 1 + row_phase;
+        int xcell = 0;
+        int row_comets_used = 0;
 
-            if(x_start >= w - 1)
-                x_start = 1;
+        if(x_start >= w - 1)
+            x_start = 1;
 
-            for(int x = x_start; x < w - 1; x += step, xcell++) {
-                const unsigned int spatial_hash = bca_hash3(xcell, ycell, 7331);
+        for(int x = x_start; x < w - 1; x += step, xcell++) {
+            const unsigned int spatial_hash = bca_hash3(xcell, ycell, 7331);
 
-                if(row_comets_used >= row_comet_limit)
-                    continue;
-                if(comet_gate < 255 && (int)((spatial_hash >> 24) & 255) > comet_gate)
-                    continue;
+            if(row_comets_used >= row_comet_limit)
+                continue;
+            if(comet_gate < 255 && (int)((spatial_hash >> 24) & 255) > comet_gate)
+                continue;
 
-                const int idx = row + x;
-                const int l = edgeY[idx - 1];
-                const int r = edgeY[idx + 1];
-                const int u0 = edgeY[idx - w];
-                const int d = edgeY[idx + w];
-                int gx = r - l;
-                int gy = d - u0;
-                const int edge = bca_absi(gx) + bca_absi(gy);
-                int motion = 0;
-                unsigned int shape_hash = bca_hash3(xcell, ycell, 9917);
-                const int hnoise = (int)(spatial_hash & 63) - 31;
-                int edge_threshold = edge_threshold_base + hnoise;
-                int strength = 0;
-                int accepted = 0;
-                int motion_only = 0;
+            const int idx = row + x;
+            const int l = edgeY[idx - 1];
+            const int r = edgeY[idx + 1];
+            const int u0 = edgeY[idx - w];
+            const int d = edgeY[idx + w];
+            int gx = r - l;
+            int gy = d - u0;
+            const int edge = bca_absi(gx) + bca_absi(gy);
+            int motion = 0;
+            unsigned int shape_hash = bca_hash3(xcell, ycell, 9917);
+            const int hnoise = (int)(spatial_hash & 63) - 31;
+            int edge_threshold = edge_threshold_base + hnoise;
+            int strength = 0;
+            int accepted = 0;
+            int motion_only = 0;
 
-                edge_threshold = bca_clampi(edge_threshold, 32, 275);
+            edge_threshold = bca_clampi(edge_threshold, 32, 275);
 
-                if(available > 1)
-                    motion = bca_absi((int)edgeY[idx] - (int)lastEdgeY[idx]);
+            if(available > 1)
+                motion = bca_absi((int)edgeY[idx] - (int)lastEdgeY[idx]);
 
-                if(edge >= seed_floor) {
-                    const int edge_core = edge - edge_threshold;
-                    const int motion_boost = (motion * motion_launch) / 145;
-                    int keep;
-                    int density_hash;
+            if(edge >= seed_floor) {
+                const int edge_core = edge - edge_threshold;
+                const int motion_boost = (motion * motion_launch) / 145;
+                int keep;
+                int density_hash;
 
-                    strength = bca_ramp255(edge_core + motion_boost, 180);
-                    keep = 12 + ((comet_density * tail_comp_q8) >> 7) + (motion_launch >> 3) + (strength >> 2);
+                strength = bca_ramp255(edge_core + motion_boost, 180);
+                keep = 12 + ((comet_density * tail_comp_q8) >> 7) + (motion_launch >> 3) + (strength >> 2);
 
-                    if(edge > 160)
-                        keep += (edge - 160) >> 3;
+                if(edge > 160)
+                    keep += (edge - 160) >> 3;
 
-                    if(motion > 6)
-                        keep += (motion * motion_launch) >> 9;
+                if(motion > 6)
+                    keep += (motion * motion_launch) >> 9;
 
-                    if(strength > 210)
-                        keep += 18;
+                if(strength > 210)
+                    keep += 18;
 
-                    keep = bca_clampi(keep, 6, 230);
-                    density_hash = (int)((spatial_hash >> 8) & 255);
+                keep = bca_clampi(keep, 6, 230);
+                density_hash = (int)((spatial_hash >> 8) & 255);
 
-                    if(density_hash <= keep)
-                        accepted = 1;
+                if(density_hash <= keep)
+                    accepted = 1;
+            }
+            else if(available > 1 && motion_launch > 0) {
+                if(motion >= motion_min &&
+                   (int)((spatial_hash >> 8) & 255) <= motion_only_keep) {
+                    accepted = 1;
+                    motion_only = 1;
+
+                    gx = (int)((shape_hash >> 16) & 255) - 128;
+                    gy = (int)((shape_hash >> 24) & 255) - 128;
+
+                    if(gx == 0 && gy == 0)
+                        gx = 1;
+
+                    strength = 54 + ((motion * motion_launch) / 150) + (launch_energy >> 2);
+                    strength = bca_clampi(strength, 0, 168);
                 }
-                else if(available > 1 && motion_launch > 0) {
-                    if(motion >= motion_min &&
-                       (int)((spatial_hash >> 8) & 255) <= motion_only_keep) {
-                        accepted = 1;
-                        motion_only = 1;
+            }
 
+            if(!accepted && launch_energy > 38 && available > 1) {
+                const int reactive_hash = (int)((spatial_hash >> 18) & 255);
+                const int edge_active = edge >= reactive_edge_floor;
+                const int motion_active = motion >= reactive_motion_floor;
+                int reactive_score = 0;
+                int reactive_keep = reactive_seed_keep;
+
+                if(edge_active)
+                    reactive_score += bca_ramp255(edge - reactive_edge_floor, 180) >> 1;
+                if(motion_active)
+                    reactive_score += (motion * motion_launch) / 130;
+
+                if(edge > 96)
+                    reactive_keep += (edge - 96) >> 4;
+                if(motion > 6)
+                    reactive_keep += (motion * launch_energy) >> 10;
+                if(edge_active && motion_active)
+                    reactive_keep += 8;
+
+                reactive_keep = bca_clampi(reactive_keep, 0, 112);
+
+                if((edge_active || motion_active) && reactive_score > 0 && reactive_hash <= reactive_keep) {
+                    accepted = 1;
+                    motion_only = edge_active ? 0 : 1;
+                    strength = 48 + reactive_score + (launch_energy >> 2);
+                    strength = bca_clampi(strength, 0, 224);
+
+                    if(!edge_active || (gx == 0 && gy == 0)) {
                         gx = (int)((shape_hash >> 16) & 255) - 128;
                         gy = (int)((shape_hash >> 24) & 255) - 128;
 
                         if(gx == 0 && gy == 0)
                             gx = 1;
-
-                        strength = 54 + ((motion * motion_launch) / 150) + (launch_energy >> 2);
-                        strength = bca_clampi(strength, 0, 168);
                     }
                 }
-
-                if(!accepted && launch_energy > 38 && available > 1) {
-                    const int reactive_hash = (int)((spatial_hash >> 18) & 255);
-                    const int edge_active = edge >= reactive_edge_floor;
-                    const int motion_active = motion >= reactive_motion_floor;
-                    int reactive_score = 0;
-                    int reactive_keep = reactive_seed_keep;
-
-                    if(edge_active)
-                        reactive_score += bca_ramp255(edge - reactive_edge_floor, 180) >> 1;
-                    if(motion_active)
-                        reactive_score += (motion * motion_launch) / 130;
-
-                    if(edge > 96)
-                        reactive_keep += (edge - 96) >> 4;
-                    if(motion > 6)
-                        reactive_keep += (motion * launch_energy) >> 10;
-                    if(edge_active && motion_active)
-                        reactive_keep += 8;
-
-                    reactive_keep = bca_clampi(reactive_keep, 0, 112);
-
-                    if((edge_active || motion_active) && reactive_score > 0 && reactive_hash <= reactive_keep) {
-                        accepted = 1;
-                        motion_only = edge_active ? 0 : 1;
-                        strength = 48 + reactive_score + (launch_energy >> 2);
-                        strength = bca_clampi(strength, 0, 224);
-
-                        if(!edge_active || (gx == 0 && gy == 0)) {
-                            gx = (int)((shape_hash >> 16) & 255) - 128;
-                            gy = (int)((shape_hash >> 24) & 255) - 128;
-
-                            if(gx == 0 && gy == 0)
-                                gx = 1;
-                        }
-                    }
-                }
-
-                if(!accepted || strength <= 0)
-                    continue;
-
-                row_comets_used++;
-
-                int age;
-
-                if(max_age > 0) {
-                    int motion_part = (motion * (motion_launch + (launch_energy >> 1)) * max_age) / 6000;
-                    int jitter_part = 0;
-
-                    if(motion > 3 &&
-                       (int)((spatial_hash >> 16) & 255) < (comet_density + 40)) {
-                        jitter_part = (int)((spatial_hash >> 24) & 3);
-                    }
-
-                    if(launch_energy > 70 && strength > 100 &&
-                       (int)((spatial_hash >> 21) & 255) < (comet_density + 24))
-                        jitter_part++;
-
-                    age = bca_clampi(motion_part + jitter_part, 0, max_age);
-                }
-                else {
-                    age = 0;
-                }
-
-                const int head_slot = write_slot;
-                const int tail_slot = bca_slot_for_age(write_slot, age);
-                int draw_x = x;
-                int draw_y = y;
-                int local_tail;
-                int local_head;
-
-                if(step > 3) {
-                    const int jlim = step / 3;
-                    const int jx = ((((int)(shape_hash & 15)) - 8) * jlim) / 8;
-                    const int jy = ((((int)((shape_hash >> 4) & 15)) - 8) * jlim) / 8;
-
-                    draw_x = bca_clampi(x + jx, 1, w - 2);
-                    draw_y = bca_clampi(y + jy, 1, rows - 2);
-                }
-
-                local_tail = tail_length + (((int)((shape_hash >> 6) & 15) - 7) * tail_length) / 64;
-                local_tail = bca_clampi(local_tail, 2, 112);
-
-                local_head = head_size;
-
-                if(motion_only && local_head > 1)
-                    local_head--;
-
-                if(!motion_only && motion > 10 && local_head < 8)
-                    local_head++;
-
-                if(launch_energy > 72 && strength > 96 && local_head < 8)
-                    local_head++;
-
-                if(launch_energy > 84 && strength > 160 && local_head < 8)
-                    local_head++;
-
-                if(launch_energy > 66 && strength > 90) {
-                    int tail_boost = (local_tail * launch_energy) / 520;
-                    if(tail_boost > 18)
-                        tail_boost = 18;
-                    local_tail = bca_clampi(local_tail + tail_boost, 2, 112);
-                }
-
-                bca_draw_comet(
-                    c,
-                    Y, U, V,
-                    c->ring_y[head_slot],
-                    c->ring_u[head_slot],
-                    c->ring_v[head_slot],
-                    c->ring_y[tail_slot],
-                    c->ring_u[tail_slot],
-                    c->ring_v[tail_slot],
-                    rows,
-                    draw_x, draw_y,
-                    gx, gy,
-                    strength,
-                    local_head,
-                    local_tail,
-                    opacity_q8,
-                    age,
-                    max_age,
-                    motion_launch,
-                    white_forge_q8,
-                    chroma_gain_age_q8[age],
-                    color_bias,
-                    shape_hash ^ ((unsigned int)age * 0x45d9f3bU),
-                    long_fast
-                );
             }
+
+            if(!accepted || strength <= 0)
+                continue;
+
+            row_comets_used++;
+
+            int age;
+
+            if(max_age > 0) {
+                int motion_part = (motion * (motion_launch + (launch_energy >> 1)) * max_age) / 6000;
+                int jitter_part = 0;
+
+                if(motion > 3 &&
+                   (int)((spatial_hash >> 16) & 255) < (comet_density + 40)) {
+                    jitter_part = (int)((spatial_hash >> 24) & 3);
+                }
+
+                if(launch_energy > 70 && strength > 100 &&
+                   (int)((spatial_hash >> 21) & 255) < (comet_density + 24))
+                    jitter_part++;
+
+                age = bca_clampi(motion_part + jitter_part, 0, max_age);
+            }
+            else {
+                age = 0;
+            }
+
+            const int head_slot = write_slot;
+            const int tail_slot = bca_slot_for_age(write_slot, age);
+            int draw_x = x;
+            int draw_y = y;
+            int local_tail;
+            int local_head;
+
+            if(step > 3) {
+                const int jlim = step / 3;
+                const int jx = ((((int)(shape_hash & 15)) - 8) * jlim) / 8;
+                const int jy = ((((int)((shape_hash >> 4) & 15)) - 8) * jlim) / 8;
+
+                draw_x = bca_clampi(x + jx, 1, w - 2);
+                draw_y = bca_clampi(y + jy, 1, rows - 2);
+            }
+
+            local_tail = tail_length + (((int)((shape_hash >> 6) & 15) - 7) * tail_length) / 64;
+            local_tail = bca_clampi(local_tail, 2, 112);
+
+            local_head = head_size;
+
+            if(motion_only && local_head > 1)
+                local_head--;
+
+            if(!motion_only && motion > 10 && local_head < 8)
+                local_head++;
+
+            if(launch_energy > 72 && strength > 96 && local_head < 8)
+                local_head++;
+
+            if(launch_energy > 84 && strength > 160 && local_head < 8)
+                local_head++;
+
+            if(launch_energy > 66 && strength > 90) {
+                int tail_boost = (local_tail * launch_energy) / 520;
+                if(tail_boost > 18)
+                    tail_boost = 18;
+                local_tail = bca_clampi(local_tail + tail_boost, 2, 112);
+            }
+
+            bca_draw_comet(
+                c,
+                Y, U, V,
+                c->ring_y[head_slot],
+                c->ring_u[head_slot],
+                c->ring_v[head_slot],
+                c->ring_y[tail_slot],
+                c->ring_u[tail_slot],
+                c->ring_v[tail_slot],
+                rows,
+                draw_x, draw_y,
+                gx, gy,
+                strength,
+                local_head,
+                local_tail,
+                opacity_q8,
+                age,
+                max_age,
+                motion_launch,
+                white_forge_q8,
+                chroma_gain_age_q8[age],
+                color_bias,
+                shape_hash ^ ((unsigned int)age * 0x45d9f3bU),
+                long_fast
+            );
         }
-
-        if(c->filled < BCA_MAX_FRAMES)
-            c->filled++;
-
-        c->frame++;
     }
+
+    if(c->filled < BCA_MAX_FRAMES)
+        c->filled++;
+
+    c->frame++;
 }

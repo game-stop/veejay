@@ -67,6 +67,7 @@ void colormap_apply(void *ptr, VJFrame *frame, int *args)
     const int b = args[2];
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
+    const int n_threads = vje_advise_num_threads(uv_len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -80,7 +81,7 @@ void colormap_apply(void *ptr, VJFrame *frame, int *args)
         v_table[i] = (uint8_t)clampi(i + r - g, 0, 255);
     }
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < uv_len; i++)
     {
         Cb[i] = u_table[Cb[i]];

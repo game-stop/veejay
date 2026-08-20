@@ -48,6 +48,7 @@ typedef struct {
     int len;
     int seeded;
     int frame;
+    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -241,6 +242,7 @@ void *chronoglass_malloc(int w, int h)
     c->frame = 0;
     c->lut_valid = 0;
 
+    c->n_threads = vje_advise_num_threads(w * h);
 
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y  = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1250,11 +1252,8 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
     int silt_gain;
     int color_energy;
 
-#pragma omp single
-    {
-        if(!c->seeded)
-            cs_seed(c, frame);
-    }
+    if(!c->seeded)
+        cs_seed(c, frame);
 
     threshold    = cs_ui_to_u8(args[P_THRESHOLD]);
     flow         = cs_ui_to_u8(args[P_FLOW]);
@@ -1267,22 +1266,20 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
     silt_gain    = cs_clampi(args[P_SILT_GAIN], 0, CS_UI_MAX);
     color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, CS_UI_MAX);
 
-#pragma omp single
-    {
-        cs_build_luts_if_needed(
-            c,
-            threshold,
-            flow,
-            erosion,
-            decay,
-            sediment,
-            source_bleed,
-            turbulence,
-            silt_gain,
-            color_energy
-        );
-    }
+    cs_build_luts_if_needed(
+        c,
+        threshold,
+        flow,
+        erosion,
+        decay,
+        sediment,
+        source_bleed,
+        turbulence,
+        silt_gain,
+        color_energy
+    );
 
+#pragma omp parallel num_threads(c->n_threads)
     {
         cs_compute_silt(
             c,
@@ -1302,11 +1299,7 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
             source_bleed,
             color_mode
         );
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        c->frame++;
-    }
+    c->frame++;
 }

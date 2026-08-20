@@ -128,6 +128,7 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
     const int black_clip_fp = threshold * scale;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -137,7 +138,7 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;

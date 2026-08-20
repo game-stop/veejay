@@ -128,6 +128,7 @@ typedef struct
     int last_pastel_param;
     int last_bprot_param;
     int last_wprot_param;
+    int n_threads;
 } chromaticdrift_t;
 
 vj_effect *chromaticdrift_init(int w, int h)
@@ -243,6 +244,7 @@ void *chromaticdrift_malloc(int w, int h)
     c->last_bprot_param = -1;
     c->last_wprot_param = -1;
 
+    c->n_threads = vje_advise_num_threads(w * h);
 
     return c;
 }
@@ -296,60 +298,54 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict pv = frame->data[2];
 
     const int len = w * h;
-#pragma omp single
-    {
-        veejay_memcpy(n->srcY_copy, py, len);
-    }
+    veejay_memcpy(n->srcY_copy, py, len);
     const uint8_t *restrict srcY = n->srcY_copy;
 
-#pragma omp single
-    {
-        if (contrast_i != n->last_contrast_param) {
-            for (int i = 0; i < 256; i++) {
-                float x = (i + 0.5f) * INV_255;
-                n->contrast_lut[i] = clamp_u8((int)(powf(x, contrast_val) * 255.0f + 0.5f));
-            }
-
-            n->last_contrast_param = contrast_i;
-            n->last_luma_floor = -1;
+    if (contrast_i != n->last_contrast_param) {
+        for (int i = 0; i < 256; i++) {
+            float x = (i + 0.5f) * INV_255;
+            n->contrast_lut[i] = clamp_u8((int)(powf(x, contrast_val) * 255.0f + 0.5f));
         }
 
-        if (luma_floor != n->last_luma_floor ||
-            luma_knee != n->last_luma_knee ||
-            luma_guard_q8 != n->last_luma_guard_q8) {
-            for (int i = 0; i < 256; i++) {
-                n->luma_lut[i] = clamp_u8(cd_guard_luma_black_i(i, n->contrast_lut[i], luma_floor, luma_knee, luma_guard_q8));
-            }
-
-            n->last_luma_floor = luma_floor;
-            n->last_luma_knee = luma_knee;
-            n->last_luma_guard_q8 = luma_guard_q8;
-        }
-
-        if (pastel_i != n->last_pastel_param ||
-            bprot_i != n->last_bprot_param ||
-            wprot_i != n->last_wprot_param) {
-            const float b_prot = (float)bprot_i * 0.001f;
-            const float w_prot = (float)wprot_i * 0.001f;
-
-            const float inv_b = 1.0f / (b_prot + 0.001f);
-            const float inv_w = 1.0f / (1.0f - w_prot + 0.001f);
-
-            for (int i = 0; i < 256; i++) {
-                const float y_raw = (float)i * INV_255;
-                const float m_b = (y_raw < b_prot) ? (y_raw * inv_b) : 1.0f;
-                const float m_w = (y_raw > w_prot) ? (1.0f - (y_raw - w_prot) * inv_w) : 1.0f;
-                const float mask = m_b * m_b * m_w * m_w;
-                n->tint_lut_fp[i] = (int32_t)(pastel_base * mask * (float)FP_M + 0.5f);
-            }
-
-            n->last_pastel_param = pastel_i;
-            n->last_bprot_param = bprot_i;
-            n->last_wprot_param = wprot_i;
-        }
-
-        n->time += speed * dir;
+        n->last_contrast_param = contrast_i;
+        n->last_luma_floor = -1;
     }
+
+    if (luma_floor != n->last_luma_floor ||
+        luma_knee != n->last_luma_knee ||
+        luma_guard_q8 != n->last_luma_guard_q8) {
+        for (int i = 0; i < 256; i++) {
+            n->luma_lut[i] = clamp_u8(cd_guard_luma_black_i(i, n->contrast_lut[i], luma_floor, luma_knee, luma_guard_q8));
+        }
+
+        n->last_luma_floor = luma_floor;
+        n->last_luma_knee = luma_knee;
+        n->last_luma_guard_q8 = luma_guard_q8;
+    }
+
+    if (pastel_i != n->last_pastel_param ||
+        bprot_i != n->last_bprot_param ||
+        wprot_i != n->last_wprot_param) {
+        const float b_prot = (float)bprot_i * 0.001f;
+        const float w_prot = (float)wprot_i * 0.001f;
+
+        const float inv_b = 1.0f / (b_prot + 0.001f);
+        const float inv_w = 1.0f / (1.0f - w_prot + 0.001f);
+
+        for (int i = 0; i < 256; i++) {
+            const float y_raw = (float)i * INV_255;
+            const float m_b = (y_raw < b_prot) ? (y_raw * inv_b) : 1.0f;
+            const float m_w = (y_raw > w_prot) ? (1.0f - (y_raw - w_prot) * inv_w) : 1.0f;
+            const float mask = m_b * m_b * m_w * m_w;
+            n->tint_lut_fp[i] = (int32_t)(pastel_base * mask * (float)FP_M + 0.5f);
+        }
+
+        n->last_pastel_param = pastel_i;
+        n->last_bprot_param = bprot_i;
+        n->last_wprot_param = wprot_i;
+    }
+
+    n->time += speed * dir;
 
     const float t = n->time;
     const float base_idx_f = ((global_hue + t) * SCALER_TO_LUT) + (t * 0.15f * rainbow_idx * INV_255);
@@ -363,7 +359,7 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t *restrict luma_lut = n->luma_lut;
     const int32_t *restrict tint_lut = n->tint_lut_fp;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n->n_threads)
     for (int y = 1; y < h_sub_1; y++) {
         const uint8_t *row  = srcY + y * w;
         const uint8_t *up   = row - w;

@@ -29,6 +29,7 @@ typedef struct {
     int *rand_lut;
     int *lsfr_lut;
     int frame_count;
+    int n_threads;
 } glitch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -152,6 +153,7 @@ void *glitch_malloc(int w, int h)
 
     g->lsfr_lut = g->rand_lut + len;
     g->frame_count = 0;
+    g->n_threads = vje_advise_num_threads(len);
 
     for(int i = 0; i < len; i++)
         g->rand_lut[i] = rand();
@@ -187,13 +189,10 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     const int duration = args[P_DURATION];
 
     int phase = g->frame_count;
-#pragma omp single
-    {
-        g->frame_count = phase + 1;
+    g->frame_count = phase + 1;
 
-        if(g->frame_count >= interval)
-            g->frame_count = 0;
-    }
+    if(g->frame_count >= interval)
+        g->frame_count = 0;
 
     if(phase >= interval)
         phase = 0;
@@ -212,11 +211,8 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     int *restrict rand_lut = g->rand_lut;
     int *restrict lsfr_lut = g->lsfr_lut;
 
-#pragma omp single
-    {
-        veejay_memcpy(bU, U, len);
-        veejay_memcpy(bV, V, len);
-    }
+    veejay_memcpy(bU, U, len);
+    veejay_memcpy(bV, V, len);
 
     const int half_qty = noise_qty >> 1;
     const int noise_mul = amplitude * noise_gain * noise_scale;
@@ -233,6 +229,7 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     const int chroma_alpha_base = clampi(glitch_absi(distortion_x_arg) + glitch_absi(distortion_y_arg), 0, 200);
     const int chroma_alpha_scale = 96 + ((chroma_alpha_base * 159) / 200);
 
+#pragma omp parallel num_threads(g->n_threads)
     {
         if(phase == 0) {
 #pragma omp for schedule(static)
@@ -270,6 +267,5 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
                 Y[src] = (uint8_t)(((int)Y[src] + (int)bY[dst] + 1) >> 1);
             }
         }
-    #pragma omp barrier
     }
 }

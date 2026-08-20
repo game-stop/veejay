@@ -56,6 +56,7 @@ typedef struct {
     uint8_t *buf;
     int ds_w;
     int ds_h;
+    int n_threads;
 } bloom_t;
 
 void *bloom_malloc(int width, int height)
@@ -67,6 +68,7 @@ void *bloom_malloc(int width, int height)
 
     b->ds_w = (width + 1) >> 1;
     b->ds_h = (height + 1) >> 1;
+    b->n_threads = vje_advise_num_threads(width * height);
 
     const size_t full_res_len = (size_t)width * (size_t)height;
     const size_t ds_res_len = (size_t)b->ds_w * (size_t)b->ds_h;
@@ -142,6 +144,7 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args)
     const int h = frame->height;
     const int len = frame->len;
     const int ds_len = b->ds_w * b->ds_h;
+    const int n_threads = b->n_threads;
 
     uint8_t *restrict L = frame->data[0];
 
@@ -151,6 +154,7 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *BL = T + ds_len;
     uint8_t *PB = BL + ds_len;
 
+#pragma omp parallel num_threads(n_threads)
     {
 #pragma omp for simd schedule(static)
         for(int i = 0; i < len; i++)
@@ -202,7 +206,6 @@ void bloom_apply(void *ptr, VJFrame *frame, int *args)
 
             L[i] = v > 255 ? 255 : (uint8_t)v;
         }
-    #pragma omp barrier
     }
 }
 

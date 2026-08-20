@@ -196,6 +196,7 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int ut = (int)ut_f;
     const int vt = (int)vt_f;
     const int len = frame->len;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -205,7 +206,7 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

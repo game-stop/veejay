@@ -29,6 +29,7 @@
 typedef struct {
     int currentFrame;
     int last_exposure;
+    int n_threads;
     uint16_t explut[TABLE_SIZE];
 } flash_t;
 
@@ -127,6 +128,7 @@ void *flashopacity_malloc(int w, int h)
 
     f->currentFrame = 0;
     f->last_exposure = -1;
+    f->n_threads = vje_advise_num_threads(w * h);
 
     return f;
 }
@@ -148,11 +150,8 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int interval = args[3];
     const int mode = args[4];
 
-#pragma omp single
-    {
-        if(f->last_exposure != exposure)
-            flashopacity_build_lut(f, exposure);
-    }
+    if(f->last_exposure != exposure)
+        flashopacity_build_lut(f, exposure);
 
     int currentFrame = f->currentFrame;
 
@@ -193,6 +192,7 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
+#pragma omp parallel num_threads(f->n_threads)
     {
         if(rising) {
 #pragma omp for schedule(static)
@@ -220,15 +220,11 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                 V[i] = flashopacity_blend255(V[i], V2[i], opacity);
             }
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        f->currentFrame = currentFrame + 1;
-        if(f->currentFrame >= interval)
-            f->currentFrame = 0;
-    }
+    f->currentFrame = currentFrame + 1;
+    if(f->currentFrame >= interval)
+        f->currentFrame = 0;
 }
 
 

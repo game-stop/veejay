@@ -34,6 +34,7 @@
 typedef struct {
     uint8_t *buf[3];
     int max_len;
+    int n_threads;
 
     float eff_threshold;
     float eff_mix;
@@ -181,6 +182,7 @@ void *sobel_malloc(int w, int h)
     s->buf[2] = s->buf[1] + len;
     s->max_len = len;
 
+    s->n_threads = vje_advise_num_threads(len);
 
     s->eff_initialized = 0;
 
@@ -353,20 +355,17 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
     const float param_fast = 0.30f;
     const float param_slow = 0.085f;
 
-    #pragma omp single copyprivate(chroma, gain, mix, threshold)
-    {
-        if(!s->eff_initialized) {
-            s->eff_threshold = (float)threshold;
-            s->eff_mix = (float)mix;
-            s->eff_gain = (float)gain;
-            s->eff_chroma = (float)chroma;
-            s->eff_initialized = 1;
-        } else {
-            threshold    = sobel_smooth_i(&s->eff_threshold, threshold,    param_fast, param_slow);
-            mix          = sobel_smooth_i(&s->eff_mix,       mix,          param_fast * 0.88f, param_slow);
-            gain         = sobel_smooth_i(&s->eff_gain,      gain,         param_fast * 0.88f, param_slow);
-            chroma       = sobel_smooth_i(&s->eff_chroma,    chroma,       param_fast * 0.80f, param_slow);
-        }
+    if(!s->eff_initialized) {
+        s->eff_threshold = (float)threshold;
+        s->eff_mix = (float)mix;
+        s->eff_gain = (float)gain;
+        s->eff_chroma = (float)chroma;
+        s->eff_initialized = 1;
+    } else {
+        threshold    = sobel_smooth_i(&s->eff_threshold, threshold,    param_fast, param_slow);
+        mix          = sobel_smooth_i(&s->eff_mix,       mix,          param_fast * 0.88f, param_slow);
+        gain         = sobel_smooth_i(&s->eff_gain,      gain,         param_fast * 0.88f, param_slow);
+        chroma       = sobel_smooth_i(&s->eff_chroma,    chroma,       param_fast * 0.80f, param_slow);
     }
 
     threshold = clampi(threshold, 0, 255);
@@ -376,16 +375,14 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *restrict Y = frame->data[0];
 
-    #pragma omp single
-    {
-        veejay_memcpy(s->buf[0], Y, len);
+    veejay_memcpy(s->buf[0], Y, len);
 
-        veejay_memcpy(s->buf[1], frame->data[1], uv_len);
-        veejay_memcpy(s->buf[2], frame->data[2], uv_len);
+    veejay_memcpy(s->buf[1], frame->data[1], uv_len);
+    veejay_memcpy(s->buf[2], frame->data[2], uv_len);
 
-        veejay_memset(Y, pixel_Y_lo_, len);
-    }
+    veejay_memset(Y, pixel_Y_lo_, len);
 
+#pragma omp parallel num_threads(s->n_threads)
     {
         switch(mode) {
             case 0:
@@ -405,6 +402,5 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
         }
 
         sobel_postprocess(s, frame, mix, chroma);
-    #pragma omp barrier
     }
 }

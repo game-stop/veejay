@@ -31,6 +31,7 @@ typedef struct {
     uint8_t *pyrY[FLARE_LEVELS];
     int pyrW[FLARE_LEVELS];
     int pyrH[FLARE_LEVELS];
+    int n_threads;
     uint16_t lin_lut[256];
     uint8_t inv_lut[1024];
 } flare_t;
@@ -175,6 +176,7 @@ void *flare_malloc(int w, int h)
         }
     }
 
+    f->n_threads = vje_advise_num_threads(len);
 
     flare_init_lut(f);
 
@@ -198,9 +200,10 @@ static void flare_downsample2(const uint8_t *restrict src,
                               int sh,
                               uint8_t *restrict dst,
                               int dw,
-                              int dh)
+                              int dh,
+                              int n_threads)
 {
-    
+    (void)n_threads;
 
 #pragma omp for schedule(static)
     for(int y = 0; y < dh; y++) {
@@ -235,9 +238,10 @@ static void flare_box_blur_u8(uint8_t *restrict buf,
                               uint8_t *restrict tmp,
                               int w,
                               int h,
-                              int radius)
+                              int radius,
+                              int n_threads)
 {
-    
+    (void)n_threads;
 
     const int diameter = radius * 2 + 1;
     const uint32_t inv = (uint32_t)(((1ULL << 24) + (diameter >> 1)) / (uint32_t)diameter);
@@ -297,9 +301,10 @@ static void flare_upsample_add(uint8_t *restrict dst,
                                const uint8_t *restrict src,
                                int sw,
                                int sh,
-                               int weight)
+                               int weight,
+                               int n_threads)
 {
-    
+    (void)n_threads;
 
     const int scale_x = dw > 1 ? ((sw - 1) << 8) / (dw - 1) : 0;
     const int scale_y = dh > 1 ? ((sh - 1) << 8) / (dh - 1) : 0;
@@ -403,62 +408,61 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
     const int t = (threshold << 2) + 16;
     int skip = 0;
 
+#pragma omp parallel num_threads(f->n_threads)
     {
-#pragma omp single copyprivate(hasGlow, minX, minY, maxX, maxY)
-{
+#pragma omp for reduction(|:hasGlow) reduction(min:minX,minY) reduction(max:maxX,maxY) schedule(static)
     for(int i = 0; i < len; i++) {
-            int v = (int)lin[dstY[i]] - t;
-            int out = 0;
+        int v = (int)lin[dstY[i]] - t;
+        int out = 0;
 
-            if(v > 0) {
-                int denom = 1023 - (t >> 1);
+        if(v > 0) {
+            int denom = 1023 - (t >> 1);
 
-                if(denom < 128)
-                    denom = 128;
+            if(denom < 128)
+                denom = 128;
 
-                int x = (v << 8) / denom;
+            int x = (v << 8) / denom;
 
-                if(x > 320)
-                    x = 320;
+            if(x > 320)
+                x = 320;
 
-                x += (x * x) >> 8;
+            x += (x * x) >> 8;
 
-                if(x > 512)
-                    x = 512;
+            if(x > 512)
+                x = 512;
 
-                int knee = (t >> 1) + 16;
-                int k = (v * 256) / knee;
+            int knee = (t >> 1) + 16;
+            int k = (v * 256) / knee;
 
-                if(k > 256)
-                    k = 256;
+            if(k > 256)
+                k = 256;
 
-                int smooth = (k * k * (3 * 256 - 2 * k)) >> 16;
-                x = ((x * smooth) >> 8) >> 1;
+            int smooth = (k * k * (3 * 256 - 2 * k)) >> 16;
+            x = ((x * smooth) >> 8) >> 1;
 
-                if(x > 255)
-                    x = 255;
+            if(x > 255)
+                x = 255;
 
-                out = x;
-                hasGlow = 1;
+            out = x;
+            hasGlow = 1;
 
-                int py = i / W;
-                int px = i - py * W;
+            int py = i / W;
+            int px = i - py * W;
 
-                if(px < minX)
-                    minX = px;
-                if(px > maxX)
-                    maxX = px;
-                if(py < minY)
-                    minY = py;
-                if(py > maxY)
-                    maxY = py;
-            }
-
-            maskY[i] = (uint8_t)out;
+            if(px < minX)
+                minX = px;
+            if(px > maxX)
+                maxX = px;
+            if(py < minY)
+                minY = py;
+            if(py > maxY)
+                maxY = py;
         }
-}
 
-#pragma omp single copyprivate(maxX, maxY, minX, minY, skip)
+        maskY[i] = (uint8_t)out;
+    }
+
+#pragma omp single
         {
             if(!hasGlow) {
                 skip = 1;
@@ -476,10 +480,10 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp barrier
 
         if(!skip) {
-            flare_downsample2(maskY, W, H, f->pyrY[0], f->pyrW[0], f->pyrH[0]);
+            flare_downsample2(maskY, W, H, f->pyrY[0], f->pyrW[0], f->pyrH[0], f->n_threads);
 
     for(int l = 1; l < FLARE_LEVELS; l++)
-        flare_downsample2(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l]);
+        flare_downsample2(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], f->n_threads);
 
     for(int l = 0; l < FLARE_LEVELS; l++) {
         int r = spread >> (l + 1);
@@ -488,11 +492,11 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
             r = 1;
 
         if(r > 0)
-            flare_box_blur_u8(f->pyrY[l], tmp, f->pyrW[l], f->pyrH[l], r);
+            flare_box_blur_u8(f->pyrY[l], tmp, f->pyrW[l], f->pyrH[l], r, f->n_threads);
     }
 
     for(int l = FLARE_LEVELS - 1; l > 0; l--)
-        flare_upsample_add(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], bloom_weights[l]);
+        flare_upsample_add(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], bloom_weights[l], f->n_threads);
 
     const uint8_t *restrict base_bloom = f->pyrY[0];
     const int bw = f->pyrW[0];
@@ -655,7 +659,6 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
             break;
     }
         }
-    #pragma omp barrier
     }
 }
 

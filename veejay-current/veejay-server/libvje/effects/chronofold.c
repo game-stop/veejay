@@ -40,12 +40,15 @@
 #define CF_COLOR_THERMAL    3
 #define CF_COLOR_INVERT     4
 
+#define CF_OMP_FOR _Pragma("omp parallel for schedule(static) num_threads(c->n_threads)")
+
 typedef struct {
     int w;
     int h;
     int len;
     int frame;
     int seeded;
+    int n_threads;
 
     uint8_t *ref_y;
 
@@ -261,6 +264,8 @@ void *chronofold_malloc(int w, int h)
     c->lut_valid = 0;
     c->last_color_mode = -1;
 
+    c->n_threads = vje_advise_num_threads(w * h);
+
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
 
     c->ev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -331,7 +336,7 @@ static void cf_seed(chronofold_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-#pragma omp for schedule(static)
+    CF_OMP_FOR
     for(i = 0; i < len; i++) {
         c->ref_y[i] = Y[i];
 
@@ -344,7 +349,6 @@ static void cf_seed(chronofold_t *c, VJFrame *frame)
         c->nx_v[i] = 128;
     }
 
-#pragma omp single
     c->seeded = 1;
 }
 
@@ -621,7 +625,7 @@ static void NAME(chronofold_t *c, VJFrame *frame)                               
     int h = c->h;                                                                   \
     int y;                                                                          \
                                                                                     \
-    _Pragma("omp for schedule(static)")                                             \
+    CF_OMP_FOR                                                                      \
     for(y = 0; y < h; y++) {                                                        \
         int x;                                                                      \
         int pos = y * w;                                                            \
@@ -690,7 +694,7 @@ static void NAME(chronofold_t *c, VJFrame *frame, int color_mode)               
     int h = c->h;                                                                   \
     int y;                                                                          \
                                                                                     \
-    _Pragma("omp for schedule(static)")                                             \
+    CF_OMP_FOR                                                                      \
     for(y = 0; y < h; y++) {                                                        \
         int x;                                                                      \
         int pos = y * w;                                                            \
@@ -790,15 +794,12 @@ static void cf_render_white_pure(chronofold_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-#pragma omp for schedule(static)
+    CF_OMP_FOR
     for(i = 0; i < len; i++)
         Y[i] = c->output_lut[c->ev_y[i]];
 
-#pragma omp single
-    {
-        veejay_memset(frame->data[1], 128, (size_t) len);
-        veejay_memset(frame->data[2], 128, (size_t) len);
-    }
+    veejay_memset(frame->data[1], 128, (size_t) len);
+    veejay_memset(frame->data[2], 128, (size_t) len);
 }
 
 static void cf_render_white_bleed(chronofold_t *c, VJFrame *frame)
@@ -810,7 +811,7 @@ static void cf_render_white_bleed(chronofold_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-#pragma omp for schedule(static)
+    CF_OMP_FOR
     for(i = 0; i < len; i++) {
         int base_y = c->bleed_y_lut[Y[i]];
         int ev = c->output_lut[c->ev_y[i]];
@@ -830,7 +831,7 @@ static void cf_render_color_pure(chronofold_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-#pragma omp for schedule(static)
+    CF_OMP_FOR
     for(i = 0; i < len; i++) {
         int ev = c->ev_y[i];
         int out_ev = c->output_lut[ev];
@@ -851,7 +852,7 @@ static void cf_render_color_bleed(chronofold_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-#pragma omp for schedule(static)
+    CF_OMP_FOR
     for(i = 0; i < len; i++) {
         int ev = c->ev_y[i];
         int out_ev = c->output_lut[ev];
@@ -890,15 +891,13 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     int flash_gain;
     int color_energy;
 
+    uint8_t *swap;
+
     int use_white;
     int use_trail;
     int use_noise;
-    int need_seed;
 
-#pragma omp single copyprivate(need_seed)
-    need_seed = !c->seeded;
-
-    if(need_seed)
+    if(!c->seeded)
         cf_seed(c, frame);
 
     threshold    = cf_scale_1000_to_255(args[P_THRESHOLD]);
@@ -916,24 +915,21 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
     use_trail = (trail > 0);
     use_noise = (noise > 0);
 
-#pragma omp single
-    {
-        if(c->last_color_mode == CF_COLOR_WHITE && !use_white)
-            cf_neutralize_chroma_buffers(c);
+    if(c->last_color_mode == CF_COLOR_WHITE && !use_white)
+        cf_neutralize_chroma_buffers(c);
 
-        cf_build_luts_if_needed(
-            c,
-            threshold,
-            decay,
-            gain,
-            memory,
-            trail,
-            noise,
-            source_bleed,
-            flash_gain,
-            color_energy
-        );
-    }
+    cf_build_luts_if_needed(
+        c,
+        threshold,
+        decay,
+        gain,
+        memory,
+        trail,
+        noise,
+        source_bleed,
+        flash_gain,
+        color_energy
+    );
 
     if(use_white) {
         if(use_trail) {
@@ -949,12 +945,9 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
                 cf_compute_white_plain(c, frame);
         }
 
-#pragma omp single
-        {
-            uint8_t *swap = c->ev_y;
-            c->ev_y = c->nx_y;
-            c->nx_y = swap;
-        }
+        swap = c->ev_y;
+        c->ev_y = c->nx_y;
+        c->nx_y = swap;
 
     }
     else {
@@ -971,20 +964,17 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
                 cf_compute_color_plain(c, frame, color_mode);
         }
 
-#pragma omp single
-        {
-            uint8_t *swap = c->ev_y;
-            c->ev_y = c->nx_y;
-            c->nx_y = swap;
+        swap = c->ev_y;
+        c->ev_y = c->nx_y;
+        c->nx_y = swap;
 
-            swap = c->ev_u;
-            c->ev_u = c->nx_u;
-            c->nx_u = swap;
+        swap = c->ev_u;
+        c->ev_u = c->nx_u;
+        c->nx_u = swap;
 
-            swap = c->ev_v;
-            c->ev_v = c->nx_v;
-            c->nx_v = swap;
-        }
+        swap = c->ev_v;
+        c->ev_v = c->nx_v;
+        c->nx_v = swap;
     }
 
     if(use_white) {
@@ -1000,9 +990,6 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
             cf_render_color_bleed(c, frame);
     }
 
-#pragma omp single
-    {
-        c->last_color_mode = color_mode;
-        c->frame++;
-    }
+    c->last_color_mode = color_mode;
+    c->frame++;
 }

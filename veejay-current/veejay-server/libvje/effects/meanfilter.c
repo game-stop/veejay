@@ -69,9 +69,10 @@ void meanfilter_free(void *ptr)
 static void vje_mean_filter(const uint8_t *restrict src,
                             uint8_t *restrict dst,
                             int w,
-                            int h)
+                            int h,
+                            int n_threads)
 {
-#pragma omp for schedule(static)
+#pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int y = 1; y < h - 1; y++) {
         const int row = y * w;
         const int prev = row - w;
@@ -102,9 +103,6 @@ void meanfilter_apply(void *ptr, VJFrame *frame, int *args)
 
     mean_t *m = (mean_t*) ptr;
 
-    #pragma omp single
-    {
-        veejay_memcpy(m->mean, frame->data[0], frame->len);
-    }
-    vje_mean_filter(m->mean, frame->data[0], frame->width, frame->height);
+    veejay_memcpy(m->mean, frame->data[0], frame->len);
+    vje_mean_filter(m->mean, frame->data[0], frame->width, frame->height, m->n_threads);
 }

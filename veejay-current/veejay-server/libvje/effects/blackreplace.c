@@ -96,6 +96,7 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
     const int green = args[3];
     const int blue = args[4];
     const int len = frame->len;
+    const int n_threads = br->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -112,7 +113,7 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
     const int denom = edge - full;
     const int mul = (255 << 16) / denom;
 
-    #pragma omp for simd schedule(static)
+    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
     for(int i = 0; i < len; i++)
     {
         const int y = Y[i];

@@ -62,6 +62,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
     int frame;
     int motor_q8;
     int seeded;
@@ -356,15 +357,12 @@ static void kd_rebuild_wave_lut(kinetic_t *k, int wave)
     const int max_cols = k->max_cols;
 
 #pragma omp for schedule(static)
-    for(int idx = 0; idx < rows * max_cols; idx++) {
-            const int cy = idx / max_cols;
-            const int cx = idx - cy * max_cols;
-
-            if(cx >= cols)
-                continue;
-
+    for(int cy = 0; cy < rows; cy++) {
+        for(int cx = 0; cx < cols; cx++) {
+            const int idx = cy * max_cols + cx;
             k->cell_wave[idx] = (uint8_t) kd_wave_phase_for_cell(
                 wave, cx, cy, cols, rows, k->cell_rand[idx]);
+        }
     }
 
 #pragma omp single
@@ -519,6 +517,7 @@ void *mechanicalpixels_malloc(int w, int h)
     k->w = w;
     k->h = h;
     k->len = w * h;
+    k->n_threads = vje_advise_num_threads(k->len);
     k->max_cols = (w + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_rows = (h + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_cells = k->max_cols * k->max_rows;
@@ -584,13 +583,9 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
     uint8_t *prev_y = k->prev_y;
 
 #pragma omp for schedule(static)
-    for(int idx = 0; idx < rows * max_cols; idx++) {
-            const int cy = idx / max_cols;
-            const int cx = idx - cy * max_cols;
-
-            if(cx >= cols)
-                continue;
-
+    for(int cy = 0; cy < rows; cy++) {
+        for(int cx = 0; cx < cols; cx++) {
+            const int idx = cy * max_cols + cx;
             const int x0 = cx * cell_size;
             const int y0 = cy * cell_size;
             const int x1 = (x0 + cell_size < w) ? x0 + cell_size : w;
@@ -635,6 +630,7 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             k->cell_phase[idx] = 0;
             k->cell_impact[idx] = 0;
             k->cell_detail[idx] = (uint8_t) clampi(max_y - min_y, 0, 255);
+        }
     }
 }
 
@@ -661,13 +657,9 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
     uint8_t *prev_y = k->prev_y;
 
 #pragma omp for schedule(static)
-    for(int idx = 0; idx < rows * max_cols; idx++) {
-            const int cy = idx / max_cols;
-            const int cx = idx - cy * max_cols;
-
-            if(cx >= cols)
-                continue;
-
+    for(int cy = 0; cy < rows; cy++) {
+        for(int cx = 0; cx < cols; cx++) {
+            const int idx = cy * max_cols + cx;
             const int x0 = cx * cell_size;
             const int y0 = cy * cell_size;
             const int x1 = (x0 + cell_size < w) ? x0 + cell_size : w;
@@ -809,6 +801,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U,
             k->cell_value[idx] = (uint8_t) value;
             k->cell_phase[idx] = (uint8_t) clampi(kd_absi(target - value), 0, 255);
             k->cell_impact[idx] = (uint8_t) impact;
+        }
     }
 }
 
@@ -1014,19 +1007,17 @@ void mechanicalpixels_apply(void *ptr, VJFrame *frame, int *args)
     const int palette = clampi(args[P_PALETTE], 0, KD_PALETTES - 1);
     const int reset = args[P_RESET];
 
-#pragma omp single
-    {
-        if(cell_size != k->last_cell_size) {
-            kd_configure_grid(k, cell_size);
-            kd_clear_cells(k);
-            k->seeded = 0;
-            k->motor_q8 = 0;
-        }
+    if(cell_size != k->last_cell_size) {
+        kd_configure_grid(k, cell_size);
+        kd_clear_cells(k);
+        k->seeded = 0;
+        k->motor_q8 = 0;
     }
 
     const int rebuild_wave = k->last_wave != wave;
     const int need_seed = !k->seeded || (reset && !k->last_reset);
 
+#pragma omp parallel num_threads(k->n_threads)
     {
         if(rebuild_wave)
             kd_rebuild_wave_lut(k, wave);
@@ -1042,21 +1033,17 @@ void mechanicalpixels_apply(void *ptr, VJFrame *frame, int *args)
             for(int i = 0; i < k->len; i++)
                 k->prev_y[i] = Y[i];
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        if(need_seed) {
-            k->seeded = 1;
-            k->motor_q8 = 0;
-        }
-
-        k->last_reset = reset;
-
-        if(motor_speed > 0)
-            k->motor_q8 = (k->motor_q8 + kd_motor_inc_q8(motor_speed)) & 0xffff;
-
-        k->frame++;
+    if(need_seed) {
+        k->seeded = 1;
+        k->motor_q8 = 0;
     }
+
+    k->last_reset = reset;
+
+    if(motor_speed > 0)
+        k->motor_q8 = (k->motor_q8 + kd_motor_inc_q8(motor_speed)) & 0xffff;
+
+    k->frame++;
 }

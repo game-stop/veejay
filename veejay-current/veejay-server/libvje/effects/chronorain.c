@@ -49,6 +49,7 @@ typedef struct {
     int h;
     int len;
     int seeded;
+    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -331,6 +332,7 @@ void *chronorain_malloc(int w, int h)
     c->seeded = 0;
     c->lut_valid = 0;
 
+    c->n_threads = vje_advise_num_threads(w * h);
 
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y  = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1510,11 +1512,8 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
     int use_conduct;
     int use_storm;
 
-#pragma omp single
-    {
-        if(!c->seeded)
-            cf_seed(c, frame);
-    }
+    if(!c->seeded)
+        cf_seed(c, frame);
 
     trigger_gate   = cf_param1000_to_u8(args[P_TRIGGER_GATE]);
     gravity        = cf_param1000_to_u8(args[P_GRAVITY]);
@@ -1527,20 +1526,17 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
     trail_gain     = cf_clampi(args[P_TRAIL_GAIN], 0, 1000);
     color_energy   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
 
-#pragma omp single
-    {
-        cf_build_luts_if_needed(
-            c,
-            trigger_gate,
-            gravity,
-            conductivity,
-            decay,
-            source_bleed,
-            storm,
-            trail_gain,
-            color_energy
-        );
-    }
+    cf_build_luts_if_needed(
+        c,
+        trigger_gate,
+        gravity,
+        conductivity,
+        decay,
+        source_bleed,
+        storm,
+        trail_gain,
+        color_energy
+    );
 
     {
         int conduct_power = conductivity * decay;
@@ -1552,6 +1548,7 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
 
     render_gain_q8 = 256;
 
+#pragma omp parallel num_threads(c->n_threads)
     {
         if(use_conduct) {
             if(use_storm)
@@ -1566,7 +1563,7 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
                 cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
         }
 
-#pragma omp single copyprivate(render_gain_q8)
+#pragma omp single
         {
             cf_swap_fields(c);
             render_gain_q8 = cf_density_render_gain_q8(c);
@@ -1579,7 +1576,6 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
             color_mode,
             render_gain_q8
         );
-    #pragma omp barrier
     }
 }
 

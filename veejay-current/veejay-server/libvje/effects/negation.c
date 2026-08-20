@@ -81,11 +81,13 @@ void negation_apply(void *ptr, VJFrame *frame, int *args)
     const int val = args[P_VALUE];
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
+    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
+#pragma omp parallel num_threads(n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -96,6 +98,5 @@ void negation_apply(void *ptr, VJFrame *frame, int *args)
             Cb[i] = (uint8_t)(val - Cb[i]);
             Cr[i] = (uint8_t)(val - Cr[i]);
         }
-    #pragma omp barrier
     }
 }

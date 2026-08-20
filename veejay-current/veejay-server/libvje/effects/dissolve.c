@@ -76,16 +76,15 @@ void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     if(opacity == 255)
     {
-        #pragma omp single
-        {
-            veejay_memcpy(Y, Y2, len);
-            veejay_memcpy(Cb, Cb2, uv_len);
-            veejay_memcpy(Cr, Cr2, uv_len);
-        }
+        veejay_memcpy(Y, Y2, len);
+        veejay_memcpy(Cb, Cb2, uv_len);
+        veejay_memcpy(Cr, Cr2, uv_len);
         return;
     }
 
+    const int n_threads = vje_advise_num_threads(len);
 
+    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -97,6 +96,5 @@ void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             Cb[i] = dissolve_blend255(Cb[i], Cb2[i], opacity);
             Cr[i] = dissolve_blend255(Cr[i], Cr2[i], opacity);
         }
-    #pragma omp barrier
     }
 }

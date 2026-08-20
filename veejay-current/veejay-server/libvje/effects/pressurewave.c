@@ -67,6 +67,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
 
     uint8_t *src_y;
     uint8_t *src_u;
@@ -283,6 +284,7 @@ void *pressurewave_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
+    s->n_threads = vje_advise_num_threads(len);
 
     uint8_t *p = (uint8_t *)(s + 1);
 
@@ -373,6 +375,7 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
+    const int threads = s->n_threads;
 
     const int displace_arg = args[PW_DISPLACE];
     const int impact_arg = args[PW_IMPACT];
@@ -419,77 +422,71 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
             snare_delta > 0.12f
         );
 
-#pragma omp single
-    {
-        s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
-        s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
-        s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
-        s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
+    s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
+    s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
+    s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
+    s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-        if(impact_rise) {
-            pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
-            s->impact_cooldown = 3;
-        }
-
-        if(shock_rise && !impact_rise) {
-            pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
-            s->shock_cooldown = 4;
-        }
-
-        if(snare_rise) {
-            pw_spawn_wave(
-                s,
-                impact_target * 0.35f,
-                shock_target * 0.42f + snare_target * 0.58f,
-                width_arg >> 1,
-                speed_arg + 12,
-                center_arg
-            );
-            s->snare_cooldown = 3;
-        }
-
-        if(s->impact_cooldown > 0)
-            s->impact_cooldown--;
-        if(s->shock_cooldown > 0)
-            s->shock_cooldown--;
-        if(s->snare_cooldown > 0)
-            s->snare_cooldown--;
+    if(impact_rise) {
+        pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
+        s->impact_cooldown = 3;
     }
+
+    if(shock_rise && !impact_rise) {
+        pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
+        s->shock_cooldown = 4;
+    }
+
+    if(snare_rise) {
+        pw_spawn_wave(
+            s,
+            impact_target * 0.35f,
+            shock_target * 0.42f + snare_target * 0.58f,
+            width_arg >> 1,
+            speed_arg + 12,
+            center_arg
+        );
+        s->snare_cooldown = 3;
+    }
+
+    if(s->impact_cooldown > 0)
+        s->impact_cooldown--;
+    if(s->shock_cooldown > 0)
+        s->shock_cooldown--;
+    if(s->snare_cooldown > 0)
+        s->snare_cooldown--;
 
     const float decay = 0.855f + ((float)decay_arg * 0.00125f);
     const float max_dist = (float)(w > h ? w : h) * 1.55f;
 
-#pragma omp single
-    {
-        for(int i = 0; i < PW_MAX_WAVES; i++) {
-            pressure_wave_t *wv = &s->waves[i];
+    for(int i = 0; i < PW_MAX_WAVES; i++) {
+        pressure_wave_t *wv = &s->waves[i];
 
-            if(!wv->active)
-                continue;
+        if(!wv->active)
+            continue;
 
-            wv->pos += wv->speed;
-            wv->amp *= decay;
+        wv->pos += wv->speed;
+        wv->amp *= decay;
 
-            if(wv->amp < 0.012f || wv->pos > max_dist)
-                wv->active = 0;
-        }
-
-        s->swing_phase +=
-            0.010f +
-            ((float)speed_arg * 0.0011f) +
-            ((float)swing_arg * 0.0009f) +
-            s->impact_env * 0.050f +
-            s->snare_env * 0.030f +
-            s->hat_env * 0.012f;
-
-        if(s->swing_phase > (float)(PW_PI * 2.0))
-            s->swing_phase -= (float)(PW_PI * 2.0);
-
-        s->last_impact = impact_target;
-        s->last_shock = shock_target;
-        s->last_snare = snare_target;
-        s->frame_count++;
+        if(wv->amp < 0.012f || wv->pos > max_dist)
+            wv->active = 0;
     }
+
+    s->swing_phase +=
+        0.010f +
+        ((float)speed_arg * 0.0011f) +
+        ((float)swing_arg * 0.0009f) +
+        s->impact_env * 0.050f +
+        s->snare_env * 0.030f +
+        s->hat_env * 0.012f;
+
+    if(s->swing_phase > (float)(PW_PI * 2.0))
+        s->swing_phase -= (float)(PW_PI * 2.0);
+
+    s->last_impact = impact_target;
+    s->last_shock = shock_target;
+    s->last_snare = snare_target;
+    s->frame_count++;
 
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int shock_i = (int)(s->shock_env * 256.0f);
@@ -539,6 +536,7 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     if(nactive <= 0 && swing_x == 0 && swing_y == 0)
         return;
 
+#pragma omp parallel num_threads(threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
@@ -713,7 +711,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-    #pragma omp barrier
     }
 }
 #undef PW_ACCUM_WAVE_NB

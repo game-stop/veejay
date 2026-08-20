@@ -51,6 +51,7 @@ typedef struct {
     int have_shift;
 
     uint32_t seed;
+    int n_threads;
 
     int smooth_ready;
     float sm_width;
@@ -334,6 +335,7 @@ void *slicer_malloc(int width, int height)
     s->sm_slice_drive = 0.0f;
     s->sm_shatter_drive = 0.0f;
     s->sm_mix_drive = 0.0f;
+    s->n_threads = vje_advise_num_threads((int)frame_sz);
 
     return s;
 }
@@ -377,33 +379,30 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_step = 0.24f;
 
-#pragma omp single
-    {
-        if(!s->smooth_ready) {
-            s->sm_width = (float)base_w;
-            s->sm_height = (float)base_h;
-            s->sm_shatter = (float)base_shatter;
-            s->sm_period = (float)base_period;
-            s->sm_smoothness = (float)base_smooth;
-            s->sm_dominance = (float)base_dom;
-            s->sm_block = (float)base_block;
-            s->sm_slice_drive = (float)slice_drive_arg;
-            s->sm_shatter_drive = (float)shatter_drive_arg;
-            s->sm_mix_drive = (float)mix_drive_arg;
-            s->smooth_ready = 1;
-        }
-        else {
-            s->sm_width = slicer_smooth_value(s->sm_width, (float)base_w, param_step);
-            s->sm_height = slicer_smooth_value(s->sm_height, (float)base_h, param_step);
-            s->sm_shatter = slicer_smooth_value(s->sm_shatter, (float)base_shatter, param_step);
-            s->sm_period = slicer_smooth_value(s->sm_period, (float)base_period, param_step);
-            s->sm_smoothness = slicer_smooth_value(s->sm_smoothness, (float)base_smooth, param_step);
-            s->sm_dominance = slicer_smooth_value(s->sm_dominance, (float)base_dom, param_step);
-            s->sm_block = slicer_smooth_value(s->sm_block, (float)base_block, param_step);
-            s->sm_slice_drive = slicer_smooth_value(s->sm_slice_drive, (float)slice_drive_arg, param_step);
-            s->sm_shatter_drive = slicer_smooth_value(s->sm_shatter_drive, (float)shatter_drive_arg, param_step);
-            s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
-        }
+    if(!s->smooth_ready) {
+        s->sm_width = (float)base_w;
+        s->sm_height = (float)base_h;
+        s->sm_shatter = (float)base_shatter;
+        s->sm_period = (float)base_period;
+        s->sm_smoothness = (float)base_smooth;
+        s->sm_dominance = (float)base_dom;
+        s->sm_block = (float)base_block;
+        s->sm_slice_drive = (float)slice_drive_arg;
+        s->sm_shatter_drive = (float)shatter_drive_arg;
+        s->sm_mix_drive = (float)mix_drive_arg;
+        s->smooth_ready = 1;
+    }
+    else {
+        s->sm_width = slicer_smooth_value(s->sm_width, (float)base_w, param_step);
+        s->sm_height = slicer_smooth_value(s->sm_height, (float)base_h, param_step);
+        s->sm_shatter = slicer_smooth_value(s->sm_shatter, (float)base_shatter, param_step);
+        s->sm_period = slicer_smooth_value(s->sm_period, (float)base_period, param_step);
+        s->sm_smoothness = slicer_smooth_value(s->sm_smoothness, (float)base_smooth, param_step);
+        s->sm_dominance = slicer_smooth_value(s->sm_dominance, (float)base_dom, param_step);
+        s->sm_block = slicer_smooth_value(s->sm_block, (float)base_block, param_step);
+        s->sm_slice_drive = slicer_smooth_value(s->sm_slice_drive, (float)slice_drive_arg, param_step);
+        s->sm_shatter_drive = slicer_smooth_value(s->sm_shatter_drive, (float)shatter_drive_arg, param_step);
+        s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
     }
 
     const int slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
@@ -428,39 +427,33 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
 
-#pragma omp single
-    {
-        if(s->last_period != period) {
-            s->last_period = period;
-            s->current_period = 0;
-        }
-
-
-        if(s->current_period <= 0 || !s->have_shift) {
-            s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
-            s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
-            s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
-            s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
-            s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
-
-            recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
-
-            s->current_period = period > 0 ? period : 1;
-        }
-
-        s->current_period--;
+    if(s->last_period != period) {
+        s->last_period = period;
+        s->current_period = 0;
     }
+
+
+    if(s->current_period <= 0 || !s->have_shift) {
+        s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
+        s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
+        s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
+        s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
+        s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
+
+        recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
+
+        s->current_period = period > 0 ? period : 1;
+    }
+
+    s->current_period--;
 
     uint8_t *restrict dY = frame->data[0];
     uint8_t *restrict dCb = frame->data[1];
     uint8_t *restrict dCr = frame->data[2];
 
-#pragma omp single
-    {
-        veejay_memcpy(s->tmp[0], dY, len);
-        veejay_memcpy(s->tmp[1], dCb, len);
-        veejay_memcpy(s->tmp[2], dCr, len);
-    }
+    veejay_memcpy(s->tmp[0], dY, len);
+    veejay_memcpy(s->tmp[1], dCb, len);
+    veejay_memcpy(s->tmp[2], dCr, len);
 
     const uint8_t *restrict s1Y = s->tmp[0];
     const uint8_t *restrict s1Cb = s->tmp[1];
@@ -473,7 +466,7 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     int *restrict sx_row = s->slice_xshift;
     int *restrict sy_col = s->slice_yshift;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const int shift_x = sx_row[y];

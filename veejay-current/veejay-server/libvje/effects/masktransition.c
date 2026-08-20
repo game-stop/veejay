@@ -119,13 +119,11 @@ static void alpha_blend_transition(uint8_t *restrict Y,
 {
     uint8_t lookup[256];
     const uint8_t *restrict alpha_map = alpha_select == USE_FROM_A ? a0 : a1;
+    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp single
-    {
-        masktransition_build_lookup(lookup, time_index, duration);
-    }
+    masktransition_build_lookup(lookup, time_index, duration);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
         const uint8_t alpha = lookup[alpha_map[i]];
 

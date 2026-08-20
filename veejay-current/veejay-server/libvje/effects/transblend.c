@@ -252,12 +252,9 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float fast = 0.24f;
 
-#pragma omp single
-    {
-        wipe->speed_env = transblend_smooth(wipe->speed_env, (float)speed_arg, fast);
-        wipe->expand_env = transblend_smooth(wipe->expand_env, (float)expand_drive_arg, fast * 0.82f);
-        wipe->glow_env = transblend_smooth(wipe->glow_env, (float)edge_glow_arg, fast * 0.88f);
-    }
+    wipe->speed_env = transblend_smooth(wipe->speed_env, (float)speed_arg, fast);
+    wipe->expand_env = transblend_smooth(wipe->expand_env, (float)expand_drive_arg, fast * 0.82f);
+    wipe->glow_env = transblend_smooth(wipe->glow_env, (float)edge_glow_arg, fast * 0.88f);
 
     const float expand_t = wipe->expand_env * 0.001f;
 
@@ -265,10 +262,7 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     speed_eff += (int)((float)max_speed * expand_t * 0.045f + 0.5f);
     speed_eff = transblend_clampi(speed_eff, 0, max_speed);
 
-#pragma omp single
-    {
-        transblend_step(wipe, speed_eff, bounce, width, height);
-    }
+    transblend_step(wipe, speed_eff, bounce, width, height);
 
     int expand_q16 = (int)(wipe->expand_env * 42.0f + 0.5f);
     expand_q16 = transblend_clampi(expand_q16, 0, 32768);
@@ -299,7 +293,7 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint16_t *restrict angle = wipe->angle_lut;
     const uint16_t progress = (uint16_t)progress_eff;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
     for(int i = 0; i < len; i++) {
         const int a = (int)angle[i];
 

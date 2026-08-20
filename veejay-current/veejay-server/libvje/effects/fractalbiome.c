@@ -42,6 +42,7 @@ typedef struct {
     int w;
     int h;
     int len;
+    int n_threads;
     void *region;
     uint8_t *src_y;
     uint8_t *src_u;
@@ -160,7 +161,7 @@ static void fb_box_blur(
     uint8_t *restrict tmp = t->tmp;
     int y;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (y = 0; y < h; y++) {
         const uint8_t *row = src + y * w;
         uint8_t *out = tmp + y * w;
@@ -183,7 +184,7 @@ static void fb_box_blur(
         }
     }
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int x = 0; x < w; x++) {
         int sum = tmp[x] * (radius + 1);
         int yy;
@@ -645,6 +646,7 @@ void *fractalbiome_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
+    t->n_threads = vje_advise_num_threads(w * h);
     t->phase = 0.0f;
     t->orbit = 0.0f;
 
@@ -727,24 +729,18 @@ void fractalbiome_apply(void *ptr, VJFrame *frame, int *args)
     if (len <= 0 || len > t->len)
         len = t->len;
 
-#pragma omp single
-    {
-        veejay_memcpy(src_y, Y, len);
-        veejay_memcpy(src_u, U, len);
-        veejay_memcpy(src_v, V, len);
-    }
+    veejay_memcpy(src_y, Y, len);
+    veejay_memcpy(src_u, U, len);
+    veejay_memcpy(src_v, V, len);
 
     blur_r = 6 + density_i / 9;
     fb_box_blur(t, src_y, blur, blur_r);
 
     pulse = (float) pulse_i * 0.01f;
-#pragma omp single
     {
-        {
-            float dt = fb_time_step(speed_i);
-            t->phase = fb_wrap_2pi(t->phase + dt * 1.10f);
-            t->orbit = fb_wrap_2pi(t->orbit + dt * (0.45f + pulse * 0.35f));
-        }
+        float dt = fb_time_step(speed_i);
+        t->phase = fb_wrap_2pi(t->phase + dt * 1.10f);
+        t->orbit = fb_wrap_2pi(t->orbit + dt * (0.45f + pulse * 0.35f));
     }
 
     zoom = 2.9f - (float) zoom_i * 0.022f;
@@ -761,7 +757,7 @@ void fractalbiome_apply(void *ptr, VJFrame *frame, int *args)
     c_im =  0.16f + 0.16f * fb_lut_sin(t, t->phase * 0.72f + pulse_wave * 1.05f);
     base_step = zoom / min_dim;
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (yy = 0; yy < h; yy++) {
         float ybase = (((float) yy * invh) - 0.5f) * zoom;
         int row = yy * w;

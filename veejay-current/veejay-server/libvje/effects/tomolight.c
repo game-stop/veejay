@@ -126,6 +126,7 @@ typedef struct {
     int seeded;
     int last_reset;
     int prev_valid;
+    int n_threads;
 
     int last_slices;
     int last_center;
@@ -938,6 +939,7 @@ void *tomolight_malloc(int w, int h)
     t->seeded = 0;
     t->last_reset = 0;
     t->prev_valid = 0;
+    t->n_threads = vje_advise_num_threads(len);
 
     if(!tl_init_geometry_maps(t)) {
         free(t->region);
@@ -1306,13 +1308,10 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
     const int len = t->len;
     const int reset = args[P_RESET] ? 1 : 0;
 
-    #pragma omp single
-    {
-        if(!t->seeded || (reset && !t->last_reset))
-            tl_seed(t, frame);
+    if(!t->seeded || (reset && !t->last_reset))
+        tl_seed(t, frame);
 
-        t->last_reset = reset;
-    }
+    t->last_reset = reset;
 
     const int depth_source = clampi(args[P_DEPTH_SOURCE], 0, 4);
     const int use_motion = (depth_source == TL_SRC_MOTION || depth_source == TL_SRC_LUMA_MOTION);
@@ -1332,66 +1331,33 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
     int scan_width_arg = args[P_SCAN_WIDTH];
 
 
-    #pragma omp single
-    {
-        if(!t->eff_initialized) {
-            t->eff_amount = (float)amount_arg;
-            t->eff_light = (float)light_arg;
-            t->eff_residue = (float)residue_arg;
-            t->eff_depth_scale = (float)depth_arg;
-            t->eff_slices = (float)slices_arg;
-            t->eff_scan_pos = (float)scan_pos_arg;
-            t->eff_scan_width = (float)scan_width_arg;
-            t->eff_initialized = 1;
-        }
+    if(!t->eff_initialized) {
+        t->eff_amount = (float)amount_arg;
+        t->eff_light = (float)light_arg;
+        t->eff_residue = (float)residue_arg;
+        t->eff_depth_scale = (float)depth_arg;
+        t->eff_slices = (float)slices_arg;
+        t->eff_scan_pos = (float)scan_pos_arg;
+        t->eff_scan_width = (float)scan_width_arg;
+        t->eff_initialized = 1;
     }
 
-    int amount_eff;
-    #pragma omp single copyprivate(amount_eff)
-    {
-        amount_eff = clampi(tl_smooth_i(&t->eff_amount, amount_arg, 0.20f, 0.090f), 0, 100);
-    }
-    int light_strength;
-    #pragma omp single copyprivate(light_strength)
-    {
-        light_strength = clampi(tl_smooth_i(&t->eff_light, light_arg, 0.24f, 0.115f), 0, 100);
-    }
-    int residue_eff;
-    #pragma omp single copyprivate(residue_eff)
-    {
-        residue_eff = clampi(tl_smooth_i(&t->eff_residue, residue_arg, 0.120f, 0.060f), 0, 99);
-    }
-    #pragma omp single copyprivate(depth_arg)
-    {
-        depth_arg = clampi(tl_smooth_i(&t->eff_depth_scale, depth_arg, 0.145f, 0.070f), 0, 300);
-    }
-    int slices;
-    #pragma omp single copyprivate(slices)
-    {
-        slices = clampi(tl_smooth_i(&t->eff_slices, slices_arg, 0.110f, 0.055f), 2, 64);
-    }
-    int scan_pos_eff;
-    #pragma omp single copyprivate(scan_pos_eff)
-    {
-        scan_pos_eff = tl_smooth_wrap1000_i(&t->eff_scan_pos, scan_pos_arg, 0.185f);
-    }
-    int scan_width_eff;
-    #pragma omp single copyprivate(scan_width_eff)
-    {
-        scan_width_eff = clampi(tl_smooth_i(&t->eff_scan_width, scan_width_arg, 0.180f, 0.080f), 1, 100);
-    }
+    const int amount_eff = clampi(tl_smooth_i(&t->eff_amount, amount_arg, 0.20f, 0.090f), 0, 100);
+    const int light_strength = clampi(tl_smooth_i(&t->eff_light, light_arg, 0.24f, 0.115f), 0, 100);
+    const int residue_eff = clampi(tl_smooth_i(&t->eff_residue, residue_arg, 0.120f, 0.060f), 0, 99);
+    depth_arg = clampi(tl_smooth_i(&t->eff_depth_scale, depth_arg, 0.145f, 0.070f), 0, 300);
+    const int slices = clampi(tl_smooth_i(&t->eff_slices, slices_arg, 0.110f, 0.055f), 2, 64);
+    const int scan_pos_eff = tl_smooth_wrap1000_i(&t->eff_scan_pos, scan_pos_arg, 0.185f);
+    const int scan_width_eff = clampi(tl_smooth_i(&t->eff_scan_width, scan_width_arg, 0.180f, 0.080f), 1, 100);
 
     if(amount_eff <= 0) {
-        #pragma omp single
-        {
-            if(use_motion) {
-                memcpy(t->prev_y, frame->data[0], (size_t) len);
-                t->prev_valid = 1;
-            } else {
-                t->prev_valid = 0;
-            }
-            t->frame++;
+        if(use_motion) {
+            memcpy(t->prev_y, frame->data[0], (size_t) len);
+            t->prev_valid = 1;
+        } else {
+            t->prev_valid = 0;
         }
+        t->frame++;
         return;
     }
 
@@ -1433,19 +1399,16 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
 
     const int needs_src_copy = true_edge || soft_depth_mode;
 
-    #pragma omp single
-    {
-        tl_rebuild_shape_luts(t, slices, center, width);
-        tl_rebuild_depth_luts(t, depth_scale_q8, motion_react_q8);
-        tl_rebuild_light_lut(t, render_mode);
-        tl_rebuild_blend_luts(t, amount_q8, inject_q8);
-        tl_rebuild_light_scale_luts(t, light_strength);
-        tl_rebuild_fixed_chroma_luts(t, color_mode);
+    tl_rebuild_shape_luts(t, slices, center, width);
+    tl_rebuild_depth_luts(t, depth_scale_q8, motion_react_q8);
+    tl_rebuild_light_lut(t, render_mode);
+    tl_rebuild_blend_luts(t, amount_q8, inject_q8);
+    tl_rebuild_light_scale_luts(t, light_strength);
+    tl_rebuild_fixed_chroma_luts(t, color_mode);
 
-        if(use_motion && !t->prev_valid) {
-            memcpy(t->prev_y, frame->data[0], (size_t) len);
-            t->prev_valid = 1;
-        }
+    if(use_motion && !t->prev_valid) {
+        memcpy(t->prev_y, frame->data[0], (size_t) len);
+        t->prev_valid = 1;
     }
 
     uint8_t * restrict Y = frame->data[0];
@@ -1507,15 +1470,12 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
     const int * restrict blur_y_rm = t->blur_y_rm;
     const int * restrict blur_y_ap = t->blur_y_ap;
 
-    #pragma omp single
-    {
-        if(t->last_apply_render_mode != render_mode) {
-            memset(res_y, 0, (size_t) len);
-            memset(glow, 0, (size_t) t->glen);
-            memset(glow_tmp, 0, (size_t) t->glen);
-            memset(glow_next, 0, (size_t) t->glen);
-            t->last_apply_render_mode = render_mode;
-        }
+    if(t->last_apply_render_mode != render_mode) {
+        memset(res_y, 0, (size_t) len);
+        memset(glow, 0, (size_t) t->glen);
+        memset(glow_tmp, 0, (size_t) t->glen);
+        memset(glow_next, 0, (size_t) t->glen);
+        t->last_apply_render_mode = render_mode;
     }
 
     uint8_t radar_lut[256];
@@ -1528,6 +1488,7 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
+#pragma omp parallel num_threads(t->n_threads)
     {
         if(needs_src_copy) {
             TL_OMP_FOR
@@ -1609,14 +1570,10 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
                 sum += (int)glow_tmp[blur_y_ap[gy] + gx] - (int)glow_tmp[blur_y_rm[gy] + gx];
             }
         }
-    #pragma omp barrier
     }
 
-    #pragma omp single
-    {
-        if(!use_motion)
-            t->prev_valid = 0;
+    if(!use_motion)
+        t->prev_valid = 0;
 
-        t->frame++;
-    }
+    t->frame++;
 }

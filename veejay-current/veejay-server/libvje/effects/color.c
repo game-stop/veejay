@@ -66,11 +66,12 @@ void color_apply(void *ptr, VJFrame *frame, int *args)
     const int bias_v = args[2];
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
+    const int n_threads = vje_advise_num_threads(uv_len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < uv_len; i++)
     {
         int cb = (int)Cb[i] - 128;

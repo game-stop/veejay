@@ -64,6 +64,7 @@ typedef struct {
     float sm_phase_drive;
 
     int have_smooth;
+    int n_threads;
 } ripple_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -240,6 +241,7 @@ void *ripple_malloc(int width, int height)
     r->sm_attn_drive = 0.0f;
     r->sm_phase_drive = 0.0f;
     r->have_smooth = 0;
+    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -341,33 +343,30 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
     const float slow = 0.22f;
     const float fast = 0.34f;
 
-#pragma omp single
-    {
-        if(!r->have_smooth) {
-            r->sm_waves = (float)waves_arg;
-            r->sm_ampli = (float)amplitude_arg;
-            r->sm_attn = (float)atten_arg;
-            r->sm_mix = (float)mix_arg;
-            r->sm_chroma = (float)chroma_arg;
-            r->sm_phase = (float)phase_arg;
-            r->sm_waves_drive = (float)waves_drive;
-            r->sm_ampli_drive = (float)ampli_drive;
-            r->sm_attn_drive = (float)attn_drive;
-            r->sm_phase_drive = (float)phase_drive;
-            r->have_smooth = 1;
-        }
-        else {
-            r->sm_waves = ripple_smooth_value(r->sm_waves, (float)waves_arg, slow);
-            r->sm_ampli = ripple_smooth_value(r->sm_ampli, (float)amplitude_arg, slow);
-            r->sm_attn = ripple_smooth_value(r->sm_attn, (float)atten_arg, slow);
-            r->sm_mix = ripple_smooth_value(r->sm_mix, (float)mix_arg, fast);
-            r->sm_chroma = ripple_smooth_value(r->sm_chroma, (float)chroma_arg, fast);
-            r->sm_phase = ripple_smooth_value(r->sm_phase, (float)phase_arg, fast);
-            r->sm_waves_drive = ripple_smooth_value(r->sm_waves_drive, (float)waves_drive, fast);
-            r->sm_ampli_drive = ripple_smooth_value(r->sm_ampli_drive, (float)ampli_drive, fast);
-            r->sm_attn_drive = ripple_smooth_value(r->sm_attn_drive, (float)attn_drive, fast);
-            r->sm_phase_drive = ripple_smooth_value(r->sm_phase_drive, (float)phase_drive, fast);
-        }
+    if(!r->have_smooth) {
+        r->sm_waves = (float)waves_arg;
+        r->sm_ampli = (float)amplitude_arg;
+        r->sm_attn = (float)atten_arg;
+        r->sm_mix = (float)mix_arg;
+        r->sm_chroma = (float)chroma_arg;
+        r->sm_phase = (float)phase_arg;
+        r->sm_waves_drive = (float)waves_drive;
+        r->sm_ampli_drive = (float)ampli_drive;
+        r->sm_attn_drive = (float)attn_drive;
+        r->sm_phase_drive = (float)phase_drive;
+        r->have_smooth = 1;
+    }
+    else {
+        r->sm_waves = ripple_smooth_value(r->sm_waves, (float)waves_arg, slow);
+        r->sm_ampli = ripple_smooth_value(r->sm_ampli, (float)amplitude_arg, slow);
+        r->sm_attn = ripple_smooth_value(r->sm_attn, (float)atten_arg, slow);
+        r->sm_mix = ripple_smooth_value(r->sm_mix, (float)mix_arg, fast);
+        r->sm_chroma = ripple_smooth_value(r->sm_chroma, (float)chroma_arg, fast);
+        r->sm_phase = ripple_smooth_value(r->sm_phase, (float)phase_arg, fast);
+        r->sm_waves_drive = ripple_smooth_value(r->sm_waves_drive, (float)waves_drive, fast);
+        r->sm_ampli_drive = ripple_smooth_value(r->sm_ampli_drive, (float)ampli_drive, fast);
+        r->sm_attn_drive = ripple_smooth_value(r->sm_attn_drive, (float)attn_drive, fast);
+        r->sm_phase_drive = ripple_smooth_value(r->sm_phase_drive, (float)phase_drive, fast);
     }
 
     const int base_waves = clampi(ripple_roundi(r->sm_waves), 1, 3600);
@@ -410,12 +409,9 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp single
-    {
-        veejay_memcpy(r->ripple_data[0], Y, len);
-        veejay_memcpy(r->ripple_data[1], Cb, len);
-        veejay_memcpy(r->ripple_data[2], Cr, len);
-    }
+    veejay_memcpy(r->ripple_data[0], Y, len);
+    veejay_memcpy(r->ripple_data[1], Cb, len);
+    veejay_memcpy(r->ripple_data[2], Cr, len);
 
     const int rebuild =
         r->ripple_waves != effective_waves ||
@@ -428,6 +424,7 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcCb = r->ripple_data[1];
     uint8_t *restrict srcCr = r->ripple_data[2];
 
+#pragma omp parallel num_threads(r->n_threads)
     {
         if(rebuild)
             ripple_build_table(r, width, height, effective_waves, effective_ampli, effective_attn, effective_phase);
@@ -452,7 +449,6 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[i] = ripple_mix_u8(srcCr[i], srcCr[src], chroma_q8);
             }
         }
-    #pragma omp barrier
     }
 }
 

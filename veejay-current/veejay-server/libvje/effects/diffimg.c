@@ -82,12 +82,13 @@ void diffimg_apply(void *ptr, VJFrame *frame, int *args)
     if(!_pff)
         return;
 
+    const int n_threads = vje_advise_num_threads(len);
     const int lo = pixel_Y_lo_ ? pixel_Y_lo_ : 1;
     const int hi = pixel_Y_hi_;
     const int range = threshold_max - threshold_min + 1;
     const int out_range = hi - lo;
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for num_threads(n_threads) schedule(static)
     for(int i = 0; i < len; i++)
     {
         const uint8_t y = Y[i];

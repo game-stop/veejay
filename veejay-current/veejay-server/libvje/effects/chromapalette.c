@@ -22,6 +22,7 @@
 #include "chromapalette.h"
 
 typedef struct {
+    int n_threads;
     int softness;
     int tolerance;
     float *lut;
@@ -98,6 +99,7 @@ void *chromapalette_malloc(int w, int h)
     if(!c)
         return NULL;
 
+    c->n_threads = vje_advise_num_threads(w * h);
     c->softness = -1;
     c->tolerance = -1;
     c->lut = (float*) vj_malloc(sizeof(float) * 512 * 512);
@@ -169,6 +171,7 @@ void chromapalette_apply(void *ptr, VJFrame *frame, int *args)
     const int color_cr = args[5];
     const int softness = args[6];
     const int len = frame->len;
+    const int n_threads = c->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -183,13 +186,10 @@ void chromapalette_apply(void *ptr, VJFrame *frame, int *args)
     target_u = clampi(target_u, 0, 255);
     target_v = clampi(target_v, 0, 255);
 
-    #pragma omp single
-    {
-        if(softness != c->softness || tolerance != c->tolerance) {
-            calc_lut(c, tolerance, softness);
-            c->softness = softness;
-            c->tolerance = tolerance;
-        }
+    if(softness != c->softness || tolerance != c->tolerance) {
+        calc_lut(c, tolerance, softness);
+        c->softness = softness;
+        c->tolerance = tolerance;
     }
 
     const float *restrict lut = c->lut;
@@ -199,7 +199,7 @@ void chromapalette_apply(void *ptr, VJFrame *frame, int *args)
         lut_cr[i] = CLAMP_UV(128 + (int)(((float)(color_cr - i) * 0.877f) + 0.5f));
     }
 
-    #pragma omp for schedule(static)
+    #pragma omp parallel for schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++)
     {
         const int du_idx = (int)Cb[i] - target_u + 255;

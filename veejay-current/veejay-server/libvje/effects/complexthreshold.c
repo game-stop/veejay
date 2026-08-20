@@ -29,6 +29,7 @@
 #define DIV3(x) (((x) * 21846) >> 16)
 
 typedef struct {
+    int n_threads;
     uint8_t *alpha_map;
     uint8_t *alpha_temp;
     uint8_t gamma_lut[256];
@@ -119,6 +120,7 @@ void *complexthreshold_malloc(int w, int h)
 
     const int len = w * h;
 
+    m->n_threads = vje_advise_num_threads(len);
     m->alpha_map = (uint8_t*) vj_malloc(len);
     m->alpha_temp = (uint8_t*) vj_malloc(len);
 
@@ -183,11 +185,8 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
 
     const float g_val = fmaxf((float)matte_gamma / 128.0f, 0.1f);
 
-        #pragma omp single
-    {
-        for(int i = 0; i < 256; i++)
-            mk->gamma_lut[i] = complexthreshold_u8((int)(powf((float)i / 255.0f, 1.0f / g_val) * 255.0f));
-    }
+    for(int i = 0; i < 256; i++)
+        mk->gamma_lut[i] = complexthreshold_u8((int)(powf((float)i / 255.0f, 1.0f / g_val) * 255.0f));
 
     const int sat_gate_sq = sat_gate * sat_gate;
     const int matte_range = clampi(clip_white - clip_black, 1, 255);
@@ -214,6 +213,7 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
+    #pragma omp parallel num_threads(mk->n_threads)
     {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -342,6 +342,5 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
             Cb[i] = (uint8_t)DIV255((int)Cb[i] * a + sCb * ia);
             Cr[i] = (uint8_t)DIV255((int)Cr[i] * a + sCr * ia);
         }
-    #pragma omp barrier
     }
 }

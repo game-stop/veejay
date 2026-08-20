@@ -384,33 +384,32 @@ static int32_t motionmap_calc_diff(const uint8_t *restrict bg,
                                       uint8_t *restrict tmp2,
                                       uint8_t *restrict dst,
                                       int len,
-                                      int threshold)
+                                      int threshold,
+                                      int n_threads)
 {
     int64_t level = 0;
 
-#pragma omp single copyprivate(level)
-{
+#pragma omp parallel for reduction(+:level) schedule(static) num_threads(n_threads)
     for(int i = 0; i < len; i++) {
-            int a = motionmap_absi((int)bg[i] - (int)img[i]);
-            int b = motionmap_absi((int)bg[i] - (int)prev[i]);
-            int edge;
-            int old;
-            int out;
+        int a = motionmap_absi((int)bg[i] - (int)img[i]);
+        int b = motionmap_absi((int)bg[i] - (int)prev[i]);
+        int edge;
+        int old;
+        int out;
 
-            a = a < threshold ? 0 : 255;
-            b = b < threshold ? 0 : 255;
+        a = a < threshold ? 0 : 255;
+        b = b < threshold ? 0 : 255;
 
-            edge = motionmap_absi(a - b);
-            old = dst[i] >> 1;
-            out = motionmap_u8_sat(edge + old);
+        edge = motionmap_absi(a - b);
+        old = dst[i] >> 1;
+        out = motionmap_u8_sat(edge + old);
 
-            tmp1[i] = (uint8_t)edge;
-            tmp2[i] = (uint8_t)old;
-            dst[i] = (uint8_t)out;
-            prev[i] = img[i];
-            level += out;
-        }
-}
+        tmp1[i] = (uint8_t)edge;
+        tmp2[i] = (uint8_t)old;
+        dst[i] = (uint8_t)out;
+        prev[i] = img[i];
+        level += out;
+    }
 
     return (int32_t)(level >> 8);
 }
@@ -465,19 +464,13 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
     const int act_decay = args[P_ACTIVITY_DECAY];
 
     if(!mm->have_bg) {
-        #pragma omp single
-        {
-            veejay_msg(VEEJAY_MSG_ERROR, "Motion Mapping: Snap the background frame with VIMS 339 or mask button in reloaded");
-        }
+        veejay_msg(VEEJAY_MSG_ERROR, "Motion Mapping: Snap the background frame with VIMS 339 or mask button in reloaded");
         return;
     }
 
-    #pragma omp single
-    {
-        if(act_decay != mm->last_act_decay) {
-            mm->last_act_decay = act_decay;
-            mm->activity_decay = act_decay;
-        }
+    if(act_decay != mm->last_act_decay) {
+        mm->last_act_decay = act_decay;
+        mm->activity_decay = act_decay;
     }
 
     int32_t activity_level = motionmap_calc_diff(
@@ -488,20 +481,18 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
         mm->diff_img + len,
         mm->binary_img,
         len,
-        threshold
+        threshold,
+        mm->n_threads
     );
 
     if(draw) {
-        #pragma omp single
-        {
-            vj_frame_clear1(Cb, 128, uv_len);
-            vj_frame_clear1(Cr, 128, uv_len);
-            vj_frame_copy1(mm->binary_img, frame->data[0], len);
+        vj_frame_clear1(Cb, 128, uv_len);
+        vj_frame_clear1(Cr, 128, uv_len);
+        vj_frame_copy1(mm->binary_img, frame->data[0], len);
 
-            mm->running = 0;
-            mm->stored_frame = 0;
-            mm->scale_lock = 0;
-        }
+        mm->running = 0;
+        mm->stored_frame = 0;
+        mm->scale_lock = 0;
         return;
     }
 
@@ -509,23 +500,17 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
     int32_t min = INT_MAX;
     int32_t local_max = 0;
 
-    #pragma omp single
-    {
-        mm->current_his_len = history;
-        mm->current_decay = decay;
-        mm->histogram_[mm->nframe_ % mm->current_his_len] = activity_level;
-    }
+    mm->current_his_len = history;
+    mm->current_decay = decay;
+    mm->histogram_[mm->nframe_ % mm->current_his_len] = activity_level;
 
     for(int i = 0; i < mm->current_his_len; i++) {
         const int32_t v = mm->histogram_[i];
 
         avg_actlvl += v;
 
-        #pragma omp single
-        {
-            if(v > mm->max)
-                mm->max = v;
-        }
+        if(v > mm->max)
+            mm->max = v;
         if(v < min)
             min = v;
         if(v > local_max)
@@ -537,59 +522,56 @@ void motionmap_apply(void *ptr, VJFrame *frame, int *args)
     if(avg_actlvl < limit)
         avg_actlvl = 0;
 
-    #pragma omp single
-    {
-        mm->nframe_++;
+    mm->nframe_++;
 
-        switch(activity_mode) {
-            case 0:
-                if((mm->nframe_ % mm->current_his_len) == 0) {
-                    mm->key1_ = min;
-                    mm->key2_ = mm->max;
-                    mm->keyp_ = mm->keyv_;
-                    mm->keyv_ = avg_actlvl;
-                    mm->global_max = mm->max;
-                }
-                break;
-
-            case 1:
-                mm->key1_ = min;
-                mm->key2_ = mm->max;
-                mm->keyv_ = local_max;
-                mm->global_max = local_max;
-                break;
-
-            case 2:
+    switch(activity_mode) {
+        case 0:
+            if((mm->nframe_ % mm->current_his_len) == 0) {
                 mm->key1_ = min;
                 mm->key2_ = mm->max;
                 mm->keyp_ = mm->keyv_;
                 mm->keyv_ = avg_actlvl;
                 mm->global_max = mm->max;
-                break;
+            }
+            break;
 
-            case 3:
-                if((mm->nframe_ % mm->current_his_len) == 0) {
-                    mm->key1_ = min;
-                    mm->key2_ = mm->max;
-                    mm->keyp_ = mm->keyv_;
-                    mm->keyv_ = avg_actlvl;
-                    mm->global_max = mm->max;
+        case 1:
+            mm->key1_ = min;
+            mm->key2_ = mm->max;
+            mm->keyv_ = local_max;
+            mm->global_max = local_max;
+            break;
+
+        case 2:
+            mm->key1_ = min;
+            mm->key2_ = mm->max;
+            mm->keyp_ = mm->keyv_;
+            mm->keyv_ = avg_actlvl;
+            mm->global_max = mm->max;
+            break;
+
+        case 3:
+            if((mm->nframe_ % mm->current_his_len) == 0) {
+                mm->key1_ = min;
+                mm->key2_ = mm->max;
+                mm->keyp_ = mm->keyv_;
+                mm->keyv_ = avg_actlvl;
+                mm->global_max = mm->max;
+            }
+
+            mm->scale_lock = avg_actlvl == 0;
+
+            if(mm->scale_lock && act_decay > 0) {
+                mm->activity_decay--;
+
+                if(mm->activity_decay == 0) {
+                    mm->last_act_decay = 0;
+                    mm->scale_lock = 0;
                 }
-
-                mm->scale_lock = avg_actlvl == 0;
-
-                if(mm->scale_lock && act_decay > 0) {
-                    mm->activity_decay--;
-
-                    if(mm->activity_decay == 0) {
-                        mm->last_act_decay = 0;
-                        mm->scale_lock = 0;
-                    }
-                }
-                break;
-        }
-
-        mm->running = 1;
-        mm->do_interpolation = interpol;
+            }
+            break;
     }
+
+    mm->running = 1;
+    mm->do_interpolation = interpol;
 }

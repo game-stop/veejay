@@ -41,6 +41,7 @@ typedef struct {
     uint8_t *timebuffer;
     int plane;
     uint8_t *bgimage[4];
+    int n_threads;
 } chameleonblend_t;
 
 static inline int chameleonblend_clampi(int v, int lo, int hi)
@@ -163,6 +164,7 @@ void *chameleonblend_malloc(int w, int h)
     for(int i = 1; i < 3; i++)
         vj_frame_clear1(c->bgimage[i], 128, len + safe_zone);
 
+    c->n_threads = vje_advise_num_threads(len);
     c->last_mode_ = -1;
 
     return c;
@@ -204,7 +206,7 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
     uint8_t *restrict dstU = dest->data[1];
     uint8_t *restrict dstV = dest->data[2];
 
-#pragma omp for simd schedule(static)
+#pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
     for(int i = 0; i < video_area; i++)
     {
         const int y = srcY[i];
@@ -233,10 +235,7 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
         }
     }
 
-#pragma omp single
-    {
-        cb->plane = (cb->plane + 1) & (PLANES - 1);
-    }
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
 
@@ -246,15 +245,12 @@ void chameleonblend_apply(void *ptr, VJFrame *frame, VJFrame *source, int *args)
 
     const int mode = args[0];
 
-    #pragma omp single
-    {
-        if(!c->has_bg)
-            chameleonblend_prepare(c, frame);
+    if(!c->has_bg)
+        chameleonblend_prepare(c, frame);
 
-        if(c->last_mode_ != mode) {
-            chameleonblend_reset_history(c, source->len);
-            c->last_mode_ = mode;
-        }
+    if(c->last_mode_ != mode) {
+        chameleonblend_reset_history(c, source->len);
+        c->last_mode_ = mode;
     }
 
     uint32_t activity = 0;
@@ -262,19 +258,16 @@ void chameleonblend_apply(void *ptr, VJFrame *frame, VJFrame *source, int *args)
     int tmp1 = 0;
     int tmp2 = 0;
 
-    #pragma omp single copyprivate(activity, auto_switch)
+    if(c->motionmap && motionmap_active(c->motionmap))
     {
-        if(c->motionmap && motionmap_active(c->motionmap))
-        {
-            motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
-            auto_switch = 1;
-            activity = motionmap_activity(c->motionmap);
-        }
-        else
-        {
-            c->N__ = 0;
-            c->n__ = 0;
-        }
+        motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
+        auto_switch = 1;
+        activity = motionmap_activity(c->motionmap);
+    }
+    else
+    {
+        c->N__ = 0;
+        c->n__ = 0;
     }
 
     if(c->n__ == c->N__ || c->n__ == 0)

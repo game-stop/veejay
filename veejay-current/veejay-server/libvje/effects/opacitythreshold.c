@@ -30,6 +30,7 @@
 
 typedef struct {
     uint16_t *hblur;
+    int n_threads;
 } op_thres_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -115,6 +116,7 @@ void *opacitythreshold_malloc(int w, int h)
         return NULL;
     }
 
+    opt->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) opt;
 }
@@ -139,6 +141,7 @@ void opacitythreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
     const int w = frame->width;
     const int h = frame->height;
     const int t_diff = tmax > tmin ? tmax - tmin : 1;
+    const int n_threads = opt->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -150,6 +153,7 @@ void opacitythreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
 
     uint16_t *restrict tmp = opt->hblur;
 
+#pragma omp parallel num_threads(n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 0; y < h; y++) {
@@ -196,6 +200,5 @@ void opacitythreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
                 }
             }
         }
-    #pragma omp barrier
     }
 }

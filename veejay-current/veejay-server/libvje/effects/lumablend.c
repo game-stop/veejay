@@ -134,7 +134,7 @@ void lumablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict u2 = frame2->data[1];
     const uint8_t *restrict v2 = frame2->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(lb->n_threads)
     for(int i = 0; i < len; i++) {
         const int trigger = mode ? y2[i] : y1[i];
         int mask = 0;

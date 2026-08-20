@@ -31,6 +31,7 @@
 typedef struct {
     int gamma_key;
     uint8_t table[256];
+    int n_threads;
 } gammacompr_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -95,6 +96,7 @@ void *gammacompr_malloc(int w, int h)
         return NULL;
 
     g->gamma_key = -1;
+    g->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) g;
 }   
@@ -127,17 +129,15 @@ void gammacompr_apply(void *ptr, VJFrame *frame, int *args)
     const int black_threshold = args[2];
     const int len = frame->len;
 
-#pragma omp single
-    {
-        if(value != g->gamma_key)
-            gammacompr_setup(g, value);
-    }
+    if(value != g->gamma_key)
+        gammacompr_setup(g, value);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
     const uint8_t *restrict table = g->table;
 
+#pragma omp parallel num_threads(g->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -155,6 +155,5 @@ void gammacompr_apply(void *ptr, VJFrame *frame, int *args)
                 V[i] = (uint8_t)((V[i] & ~mask) | (128 & mask));
             }
         }
-    #pragma omp barrier
     }
 }

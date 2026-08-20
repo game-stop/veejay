@@ -52,6 +52,7 @@ typedef struct {
     int last_fresh_rate;
     int lastmode;
     int loopnum;
+    int n_threads;
     int frame_counter;
 
     float loop_env;
@@ -268,6 +269,7 @@ void *water_malloc(int width, int height)
     w->drops_env = -1.0f;
     w->power_env = -1.0f;
 
+    w->n_threads = vje_advise_num_threads(len);
 
     return (void*) w;
 }
@@ -708,55 +710,29 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         ((12 + ((power_q * 72 + 500) / 1000)) * drive_q + 500) / 1000;
     const int threshold_target = clampi(threshold_arg - threshold_drop, 0, 255);
 
-    int loopnum_eff;
-    #pragma omp single copyprivate(loopnum_eff)
-    {
-        loopnum_eff = water_env_i(&w->loop_env, loop_target, 1, 16, 0.34f, 0.105f);
-    }
-    int decay_eff;
-    #pragma omp single copyprivate(decay_eff)
-    {
-        decay_eff = water_env_i(&w->decay_env, decay_target, 1, 31, 0.26f, 0.070f);
-    }
-    int threshold_eff;
-    #pragma omp single copyprivate(threshold_eff)
-    {
-        threshold_eff = water_env_i(&w->threshold_env, threshold_target, 0, 255, 0.42f, 0.115f);
-    }
-    int drop_drive;
-    #pragma omp single copyprivate(drop_drive)
-    {
-        drop_drive = water_env_i(&w->drops_env, drop_drive_arg, 0, 1000, 0.40f, 0.130f);
-    }
-    int ripple_power;
-    #pragma omp single copyprivate(ripple_power)
-    {
-        ripple_power = water_env_i(&w->power_env, ripple_power_arg, 0, 1000, 0.36f, 0.120f);
+    const int loopnum_eff = water_env_i(&w->loop_env, loop_target, 1, 16, 0.34f, 0.105f);
+    const int decay_eff = water_env_i(&w->decay_env, decay_target, 1, 31, 0.26f, 0.070f);
+    const int threshold_eff = water_env_i(&w->threshold_env, threshold_target, 0, 255, 0.42f, 0.115f);
+    const int drop_drive = water_env_i(&w->drops_env, drop_drive_arg, 0, 1000, 0.40f, 0.130f);
+    const int ripple_power = water_env_i(&w->power_env, ripple_power_arg, 0, 1000, 0.36f, 0.120f);
+
+    if(w->last_fresh_rate != fresh_rate) {
+        w->last_fresh_rate = fresh_rate;
+        w->rain_period = 0;
     }
 
-    #pragma omp single
-    {
-        if(w->last_fresh_rate != fresh_rate) {
-            w->last_fresh_rate = fresh_rate;
-            w->rain_period = 0;
-        }
-
-        if(w->lastmode != mode) {
-            water_clear_maps(w);
-            w->have_img = 0;
-            w->lastmode = mode;
-            w->rain_period = 0;
-        }
-
-        veejay_memcpy(w->src_img, frame->data[0], len);
+    if(w->lastmode != mode) {
+        water_clear_maps(w);
+        w->have_img = 0;
+        w->lastmode = mode;
+        w->rain_period = 0;
     }
+
+    veejay_memcpy(w->src_img, frame->data[0], len);
 
     if(mode == 0 && !w->have_img) {
-        #pragma omp single
-        {
-            veejay_memcpy(w->bg_img, frame->data[0], len);
-            w->have_img = 1;
-        }
+        veejay_memcpy(w->bg_img, frame->data[0], len);
+        w->have_img = 1;
         return;
     }
 
@@ -765,6 +741,7 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int preview = (mode == 1 || mode == 3 || mode == 5);
     int motion_seeded = 0;
 
+#pragma omp parallel num_threads(w->n_threads)
     {
         if(use_motion) {
             const uint8_t *restrict in = frame2->data[0];
@@ -774,7 +751,7 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                 in = w->blur_img;
             }
 
-#pragma omp single copyprivate(motion_seeded)
+#pragma omp single
             {
                 if(!w->have_img) {
                     veejay_memcpy(w->bg_img, in, len);
@@ -812,13 +789,9 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             water_calc_vtable(w);
             water_render(frame, w);
         }
-    #pragma omp barrier
     }
 
-    #pragma omp single
-    {
-        if(!preview) {
-            w->frame_counter++;
-        }
+    if(!preview) {
+        w->frame_counter++;
     }
 }

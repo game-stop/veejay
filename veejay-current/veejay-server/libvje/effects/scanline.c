@@ -56,6 +56,7 @@ typedef struct {
     float sm_beat_glow;
     float sm_beat_decay;
     int sm_ready;
+    int n_threads;
 } scanline_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -216,6 +217,7 @@ void *scanline_malloc(int w, int h)
     s->beat_env = 0.0f;
     s->beat_kick = 0.0f;
     s->sm_ready = 0;
+    s->n_threads = vje_advise_num_threads(len);
 
     return (void*)s;
 }
@@ -382,31 +384,28 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     const float smooth = (float)smooth_arg * 0.001f;
     const float param_a = 0.46f - smooth * 0.32f;
 
-#pragma omp single
-    {
-        if(!s->sm_ready) {
-            s->sm_speed = (float)speed_arg;
-            s->sm_stop = (float)stop_arg;
-            s->sm_beam = (float)beam_arg;
-            s->sm_hold = (float)hold_arg;
-            s->sm_mix = (float)mix_arg;
-            s->sm_beat_speed = (float)bs_arg;
-            s->sm_beat_beam = (float)bb_arg;
-            s->sm_beat_glow = (float)glow_arg;
-            s->sm_beat_decay = (float)decay_arg;
-            s->sm_ready = 1;
-        }
-        else {
-            s->sm_speed = scanline_smooth_to(s->sm_speed, (float)speed_arg, param_a);
-            s->sm_stop = scanline_smooth_to(s->sm_stop, (float)stop_arg, param_a);
-            s->sm_beam = scanline_smooth_to(s->sm_beam, (float)beam_arg, param_a);
-            s->sm_hold = scanline_smooth_to(s->sm_hold, (float)hold_arg, param_a);
-            s->sm_mix = scanline_smooth_to(s->sm_mix, (float)mix_arg, param_a);
-            s->sm_beat_speed = scanline_smooth_to(s->sm_beat_speed, (float)bs_arg, param_a);
-            s->sm_beat_beam = scanline_smooth_to(s->sm_beat_beam, (float)bb_arg, param_a);
-            s->sm_beat_glow = scanline_smooth_to(s->sm_beat_glow, (float)glow_arg, param_a);
-            s->sm_beat_decay = scanline_smooth_to(s->sm_beat_decay, (float)decay_arg, param_a);
-        }
+    if(!s->sm_ready) {
+        s->sm_speed = (float)speed_arg;
+        s->sm_stop = (float)stop_arg;
+        s->sm_beam = (float)beam_arg;
+        s->sm_hold = (float)hold_arg;
+        s->sm_mix = (float)mix_arg;
+        s->sm_beat_speed = (float)bs_arg;
+        s->sm_beat_beam = (float)bb_arg;
+        s->sm_beat_glow = (float)glow_arg;
+        s->sm_beat_decay = (float)decay_arg;
+        s->sm_ready = 1;
+    }
+    else {
+        s->sm_speed = scanline_smooth_to(s->sm_speed, (float)speed_arg, param_a);
+        s->sm_stop = scanline_smooth_to(s->sm_stop, (float)stop_arg, param_a);
+        s->sm_beam = scanline_smooth_to(s->sm_beam, (float)beam_arg, param_a);
+        s->sm_hold = scanline_smooth_to(s->sm_hold, (float)hold_arg, param_a);
+        s->sm_mix = scanline_smooth_to(s->sm_mix, (float)mix_arg, param_a);
+        s->sm_beat_speed = scanline_smooth_to(s->sm_beat_speed, (float)bs_arg, param_a);
+        s->sm_beat_beam = scanline_smooth_to(s->sm_beat_beam, (float)bb_arg, param_a);
+        s->sm_beat_glow = scanline_smooth_to(s->sm_beat_glow, (float)glow_arg, param_a);
+        s->sm_beat_decay = scanline_smooth_to(s->sm_beat_decay, (float)decay_arg, param_a);
     }
 
     const int beat_shaped = scanline_beat_shape(beat_arg);
@@ -415,33 +414,27 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     const float release = 0.028f + (1.0f - smooth) * 0.095f;
     const float old_env = s->beat_env;
 
-#pragma omp single
-    {
-        if(target > s->beat_env)
-            s->beat_env += (target - s->beat_env) * attack;
-        else
-            s->beat_env += (target - s->beat_env) * release;
+    if(target > s->beat_env)
+        s->beat_env += (target - s->beat_env) * attack;
+    else
+        s->beat_env += (target - s->beat_env) * release;
 
-        if(s->beat_env < 0.0001f)
-            s->beat_env = 0.0f;
-        else if(s->beat_env > 1.0f)
-            s->beat_env = 1.0f;
-    }
+    if(s->beat_env < 0.0001f)
+        s->beat_env = 0.0f;
+    else if(s->beat_env > 1.0f)
+        s->beat_env = 1.0f;
 
     const float rise = s->beat_env - old_env;
 
-#pragma omp single
-    {
-        if(rise > 0.0f)
-            s->beat_kick += rise * 1.55f;
+    if(rise > 0.0f)
+        s->beat_kick += rise * 1.55f;
 
-        s->beat_kick *= 0.50f + smooth * 0.30f;
+    s->beat_kick *= 0.50f + smooth * 0.30f;
 
-        if(s->beat_kick > 1.0f)
-            s->beat_kick = 1.0f;
-        else if(s->beat_kick < 0.0001f)
-            s->beat_kick = 0.0f;
-    }
+    if(s->beat_kick > 1.0f)
+        s->beat_kick = 1.0f;
+    else if(s->beat_kick < 0.0001f)
+        s->beat_kick = 0.0f;
 
     const int beat_q = clampi((int)(s->beat_env * 700.0f + s->beat_kick * 520.0f + 0.5f), 0, 1000);
     const int long_axis = mode < 2 ? height : width;
@@ -488,26 +481,24 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     int head = 0;
     int horizontal = mode < 2;
 
-#pragma omp single copyprivate(stopped)
-    {
-        if(s->stopCount > 0) {
-            const int skip = 1 + ((beat_speed * 6 + beat_q * 7 + 1000) / 2000);
+    if(s->stopCount > 0) {
+        const int skip = 1 + ((beat_speed * 6 + beat_q * 7 + 1000) / 2000);
 
-            s->stopCount -= skip;
-            stopped = 1;
+        s->stopCount -= skip;
+        stopped = 1;
 
-            if(s->stopCount <= 0) {
-                s->prevRow = 0;
-                s->prevCol = 0;
-                s->stopCount = 0;
+        if(s->stopCount <= 0) {
+            s->prevRow = 0;
+            s->prevCol = 0;
+            s->stopCount = 0;
 
-                veejay_memset(bufY, pixel_Y_lo_, len);
-                veejay_memset(bufU, 128, len);
-                veejay_memset(bufV, 128, len);
-            }
+            veejay_memset(bufY, pixel_Y_lo_, len);
+            veejay_memset(bufU, 128, len);
+            veejay_memset(bufV, 128, len);
         }
     }
 
+#pragma omp parallel num_threads(s->n_threads)
     {
         if(stopped) {
             scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
@@ -515,7 +506,7 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
         else {
             scanline_fade_buffer(s, len, eff_hold);
 
-#pragma omp single copyprivate(head, horizontal)
+#pragma omp single
             {
                 switch(mode) {
                     case 0:
@@ -638,7 +629,6 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
             else
                 scanline_overlay_vertical(dstY, width, height, head, eff_beam, eff_glow);
         }
-    #pragma omp barrier
     }
 }
 

@@ -36,6 +36,7 @@ typedef struct {
     int w;
     int h;
     int initialized;
+    int n_threads;
     float maturity;
     uint32_t frame_no;
 } fluid_paint_t;
@@ -244,6 +245,7 @@ void *dotillism_malloc(int w, int h)
     p->initialized = 0;
     p->maturity = 0.0f;
     p->frame_no = 0;
+    p->n_threads = vje_advise_num_threads(len);
 
     return (void *)p;
 }
@@ -278,17 +280,14 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict V = frame->data[2];
 
 
-    #pragma omp single
-    {
-        if (!p->initialized) {
-            veejay_memcpy(p->canvas_y, Y, len);
-            veejay_memcpy(p->canvas_u, U, len);
-            veejay_memcpy(p->canvas_v, V, len);
-            veejay_memcpy(p->prev_src_y, Y, len);
-            p->initialized = 1;
-            p->maturity = 0.0f;
-            p->frame_no = 0;
-        }
+    if (!p->initialized) {
+        veejay_memcpy(p->canvas_y, Y, len);
+        veejay_memcpy(p->canvas_u, U, len);
+        veejay_memcpy(p->canvas_v, V, len);
+        veejay_memcpy(p->prev_src_y, Y, len);
+        p->initialized = 1;
+        p->maturity = 0.0f;
+        p->frame_no = 0;
     }
 
     const float build_param = clampf_local((float)args[0] * 0.01f, 0.0f, 1.0f);
@@ -316,11 +315,8 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
     const float chroma_gain_curve = chroma_gain_param * chroma_gain_param;
 
     const float mature_rate = 0.0005f + build_curve * 0.0500f;
-    #pragma omp single
-    {
-        p->maturity += (1.0f - p->maturity) * mature_rate;
-        if (p->maturity > 1.0f) p->maturity = 1.0f;
-    }
+    p->maturity += (1.0f - p->maturity) * mature_rate;
+    if (p->maturity > 1.0f) p->maturity = 1.0f;
 
     const float maturity = p->maturity;
 
@@ -354,10 +350,7 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
     for (int i = 0; i <= cell; i++)
         lut[i] = smoothstepf_local((float)i / (float)cell);
 
-    #pragma omp single
-    {
-        build_flow_grid(p, w, h, cell);
-    }
+    build_flow_grid(p, w, h, cell);
 
     const int gw = (w + cell - 1) / cell + 2;
     const int gh = (h + cell - 1) / cell + 2;
@@ -375,7 +368,7 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
     const float amp = 1.0f + turbulence_gain * 0.18f;
     const float motion_scale = (0.35f + motion_curve * 5.25f) * (1.0f / 255.0f);
 
-    #pragma omp for collapse(2) schedule(static)
+    #pragma omp parallel for collapse(2) schedule(static) num_threads(p->n_threads)
     for (int gy = 0; gy < gh - 1; gy++) {
         for (int gx = 0; gx < gw - 1; gx++) {
             const int y0 = gy * cell;
@@ -483,15 +476,12 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
     {
-        {
-            uint8_t *tmp;
-            tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
-            tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
-            tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
-        }
-
-        p->frame_no++;
+        uint8_t *tmp;
+        tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
+        tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
+        tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
     }
+
+    p->frame_no++;
 }

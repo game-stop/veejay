@@ -25,6 +25,7 @@
 typedef struct {
     int value_q8;
     int last_mode;
+    int n_threads;
 } fc_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -93,6 +94,7 @@ void *fadecolor_malloc(int w, int h)
 
     state->value_q8 = 0;
     state->last_mode = -1;
+    state->n_threads = vje_advise_num_threads(w * h);
     return state;
 }
 
@@ -169,23 +171,20 @@ void fadecolor_apply(void *ptr, VJFrame *frame, int *args)
     if(step_q8 < 1)
         step_q8 = 1;
 
-#pragma omp single
-    {
-        if(mode != state->last_mode) {
-            state->value_q8 = mode ? target_q8 : 0;
-            state->last_mode = mode;
-        }
+    if(mode != state->last_mode) {
+        state->value_q8 = mode ? target_q8 : 0;
+        state->last_mode = mode;
+    }
 
-        if(mode == 0) {
-            state->value_q8 += step_q8;
-            if(state->value_q8 > target_q8)
-                state->value_q8 = target_q8;
-        }
-        else {
-            state->value_q8 -= step_q8;
-            if(state->value_q8 < 0)
-                state->value_q8 = 0;
-        }
+    if(mode == 0) {
+        state->value_q8 += step_q8;
+        if(state->value_q8 > target_q8)
+            state->value_q8 = target_q8;
+    }
+    else {
+        state->value_q8 -= step_q8;
+        if(state->value_q8 < 0)
+            state->value_q8 = 0;
     }
 
     const int op1 = clampi((state->value_q8 + 128) >> 8, 0, 255);
@@ -206,6 +205,7 @@ void fadecolor_apply(void *ptr, VJFrame *frame, int *args)
 
     const int uv_len = frame->ssm ? len : frame->uv_len;
 
+#pragma omp parallel num_threads(state->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -216,6 +216,5 @@ void fadecolor_apply(void *ptr, VJFrame *frame, int *args)
             Cb[i] = (uint8_t)((op0 * Cb[i] + op1 * colorCb + 127) / 255);
             Cr[i] = (uint8_t)((op0 * Cr[i] + op1 * colorCr + 127) / 255);
         }
-    #pragma omp barrier
     }
 }

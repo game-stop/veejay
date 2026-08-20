@@ -41,6 +41,7 @@ typedef struct {
     float chroma_trail_s;
     int state_ready;
 
+    int n_threads;
 } tracer_t;
 
 static inline int tracer_clampi(int v, int lo, int hi)
@@ -179,6 +180,7 @@ void *tracer_malloc(int w, int h)
     t->chroma_trail_s = 1000.0f;
     t->state_ready = 0;
 
+    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }
@@ -208,22 +210,19 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_coeff = 0.185f;
 
-#pragma omp single
-    {
-        if(!t->state_ready) {
-            t->opacity_s = (float)opacity_arg;
-            t->buffer_s = (float)buffer_arg;
-            t->mix_drive_s = (float)mix_drive_arg;
-            t->feed_drive_s = (float)feed_drive_arg;
-            t->chroma_trail_s = (float)chroma_trail_arg;
-            t->state_ready = 1;
-        } else {
-            t->opacity_s = tracer_smoothf(t->opacity_s, (float)opacity_arg, param_coeff);
-            t->buffer_s = tracer_smoothf(t->buffer_s, (float)buffer_arg, param_coeff * 0.80f);
-            t->mix_drive_s = tracer_smoothf(t->mix_drive_s, (float)mix_drive_arg, param_coeff);
-            t->feed_drive_s = tracer_smoothf(t->feed_drive_s, (float)feed_drive_arg, param_coeff * 0.90f);
-            t->chroma_trail_s = tracer_smoothf(t->chroma_trail_s, (float)chroma_trail_arg, param_coeff * 0.76f);
-        }
+    if(!t->state_ready) {
+        t->opacity_s = (float)opacity_arg;
+        t->buffer_s = (float)buffer_arg;
+        t->mix_drive_s = (float)mix_drive_arg;
+        t->feed_drive_s = (float)feed_drive_arg;
+        t->chroma_trail_s = (float)chroma_trail_arg;
+        t->state_ready = 1;
+    } else {
+        t->opacity_s = tracer_smoothf(t->opacity_s, (float)opacity_arg, param_coeff);
+        t->buffer_s = tracer_smoothf(t->buffer_s, (float)buffer_arg, param_coeff * 0.80f);
+        t->mix_drive_s = tracer_smoothf(t->mix_drive_s, (float)mix_drive_arg, param_coeff);
+        t->feed_drive_s = tracer_smoothf(t->feed_drive_s, (float)feed_drive_arg, param_coeff * 0.90f);
+        t->chroma_trail_s = tracer_smoothf(t->chroma_trail_s, (float)chroma_trail_arg, param_coeff * 0.76f);
     }
 
     const float mix_t = tracer_clampf(t->mix_drive_s * 0.001f, 0.0f, 1.0f);
@@ -266,6 +265,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict tU = t->trace_buffer[1];
     uint8_t *restrict tV = t->trace_buffer[2];
 
+#pragma omp parallel num_threads(t->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
@@ -293,6 +293,5 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             Cb[i] = tracer_mix_uv(Cb[i], tU[i], chroma_wet_q8);
             Cr[i] = tracer_mix_uv(Cr[i], tV[i], chroma_wet_q8);
         }
-    #pragma omp barrier
     }
 }

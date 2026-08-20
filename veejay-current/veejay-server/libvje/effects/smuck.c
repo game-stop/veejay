@@ -41,6 +41,7 @@ typedef struct {
     uint8_t *tmp[3];
     uint32_t seed;
     uint32_t beat_seed;
+    int n_threads;
 
     float eff_shimmer;
     float eff_mix;
@@ -220,6 +221,7 @@ void *smuck_malloc(int w, int h)
     s->seed = 0x1337BEEFU ^ (uint32_t)(w * 73856093u) ^ (uint32_t)(h * 19349663u);
     s->beat_seed = smuck_hash_u32(s->seed ^ 0x9e3779b9U);
 
+    s->n_threads = vje_advise_num_threads(len);
 
     s->eff_shimmer = 0.0f;
     s->eff_mix = 0.0f;
@@ -247,9 +249,10 @@ static void smuck_apply_plane(uint8_t *restrict dst,
                               int mx,
                               int my,
                               uint32_t seed,
-                              int chroma)
+                              int chroma,
+                              int n_threads)
 {
-    
+    (void)n_threads;
 
     const unsigned int shift = (unsigned int)(10 + shimmer);
     const unsigned int mask = chroma ? 0x3u : 0x7u;
@@ -302,20 +305,17 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
     int shimmer_drive = shimmer_drive_arg;
     int jitter_drive = jitter_drive_arg;
 
-#pragma omp single copyprivate(jitter_drive, mix, shimmer, shimmer_drive)
-    {
-        if(!s->initialized) {
-            s->eff_shimmer = (float)shimmer;
-            s->eff_mix = (float)mix;
-            s->eff_shimmer_drive = (float)shimmer_drive;
-            s->eff_jitter_drive = (float)jitter_drive;
-            s->initialized = 1;
-        } else {
-            shimmer = smuck_smooth_i(&s->eff_shimmer, shimmer, 0.30f, 0.075f);
-            mix = smuck_smooth_i(&s->eff_mix, mix, 0.24f, 0.075f);
-            shimmer_drive = smuck_smooth_i(&s->eff_shimmer_drive, shimmer_drive, 0.34f, 0.090f);
-            jitter_drive = smuck_smooth_i(&s->eff_jitter_drive, jitter_drive, 0.38f, 0.100f);
-        }
+    if(!s->initialized) {
+        s->eff_shimmer = (float)shimmer;
+        s->eff_mix = (float)mix;
+        s->eff_shimmer_drive = (float)shimmer_drive;
+        s->eff_jitter_drive = (float)jitter_drive;
+        s->initialized = 1;
+    } else {
+        shimmer = smuck_smooth_i(&s->eff_shimmer, shimmer, 0.30f, 0.075f);
+        mix = smuck_smooth_i(&s->eff_mix, mix, 0.24f, 0.075f);
+        shimmer_drive = smuck_smooth_i(&s->eff_shimmer_drive, shimmer_drive, 0.34f, 0.090f);
+        jitter_drive = smuck_smooth_i(&s->eff_jitter_drive, jitter_drive, 0.38f, 0.100f);
     }
 
     shimmer = clampi(shimmer, 0, 17);
@@ -338,11 +338,8 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
     const int mx = (direction == 0 || direction == 2) ? 1 : 0;
     const int my = (direction == 1 || direction == 2) ? 1 : 0;
 
-#pragma omp single
-    {
-        if(!static_seed || jitter_drive > 0)
-            s->beat_seed = smuck_hash_u32(s->beat_seed + 0x6d2b79f5U + (uint32_t)(jitter_drive * 23 + shimmer_drive * 11));
-    }
+    if(!static_seed || jitter_drive > 0)
+        s->beat_seed = smuck_hash_u32(s->beat_seed + 0x6d2b79f5U + (uint32_t)(jitter_drive * 23 + shimmer_drive * 11));
 
     const uint32_t base_seed = static_seed ? 0x1337BEEFU : s->seed;
     const uint32_t drive_seed = smuck_hash_u32(((uint32_t)shimmer_drive * 0x45d9f3bu) ^
@@ -354,6 +351,7 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *restrict Y = frame->data[0];
 
+#pragma omp parallel num_threads(s->n_threads)
     {
 #pragma omp single
         veejay_memcpy(s->tmp[0], Y, len);
@@ -368,7 +366,8 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
         mx,
         my,
         seed,
-        0
+        0,
+        s->n_threads
         );
 
         if(mix_q8 < 256) {
@@ -398,7 +397,8 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
             mx,
             my,
             seed ^ 0x9e3779b9U,
-            1
+            1,
+            s->n_threads
             );
 
             smuck_apply_plane(
@@ -411,7 +411,8 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
             mx,
             my,
             seed ^ 0x85ebca6bU,
-            1
+            1,
+            s->n_threads
             );
 
             if(mix_q8 < 256) {
@@ -422,12 +423,8 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-    #pragma omp barrier
     }
 
-#pragma omp single
-    {
-        if(!static_seed)
-            s->seed = smuck_hash_u32(s->seed + 0x6d2b79f5U);
-    }
+    if(!static_seed)
+        s->seed = smuck_hash_u32(s->seed + 0x6d2b79f5U);
 }

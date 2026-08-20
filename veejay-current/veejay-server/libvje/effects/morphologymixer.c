@@ -52,6 +52,7 @@ typedef struct {
 
     int grid_w;
     int grid_h;
+    int n_threads;
 } morph_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -166,6 +167,7 @@ void *morphologymixer_malloc(int w, int h)
     m->grid_x2 = m->grid_y1 + grid_cells;
     m->grid_y2 = m->grid_x2 + grid_cells;
 
+    m->n_threads = vje_advise_num_threads(size);
 
     return (void*) m;
 }
@@ -273,9 +275,7 @@ static void morphologymixer_mode_grid(morph_t *m,
     const uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-    for(int gi = 0; gi < m->grid_w * m->grid_h; gi++) {
-        const int gy = gi / m->grid_w;
-        const int gx = gi - gy * m->grid_w;
+    for(int gy = 0; gy < m->grid_h; gy++) {
         int y = gy << FLOW_SHIFT;
 
         if(y >= h)
@@ -284,23 +284,26 @@ static void morphologymixer_mode_grid(morph_t *m,
         const int up = y >= FLOW_SIZE ? y - FLOW_SIZE : 0;
         const int dn = y < h - FLOW_SIZE ? y + FLOW_SIZE : h - 1;
 
-        int x = gx << FLOW_SHIFT;
+        for(int gx = 0; gx < m->grid_w; gx++) {
+            int x = gx << FLOW_SHIFT;
 
-        if(x >= w)
-            x = w - 1;
+            if(x >= w)
+                x = w - 1;
 
-        const int lx = x >= FLOW_SIZE ? x - FLOW_SIZE : 0;
-        const int rx = x < w - FLOW_SIZE ? x + FLOW_SIZE : w - 1;
+            const int lx = x >= FLOW_SIZE ? x - FLOW_SIZE : 0;
+            const int rx = x < w - FLOW_SIZE ? x + FLOW_SIZE : w - 1;
+            const int gi = gy * m->grid_w + gx;
 
-        const int dx1 = Y2[y * w + rx] - Y2[y * w + lx];
-        const int dy1 = Y2[dn * w + x] - Y2[up * w + x];
-        const int dx2 = sY[y * w + rx] - sY[y * w + lx];
-        const int dy2 = sY[dn * w + x] - sY[up * w + x];
+            const int dx1 = Y2[y * w + rx] - Y2[y * w + lx];
+            const int dy1 = Y2[dn * w + x] - Y2[up * w + x];
+            const int dx2 = sY[y * w + rx] - sY[y * w + lx];
+            const int dy2 = sY[dn * w + x] - sY[up * w + x];
 
-        m->grid_x1[gi] = (dx1 * gain * envelope) >> 16;
-        m->grid_y1[gi] = (dy1 * gain * envelope) >> 16;
-        m->grid_x2[gi] = (dx2 * gain * envelope) >> 16;
-        m->grid_y2[gi] = (dy2 * gain * envelope) >> 16;
+            m->grid_x1[gi] = (dx1 * gain * envelope) >> 16;
+            m->grid_y1[gi] = (dy1 * gain * envelope) >> 16;
+            m->grid_x2[gi] = (dx2 * gain * envelope) >> 16;
+            m->grid_y2[gi] = (dy2 * gain * envelope) >> 16;
+        }
     }
 
 #pragma omp for schedule(static)
@@ -425,13 +428,11 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp single
-    {
-        veejay_memcpy(m->tmpY, Y, (size_t)size);
-        veejay_memcpy(m->tmpCb, Cb, (size_t)size);
-        veejay_memcpy(m->tmpCr, Cr, (size_t)size);
-    }
+    veejay_memcpy(m->tmpY, Y, (size_t)size);
+    veejay_memcpy(m->tmpCb, Cb, (size_t)size);
+    veejay_memcpy(m->tmpCr, Cr, (size_t)size);
 
+#pragma omp parallel num_threads(m->n_threads)
     {
         if(warp_amt == 0) {
             morphologymixer_blend_plain(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress);
@@ -445,6 +446,5 @@ void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
         else {
             morphologymixer_mode_persistent(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
         }
-    #pragma omp barrier
     }
 }

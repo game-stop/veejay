@@ -36,6 +36,7 @@
 #define ISOLATE_PI    3.14159265358979323846f
 
 typedef struct {
+    int n_threads;
     int last[ISOLATE_PARAMS];
     int mag_fp;
     int cos_q_fp;
@@ -154,6 +155,7 @@ void *isolate_malloc(int w, int h)
     s->inv_range_fp = 255 << 8;
     s->black_clip_fp = 0;
     s->bg_level = 128;
+    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }
@@ -217,10 +219,7 @@ void isolate_apply(void *ptr, VJFrame *frame, int *args)
 {
     isolate_t *s = (isolate_t*) ptr;
 
-#pragma omp single
-    {
-        isolate_update_cache(s, args);
-    }
+    isolate_update_cache(s, args);
 
     const int mag_fp = s->mag_fp;
     const int cos_q_fp = s->cos_q_fp;
@@ -235,7 +234,7 @@ void isolate_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(s->n_threads)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

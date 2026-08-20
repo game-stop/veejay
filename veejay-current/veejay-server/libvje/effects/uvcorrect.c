@@ -47,6 +47,7 @@
 
 typedef struct {
     uint8_t *chrominance;
+    int n_threads;
 
     int valid;
     int last_angle;
@@ -161,6 +162,7 @@ void *uvcorrect_malloc(int w, int h)
         return NULL;
     }
 
+    uv->n_threads = vje_advise_num_threads(w * h);
 
     uv->valid = 0;
     uv->smooth_valid = 0;
@@ -328,26 +330,23 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
     const float slow = 0.118f;
     const float fast = 0.176f;
 
-    #pragma omp single
-    {
-        if(!uv->smooth_valid) {
-            uv->angle_f = (float)angle;
-            uv->center_u_f = (float)center_u;
-            uv->center_v_f = (float)center_v;
-            uv->iu_f = (float)iu_factor;
-            uv->iv_f = (float)iv_factor;
-            uv->chroma_drive_f = (float)chroma_drive;
-            uv->rotate_drive_f = (float)rotate_drive;
-            uv->smooth_valid = 1;
-        } else {
-            uv->angle_f = uvcorrect_smoothf(uv->angle_f, (float)angle, fast);
-            uv->center_u_f = uvcorrect_smoothf(uv->center_u_f, (float)center_u, slow);
-            uv->center_v_f = uvcorrect_smoothf(uv->center_v_f, (float)center_v, slow);
-            uv->iu_f = uvcorrect_smoothf(uv->iu_f, (float)iu_factor, fast * 0.92f);
-            uv->iv_f = uvcorrect_smoothf(uv->iv_f, (float)iv_factor, fast * 0.92f);
-            uv->chroma_drive_f = uvcorrect_smoothf(uv->chroma_drive_f, (float)chroma_drive, fast * 1.08f);
-            uv->rotate_drive_f = uvcorrect_smoothf(uv->rotate_drive_f, (float)rotate_drive, fast * 1.08f);
-        }
+    if(!uv->smooth_valid) {
+        uv->angle_f = (float)angle;
+        uv->center_u_f = (float)center_u;
+        uv->center_v_f = (float)center_v;
+        uv->iu_f = (float)iu_factor;
+        uv->iv_f = (float)iv_factor;
+        uv->chroma_drive_f = (float)chroma_drive;
+        uv->rotate_drive_f = (float)rotate_drive;
+        uv->smooth_valid = 1;
+    } else {
+        uv->angle_f = uvcorrect_smoothf(uv->angle_f, (float)angle, fast);
+        uv->center_u_f = uvcorrect_smoothf(uv->center_u_f, (float)center_u, slow);
+        uv->center_v_f = uvcorrect_smoothf(uv->center_v_f, (float)center_v, slow);
+        uv->iu_f = uvcorrect_smoothf(uv->iu_f, (float)iu_factor, fast * 0.92f);
+        uv->iv_f = uvcorrect_smoothf(uv->iv_f, (float)iv_factor, fast * 0.92f);
+        uv->chroma_drive_f = uvcorrect_smoothf(uv->chroma_drive_f, (float)chroma_drive, fast * 1.08f);
+        uv->rotate_drive_f = uvcorrect_smoothf(uv->rotate_drive_f, (float)rotate_drive, fast * 1.08f);
     }
 
     angle = clampi((int)(uv->angle_f + 0.5f), 1, 360);
@@ -366,6 +365,7 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
 
     const int table_dirty = uvcorrect_table_dirty(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
 
+#pragma omp parallel num_threads(uv->n_threads)
     {
         if(table_dirty)
             uvcorrect_rebuild_table(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
@@ -380,6 +380,5 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
             uv_min,
             uv_max
         );
-    #pragma omp barrier
     }
 }

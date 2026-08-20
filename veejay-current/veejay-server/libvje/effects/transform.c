@@ -35,6 +35,7 @@ typedef struct {
     uint8_t *buf[3];
     int *xmap;
     int *ymap;
+    int n_threads;
     int max_size;
     int w;
     int h;
@@ -163,6 +164,7 @@ void *transform_malloc(int w, int h)
     t->size_drive_state = 0.0f;
     t->drift_phase = 0.0f;
 
+    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }
@@ -218,20 +220,14 @@ void transform_apply(void *ptr, VJFrame *frame, int *args)
 
     const int base_size = transform_clampi(base_size_arg, 1, t->max_size);
 
-#pragma omp single
-    {
-        if(t->size_state < 1.0f)
-            t->size_state = (float)base_size;
-    }
+    if(t->size_state < 1.0f)
+        t->size_state = (float)base_size;
 
     const float size_coef = 0.142f;
     const float phase_coef = 0.170f;
 
-#pragma omp single
-    {
-        t->size_drive_state += ((float)size_drive_arg - t->size_drive_state) * size_coef;
-        t->phase_state += ((float)phase_arg - t->phase_state) * phase_coef;
-    }
+    t->size_drive_state += ((float)size_drive_arg - t->size_drive_state) * size_coef;
+    t->phase_state += ((float)phase_arg - t->phase_state) * phase_coef;
 
     const float size_lane = transform_clampi((int)(t->size_drive_state + 0.5f), 0, 1000) * 0.001f;
     const float headroom = (float)(t->max_size - base_size);
@@ -244,24 +240,18 @@ void transform_apply(void *ptr, VJFrame *frame, int *args)
     else if(size_target > (float)t->max_size)
         size_target = (float)t->max_size;
 
-#pragma omp single
-    {
-        t->size_state += (size_target - t->size_state) * size_coef;
-    }
+    t->size_state += (size_target - t->size_state) * size_coef;
 
     int size = transform_clampi((int)(t->size_state + 0.5f), 1, t->max_size);
 
     const float drift_step = (float)drift_arg * 0.020f;
 
-#pragma omp single
-    {
-        t->drift_phase += drift_step;
+    t->drift_phase += drift_step;
 
-        if(t->drift_phase > 1048576.0f)
-            t->drift_phase -= 1048576.0f;
-        else if(t->drift_phase < -1048576.0f)
-            t->drift_phase += 1048576.0f;
-    }
+    if(t->drift_phase > 1048576.0f)
+        t->drift_phase -= 1048576.0f;
+    else if(t->drift_phase < -1048576.0f)
+        t->drift_phase += 1048576.0f;
 
     const int manual_phase = (int)((t->phase_state * (float)(size * 2)) * 0.001f + 0.5f);
     const int drift_phase = (int)t->drift_phase;
@@ -276,17 +266,14 @@ void transform_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcCb = t->buf[1];
     uint8_t *restrict srcCr = t->buf[2];
 
-#pragma omp single
-    {
-        veejay_memcpy(srcY,  Y,  len);
-        veejay_memcpy(srcCb, Cb, len);
-        veejay_memcpy(srcCr, Cr, len);
+    veejay_memcpy(srcY,  Y,  len);
+    veejay_memcpy(srcCb, Cb, len);
+    veejay_memcpy(srcCr, Cr, len);
 
-        transform_build_map(t->xmap, width, size, phase_x);
-        transform_build_map(t->ymap, height, size, phase_y);
-    }
+    transform_build_map(t->xmap, width, size, phase_x);
+    transform_build_map(t->ymap, height, size, phase_y);
 
-#pragma omp for schedule(static)
+#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const int sy = t->ymap[y] * width;

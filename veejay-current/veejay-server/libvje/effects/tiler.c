@@ -32,6 +32,7 @@
 
 typedef struct {
     uint8_t *buf[3];
+    int n_threads;
 
     float tiles_s;
     float phase_x_s;
@@ -170,6 +171,7 @@ void *tiler_malloc(int w, int h)
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
+    s->n_threads = vje_advise_num_threads(len);
 
     s->tiles_s = 2.0f;
     s->phase_x_s = 0.0f;
@@ -210,43 +212,20 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     const float fast_a = 0.34f;
     const float slow_r = 0.085f;
 
-    #pragma omp single
-    {
-        if(!s->initialized) {
-            s->tiles_s = (float)tiles_arg;
-            s->phase_x_s = (float)phase_x_arg;
-            s->phase_y_s = (float)phase_y_arg;
-            s->drift_s = (float)drift_arg;
-            s->opacity_s = (float)opacity_arg;
-            s->initialized = 1;
-        }
+    if(!s->initialized) {
+        s->tiles_s = (float)tiles_arg;
+        s->phase_x_s = (float)phase_x_arg;
+        s->phase_y_s = (float)phase_y_arg;
+        s->drift_s = (float)drift_arg;
+        s->opacity_s = (float)opacity_arg;
+        s->initialized = 1;
     }
 
-    int tiles;
-    #pragma omp single copyprivate(tiles)
-    {
-        tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
-    }
-    int phase_x;
-    #pragma omp single copyprivate(phase_x)
-    {
-        phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
-    }
-    int phase_y;
-    #pragma omp single copyprivate(phase_y)
-    {
-        phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
-    }
-    int drift;
-    #pragma omp single copyprivate(drift)
-    {
-        drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
-    }
-    int opacity;
-    #pragma omp single copyprivate(opacity)
-    {
-        opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
-    }
+    int tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
+    int phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
+    int phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
+    int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
+    int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
 
     tiles = tiler_clampi(tiles, 2, max_tiles);
     phase_x = tiler_clampi(phase_x, 0, 1000);
@@ -254,12 +233,9 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     drift = tiler_clampi(drift, -1000, 1000);
     opacity = tiler_clampi(opacity, 0, 255);
 
-    #pragma omp single
-    {
-        s->drift_phase += (float)drift * 0.018f;
-        if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
-            s->drift_phase = 0.0f;
-    }
+    s->drift_phase += (float)drift * 0.018f;
+    if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
+        s->drift_phase = 0.0f;
 
     if(opacity <= 0)
         return;
@@ -277,6 +253,7 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
+#pragma omp parallel num_threads(s->n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 0; y < small_h; y++) {
@@ -332,6 +309,5 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-    #pragma omp barrier
     }
 }
