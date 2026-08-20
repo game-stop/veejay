@@ -13,7 +13,7 @@ AM_CPPFLAGS += -I /usr/X11R6/include \
 		-I$(top_srcdir)/libvjlzo \
 		-I$(top_srcdir)/libvjmsg \
 		-I$(top_srcdir)/libvjnet \
-		-I$(top_scrdir)/libyuv \
+		-I$(top_srcdir)/libyuv \
 		-I$(top_srcdir)/libvevo \
 		$(LIBAVFORMAT_CFLAGS) $(LIBAVCODEC_CFLAGS) $(LIBAVUTIL_CFLAGS) $(LIBSWSCALE_CFLAGS) $(GLIB_CFLAGS) \
 		$(PTHREAD_CFLAGS) 
