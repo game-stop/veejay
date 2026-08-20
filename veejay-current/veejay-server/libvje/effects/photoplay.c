@@ -307,74 +307,54 @@ void photoplay_apply(void *ptr, VJFrame *frame, int *args)
     const int size = clampi(args[P_GRID_SIZE], 2, max_grid);
     const int delay = args[P_FRAME_DELAY];
     const int mode = clampi(args[P_MODE], 0, pp_mode_max());
-    int ready;
-    int capture_index;
 
-    #pragma omp single copyprivate(ready, capture_index)
-    {
-        ready = 1;
-        capture_index = -1;
+    if((size * size) != p->num_photos || p->grid_size != size) {
+        if(!prepare_filmstrip(p, size, width, height))
+            return;
 
-        if((size * size) != p->num_photos || p->grid_size != size) {
-            ready = prepare_filmstrip(p, size, width, height);
-
-            if(ready)
-                photoplay_reset_order(p, mode);
-        }
-        else if(p->last_mode != mode) {
-            photoplay_reset_order(p, mode);
-        }
-
-        if(ready) {
-            if(p->frame_delay > 0)
-                p->frame_delay--;
-
-            if(p->frame_delay == 0) {
-                capture_index = p->frame_counter % p->num_photos;
-                p->frame_delay = delay;
-                p->frame_counter++;
-            }
-        }
+        photoplay_reset_order(p, mode);
+    }
+    else if(p->last_mode != mode) {
+        photoplay_reset_order(p, mode);
     }
 
-    if(!ready)
-        return;
+    if(p->frame_delay > 0)
+        p->frame_delay--;
 
-    if(capture_index >= 0) {
-        #pragma omp for schedule(static)
-        for(int plane = 0; plane < 3; plane++) {
+    if(p->frame_delay == 0) {
+        const int photo_index = p->frame_counter % p->num_photos;
+
+        for(int i = 0; i < 3; i++) {
             take_photo(
                 p,
-                frame->data[plane],
-                p->photo_list[capture_index]->data[plane],
+                frame->data[i],
+                p->photo_list[photo_index]->data[i],
                 width,
                 height,
-                capture_index
+                photo_index
             );
         }
+
+        p->frame_delay = delay;
+        p->frame_counter++;
     }
 
     matrix_f matrix_placement = mode == 0 ? get_matrix_func(0) : get_matrix_func(mode - 1);
-    uint8_t *restrict dst[3] = { frame->data[0], frame->data[1], frame->data[2] };
-    const int plane_len[3] = { len, uv_len, uv_len };
 
-    #pragma omp for schedule(static)
-    for(int plane = 0; plane < 3; plane++) {
-        veejay_memset(dst[plane], plane == 0 ? pixel_Y_lo_ : 128, plane_len[plane]);
+    uint8_t *restrict dstY = frame->data[0];
+    uint8_t *restrict dstU = frame->data[1];
+    uint8_t *restrict dstV = frame->data[2];
 
-        for(int i = 0; i < p->num_photos; i++) {
-            const int photo_index = p->rt[i];
-            matrix_t m = matrix_placement(i, size, width, height);
+    veejay_memset(dstY, pixel_Y_lo_, len);
+    veejay_memset(dstU, 128, uv_len);
+    veejay_memset(dstV, 128, uv_len);
 
-            put_photo(
-                p,
-                dst[plane],
-                p->photo_list[photo_index]->data[plane],
-                width,
-                height,
-                photo_index,
-                m
-            );
-        }
+    for(int i = 0; i < p->num_photos; i++) {
+        const int photo_index = p->rt[i];
+        matrix_t m = matrix_placement(i, size, width, height);
+
+        put_photo(p, dstY, p->photo_list[photo_index]->data[0], width, height, photo_index, m);
+        put_photo(p, dstU, p->photo_list[photo_index]->data[1], width, height, photo_index, m);
+        put_photo(p, dstV, p->photo_list[photo_index]->data[2], width, height, photo_index, m);
     }
 }

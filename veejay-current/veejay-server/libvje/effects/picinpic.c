@@ -271,23 +271,12 @@ void picinpic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     src.stride[1] = src.width;
     src.stride[2] = src.width;
 
-    int ready;
-
-    #pragma omp single copyprivate(ready)
-    {
-        ready = 1;
-
-        if(picture->w != view_width || picture->h != view_height ||
-           picture->pixfmt != pixfmt || !picture->frame || !picture->scaler) {
-            ready = picinpic_rebuild(picture, &src, view_width, view_height, pixfmt);
-        }
-
-        if(ready)
-            yuv_convert_and_scale(picture->scaler, &src, picture->frame);
+    if(picture->w != view_width || picture->h != view_height || picture->pixfmt != pixfmt || !picture->frame || !picture->scaler) {
+        if(!picinpic_rebuild(picture, &src, view_width, view_height, pixfmt))
+            return;
     }
 
-    if(!ready)
-        return;
+    yuv_convert_and_scale(picture->scaler, &src, picture->frame);
 
     const uint8_t *restrict sY = picture->frame->data[0];
     const uint8_t *restrict sCb = picture->frame->data[1];
@@ -297,7 +286,6 @@ void picinpic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict dCb = frame->data[1];
     uint8_t *restrict dCr = frame->data[2];
 
-    #pragma omp for schedule(static)
     for(int y = 0; y < view_height; y++) {
         const int dst_off = (dy + y) * width + dx;
         const int src_off = y * view_width;
