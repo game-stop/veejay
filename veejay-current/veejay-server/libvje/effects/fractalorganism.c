@@ -26,6 +26,8 @@
 #define FR_TRIG_LUT_MASK 1023
 #define FR_TWO_PI 6.28318530718f
 #define FR_INV_TWO_PI 0.15915494309f
+#define FR_LUT_SCALE 162.974661726f
+#define FR_BLUR_TILE 32
 
 #define P_ZOOM        0
 #define P_DENSITY     1
@@ -52,6 +54,8 @@ typedef struct {
     uint8_t *tmp;
     float sin_lut[FR_TRIG_LUT_SIZE];
     float cos_lut[FR_TRIG_LUT_SIZE];
+    float spectral_u[FR_TRIG_LUT_SIZE];
+    float spectral_v[FR_TRIG_LUT_SIZE];
     float phase;
     float orbit;
 } fractalorganism_t;
@@ -69,6 +73,17 @@ static inline float fb_clampf(float v, float lo, float hi)
 static inline float fb_absf(float x)
 {
     return x < 0.0f ? -x : x;
+}
+
+static inline float fb_fast_log2(float x)
+{
+    union {
+        float f;
+        uint32_t u;
+    } v;
+
+    v.f = x;
+    return (float) v.u * 1.1920928955078125e-7f - 127.0f;
 }
 
 static inline float fb_smooth01(float x)
@@ -92,48 +107,19 @@ static inline float fb_wrap_2pi(float v)
 
 static inline float fb_lut_sin(const fractalorganism_t *t, float phase)
 {
-    float fidx = phase * ((float) FR_TRIG_LUT_SIZE * FR_INV_TWO_PI);
-    int idx0 = (int) fidx;
-    float frac;
-    int i0;
-    int i1;
-
-    if (fidx < 0.0f && (float) idx0 != fidx)
-        idx0--;
-
-    frac = fidx - (float) idx0;
-    i0 = idx0 & FR_TRIG_LUT_MASK;
-    i1 = (i0 + 1) & FR_TRIG_LUT_MASK;
-    return t->sin_lut[i0] + (t->sin_lut[i1] - t->sin_lut[i0]) * frac;
+    return t->sin_lut[((int) (phase * FR_LUT_SCALE)) & FR_TRIG_LUT_MASK];
 }
 
 static inline float fb_lut_cos(const fractalorganism_t *t, float phase)
 {
-    float fidx = phase * ((float) FR_TRIG_LUT_SIZE * FR_INV_TWO_PI);
-    int idx0 = (int) fidx;
-    float frac;
-    int i0;
-    int i1;
-
-    if (fidx < 0.0f && (float) idx0 != fidx)
-        idx0--;
-
-    frac = fidx - (float) idx0;
-    i0 = idx0 & FR_TRIG_LUT_MASK;
-    i1 = (i0 + 1) & FR_TRIG_LUT_MASK;
-    return t->cos_lut[i0] + (t->cos_lut[i1] - t->cos_lut[i0]) * frac;
+    return t->cos_lut[((int) (phase * FR_LUT_SCALE)) & FR_TRIG_LUT_MASK];
 }
 
-static inline void fb_spectral_uv(float phase, float *u, float *v)
+static inline void fb_spectral_uv(const fractalorganism_t *t, float phase, float *u, float *v)
 {
-    float h = fb_wrap_2pi(phase) * 0.15915494309f;
-    float h6 = h * 6.0f;
-    float r = fb_clampf(fb_absf(h6 - 3.0f) - 1.0f, 0.0f, 1.0f);
-    float g = fb_clampf(2.0f - fb_absf(h6 - 2.0f), 0.0f, 1.0f);
-    float b = fb_clampf(2.0f - fb_absf(h6 - 4.0f), 0.0f, 1.0f);
-
-    *u = (-0.168736f * r - 0.331264f * g + 0.500000f * b) * 2.0f;
-    *v = ( 0.500000f * r - 0.418688f * g - 0.081312f * b) * 2.0f;
+    int i = ((int) (phase * FR_LUT_SCALE)) & FR_TRIG_LUT_MASK;
+    *u = t->spectral_u[i];
+    *v = t->spectral_v[i];
 }
 
 static inline float fb_time_step(int speed)
@@ -186,25 +172,40 @@ static void fb_box_blur(
     }
 
 #pragma omp for schedule(static)
-    for (int x = 0; x < w; x++) {
-        int sum = tmp[x] * (radius + 1);
-        int yy;
+    for (int xb = 0; xb < w; xb += FR_BLUR_TILE) {
+        int sums[FR_BLUR_TILE];
+        int count = w - xb;
 
-        for (yy = 1; yy <= radius; yy++) {
-            int sy = yy < h ? yy : h - 1;
-            sum += tmp[sy * w + x];
+        if (count > FR_BLUR_TILE)
+            count = FR_BLUR_TILE;
+
+        for (int k = 0; k < count; k++) {
+            int x = xb + k;
+            int sum = tmp[x] * (radius + 1);
+
+            for (int yy = 1; yy <= radius; yy++) {
+                int sy = yy < h ? yy : h - 1;
+                sum += tmp[sy * w + x];
+            }
+            sums[k] = sum;
         }
 
-        for (yy = 0; yy < h; yy++) {
-            int suby = yy - radius;
+        for (int yy = 0; yy < h; yy++) {
+            int suby = yy > radius ? yy - radius : 0;
             int addy = yy + radius + 1;
+            int outrow = yy * w + xb;
+            int subrow;
+            int addrow;
 
-            dst[yy * w + x] = (uint8_t) ((sum * recip + 32768) >> 16);
-            if (suby < 0)
-                suby = 0;
             if (addy >= h)
                 addy = h - 1;
-            sum += tmp[addy * w + x] - tmp[suby * w + x];
+            subrow = suby * w + xb;
+            addrow = addy * w + xb;
+
+            for (int k = 0; k < count; k++) {
+                dst[outrow + k] = (uint8_t) ((sums[k] * recip + 32768) >> 16);
+                sums[k] += tmp[addrow + k] - tmp[subrow + k];
+            }
         }
     }
 }
@@ -247,29 +248,11 @@ static inline void fb_sample_bilinear_y(
 
     x0 = (int) fx;
     y0 = (int) fy;
-    if (fx < 0.0f && (float) x0 != fx)
-        x0--;
-    if (fy < 0.0f && (float) y0 != fy)
-        y0--;
-
     x1 = x0 + 1;
     y1 = y0 + 1;
-
-    if (x0 < 0)
-        x0 = 0;
-    else if (x0 >= w)
-        x0 = w - 1;
-    if (y0 < 0)
-        y0 = 0;
-    else if (y0 >= h)
-        y0 = h - 1;
-    if (x1 < 0)
-        x1 = 0;
-    else if (x1 >= w)
+    if (x1 >= w)
         x1 = w - 1;
-    if (y1 < 0)
-        y1 = 0;
-    else if (y1 >= h)
+    if (y1 >= h)
         y1 = h - 1;
 
     wx = (int) ((fx - (float) x0) * 256.0f);
@@ -318,7 +301,7 @@ static inline void fb_fractal_scalar(
         float mag2 = zr * zr + zi * zi;
         if (mag2 < 1.0f)
             mag2 = 1.0f;
-        mu = ((float) iter + 1.0f - log2f(0.5f * log2f(mag2))) / (float) max_iter;
+        mu = ((float) iter + 1.0f - fb_fast_log2(0.5f * fb_fast_log2(mag2))) / (float) max_iter;
     }
     else {
         mu = 1.0f;
@@ -342,8 +325,8 @@ static inline void fb_fractal_auto(
 ) {
     float zr[FB_AUTO_BLOCK];
     float zi[FB_AUTO_BLOCK];
-    float iterf[FB_AUTO_BLOCK];
-    float active[FB_AUTO_BLOCK];
+    int iter_count[FB_AUTO_BLOCK];
+    int active[FB_AUTO_BLOCK];
     int k;
     int iter;
 
@@ -351,21 +334,21 @@ static inline void fb_fractal_auto(
     for (k = 0; k < n; k++) {
         zr[k] = x0[k];
         zi[k] = y0[k];
-        iterf[k] = 0.0f;
-        active[k] = 1.0f;
+        iter_count[k] = 0;
+        active[k] = 1;
     }
 
     for (iter = 0; iter < max_iter; iter++) {
         int any = 0;
 
-#pragma omp simd reduction(+:any)
+#pragma omp simd reduction(|:any)
         for (k = 0; k < n; k++) {
             float zrk = zr[k];
             float zik = zi[k];
             float zr2 = zrk * zrk;
             float zi2 = zik * zik;
             float mag2 = zr2 + zi2;
-            int step = (active[k] > 0.5f) && (mag2 <= 16.0f);
+            int step = active[k] && (mag2 <= 16.0f);
             float prod = zrk * zik;
             float nzr = zr2 - zi2 + cr;
             float nzi = prod + prod + ci;
@@ -373,10 +356,10 @@ static inline void fb_fractal_auto(
             if (step) {
                 zr[k] = nzr;
                 zi[k] = nzi;
-                iterf[k] += 1.0f;
+                iter_count[k]++;
             }
-            active[k] = step ? 1.0f : 0.0f;
-            any += step;
+            active[k] = step;
+            any |= step;
         }
 
         if (any == 0)
@@ -386,14 +369,16 @@ static inline void fb_fractal_auto(
     for (k = 0; k < n; k++) {
         float smooth;
 
-        if (iterf[k] >= (float) max_iter - 0.5f) {
+        if (iter_count[k] >= max_iter) {
             smooth = 1.0f;
         }
         else {
             float mag2 = zr[k] * zr[k] + zi[k] * zi[k];
             if (mag2 < 16.0f)
                 mag2 = 16.0f;
-            smooth = (iterf[k] + 1.0f - log2f(0.5f * log2f(mag2))) * (1.0f / (float) max_iter);
+            smooth = ((float) iter_count[k] + 1.0f
+                   - fb_fast_log2(0.5f * fb_fast_log2(mag2)))
+                   * (1.0f / (float) max_iter);
         }
 
         mu[k] = fb_clampf(smooth, 0.0f, 1.0f);
@@ -425,6 +410,7 @@ static inline void fb_render_organism_pixel(
     float mu,
     float zr,
     float zi,
+    float lod,
     float density,
     float warp,
     float facet,
@@ -432,15 +418,12 @@ static inline void fb_render_organism_pixel(
     float mix_gain,
     float chroma_gain,
     float pulse,
-    float pulse_wave,
-    float base_step
+    float pulse_wave
 ) {
     const int w = t->w;
     const int h = t->h;
     const int i = y * w + x;
     float subject = (float) mask_blur[i] * (1.0f / 255.0f);
-    float detail = (float) t->mask[i] * (1.0f / 255.0f);
-    float lod = fb_lod_from_footprint(base_step, warp, detail, density);
     float freq = 1.0f - lod * 0.58f;
     float escape = fb_smooth01(mu);
     float tendril_phase = (x0 * 1.72f + y0 * 2.18f)
@@ -467,8 +450,9 @@ static inline void fb_render_organism_pixel(
     float local_mesh = mesh * colonize;
     float chew = fb_clampf(local_mesh * (0.35f + 0.65f * mix_gain) + silhouette * 0.10f * mix_gain, 0.0f, 1.0f);
     float zden = 1.0f + fb_absf(zr) + fb_absf(zi);
-    float zx = zr / zden;
-    float zy = zi / zden;
+    float inv_zden = 1.0f / zden;
+    float zx = zr * inv_zden;
+    float zy = zi * inv_zden;
     float fine_w = 1.0f - lod;
     float flowx = fb_lut_sin(t, y0 * density * 0.30f * freq + x0 * 0.42f + t->phase * 0.58f);
     float flowy = fb_lut_cos(t, x0 * density * 0.28f * freq - y0 * 0.38f + t->orbit * 0.54f);
@@ -508,7 +492,7 @@ static inline void fb_render_organism_pixel(
     outy = fb_clampi(outy, 0, 255);
 
     charge = (int) (local_mesh * chroma_gain * 76.0f * (0.35f + 0.65f * pulse_wave));
-    fb_spectral_uv(color_phase, &cu, &cv);
+    fb_spectral_uv(t, color_phase, &cu, &cv);
     outu = fb_clampi(suv + (int) (cu * (float) charge * 0.58f), 0, 255);
     outv = fb_clampi(svv + (int) (cv * (float) charge * 0.58f), 0, 255);
 
@@ -642,8 +626,15 @@ void *fractalorganism_malloc(int w, int h)
 
     for (i = 0; i < FR_TRIG_LUT_SIZE; i++) {
         float a = FR_TWO_PI * ((float) i / (float) FR_TRIG_LUT_SIZE);
+        float h6 = (float) i * (6.0f / (float) FR_TRIG_LUT_SIZE);
+        float r = fb_clampf(fb_absf(h6 - 3.0f) - 1.0f, 0.0f, 1.0f);
+        float g = fb_clampf(2.0f - fb_absf(h6 - 2.0f), 0.0f, 1.0f);
+        float b = fb_clampf(2.0f - fb_absf(h6 - 4.0f), 0.0f, 1.0f);
+
         t->sin_lut[i] = sinf(a);
         t->cos_lut[i] = cosf(a);
+        t->spectral_u[i] = (-0.168736f * r - 0.331264f * g + 0.500000f * b) * 2.0f;
+        t->spectral_v[i] = ( 0.500000f * r - 0.418688f * g - 0.081312f * b) * 2.0f;
     }
 
     return (void *) t;
@@ -679,7 +670,7 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
     const float invw = 1.0f / (float) w;
     const float invh = 1.0f / (float) h;
     const float min_dim = (float) (w < h ? w : h);
-    int len = frame->len;
+    const int len = t->len;
     int zoom_i = args[P_ZOOM];
     int density_i = args[P_DENSITY];
     int iter_i = args[P_ITER];
@@ -705,9 +696,6 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
     int blur_r;
     int yy;
 
-    if (len <= 0 || len > t->len)
-        len = t->len;
-
 #pragma omp single
     {
         veejay_memcpy(src_y, Y, len);
@@ -725,8 +713,11 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
 
         for (xx = 0; xx < w; xx++) {
             int i = row + xx;
-            int detail = (int) fb_absf((float) src_y[i] - (float) coarse[i]);
+            int detail = (int) src_y[i] - (int) coarse[i];
             int bright = src_y[i] > 138 ? src_y[i] - 138 : 0;
+
+            if (detail < 0)
+                detail = -detail;
             int activity = detail * 5 + bright * 4;
             mask[i] = (uint8_t) fb_clampi(activity, 0, 255);
         }
@@ -770,6 +761,7 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
             float mu[FB_AUTO_BLOCK];
             float zr[FB_AUTO_BLOCK];
             float zi[FB_AUTO_BLOCK];
+            float lodv[FB_AUTO_BLOCK];
             int k;
 
             for (k = 0; k < FB_AUTO_BLOCK; k++) {
@@ -781,6 +773,8 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
                 float lod = fb_lod_from_footprint(base_step, warp, detail, density);
                 float source = srcn + (blrn - srcn) * (0.38f + 0.62f * lod);
                 float subject = (float) blur[i] * (1.0f / 255.0f);
+
+                lodv[k] = lod;
 
                 x0[k] = xn + source * warp * (0.16f + subject * 0.60f)
                       + blrn * warp * 0.12f
@@ -794,9 +788,9 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
 
             for (k = 0; k < FB_AUTO_BLOCK; k++) {
                 fb_render_organism_pixel(t, Y, U, V, src_y, src_u, src_v, blur,
-                    xx + k, yy, x0[k], y0[k], mu[k], zr[k], zi[k], density,
-                    warp, facet, silhouette_gain, mix_gain, chroma_gain,
-                    pulse, pulse_wave, base_step);
+                    xx + k, yy, x0[k], y0[k], mu[k], zr[k], zi[k], lodv[k],
+                    density, warp, facet, silhouette_gain, mix_gain,
+                    chroma_gain, pulse, pulse_wave);
             }
         }
 
@@ -821,9 +815,8 @@ void fractalorganism_apply(void *ptr, VJFrame *frame, int *args)
 
             fb_fractal_scalar(x0, y0, c_re, c_im, iter_i, &mu, &zr, &zi);
             fb_render_organism_pixel(t, Y, U, V, src_y, src_u, src_v, blur,
-                xx, yy, x0, y0, mu, zr, zi, density, warp, facet,
-                silhouette_gain, mix_gain, chroma_gain, pulse, pulse_wave, base_step);
+                xx, yy, x0, y0, mu, zr, zi, lod, density, warp, facet,
+                silhouette_gain, mix_gain, chroma_gain, pulse, pulse_wave);
         }
     }
 }
-

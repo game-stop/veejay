@@ -26,6 +26,8 @@
 #define SS_LUT_MASK 1023
 #define SS_TWO_PI 6.28318530718f
 #define SS_INV_TWO_PI 0.15915494309f
+#define SS_LUT_SCALE 162.974661726f
+#define SS_INV_SIZE 511
 
 #define P_DIFFUSION  0
 #define P_SHOCK      1
@@ -49,6 +51,7 @@ typedef struct {
     uint8_t *field[2];
     float sin_lut[SS_LUT_SIZE];
     float cos_lut[SS_LUT_SIZE];
+    float inv_sum[SS_INV_SIZE];
     float phase;
 } shocksilk_t;
 
@@ -87,36 +90,12 @@ static inline float ss_wrap(float v)
 
 static inline float ss_lut_sin(const shocksilk_t *t, float phase)
 {
-    float fidx = phase * ((float) SS_LUT_SIZE * SS_INV_TWO_PI);
-    int idx0 = (int) fidx;
-    float frac;
-    int i0;
-    int i1;
-
-    if (fidx < 0.0f && (float) idx0 != fidx)
-        idx0--;
-
-    frac = fidx - (float) idx0;
-    i0 = idx0 & SS_LUT_MASK;
-    i1 = (i0 + 1) & SS_LUT_MASK;
-    return t->sin_lut[i0] + (t->sin_lut[i1] - t->sin_lut[i0]) * frac;
+    return t->sin_lut[((int) (phase * SS_LUT_SCALE)) & SS_LUT_MASK];
 }
 
 static inline float ss_lut_cos(const shocksilk_t *t, float phase)
 {
-    float fidx = phase * ((float) SS_LUT_SIZE * SS_INV_TWO_PI);
-    int idx0 = (int) fidx;
-    float frac;
-    int i0;
-    int i1;
-
-    if (fidx < 0.0f && (float) idx0 != fidx)
-        idx0--;
-
-    frac = fidx - (float) idx0;
-    i0 = idx0 & SS_LUT_MASK;
-    i1 = (i0 + 1) & SS_LUT_MASK;
-    return t->cos_lut[i0] + (t->cos_lut[i1] - t->cos_lut[i0]) * frac;
+    return t->cos_lut[((int) (phase * SS_LUT_SCALE)) & SS_LUT_MASK];
 }
 
 static inline float ss_time_step(int speed)
@@ -201,6 +180,69 @@ static inline void ss_sample_yuv(
     p00 = ny * w + nx;
     *ou = U[p00];
     *ov = V[p00];
+}
+
+static inline uint8_t ss_pde_pixel(
+    int c,
+    int l,
+    int r,
+    int u,
+    int d,
+    int ul,
+    int ur,
+    int dl,
+    int dr,
+    int diffusion,
+    int shock,
+    int coherence
+) {
+    int gx = r - l;
+    int gy = d - u;
+    int ax = ss_abs(gx);
+    int ay = ss_abs(gy);
+    int tangent_avg;
+    int iso = ((l + r + u + d + 2) >> 2) - c;
+    int lap = l + r + u + d - (c << 2);
+    int grad = ss_clampi(ax + ay, 0, 255);
+    int diff_term;
+    int shock_term;
+
+    if (ax > (ay << 1))
+        tangent_avg = ((u + d + 1) >> 1) - c;
+    else if (ay > (ax << 1))
+        tangent_avg = ((l + r + 1) >> 1) - c;
+    else if ((gx ^ gy) >= 0)
+        tangent_avg = ((ur + dl + 1) >> 1) - c;
+    else
+        tangent_avg = ((ul + dr + 1) >> 1) - c;
+
+    diff_term = (tangent_avg * coherence + iso * (100 - coherence)) / 100;
+    diff_term = (diff_term * diffusion) / 118;
+
+    if (lap > 0)
+        shock_term = -(grad * shock) / 170;
+    else if (lap < 0)
+        shock_term = (grad * shock) / 170;
+    else
+        shock_term = 0;
+
+    return (uint8_t) ss_clampi(c + diff_term + shock_term, 0, 255);
+}
+
+static inline uint8_t ss_activity_pixel(
+    int center,
+    int left,
+    int right,
+    int up,
+    int down,
+    int source
+) {
+    int grad = ss_clampi(ss_abs(right - left) + ss_abs(down - up), 0, 255);
+    int delta = ss_abs(center - source);
+    int ridge = (delta > 2 ? (delta - 2) * 9 : 0)
+              + (grad > 52 ? (grad - 52) >> 1 : 0);
+
+    return (uint8_t) ss_clampi(ridge, 0, 255);
 }
 
 vj_effect *shocksilk_init(int w, int h)
@@ -295,6 +337,9 @@ void *shocksilk_malloc(int w, int h)
         t->cos_lut[i] = cosf(a);
     }
 
+    for (int i = 0; i < SS_INV_SIZE; i++)
+        t->inv_sum[i] = 1.0f / (float) (i + 1);
+
     return t;
 }
 
@@ -331,6 +376,14 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
     const int mix = args[P_MIX];
     int cur = 0;
 
+    if (mix == 0 || (flow == 0 && twist == 0 && ridges == 0 && chroma == 0)) {
+#pragma omp single
+        {
+            t->phase = ss_wrap(t->phase + ss_time_step(args[P_SPEED]));
+        }
+        return;
+    }
+
 #pragma omp single
     {
         veejay_memcpy(src_y, Y, len);
@@ -346,11 +399,32 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
         int rowm = ym * w;
         int rowp = yp * w;
 
-        for (int x = 0; x < w; x++) {
-            int xm = x > 0 ? x - 1 : 0;
-            int xp = x + 1 < w ? x + 1 : w - 1;
-            int i = row + x;
-            t->field[0][i] = (uint8_t) (((int) src_y[i] * 4 + src_y[row + xm] + src_y[row + xp] + src_y[rowm + x] + src_y[rowp + x] + 4) >> 3);
+        if (y > 0 && y + 1 < h) {
+            int i = row;
+
+            t->field[0][i] = (uint8_t) (((int) src_y[i] * 5 + src_y[i + 1]
+                + src_y[rowm] + src_y[rowp] + 4) >> 3);
+
+            for (int x = 1; x < w - 1; x++) {
+                i = row + x;
+                t->field[0][i] = (uint8_t) (((int) src_y[i] * 4
+                    + src_y[i - 1] + src_y[i + 1]
+                    + src_y[rowm + x] + src_y[rowp + x] + 4) >> 3);
+            }
+
+            i = row + w - 1;
+            t->field[0][i] = (uint8_t) (((int) src_y[i] * 5 + src_y[i - 1]
+                + src_y[rowm + w - 1] + src_y[rowp + w - 1] + 4) >> 3);
+        }
+        else {
+            for (int x = 0; x < w; x++) {
+                int xm = x > 0 ? x - 1 : 0;
+                int xp = x + 1 < w ? x + 1 : w - 1;
+                int i = row + x;
+                t->field[0][i] = (uint8_t) (((int) src_y[i] * 4
+                    + src_y[row + xm] + src_y[row + xp]
+                    + src_y[rowm + x] + src_y[rowp + x] + 4) >> 3);
+            }
         }
     }
 
@@ -366,52 +440,38 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
             int rowm = ym * w;
             int rowp = yp * w;
 
-            for (int x = 0; x < w; x++) {
-                int xm = x > 0 ? x - 1 : 0;
-                int xp = x + 1 < w ? x + 1 : w - 1;
-                int i = row + x;
-                int c = in[i];
-                int l = in[row + xm];
-                int r = in[row + xp];
-                int u = in[rowm + x];
-                int d = in[rowp + x];
-                int ul = in[rowm + xm];
-                int ur = in[rowm + xp];
-                int dl = in[rowp + xm];
-                int dr = in[rowp + xp];
-                int gx = r - l;
-                int gy = d - u;
-                int ax = ss_abs(gx);
-                int ay = ss_abs(gy);
-                int tangent_avg;
-                int iso = ((l + r + u + d + 2) >> 2) - c;
-                int lap = l + r + u + d - (c << 2);
-                int grad = ss_clampi(ax + ay, 0, 255);
-                int diff_term;
-                int shock_term;
-                int value;
+            if (y > 0 && y + 1 < h) {
+                int i = row;
 
-                if (ax > (ay << 1))
-                    tangent_avg = ((u + d + 1) >> 1) - c;
-                else if (ay > (ax << 1))
-                    tangent_avg = ((l + r + 1) >> 1) - c;
-                else if ((gx ^ gy) >= 0)
-                    tangent_avg = ((ur + dl + 1) >> 1) - c;
-                else
-                    tangent_avg = ((ul + dr + 1) >> 1) - c;
+                out[i] = ss_pde_pixel(in[i], in[i], in[i + 1],
+                    in[rowm], in[rowp], in[rowm], in[rowm + 1],
+                    in[rowp], in[rowp + 1], diffusion, shock, coherence);
 
-                diff_term = (tangent_avg * coherence + iso * (100 - coherence)) / 100;
-                diff_term = (diff_term * diffusion) / 118;
+                for (int x = 1; x < w - 1; x++) {
+                    i = row + x;
+                    out[i] = ss_pde_pixel(in[i], in[i - 1], in[i + 1],
+                        in[rowm + x], in[rowp + x], in[rowm + x - 1],
+                        in[rowm + x + 1], in[rowp + x - 1], in[rowp + x + 1],
+                        diffusion, shock, coherence);
+                }
 
-                if (lap > 0)
-                    shock_term = -(grad * shock) / 170;
-                else if (lap < 0)
-                    shock_term = (grad * shock) / 170;
-                else
-                    shock_term = 0;
+                i = row + w - 1;
+                out[i] = ss_pde_pixel(in[i], in[i - 1], in[i],
+                    in[rowm + w - 1], in[rowp + w - 1], in[rowm + w - 2],
+                    in[rowm + w - 1], in[rowp + w - 2], in[rowp + w - 1],
+                    diffusion, shock, coherence);
+            }
+            else {
+                for (int x = 0; x < w; x++) {
+                    int xm = x > 0 ? x - 1 : 0;
+                    int xp = x + 1 < w ? x + 1 : w - 1;
+                    int i = row + x;
 
-                value = c + diff_term + shock_term;
-                out[i] = (uint8_t) ss_clampi(value, 0, 255);
+                    out[i] = ss_pde_pixel(in[i], in[row + xm], in[row + xp],
+                        in[rowm + x], in[rowp + x], in[rowm + xm],
+                        in[rowm + xp], in[rowp + xm], in[rowp + xp],
+                        diffusion, shock, coherence);
+                }
             }
         }
 
@@ -435,16 +495,26 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
             int rowm = ym * w;
             int rowp = yp * w;
 
-            for (int x = 0; x < w; x++) {
+            for (int x = 0; x < 3; x++) {
                 int xm = x > 2 ? x - 3 : 0;
-                int xp = x + 3 < w ? x + 3 : w - 1;
+                int xp = x + 3;
                 int i = row + x;
-                int gx = (int) field[row + xp] - (int) field[row + xm];
-                int gy = (int) field[rowp + x] - (int) field[rowm + x];
-                int grad = ss_clampi(ss_abs(gx) + ss_abs(gy), 0, 255);
-                int delta = ss_abs((int) field[i] - (int) src_y[i]);
-                int ridge = (delta > 2 ? (delta - 2) * 9 : 0) + (grad > 52 ? (grad - 52) >> 1 : 0);
-                activity_map[i] = (uint8_t) ss_clampi(ridge, 0, 255);
+                activity_map[i] = ss_activity_pixel(field[i], field[row + xm],
+                    field[row + xp], field[rowm + x], field[rowp + x], src_y[i]);
+            }
+
+            for (int x = 3; x < w - 3; x++) {
+                int i = row + x;
+                activity_map[i] = ss_activity_pixel(field[i], field[i - 3],
+                    field[i + 3], field[rowm + x], field[rowp + x], src_y[i]);
+            }
+
+            for (int x = w - 3; x < w; x++) {
+                int xm = x - 3;
+                int xp = w - 1;
+                int i = row + x;
+                activity_map[i] = ss_activity_pixel(field[i], field[row + xm],
+                    field[row + xp], field[rowm + x], field[rowp + x], src_y[i]);
             }
         }
         const float flow_abs = (float) ss_abs(flow);
@@ -453,7 +523,8 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
         const float twist_gain = (twist < 0 ? -1.0f : 1.0f) * twist_abs * (0.00012f + 0.0000020f * twist_abs);
         const float ridge_gain = (float) ridges * 0.01f;
         const float chroma_gain = (float) chroma * 0.01f;
-        const float mix_gain = (float) mix * 0.01f;
+        const int mix256 = (mix * 256 + 50) / 100;
+        const float min_dim = (float) (w < h ? w : h);
         const float phase = t->phase;
 
 #pragma omp for schedule(static)
@@ -463,6 +534,14 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
             int row = y * w;
             int rowm = ym * w;
             int rowp = yp * w;
+            int r2u = y > 1 ? y - 2 : 0;
+            int r2d = y + 2 < h ? y + 2 : h - 1;
+            int r4u = y > 3 ? y - 4 : 0;
+            int r4d = y + 4 < h ? y + 4 : h - 1;
+            int row2u = r2u * w;
+            int row2d = r2d * w;
+            int row4u = r4u * w;
+            int row4d = r4d * w;
 
             for (int x = 0; x < w; x++) {
                 int xm = x > 11 ? x - 12 : 0;
@@ -472,18 +551,14 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
                 int gy = (int) field[rowp + x] - (int) field[rowm + x];
                 int r2l = x > 1 ? x - 2 : 0;
                 int r2r = x + 2 < w ? x + 2 : w - 1;
-                int r2u = y > 1 ? y - 2 : 0;
-                int r2d = y + 2 < h ? y + 2 : h - 1;
                 int r4l = x > 3 ? x - 4 : 0;
                 int r4r = x + 4 < w ? x + 4 : w - 1;
-                int r4u = y > 3 ? y - 4 : 0;
-                int r4d = y + 4 < h ? y + 4 : h - 1;
                 int ridge = ((int) activity_map[i] * 4 +
                              activity_map[row + r2l] + activity_map[row + r2r] +
-                             activity_map[r2u * w + x] + activity_map[r2d * w + x] +
+                             activity_map[row2u + x] + activity_map[row2d + x] +
                              activity_map[row + r4l] + activity_map[row + r4r] +
-                             activity_map[r4u * w + x] + activity_map[r4d * w + x] + 6) / 12;
-                float inv = 1.0f / (float) (ss_abs(gx) + ss_abs(gy) + 1);
+                             activity_map[row4u + x] + activity_map[row4d + x] + 6) / 12;
+                float inv = t->inv_sum[ss_abs(gx) + ss_abs(gy)];
                 float nx = (float) gx * inv;
                 float ny = (float) gy * inv;
                 float tx = -ny;
@@ -492,8 +567,8 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
                 float wave2 = ss_lut_cos(t, phase * 0.73f + (float) x * 0.0011f - (float) y * 0.0017f);
                 float activity = ss_clampf(0.16f + (float) ridge * (1.0f / 360.0f), 0.0f, 1.0f);
                 activity = activity * activity * (3.0f - 2.0f * activity);
-                float along = flow_gain * (float) (w < h ? w : h) * activity * (0.72f + 0.28f * wave);
-                float across = twist_gain * (float) (w < h ? w : h) * activity * wave2;
+                float along = flow_gain * min_dim * activity * (0.72f + 0.28f * wave);
+                float across = twist_gain * min_dim * activity * wave2;
                 float sx = (float) x + tx * along + nx * across;
                 float sy = (float) y + ty * along + ny * across;
                 int syv;
@@ -516,9 +591,12 @@ void shocksilk_apply(void *ptr, VJFrame *frame, int *args)
                 silk_u = ss_clampi(suv + (int) (wave * (float) charge * 0.35f), 0, 255);
                 silk_v = ss_clampi(svv + (int) (wave2 * (float) charge * 0.40f), 0, 255);
 
-                Y[i] = (uint8_t) ss_clampi((int) ((float) src_y[i] + ((float) silk_y - (float) src_y[i]) * mix_gain), 0, 255);
-                U[i] = (uint8_t) ss_clampi((int) ((float) src_u[i] + ((float) silk_u - (float) src_u[i]) * mix_gain), 0, 255);
-                V[i] = (uint8_t) ss_clampi((int) ((float) src_v[i] + ((float) silk_v - (float) src_v[i]) * mix_gain), 0, 255);
+                Y[i] = (uint8_t) ss_clampi((int) src_y[i]
+                    + (((silk_y - (int) src_y[i]) * mix256) >> 8), 0, 255);
+                U[i] = (uint8_t) ss_clampi((int) src_u[i]
+                    + (((silk_u - (int) src_u[i]) * mix256) >> 8), 0, 255);
+                V[i] = (uint8_t) ss_clampi((int) src_v[i]
+                    + (((silk_v - (int) src_v[i]) * mix256) >> 8), 0, 255);
             }
         }
     }
