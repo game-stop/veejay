@@ -32,7 +32,6 @@
 typedef struct {
     int wipe_pos;
     int direction;
-    int n_threads;
 
     float speed_state;
     float expand_state;
@@ -142,7 +141,6 @@ void *transline_malloc(int w, int h)
     wipe->glow_state = 0.0f;
     wipe->state_ready = 0;
 
-    wipe->n_threads = vje_advise_num_threads(w * h);
 
     return wipe;
 }
@@ -180,15 +178,14 @@ static void transline_apply_cross_glow(VJFrame *frame,
                                        int y0,
                                        int y1,
                                        int glow_width,
-                                       int glow_strength,
-                                       int n_threads)
+                                       int glow_strength)
 {
     const int width = frame->width;
     const int height = frame->height;
 
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -256,15 +253,18 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float fast = 0.28f;
 
-    if(!wipe->state_ready) {
-        wipe->speed_state = (float)speed_arg;
-        wipe->expand_state = (float)expand_drive;
-        wipe->glow_state = (float)edge_glow;
-        wipe->state_ready = 1;
-    } else {
-        wipe->speed_state += ((float)speed_arg - wipe->speed_state) * fast;
-        wipe->expand_state += ((float)expand_drive - wipe->expand_state) * (fast * 0.62f);
-        wipe->glow_state += ((float)edge_glow - wipe->glow_state) * (fast * 0.72f);
+#pragma omp single
+    {
+        if(!wipe->state_ready) {
+            wipe->speed_state = (float)speed_arg;
+            wipe->expand_state = (float)expand_drive;
+            wipe->glow_state = (float)edge_glow;
+            wipe->state_ready = 1;
+        } else {
+            wipe->speed_state += ((float)speed_arg - wipe->speed_state) * fast;
+            wipe->expand_state += ((float)expand_drive - wipe->expand_state) * (fast * 0.62f);
+            wipe->glow_state += ((float)edge_glow - wipe->glow_state) * (fast * 0.72f);
+        }
     }
 
     const float expand_t = wipe->expand_state * 0.001f;
@@ -272,7 +272,10 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     int speed = transline_clampi((int)(wipe->speed_state + 0.5f) + (int)(expand_t * (float)(max_speed / 8) + 0.5f), 0, max_speed);
 
     const int max_pos = width;
-    transline_step(wipe, speed, bounce, max_pos);
+#pragma omp single
+    {
+        transline_step(wipe, speed, bounce, max_pos);
+    }
 
     const int center_x = width >> 1;
     const int center_y = height >> 1;
@@ -299,7 +302,7 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     y0 = transline_clampi(y0, 0, height - 1);
     y1 = transline_clampi(y1, 0, height - 1);
 
-#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -322,6 +325,6 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         int glow_strength = (int)(wipe->glow_state * 0.150f + expand_t * 42.0f + 0.5f);
 
         glow_strength = transline_clampi(glow_strength, 0, 210);
-        transline_apply_cross_glow(frame, x0, x1, y0, y1, glow_width, glow_strength, wipe->n_threads);
+        transline_apply_cross_glow(frame, x0, x1, y0, y1, glow_width, glow_strength);
     }
 }

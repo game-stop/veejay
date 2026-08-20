@@ -84,9 +84,7 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
 
     const int scale_y = (luma << 8) / 100;
     const int scale_uv = (chroma << 8) / 100;
-    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel num_threads(n_threads)
     {
         if(mode == 0 || mode == 2)
         {
@@ -109,5 +107,6 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
                 Cr[r] = contrast_u8(cr + 128);
             }
         }
+    #pragma omp barrier
     }
 }

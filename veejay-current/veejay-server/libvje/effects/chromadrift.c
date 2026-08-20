@@ -31,7 +31,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
 
     void *region;
 
@@ -622,7 +621,6 @@ void *chromadrift_malloc(int w, int h)
     e->len = (int) len;
     e->seeded = 0;
     e->frame = 0;
-    e->n_threads = vje_advise_num_threads((int) len);
 
     gridcap = (size_t) (((w + 7) / 8) + 2) * (size_t) (((h + 7) / 8) + 2);
     total = len * 10 + sizeof(float) * gridcap * 3 + 128;
@@ -1164,8 +1162,11 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     U = frame->data[1];
     V = frame->data[2];
 
-    if (!e->seeded)
-        eh_seed(e, frame);
+#pragma omp single
+    {
+        if (!e->seeded)
+            eh_seed(e, frame);
+    }
 
     source_user_i = eh_param1000_to_100(args[P_SOURCE]);
     drift_user_i = eh_param1000_to_100(args[P_DRIFT]);
@@ -1219,13 +1220,19 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     speed_curve = speed_mag * speed_mag * (0.42f + speed_mag * 0.58f);
 
     mature_rate = 0.0008f + build_t * build_t * 0.035f;
-    e->maturity += (1.0f - e->maturity) * mature_rate;
-    if (e->maturity > 1.0f)
-        e->maturity = 1.0f;
+#pragma omp single
+    {
+        e->maturity += (1.0f - e->maturity) * mature_rate;
+        if (e->maturity > 1.0f)
+            e->maturity = 1.0f;
+    }
 
     tone_mix = (int) ((0.055f + glow_t * 0.22f + color_t * 0.055f) * 255.0f + 0.5f);
     tone_mix = eh_clampi(tone_mix, 0, 255);
-    eh_build_luts(e, glow_i, decay_i, density_i, color_i, tone_mix);
+#pragma omp single
+    {
+        eh_build_luts(e, glow_i, decay_i, density_i, color_i, tone_mix);
+    }
 
     src_mix = (0.010f + source_t * source_t * 0.135f + source_t * 0.038f) * (1.0f - trail_t * 0.48f);
     src_mix = eh_clampf(src_mix, 0.0030f, 0.22f);
@@ -1284,8 +1291,11 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     force_update = !((e->frame & 1) && speed_mag < 0.62f && drift_i < 70 && contour_i < 84 && pull_i < 84);
 
     phase_step = (0.0012f + speed_curve * 0.025f + contour_t * 0.004f) * (speed_i < 0 ? -1.0f : 1.0f);
-    e->time = eh_wrap_2pi(e->time + phase_step);
-    e->phase = eh_wrap_2pi(e->phase + phase_step * (0.43f + bands_t));
+#pragma omp single
+    {
+        e->time = eh_wrap_2pi(e->time + phase_step);
+        e->phase = eh_wrap_2pi(e->phase + phase_step * (0.43f + bands_t));
+    }
 
     flow_cell = 28 - (contour_i * 8 + 50) / 100 - (drift_i * 4 + 50) / 100;
     if (flow_cell < 12)
@@ -1293,7 +1303,10 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     else if (flow_cell > 30)
         flow_cell = 30;
     cell_changed = (e->grid_cell != flow_cell);
-    e->grid_cell = flow_cell;
+#pragma omp single
+    {
+        e->grid_cell = flow_cell;
+    }
 
     old_y = e->paint_y;
     old_u = e->paint_u;
@@ -1303,15 +1316,18 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
     next_v = e->next_v;
     next_charge = e->next_charge;
 
-    veejay_memcpy(e->src_y, Y, len);
+#pragma omp single
+    {
+        veejay_memcpy(e->src_y, Y, len);
 
-    if (cell_changed || e->grid_w <= 0 || e->grid_h <= 0 || force_update)
-        eh_build_contour_force(e, e->src_y, e->prev_y, drift_i, contour_i, pull_i, curl_i, trail_i, speed_i);
+        if (cell_changed || e->grid_w <= 0 || e->grid_h <= 0 || force_update)
+            eh_build_contour_force(e, e->src_y, e->prev_y, drift_i, contour_i, pull_i, curl_i, trail_i, speed_i);
+    }
 
     qcols = (w + 3) >> 2;
     qrows = (h + 3) >> 2;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
+#pragma omp for schedule(static)
     for (qy = 0; qy < qrows; qy++) {
         int yy = qy << 2;
         int th_row = (yy + 4 <= h) ? 4 : (h - yy);
@@ -1444,13 +1460,16 @@ void chromadrift_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
+#pragma omp single
     {
-        uint8_t *tmp;
-        tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
-        tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
-        tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
-        tmp = e->charge; e->charge = e->next_charge; e->next_charge = tmp;
-    }
+        {
+            uint8_t *tmp;
+            tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
+            tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
+            tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
+            tmp = e->charge; e->charge = e->next_charge; e->next_charge = tmp;
+        }
 
-    e->frame++;
+        e->frame++;
+    }
 }

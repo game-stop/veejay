@@ -36,7 +36,6 @@ typedef struct {
     uint8_t *tmp[3];
     int n__;
     int N__;
-    int n_threads;
     void *motionmap;
 
     float eff_value;
@@ -182,7 +181,6 @@ void *smear_malloc(int w, int h)
     s->motionmap = NULL;
     s->initialized = 0;
 
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*) s;
 }
@@ -224,7 +222,7 @@ static void smear_apply_axis(smear_t *s,
     const uint8_t *restrict sCb = s->tmp[1];
     const uint8_t *restrict sCr = s->tmp[2];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -303,45 +301,51 @@ void smear_apply(void *ptr, VJFrame *frame, int *args)
     int motion = 0;
     int interpolate = 0;
 
-    if(s->motionmap && motionmap_active(s->motionmap)) {
-        motionmap_scale_to(
-            s->motionmap,
-            255,
-            3,
-            0,
-            0,
-            &tmp2,
-            &tmp1,
-            &(s->n__),
-            &(s->N__)
-        );
+    #pragma omp single copyprivate(interpolate, mode, motion, value)
+    {
+        if(s->motionmap && motionmap_active(s->motionmap)) {
+            motionmap_scale_to(
+                s->motionmap,
+                255,
+                3,
+                0,
+                0,
+                &tmp2,
+                &tmp1,
+                &(s->n__),
+                &(s->N__)
+            );
 
-        value = clampi(tmp2, 0, 255);
-        mode = clampi(tmp1, 0, 3);
+            value = clampi(tmp2, 0, 255);
+            mode = clampi(tmp1, 0, 3);
 
-        motion = 1;
-        interpolate = !(s->n__ == s->N__ || s->n__ == 0);
-    } else {
-        s->N__ = 0;
-        s->n__ = 0;
+            motion = 1;
+            interpolate = !(s->n__ == s->N__ || s->n__ == 0);
+        } else {
+            s->N__ = 0;
+            s->n__ = 0;
+        }
     }
 
     const float fast = 0.28f;
     const float slow = 0.115f;
 
-    if(!s->initialized) {
-        s->eff_value = (float)value;
-        s->eff_length = (float)length;
-        s->eff_mix = (float)mix;
-        s->eff_chroma = (float)chroma;
-        s->eff_smear_drive = (float)smear_drive;
-        s->initialized = 1;
-    } else {
-        value = smear_smooth_i(&s->eff_value, value, fast, slow);
-        length = smear_smooth_i(&s->eff_length, length, fast * 0.72f, slow);
-        mix = smear_smooth_i(&s->eff_mix, mix, fast * 0.80f, slow);
-        chroma = smear_smooth_i(&s->eff_chroma, chroma, fast * 0.72f, slow);
-        smear_drive = smear_smooth_i(&s->eff_smear_drive, smear_drive, fast, slow);
+    #pragma omp single copyprivate(chroma, length, mix, smear_drive, value)
+    {
+        if(!s->initialized) {
+            s->eff_value = (float)value;
+            s->eff_length = (float)length;
+            s->eff_mix = (float)mix;
+            s->eff_chroma = (float)chroma;
+            s->eff_smear_drive = (float)smear_drive;
+            s->initialized = 1;
+        } else {
+            value = smear_smooth_i(&s->eff_value, value, fast, slow);
+            length = smear_smooth_i(&s->eff_length, length, fast * 0.72f, slow);
+            mix = smear_smooth_i(&s->eff_mix, mix, fast * 0.80f, slow);
+            chroma = smear_smooth_i(&s->eff_chroma, chroma, fast * 0.72f, slow);
+            smear_drive = smear_smooth_i(&s->eff_smear_drive, smear_drive, fast, slow);
+        }
     }
 
     mode = clampi(mode, 0, 3);
@@ -360,7 +364,10 @@ void smear_apply(void *ptr, VJFrame *frame, int *args)
     const int chroma_q8 = smear_to_q8_1000(effective_chroma);
     const int chroma_mix_q8 = (mix_q8 * chroma_q8 + 128) >> 8;
 
-    smear_snapshot(s, frame);
+    #pragma omp single
+    {
+        smear_snapshot(s, frame);
+    }
 
     switch(mode) {
         case 0:
@@ -379,9 +386,12 @@ void smear_apply(void *ptr, VJFrame *frame, int *args)
             break;
     }
 
-    if(interpolate)
-        motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
+    #pragma omp single
+    {
+        if(interpolate)
+            motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
 
-    if(motion)
-        motionmap_store_frame(s->motionmap, frame);
+        if(motion)
+            motionmap_store_frame(s->motionmap, frame);
+    }
 }

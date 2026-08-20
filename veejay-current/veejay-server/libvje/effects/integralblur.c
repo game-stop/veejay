@@ -41,7 +41,6 @@ typedef struct {
     int stride;
     int height;
     int max_radius;
-    int n_threads;
 } integralblur_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -168,7 +167,6 @@ void *integralblur_malloc(int width, int height)
     f->orig = f->planes;
     f->mask = f->orig + len;
     f->tmp  = f->mask + len;
-    f->n_threads = vje_advise_num_threads(width * height);
 
     return f;
 }
@@ -213,9 +211,12 @@ static void box_blur(integralblur_t *f, uint8_t *src, uint8_t *dst, int radius)
     const int stride = f->stride;
     const uint32_t *restrict I = f->integral;
 
-    build_integral(f, src);
+#pragma omp single
+    {
+        build_integral(f, src);
+    }
 
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         int y0 = y - radius;
         int y1 = y + radius;
@@ -256,7 +257,10 @@ static uint8_t *integralblur_blur_plane(integralblur_t *f, uint8_t *plane, int l
     uint8_t *src = f->mask;
     uint8_t *dst = f->tmp;
 
-    veejay_memcpy(src, plane, len);
+    #pragma omp single
+    {
+        veejay_memcpy(src, plane, len);
+    }
 
     if(iter < 2) {
         for(int i = 0; i < iter; i++) {
@@ -296,12 +300,15 @@ static void integralblur_mix_plane(integralblur_t *f, uint8_t *plane, uint8_t *b
     uint8_t *restrict out = plane;
 
     if(mix_q8 >= 255) {
-        if(out != blur)
-            veejay_memcpy(out, blur, len);
+        #pragma omp single
+        {
+            if(out != blur)
+                veejay_memcpy(out, blur, len);
+        }
         return;
     }
 
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         out[i] = ib_u8(ib_mix_u8(orig[i], blur[i], mix_q8));
 }
@@ -328,7 +335,10 @@ void integralblur_apply(void *ptr, VJFrame *frame, int *args)
         if(plane_mix > 0) {
             uint8_t *blurred;
 
-            veejay_memcpy(f->orig, frame->data[p], len);
+            #pragma omp single
+            {
+                veejay_memcpy(f->orig, frame->data[p], len);
+            }
             blurred = integralblur_blur_plane(f, frame->data[p], len, radius, iter);
             integralblur_mix_plane(f, frame->data[p], blurred, len, plane_mix);
         }

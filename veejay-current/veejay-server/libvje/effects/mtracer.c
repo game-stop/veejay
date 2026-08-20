@@ -43,7 +43,6 @@ typedef struct {
     int mode_transition;
     int mode_transition_len;
     int prev_mode;
-    int n_threads;
 } m_tracer_t;
 
 static inline int mtracer_clampi(int v, int lo, int hi)
@@ -226,11 +225,10 @@ void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n)
 {
     (void)ptr;
 
-    const int n_threads = vje_advise_num_threads(frame->len);
 
-#pragma omp parallel num_threads(n_threads)
     {
         overlaymagic1_apply_n(frame, frame2, n);
+    #pragma omp barrier
     }
 }
 
@@ -345,7 +343,6 @@ void *mtracer_malloc(int w, int h)
     m->mode_transition = 0;
     m->mode_transition_len = 12;
     m->prev_mode = 0;
-    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }
@@ -364,7 +361,6 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int len = frame->len;
     const int uv_len = frame->uv_len;
-    const int n_threads = m->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -385,23 +381,32 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     VJFrame blend_frame;
     VJFrame feedback_frame;
 
-    veejay_memcpy(&blend_frame, frame, sizeof(VJFrame));
+#pragma omp single copyprivate(blend_frame)
+    {
+        veejay_memcpy(&blend_frame, frame, sizeof(VJFrame));
+    }
     blend_frame.data[0] = blended_result;
-    veejay_memcpy(&feedback_frame, frame, sizeof(VJFrame));
+#pragma omp single copyprivate(feedback_frame)
+    {
+        veejay_memcpy(&feedback_frame, frame, sizeof(VJFrame));
+    }
     feedback_frame.data[0] = feedback_buf;
 
-    if(!m->started) {
-        veejay_memcpy(feedback_buf, Y, len);
-        veejay_memcpy(prev_frame, Y, len);
-        m->prev_mode = mode;
-        m->mode_transition = 0;
-        m->started = 1;
-    }
+#pragma omp single
+    {
+        if(!m->started) {
+            veejay_memcpy(feedback_buf, Y, len);
+            veejay_memcpy(prev_frame, Y, len);
+            m->prev_mode = mode;
+            m->mode_transition = 0;
+            m->started = 1;
+        }
 
-    if(mode != m->prev_mode) {
-        veejay_memcpy(m->mode_buffer, feedback_buf, len);
-        m->mode_transition = m->mode_transition_len;
-        m->prev_mode = mode;
+        if(mode != m->prev_mode) {
+            veejay_memcpy(m->mode_buffer, feedback_buf, len);
+            m->mode_transition = m->mode_transition_len;
+            m->prev_mode = mode;
+        }
     }
 
     const int transition_active = m->mode_transition > 0;
@@ -413,14 +418,16 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         transition_alpha = (x * x * (768 - (x << 1))) >> 16;
     }
 
-    veejay_memcpy(blended_result, Y, len);
+#pragma omp single
+    {
+        veejay_memcpy(blended_result, Y, len);
+    }
 
     const int combined_scale = mtracer_clampi((strength * character + 127) / 255, 1, 255);
     const int decay = 256 - (256 / decay_val);
     const int inject = 256 - decay;
     uint8_t *restrict mode_buf = m->mode_buffer;
 
-#pragma omp parallel num_threads(n_threads)
     {
         overlaymagic1_apply_n(&blend_frame, frame2, mode);
 
@@ -466,8 +473,12 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             U[i] = 128;
             V[i] = 128;
         }
+    #pragma omp barrier
     }
 
-    if(transition_active)
-        m->mode_transition--;
+#pragma omp single
+    {
+        if(transition_active)
+            m->mode_transition--;
+    }
 }

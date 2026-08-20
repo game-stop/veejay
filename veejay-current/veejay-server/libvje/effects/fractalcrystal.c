@@ -50,7 +50,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int max_cell_cols;
     int max_cell_rows;
     void *region;
@@ -147,7 +146,7 @@ static void fc_box_blur(
     uint8_t *restrict tmp = t->tmp;
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         const uint8_t *row = src + y * w;
         uint8_t *out = tmp + y * w;
@@ -170,7 +169,7 @@ static void fc_box_blur(
         }
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (int x = 0; x < w; x++) {
         int sum = tmp[x] * (radius + 1);
         int yy;
@@ -434,7 +433,6 @@ void *fractalcrystal_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
-    t->n_threads = vje_advise_num_threads(w * h);
     t->max_cell_cols = max_cols;
     t->max_cell_rows = max_rows;
     t->phase = 0.0f;
@@ -516,20 +514,26 @@ void fractalcrystal_apply(void *ptr, VJFrame *frame, int *args)
     if (len <= 0 || len > t->len)
         len = t->len;
 
-    veejay_memcpy(src_y, Y, len);
-    veejay_memcpy(src_u, U, len);
-    veejay_memcpy(src_v, V, len);
+#pragma omp single
+    {
+        veejay_memcpy(src_y, Y, len);
+        veejay_memcpy(src_u, U, len);
+        veejay_memcpy(src_v, V, len);
+    }
 
     if (blur_r > 18)
         blur_r = 18;
     fc_box_blur(t, src_y, blur, blur_r);
 
-    t->phase = fc_wrap_2pi(t->phase + fc_time_step(speed_i));
+#pragma omp single
+    {
+        t->phase = fc_wrap_2pi(t->phase + fc_time_step(speed_i));
+    }
 
     {
         float travel = fc_pingpong(t->phase);
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (int iy = 0; iy < cell_rows; iy++) {
         int cy = iy - 1;
         int ix;
@@ -568,7 +572,7 @@ void fractalcrystal_apply(void *ptr, VJFrame *frame, int *args)
     }
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int row = y * w;
         int x;

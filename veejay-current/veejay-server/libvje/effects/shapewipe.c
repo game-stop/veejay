@@ -58,7 +58,6 @@ typedef struct {
     int shape_max;
     int shape_completed;
 
-    int n_threads;
     int have_smooth;
     float sm_threshold;
     float sm_softness;
@@ -66,6 +65,34 @@ typedef struct {
     float sm_wipe_drive;
     float sm_mix_drive;
 } shape_t;
+
+typedef struct {
+    const uint8_t *pattern;
+    int ready;
+    int threshold;
+    int direction;
+    int softness;
+    int edge_glow;
+    int mix_q8;
+    int completed;
+} shapewipe_job_t;
+
+typedef struct {
+    uint8_t *d0;
+    uint8_t *d1;
+    uint8_t *d2;
+    const uint8_t *s0;
+    const uint8_t *s1;
+    const uint8_t *s2;
+    const uint8_t *pattern;
+    int threshold;
+    int direction;
+    int softness;
+    int edge_glow;
+    int beat_mix_q8;
+    int edge_span;
+    int denom;
+} shape_wipe_context_t;
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -197,7 +224,6 @@ static shape_t *init_shape_loader(void)
     s->shape_min = 0;
     s->shape_max = 255;
     s->shape_completed = 0;
-    s->n_threads = 1;
     s->have_smooth = 0;
 
     load_shapes(s->shapelist, &(s->shapeidx), MAX_NUMBER_OF_SHAPES);
@@ -305,104 +331,85 @@ static void shape_find_min_max(uint8_t *restrict data, const int len, int *min, 
     *max = b;
 }
 
-static void shape_wipe_1(uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
+static inline shape_wipe_context_t shape_wipe_context(uint8_t *dst[4],
+                                                       uint8_t *src[4],
+                                                       const shapewipe_job_t *job)
 {
-    uint8_t *restrict d0 = dst[0];
-    uint8_t *restrict d1 = dst[1];
-    uint8_t *restrict d2 = dst[2];
+    shape_wipe_context_t context;
 
-    uint8_t *restrict s0 = src[0];
-    uint8_t *restrict s1 = src[1];
-    uint8_t *restrict s2 = src[2];
+    context.d0 = dst[0];
+    context.d1 = dst[1];
+    context.d2 = dst[2];
+    context.s0 = src[0];
+    context.s1 = src[1];
+    context.s2 = src[2];
+    context.pattern = job->pattern;
+    context.threshold = clampi(job->threshold, 0, 256);
+    context.direction = job->direction;
+    context.softness = clampi(job->softness, 0, 128);
+    context.edge_glow = clampi(job->edge_glow, 0, 255);
+    context.beat_mix_q8 = clampi(job->mix_q8, 0, 256);
+    context.edge_span = context.softness > 0 ? context.softness : (context.edge_glow > 0 ? 8 : 1);
+    context.denom = context.edge_span << 1;
 
-    for(int i = 0; i < len; i++) {
-        if(pattern[i] < threshold) {
-            d0[i] = s0[i];
-            d1[i] = s1[i];
-            d2[i] = s2[i];
+    return context;
+}
+
+static inline void shape_wipe_pixel(const shape_wipe_context_t *context, int i)
+{
+    const int p = context->pattern[i];
+    const int edge = context->direction ? (context->threshold - p) : (p - context->threshold);
+    int q8;
+
+    if(context->softness <= 0) {
+        q8 = edge > 0 ? 256 : 0;
+    }
+    else {
+        q8 = ((edge + context->edge_span) * 256 + (context->denom >> 1)) / context->denom;
+        q8 = clampi(q8, 0, 256);
+    }
+
+    if(context->beat_mix_q8 > 0)
+        q8 += ((256 - q8) * context->beat_mix_q8 + 128) >> 8;
+
+    if(q8 > 0) {
+        context->d0[i] = (uint8_t)((((int)context->d0[i] * (256 - q8)) + ((int)context->s0[i] * q8) + 128) >> 8);
+        context->d1[i] = (uint8_t)((((int)context->d1[i] * (256 - q8)) + ((int)context->s1[i] * q8) + 128) >> 8);
+        context->d2[i] = (uint8_t)((((int)context->d2[i] * (256 - q8)) + ((int)context->s2[i] * q8) + 128) >> 8);
+    }
+
+    if(context->edge_glow > 0) {
+        const int ae = edge < 0 ? -edge : edge;
+
+        if(ae < context->edge_span) {
+            const int g = (context->edge_glow * (context->edge_span - ae) + (context->edge_span >> 1)) / context->edge_span;
+
+            context->d0[i] = shapewipe_u8((int)context->d0[i] + g);
         }
     }
 }
 
-static void shape_wipe_2(uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
+static void shape_wipe_team(uint8_t *dst[4],
+                            uint8_t *src[4],
+                            int len,
+                            const shapewipe_job_t *job)
 {
-    uint8_t *restrict d0 = dst[0];
-    uint8_t *restrict d1 = dst[1];
-    uint8_t *restrict d2 = dst[2];
+    const shape_wipe_context_t context = shape_wipe_context(dst, src, job);
 
-    uint8_t *restrict s0 = src[0];
-    uint8_t *restrict s1 = src[1];
-    uint8_t *restrict s2 = src[2];
-
-    for(int i = 0; i < len; i++) {
-        if(pattern[i] > threshold) {
-            d0[i] = s0[i];
-            d1[i] = s1[i];
-            d2[i] = s2[i];
-        }
-    }
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        shape_wipe_pixel(&context, i);
 }
 
-static void shape_wipe_musical(shape_t *s,
-                               uint8_t *dst[4],
-                               uint8_t *src[4],
-                               const uint8_t *restrict pattern,
-                               int len,
-                               int threshold,
-                               int direction,
-                               int softness,
-                               int edge_glow,
-                               int beat_mix_q8)
+static void shape_wipe_serial(uint8_t *dst[4],
+                              uint8_t *src[4],
+                              int len,
+                              const shapewipe_job_t *job)
 {
-    uint8_t *restrict d0 = dst[0];
-    uint8_t *restrict d1 = dst[1];
-    uint8_t *restrict d2 = dst[2];
+    const shape_wipe_context_t context = shape_wipe_context(dst, src, job);
 
-    const uint8_t *restrict s0 = src[0];
-    const uint8_t *restrict s1 = src[1];
-    const uint8_t *restrict s2 = src[2];
-
-    threshold = clampi(threshold, 0, 256);
-    softness = clampi(softness, 0, 128);
-    edge_glow = clampi(edge_glow, 0, 255);
-    beat_mix_q8 = clampi(beat_mix_q8, 0, 256);
-
-    const int edge_span = softness > 0 ? softness : (edge_glow > 0 ? 8 : 1);
-    const int denom = edge_span << 1;
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
-    for(int i = 0; i < len; i++) {
-        const int p = pattern[i];
-        const int edge = direction ? (threshold - p) : (p - threshold);
-        int q8;
-
-        if(softness <= 0) {
-            q8 = edge > 0 ? 256 : 0;
-        }
-        else {
-            q8 = ((edge + edge_span) * 256 + (denom >> 1)) / denom;
-            q8 = clampi(q8, 0, 256);
-        }
-
-        if(beat_mix_q8 > 0)
-            q8 += ((256 - q8) * beat_mix_q8 + 128) >> 8;
-
-        if(q8 > 0) {
-            d0[i] = (uint8_t)((((int)d0[i] * (256 - q8)) + ((int)s0[i] * q8) + 128) >> 8);
-            d1[i] = (uint8_t)((((int)d1[i] * (256 - q8)) + ((int)s1[i] * q8) + 128) >> 8);
-            d2[i] = (uint8_t)((((int)d2[i] * (256 - q8)) + ((int)s2[i] * q8) + 128) >> 8);
-        }
-
-        if(edge_glow > 0) {
-            const int ae = edge < 0 ? -edge : edge;
-
-            if(ae < edge_span) {
-                const int g = (edge_glow * (edge_span - ae) + (edge_span >> 1)) / edge_span;
-
-                d0[i] = shapewipe_u8((int)d0[i] + g);
-            }
-        }
-    }
+    for(int i = 0; i < len; i++)
+        shape_wipe_pixel(&context, i);
 }
 
 int shapewipe_get_shape_count(void *ptr)
@@ -540,7 +547,6 @@ void *shapewipe_malloc(int w, int h)
     if(!s)
         return NULL;
 
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return s;
 }
@@ -555,23 +561,23 @@ void shapewipe_free(void *ptr)
     free_shape_loader(s);
 }
 
-static int shapewipe_apply1(void *ptr,
-                            VJFrame *frame,
-                            VJFrame *frame2,
-                            double timecode,
-                            int shape,
-                            int threshold,
-                            int direction,
-                            int automatic,
-                            int softness,
-                            int edge_glow,
-                            int wipe_drive,
-                            int mix_drive)
+static shapewipe_job_t shapewipe_prepare(void *ptr,
+                                         VJFrame *frame,
+                                         double timecode,
+                                         int shape,
+                                         int threshold,
+                                         int direction,
+                                         int automatic,
+                                         int softness,
+                                         int edge_glow,
+                                         int wipe_drive,
+                                         int mix_drive)
 {
     shape_t *s = (shape_t*)ptr;
+    shapewipe_job_t job = { 0 };
 
     if(s->shapeidx <= 0)
-        return 0;
+        return job;
 
     shape = clampi(shape, 0, s->shapeidx - 1);
     threshold = clampi(threshold, 0, 256);
@@ -587,7 +593,7 @@ static int shapewipe_apply1(void *ptr,
 
         if(newshape == s->selected_shape && s->currentshape != shape) {
             veejay_msg(0, "Unable to read %s", s->shapelist[shape]);
-            return 0;
+            return job;
         }
 
         s->selected_shape = newshape;
@@ -597,7 +603,7 @@ static int shapewipe_apply1(void *ptr,
         VJFrame *tmp = vj_picture_get(s->selected_shape);
 
         if(!tmp || !tmp->data[0])
-            return 0;
+            return job;
 
         shape_find_min_max(tmp->data[0], tmp->len, &(s->shape_min), &(s->shape_max));
     }
@@ -605,7 +611,7 @@ static int shapewipe_apply1(void *ptr,
     VJFrame *src = vj_picture_get(s->selected_shape);
 
     if(!src || !src->data[0])
-        return 0;
+        return job;
 
     int base_threshold = threshold;
     int done_threshold = threshold;
@@ -639,16 +645,14 @@ static int shapewipe_apply1(void *ptr,
                                wipe_drive > 0 || mix_drive > 0 ||
                                threshold > 0;
 
+    job.pattern = src->data[0];
+    job.ready = 1;
+    job.threshold = done_threshold;
+    job.direction = direction;
+    job.completed = direction ? done_threshold >= s->shape_max : done_threshold <= s->shape_min;
+
     if(!musical_active) {
-        if(direction) {
-            shape_wipe_1(frame->data, frame2->data, src->data[0], frame->len, done_threshold);
-
-            return done_threshold >= s->shape_max;
-        }
-
-        shape_wipe_2(frame->data, frame2->data, src->data[0], frame->len, done_threshold);
-
-        return done_threshold <= s->shape_min;
+        return job;
     }
 
     const float lane_a = 0.26f;
@@ -691,45 +695,41 @@ static int shapewipe_apply1(void *ptr,
     effective_mix += ((wipe_q * 180) + 500) / 1000;
     effective_mix = clampi(effective_mix, 0, 1000);
 
-    const int mix_q8 = (effective_mix * 256 + 500) / 1000;
+    job.threshold = effective_threshold;
+    job.softness = effective_softness;
+    job.edge_glow = effective_glow;
+    job.mix_q8 = (effective_mix * 256 + 500) / 1000;
 
-    shape_wipe_musical(
-        s,
-        frame->data,
-        frame2->data,
-        src->data[0],
-        frame->len,
-        effective_threshold,
-        direction,
-        effective_softness,
-        effective_glow,
-        mix_q8
-    );
-
-    if(direction)
-        return done_threshold >= s->shape_max;
-
-    return done_threshold <= s->shape_min;
+    return job;
 }
 
 void shapewipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     shape_t *s = (shape_t*)ptr;
+    shapewipe_job_t job;
 
-    s->shape_completed = shapewipe_apply1(
-        ptr,
-        frame,
-        frame2,
-        frame->timecode,
-        args[P_SHAPE],
-        args[P_THRESHOLD],
-        args[P_DIRECTION],
-        args[P_AUTOMATIC],
-        args[P_SOFTNESS],
-        args[P_EDGE_GLOW],
-        args[P_WIPE_DRIVE],
-        args[P_MIX_DRIVE]
-    );
+#pragma omp single copyprivate(job)
+    {
+        job = shapewipe_prepare(
+            ptr,
+            frame,
+            frame->timecode,
+            args[P_SHAPE],
+            args[P_THRESHOLD],
+            args[P_DIRECTION],
+            args[P_AUTOMATIC],
+            args[P_SOFTNESS],
+            args[P_EDGE_GLOW],
+            args[P_WIPE_DRIVE],
+            args[P_MIX_DRIVE]
+        );
+    }
+
+    if(job.ready)
+        shape_wipe_team(frame->data, frame2->data, frame->len, &job);
+
+#pragma omp single
+    s->shape_completed = job.completed;
 }
 
 int shapewipe_process(void *ptr,
@@ -742,11 +742,9 @@ int shapewipe_process(void *ptr,
                       int automatic)
 {
     shape_t *s = (shape_t*)ptr;
-
-    s->shape_completed = shapewipe_apply1(
+    shapewipe_job_t job = shapewipe_prepare(
         ptr,
         frame,
-        frame2,
         timecode,
         shape,
         threshold,
@@ -757,6 +755,11 @@ int shapewipe_process(void *ptr,
         0,
         0
     );
+
+    if(job.ready)
+        shape_wipe_serial(frame->data, frame2->data, frame->len, &job);
+
+    s->shape_completed = job.completed;
 
     return s->shape_completed;
 }

@@ -42,7 +42,6 @@ typedef struct {
     uint8_t *tmpimage[4];
     int plane;
     uint8_t *bgimage[4];
-    int n_threads;
 } chameleon_t;
 
 static inline int chameleon_clampi(int v, int lo, int hi)
@@ -170,7 +169,6 @@ void *chameleon_malloc(int w, int h)
     }
 
     c->last_mode_ = -1;
-    c->n_threads = vje_advise_num_threads(len);
 
     return c;
 }
@@ -241,20 +239,26 @@ void chameleon_apply(void *ptr, VJFrame *frame, int *args)
     const int sensitivity = chameleon_clampi(args[1], 1, 32);
     const int len = frame->len;
 
-    if(!c->has_bg)
-        chameleon_prepare(c, frame);
+    #pragma omp single
+    {
+        if(!c->has_bg)
+            chameleon_prepare(c, frame);
 
-    if(c->last_mode_ != mode) {
-        chameleon_reset_history(c, len);
-        c->last_mode_ = mode;
+        if(c->last_mode_ != mode) {
+            chameleon_reset_history(c, len);
+            c->last_mode_ = mode;
+        }
     }
 
     VJFrame source;
     int strides[4] = { len, len, len, 0 };
 
-    vj_frame_copy(frame->data, c->tmpimage, strides);
+    #pragma omp single copyprivate(source)
+    {
+        vj_frame_copy(frame->data, c->tmpimage, strides);
 
-    veejay_memset(&source, 0, sizeof(VJFrame));
+        veejay_memset(&source, 0, sizeof(VJFrame));
+    }
     source.data[0] = c->tmpimage[0];
     source.data[1] = c->tmpimage[1];
     source.data[2] = c->tmpimage[2];
@@ -265,13 +269,16 @@ void chameleon_apply(void *ptr, VJFrame *frame, int *args)
     int tmp1 = 0;
     int tmp2 = 0;
 
-    if(c->motionmap && motionmap_active(c->motionmap)) {
-        motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
-        auto_switch = 1;
-        activity = motionmap_activity(c->motionmap);
-    } else {
-        c->N__ = 0;
-        c->n__ = 0;
+    #pragma omp single copyprivate(activity, auto_switch)
+    {
+        if(c->motionmap && motionmap_active(c->motionmap)) {
+            motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
+            auto_switch = 1;
+            activity = motionmap_activity(c->motionmap);
+        } else {
+            c->N__ = 0;
+            c->n__ = 0;
+        }
     }
 
     if(c->n__ == c->N__ || c->n__ == 0)
@@ -282,9 +289,9 @@ void chameleon_apply(void *ptr, VJFrame *frame, int *args)
     if(auto_switch)
         appearing = activity > 40 ? 1 : 0;
 
-#pragma omp parallel num_threads(c->n_threads)
     {
         drawChameleon(c, &source, frame, sensitivity, appearing);
+    #pragma omp barrier
     }
 }
 

@@ -99,11 +99,10 @@ void rgbchannel_apply(void *ptr, VJFrame *frame, int *args)
         return;
 
     const int pixels = frame->width * frame->height;
-    const int n_threads = vje_advise_num_threads(pixels);
 
     uint8_t *restrict rgba = frame->data[0];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < pixels; i++) {
         uint8_t *restrict p = rgba + (i << 2);
 

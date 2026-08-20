@@ -112,7 +112,6 @@ void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->len;
     const int range = maxv - minv;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
 
@@ -124,7 +123,7 @@ void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 
     const uint32_t span = (uint32_t)(range + 1);
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         if(range == 0) {
             Y[i] = randnoise_u8((int)Y[i] + minv);

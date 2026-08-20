@@ -40,6 +40,10 @@
 #include <assert.h>
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #define MAX_EFFECTS 4096
 #define NUM_CHAINS 2
 #define MAX_ENTRY_PER_CHAIN 20
@@ -351,6 +355,10 @@ static int VJ_INTERNAL = 0;
 static int LAST_ID = 0;
 static VJFrame *vj_fx_bg = NULL;
 
+#ifdef _OPENMP
+static int vje_openmp_threads = 1;
+#endif
+
 uint8_t  pixel_Y_hi_ = 235;
 uint8_t  pixel_U_hi_ = 240;
 uint8_t  pixel_Y_lo_ = 16;
@@ -449,6 +457,14 @@ void	vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 int vje_init(int w, int h)
 {   
     int i;
+
+#ifdef _OPENMP
+    vje_openmp_threads = vje_advise_num_threads(w * h);
+    omp_set_dynamic(0);
+    omp_set_max_active_levels(1);
+    omp_set_num_threads(vje_openmp_threads);
+#endif
+
     vj_fx_map = (int*) vj_malloc( sizeof(int) * MAX_EFFECTS );
     if(vj_fx_map == NULL)
         return 0;
@@ -491,13 +507,6 @@ int vje_init(int w, int h)
         LAST_ID = VJ_PLUGIN + ( i - offset );
         num_fx ++;
     }   
-
-
-#ifdef _OPENMP
-    //omp_set_dynamic(0);
-    //omp_set_max_active_levels(1);
-#endif
-
     init_sqrt_map_pixel_values();
 
     plug_sys_init( PIX_FMT_YUVA444P, w,h, 0 );
@@ -590,7 +599,7 @@ static void vje_fx_parallel_apply( void *arg )
 
 static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A, VJFrame *B, int *args )
 {
-    if(!fx->parallel)
+    if(fx->parallel != 2)
         return 0;
 
     if( vj_task_get_workers() <= 0 )
@@ -637,6 +646,22 @@ static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B,
     plug_process( ptr, A->timecode );
 }
 
+static void vje_fx_direct_apply( int idx, void *ptr, VJFrame *A, VJFrame *B, int *args )
+{
+    if(vj_effect_map[idx]->extra_frame) {
+#ifdef STRICT_CHECKING
+        assert( vj_fx[ idx ].fx_process != NULL );
+#endif
+        vj_fx[ idx ].fx_process( ptr, A, B, args );
+    }
+    else {
+#ifdef STRICT_CHECKING
+        assert( vj_fx[ idx ].fx_filter != NULL );
+#endif
+        vj_fx[ idx ].fx_filter( ptr, A, args );
+    }
+}
+
 void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
 {
     int idx = vj_fx_map[ fx_id ];
@@ -647,30 +672,65 @@ void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
 #endif
 
     if(fx_id >= VJ_PLUGIN) {
-        vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
-    }
-    else {
-        int doneProcessing = 0;
-
-        if( parallel_enabled && fx->parallel ) {
-            doneProcessing = vje_fx_parallize( fx, ptr, idx, A, B, args );
+#ifdef _OPENMP
+        if(omp_in_parallel()) {
+#pragma omp single
+            {
+                vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
+            }
         }
+        else
+#endif
+        {
+            vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
+        }
+        return;
+    }
 
-        if(doneProcessing)
+#ifdef _OPENMP
+    if(fx->parallel == 0) {
+        if(omp_in_parallel()) {
+            vje_fx_direct_apply( idx, ptr, A, B, args );
+        }
+        else if(parallel_enabled) {
+#pragma omp parallel num_threads(vje_openmp_threads)
+            {
+                vje_fx_direct_apply( idx, ptr, A, B, args );
+            }
+        }
+        else {
+            vje_fx_direct_apply( idx, ptr, A, B, args );
+        }
+        return;
+    }
+#endif
+
+    if(parallel_enabled && fx->parallel == 2) {
+#ifdef _OPENMP
+        if(omp_in_parallel()) {
+#pragma omp single
+            {
+                if(!vje_fx_parallize( fx, ptr, idx, A, B, args ))
+                    vje_fx_direct_apply( idx, ptr, A, B, args );
+            }
             return;
-
-        if(fx->extra_frame) {
-#ifdef STRICT_CHECKING
-            assert( vj_fx[ idx ].fx_process != NULL );
-#endif
-            vj_fx[ idx ].fx_process( ptr, A, B, args );
-        } else {
-#ifdef STRICT_CHECKING
-            assert( vj_fx[ idx ].fx_filter != NULL );
-#endif
-            vj_fx[ idx ].fx_filter( ptr, A, args );
         }
+#endif
+        if(vje_fx_parallize( fx, ptr, idx, A, B, args ))
+            return;
     }
+
+#ifdef _OPENMP
+    if(omp_in_parallel()) {
+#pragma omp single
+        {
+            vje_fx_direct_apply( idx, ptr, A, B, args );
+        }
+        return;
+    }
+#endif
+
+    vje_fx_direct_apply( idx, ptr, A, B, args );
 }
 
 void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A )
@@ -1449,7 +1509,13 @@ int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *ds
 }
 
 int vje_max_threads(int len) {
-    return vje_advise_num_threads(len);
+#ifdef _OPENMP
+    (void) len;
+    return vje_openmp_threads;
+#else
+    (void) len;
+    return 1;
+#endif
 }
 
 void vje_dump(void) {

@@ -87,14 +87,13 @@ static void pixelate_plane(uint8_t *restrict plane,
                            int width,
                            int height,
                            int block_w,
-                           int block_h,
-                           int n_threads)
+                           int block_h)
 {
     const int blocks_x = (width + block_w - 1) / block_w;
     const int blocks_y = (height + block_h - 1) / block_h;
     const int blocks = blocks_x * blocks_y;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int b = 0; b < blocks; b++) {
         const int by = (b / blocks_x) * block_h;
         const int bx = (b - ((b / blocks_x) * blocks_x)) * block_w;
@@ -128,16 +127,15 @@ void pixelate_apply(void *ptr, VJFrame *frame, int *args)
     const int width = frame->width;
     const int height = frame->height;
     const int pixel_size = pixelate_clampi(args[P_PIXEL_SIZE], 1, width < height ? width : height);
-    const int n_threads = vje_advise_num_threads(frame->len);
 
     if(pixel_size <= 1)
         return;
 
-    pixelate_plane(frame->data[0], width, height, pixel_size, pixel_size, n_threads);
+    pixelate_plane(frame->data[0], width, height, pixel_size, pixel_size);
 
     if(frame->ssm) {
-        pixelate_plane(frame->data[1], width, height, pixel_size, pixel_size, n_threads);
-        pixelate_plane(frame->data[2], width, height, pixel_size, pixel_size, n_threads);
+        pixelate_plane(frame->data[1], width, height, pixel_size, pixel_size);
+        pixelate_plane(frame->data[2], width, height, pixel_size, pixel_size);
     }
     else {
         int uv_block_w = pixel_size >> frame->shift_h;
@@ -149,10 +147,8 @@ void pixelate_apply(void *ptr, VJFrame *frame, int *args)
             uv_block_h = 1;
 
         if(uv_block_w > 1 || uv_block_h > 1) {
-            const int uv_threads = vje_advise_num_threads(frame->uv_len);
-
-            pixelate_plane(frame->data[1], frame->uv_width, frame->uv_height, uv_block_w, uv_block_h, uv_threads);
-            pixelate_plane(frame->data[2], frame->uv_width, frame->uv_height, uv_block_w, uv_block_h, uv_threads);
+            pixelate_plane(frame->data[1], frame->uv_width, frame->uv_height, uv_block_w, uv_block_h);
+            pixelate_plane(frame->data[2], frame->uv_width, frame->uv_height, uv_block_w, uv_block_h);
         }
     }
 }

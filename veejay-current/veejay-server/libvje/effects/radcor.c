@@ -42,7 +42,6 @@ typedef struct {
     uint32_t *Map;
     float *x_lut;
     int map_upd[3];
-    int n_threads;
 } radcor_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -148,7 +147,6 @@ void *radcor_malloc(int w, int h)
     r->map_upd[0] = -1;
     r->map_upd[1] = -1;
     r->map_upd[2] = -1;
-    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -252,19 +250,22 @@ void radcor_apply(void *ptr, VJFrame *frame, int *args)
 
     uint32_t *restrict Map = radcor->Map;
 
-    if(radcor->map_upd[0] != alpha_x ||
-       radcor->map_upd[1] != alpha_y ||
-       radcor->map_upd[2] != direction)
-        radcor_build_map(radcor, width, height, alpha_x, alpha_y, direction);
+#pragma omp single
+    {
+        if(radcor->map_upd[0] != alpha_x ||
+           radcor->map_upd[1] != alpha_y ||
+           radcor->map_upd[2] != direction)
+            radcor_build_map(radcor, width, height, alpha_x, alpha_y, direction);
 
-    veejay_memcpy(Yi, Y, len);
-    veejay_memcpy(Cbi, Cb, len);
-    veejay_memcpy(Cri, Cr, len);
+        veejay_memcpy(Yi, Y, len);
+        veejay_memcpy(Cbi, Cb, len);
+        veejay_memcpy(Cri, Cr, len);
 
-    if(update_alpha)
-        veejay_memcpy(Ai, A, len);
+        if(update_alpha)
+            veejay_memcpy(Ai, A, len);
+    }
 
-#pragma omp parallel for schedule(static) num_threads(radcor->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const uint32_t idx = Map[i];
 

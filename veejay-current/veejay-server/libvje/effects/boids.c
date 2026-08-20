@@ -63,7 +63,6 @@ typedef struct {
     int blob_num_;
     int blob_type_;
     int blob_home_radius_;
-    int n_threads;
 } boids_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -222,7 +221,6 @@ void *boids_malloc(int w, int h)
 
     veejay_memset(b->blob_image_, 0, w * h);
     b->blob_ready_ = 1;
-    b->n_threads = vje_advise_num_threads(w * h);
 
     return b;
 }
@@ -379,59 +377,73 @@ void boids_apply(void *ptr, VJFrame *frame, int *args)
     const double M2 = m2 == 0 ? 0.0 : (double)m2 / 100.0;
     const double M3 = m3 == 0 ? 0.0 : (double)m3 / 1000.0;
 
-    b->blob_type_ = shape;
+    #pragma omp single
+    {
+        b->blob_type_ = shape;
+    }
 
     if(radius != b->blob_radius_ || num != b->blob_num_) {
-        if(!boids_reinit(b, radius, num, frame->width, frame->height))
+        int vje_omp_return_condition;
+        #pragma omp single copyprivate(vje_omp_return_condition)
+        {
+            vje_omp_return_condition = !!(!boids_reinit(b, radius, num, frame->width, frame->height));
+        }
+        if (vje_omp_return_condition)
             return;
     }
 
-    if(home_radius != b->blob_home_radius_)
+    #pragma omp single
     {
-        b->blob_home_radius_ = home_radius;
+        if(home_radius != b->blob_home_radius_)
+        {
+            b->blob_home_radius_ = home_radius;
+
+            for(int i = 0; i < b->blob_num_; i++)
+                blob_init_(b, b->blobs_ + i, i, width, height);
+        }
 
         for(int i = 0; i < b->blob_num_; i++)
-            blob_init_(b, b->blobs_ + i, i, width, height);
-    }
+        {
+            double v1[2];
+            double v2[2];
+            double v3[2];
 
-    for(int i = 0; i < b->blob_num_; i++)
-    {
-        double v1[2];
-        double v2[2];
-        double v3[2];
+            boid_rule1_(b, i, v1);
+            boid_rule2_(b, i, v2);
+            boid_rule3_(b, i, v3);
 
-        boid_rule1_(b, i, v1);
-        boid_rule2_(b, i, v2);
-        boid_rule3_(b, i, v3);
+            b->blobs_[i].vx += v1[0] * M1 + v2[0] * M2 + v3[0] * M3;
+            b->blobs_[i].vy += v1[1] * M1 + v2[1] * M2 + v3[1] * M3;
 
-        b->blobs_[i].vx += v1[0] * M1 + v2[0] * M2 + v3[0] * M3;
-        b->blobs_[i].vy += v1[1] * M1 + v2[1] * M2 + v3[1] * M3;
+            boid_rule4_(b, i, speed);
 
-        boid_rule4_(b, i, speed);
-
-        b->blobs_[i].x = (short)((double)b->blobs_[i].x + b->blobs_[i].vx);
-        b->blobs_[i].y = (short)((double)b->blobs_[i].y + b->blobs_[i].vy);
+            b->blobs_[i].x = (short)((double)b->blobs_[i].x + b->blobs_[i].vx);
+            b->blobs_[i].y = (short)((double)b->blobs_[i].y + b->blobs_[i].vy);
+        }
     }
 
     blob_func f = blob_render(b);
 
-    for(int k = 0; k < b->blob_num_; k++)
+    #pragma omp single
     {
-        if((b->blobs_[k].x > 0) &&
-           (b->blobs_[k].x < (int)(width - b->blob_dradius_)) &&
-           (b->blobs_[k].y > 0) &&
-           (b->blobs_[k].y < (int)(height - b->blob_dradius_)))
+        for(int k = 0; k < b->blob_num_; k++)
         {
-            const int s = b->blobs_[k].x + b->blobs_[k].y * (int)width;
-            f(b, s, (int)width);
-        }
-        else
-        {
-            blob_init_(b, b->blobs_ + k, k, width, height);
+            if((b->blobs_[k].x > 0) &&
+               (b->blobs_[k].x < (int)(width - b->blob_dradius_)) &&
+               (b->blobs_[k].y > 0) &&
+               (b->blobs_[k].y < (int)(height - b->blob_dradius_)))
+            {
+                const int s = b->blobs_[k].x + b->blobs_[k].y * (int)width;
+                f(b, s, (int)width);
+            }
+            else
+            {
+                blob_init_(b, b->blobs_ + k, k, width, height);
+            }
         }
     }
 
-    #pragma omp parallel for num_threads(b->n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         if(b->blob_image_[i] == 0x0)

@@ -178,12 +178,11 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->ssm ? frame->len : frame->uv_len;
 
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const int cb0 = Cb[i];

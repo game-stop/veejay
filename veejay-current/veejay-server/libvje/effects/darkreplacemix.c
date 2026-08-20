@@ -100,7 +100,7 @@ void darkreplace_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int denom = edge - full;
     const int mul = denom > 0 ? ((255 << 16) / denom) : 0;
 
-    #pragma omp parallel for num_threads(dr->n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const int y = Y[i];

@@ -71,7 +71,6 @@ typedef struct {
     int history_len;
     int history_pos;
     int first_frame;
-    int n_threads;
 } shutterdrag_t;
 
 static inline int shutter_clampi(int v, int lo, int hi)
@@ -244,7 +243,6 @@ void *shutterdrag_malloc(int width, int height)
     sb->historyY = sb->history_block;
     sb->historyU = sb->historyY + (pixels * hlen);
     sb->historyV = sb->historyU + (pixels * hlen);
-    sb->n_threads = vje_advise_num_threads(pixels);
 
     return (void*)sb;
 }
@@ -391,21 +389,24 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
     const int loop = args[P_LOOP] ? 1 : 0;
     const int reset = args[P_RESET] ? 1 : 0;
 
-    shutterdrag_update_controls(
-        sb,
-        args,
-        &trail_strength,
-        &duration_mix,
-        &y_boost,
-        &sharpen,
-        &propagate,
-        &luma_ceiling
-    );
+#pragma omp single copyprivate(duration_mix, luma_ceiling, propagate, sharpen, trail_strength, y_boost)
+    {
+        shutterdrag_update_controls(
+            sb,
+            args,
+            &trail_strength,
+            &duration_mix,
+            &y_boost,
+            &sharpen,
+            &propagate,
+            &luma_ceiling
+        );
 
-    if(sb->first_frame || reset)
-        shutterdrag_seed_state(sb, frame);
+        if(sb->first_frame || reset)
+            shutterdrag_seed_state(sb, frame);
 
-    sb->history_pos = (sb->history_pos + 1) % hlen;
+        sb->history_pos = (sb->history_pos + 1) % hlen;
+    }
     const int pos = sb->history_pos;
 
     const int32_t alpha = shutter_pct_to_fp(trail_strength);
@@ -429,7 +430,6 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
     int32_t *restrict fbU = sb->feedbackU;
     int32_t *restrict fbV = sb->feedbackV;
 
-#pragma omp parallel num_threads(sb->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < pixels; i++) {
@@ -525,6 +525,7 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
             U[i] = shutter_u8((int)((out_u * sharpen) >> (FIXED_BITS + 7)) + 128);
             V[i] = shutter_u8((int)((out_v * sharpen) >> (FIXED_BITS + 7)) + 128);
         }
+    #pragma omp barrier
     }
 }
 

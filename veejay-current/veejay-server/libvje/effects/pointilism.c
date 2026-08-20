@@ -34,7 +34,6 @@
 typedef struct {
     uint8_t *buf[3];
     uint32_t *rand_lut;
-    int n_threads;
 } pointilism_t;
 
 static inline uint32_t pointilism_xorshift32(uint32_t *state)
@@ -153,7 +152,6 @@ void *pointilism_malloc(int w, int h)
     for(int i = 0; i < len; i++)
         s->rand_lut[i] = pointilism_xorshift32(&r_state);
 
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*)s;
 }
@@ -320,7 +318,6 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
 
     const uint32_t *restrict lut = p->rand_lut;
 
-#pragma omp parallel num_threads(p->n_threads)
     {
         if(!loop)
             pointilism_background(p, srcY, srcU, srcV, len, keep_original);
@@ -368,5 +365,6 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
         }
 
         pointilism_copy_back(p, frame->data[0], frame->data[1], frame->data[2], len);
+    #pragma omp barrier
     }
 }

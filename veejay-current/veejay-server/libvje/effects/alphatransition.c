@@ -74,7 +74,6 @@ void alphatransition_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
     const int threshold  = args[3];
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -85,7 +84,7 @@ void alphatransition_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args
     uint8_t *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for (int i = 0; i < len; i++)
     {
         const int a = A[i];

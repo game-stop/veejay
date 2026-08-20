@@ -45,7 +45,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
     void *region;
 
     uint8_t *src_y;
@@ -574,7 +573,6 @@ void *edgefoldtide_malloc(int w, int h)
     e->len = (int) len;
     e->seeded = 0;
     e->frame = 0;
-    e->n_threads = vje_advise_num_threads((int) len);
 
     gridcap = (size_t) (((w + 7) / 8) + 3) * (size_t) (((h + 7) / 8) + 3);
     total = len * 10 + sizeof(float) * gridcap * 3 + 128;
@@ -837,8 +835,11 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     U = frame->data[1];
     V = frame->data[2];
 
-    if (!e->seeded)
-        eh_seed(e, frame);
+#pragma omp single
+    {
+        if (!e->seeded)
+            eh_seed(e, frame);
+    }
     source_i = args[P_SOURCE];
     flow_i = args[P_FLOW];
     geom_i = args[P_GEOM];
@@ -864,20 +865,29 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     speed_curve = speed_t * speed_t * (3.0f - 2.0f * speed_t);
 
     mature_rate = 0.004f + source_t * 0.018f;
-    e->maturity += (1.0f - e->maturity) * mature_rate;
-    if (e->maturity > 1.0f) e->maturity = 1.0f;
+#pragma omp single
+    {
+        e->maturity += (1.0f - e->maturity) * mature_rate;
+        if (e->maturity > 1.0f) e->maturity = 1.0f;
+    }
 
     tone_mix_f = 0.18f + glow_t * 0.18f + color_t * 0.16f;
     tone_mix = eh_clampi((int) (tone_mix_f * 255.0f + 0.5f), 0, 255);
-    eh_build_luts(e, source_i, glow_i, trail_i, color_i, tone_mix);
+#pragma omp single
+    {
+        eh_build_luts(e, source_i, glow_i, trail_i, color_i, tone_mix);
 
-    e->time = eh_wrap_2pi(e->time + (0.0015f + flow_t * 0.006f + geom_t * 0.003f) * (0.16f + speed_curve * 1.85f));
-    e->phase = eh_wrap_2pi(e->phase + (0.0020f + mirror_t * 0.011f) * (0.10f + speed_curve * 1.60f) * (speed_i < 0 ? -1.0f : 1.0f));
+        e->time = eh_wrap_2pi(e->time + (0.0015f + flow_t * 0.006f + geom_t * 0.003f) * (0.16f + speed_curve * 1.85f));
+        e->phase = eh_wrap_2pi(e->phase + (0.0020f + mirror_t * 0.011f) * (0.10f + speed_curve * 1.60f) * (speed_i < 0 ? -1.0f : 1.0f));
+    }
     eh_lut_sincos_fast(e, e->phase, &phase_s, &phase_c);
 
-    e->grid_cell = 18 + (soft_i >> 3) - (flow_i >> 4);
-    if (e->grid_cell < 10) e->grid_cell = 10;
-    else if (e->grid_cell > 34) e->grid_cell = 34;
+#pragma omp single
+    {
+        e->grid_cell = 18 + (soft_i >> 3) - (flow_i >> 4);
+        if (e->grid_cell < 10) e->grid_cell = 10;
+        else if (e->grid_cell > 34) e->grid_cell = 34;
+    }
 
     src_y = e->src_y;
     old_y = e->paint_y;
@@ -895,9 +905,12 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     decay_lut = e->decay_lut;
     glow_lut = e->glow_lut;
 
-    veejay_memcpy(src_y, Y, len);
+#pragma omp single
+    {
+        veejay_memcpy(src_y, Y, len);
 
-    eh_build_cathedral_force(e, src_y, prev_y, flow_i, geom_i, mirror_i, pull_i, trail_i, speed_i, soft_i);
+        eh_build_cathedral_force(e, src_y, prev_y, flow_i, geom_i, mirror_i, pull_i, trail_i, speed_i, soft_i);
+    }
 
     source_base = (0.004f + source_t * source_t * 0.078f) * (1.0f - trail_t * 0.48f);
     source_base = eh_clampf(source_base, 0.003f, 0.095f);
@@ -910,7 +923,7 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     qcols = (w + 3) >> 2;
     qrows = (h + 3) >> 2;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
+#pragma omp for schedule(static)
     for (qy = 0; qy < qrows; qy++) {
         int yy = qy << 2;
         int qx;
@@ -1063,13 +1076,16 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
+#pragma omp single
     {
-        uint8_t *tmp;
-        tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
-        tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
-        tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
-        tmp = e->charge; e->charge = e->next_charge; e->next_charge = tmp;
-    }
+        {
+            uint8_t *tmp;
+            tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
+            tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
+            tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
+            tmp = e->charge; e->charge = e->next_charge; e->next_charge = tmp;
+        }
 
-    e->frame++;
+        e->frame++;
+    }
 }

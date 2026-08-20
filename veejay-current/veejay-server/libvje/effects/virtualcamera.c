@@ -54,7 +54,6 @@ typedef struct {
     float shake_env;
     uint32_t frame_no;
     int is_initialized;
-    int n_threads;
     int w;
     int h;
 } virtualcam_t;
@@ -273,7 +272,6 @@ void *virtualcamera_malloc(int w, int h)
     c->w = w;
     c->h = h;
 
-    c->n_threads = vje_advise_num_threads((int)plane_size);
 
     return (void*) c;
 }
@@ -321,16 +319,19 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
     const int lock_aspect  = args[P_LOCK_ASPECT] ? 1 : 0;
     const int edge_black   = args[P_EDGE_MODE] ? 1 : 0;
 
-    if(!c->is_initialized) {
-        c->speed_env = (float)speed_arg;
-        c->zoom_env = (float)zoom_arg;
-        c->pan_env = (float)pan_arg;
-        c->shake_env = (float)shake_arg;
-    } else {
-        c->speed_env = virtualcamera_smoothf(c->speed_env, (float)speed_arg, 0.16f, 0.10f);
-        c->zoom_env = virtualcamera_smoothf(c->zoom_env, (float)zoom_arg, 0.28f, 0.090f);
-        c->pan_env = virtualcamera_smoothf(c->pan_env, (float)pan_arg, 0.18f, 0.075f);
-        c->shake_env = virtualcamera_smoothf(c->shake_env, (float)shake_arg, 0.42f, 0.120f);
+#pragma omp single
+    {
+        if(!c->is_initialized) {
+            c->speed_env = (float)speed_arg;
+            c->zoom_env = (float)zoom_arg;
+            c->pan_env = (float)pan_arg;
+            c->shake_env = (float)shake_arg;
+        } else {
+            c->speed_env = virtualcamera_smoothf(c->speed_env, (float)speed_arg, 0.16f, 0.10f);
+            c->zoom_env = virtualcamera_smoothf(c->zoom_env, (float)zoom_arg, 0.28f, 0.090f);
+            c->pan_env = virtualcamera_smoothf(c->pan_env, (float)pan_arg, 0.18f, 0.075f);
+            c->shake_env = virtualcamera_smoothf(c->shake_env, (float)shake_arg, 0.42f, 0.120f);
+        }
     }
 
     const float target_x_base = ((float)target_x_arg * (float)w) * 0.001f;
@@ -363,17 +364,20 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
 
     const float fov_speed = clampf(0.12f + speed * 0.58f + zoom_t * 0.24f, 0.015f, 0.94f);
 
-    if(!c->is_initialized) {
-        c->current_x = target_x;
-        c->current_y = target_y;
-        c->current_fov_w = fov_w_target;
-        c->current_fov_h = fov_h_target;
-        c->is_initialized = 1;
-    } else {
-        c->current_x += (target_x - c->current_x) * speed;
-        c->current_y += (target_y - c->current_y) * speed;
-        c->current_fov_w += (fov_w_target - c->current_fov_w) * fov_speed;
-        c->current_fov_h += (fov_h_target - c->current_fov_h) * fov_speed;
+#pragma omp single
+    {
+        if(!c->is_initialized) {
+            c->current_x = target_x;
+            c->current_y = target_y;
+            c->current_fov_w = fov_w_target;
+            c->current_fov_h = fov_h_target;
+            c->is_initialized = 1;
+        } else {
+            c->current_x += (target_x - c->current_x) * speed;
+            c->current_y += (target_y - c->current_y) * speed;
+            c->current_fov_w += (fov_w_target - c->current_fov_w) * fov_speed;
+            c->current_fov_h += (fov_h_target - c->current_fov_h) * fov_speed;
+        }
     }
 
     float sample_x = c->current_x;
@@ -411,7 +415,6 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
 
     int *restrict xmap = c->xmap;
 
-#pragma omp parallel num_threads(c->n_threads)
     {
         virtualcamera_build_xmap(c, w, edge_black, start_x_fp, step_x_fp);
 
@@ -469,13 +472,17 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 
     const size_t plane_size = (size_t)w * (size_t)h;
 
-    veejay_memcpy(frame->data[0], c->buf[0], plane_size);
-    veejay_memcpy(frame->data[1], c->buf[1], plane_size);
-    veejay_memcpy(frame->data[2], c->buf[2], plane_size);
+#pragma omp single
+    {
+        veejay_memcpy(frame->data[0], c->buf[0], plane_size);
+        veejay_memcpy(frame->data[1], c->buf[1], plane_size);
+        veejay_memcpy(frame->data[2], c->buf[2], plane_size);
 
-    c->frame_no++;
+        c->frame_no++;
+    }
 }

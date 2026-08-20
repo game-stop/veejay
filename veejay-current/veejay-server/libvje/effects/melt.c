@@ -52,7 +52,6 @@ typedef struct {
     int32_t time_q16;
     int first_frame;
     uint32_t seed;
-    int n_threads;
 } melt_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -183,7 +182,6 @@ void *melt_malloc(int w, int h)
     t->time_q16 = 0;
     t->first_frame = 1;
     t->seed = 0x12345678u;
-    t->n_threads = vje_advise_num_threads(len);
 
     init_trig_lut_q14();
 
@@ -218,11 +216,14 @@ void melt_apply(void *ptr, VJFrame *A, int *args)
     int32_t *restrict vx = t->vx;
     int32_t *restrict vy = t->vy;
 
-    if(t->first_frame) {
-        veejay_memcpy(bufY, srcY, len);
-        veejay_memcpy(bufU, srcU, len);
-        veejay_memcpy(bufV, srcV, len);
-        t->first_frame = 0;
+#pragma omp single
+    {
+        if(t->first_frame) {
+            veejay_memcpy(bufY, srcY, len);
+            veejay_memcpy(bufU, srcU, len);
+            veejay_memcpy(bufV, srcV, len);
+            t->first_frame = 0;
+        }
     }
 
     const int32_t ce_factor = curl_amt * ((speed_q8 * intensity) >> 4);
@@ -230,7 +231,6 @@ void melt_apply(void *ptr, VJFrame *A, int *args)
     const int32_t w_minus1 = (int32_t)width - 1;
     const int32_t h_minus1 = (int32_t)height - 1;
 
-#pragma omp parallel num_threads(t->n_threads)
     {
         if(alpha_perc > 0) {
 #pragma omp for schedule(static)
@@ -307,7 +307,11 @@ void melt_apply(void *ptr, VJFrame *A, int *args)
             bufU[i] = srcU[i];
             bufV[i] = srcV[i];
         }
+    #pragma omp barrier
     }
 
-    t->seed++;
+#pragma omp single
+    {
+        t->seed++;
+    }
 }

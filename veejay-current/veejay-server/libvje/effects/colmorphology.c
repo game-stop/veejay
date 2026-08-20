@@ -34,7 +34,6 @@ static const uint8_t kernels[8][9] = {
 
 typedef struct {
     uint8_t *binary_img;
-    int n_threads;
 } colmorph_t;
 
 vj_effect *colmorphology_init(int w, int h)
@@ -83,7 +82,6 @@ void *colmorphology_malloc(int w, int h)
         return NULL;
     }
 
-    c->n_threads = vje_advise_num_threads(w * h);
     return c;
 }
 
@@ -133,11 +131,13 @@ void colmorphology_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t *restrict k = kernels[type];
 
     if(width < 3 || height < 3) {
-        veejay_memset(Y, pixel_Y_lo_, len);
+        #pragma omp single
+        {
+            veejay_memset(Y, pixel_Y_lo_, len);
+        }
         return;
     }
 
-#pragma omp parallel num_threads(c->n_threads)
     {
 #pragma omp for simd schedule(static)
         for(int i = 0; i < len; i++)
@@ -184,6 +184,7 @@ void colmorphology_apply(void *ptr, VJFrame *frame, int *args)
                     dst_row[x] = r1[x] == 0x00 ? pixel_Y_lo_ : do_erode(k, r0, r1, r2, x);
             }
         }
+    #pragma omp barrier
     }
 }
 

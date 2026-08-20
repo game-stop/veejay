@@ -69,7 +69,6 @@ void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
     const int hue_arg = args[3];
     const int len = frame->len;
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
-    const int n_threads = vje_advise_num_threads(uv_len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -100,7 +99,7 @@ void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
     const float sin_val = a_sin(hue_shift);
     const int inv_opacity = 255 - opacity;
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < uv_len; i++)
     {
         int u = (int)U[i] - 128;

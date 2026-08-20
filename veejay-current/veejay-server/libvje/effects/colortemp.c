@@ -871,22 +871,22 @@ void colortemp_apply(void *ptr, VJFrame *frame, int *args)
     int iu = 128;
     int iv = 128;
     uint64_t sum = 0;
-    const int n_threads = vje_advise_num_threads(len);
 
     _rgb2yuv(blackbody_t[temperature].r, blackbody_t[temperature].g, blackbody_t[temperature].b, iy, iu, iv);
 
     iu -= 128;
     iv -= 128;
 
-#pragma omp parallel num_threads(n_threads)
     {
         if(mode == 1)
         {
-#pragma omp for reduction(+:sum) schedule(static)
-            for(int i = 0; i < len; i++)
-                sum += Y[i];
+#pragma omp single copyprivate(sum)
+{
+    for(int i = 0; i < len; i++)
+                    sum += Y[i];
+}
 
-#pragma omp single
+#pragma omp single copyprivate(opacity)
             {
                 opacity = (int)(sum / (uint64_t)len);
             }
@@ -904,6 +904,7 @@ void colortemp_apply(void *ptr, VJFrame *frame, int *args)
             U[i] = (uint8_t)clampi(u, 0, 255);
             V[i] = (uint8_t)clampi(v, 0, 255);
         }
+    #pragma omp barrier
     }
 }
 

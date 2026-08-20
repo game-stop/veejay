@@ -24,7 +24,6 @@
 
 typedef struct {
     uint8_t *binary_img;
-    int n_threads;
 } diffmap_t;
 
 vj_effect *differencemap_init(int w, int h)
@@ -79,7 +78,6 @@ void *differencemap_malloc(int w, int h)
         return NULL;
     }
 
-    d->n_threads = vje_advise_num_threads(len);
 
     return d;
 }
@@ -120,10 +118,16 @@ void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict binary_img = d->binary_img;
     uint8_t *restrict previous_img = binary_img + len;
 
-    vj_frame_copy1(Y, previous_img, len);
+    #pragma omp single
+    {
+        vj_frame_copy1(Y, previous_img, len);
+    }
 
     VJFrame tmp;
-    veejay_memcpy(&tmp, frame, sizeof(VJFrame));
+    #pragma omp single copyprivate(tmp)
+    {
+        veejay_memcpy(&tmp, frame, sizeof(VJFrame));
+    }
     tmp.data[0] = previous_img;
 
     softblur_apply_internal(&tmp);
@@ -131,20 +135,26 @@ void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     if(show)
     {
-        vj_frame_copy1(binary_img, Y, len);
-        vj_frame_clear1(Cb, 128, uv_len);
-        vj_frame_clear1(Cr, 128, uv_len);
+        #pragma omp single
+        {
+            vj_frame_copy1(binary_img, Y, len);
+            vj_frame_clear1(Cb, 128, uv_len);
+            vj_frame_clear1(Cr, 128, uv_len);
+        }
         return;
     }
 
-    veejay_memset(Y, pixel_Y_lo_, len);
-    veejay_memset(Cb, 128, uv_len);
-    veejay_memset(Cr, 128, uv_len);
+    #pragma omp single
+    {
+        veejay_memset(Y, pixel_Y_lo_, len);
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
+    }
 
     if(height < 3 || width < 3)
         return;
 
-    #pragma omp parallel for schedule(static) num_threads(d->n_threads)
+    #pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++)
     {
         const int row = y * width;

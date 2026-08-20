@@ -56,7 +56,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
     void *region;
     uint8_t *src_y;
     uint8_t *paint_y;
@@ -1119,7 +1118,6 @@ void *eventhorizon_malloc(int w, int h)
     e->len = (int) len;
     e->seeded = 0;
     e->frame = 0;
-    e->n_threads = vje_advise_num_threads((int) len);
 
     gridcap = (size_t) (((w + 7) / 8) + 2) * (size_t) (((h + 7) / 8) + 2);
     total = len * 15 + sizeof(float) * ((size_t) w + gridcap * 9 + ((size_t) w + (size_t) h) * 4) + sizeof(uint16_t) * ((size_t) w + (size_t) h) * 4 + 128;
@@ -2745,8 +2743,11 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     U = frame->data[1];
     V = frame->data[2];
 
-    if (!e->seeded)
-        eh_seed(e, frame);
+#pragma omp single
+    {
+        if (!e->seeded)
+            eh_seed(e, frame);
+    }
 
     build_i = args[P_BUILD];
     source_i = args[P_SOURCE];
@@ -2778,12 +2779,18 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     if (speed_i == 0)
         motion_scale = 0.0f;
 
-    eh_build_luts(e, smoke_i, decay_i, density_i, flow_i, lens_i);
+#pragma omp single
+    {
+        eh_build_luts(e, smoke_i, decay_i, density_i, flow_i, lens_i);
+    }
 
     mature_rate = 0.0005f + build_t * build_t * 0.0500f;
-    e->maturity += (1.0f - e->maturity) * mature_rate;
-    if (e->maturity > 1.0f)
-        e->maturity = 1.0f;
+#pragma omp single
+    {
+        e->maturity += (1.0f - e->maturity) * mature_rate;
+        if (e->maturity > 1.0f)
+            e->maturity = 1.0f;
+    }
 
     src_mix = eh_lerpf(0.0008f + source_t * 0.035f + source_t * source_t * 0.185f,
                        0.0006f + source_t * 0.018f + source_t * source_t * 0.092f,
@@ -2794,7 +2801,10 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     chroma_src_mix = src_mix + 0.0020f + source_t * 0.045f + (1.0f - trail_t) * 0.006f;
     chroma_src_mix = eh_clampf(chroma_src_mix, 0.0020f, 0.30f);
     chroma_gain = 0.982f + chroma_t * 0.022f + chroma_t * chroma_t * 0.118f;
-    eh_update_palette(e, chroma_t);
+#pragma omp single
+    {
+        eh_update_palette(e, chroma_t);
+    }
 
     lens_curve = eh_smooth01(lens_t);
     flow_pixels = (0.35f + e->maturity * 1.18f) * (0.55f + flow_t * 3.50f + flow_t * flow_t * 14.5f) * (0.60f + speed_mag * 0.82f);
@@ -2815,11 +2825,14 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     shadow_scale = (12.0f + lens_curve * 26.0f + density_t * 9.0f) * lens_curve;
     redshift_scale = (12.0f + lens_curve * 24.0f + density_t * 10.0f) * lens_curve;
 
-    e->time = eh_wrap_2pi(e->time + (0.0011f + flow_t * 0.0110f + spin_abs * 0.0040f) * motion_scale);
-    e->orbit = eh_wrap_2pi(e->orbit + (0.0022f + lens_curve * 0.0080f + fold_t * 0.0120f) * motion_scale * (speed_i < 0 ? -1.0f : 1.0f));
-    e->spin_phase1 = eh_wrap_2pi(e->spin_phase1 + (0.009f + spin_abs * 0.090f + lens_curve * 0.018f) * motion_scale * (spin_i < 0 ? -1.0f : 1.0f));
-    e->spin_phase2 = eh_wrap_2pi(e->spin_phase2 - (0.008f + spin_abs * 0.078f + lens_curve * 0.016f) * motion_scale * (spin_i < 0 ? -1.0f : 1.0f));
-    e->pulse = e->pulse * 0.95f + (eh_lut_sin(e, e->time * 0.73f) * 0.5f + 0.5f) * lens_curve * flow_t * 0.010f;
+#pragma omp single
+    {
+        e->time = eh_wrap_2pi(e->time + (0.0011f + flow_t * 0.0110f + spin_abs * 0.0040f) * motion_scale);
+        e->orbit = eh_wrap_2pi(e->orbit + (0.0022f + lens_curve * 0.0080f + fold_t * 0.0120f) * motion_scale * (speed_i < 0 ? -1.0f : 1.0f));
+        e->spin_phase1 = eh_wrap_2pi(e->spin_phase1 + (0.009f + spin_abs * 0.090f + lens_curve * 0.018f) * motion_scale * (spin_i < 0 ? -1.0f : 1.0f));
+        e->spin_phase2 = eh_wrap_2pi(e->spin_phase2 - (0.008f + spin_abs * 0.078f + lens_curve * 0.016f) * motion_scale * (spin_i < 0 ? -1.0f : 1.0f));
+        e->pulse = e->pulse * 0.95f + (eh_lut_sin(e, e->time * 0.73f) * 0.5f + 0.5f) * lens_curve * flow_t * 0.010f;
+    }
 
     eh_lut_sincos(e, e->spin_phase1 + e->orbit, &wave_s, &wave_c);
 
@@ -2830,13 +2843,16 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
 
     tone_mix = (int) (lens_curve * 168.0f + chroma_t * 6.0f + 0.5f);
     tone_mix = clampi(tone_mix, 0, 255);
-    if (!e->tone_lut_valid || e->last_tone_mix != tone_mix) {
-        for (i = 0; i < 256; i++) {
-            int g = e->gamma_lut[i];
-            e->tone_lut[i] = eh_u8i(i + (((g - i) * tone_mix + 127) / 255));
+#pragma omp single
+    {
+        if (!e->tone_lut_valid || e->last_tone_mix != tone_mix) {
+            for (i = 0; i < 256; i++) {
+                int g = e->gamma_lut[i];
+                e->tone_lut[i] = eh_u8i(i + (((g - i) * tone_mix + 127) / 255));
+            }
+            e->last_tone_mix = tone_mix;
+            e->tone_lut_valid = 1;
         }
-        e->last_tone_mix = tone_mix;
-        e->tone_lut_valid = 1;
     }
 
     rise_step = 1 + (flow_i * 3 + 50) / 100;
@@ -2845,7 +2861,10 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
         flow_cell = 12;
     else if (flow_cell > 72)
         flow_cell = 72;
-    eh_build_flow_grid(e, flow_cell, fluid_persistence);
+#pragma omp single
+    {
+        eh_build_flow_grid(e, flow_cell, fluid_persistence);
+    }
 
     force_cell = 22 + ((100 - lens_i) * 18 + 50) / 100 - (flow_i * 8 + 50) / 100 - (swirl_i * 4 + 50) / 100;
     if (force_cell < 10)
@@ -2869,18 +2888,21 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
     nx_off = e->nx_off_y;
     nx_veil = e->nx_veil;
 
-    veejay_memcpy(src_y, Y, len);
+#pragma omp single
+    {
+        veejay_memcpy(src_y, Y, len);
 
-    eh_build_light_force_grid(e, src_y, prev_y, force_cell, gravity_gain, vortex_gain,
-                              lens_curve, flow_t, motion_scale,
-                              0.24f + trail_t * 0.34f);
-    if ((e->frame & 1) == 0 || e->drop_w != e->force_w || e->drop_h != e->force_h || e->drop_cell != force_cell)
-        eh_update_drop_field(e, force_cell, lens_curve, flow_t, smoke_t, density_t, trail_t, motion_scale);
+        eh_build_light_force_grid(e, src_y, prev_y, force_cell, gravity_gain, vortex_gain,
+                                  lens_curve, flow_t, motion_scale,
+                                  0.24f + trail_t * 0.34f);
+        if ((e->frame & 1) == 0 || e->drop_w != e->force_w || e->drop_h != e->force_h || e->drop_cell != force_cell)
+            eh_update_drop_field(e, force_cell, lens_curve, flow_t, smoke_t, density_t, trail_t, motion_scale);
+    }
 
     qcols = (w + 7) >> 3;
     qrows = (h + 7) >> 3;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
+#pragma omp for schedule(static)
     for (qy = 0; qy < qrows; qy++) {
         int yy = qy << 3;
         int qx;
@@ -2962,15 +2984,18 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
+#pragma omp single
     {
-        uint8_t *tmp;
-        tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
-        tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
-        tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
-        tmp = e->on_y; e->on_y = e->nx_on_y; e->nx_on_y = tmp;
-        tmp = e->off_y; e->off_y = e->nx_off_y; e->nx_off_y = tmp;
-        tmp = e->veil; e->veil = e->nx_veil; e->nx_veil = tmp;
-    }
+        {
+            uint8_t *tmp;
+            tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
+            tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
+            tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
+            tmp = e->on_y; e->on_y = e->nx_on_y; e->nx_on_y = tmp;
+            tmp = e->off_y; e->off_y = e->nx_off_y; e->nx_off_y = tmp;
+            tmp = e->veil; e->veil = e->nx_veil; e->nx_veil = tmp;
+        }
 
-    e->frame++;
+        e->frame++;
+    }
 }

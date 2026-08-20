@@ -59,7 +59,6 @@ typedef struct {
     int smooth_init;
     int n__;
     int N__;
-    int n_threads;
     void *motionmap;
 } sinoids_t;
 
@@ -233,7 +232,6 @@ void *sinoids_malloc(int width, int height)
     s->n__ = 0;
     s->N__ = 0;
     s->motionmap = NULL;
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*)s;
 }
@@ -361,27 +359,30 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
     int interpolate = 0;
     int motion = 0;
 
-    if(s->motionmap && motionmap_active(s->motionmap)) {
-        motionmap_scale_to(
-            s->motionmap,
-            1,
-            1000,
-            0,
-            0,
-            &tmp1,
-            &tmp2,
-            &(s->n__),
-            &(s->N__)
-        );
+    #pragma omp single copyprivate(interpolate, mode, motion, ns)
+    {
+        if(s->motionmap && motionmap_active(s->motionmap)) {
+            motionmap_scale_to(
+                s->motionmap,
+                1,
+                1000,
+                0,
+                0,
+                &tmp1,
+                &tmp2,
+                &(s->n__),
+                &(s->N__)
+            );
 
-        mode = clampi(tmp1, 0, 1);
-        ns = clampi(tmp2, 0, 1000);
-        motion = 1;
-        interpolate = !(s->n__ == s->N__ || s->n__ == 0);
-    }
-    else {
-        s->n__ = 0;
-        s->N__ = 0;
+            mode = clampi(tmp1, 0, 1);
+            ns = clampi(tmp2, 0, 1000);
+            motion = 1;
+            interpolate = !(s->n__ == s->N__ || s->n__ == 0);
+        }
+        else {
+            s->n__ = 0;
+            s->N__ = 0;
+        }
     }
 
     const int width = frame->width;
@@ -393,35 +394,44 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
     const int warp_drive_arg = args[P_WARP_DRIVE];
     const int phase_drive_arg = args[P_PHASE_DRIVE];
 
-    if(!s->smooth_init) {
-        s->sm_sinoids = (float)ns;
-        s->sm_mix = (float)mix_arg;
-        s->sm_chroma = (float)chroma_arg;
-        s->sm_phase = (float)phase_arg;
-        s->sm_drift = (float)drift_arg;
-        s->sm_warp_drive = (float)warp_drive_arg;
-        s->sm_phase_drive = (float)phase_drive_arg;
-        s->smooth_init = 1;
+    #pragma omp single
+    {
+        if(!s->smooth_init) {
+            s->sm_sinoids = (float)ns;
+            s->sm_mix = (float)mix_arg;
+            s->sm_chroma = (float)chroma_arg;
+            s->sm_phase = (float)phase_arg;
+            s->sm_drift = (float)drift_arg;
+            s->sm_warp_drive = (float)warp_drive_arg;
+            s->sm_phase_drive = (float)phase_drive_arg;
+            s->smooth_init = 1;
+        }
     }
 
     const float lane_alpha = 0.30f;
 
-    s->sm_sinoids = sinoids_smoothf(s->sm_sinoids, (float)ns, lane_alpha);
-    s->sm_mix = sinoids_smoothf(s->sm_mix, (float)mix_arg, lane_alpha);
-    s->sm_chroma = sinoids_smoothf(s->sm_chroma, (float)chroma_arg, lane_alpha);
-    s->sm_phase = sinoids_smoothf(s->sm_phase, (float)phase_arg, lane_alpha);
-    s->sm_drift = sinoids_smoothf(s->sm_drift, (float)drift_arg, lane_alpha);
-    s->sm_warp_drive = sinoids_smoothf(s->sm_warp_drive, (float)warp_drive_arg, lane_alpha);
-    s->sm_phase_drive = sinoids_smoothf(s->sm_phase_drive, (float)phase_drive_arg, lane_alpha);
+    #pragma omp single
+    {
+        s->sm_sinoids = sinoids_smoothf(s->sm_sinoids, (float)ns, lane_alpha);
+        s->sm_mix = sinoids_smoothf(s->sm_mix, (float)mix_arg, lane_alpha);
+        s->sm_chroma = sinoids_smoothf(s->sm_chroma, (float)chroma_arg, lane_alpha);
+        s->sm_phase = sinoids_smoothf(s->sm_phase, (float)phase_arg, lane_alpha);
+        s->sm_drift = sinoids_smoothf(s->sm_drift, (float)drift_arg, lane_alpha);
+        s->sm_warp_drive = sinoids_smoothf(s->sm_warp_drive, (float)warp_drive_arg, lane_alpha);
+        s->sm_phase_drive = sinoids_smoothf(s->sm_phase_drive, (float)phase_drive_arg, lane_alpha);
+    }
 
     const int drift_speed = sinoids_signed_speed_from_center((int)(s->sm_drift + 0.5f));
 
-    s->phase_accum += (float)drift_speed * (18.0f / 65536.0f);
+    #pragma omp single
+    {
+        s->phase_accum += (float)drift_speed * (18.0f / 65536.0f);
 
-    while(s->phase_accum >= 1.0f)
-        s->phase_accum -= 1.0f;
-    while(s->phase_accum < 0.0f)
-        s->phase_accum += 1.0f;
+        while(s->phase_accum >= 1.0f)
+            s->phase_accum -= 1.0f;
+        while(s->phase_accum < 0.0f)
+            s->phase_accum += 1.0f;
+    }
 
     const int warp_drive_q = clampi((int)(s->sm_warp_drive + 0.5f), 0, 1000);
     const int phase_drive_q = clampi((int)(s->sm_phase_drive + 0.5f), 0, 1000);
@@ -439,11 +449,13 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
     mix_q8 = clampi(mix_q8 + (((warp_drive_q + phase_drive_q) * 18 + 500) / 2000), 0, 256);
     chroma_q8 = clampi(chroma_q8 + (((warp_drive_q + phase_drive_q) * 24 + 500) / 2000), 0, 256);
 
-    veejay_memcpy(s->sinoid_frame[0], frame->data[0], len);
-    veejay_memcpy(s->sinoid_frame[1], frame->data[1], len);
-    veejay_memcpy(s->sinoid_frame[2], frame->data[2], len);
+    #pragma omp single
+    {
+        veejay_memcpy(s->sinoid_frame[0], frame->data[0], len);
+        veejay_memcpy(s->sinoid_frame[1], frame->data[1], len);
+        veejay_memcpy(s->sinoid_frame[2], frame->data[2], len);
+    }
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         if(rebuild)
             sinoids_recalc(s, width, eff_sinoids, eff_phase_q16);
@@ -455,13 +467,17 @@ void sinoids_apply(void *ptr, VJFrame *frame, int *args)
         else {
             sinoids_apply_copy_mix(s, frame, mix_q8, chroma_q8);
         }
+    #pragma omp barrier
     }
 
-    if(interpolate)
-        motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
+    #pragma omp single
+    {
+        if(interpolate)
+            motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
 
-    if(motion)
-        motionmap_store_frame(s->motionmap, frame);
+        if(motion)
+            motionmap_store_frame(s->motionmap, frame);
+    }
 }
 
 

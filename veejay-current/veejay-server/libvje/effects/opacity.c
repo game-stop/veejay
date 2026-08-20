@@ -94,19 +94,20 @@ static void opacity_blend_yuv(uint8_t *restrict Y1,
                               int uv_len,
                               int opacity)
 {
-    const int n_threads = vje_advise_num_threads(len);
 
     if(opacity <= 0)
         return;
 
     if(opacity >= 255) {
-        veejay_memcpy(Y1, Y2, len);
-        veejay_memcpy(Cb1, Cb2, uv_len);
-        veejay_memcpy(Cr1, Cr2, uv_len);
+        #pragma omp single
+        {
+            veejay_memcpy(Y1, Y2, len);
+            veejay_memcpy(Cb1, Cb2, uv_len);
+            veejay_memcpy(Cr1, Cr2, uv_len);
+        }
         return;
     }
 
-#pragma omp parallel num_threads(n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -117,6 +118,7 @@ static void opacity_blend_yuv(uint8_t *restrict Y1,
             Cb1[i] = opacity_blend_u8(Cb1[i], Cb2[i], opacity);
             Cr1[i] = opacity_blend_u8(Cr1[i], Cr2[i], opacity);
         }
+    #pragma omp barrier
     }
 }
 

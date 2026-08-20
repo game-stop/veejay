@@ -60,7 +60,6 @@ typedef struct {
     int cw;
     int ch;
     int initialized;
-    int n_threads;
     float maturity;
     uint32_t frame_no;
 } ghostwash_t;
@@ -465,7 +464,6 @@ void *ghostwash_malloc(int w, int h)
     p->initialized = 0;
     p->maturity = 0.0f;
     p->frame_no = 0;
-    p->n_threads = vje_advise_num_threads((int)clen_sz);
 
     return (void *)p;
 }
@@ -851,24 +849,27 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    if (!p->initialized) {
-        for (int y = 0; y < ch; y++) {
-            const int row = y * cw;
-            for (int x = 0; x < cw; x++) {
-                const int idx = row + x;
-                p->canvas_y[idx] = downsample_src_plane_2x2(Y, x, y, w, h);
-                p->canvas_u[idx] = downsample_src_plane_2x2(U, x, y, w, h);
-                p->canvas_v[idx] = downsample_src_plane_2x2(V, x, y, w, h);
-                p->next_y[idx] = p->canvas_y[idx];
-                p->next_u[idx] = p->canvas_u[idx];
-                p->next_v[idx] = p->canvas_v[idx];
-                p->prev_src_y[idx] = p->canvas_y[idx];
+    #pragma omp single
+    {
+        if (!p->initialized) {
+            for (int y = 0; y < ch; y++) {
+                const int row = y * cw;
+                for (int x = 0; x < cw; x++) {
+                    const int idx = row + x;
+                    p->canvas_y[idx] = downsample_src_plane_2x2(Y, x, y, w, h);
+                    p->canvas_u[idx] = downsample_src_plane_2x2(U, x, y, w, h);
+                    p->canvas_v[idx] = downsample_src_plane_2x2(V, x, y, w, h);
+                    p->next_y[idx] = p->canvas_y[idx];
+                    p->next_u[idx] = p->canvas_u[idx];
+                    p->next_v[idx] = p->canvas_v[idx];
+                    p->prev_src_y[idx] = p->canvas_y[idx];
+                }
             }
-        }
 
-        p->initialized = 1;
-        p->maturity = 0.0f;
-        p->frame_no = 0;
+            p->initialized = 1;
+            p->maturity = 0.0f;
+            p->frame_no = 0;
+        }
     }
 
     const float fade_param = 0.35f;
@@ -905,10 +906,13 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     const float color_strength_curve = color_strength_param * color_strength_param;
 
     const float mature_rate = 0.0004f + fade_curve * 0.0350f;
-    p->maturity += (1.0f - p->maturity) * mature_rate;
+    #pragma omp single
+    {
+        p->maturity += (1.0f - p->maturity) * mature_rate;
 
-    if (p->maturity > 1.0f)
-        p->maturity = 1.0f;
+        if (p->maturity > 1.0f)
+            p->maturity = 1.0f;
+    }
 
     const float maturity = p->maturity;
     const float early_source = 0.004f + source_curve * 0.360f;
@@ -950,7 +954,12 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     if (cell < 7) cell = 7;
     if (cell > 40) cell = 40;
 
-    if (!ghostwash_ensure_grid(p, cw, ch, cell))
+    int vje_omp_return_condition;
+    #pragma omp single copyprivate(vje_omp_return_condition)
+    {
+        vje_omp_return_condition = !!(!ghostwash_ensure_grid(p, cw, ch, cell));
+    }
+    if (vje_omp_return_condition)
         return;
 
     float lut[41];
@@ -958,7 +967,10 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     for (int i = 0; i <= cell; i++)
         lut[i] = smoothstepf_local((float)i / (float)cell);
 
-    build_flow_grid(p, cw, ch, cell);
+    #pragma omp single
+    {
+        build_flow_grid(p, cw, ch, cell);
+    }
 
     const int gw = (cw + cell - 1) / cell + 2;
     const int gh = (ch + cell - 1) / cell + 2;
@@ -973,49 +985,55 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     const float shear_phase = time_phase * (0.40f + instability_param * 1.60f);
     const float shear_freq = 0.020f + flow_size_param * 0.090f;
 
-    if (geometry_mode == 3) {
-        for (int y = 0; y < ch; y++)
-            p->shear_y[y] = sinf((float)y * shear_freq + shear_phase);
+    #pragma omp single
+    {
+        if (geometry_mode == 3) {
+            for (int y = 0; y < ch; y++)
+                p->shear_y[y] = sinf((float)y * shear_freq + shear_phase);
 
-        for (int x = 0; x < cw; x++)
-            p->shear_x[x] = sinf((float)x * shear_freq * 0.73f + shear_phase * 1.31f);
+            for (int x = 0; x < cw; x++)
+                p->shear_x[x] = sinf((float)x * shear_freq * 0.73f + shear_phase * 1.31f);
+        }
     }
 
     const float inv_max_dim = 1.0f / ((float)((cw > ch) ? cw : ch) * 0.5f + 1.0f);
     const float half_cw = (float)cw * 0.5f;
     const float half_ch = (float)ch * 0.5f;
 
-    if (geometry_mode == 8) {
-        const float tri_angle = time_phase * (0.18f + instability_param * 0.42f);
-        const float tri_ca = cosf(tri_angle);
-        const float tri_sa = sinf(tri_angle);
+    #pragma omp single
+    {
+        if (geometry_mode == 8) {
+            const float tri_angle = time_phase * (0.18f + instability_param * 0.42f);
+            const float tri_ca = cosf(tri_angle);
+            const float tri_sa = sinf(tri_angle);
 
-        for (int x = 0; x < cw; x++) {
-            const float nx = ((float)x - half_cw) * inv_max_dim;
-            p->poly_rx_x[x] = nx * tri_ca;
-            p->poly_ry_x[x] = nx * tri_sa;
-        }
+            for (int x = 0; x < cw; x++) {
+                const float nx = ((float)x - half_cw) * inv_max_dim;
+                p->poly_rx_x[x] = nx * tri_ca;
+                p->poly_ry_x[x] = nx * tri_sa;
+            }
 
-        for (int y = 0; y < ch; y++) {
-            const float ny = ((float)y - half_ch) * inv_max_dim;
-            p->poly_rx_y[y] = -ny * tri_sa;
-            p->poly_ry_y[y] =  ny * tri_ca;
-        }
-    } else if (geometry_mode == 9) {
-        const float rect_angle = -time_phase * (0.14f + instability_param * 0.36f);
-        const float rect_ca = cosf(rect_angle);
-        const float rect_sa = sinf(rect_angle);
+            for (int y = 0; y < ch; y++) {
+                const float ny = ((float)y - half_ch) * inv_max_dim;
+                p->poly_rx_y[y] = -ny * tri_sa;
+                p->poly_ry_y[y] =  ny * tri_ca;
+            }
+        } else if (geometry_mode == 9) {
+            const float rect_angle = -time_phase * (0.14f + instability_param * 0.36f);
+            const float rect_ca = cosf(rect_angle);
+            const float rect_sa = sinf(rect_angle);
 
-        for (int x = 0; x < cw; x++) {
-            const float nx = ((float)x - half_cw) * inv_max_dim;
-            p->poly_rx_x[x] = nx * rect_ca;
-            p->poly_ry_x[x] = nx * rect_sa;
-        }
+            for (int x = 0; x < cw; x++) {
+                const float nx = ((float)x - half_cw) * inv_max_dim;
+                p->poly_rx_x[x] = nx * rect_ca;
+                p->poly_ry_x[x] = nx * rect_sa;
+            }
 
-        for (int y = 0; y < ch; y++) {
-            const float ny = ((float)y - half_ch) * inv_max_dim;
-            p->poly_rx_y[y] = -ny * rect_sa;
-            p->poly_ry_y[y] =  ny * rect_ca;
+            for (int y = 0; y < ch; y++) {
+                const float ny = ((float)y - half_ch) * inv_max_dim;
+                p->poly_rx_y[y] = -ny * rect_sa;
+                p->poly_ry_y[y] =  ny * rect_ca;
+            }
         }
     }
 
@@ -1028,7 +1046,6 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict next_v = p->next_v;
     uint8_t *restrict prev_y = p->prev_src_y;
 
-#pragma omp parallel num_threads(p->n_threads)
     {
         ghostwash_dispatch_advection(
             p,
@@ -1075,14 +1092,18 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp barrier
         ghostwash_render_fullres(p, frame, mono_mode);
+    #pragma omp barrier
     }
 
+    #pragma omp single
     {
-        uint8_t *tmp;
-        tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
-        tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
-        tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
-    }
+        {
+            uint8_t *tmp;
+            tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
+            tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
+            tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
+        }
 
-    p->frame_no++;
+        p->frame_no++;
+    }
 }

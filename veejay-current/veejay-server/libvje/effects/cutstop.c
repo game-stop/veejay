@@ -27,7 +27,6 @@
 typedef struct {
     uint8_t *vvcutstop_buffer[4];
     unsigned int frq_cnt;
-    int n_threads;
 } cutstop_t;
 
 vj_effect *cutstop_init(int width, int height)
@@ -92,7 +91,6 @@ void *cutstop_malloc(int width, int height)
     veejay_memset(c->vvcutstop_buffer[1], 128, len * 2);
 
     c->frq_cnt = 256;
-    c->n_threads = vje_advise_num_threads(len);
 
     return c;
 }
@@ -194,17 +192,19 @@ void cutstop_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Ud = frame->data[1];
     uint8_t *restrict Vd = frame->data[2];
 
-    c->frq_cnt += (unsigned int)freq;
-
-    if(freq == 255 || c->frq_cnt > 255)
+#pragma omp single
     {
-        veejay_memcpy(Yb, Yd, len);
-        veejay_memcpy(Ub, Ud, uv_len);
-        veejay_memcpy(Vb, Vd, uv_len);
-        c->frq_cnt = 0;
+        c->frq_cnt += (unsigned int)freq;
+
+        if(freq == 255 || c->frq_cnt > 255)
+        {
+            veejay_memcpy(Yb, Yd, len);
+            veejay_memcpy(Ub, Ud, uv_len);
+            veejay_memcpy(Vb, Vd, uv_len);
+            c->frq_cnt = 0;
+        }
     }
 
-#pragma omp parallel num_threads(c->n_threads)
     {
         if(uv_len == len)
         {
@@ -248,6 +248,7 @@ void cutstop_apply(void *ptr, VJFrame *frame, int *args)
                 Vd[i] = Vb[i];
             }
         }
+    #pragma omp barrier
     }
 
 }

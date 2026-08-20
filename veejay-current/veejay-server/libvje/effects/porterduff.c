@@ -352,11 +352,9 @@ void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int mode = args[P_OPERATOR];
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
     uint8_t *restrict A = frame->data[0];
     const uint8_t *restrict B = frame2->data[0];
 
-#pragma omp parallel num_threads(n_threads)
     {
         switch(mode) {
             case 0:
@@ -409,5 +407,6 @@ void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                 porterduff_overlay(A, B, len);
                 break;
         }
+    #pragma omp barrier
     }
 }

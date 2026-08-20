@@ -26,7 +26,6 @@ typedef struct
     uint32_t *integralY;
     uint32_t *integralU;
     uint32_t *integralV;
-    int n_threads;
 } boxfit_t;
 
 static inline int boxfit_clampi(int v, int lo, int hi)
@@ -98,7 +97,6 @@ void *boxfit_malloc(int w, int h)
     s->buf[2] = s->buf[1] + plane_size;
     s->integralU = s->integralY + integral_size;
     s->integralV = s->integralU + integral_size;
-    s->n_threads = vje_advise_num_threads(plane_size);
 
     return s;
 }
@@ -157,7 +155,7 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
         size_lut[i] = boxfit_clampi(sz, min_s, max_s);
     }
 
-    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int c = 0; c < 3; c++)
     {
         const uint8_t *restrict src = frame->data[c];
@@ -184,78 +182,81 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
 
     int i = 0;
 
-    while(i < height)
+    #pragma omp single
     {
-        const int rem_h = height - i;
-        const int sh = min_s < rem_h ? min_s : rem_h;
-        const int sw0 = min_s < width ? min_s : width;
-        const int r_area = sw0 * sh;
-        int r_avg = get_rect_sum(s->integralY, stride, 0, i, sw0, sh) / r_area;
-        int row_h = size_lut[r_avg];
-
-        if(row_h > rem_h)
-            row_h = rem_h;
-
-        int j = 0;
-
-        while(j < width)
+        while(i < height)
         {
-            const int rem_w = width - j;
-            const int sw = min_s < rem_w ? min_s : rem_w;
-            const int b_area = sw * row_h;
-            int b_avg = get_rect_sum(s->integralY, stride, j, i, sw, row_h) / b_area;
-            int box_w = size_lut[b_avg];
+            const int rem_h = height - i;
+            const int sh = min_s < rem_h ? min_s : rem_h;
+            const int sw0 = min_s < width ? min_s : width;
+            const int r_area = sw0 * sh;
+            int r_avg = get_rect_sum(s->integralY, stride, 0, i, sw0, sh) / r_area;
+            int row_h = size_lut[r_avg];
 
-            if(box_w > rem_w)
-                box_w = rem_w;
+            if(row_h > rem_h)
+                row_h = rem_h;
 
-            const uint32_t area = (uint32_t)box_w * (uint32_t)row_h;
-            const uint8_t valY = (uint8_t)(get_rect_sum(s->integralY, stride, j, i, box_w, row_h) / area);
-            const uint8_t valU = (uint8_t)(get_rect_sum(s->integralU, stride, j, i, box_w, row_h) / area);
-            const uint8_t valV = (uint8_t)(get_rect_sum(s->integralV, stride, j, i, box_w, row_h) / area);
-            const uint8_t borderY = valY >> 1;
+            int j = 0;
 
-            for(int bi = 0; bi < row_h; bi++)
+            while(j < width)
             {
-                const int row_off = (i + bi) * width + j;
+                const int rem_w = width - j;
+                const int sw = min_s < rem_w ? min_s : rem_w;
+                const int b_area = sw * row_h;
+                int b_avg = get_rect_sum(s->integralY, stride, j, i, sw, row_h) / b_area;
+                int box_w = size_lut[b_avg];
 
-                uint8_t *restrict pY = frame->data[0] + row_off;
-                uint8_t *restrict pU = frame->data[1] + row_off;
-                uint8_t *restrict pV = frame->data[2] + row_off;
+                if(box_w > rem_w)
+                    box_w = rem_w;
 
-                if(show_borders)
+                const uint32_t area = (uint32_t)box_w * (uint32_t)row_h;
+                const uint8_t valY = (uint8_t)(get_rect_sum(s->integralY, stride, j, i, box_w, row_h) / area);
+                const uint8_t valU = (uint8_t)(get_rect_sum(s->integralU, stride, j, i, box_w, row_h) / area);
+                const uint8_t valV = (uint8_t)(get_rect_sum(s->integralV, stride, j, i, box_w, row_h) / area);
+                const uint8_t borderY = valY >> 1;
+
+                for(int bi = 0; bi < row_h; bi++)
                 {
-                    if(bi == 0 || bi == row_h - 1 || box_w <= 2)
+                    const int row_off = (i + bi) * width + j;
+
+                    uint8_t *restrict pY = frame->data[0] + row_off;
+                    uint8_t *restrict pU = frame->data[1] + row_off;
+                    uint8_t *restrict pV = frame->data[2] + row_off;
+
+                    if(show_borders)
                     {
-                        for(int bk = 0; bk < box_w; bk++)
-                            pY[bk] = borderY;
+                        if(bi == 0 || bi == row_h - 1 || box_w <= 2)
+                        {
+                            for(int bk = 0; bk < box_w; bk++)
+                                pY[bk] = borderY;
+                        }
+                        else
+                        {
+                            pY[0] = borderY;
+
+                            for(int bk = 1; bk < box_w - 1; bk++)
+                                pY[bk] = valY;
+
+                            pY[box_w - 1] = borderY;
+                        }
                     }
                     else
                     {
-                        pY[0] = borderY;
-
-                        for(int bk = 1; bk < box_w - 1; bk++)
+                        for(int bk = 0; bk < box_w; bk++)
                             pY[bk] = valY;
+                    }
 
-                        pY[box_w - 1] = borderY;
+                    for(int bk = 0; bk < box_w; bk++)
+                    {
+                        pU[bk] = valU;
+                        pV[bk] = valV;
                     }
                 }
-                else
-                {
-                    for(int bk = 0; bk < box_w; bk++)
-                        pY[bk] = valY;
-                }
 
-                for(int bk = 0; bk < box_w; bk++)
-                {
-                    pU[bk] = valU;
-                    pV[bk] = valV;
-                }
+                j += box_w;
             }
 
-            j += box_w;
+            i += row_h;
         }
-
-        i += row_h;
     }
 }

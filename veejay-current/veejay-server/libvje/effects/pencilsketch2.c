@@ -40,7 +40,6 @@ typedef struct {
     int prev_gamma_arg;
     int prev_contrast;
     int prev_levels;
-    int n_threads;
 } pencilsketch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -193,7 +192,6 @@ void *pencilsketch2_malloc(int w, int h)
         return NULL;
     }
 
-    p->n_threads = vje_advise_num_threads(len);
     p->prev_gamma_arg = -1;
     p->prev_contrast = -1;
     p->prev_levels = -1;
@@ -205,10 +203,9 @@ static void ps2_hblur(uint8_t *restrict dst,
                       const uint8_t *restrict src,
                       int w,
                       int h,
-                      int radius,
-                      int n_threads)
+                      int radius)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++)
         veejay_blur(dst + y * w, src + y * w, w, radius, 1, 1);
 }
@@ -217,10 +214,9 @@ static void ps2_vblur(uint8_t *restrict dst,
                       const uint8_t *restrict src,
                       int w,
                       int h,
-                      int radius,
-                      int n_threads)
+                      int radius)
 {
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int x = 0; x < w; x++)
         veejay_blur(dst + x, src + x, h, radius, w, w);
 }
@@ -244,23 +240,26 @@ void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args)
     if(radius > h)
         radius = h;
 
-    if(gamma_arg != p->prev_gamma_arg || contrast != p->prev_contrast || levels != p->prev_levels)
-        rebuild_master_lut(p, gamma_arg, contrast, levels);
+#pragma omp single
+    {
+        if(gamma_arg != p->prev_gamma_arg || contrast != p->prev_contrast || levels != p->prev_levels)
+            rebuild_master_lut(p, gamma_arg, contrast, levels);
+    }
 
     uint8_t *restrict y_plane = frame->data[0];
     uint8_t *restrict tmp_buf = p->blur_tmp;
     uint8_t *restrict blur_buf = p->blur_final;
 
-#pragma omp parallel for schedule(static) num_threads(p->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         tmp_buf[i] = (uint8_t)(255 - y_plane[i]);
 
-    ps2_hblur(blur_buf, tmp_buf, w, h, radius, p->n_threads);
-    ps2_vblur(tmp_buf, blur_buf, w, h, radius, p->n_threads);
-    ps2_hblur(blur_buf, tmp_buf, w, h, radius, p->n_threads);
-    ps2_vblur(tmp_buf, blur_buf, w, h, radius, p->n_threads);
+    ps2_hblur(blur_buf, tmp_buf, w, h, radius);
+    ps2_vblur(tmp_buf, blur_buf, w, h, radius);
+    ps2_hblur(blur_buf, tmp_buf, w, h, radius);
+    ps2_vblur(tmp_buf, blur_buf, w, h, radius);
 
-#pragma omp parallel for schedule(static) num_threads(p->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         y_plane[i] = p->master_lut[y_plane[i]][tmp_buf[i]];
 
@@ -269,10 +268,13 @@ void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args)
         veejay_histogram_equalize(p->histogram_, frame, 0xff, strength);
     }
 
-    if(grayscale) {
-        const int uv_len = frame->ssm ? len : frame->uv_len;
+#pragma omp single
+    {
+        if(grayscale) {
+            const int uv_len = frame->ssm ? len : frame->uv_len;
 
-        veejay_memset(frame->data[1], 128, uv_len);
-        veejay_memset(frame->data[2], 128, uv_len);
+            veejay_memset(frame->data[1], 128, uv_len);
+            veejay_memset(frame->data[2], 128, uv_len);
+        }
     }
 }

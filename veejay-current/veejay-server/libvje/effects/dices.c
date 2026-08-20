@@ -292,15 +292,18 @@ void dices_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict sCb = d->src[1];
     uint8_t *restrict sCr = d->src[2];
 
-    if((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation))
+    #pragma omp single
     {
-        d->g_cube_bits = cube_bits;
-        d->g_orientation = (uint8_t)orientation;
+        if((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation))
+        {
+            d->g_cube_bits = cube_bits;
+            d->g_orientation = (uint8_t)orientation;
 
-        if(orientation == VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT)
-            dice_create_map(d, width, height);
-        else
-            dice_create_map_orientation(d, width, height, orientation);
+            if(orientation == VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT)
+                dice_create_map(d, width, height);
+            else
+                dice_create_map_orientation(d, width, height, orientation);
+        }
     }
 
     const int g_map_width = d->g_map_width;
@@ -311,14 +314,17 @@ void dices_apply(void *ptr, VJFrame *frame, int *args)
     if(g_map_width <= 0 || g_map_height <= 0 || g_cube_size <= 0)
         return;
 
-    veejay_memcpy(sY, Y, len);
-    veejay_memcpy(sCb, Cb, len);
-    veejay_memcpy(sCr, Cr, len);
+    #pragma omp single
+    {
+        veejay_memcpy(sY, Y, len);
+        veejay_memcpy(sCb, Cb, len);
+        veejay_memcpy(sCr, Cr, len);
+    }
 
     const unsigned int shift_w = (width - (g_cube_size * g_map_width)) >> 1;
     const unsigned int shift_h = (height - (g_cube_size * g_map_height)) >> 1;
 
-    #pragma omp parallel for collapse(2) schedule(static) num_threads(d->n_threads)
+    #pragma omp for collapse(2) schedule(static)
     for(int map_y = 0; map_y < g_map_height; map_y++)
     {
         for(int map_x = 0; map_x < g_map_width; map_x++)

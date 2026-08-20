@@ -35,7 +35,6 @@ typedef struct {
     uint8_t *vvmaskstop_buffer[6];
     int frq_frame;
     int frq_mask;
-    int n_threads;
 } vvmask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -144,7 +143,6 @@ void *maskstop_malloc(int width, int height)
 
     v->frq_frame = 256;
     v->frq_mask = 256;
-    v->n_threads = vje_advise_num_threads(len);
 
     return (void*) v;
 }
@@ -172,7 +170,7 @@ static void maskstop_blend(vvmask_t *v, VJFrame *frame, int swapmask, int negmas
     uint8_t *restrict Udest = frame->data[1];
     uint8_t *restrict Vdest = frame->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(v->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         if(swapmask) {
             if(negmask) {
@@ -212,21 +210,24 @@ void maskstop_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Udest = frame->data[1];
     uint8_t *restrict Vdest = frame->data[2];
 
-    v->frq_frame += framefreq;
-    v->frq_mask += maskfreq;
+    #pragma omp single
+    {
+        v->frq_frame += framefreq;
+        v->frq_mask += maskfreq;
 
-    if(v->frq_frame > 255) {
-        veejay_memcpy(v->vvmaskstop_buffer[0], Ydest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[1], Udest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[2], Vdest, len);
-        v->frq_frame = 0;
-    }
+        if(v->frq_frame > 255) {
+            veejay_memcpy(v->vvmaskstop_buffer[0], Ydest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[1], Udest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[2], Vdest, len);
+            v->frq_frame = 0;
+        }
 
-    if(v->frq_mask > 255) {
-        veejay_memcpy(v->vvmaskstop_buffer[3], Ydest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[4], Udest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[5], Vdest, len);
-        v->frq_mask = 0;
+        if(v->frq_mask > 255) {
+            veejay_memcpy(v->vvmaskstop_buffer[3], Ydest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[4], Udest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[5], Vdest, len);
+            v->frq_mask = 0;
+        }
     }
 
     maskstop_blend(v, frame, swapmask, negmask);

@@ -27,7 +27,6 @@
 #define P_OPACITY 1
 
 typedef struct {
-    int n_threads;
     int width;
     int height;
     int len;
@@ -153,7 +152,6 @@ void *gradientfield_malloc(int w, int h)
     s->width = w;
     s->height = h;
     s->len = (int)len;
-    s->n_threads = vje_advise_num_threads((int)len);
 
     for(int i = 1; i < 1024; i++)
         s->inv_area_lut[i] = (1u << 16) / (uint32_t)i;
@@ -409,11 +407,13 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    veejay_memcpy(s->copyY, Y, len);
-    veejay_memcpy(s->copyU, U, len);
-    veejay_memcpy(s->copyV, V, len);
+#pragma omp single
+    {
+        veejay_memcpy(s->copyY, Y, len);
+        veejay_memcpy(s->copyU, U, len);
+        veejay_memcpy(s->copyV, V, len);
+    }
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         gradientfield_integral_y(s->copyY, s->intY_sum, s->intY_sq, w, h);
         gradientfield_integral_sum(s->copyU, s->intU_sum, w, h);
@@ -422,5 +422,6 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp for schedule(static)
         for(int y = 0; y < h - 1; y += 2)
             gradientfield_apply_rowpair(s, Y, U, V, a, opacity, y);
+    #pragma omp barrier
     }
 }

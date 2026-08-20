@@ -264,29 +264,35 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
     const int raw_spin_drive = args[P_SPIN_DRIVE];
     const int raw_zoom_drive = args[P_ZOOM_DRIVE];
 
-    if(!s->state_ready) {
-        s->segment_state = (float)raw_segments;
-        s->rotation_state = (float)raw_rotation;
-        s->spin_state = (float)raw_spin;
-        s->zoom_state = (float)raw_zoom;
-        s->center_x_state = (float)raw_center_x;
-        s->center_y_state = (float)raw_center_y;
-        s->spin_drive_state = (float)raw_spin_drive;
-        s->zoom_drive_state = (float)raw_zoom_drive;
-        s->state_ready = 1;
+#pragma omp single
+    {
+        if(!s->state_ready) {
+            s->segment_state = (float)raw_segments;
+            s->rotation_state = (float)raw_rotation;
+            s->spin_state = (float)raw_spin;
+            s->zoom_state = (float)raw_zoom;
+            s->center_x_state = (float)raw_center_x;
+            s->center_y_state = (float)raw_center_y;
+            s->spin_drive_state = (float)raw_spin_drive;
+            s->zoom_drive_state = (float)raw_zoom_drive;
+            s->state_ready = 1;
+        }
     }
 
     const float geom_fast = 0.210f;
     const float geom_slow = 0.105f;
 
-    s->segment_state = trimirror_smooth(s->segment_state, (float)raw_segments, geom_slow);
-    s->rotation_state = trimirror_smooth(s->rotation_state, (float)raw_rotation, geom_fast);
-    s->spin_state = trimirror_smooth(s->spin_state, (float)raw_spin, geom_fast);
-    s->zoom_state = trimirror_smooth(s->zoom_state, (float)raw_zoom, geom_slow);
-    s->center_x_state = trimirror_smooth(s->center_x_state, (float)raw_center_x, geom_slow);
-    s->center_y_state = trimirror_smooth(s->center_y_state, (float)raw_center_y, geom_slow);
-    s->spin_drive_state = trimirror_smooth(s->spin_drive_state, (float)raw_spin_drive, geom_fast);
-    s->zoom_drive_state = trimirror_smooth(s->zoom_drive_state, (float)raw_zoom_drive, geom_fast);
+#pragma omp single
+    {
+        s->segment_state = trimirror_smooth(s->segment_state, (float)raw_segments, geom_slow);
+        s->rotation_state = trimirror_smooth(s->rotation_state, (float)raw_rotation, geom_fast);
+        s->spin_state = trimirror_smooth(s->spin_state, (float)raw_spin, geom_fast);
+        s->zoom_state = trimirror_smooth(s->zoom_state, (float)raw_zoom, geom_slow);
+        s->center_x_state = trimirror_smooth(s->center_x_state, (float)raw_center_x, geom_slow);
+        s->center_y_state = trimirror_smooth(s->center_y_state, (float)raw_center_y, geom_slow);
+        s->spin_drive_state = trimirror_smooth(s->spin_drive_state, (float)raw_spin_drive, geom_fast);
+        s->zoom_drive_state = trimirror_smooth(s->zoom_drive_state, (float)raw_zoom_drive, geom_fast);
+    }
 
     int segments = trimirror_clampi((int)(s->segment_state + 0.5f), 1, TRIMIRROR_MAX_SEGMENTS);
 
@@ -301,14 +307,20 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = s->buf[1];
     uint8_t *restrict srcV = s->buf[2];
 
-    veejay_memcpy(srcY, Y, len);
-    veejay_memcpy(srcU, U, len);
-    veejay_memcpy(srcV, V, len);
+#pragma omp single
+    {
+        veejay_memcpy(srcY, Y, len);
+        veejay_memcpy(srcU, U, len);
+        veejay_memcpy(srcV, V, len);
+    }
 
     const float spin = s->spin_state * 0.00125f;
     const float direct_spin = spin_drive * 0.0125f;
 
-    s->phase = trimirror_wrap_angle(s->phase + spin + direct_spin);
+#pragma omp single
+    {
+        s->phase = trimirror_wrap_angle(s->phase + spin + direct_spin);
+    }
 
     const float user_rot = s->rotation_state * (TRIMIRROR_TWO_PI / 360.0f);
     const float base_angle = trimirror_wrap_angle(user_rot + s->phase + spin_drive * 0.16f * sinf(s->phase * 1.37f));
@@ -345,7 +357,7 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
     const float *restrict vy = s->vec_y;
     const int half = segments >> 1;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int p = 0; p < len; p++) {
         const float dx = vx[p];
         const float dy = vy[p];

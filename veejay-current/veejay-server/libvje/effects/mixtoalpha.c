@@ -105,13 +105,15 @@ void mixtoalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict src = mode == 0 ? frame2->data[0] : frame2->data[3];
 
     if(scale && frame->range == 0) {
-        const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             A[i] = mixtoalpha_scale_full(src[i]);
     }
     else {
-        veejay_memcpy(A, src, len);
+        #pragma omp single
+        {
+            veejay_memcpy(A, src, len);
+        }
     }
 }

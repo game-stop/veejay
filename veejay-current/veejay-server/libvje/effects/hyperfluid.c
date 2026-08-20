@@ -41,7 +41,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     void *region;
     uint8_t *src_y;
     uint8_t *src_u;
@@ -174,7 +173,7 @@ static void hf_box_blur_horizontal(
     const int recip = (65536 + window / 2) / window;
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         const uint8_t *row = src + y * w;
         uint8_t *out = dst + y * w;
@@ -221,7 +220,7 @@ static void hf_box_blur3(
     uint8_t *restrict tmp3 = t->envelope;
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         const uint8_t *row = src + y * w;
         uint8_t *out1 = tmp1 + y * w;
@@ -258,7 +257,7 @@ static void hf_box_blur3(
         }
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (int x = 0; x < w; x++) {
         int sum1 = tmp1[x] * (r1 + 1);
         int sum2 = tmp2[x] * (r2 + 1);
@@ -488,7 +487,6 @@ void *hyperfluid_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
-    t->n_threads = vje_advise_num_threads(w * h);
     t->region = vj_malloc(total);
     if (!t->region) {
         free(t);
@@ -572,13 +570,16 @@ void hyperfluid_apply(void *ptr, VJFrame *frame, int *args)
     const int envelope_radius = 2 + scale * 2 + width / 64;
     int i;
 
-    veejay_memcpy(src_y, Y, len);
-    veejay_memcpy(src_u, U, len);
-    veejay_memcpy(src_v, V, len);
+#pragma omp single
+    {
+        veejay_memcpy(src_y, Y, len);
+        veejay_memcpy(src_u, U, len);
+        veejay_memcpy(src_v, V, len);
+    }
 
     hf_box_blur3(t, src_y, b1, b2, b3, r1, r2, r3);
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (i = 0; i < len; i++) {
         float d0 = (float) src_y[i] - (float) b1[i];
         float d1 = ((float) b1[i] - (float) b2[i]) * 1.30f;
@@ -602,9 +603,12 @@ void hyperfluid_apply(void *ptr, VJFrame *frame, int *args)
 
     hf_box_blur_horizontal(t, activity, envelope, envelope_radius);
 
-    t->phase = hf_wrap_2pi(t->phase + hf_time_step(args[P_SPEED]));
+#pragma omp single
+    {
+        t->phase = hf_wrap_2pi(t->phase + hf_time_step(args[P_SPEED]));
+    }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;

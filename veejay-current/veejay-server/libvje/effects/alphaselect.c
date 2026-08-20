@@ -76,7 +76,6 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
     const int invert    = args[7];
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -110,7 +109,6 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
     const int inv_range_fp = (int)((255.0f / diff) * (1 << 8));
     const int black_clip_fp = (int)(threshold * SCALE);
 
-    #pragma omp parallel num_threads(n_threads)
     {
         #pragma omp for schedule(static)
         for (int pos = 0; pos < len; pos++)
@@ -146,5 +144,6 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[pos] = 128;
             }
         }
+    #pragma omp barrier
     }
 }

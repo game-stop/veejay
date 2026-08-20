@@ -41,7 +41,6 @@ typedef struct {
     int distortion_key;
     int offset_x_key;
     int offset_y_key;
-    int n_threads;
 } mirror_distortion_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -150,7 +149,6 @@ void *mirrordistortion_malloc(int w, int h)
     m->distortion_key = -1;
     m->offset_x_key = 0x7fffffff;
     m->offset_y_key = 0x7fffffff;
-    m->n_threads = vje_advise_num_threads(len);
 
     return (void*) m;
 }
@@ -208,16 +206,19 @@ void mirrordistortion_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = m->buf[1];
     uint8_t *restrict srcV = m->buf[2];
 
-    if(distortion != m->distortion_key)
-        mirrordistortion_update_trig(m, w, h, distortion);
+#pragma omp single
+    {
+        if(distortion != m->distortion_key)
+            mirrordistortion_update_trig(m, w, h, distortion);
 
-    mirrordistortion_update_offsets(m, w, h, offset_x, offset_y);
+        mirrordistortion_update_offsets(m, w, h, offset_x, offset_y);
 
-    veejay_memcpy(srcY, dstY, len);
-    veejay_memcpy(srcU, dstU, len);
-    veejay_memcpy(srcV, dstV, len);
+        veejay_memcpy(srcY, dstY, len);
+        veejay_memcpy(srcU, dstU, len);
+        veejay_memcpy(srcV, dstV, len);
+    }
 
-#pragma omp parallel for num_threads(m->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int row = y * w;
         const int dx = m->dx_y[y];

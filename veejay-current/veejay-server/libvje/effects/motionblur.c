@@ -43,7 +43,6 @@ typedef struct {
     int dir_key;
     int dx_q16;
     int dy_q16;
-    int n_threads;
 } motionblur_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -189,7 +188,6 @@ void *motionblur_malloc(int w, int h)
     m->dir_key = 0x7fffffff;
     m->dx_q16 = 32768;
     m->dy_q16 = 0;
-    m->n_threads = vje_advise_num_threads(size);
 
     return m;
 }
@@ -200,6 +198,7 @@ static void motionblur_init_accumulators(motionblur_t *m,
                                          uint8_t *restrict V,
                                          int size)
 {
+#pragma omp for schedule(static)
     for(int i = 0; i < size; i++) {
         m->accY[i] = (int32_t)Y[i] << MB_Q8_SHIFT;
         m->accU[i] = ((int32_t)U[i] - 128) << MB_Q8_SHIFT;
@@ -207,6 +206,7 @@ static void motionblur_init_accumulators(motionblur_t *m,
         m->prevY[i] = Y[i];
     }
 
+#pragma omp single
     m->initialized = 1;
 }
 
@@ -251,16 +251,27 @@ void motionblur_apply(void *ptr, VJFrame *f, int *a)
     const int direction = a[P_DIRECTION];
     const int velocity = a[P_VELOCITY];
     const int reset = a[P_RESET];
+    int needs_init;
+    int should_reset;
 
-    if(direction != m->dir_key)
-        motionblur_update_direction(m, direction);
+#pragma omp single
+    {
+        if(direction != m->dir_key)
+            motionblur_update_direction(m, direction);
+    }
 
-    if(!m->initialized) {
+#pragma omp single copyprivate(needs_init)
+    needs_init = !m->initialized;
+
+    if(needs_init) {
         motionblur_init_accumulators(m, Y, U, V, size);
         return;
     }
 
-    if(motionblur_should_reset(m, Y, w, h, reset)) {
+#pragma omp single copyprivate(should_reset)
+    should_reset = motionblur_should_reset(m, Y, w, h, reset);
+
+    if(should_reset) {
         motionblur_init_accumulators(m, Y, U, V, size);
         return;
     }
@@ -270,7 +281,7 @@ void motionblur_apply(void *ptr, VJFrame *f, int *a)
     const int dx_q16 = m->dx_q16;
     const int dy_q16 = m->dy_q16;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const int row = y * w;
         const int row_bias_q16 = (dy_q16 * ((y << 1) - h)) / (h << 1);

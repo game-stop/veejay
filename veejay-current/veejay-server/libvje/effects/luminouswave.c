@@ -43,7 +43,6 @@ typedef struct {
     int width;
     int height;
     int speed;
-    int n_threads;
 } luminouswave_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -138,7 +137,6 @@ void *luminouswave_malloc(int w, int h)
     data->width = w;
     data->height = h;
     data->speed = 0;
-    data->n_threads = vje_advise_num_threads(w * h);
 
     for(int i = 0; i < LW_LUT_SIZE; i++) {
         const float a = ((float)i / (float)LW_LUT_SIZE) * 6.28318530718f;
@@ -184,10 +182,13 @@ void luminouswave_apply(void *ptr, VJFrame *frame, int *args)
     if(step < 1)
         step = 1;
 
-    data->speed += step;
+#pragma omp single
+    {
+        data->speed += step;
 
-    if(data->speed > max_speed)
-        data->speed = min_speed;
+        if(data->speed > max_speed)
+            data->speed = min_speed;
+    }
 
     const int speed = min_speed + data->speed;
     const int inc_y_q16 = luminouswave_phase_step_q16(freq_y, sx);
@@ -196,7 +197,7 @@ void luminouswave_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp parallel for num_threads(data->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         uint8_t *restrict row = Y + y * width;
         const int actual_y = y + offset;

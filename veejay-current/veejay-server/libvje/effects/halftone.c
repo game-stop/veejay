@@ -35,7 +35,6 @@ typedef struct {
     uint8_t *u_grid;
     uint8_t *v_grid;
     int max_cells;
-    int n_threads;
 } halftone_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -172,7 +171,6 @@ void *halftone_malloc(int w, int h)
     s->u_grid = s->y_grid + len;
     s->v_grid = s->u_grid + len;
     s->max_cells = len;
-    s->n_threads = vje_advise_num_threads(len);
 
     return s;
 }
@@ -209,7 +207,7 @@ static void halftone_prepare_cells(halftone_t *s,
     uint8_t *restrict u_grid = s->u_grid;
     uint8_t *restrict v_grid = s->v_grid;
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int gy = 0; gy < grid_h; gy++) {
         for(int gx = 0; gx < grid_w; gx++) {
             int bx = x_inf + gx * radius;
@@ -427,5 +425,8 @@ void halftone_apply(void *ptr, VJFrame *frame, int *args)
         grid_h--;
 
     halftone_prepare_cells(s, frame, radius, mode, orientation, parity, x_inf, y_inf, grid_w, grid_h);
-    halftone_render_cells(s, frame, radius, mode, x_inf, y_inf, grid_w, grid_h);
+    #pragma omp single
+    {
+        halftone_render_cells(s, frame, radius, mode, x_inf, y_inf, grid_w, grid_h);
+    }
 }

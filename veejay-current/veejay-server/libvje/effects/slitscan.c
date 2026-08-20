@@ -1491,28 +1491,31 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     int target_time_blend = ss_clampi(time_blend, 0, 100);
     int target_chroma = ss_clampi(chroma, 0, 100);
 
-    if(!s->smooth_ready) {
-        s->sm_amount = (float)target_amount;
-        s->sm_depth = (float)target_depth;
-        s->sm_source_gain = (float)target_source_gain;
-        s->sm_motion = (float)target_motion;
-        s->sm_time_offset = (float)target_time_offset;
-        s->sm_time_scale = (float)target_time_scale;
-        s->sm_time_blend = (float)target_time_blend;
-        s->sm_chroma = (float)target_chroma;
-        s->smooth_ready = 1;
-    } else {
-        const float fast = 0.30f;
-        const float slow = 0.095f;
+#pragma omp single
+    {
+        if(!s->smooth_ready) {
+            s->sm_amount = (float)target_amount;
+            s->sm_depth = (float)target_depth;
+            s->sm_source_gain = (float)target_source_gain;
+            s->sm_motion = (float)target_motion;
+            s->sm_time_offset = (float)target_time_offset;
+            s->sm_time_scale = (float)target_time_scale;
+            s->sm_time_blend = (float)target_time_blend;
+            s->sm_chroma = (float)target_chroma;
+            s->smooth_ready = 1;
+        } else {
+            const float fast = 0.30f;
+            const float slow = 0.095f;
 
-        s->sm_amount = ss_smooth_param(s->sm_amount, (float)target_amount, fast, slow);
-        s->sm_depth = ss_smooth_param(s->sm_depth, (float)target_depth, fast, slow);
-        s->sm_source_gain = ss_smooth_param(s->sm_source_gain, (float)target_source_gain, fast, slow);
-        s->sm_motion = ss_smooth_param(s->sm_motion, (float)target_motion, fast, slow);
-        s->sm_time_offset = ss_smooth_param(s->sm_time_offset, (float)target_time_offset, fast, slow);
-        s->sm_time_scale = ss_smooth_param(s->sm_time_scale, (float)target_time_scale, fast, slow);
-        s->sm_time_blend = ss_smooth_param(s->sm_time_blend, (float)target_time_blend, fast, slow);
-        s->sm_chroma = ss_smooth_param(s->sm_chroma, (float)target_chroma, fast, slow);
+            s->sm_amount = ss_smooth_param(s->sm_amount, (float)target_amount, fast, slow);
+            s->sm_depth = ss_smooth_param(s->sm_depth, (float)target_depth, fast, slow);
+            s->sm_source_gain = ss_smooth_param(s->sm_source_gain, (float)target_source_gain, fast, slow);
+            s->sm_motion = ss_smooth_param(s->sm_motion, (float)target_motion, fast, slow);
+            s->sm_time_offset = ss_smooth_param(s->sm_time_offset, (float)target_time_offset, fast, slow);
+            s->sm_time_scale = ss_smooth_param(s->sm_time_scale, (float)target_time_scale, fast, slow);
+            s->sm_time_blend = ss_smooth_param(s->sm_time_blend, (float)target_time_blend, fast, slow);
+            s->sm_chroma = ss_smooth_param(s->sm_chroma, (float)target_chroma, fast, slow);
+        }
     }
 
     amount = ss_clampi((int)(s->sm_amount + 0.5f), 0, 100);
@@ -1524,29 +1527,41 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     time_blend = ss_clampi((int)(s->sm_time_blend + 0.5f), 0, 100);
     chroma = ss_clampi((int)(s->sm_chroma + 0.5f), 0, 100);
 
-    if(!s->seeded || (reset && !s->last_reset)) {
-        ss_seed_history(s, frame);
-        s->smooth_ready = 0;
-    }
-    s->last_reset = reset;
+#pragma omp single
+    {
+        if(!s->seeded || (reset && !s->last_reset)) {
+            ss_seed_history(s, frame);
+            s->smooth_ready = 0;
+        }
+        s->last_reset = reset;
 
-    ss_build_geom(s, mode);
+        ss_build_geom(s, mode);
+    }
 
     const int write_slot = s->write_pos;
-    ss_copy_current_to_slot(s, frame, write_slot);
+#pragma omp single
+    {
+        ss_copy_current_to_slot(s, frame, write_slot);
+    }
 
     uint8_t *cur_y = s->hist_y[write_slot];
     uint8_t *cur_u = s->hist_u[write_slot];
     uint8_t *cur_v = s->hist_v[write_slot];
 
     if(amount <= 0 || depth <= 1) {
-        veejay_memcpy(s->prev_y, cur_y, len);
-        s->write_pos = (s->write_pos + 1) & SS_HISTORY_MASK;
-        s->frame++;
+        #pragma omp single
+        {
+            veejay_memcpy(s->prev_y, cur_y, len);
+            s->write_pos = (s->write_pos + 1) & SS_HISTORY_MASK;
+            s->frame++;
+        }
         return;
     }
 
-    ss_build_time_lut(s, depth);
+#pragma omp single
+    {
+        ss_build_time_lut(s, depth);
+    }
 
     const int amount_q8 = (amount * 256 + 50) / 100;
     const int chroma_q8 = (amount_q8 * ((chroma * 256 + 50) / 100) + 128) >> 8;
@@ -1591,7 +1606,6 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     cfg.time_add = time_add;
     cfg.time_reverse = time_reverse;
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         render(s, &cfg);
 
@@ -1601,5 +1615,6 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
             s->write_pos = (s->write_pos + 1) & SS_HISTORY_MASK;
             s->frame++;
         }
+    #pragma omp barrier
     }
 }

@@ -254,14 +254,17 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
 
     const int max_dim = (w > h) ? w : h;
 
-    if(fabsf(s->gamma - gamma) > 0.01f) {
-        build_gamma_lut(s->gamma_lut, gamma);
-        s->gamma = gamma;
-    }
+#pragma omp single
+    {
+        if(fabsf(s->gamma - gamma) > 0.01f) {
+            build_gamma_lut(s->gamma_lut, gamma);
+            s->gamma = gamma;
+        }
 
-    s->phase += (float)cycle_speed;
-    if(s->phase >= 4096.0f)
-        s->phase -= 4096.0f;
+        s->phase += (float)cycle_speed;
+        if(s->phase >= 4096.0f)
+            s->phase -= 4096.0f;
+    }
 
     const int lut_offset = ((int)s->phase) & 0xFF;
 
@@ -269,7 +272,6 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
     int global_max = 0;
     int scale_fp = 0;
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         const int tid = omp_get_thread_num();
 
@@ -294,17 +296,19 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
                 blur_buf[y * w + x] = col_out[y];
         }
 
-#pragma omp for schedule(static) reduction(min:global_min) reduction(max:global_max)
-        for(int i = 0; i < len; i++) {
-            int v = blur_buf[i];
+#pragma omp single copyprivate(global_min, global_max)
+{
+    for(int i = 0; i < len; i++) {
+                int v = blur_buf[i];
 
-            if(v < global_min)
-                global_min = v;
-            if(v > global_max)
-                global_max = v;
-        }
+                if(v < global_min)
+                    global_min = v;
+                if(v > global_max)
+                    global_max = v;
+            }
+}
 
-#pragma omp single
+#pragma omp single copyprivate(scale_fp)
         {
             int range = global_max - global_min;
             if(range < 64)
@@ -355,7 +359,11 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
             U[i] = col[1];
             V[i] = col[2];
         }
+    #pragma omp barrier
     }
 
-    s->timestamp++;
+#pragma omp single
+    {
+        s->timestamp++;
+    }
 }

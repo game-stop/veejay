@@ -58,7 +58,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int frame;
     int seeded;
     int last_reset;
@@ -249,7 +248,6 @@ void *kineticdisplay_malloc(int w, int h)
     k->w = w;
     k->h = h;
     k->len = w * h;
-    k->n_threads = vje_advise_num_threads(k->len);
     k->max_cols = (w + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_rows = (h + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_cells = k->max_cols * k->max_rows;
@@ -310,9 +308,13 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
     const int max_cols = k->max_cols;
 
 #pragma omp for schedule(static)
-    for(int cy = 0; cy < rows; cy++) {
-        for(int cx = 0; cx < cols; cx++) {
-            const int idx = cy * max_cols + cx;
+    for(int idx = 0; idx < rows * max_cols; idx++) {
+            const int cy = idx / max_cols;
+            const int cx = idx - cy * max_cols;
+
+            if(cx >= cols)
+                continue;
+
             const int x0 = cx * cell_size;
             const int y0 = cy * cell_size;
             const int x1 = (x0 + cell_size < w) ? x0 + cell_size : w;
@@ -346,7 +348,6 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
             k->cell_target[idx] = ay;
             k->cell_delay[idx] = 0;
             k->cell_phase[idx] = 0;
-        }
     }
 }
 
@@ -362,9 +363,13 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
     const int frame = k->frame;
 
 #pragma omp for schedule(static)
-    for(int cy = 0; cy < rows; cy++) {
-        for(int cx = 0; cx < cols; cx++) {
-            const int idx = cy * max_cols + cx;
+    for(int idx = 0; idx < rows * max_cols; idx++) {
+            const int cy = idx / max_cols;
+            const int cx = idx - cy * max_cols;
+
+            if(cx >= cols)
+                continue;
+
             const int x0 = cx * cell_size;
             const int y0 = cy * cell_size;
             const int x1 = (x0 + cell_size < w) ? x0 + cell_size : w;
@@ -477,7 +482,6 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
 
             k->cell_value[idx] = (uint8_t)value;
             k->cell_phase[idx] = (uint8_t)kd_clampi(kd_absi(target - value), 0, 255);
-        }
     }
 }
 
@@ -811,16 +815,21 @@ void kineticdisplay_apply(void *ptr, VJFrame *frame, int *args)
     const int motion_react = args[P_MOTION];
     const int reset = args[P_RESET];
 
-    if(cell_size != k->last_cell_size) {
-        kd_configure_grid(k, cell_size);
-        kd_clear_cells(k);
-        k->seeded = 0;
+#pragma omp single
+    {
+        if(cell_size != k->last_cell_size) {
+            kd_configure_grid(k, cell_size);
+            kd_clear_cells(k);
+            k->seeded = 0;
+        }
     }
 
     const int do_seed = !k->seeded || (reset && !k->last_reset);
-    k->last_reset = reset;
+#pragma omp single
+    {
+        k->last_reset = reset;
+    }
 
-#pragma omp parallel num_threads(k->n_threads)
     {
         if(do_seed) {
             kd_seed_cells(k, Y, U, V, cell_size);
@@ -844,10 +853,14 @@ void kineticdisplay_apply(void *ptr, VJFrame *frame, int *args)
             for(int i = 0; i < k->len; i++)
                 k->prev_y[i] = Y[i];
         }
+    #pragma omp barrier
     }
 
-    if(do_seed)
-        k->seeded = 1;
+#pragma omp single
+    {
+        if(do_seed)
+            k->seeded = 1;
 
-    k->frame++;
+        k->frame++;
+    }
 }

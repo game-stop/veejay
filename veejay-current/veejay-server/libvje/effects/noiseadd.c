@@ -33,7 +33,6 @@
 
 typedef struct {
     uint8_t *Yb_frame;
-    int n_threads;
 } noiseadd_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -131,7 +130,6 @@ void *noiseadd_malloc(int width, int height)
         return NULL;
     }
 
-    n->n_threads = vje_advise_num_threads(len);
 
     return (void*) n;
 }
@@ -146,7 +144,6 @@ static void noiseadd_apply_mask(noiseadd_t *n, VJFrame *frame, int mode, int coe
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict B = n->Yb_frame;
 
-#pragma omp parallel num_threads(n->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -204,6 +201,7 @@ static void noiseadd_apply_mask(noiseadd_t *n, VJFrame *frame, int mode, int coe
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             Y[i] = noiseadd_absdiff_scaled((int)B[i], (int)Y[i], coeff, denom);
+    #pragma omp barrier
     }
 }
 

@@ -152,7 +152,7 @@ void levelcorrection_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict A = frame->data[3];
     const int len = frame->len;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
         A[pos] = lut[A[pos]];
 }

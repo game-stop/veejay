@@ -155,12 +155,10 @@ void flip_apply(void *ptr, VJFrame *frame, int *args)
 
     const int horizontal = args[0];
     const int vertical = args[1];
-    const int n_threads = vje_advise_num_threads(frame->len);
 
     if(horizontal == 0 && vertical == 0)
         return;
 
-#pragma omp parallel num_threads(n_threads)
     {
         if(horizontal && vertical)
             flip_both_yuv444(frame);
@@ -168,5 +166,6 @@ void flip_apply(void *ptr, VJFrame *frame, int *args)
             flip_horizontal_yuv444(frame);
         else
             flip_vertical_yuv444(frame);
+    #pragma omp barrier
     }
 }

@@ -54,7 +54,6 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
 {
     const int mode = args[0];
     const int len  = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
     const unsigned int black_y = get_pixel_range_min_Y();
 
     uint8_t *restrict Y = frame->data[0];
@@ -62,7 +61,7 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict V = frame->data[2];
     uint8_t *restrict A = frame->data[3];
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for (int i = 0; i < len; i++)
     {
         unsigned int a  = A[i];
@@ -73,8 +72,11 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = (uint8_t)alphaflatten_div255(a * V[i] + ia * 128);
     }
 
-    if (mode)
+#pragma omp single
     {
-        veejay_memset(A, 0, len);
+        if (mode)
+        {
+            veejay_memset(A, 0, len);
+        }
     }
 }

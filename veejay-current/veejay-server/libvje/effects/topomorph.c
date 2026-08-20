@@ -83,7 +83,6 @@ typedef struct {
     double time;
     double phase;
     int width, height;
-    int n_threads;
     int cached_shape_p;
     float p1_x, p1_y;
     float p2_x, p2_y;
@@ -481,8 +480,11 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     const int w = t->width; \
     const int h = t->height; \
     const int size = w * h; \
-    t->time += (double)args[P_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000100 + (double)args[P_WARP_KICK] * 0.0000200; \
-    t->phase += (double)args[P_ROT_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000140; \
+    _Pragma("omp single") \
+    { \
+        t->time += (double)args[P_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000100 + (double)args[P_WARP_KICK] * 0.0000200; \
+        t->phase += (double)args[P_ROT_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000140; \
+    } \
     const float branches = (float)args[P_BRANCHES]; \
     const float swirl = (float)args[P_SWIRL] * 0.001f; \
     const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
@@ -510,7 +512,7 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     const float time_f = (float)t->time; \
     const float phase_f = (float)t->phase; \
     (void)args[P_WARP_PHASE]; \
-    _Pragma("omp parallel for schedule(static) num_threads(t->n_threads)") \
+    _Pragma("omp for schedule(static)") \
     for (int y = 0; y < h; y++) { \
         const int row = y * w; \
         const float dy = (float)y * inv_cy - 1.0f; \
@@ -533,9 +535,12 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
             blend_store_pixel(t, i, py, pu, pv, fb, inv_fb); \
         } \
     } \
-    veejay_memcpy(outY, t->dstY, size); \
-    veejay_memcpy(outU, t->dstU, size); \
-    veejay_memcpy(outV, t->dstV, size); \
+    _Pragma("omp single") \
+    { \
+        veejay_memcpy(outY, t->dstY, size); \
+        veejay_memcpy(outU, t->dstU, size); \
+        veejay_memcpy(outV, t->dstV, size); \
+    } \
 }
 
 #define DEFINE_MIRROR_KERNEL(MODE_ID, RADIUS_ID, RADIUS_FN, SAMPLE_ID, SAMPLE_FN, MAP_FN) \
@@ -546,8 +551,11 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     const int size = w * h; \
     const int half_w = w >> 1; \
     const int half_h = h >> 1; \
-    t->time += (double)args[P_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000150; \
-    t->phase += (double)args[P_ROT_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000060 + (double)args[P_WARP_KICK] * 0.0000110; \
+    _Pragma("omp single") \
+    { \
+        t->time += (double)args[P_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000150; \
+        t->phase += (double)args[P_ROT_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000060 + (double)args[P_WARP_KICK] * 0.0000110; \
+    } \
     const float branches = (float)args[P_BRANCHES]; \
     const float swirl = (float)args[P_SWIRL] * 0.001f; \
     const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
@@ -577,7 +585,7 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     (void)args[P_WARP_PHASE]; \
     float rs, rc; \
     topo_lut_sincos(t, (float)args[P_ROT_SPEED] * 0.001f, &rs, &rc); \
-    _Pragma("omp parallel for schedule(static) num_threads(t->n_threads)") \
+    _Pragma("omp for schedule(static)") \
     for (int y = 0; y < half_h; y++) { \
         const float dy = (float)y * inv_hh; \
         const int row_top = (half_h - 1 - y) * w; \
@@ -611,9 +619,12 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
             blend_store_pixel(t, row_top + mx, py, pu, pv, fb, inv_fb); \
         } \
     } \
-    veejay_memcpy(outY, t->dstY, size); \
-    veejay_memcpy(outU, t->dstU, size); \
-    veejay_memcpy(outV, t->dstV, size); \
+    _Pragma("omp single") \
+    { \
+        veejay_memcpy(outY, t->dstY, size); \
+        veejay_memcpy(outU, t->dstU, size); \
+        veejay_memcpy(outV, t->dstV, size); \
+    } \
 }
 
 #define DEFINE_MODE_RADIUS(MODE_ID, MAP_FN, RADIUS_ID, RADIUS_FN) \
@@ -844,8 +855,6 @@ void *topomorph_malloc(int width, int height)
 
     t->width = width;
     t->height = height;
-    t->n_threads = vje_advise_num_threads(size);
-
     t->histY = (int32_t*)p;
     t->histU = t->histY + size;
     t->histV = t->histU + size;
@@ -982,6 +991,8 @@ void topomorph_apply(void *ptr, VJFrame *frame, int *args)
     box_topomorph_t *t = (box_topomorph_t*) ptr;
     int eff[TOPOMORPH_INTERNAL_PARAMS];
 
+#pragma omp single copyprivate(eff)
+    {
     eff[P_SPEED]      = args[P_SPEED];
     eff[P_SCALE]      = args[P_SCALE];
     eff[P_BRANCHES]   = args[P_BRANCHES];
@@ -1081,6 +1092,7 @@ void topomorph_apply(void *ptr, VJFrame *frame, int *args)
 
     if(eff[P_SALIENCY] > 0)
         update_saliency_poles(t, frame->data[0]);
+    }
 
     if(eff[P_MIRROR] == 1)
         process_core_mirror(t, frame, eff);

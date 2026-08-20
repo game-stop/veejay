@@ -655,7 +655,6 @@ void overlaymagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int clearchroma = args[P_CLEAR_CHROMA];
     const int uv_len = frame->uv_len;
 
-#pragma omp parallel num_threads(n_threads)
     {
         switch(mode) {
             case VJ_EFFECT_BLEND_ADDITIVE:
@@ -781,5 +780,6 @@ void overlaymagic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                 frame->data[2][i] = 128;
             }
         }
+    #pragma omp barrier
     }
 }

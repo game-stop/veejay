@@ -90,7 +90,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
 
     uint8_t *src_y;
     uint8_t *src_u;
@@ -495,7 +494,6 @@ vj_effect *tessaractslide_init(int w, int h)
 void *tessaractslide_malloc(int w, int h)
 {
     const int len = w * h;
-    const int n_threads = vje_advise_num_threads(len);
 
     const size_t plane = (size_t)len;
     const size_t x_bytes = sizeof(int) * (size_t)w;
@@ -519,7 +517,6 @@ void *tessaractslide_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = n_threads;
     s->seed = 0x51ed270bU ^ (uint32_t)(w * 73856093U) ^ (uint32_t)(h * 19349663U);
 
     uint8_t *p = (uint8_t *)(s + 1);
@@ -606,7 +603,6 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
-    const int threads = s->n_threads;
 
     const int slice_target = args[ATS_SLICE_WIDTH];
     const int impact_arg = args[ATS_IMPACT];
@@ -621,16 +617,19 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int hinge_arg = args[ATS_HINGE_FOLD];
     const int settle_arg = args[ATS_SETTLE];
 
-    if(!s->smooth_ready) {
-        s->slice_width_f = (float)slice_target;
-        s->axis_angle_f = (float)axis_arg;
-        s->depth_push_f = (float)depth_push_arg;
-        s->slab_scale_f = (float)slab_scale_arg;
-        s->slide_speed_f = (float)slide_speed_arg;
-        s->edge_flash_f = (float)edge_flash_arg;
-        s->hat_flicker_f = (float)hat_arg;
-        s->hinge_fold_f = (float)hinge_arg;
-        s->smooth_ready = 1;
+#pragma omp single
+    {
+        if(!s->smooth_ready) {
+            s->slice_width_f = (float)slice_target;
+            s->axis_angle_f = (float)axis_arg;
+            s->depth_push_f = (float)depth_push_arg;
+            s->slab_scale_f = (float)slab_scale_arg;
+            s->slide_speed_f = (float)slide_speed_arg;
+            s->edge_flash_f = (float)edge_flash_arg;
+            s->hat_flicker_f = (float)hat_arg;
+            s->hinge_fold_f = (float)hinge_arg;
+            s->smooth_ready = 1;
+        }
     }
 
     const float impact_target = (float)impact_arg * 0.01f;
@@ -654,37 +653,43 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
 
     const float release = 0.010f + ((float)(100 - settle_arg) * 0.00105f);
 
-    s->impact_env = ats_env(s->impact_env, impact_target, 0.82f, release);
-    s->snare_env = ats_env(s->snare_env, snare_target, 0.86f, 0.130f);
-    s->hat_env = ats_env(s->hat_env, hat_target, 0.74f, 0.280f);
+#pragma omp single
+    {
+        s->impact_env = ats_env(s->impact_env, impact_target, 0.82f, release);
+        s->snare_env = ats_env(s->snare_env, snare_target, 0.86f, 0.130f);
+        s->hat_env = ats_env(s->hat_env, hat_target, 0.74f, 0.280f);
 
-    if(impact_rise || snare_rise) {
-        const float reseed_impact = impact_target > 0.22f ? impact_target : s->impact_env;
-        const float reseed_snare = snare_target > 0.22f ? snare_target : s->snare_env;
-        ats_reseed_bands(s, reseed_impact, reseed_snare);
-        s->impact_cooldown = impact_rise ? 4 : s->impact_cooldown;
-        s->snare_cooldown = snare_rise ? 4 : s->snare_cooldown;
+        if(impact_rise || snare_rise) {
+            const float reseed_impact = impact_target > 0.22f ? impact_target : s->impact_env;
+            const float reseed_snare = snare_target > 0.22f ? snare_target : s->snare_env;
+            ats_reseed_bands(s, reseed_impact, reseed_snare);
+            s->impact_cooldown = impact_rise ? 4 : s->impact_cooldown;
+            s->snare_cooldown = snare_rise ? 4 : s->snare_cooldown;
+        }
+
+        if(hat_rise)
+            s->hat_cooldown = 2;
+
+        if(s->impact_cooldown > 0)
+            s->impact_cooldown--;
+        if(s->snare_cooldown > 0)
+            s->snare_cooldown--;
+        if(s->hat_cooldown > 0)
+            s->hat_cooldown--;
     }
 
-    if(hat_rise)
-        s->hat_cooldown = 2;
-
-    if(s->impact_cooldown > 0)
-        s->impact_cooldown--;
-    if(s->snare_cooldown > 0)
-        s->snare_cooldown--;
-    if(s->hat_cooldown > 0)
-        s->hat_cooldown--;
-
     const float slice_alpha = (float)slice_target > s->slice_width_f ? 0.160f : 0.070f;
-    s->slice_width_f += ((float)slice_target - s->slice_width_f) * slice_alpha;
-    s->axis_angle_f += ((float)axis_arg - s->axis_angle_f) * 0.055f;
-    s->depth_push_f = ats_env(s->depth_push_f, (float)depth_push_arg, 0.260f, 0.085f);
-    s->slab_scale_f = ats_env(s->slab_scale_f, (float)slab_scale_arg, 0.235f, 0.080f);
-    s->slide_speed_f = ats_env(s->slide_speed_f, (float)slide_speed_arg, 0.280f, 0.095f);
-    s->edge_flash_f = ats_env(s->edge_flash_f, (float)edge_flash_arg, 0.360f, 0.150f);
-    s->hat_flicker_f = ats_env(s->hat_flicker_f, (float)hat_arg, 0.420f, 0.230f);
-    s->hinge_fold_f = ats_env(s->hinge_fold_f, (float)hinge_arg, 0.245f, 0.085f);
+#pragma omp single
+    {
+        s->slice_width_f += ((float)slice_target - s->slice_width_f) * slice_alpha;
+        s->axis_angle_f += ((float)axis_arg - s->axis_angle_f) * 0.055f;
+        s->depth_push_f = ats_env(s->depth_push_f, (float)depth_push_arg, 0.260f, 0.085f);
+        s->slab_scale_f = ats_env(s->slab_scale_f, (float)slab_scale_arg, 0.235f, 0.080f);
+        s->slide_speed_f = ats_env(s->slide_speed_f, (float)slide_speed_arg, 0.280f, 0.095f);
+        s->edge_flash_f = ats_env(s->edge_flash_f, (float)edge_flash_arg, 0.360f, 0.150f);
+        s->hat_flicker_f = ats_env(s->hat_flicker_f, (float)hat_arg, 0.420f, 0.230f);
+        s->hinge_fold_f = ats_env(s->hinge_fold_f, (float)hinge_arg, 0.245f, 0.085f);
+    }
 
     const int slice_width = clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
     const int axis_eff = clampi((int)lrintf(s->axis_angle_f), 0, 360);
@@ -699,9 +704,12 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int snare_i = (int)(s->snare_env * 256.0f);
     const int hat_i = (int)(s->hat_env * 256.0f);
 
-    s->last_impact = impact_target;
-    s->last_snare = snare_target;
-    s->last_hat = hat_target;
+#pragma omp single
+    {
+        s->last_impact = impact_target;
+        s->last_snare = snare_target;
+        s->last_hat = hat_target;
+    }
 
     const int beat_activity = impact_i > snare_i ? impact_i : snare_i;
     const int speed_gate = clampi((beat_activity - 4) * 2, 0, 256);
@@ -716,11 +724,14 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int phase2_target =
         ((4 + slide_speed_eff + (impact_i >> 4) + (hat_i >> 4)) << ATS_FP) >> 5;
 
-    s->phase_vel += ((float)phase_target - s->phase_vel) * 0.105f;
-    s->phase2_vel += ((float)phase2_target - s->phase2_vel) * 0.085f;
+#pragma omp single
+    {
+        s->phase_vel += ((float)phase_target - s->phase_vel) * 0.105f;
+        s->phase2_vel += ((float)phase2_target - s->phase2_vel) * 0.085f;
 
-    s->phase_fp += (int)s->phase_vel;
-    s->phase2_fp -= (int)s->phase2_vel;
+        s->phase_fp += (int)s->phase_vel;
+        s->phase2_fp -= (int)s->phase2_vel;
+    }
 
     const float axis_target =
         0.0018f +
@@ -728,41 +739,47 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
         s->impact_env * 0.0065f +
         s->snare_env * 0.0035f;
 
-    s->axis_vel += (axis_target - s->axis_vel) * 0.055f;
-    s->axis_phase += s->axis_vel;
+#pragma omp single
+    {
+        s->axis_vel += (axis_target - s->axis_vel) * 0.055f;
+        s->axis_phase += s->axis_vel;
 
-    s->axis_phase = s->axis_phase > ATS_PI * 2.0f
-        ? s->axis_phase - ATS_PI * 2.0f
-        : s->axis_phase;
+        s->axis_phase = s->axis_phase > ATS_PI * 2.0f
+            ? s->axis_phase - ATS_PI * 2.0f
+            : s->axis_phase;
+    }
 
     const float spin_target =
         ((float)slide_speed_eff * 0.010f) +
         s->impact_env * 0.22f +
         s->snare_env * 0.10f;
 
-    s->axis_spin_vel += (spin_target - s->axis_spin_vel) * 0.045f;
-    s->axis_spin += s->axis_spin_vel;
+#pragma omp single
+    {
+        s->axis_spin_vel += (spin_target - s->axis_spin_vel) * 0.045f;
+        s->axis_spin += s->axis_spin_vel;
 
-    s->axis_spin = s->axis_spin >= 360.0f
-        ? s->axis_spin - 360.0f
-        : (s->axis_spin < 0.0f ? s->axis_spin + 360.0f : s->axis_spin);
+        s->axis_spin = s->axis_spin >= 360.0f
+            ? s->axis_spin - 360.0f
+            : (s->axis_spin < 0.0f ? s->axis_spin + 360.0f : s->axis_spin);
 
-    ats_update_projection(s, axis_eff, layers_arg);
+        ats_update_projection(s, axis_eff, layers_arg);
 
-    ats_update_bands(
-        s,
-        layers_arg,
-        clampi(depth_push_eff + ((impact_i * 118) >> 8) + ((snare_i * 32) >> 8), 0, 360),
-        clampi(slab_scale_eff + ((snare_i * 86) >> 8) + ((impact_i * 42) >> 8), 0, 310),
-        clampi(hinge_eff + ((impact_i * 96) >> 8) + ((snare_i * 62) >> 8), 0, 340),
-        clampi(edge_flash_eff + ((snare_i * 175) >> 8) + ((impact_i * 55) >> 8), 0, 420),
-        clampi(hat_flicker_eff + ((hat_i * 140) >> 8), 0, 360),
-        impact_i,
-        snare_i,
-        hat_i
-    );
+        ats_update_bands(
+            s,
+            layers_arg,
+            clampi(depth_push_eff + ((impact_i * 118) >> 8) + ((snare_i * 32) >> 8), 0, 360),
+            clampi(slab_scale_eff + ((snare_i * 86) >> 8) + ((impact_i * 42) >> 8), 0, 310),
+            clampi(hinge_eff + ((impact_i * 96) >> 8) + ((snare_i * 62) >> 8), 0, 340),
+            clampi(edge_flash_eff + ((snare_i * 175) >> 8) + ((impact_i * 55) >> 8), 0, 420),
+            clampi(hat_flicker_eff + ((hat_i * 140) >> 8), 0, 360),
+            impact_i,
+            snare_i,
+            hat_i
+        );
 
-    s->frame_count++;
+        s->frame_count++;
+    }
 
     const int hw = w >> 1;
     const int hh = h >> 1;
@@ -774,17 +791,20 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int phase_wrap = slice_fp * ATS_PHASE_BANDS;
     const int phase2_wrap = slice2_fp * ATS_PHASE_BANDS;
 
-    if(s->phase_fp >= phase_wrap || s->phase_fp < 0)
-        s->phase_fp %= phase_wrap;
+#pragma omp single
+    {
+        if(s->phase_fp >= phase_wrap || s->phase_fp < 0)
+            s->phase_fp %= phase_wrap;
 
-    if(s->phase_fp < 0)
-        s->phase_fp += phase_wrap;
+        if(s->phase_fp < 0)
+            s->phase_fp += phase_wrap;
 
-    if(s->phase2_fp >= phase2_wrap || s->phase2_fp < 0)
-        s->phase2_fp %= phase2_wrap;
+        if(s->phase2_fp >= phase2_wrap || s->phase2_fp < 0)
+            s->phase2_fp %= phase2_wrap;
 
-    if(s->phase2_fp < 0)
-        s->phase2_fp += phase2_wrap;
+        if(s->phase2_fp < 0)
+            s->phase2_fp += phase2_wrap;
+    }
 
     const int edge_width = clampi(2 + (slice_width >> 5) + ((edge_flash_eff + snare_i) >> 7), 2, 8);
 
@@ -801,7 +821,6 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     const int16_t * restrict wave_lut = s->wave_lut;
     const int edge_glow_active = edge_flash_eff > 0;
 
-#pragma omp parallel num_threads(threads)
     {
 #pragma omp for schedule(static) nowait
         for(int i = 0; i < len; i++)
@@ -921,5 +940,6 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
                 V[i] = ats_u8(vv);
             }
         }
+    #pragma omp barrier
     }
 }

@@ -29,10 +29,10 @@
 
 #ifdef _OPENMP
 #include <omp.h>
-#define PSA_OMP_FOR _Pragma("omp parallel for schedule(static) num_threads(p->n_threads)")
+#define PSA_WORKER_CAP MAX_WORKERS
 #define PSA_THREAD_ID() omp_get_thread_num()
 #else
-#define PSA_OMP_FOR
+#define PSA_WORKER_CAP 1
 #define PSA_THREAD_ID() 0
 #endif
 
@@ -60,7 +60,6 @@ typedef struct {
 
 typedef struct {
     int line_cap;
-    int n_threads;
     pixelsortalpha_worker_t *workers;
     uint32_t *scratch;
 } pixelsortalpha_t;
@@ -132,20 +131,14 @@ void *pixelsortalpha_malloc(int w, int h)
 
     p->line_cap = w > h ? w : h;
 
-#ifdef _OPENMP
-    p->n_threads = vje_advise_num_threads(w * h);
-#else
-    p->n_threads = 1;
-#endif
-
-    p->workers = (pixelsortalpha_worker_t*) vj_calloc(sizeof(pixelsortalpha_worker_t) * (size_t)p->n_threads);
+    p->workers = (pixelsortalpha_worker_t*) vj_calloc(sizeof(pixelsortalpha_worker_t) * PSA_WORKER_CAP);
 
     if(!p->workers) {
         free(p);
         return NULL;
     }
 
-    p->scratch = (uint32_t*) vj_calloc(sizeof(uint32_t) * (size_t)p->n_threads * (size_t)p->line_cap * 2u);
+    p->scratch = (uint32_t*) vj_calloc(sizeof(uint32_t) * PSA_WORKER_CAP * (size_t)p->line_cap * 2u);
 
     if(!p->scratch) {
         free(p->workers);
@@ -153,7 +146,7 @@ void *pixelsortalpha_malloc(int w, int h)
         return NULL;
     }
 
-    for(int i = 0; i < p->n_threads; i++) {
+    for(int i = 0; i < PSA_WORKER_CAP; i++) {
         p->workers[i].line = p->scratch + ((size_t)i * (size_t)p->line_cap * 2u);
         p->workers[i].sorted = p->workers[i].line + p->line_cap;
     }
@@ -506,7 +499,7 @@ static void psa_rows_##NAME(                                              \
     unsigned int width,                                                    \
     unsigned int height)                                                   \
 {                                                                          \
-    PSA_OMP_FOR                                                            \
+    _Pragma("omp for schedule(static)")                                    \
     for(int yi = 0; yi < (int)height; yi++) {                              \
         unsigned int x = 0;                                                \
         const unsigned int y = (unsigned int)yi;                           \
@@ -526,7 +519,7 @@ static void psa_columns_##NAME(                                           \
     unsigned int width,                                                    \
     unsigned int height)                                                   \
 {                                                                          \
-    PSA_OMP_FOR                                                            \
+    _Pragma("omp for schedule(static)")                                    \
     for(int xi = 0; xi < (int)width; xi++) {                               \
         unsigned int y = 0;                                                \
         const unsigned int x = (unsigned int)xi;                           \

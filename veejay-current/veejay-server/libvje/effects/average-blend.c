@@ -78,7 +78,6 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int recursions = args[0] < 1 ? 1 : args[0];
     const int weight = args[1];
-    const int n_threads = t->n_threads;
     const int len = frame->len;
 
     uint8_t *restrict Y1 = frame->data[0];
@@ -89,7 +88,6 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
-    #pragma omp parallel num_threads(n_threads)
     {
         for(int r = 0; r < recursions; r++)
         {
@@ -105,6 +103,7 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                 V1[i] = (uint8_t)(v + ((weight * ((int)V2[i] - v)) >> 8));
             }
         }
+    #pragma omp barrier
     }
 }
 

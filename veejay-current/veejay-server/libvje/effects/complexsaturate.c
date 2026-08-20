@@ -135,12 +135,11 @@ void complexsaturation_apply(void *ptr, VJFrame *frame, int *args)
     const float sat_scale = (float)saturation * 0.01f;
     const int s = (int)(sinf(hue_rot) * 65536.0f * sat_scale);
     const int c = (int)(cosf(hue_rot) * 65536.0f * sat_scale);
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;

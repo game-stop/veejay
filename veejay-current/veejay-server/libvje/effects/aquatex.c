@@ -71,7 +71,6 @@ typedef struct
     uint8_t *temp_buf;
     float *sin_lut;
     float *noise_lut;
-    int n_threads;
 } aquatex_t;
 
 void *aquatex_malloc(int w, int h)
@@ -97,7 +96,6 @@ void *aquatex_malloc(int w, int h)
     for(int i = 0; i < RAND_LUT_SIZE; i++)
         s->noise_lut[i] = ((float)rand() / (float)RAND_MAX) - 0.5f;
 
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return s;
 }
@@ -136,9 +134,12 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
     const float cross = frequency * spread;
     const float phase_b = phase_shift * 0.73f;
 
-    veejay_memcpy(s->temp_buf,                  frame->data[0], plane_size);
-    veejay_memcpy(s->temp_buf + plane_size,     frame->data[1], plane_size);
-    veejay_memcpy(s->temp_buf + plane_size * 2, frame->data[2], plane_size);
+    #pragma omp single
+    {
+        veejay_memcpy(s->temp_buf,                  frame->data[0], plane_size);
+        veejay_memcpy(s->temp_buf + plane_size,     frame->data[1], plane_size);
+        veejay_memcpy(s->temp_buf + plane_size * 2, frame->data[2], plane_size);
+    }
 
     uint8_t *restrict srcY = s->temp_buf;
     uint8_t *restrict srcU = s->temp_buf + plane_size;
@@ -148,7 +149,7 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dstU = frame->data[1];
     uint8_t *restrict dstV = frame->data[2];
 
-    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int y = 0; y < h; y++)
     {
         const int dst_row_offset = y * w;

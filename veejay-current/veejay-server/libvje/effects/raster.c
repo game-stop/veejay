@@ -273,7 +273,6 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
     const int v_lines = clampi(args[P_V_LINES], 0, 100);
     const int blend = clampi(args[P_LINE_BLEND], 0, 255);
     const uint8_t pixel_color = args[P_MODE] ? pixel_Y_hi_ : pixel_Y_lo_;
-    const int n_threads = vje_advise_num_threads(frame->len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -283,7 +282,6 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
     const int v_count = (width + grid - 1) / grid;
 
     if(h_lines >= 100 && v_lines >= 100 && blend >= 255) {
-#pragma omp parallel num_threads(n_threads)
         {
 #pragma omp for schedule(static)
             for(int line_no = 0; line_no < v_count; line_no++) {
@@ -304,11 +302,11 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
                 if(y0 + 1 < height)
                     raster_draw_horizontal(Y, Cb, Cr, (y0 + 1) * width, width, pixel_color);
             }
+        #pragma omp barrier
         }
         return;
     }
 
-#pragma omp parallel num_threads(n_threads)
     {
 #pragma omp for schedule(static)
         for(int line_no = 0; line_no < h_count; line_no++) {
@@ -345,5 +343,6 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
             if(x0 + 1 < width && level1)
                 raster_draw_vertical_column(Y, Cb, Cr, x0 + 1, width, height, raster_blend_luma(pixel_color, level1));
         }
+    #pragma omp barrier
     }
 }

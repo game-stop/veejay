@@ -123,7 +123,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
 
     void *region;
 
@@ -660,7 +659,7 @@ static void afm_render_vertical_fast(mirrormadness_t *m,
     const int seam_gain = (int) (6.0f + seam_t * 62.0f + 0.5f);
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -713,7 +712,7 @@ static void afm_render_horizontal_fast(mirrormadness_t *m,
     const int seam_gain = (int) (6.0f + seam_t * 62.0f + 0.5f);
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -956,7 +955,7 @@ static void afm_render_panels(mirrormadness_t *m,
     const int mono_amount_base = (int) (mono_t * 255.0f + 0.5f);
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1074,7 +1073,7 @@ static void afm_render_circular_mirror(mirrormadness_t *m,
 
     phase = offset_t * ring_w * 0.85f + time * ring_w * 0.085f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -1251,10 +1250,13 @@ static void afm_render_staircase_mirror(mirrormadness_t *m,
         step_w = 2.0f;
     step_y = (0.045f + afm_absf(offset_t) * 0.23f + max_width_t * 0.060f) * (float) h;
 
-    afm_build_axis_map(m, 0, 0, w, min_width_t, max_width_t, offset_t, time,
-                       m->x_src, m->x_mask, m->x_edge);
+#pragma omp single
+    {
+        afm_build_axis_map(m, 0, 0, w, min_width_t, max_width_t, offset_t, time,
+                           m->x_src, m->x_mask, m->x_edge);
+    }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1323,7 +1325,7 @@ static void afm_render_tunnel_mirror(mirrormadness_t *m,
     rect_w = afm_clampf(rect_w, 0.025f, 0.65f);
     phase = offset_t * rect_w * 0.88f + time * 0.075f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = ((float) y + 0.5f - cy) / cy;
@@ -1399,7 +1401,7 @@ static void afm_render_iris_mirror(mirrormadness_t *m,
     if (ring_w < 6.0f) ring_w = 6.0f;
     phase_r = offset_t * ring_w * 0.90f + time * ring_w * 0.080f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -1467,7 +1469,7 @@ static void afm_render_shutter_mirror(mirrormadness_t *m,
     if (blades > 28) blades = 28;
     blade_w = AFM_TWO_PI / (float) blades;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -1611,9 +1613,12 @@ static void afm_render_barcode_mirror(mirrormadness_t *m,
         min_t = t;
     }
 
-    afm_build_axis_map(m, 3, 0, m->w, min_t, max_t, offset_t * 1.25f, time * 1.10f,
-                       m->x_src, m->x_mask, m->x_edge);
-    afm_prepare_axis_index(m->x_src, m->x_mask, m->w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+    #pragma omp single
+    {
+        afm_build_axis_map(m, 3, 0, m->w, min_t, max_t, offset_t * 1.25f, time * 1.10f,
+                           m->x_src, m->x_mask, m->x_edge);
+        afm_prepare_axis_index(m->x_src, m->x_mask, m->w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+    }
     afm_render_vertical_fast(m, frame, afm_clampf(seam_t * 1.12f, 0.0f, 1.0f));
 }
 
@@ -1634,9 +1639,12 @@ static void afm_render_letterbox_mirror(mirrormadness_t *m,
         min_t = t;
     }
 
-    afm_build_axis_map(m, 4, 1, m->h, min_t, max_t, -offset_t * 0.92f, time * 0.84f,
-                       m->y_src, m->y_mask, m->y_edge);
-    afm_prepare_axis_index(m->y_src, m->y_mask, m->h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+    #pragma omp single
+    {
+        afm_build_axis_map(m, 4, 1, m->h, min_t, max_t, -offset_t * 0.92f, time * 0.84f,
+                           m->y_src, m->y_mask, m->y_edge);
+        afm_prepare_axis_index(m->y_src, m->y_mask, m->h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+    }
     afm_render_horizontal_fast(m, frame, afm_clampf(seam_t * 1.08f, 0.0f, 1.0f));
 }
 
@@ -1682,7 +1690,7 @@ static void afm_render_diagonal_slats(mirrormadness_t *m,
         stripe_w = 3.0f;
     phase = offset_t * stripe_w * 1.35f + time * stripe_w * 0.075f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = ((float) y + 0.5f) - cy;
@@ -1758,7 +1766,7 @@ static void afm_render_serpentine_slits(mirrormadness_t *m,
     wobble = strip_w * (0.70f + max_width_t * 1.85f);
     freq = (5.0f + min_width_t * 18.0f) / (float) (h > 1 ? h : 1);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1827,7 +1835,7 @@ static void afm_render_quad_portal(mirrormadness_t *m,
     if (fold_x < 8.0f) fold_x = 8.0f;
     if (fold_y < 8.0f) fold_y = 8.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1903,7 +1911,7 @@ static void afm_render_moebius_ribbon(mirrormadness_t *m,
     if (strip_w < 5.0f)
         strip_w = 5.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -2037,7 +2045,7 @@ static void afm_render_triangle_mirror(mirrormadness_t *m,
     if (band_w < 5.0f) band_w = 5.0f;
     sector_w = AFM_TWO_PI / (float) sectors;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -2108,7 +2116,7 @@ static void afm_render_hex_mirror(mirrormadness_t *m,
     if (cell < 10.0f) cell = 10.0f;
     inv_cell = 1.0f / cell;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = ((float) y + 0.5f) - cy;
@@ -2170,7 +2178,7 @@ static void afm_render_tunnel_xl(mirrormadness_t *m,
     (void) min_width_t;
     if (band < 24.0f) band = 24.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float ny = (((float) y + 0.5f) - cy) / cy;
@@ -2252,10 +2260,13 @@ static void afm_render_wave_bars(mirrormadness_t *m,
     inv_stripe_w = 1.0f / stripe_w;
     x_phase = time;
 
-    for (x = 0; x < w; x++)
-        x_warp[x] = afm_lut_sin(m, (float) x * 0.012f + x_phase) * stripe_w * 0.24f;
+#pragma omp single
+    {
+        for (x = 0; x < w; x++)
+            x_warp[x] = afm_lut_sin(m, (float) x * 0.012f + x_phase) * stripe_w * 0.24f;
+    }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int xx;
         int row = y * w;
@@ -2347,7 +2358,7 @@ static void afm_render_corner_pull(mirrormadness_t *m,
     int y;
     (void) max_width_t;
     if (band < 12.0f) band = 12.0f;
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2426,24 +2437,27 @@ static void afm_render_slit_scan(mirrormadness_t *m,
 
     inv_stripe_w = 1.0f / stripe_w;
 
-    for (x = 0; x < w; x++) {
-        float coord = (float) x + phase_x;
-        float q = coord * inv_stripe_w;
-        int band = afm_floor_to_int(q);
-        float band_start = (float) band * stripe_w;
-        float l = coord - band_start;
-        float ml = (band & 1) ? (stripe_w - l) : l;
-        float edge = l < stripe_w - l ? l : stripe_w - l;
-        float sy_shift = afm_lut_sin(m, (float) band * 0.71f + time * 2.8f) * shift_scale +
-                         (float) (band & 3) * stripe_w * 0.20f;
+#pragma omp single
+    {
+        for (x = 0; x < w; x++) {
+            float coord = (float) x + phase_x;
+            float q = coord * inv_stripe_w;
+            int band = afm_floor_to_int(q);
+            float band_start = (float) band * stripe_w;
+            float l = coord - band_start;
+            float ml = (band & 1) ? (stripe_w - l) : l;
+            float edge = l < stripe_w - l ? l : stripe_w - l;
+            float sy_shift = afm_lut_sin(m, (float) band * 0.71f + time * 2.8f) * shift_scale +
+                             (float) (band & 3) * stripe_w * 0.20f;
 
-        sx_tab[x] = afm_reflect_coord(band_start + ml, wmax);
-        yshift_fp[x] = (int) (sy_shift * 256.0f);
-        edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
-        edge_tab[x] = (uint8_t) clampi((int) (edge * 255.0f + 0.5f), 0, 255);
+            sx_tab[x] = afm_reflect_coord(band_start + ml, wmax);
+            yshift_fp[x] = (int) (sy_shift * 256.0f);
+            edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
+            edge_tab[x] = (uint8_t) clampi((int) (edge * 255.0f + 0.5f), 0, 255);
+        }
     }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int xx;
         int row = y * w;
@@ -2571,7 +2585,7 @@ static void afm_render_venetian_fan(mirrormadness_t *m,
     if (blades > 32) blades = 32;
     blade_w = AFM_TWO_PI / (float) blades;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2630,7 +2644,7 @@ static void afm_render_hourglass_mirror(mirrormadness_t *m,
     base_w = min_w + (max_w - min_w) * 0.42f;
     if (base_w < 3.0f) base_w = 3.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float yn = (((float) y + 0.5f) - cy) / cy;
@@ -2689,7 +2703,7 @@ static void afm_render_pinwheel_panels(mirrormadness_t *m,
     if (panels > 16) panels = 16;
     pane_w = AFM_TWO_PI / (float) panels;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -2747,7 +2761,7 @@ static void afm_render_accordion_mirror(mirrormadness_t *m,
     fold_w = min_w + (max_w - min_w) * 0.50f;
     if (fold_w < 3.0f) fold_w = 3.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2837,7 +2851,7 @@ static void afm_render_corner_kaleido(mirrormadness_t *m,
     if (sectors < 4) sectors = 4;
     if (sectors > 24) sectors = 24;
     sector_w = (AFM_TWO_PI * 0.25f) / (float) sectors;
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2968,7 +2982,7 @@ static void afm_render_elastic_strip_mirror(mirrormadness_t *m,
     inv_stripe_w = 1.0f / stripe_w;
     lens_scale = stripe_w * (0.45f + seam_t * 0.42f);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -3062,7 +3076,7 @@ static void afm_render_sliced_lens_mirror(mirrormadness_t *m,
     inv_stripe_w = 1.0f / stripe_w;
     ybend_scale = stripe_w * (0.28f + max_width_t * 0.44f);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         const int row = y * w;
@@ -3150,7 +3164,7 @@ static void afm_render_torn_poster_mirror(mirrormadness_t *m,
 
     inv_strip_h = 1.0f / strip_h;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -3265,7 +3279,7 @@ static void afm_render_spiral_stair_mirror(mirrormadness_t *m,
     if (band < 5.0f)
         band = 5.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -3507,7 +3521,7 @@ static void afm_render_waterfall_strips(mirrormadness_t *m,
     phase = offset_t * (float) h * 0.46f + time * (float) h * 0.035f;
     seam_px = 1.1f + seam_t * 6.8f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float yy = (float) y + 0.5f + phase;
@@ -3579,7 +3593,7 @@ static void afm_render_fan_blades(mirrormadness_t *m,
     phase = offset_t * AFM_TWO_PI + time * 0.42f;
     seam_ang = 0.018f + seam_t * 0.050f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -3665,7 +3679,7 @@ static void afm_render_diamond_tunnel(mirrormadness_t *m,
     phase = offset_t * band_w * 1.8f + time * band_w * 0.065f;
     seam_px = 1.4f + seam_t * 7.2f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -3786,7 +3800,7 @@ static void afm_render_voronoi_plates(mirrormadness_t *m,
     if (cell > (float) min_dim * 0.58f) cell = (float) min_dim * 0.58f;
     inv_cell = 1.0f / cell;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -3888,7 +3902,7 @@ static void afm_render_polar_barcode(mirrormadness_t *m,
     inv_band_w = 1.0f / band_w;
     phase = offset_t * 1.7f + time * 0.28f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = (float) y + 0.5f - cy;
@@ -3948,7 +3962,7 @@ static void afm_render_ribbon_lattice(mirrormadness_t *m,
     off1 = offset_t * diag * 0.22f + time * diag * 0.010f;
     off2 = -offset_t * diag * 0.18f - time * diag * 0.008f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = (float) y + 0.5f;
@@ -4037,15 +4051,18 @@ static void afm_render_woven_mirror(mirrormadness_t *m,
     xoff = -offset_t * pitch_x * 0.5f - time * pitch_x * 0.018f;
     yoff =  offset_t * pitch_y * 0.4f + time * pitch_y * 0.02f;
 
-    for (x = 0; x < w; x++) {
-        float px = (float) x + 0.5f;
-        float vx = px + xoff;
-        int hx = afm_floor_to_int(vx * inv_pitch_x);
-        hx_tab[x] = hx;
-        lx_tab[x] = vx - (float) hx * pitch_x;
+#pragma omp single
+    {
+        for (x = 0; x < w; x++) {
+            float px = (float) x + 0.5f;
+            float vx = px + xoff;
+            int hx = afm_floor_to_int(vx * inv_pitch_x);
+            hx_tab[x] = hx;
+            lx_tab[x] = vx - (float) hx * pitch_x;
+        }
     }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int xx;
         float py = (float) y + 0.5f;
@@ -4117,7 +4134,7 @@ static void afm_render_corner_tunnel(mirrormadness_t *m,
     if (band_w < 8.0f) band_w = 8.0f;
     phase = time * band_w * 0.05f + offset_t * band_w * 1.6f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -4167,7 +4184,7 @@ static void afm_render_lens_array(mirrormadness_t *m,
     if (cell < 28.0f) cell = 28.0f;
     inv_cell = 1.0f / cell;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -4226,7 +4243,7 @@ static void afm_render_axis_roulette(mirrormadness_t *m,
     if (band_w < 10.0f) band_w = 10.0f;
     phase = offset_t * band_w * 1.3f + time * band_w * 0.05f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -4456,7 +4473,6 @@ void *hyperfold_malloc(int w, int h)
     m->skip_base_panel = 0;
     m->time = 0.0f;
 
-    m->n_threads = vje_advise_num_threads((int) len);
 
     m->region = vj_malloc(byte_size);
     if (!m->region) {
@@ -4782,8 +4798,11 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
     U = frame->data[1];
     V = frame->data[2];
 
-    if (!m->seeded)
-        afm_seed(m, frame);
+    #pragma omp single
+    {
+        if (!m->seeded)
+            afm_seed(m, frame);
+    }
 
     mode_i = args[P_MODE];
     minwidth_i = args[P_MINWIDTH];
@@ -4824,18 +4843,24 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
         contrast_i = clampi(contrast_i + (int)(tw * motion_profile.contrast_push * 220.0f + 0.5f), 0, 1000);
     }
 
-    afm_build_luts(m, contrast_i);
+    #pragma omp single
+    {
+        afm_build_luts(m, contrast_i);
 
-    m->time = afm_wrap_2pi(m->time + (0.0012f + seam_t * 0.0020f + maxwidth_t * 0.0012f) * speed_t);
+        m->time = afm_wrap_2pi(m->time + (0.0012f + seam_t * 0.0020f + maxwidth_t * 0.0012f) * speed_t);
+    }
     time = m->time;
 
     src_y = m->src_y;
     src_u = m->src_u;
     src_v = m->src_v;
 
-    veejay_memcpy(src_y, Y, (size_t) len);
-    veejay_memcpy(src_u, U, (size_t) len);
-    veejay_memcpy(src_v, V, (size_t) len);
+    #pragma omp single
+    {
+        veejay_memcpy(src_y, Y, (size_t) len);
+        veejay_memcpy(src_u, U, (size_t) len);
+        veejay_memcpy(src_v, V, (size_t) len);
+    }
 
     if (maxwidth_t < minwidth_t) {
         float t = maxwidth_t;
@@ -4843,13 +4868,19 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
         minwidth_t = t;
     }
 
-    m->skip_base_panel = 1;
+    #pragma omp single
+    {
+        m->skip_base_panel = 1;
+    }
 
     switch (mode_i) {
         case AFM_MODE_VERTICAL:
         default:
-            afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
-            afm_prepare_axis_index(m->x_src, m->x_mask, w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+#pragma omp single
+            {
+                afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
+                afm_prepare_axis_index(m->x_src, m->x_mask, w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+            }
             afm_render_vertical_fast(m, frame, seam_t);
             break;
 
@@ -4866,8 +4897,11 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case AFM_MODE_HORIZONTAL:
-            afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
-            afm_prepare_axis_index(m->y_src, m->y_mask, h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+#pragma omp single
+            {
+                afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
+                afm_prepare_axis_index(m->y_src, m->y_mask, h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+            }
             afm_render_horizontal_fast(m, frame, seam_t);
             break;
 
@@ -4908,47 +4942,74 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case AFM_MODE_SQUARE:
-            afm_build_panel_layout(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_panel_layout(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_BROKEN_WINDOW:
-            afm_build_broken_window_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_broken_window_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_SPLIT_PORTRAIT:
-            afm_build_split_portrait_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_split_portrait_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_CENTER_STACK:
-            afm_build_center_stack_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_center_stack_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_CONTACT_SHEET:
-            afm_build_contact_sheet_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_contact_sheet_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_CASCADE_COLLAGE:
-            afm_build_cascade_collage_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_cascade_collage_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_PRISM_STACK:
-            afm_build_prism_stack_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_prism_stack_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_FILM_GATE:
-            afm_build_film_gate_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_film_gate_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_ORBIT_COLLAGE:
-            afm_build_orbit_collage_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_orbit_collage_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
@@ -5013,12 +5074,18 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case AFM_MODE_SPIRAL_SHARDS:
-            afm_build_spiral_shards_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_spiral_shards_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
         case AFM_MODE_SLIDING_DOORS:
-            afm_build_sliding_doors_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_sliding_doors_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
@@ -5035,7 +5102,10 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
             break;
 
         case AFM_MODE_NESTED_FILM_GATES:
-            afm_build_nested_film_gates_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+#pragma omp single
+            {
+                afm_build_nested_film_gates_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
 
@@ -5068,5 +5138,8 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
             break;
     }
 
-    m->frame++;
+    #pragma omp single
+    {
+        m->frame++;
+    }
 }

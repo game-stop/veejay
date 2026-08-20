@@ -63,7 +63,6 @@ typedef struct
     uint8_t *tmp[3];
     frag_tile tiles[MAX_TILES];
     int tile_count;
-    int n_threads;
     int frame_count;
     int first;
     int prev[FRAGMENTTV_PARAMS];
@@ -192,7 +191,6 @@ void *fragmenttv_malloc(int w, int h)
     m->tmp[1] = m->tmp[0] + len;
     m->tmp[2] = m->tmp[1] + len;
 
-    m->n_threads = vje_advise_num_threads((int)len);
     m->first = 1;
     m->drift_accum = 0;
 
@@ -372,7 +370,7 @@ static void draw_tiles_parallel_no_overlap(fragmenttv_t *m,
                                            int w,
                                            int mode)
 {
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int t = 0; t < m->tile_count; t++) {
         frag_tile *q = &m->tiles[t];
 
@@ -498,14 +496,17 @@ void fragmenttv_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    veejay_memcpy(m->tmp[0], Y, len);
-    veejay_memcpy(m->tmp[1], U, len);
-    veejay_memcpy(m->tmp[2], V, len);
+    #pragma omp single
+    {
+        veejay_memcpy(m->tmp[0], Y, len);
+        veejay_memcpy(m->tmp[1], U, len);
+        veejay_memcpy(m->tmp[2], V, len);
 
-    if(blackbg) {
-        veejay_memset(Y, 0, len);
-        veejay_memset(U, 128, len);
-        veejay_memset(V, 128, len);
+        if(blackbg) {
+            veejay_memset(Y, 0, len);
+            veejay_memset(U, 128, len);
+            veejay_memset(V, 128, len);
+        }
     }
 
     int changed =
@@ -513,22 +514,28 @@ void fragmenttv_apply(void *ptr, VJFrame *frame, int *args)
         (refresh > 0 && (m->frame_count % refresh) == 0) ||
         memcmp(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
 
-    if(changed) {
-        generate_tiles(m, w, h, tile, vary, scatter, drift, cover);
-        veejay_memcpy(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
+    #pragma omp single
+    {
+        if(changed) {
+            generate_tiles(m, w, h, tile, vary, scatter, drift, cover);
+            veejay_memcpy(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
+        }
     }
 
     const int overlap_risk = (vary > 0 || drift > 0);
 
     draw_tiles(m, Y, U, V, m->tmp[0], m->tmp[1], m->tmp[2], w, mode, overlap_risk);
 
-    if(edge_mode == 2) {
-        draw_borders(m, Y, w, border, overlap_risk);
-        m->frame_count = 0;
-        m->drift_accum = 0;
-        m->first = 1;
-    }
+    #pragma omp single
+    {
+        if(edge_mode == 2) {
+            draw_borders(m, Y, w, border, overlap_risk);
+            m->frame_count = 0;
+            m->drift_accum = 0;
+            m->first = 1;
+        }
 
-    m->frame_count++;
-    m->first = 0;
+        m->frame_count++;
+        m->first = 0;
+    }
 }

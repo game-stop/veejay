@@ -24,7 +24,6 @@
 typedef struct {
     int last_gamma;
     uint8_t table[256];
-    int n_threads;
 } bwselect_t;
 
 vj_effect *bwselect_init(int w, int h)
@@ -85,7 +84,6 @@ void *bwselect_malloc(int w, int h)
 
     gamma_setup(b, 4.0);
     b->last_gamma = 400;
-    b->n_threads = vje_advise_num_threads(w * h);
 
     return b;
 }
@@ -124,17 +122,20 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
     if(mode == 1 && !A)
         mode = 0;
 
-    if(gamma != 0 && gamma != b->last_gamma)
+#pragma omp single copyprivate(gamma)
     {
-        gamma_setup(b, (double)gamma / 100.0);
-        b->last_gamma = gamma;
+        if(gamma != 0 && gamma != b->last_gamma)
+        {
+            gamma_setup(b, (double)gamma / 100.0);
+            b->last_gamma = gamma;
+        }
     }
 
     const int use_gamma = gamma != 0;
     const int hi = pixel_Y_hi_;
     const int lo = pixel_Y_lo_;
 
-#pragma omp parallel for num_threads(b->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
@@ -146,8 +147,11 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
             A[i] = (uint8_t)(-cond);
     }
 
-    if(mode == 0) {
-        veejay_memset(Cb, 128, frame->uv_len);
-        veejay_memset(Cr, 128, frame->uv_len);
+#pragma omp single
+    {
+        if(mode == 0) {
+            veejay_memset(Cb, 128, frame->uv_len);
+            veejay_memset(Cr, 128, frame->uv_len);
+        }
     }
 }

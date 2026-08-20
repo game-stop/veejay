@@ -30,7 +30,6 @@ typedef struct
 {
     uint8_t *buf;
     uint8_t *blurmask;
-    int n_threads;
 } edgeglow_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -92,7 +91,6 @@ void *edgeglow_malloc(int w, int h)
     }
 
     s->blurmask = s->buf + len;
-    s->n_threads = vje_advise_num_threads(len);
 
     return s;
 }
@@ -136,10 +134,12 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
     const int a2 = ((nU - 128) * 127) >> 8;
     const int b2 = ((nV - 128) * 127) >> 8;
 
-    veejay_memset(B, 0, len);
-    veejay_memset(C, 0, len);
+#pragma omp single
+    {
+        veejay_memset(B, 0, len);
+        veejay_memset(C, 0, len);
+    }
 
-#pragma omp parallel num_threads(s->n_threads)
     {
 #pragma omp for schedule(static)
         for(int y = 1; y < height - 1; y++)
@@ -211,5 +211,6 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
             Cb[i] = (uint8_t)((a_out & mask) | (Cb[i] & ~mask));
             Cr[i] = (uint8_t)((b_out & mask) | (Cr[i] & ~mask));
         }
+    #pragma omp barrier
     }
 }

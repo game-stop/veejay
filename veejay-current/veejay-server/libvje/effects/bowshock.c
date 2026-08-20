@@ -71,7 +71,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
 
     uint8_t *src_y;
     uint8_t *src_u;
@@ -311,7 +310,6 @@ void *bowshock_malloc(int w, int h)
         return NULL;
 
     const int len = w * h;
-    const int n_threads = vje_advise_num_threads(len);
     const size_t plane = (size_t)len;
     const size_t map_bytes = plane * sizeof(int16_t);
     const size_t total = sizeof(bowshock_t) + plane * 3 + map_bytes * 5 + 64;
@@ -324,7 +322,6 @@ void *bowshock_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = n_threads;
 
     uint8_t *p = (uint8_t *)(s + 1);
 
@@ -565,7 +562,6 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
-    const int threads = s->n_threads;
 
     const int mode_arg = args[BS_MODE];
     const int displace_arg = args[BS_DISPLACE];
@@ -612,71 +608,77 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
             snare_delta > 0.12f
         );
 
-    s->impact_env = bs_env(s->impact_env, impact_target, 0.82f, 0.095f);
-    s->shock_env = bs_env(s->shock_env, shock_target, 0.78f, 0.075f);
-    s->snare_env = bs_env(s->snare_env, snare_target, 0.86f, 0.190f);
-    s->hat_env = bs_env(s->hat_env, hat_target, 0.70f, 0.360f);
+#pragma omp single
+    {
+        s->impact_env = bs_env(s->impact_env, impact_target, 0.82f, 0.095f);
+        s->shock_env = bs_env(s->shock_env, shock_target, 0.78f, 0.075f);
+        s->snare_env = bs_env(s->snare_env, snare_target, 0.86f, 0.190f);
+        s->hat_env = bs_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-    if(impact_rise) {
-        bs_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg, geometry_arg, mode_arg);
-        s->impact_cooldown = 3;
+        if(impact_rise) {
+            bs_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg, geometry_arg, mode_arg);
+            s->impact_cooldown = 3;
+        }
+
+        if(shock_rise && !impact_rise) {
+            bs_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg, geometry_arg, mode_arg);
+            s->shock_cooldown = 4;
+        }
+
+        if(snare_rise) {
+            bs_spawn_wave(s,
+                          impact_target * 0.35f,
+                          shock_target * 0.42f + snare_target * 0.58f,
+                          width_arg >> 1,
+                          speed_arg + 12,
+                          center_arg,
+                          geometry_arg + 17,
+                          mode_arg);
+            s->snare_cooldown = 3;
+        }
+
+        if(s->impact_cooldown > 0)
+            s->impact_cooldown--;
+        if(s->shock_cooldown > 0)
+            s->shock_cooldown--;
+        if(s->snare_cooldown > 0)
+            s->snare_cooldown--;
     }
-
-    if(shock_rise && !impact_rise) {
-        bs_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg, geometry_arg, mode_arg);
-        s->shock_cooldown = 4;
-    }
-
-    if(snare_rise) {
-        bs_spawn_wave(s,
-                      impact_target * 0.35f,
-                      shock_target * 0.42f + snare_target * 0.58f,
-                      width_arg >> 1,
-                      speed_arg + 12,
-                      center_arg,
-                      geometry_arg + 17,
-                      mode_arg);
-        s->snare_cooldown = 3;
-    }
-
-    if(s->impact_cooldown > 0)
-        s->impact_cooldown--;
-    if(s->shock_cooldown > 0)
-        s->shock_cooldown--;
-    if(s->snare_cooldown > 0)
-        s->snare_cooldown--;
 
     const float decay = 0.9475f;
     const float max_dist = (float)(w > h ? w : h) * (mode_arg == BS_MODE_BOW ? 2.25f : 1.55f);
 
-    for(int i = 0; i < BS_MAX_WAVES; i++) {
-        bowshock_wave_t *wv = &s->waves[i];
+#pragma omp single
+    {
+        for(int i = 0; i < BS_MAX_WAVES; i++) {
+            bowshock_wave_t *wv = &s->waves[i];
 
-        if(!wv->active)
-            continue;
+            if(!wv->active)
+                continue;
 
-        wv->pos += wv->speed;
-        wv->amp *= decay;
+            wv->pos += wv->speed;
+            wv->amp *= decay;
 
-        if(wv->amp < 0.012f || wv->pos > max_dist)
-            wv->active = 0;
+            if(wv->amp < 0.012f || wv->pos > max_dist)
+                wv->active = 0;
+        }
+
+        s->swing_phase +=
+            0.010f +
+            ((float)speed_arg * 0.0011f) +
+            ((float)geometry_arg * 0.0007f) +
+            s->impact_env * 0.050f +
+            s->snare_env * 0.030f +
+            s->hat_env * 0.012f;
+
+        if(s->swing_phase > (float)(M_PI * 2.0))
+            s->swing_phase -= (float)(M_PI * 2.0);
+
+        s->last_impact = impact_target;
+        s->last_shock = shock_target;
+        s->last_snare = snare_target;
+        s->frame_count++;
     }
-
-    s->swing_phase +=
-        0.010f +
-        ((float)speed_arg * 0.0011f) +
-        ((float)geometry_arg * 0.0007f) +
-        s->impact_env * 0.050f +
-        s->snare_env * 0.030f +
-        s->hat_env * 0.012f;
-
-    if(s->swing_phase > (float)(M_PI * 2.0))
-        s->swing_phase -= (float)(M_PI * 2.0);
-
-    s->last_impact = impact_target;
-    s->last_shock = shock_target;
-    s->last_snare = snare_target;
-    s->frame_count++;
 
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int shock_i = (int)(s->shock_env * 256.0f);
@@ -738,7 +740,6 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     if(nactive <= 0 && swing_x == 0 && swing_y == 0)
         return;
 
-#pragma omp parallel num_threads(threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
@@ -857,6 +858,7 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 }
 

@@ -32,7 +32,6 @@
 
 typedef struct {
     uint8_t *mask;
-    int n_threads;
 
     float threshold_state;
     float softness_state;
@@ -162,7 +161,6 @@ void *threshold_malloc(int w, int h)
     t->mix_drive_state = 0.0f;
     t->initialized = 0;
 
-    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }
@@ -246,17 +244,20 @@ void threshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const float fast = 0.245f;
     const float slow = 0.112f;
 
-    if(!t->initialized) {
-        t->threshold_state = (float)threshold;
-        t->softness_state = (float)softness;
-        t->glow_state = (float)edge_glow;
-        t->mix_drive_state = (float)mix_drive;
-        t->initialized = 1;
-    } else {
-        threshold = threshold_smooth_i(&t->threshold_state, threshold, fast, slow);
-        softness = threshold_smooth_i(&t->softness_state, softness, fast * 0.90f, slow);
-        edge_glow = threshold_smooth_i(&t->glow_state, edge_glow, fast * 1.08f, slow);
-        mix_drive = threshold_smooth_i(&t->mix_drive_state, mix_drive, fast * 1.16f, slow);
+#pragma omp single copyprivate(edge_glow, mix_drive, softness, threshold)
+    {
+        if(!t->initialized) {
+            t->threshold_state = (float)threshold;
+            t->softness_state = (float)softness;
+            t->glow_state = (float)edge_glow;
+            t->mix_drive_state = (float)mix_drive;
+            t->initialized = 1;
+        } else {
+            threshold = threshold_smooth_i(&t->threshold_state, threshold, fast, slow);
+            softness = threshold_smooth_i(&t->softness_state, softness, fast * 0.90f, slow);
+            edge_glow = threshold_smooth_i(&t->glow_state, edge_glow, fast * 1.08f, slow);
+            mix_drive = threshold_smooth_i(&t->mix_drive_state, mix_drive, fast * 1.16f, slow);
+        }
     }
 
     mix_drive = clampi(mix_drive, 0, 1000);
@@ -284,7 +285,6 @@ void threshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     uint8_t *restrict mask = t->mask;
 
-#pragma omp parallel num_threads(t->n_threads)
     {
         threshold_build_soft_mask(t, Y, w, h);
 
@@ -322,5 +322,6 @@ void threshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             Cb[i] = threshold_u8(uv);
             Cr[i] = threshold_u8(vv);
         }
+    #pragma omp barrier
     }
 }

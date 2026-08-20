@@ -46,7 +46,6 @@ typedef struct {
     int *sample_area;
     int box_w;
     int box_h;
-    int n_threads;
     int slide_env_q8;
     int slide_phase;
     uint8_t lift_lut[33][256];
@@ -335,7 +334,6 @@ static void *prepare_filmstrip(int w, int h)
     vw->frame_counter = 0;
     vw->slide_env_q8 = 0;
     vw->slide_phase = 0;
-    vw->n_threads = vje_advise_num_threads(w * h);
 
     build_lift_lut(vw);
     build_sample_map(vw, w, h);
@@ -384,7 +382,7 @@ static void take_photo(videowall_t *vw, VJFrame *frame, int index)
     const int *restrict sy1_tbl = vw->sample_y1;
     const int *restrict area_tbl = vw->sample_area;
 
-#pragma omp parallel for schedule(static) num_threads(vw->n_threads)
+#pragma omp for schedule(static)
     for(int py = 0; py < rows; py++) {
         const int p = py / box_h;
         const int y = py - (p * box_h);
@@ -542,8 +540,11 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     const int lock_update = args[P_LOCK_UPDATE] ? 1 : 0;
     const int slide_drive = args[P_SLIDE_DRIVE];
 
-    vw->slide_env_q8 = smooth_q8(vw->slide_env_q8, slide_drive << 8);
-    vw->slide_env_q8 = clampi(vw->slide_env_q8, 0, 1000 << 8);
+    #pragma omp single
+    {
+        vw->slide_env_q8 = smooth_q8(vw->slide_env_q8, slide_drive << 8);
+        vw->slide_env_q8 = clampi(vw->slide_env_q8, 0, 1000 << 8);
+    }
 
     const int slide_q = (vw->slide_env_q8 + 128) >> 8;
     const int slide_span = vw->box_w + vw->box_h;
@@ -556,7 +557,10 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     const int amp = max_slide_px;
     const int slide_step = 2 + ((slide_q * 46 + 500) / 1000);
 
-    vw->slide_phase = (vw->slide_phase + slide_step) & 4095;
+    #pragma omp single
+    {
+        vw->slide_phase = (vw->slide_phase + slide_step) & 4095;
+    }
 
     const int phase = vw->slide_phase;
     const int phase3 = (phase * 3) & 4095;
@@ -566,9 +570,12 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     const int stagger_y = scale_wave(amp, triwave12(phase3 + 1024), 4096);
     const int luma_lift = (slide_q * 32 + 500) / 1000;
 
-    if(!lock_update) {
-        vw->offset_table_x[slot] = x_disp;
-        vw->offset_table_y[slot] = y_disp;
+    #pragma omp single
+    {
+        if(!lock_update) {
+            vw->offset_table_x[slot] = x_disp;
+            vw->offset_table_y[slot] = y_disp;
+        }
     }
 
     int next = vw->frame_counter;
@@ -583,8 +590,11 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     if(next == vw->num_photos)
         next = 0;
 
-    vw->frame_counter = next;
+    #pragma omp single
+    {
+        vw->frame_counter = next;
 
-    for(int i = 0; i < vw->num_photos; i++)
-        put_photo(vw, frameA, i, global_x, global_y, stagger_x, stagger_y, luma_lift);
+        for(int i = 0; i < vw->num_photos; i++)
+            put_photo(vw, frameA, i, global_x, global_y, stagger_x, stagger_y, luma_lift);
+    }
 }

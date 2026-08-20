@@ -37,7 +37,6 @@
 typedef struct {
     uint8_t *Yb_frame;
     uint8_t *mask;
-    int n_threads;
 } noisepencil_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -159,7 +158,6 @@ void *noisepencil_malloc(int width, int height)
     }
 
     n->mask = n->Yb_frame + len;
-    n->n_threads = vje_advise_num_threads(len);
 
     return (void*) n;
 }
@@ -185,7 +183,6 @@ static void noisepencil_apply_mode(noisepencil_t *n,
     uint8_t *restrict B = n->Yb_frame;
     uint8_t *restrict M = n->mask;
 
-#pragma omp parallel num_threads(n->n_threads)
     {
         if(use_1x3) {
 #pragma omp for schedule(static)
@@ -244,6 +241,7 @@ static void noisepencil_apply_mode(noisepencil_t *n,
             else
                 Y[i] = edge;
         }
+    #pragma omp barrier
     }
 }
 

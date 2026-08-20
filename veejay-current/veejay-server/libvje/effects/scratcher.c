@@ -37,7 +37,6 @@ typedef struct {
     int direction;
     int last_pingpong;
     int last_n;
-    int n_threads;
 
     float sm_opacity;
     float sm_buffer;
@@ -159,7 +158,6 @@ void *scratcher_malloc(int w, int h)
     s->direction = 1;
     s->last_pingpong = 1;
     s->last_n = 8;
-    s->n_threads = vje_advise_num_threads(len);
     s->sm_opacity = 150.0f;
     s->sm_buffer = 8.0f;
     s->sm_mix = 1000.0f;
@@ -241,7 +239,6 @@ static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, in
     const uint8_t *restrict hU = s->frame[1] + ((size_t)len * (size_t)slot);
     const uint8_t *restrict hV = s->frame[2] + ((size_t)len * (size_t)slot);
 
-#pragma omp parallel num_threads(s->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -252,6 +249,7 @@ static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, in
             U[i] = scratcher_mix_uv(U[i], hU[i], chroma_q8);
             V[i] = scratcher_mix_uv(V[i], hV[i], chroma_q8);
         }
+    #pragma omp barrier
     }
 }
 
@@ -266,25 +264,31 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
     const float follow = 0.34f;
     const float slow_follow = 0.16f;
 
-    scratcher_smooth_to(&s->sm_opacity, (float)raw_opacity, follow);
-    scratcher_smooth_to(&s->sm_buffer,  (float)raw_n, slow_follow);
-    scratcher_smooth_to(&s->sm_mix,     (float)raw_mix, follow);
-    scratcher_smooth_to(&s->sm_chroma,  (float)raw_chroma, follow);
+    #pragma omp single
+    {
+        scratcher_smooth_to(&s->sm_opacity, (float)raw_opacity, follow);
+        scratcher_smooth_to(&s->sm_buffer,  (float)raw_n, slow_follow);
+        scratcher_smooth_to(&s->sm_mix,     (float)raw_mix, follow);
+        scratcher_smooth_to(&s->sm_chroma,  (float)raw_chroma, follow);
+    }
 
     int n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
 
-    if(n != s->last_n || pingpong != s->last_pingpong) {
-        s->last_n = n;
-        s->last_pingpong = pingpong;
+    #pragma omp single
+    {
+        if(n != s->last_n || pingpong != s->last_pingpong) {
+            s->last_n = n;
+            s->last_pingpong = pingpong;
 
-        const int max_q8 = (n - 1) << 8;
+            const int max_q8 = (n - 1) << 8;
 
-        if(s->phase_q8 > max_q8)
-            s->phase_q8 = max_q8;
-        if(s->phase_q8 < 0)
-            s->phase_q8 = 0;
+            if(s->phase_q8 > max_q8)
+                s->phase_q8 = max_q8;
+            if(s->phase_q8 < 0)
+                s->phase_q8 = 0;
 
-        s->direction = 1;
+            s->direction = 1;
+        }
     }
 
     const int slot = clampi((s->phase_q8 + 128) >> 8, 0, n - 1);
@@ -299,8 +303,11 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
 
     scratcher_blend_from_slot(s, src, slot, wet_q8, chroma_q8);
 
-    if(!pingpong || s->direction > 0)
-        scratcher_store_current(s, src, slot);
+    #pragma omp single
+    {
+        if(!pingpong || s->direction > 0)
+            scratcher_store_current(s, src, slot);
 
-    scratcher_advance(s, n, pingpong);
+        scratcher_advance(s, n, pingpong);
+    }
 }

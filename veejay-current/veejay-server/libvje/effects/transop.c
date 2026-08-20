@@ -177,8 +177,7 @@ static void transop_copy_rect(VJFrame *frame,
                               int sy,
                               int sx,
                               int dy,
-                              int dx,
-                              int n_threads)
+                              int dx)
 {
     const int width = frame->width;
 
@@ -190,7 +189,7 @@ static void transop_copy_rect(VJFrame *frame,
     const uint8_t *restrict sCb = frame2->data[1];
     const uint8_t *restrict sCr = frame2->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < rect_h; y++) {
         const int src = (sy + y) * width + sx;
         const int dst = (dy + y) * width + dx;
@@ -217,37 +216,43 @@ void transop_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int slide_drive_arg = args[P_SLIDE_DRIVE];
     const int size_drive_arg = args[P_SIZE_DRIVE];
 
-    if(!t->initialized) {
-        t->rect_w = (float)rect_w_arg;
-        t->rect_h = (float)rect_h_arg;
-        t->src_y = (float)sy_arg;
-        t->src_x = (float)sx_arg;
-        t->dst_y = (float)dy_arg;
-        t->dst_x = (float)dx_arg;
-        t->slide_drive = (float)slide_drive_arg;
-        t->size_drive = (float)size_drive_arg;
-        t->phase = 0.0f;
-        t->initialized = 1;
-    } else {
-        const float user_coef = 0.24f;
-        const float drive_coef = 0.28f;
+    #pragma omp single
+    {
+        if(!t->initialized) {
+            t->rect_w = (float)rect_w_arg;
+            t->rect_h = (float)rect_h_arg;
+            t->src_y = (float)sy_arg;
+            t->src_x = (float)sx_arg;
+            t->dst_y = (float)dy_arg;
+            t->dst_x = (float)dx_arg;
+            t->slide_drive = (float)slide_drive_arg;
+            t->size_drive = (float)size_drive_arg;
+            t->phase = 0.0f;
+            t->initialized = 1;
+        } else {
+            const float user_coef = 0.24f;
+            const float drive_coef = 0.28f;
 
-        t->rect_w = transop_smooth(t->rect_w, (float)rect_w_arg, user_coef);
-        t->rect_h = transop_smooth(t->rect_h, (float)rect_h_arg, user_coef);
-        t->src_y = transop_smooth(t->src_y, (float)sy_arg, user_coef);
-        t->src_x = transop_smooth(t->src_x, (float)sx_arg, user_coef);
-        t->dst_y = transop_smooth(t->dst_y, (float)dy_arg, user_coef);
-        t->dst_x = transop_smooth(t->dst_x, (float)dx_arg, user_coef);
-        t->slide_drive = transop_smooth(t->slide_drive, (float)slide_drive_arg, drive_coef);
-        t->size_drive = transop_smooth(t->size_drive, (float)size_drive_arg, drive_coef * 0.82f);
+            t->rect_w = transop_smooth(t->rect_w, (float)rect_w_arg, user_coef);
+            t->rect_h = transop_smooth(t->rect_h, (float)rect_h_arg, user_coef);
+            t->src_y = transop_smooth(t->src_y, (float)sy_arg, user_coef);
+            t->src_x = transop_smooth(t->src_x, (float)sx_arg, user_coef);
+            t->dst_y = transop_smooth(t->dst_y, (float)dy_arg, user_coef);
+            t->dst_x = transop_smooth(t->dst_x, (float)dx_arg, user_coef);
+            t->slide_drive = transop_smooth(t->slide_drive, (float)slide_drive_arg, drive_coef);
+            t->size_drive = transop_smooth(t->size_drive, (float)size_drive_arg, drive_coef * 0.82f);
+        }
     }
 
     const float slide_t = transop_clampf(t->slide_drive * 0.001f, 0.0f, 1.0f);
     const float size_t = transop_clampf(t->size_drive * 0.001f, 0.0f, 1.0f);
 
-    t->phase += 0.010f + slide_t * 0.105f;
-    if(t->phase >= TRANSOP_TWO_PI)
-        t->phase -= TRANSOP_TWO_PI;
+    #pragma omp single
+    {
+        t->phase += 0.010f + slide_t * 0.105f;
+        if(t->phase >= TRANSOP_TWO_PI)
+            t->phase -= TRANSOP_TWO_PI;
+    }
 
     const float s0 = sinf(t->phase);
     const float s1 = sinf(t->phase * 0.73f + 1.91f);
@@ -285,5 +290,5 @@ void transop_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(rect_w <= 0 || rect_h <= 0)
         return;
 
-    transop_copy_rect(frame, frame2, rect_w, rect_h, sy, sx, dy, dx, t->n_threads);
+    transop_copy_rect(frame, frame2, rect_w, rect_h, sy, sx, dy, dx);
 }

@@ -103,13 +103,12 @@ static void crosspixel_copy_raster_rows(uint8_t *restrict dst,
                                         const uint8_t *restrict src,
                                         int width,
                                         int height,
-                                        unsigned int step,
-                                        int n_threads)
+                                        unsigned int step)
 {
     if(!dst || !src || width <= 0 || height <= 0 || step == 0)
         return;
 
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int y = 0; y < height; y++)
     {
         if(((unsigned int)y % step) == 1u)
@@ -146,13 +145,16 @@ void crosspixel_apply(void *ptr, VJFrame *frame, int *args)
 
     int strides[4] = { len, uv_len, uv_len, 0 };
 
-    vj_frame_copy(frame->data, c->cross_pixels, strides);
+    #pragma omp single
+    {
+        vj_frame_copy(frame->data, c->cross_pixels, strides);
 
-    vj_frame_clear1(Y, mode == 0 ? pixel_Y_lo_ : pixel_Y_hi_, len);
-    vj_frame_clear1(Cb, 128, uv_len);
-    vj_frame_clear1(Cr, 128, uv_len);
+        vj_frame_clear1(Y, mode == 0 ? pixel_Y_lo_ : pixel_Y_hi_, len);
+        vj_frame_clear1(Cb, 128, uv_len);
+        vj_frame_clear1(Cr, 128, uv_len);
+    }
 
-    crosspixel_copy_raster_rows(Y, c->cross_pixels[0], width, height, step_y, c->n_threads);
-    crosspixel_copy_raster_rows(Cb, c->cross_pixels[1], uv_width, uv_height, step_uv, c->n_threads);
-    crosspixel_copy_raster_rows(Cr, c->cross_pixels[2], uv_width, uv_height, step_uv, c->n_threads);
+    crosspixel_copy_raster_rows(Y, c->cross_pixels[0], width, height, step_y);
+    crosspixel_copy_raster_rows(Cb, c->cross_pixels[1], uv_width, uv_height, step_uv);
+    crosspixel_copy_raster_rows(Cr, c->cross_pixels[2], uv_width, uv_height, step_uv);
 }

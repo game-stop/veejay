@@ -20,7 +20,6 @@
 typedef struct {
     int wipe_position;
     int last_restart;
-    int n_threads;
     int initialized;
     float speed_env;
     float edge_env;
@@ -145,7 +144,6 @@ void *wipe_malloc(int w, int h)
     prv->edge_env = 0.0f;
     prv->glow_env = 0.0f;
 
-    prv->n_threads = vje_advise_num_threads(w * h);
 
     return prv;
 }
@@ -167,21 +165,24 @@ void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int edge_arg = args[P_EDGE_WIDTH];
     const int glow_arg = args[P_EDGE_GLOW];
 
-    if(!wipe->initialized) {
-        wipe->speed_env = (float)speed_arg;
-        wipe->edge_env = (float)edge_arg;
-        wipe->glow_env = (float)glow_arg;
-        wipe->initialized = 1;
+#pragma omp single
+    {
+        if(!wipe->initialized) {
+            wipe->speed_env = (float)speed_arg;
+            wipe->edge_env = (float)edge_arg;
+            wipe->glow_env = (float)glow_arg;
+            wipe->initialized = 1;
+        }
+
+        if(restart && !wipe->last_restart)
+            wipe->wipe_position = 0;
+
+        wipe->last_restart = restart;
+
+        wipe->speed_env = wipe_follow(wipe->speed_env, (float)speed_arg, 0.34f, 0.115f);
+        wipe->edge_env = wipe_follow(wipe->edge_env, (float)edge_arg, 0.30f, 0.105f);
+        wipe->glow_env = wipe_follow(wipe->glow_env, (float)glow_arg, 0.38f, 0.130f);
     }
-
-    if(restart && !wipe->last_restart)
-        wipe->wipe_position = 0;
-
-    wipe->last_restart = restart;
-
-    wipe->speed_env = wipe_follow(wipe->speed_env, (float)speed_arg, 0.34f, 0.115f);
-    wipe->edge_env = wipe_follow(wipe->edge_env, (float)edge_arg, 0.30f, 0.105f);
-    wipe->glow_env = wipe_follow(wipe->glow_env, (float)glow_arg, 0.38f, 0.130f);
 
     int effective_speed = (int)(wipe->speed_env + 0.5f);
     if(effective_speed < 0)
@@ -189,10 +190,13 @@ void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(effective_speed > width)
         effective_speed = width;
 
-    wipe->wipe_position += effective_speed;
+#pragma omp single
+    {
+        wipe->wipe_position += effective_speed;
 
-    if(wipe->wipe_position > width)
-        wipe->wipe_position = width;
+        if(wipe->wipe_position > width)
+            wipe->wipe_position = width;
+    }
 
     const int copy_w = wipe_clampi(wipe->wipe_position, 0, width);
 
@@ -208,7 +212,7 @@ void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(effective_glow > 255)
         effective_glow = 255;
 
-#pragma omp parallel for schedule(static) num_threads(wipe->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 

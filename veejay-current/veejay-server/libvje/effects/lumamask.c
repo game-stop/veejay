@@ -34,7 +34,6 @@ typedef struct {
     void *motionmap;
     int n__;
     int N__;
-    int n_threads;
 } lumamask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -135,7 +134,6 @@ void *lumamask_malloc(int width, int height)
     veejay_memset(l->buf[2], 128, len);
     veejay_memset(l->buf[3], 0, len);
 
-    l->n_threads = vje_advise_num_threads(len);
 
     return (void*) l;
 }
@@ -303,13 +301,16 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     int interpolate = 1;
     int motion = 0;
 
-    if(motionmap_active(l->motionmap)) {
-        motionmap_scale_to(l->motionmap, frame->width, frame->height, 1, 1, &x_scale, &y_scale, &(l->n__), &(l->N__));
-        motion = 1;
-    }
-    else {
-        l->n__ = 0;
-        l->N__ = 0;
+    #pragma omp single copyprivate(motion, x_scale, y_scale)
+    {
+        if(motionmap_active(l->motionmap)) {
+            motionmap_scale_to(l->motionmap, frame->width, frame->height, 1, 1, &x_scale, &y_scale, &(l->n__), &(l->N__));
+            motion = 1;
+        }
+        else {
+            l->n__ = 0;
+            l->N__ = 0;
+        }
     }
 
     if(l->n__ == l->N__ || l->n__ == 0)
@@ -318,13 +319,15 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int len = frame->len;
     int strides[4] = { len, len, len, alpha ? len : 0 };
 
-    vj_frame_copy(frame->data, l->buf, strides);
+    #pragma omp single
+    {
+        vj_frame_copy(frame->data, l->buf, strides);
+    }
 
     const int x_mul_q8 = -(x_scale * 2);
     const int y_mul_q8 = -(y_scale * 2);
     const uint8_t *restrict map = frame2->data[0];
 
-#pragma omp parallel num_threads(l->n_threads)
     {
         if(alpha) {
             if(border)
@@ -338,13 +341,17 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             else
                 lumamask_noalpha_clamp(l, frame, map, x_mul_q8, y_mul_q8);
         }
+    #pragma omp barrier
     }
 
-    if(interpolate)
-        motionmap_interpolate_frame(l->motionmap, frame, l->N__, l->n__);
+    #pragma omp single
+    {
+        if(interpolate)
+            motionmap_interpolate_frame(l->motionmap, frame, l->N__, l->n__);
 
-    if(motion)
-        motionmap_store_frame(l->motionmap, frame);
+        if(motion)
+            motionmap_store_frame(l->motionmap, frame);
+    }
 }
 
 void lumamask_free(void *ptr)

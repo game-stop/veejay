@@ -45,7 +45,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
 
     int seeded;
     int frame;
@@ -363,7 +362,6 @@ void *strataflight_malloc(int w, int h)
     c->w = w;
     c->h = h;
     c->len = w * h;
-    c->n_threads = vje_advise_num_threads(c->len);
 
     c->seeded = 0;
     c->frame = 0;
@@ -562,35 +560,38 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     erosion      = args[P_EROSION];
     chroma       = args[P_CHROMA];
 
-    if (!c->eff_ready) {
-        c->eff_opacity      = (float) opacity;
-        c->eff_yaw          = (float) yaw;
-        c->eff_pitch        = (float) pitch;
-        c->eff_distance     = (float) distance;
-        c->eff_flightheight = (float) flightheight;
-        c->eff_flightspeed  = (float) flightspeed;
-        c->eff_freeforward  = (float) freeforward;
-        c->eff_strafe       = (float) strafe;
-        c->eff_height       = (float) height_scale;
-        c->eff_deposit      = (float) deposit;
-        c->eff_memory       = (float) memory;
-        c->eff_erosion      = (float) erosion;
-        c->eff_chroma       = (float) chroma;
-        c->eff_ready = 1;
-    } else {
-        opacity      = sf_smooth_i(&c->eff_opacity,      opacity,      0.180f, 0.130f);
-        yaw          = sf_smooth_i(&c->eff_yaw,          yaw,          0.090f, 0.070f);
-        pitch        = sf_smooth_i(&c->eff_pitch,        pitch,        0.080f, 0.060f);
-        distance     = sf_smooth_i(&c->eff_distance,     distance,     0.075f, 0.052f);
-        flightheight = sf_smooth_i(&c->eff_flightheight, flightheight, 0.075f, 0.052f);
-        flightspeed  = sf_smooth_i(&c->eff_flightspeed,  flightspeed,  0.145f, 0.095f);
-        freeforward  = sf_smooth_i(&c->eff_freeforward,  freeforward,  0.130f, 0.085f);
-        strafe       = sf_smooth_i(&c->eff_strafe,       strafe,       0.130f, 0.085f);
-        height_scale = sf_smooth_i(&c->eff_height,       height_scale, 0.080f, 0.055f);
-        deposit      = sf_smooth_i(&c->eff_deposit,      deposit,      0.090f, 0.060f);
-        memory       = sf_smooth_i(&c->eff_memory,       memory,       0.060f, 0.045f);
-        erosion      = sf_smooth_i(&c->eff_erosion,      erosion,      0.085f, 0.060f);
-        chroma       = sf_smooth_i(&c->eff_chroma,       chroma,       0.120f, 0.080f);
+#pragma omp single copyprivate(chroma, deposit, distance, erosion, flightheight, flightspeed, freeforward, height_scale, memory, opacity, pitch, strafe, yaw)
+    {
+        if (!c->eff_ready) {
+            c->eff_opacity      = (float) opacity;
+            c->eff_yaw          = (float) yaw;
+            c->eff_pitch        = (float) pitch;
+            c->eff_distance     = (float) distance;
+            c->eff_flightheight = (float) flightheight;
+            c->eff_flightspeed  = (float) flightspeed;
+            c->eff_freeforward  = (float) freeforward;
+            c->eff_strafe       = (float) strafe;
+            c->eff_height       = (float) height_scale;
+            c->eff_deposit      = (float) deposit;
+            c->eff_memory       = (float) memory;
+            c->eff_erosion      = (float) erosion;
+            c->eff_chroma       = (float) chroma;
+            c->eff_ready = 1;
+        } else {
+            opacity      = sf_smooth_i(&c->eff_opacity,      opacity,      0.180f, 0.130f);
+            yaw          = sf_smooth_i(&c->eff_yaw,          yaw,          0.090f, 0.070f);
+            pitch        = sf_smooth_i(&c->eff_pitch,        pitch,        0.080f, 0.060f);
+            distance     = sf_smooth_i(&c->eff_distance,     distance,     0.075f, 0.052f);
+            flightheight = sf_smooth_i(&c->eff_flightheight, flightheight, 0.075f, 0.052f);
+            flightspeed  = sf_smooth_i(&c->eff_flightspeed,  flightspeed,  0.145f, 0.095f);
+            freeforward  = sf_smooth_i(&c->eff_freeforward,  freeforward,  0.130f, 0.085f);
+            strafe       = sf_smooth_i(&c->eff_strafe,       strafe,       0.130f, 0.085f);
+            height_scale = sf_smooth_i(&c->eff_height,       height_scale, 0.080f, 0.055f);
+            deposit      = sf_smooth_i(&c->eff_deposit,      deposit,      0.090f, 0.060f);
+            memory       = sf_smooth_i(&c->eff_memory,       memory,       0.060f, 0.045f);
+            erosion      = sf_smooth_i(&c->eff_erosion,      erosion,      0.085f, 0.060f);
+            chroma       = sf_smooth_i(&c->eff_chroma,       chroma,       0.120f, 0.080f);
+        }
     }
 
     opacity      = clampi(opacity,      0, 100);
@@ -710,23 +711,26 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
             elev_damp_q = 128;
     }
 
+#pragma omp single
     {
-        int free_fp = sf_signed_speed_from_center(freeforward);
-        int side_fp = sf_signed_speed_from_center(strafe);
+        {
+            int free_fp = sf_signed_speed_from_center(freeforward);
+            int side_fp = sf_signed_speed_from_center(strafe);
 
-        int speed_q = flightspeed <= 0 ? 0 : 1 + ((flightspeed * flightspeed * 255 + 5000) / 10000);
+            int speed_q = flightspeed <= 0 ? 0 : 1 + ((flightspeed * flightspeed * 255 + 5000) / 10000);
 
-        int move_forward_fp = sf_scale_move_q(free_fp, speed_q, world_q);
-        int move_side_fp = sf_scale_move_q(side_fp, speed_q, world_q);
+            int move_forward_fp = sf_scale_move_q(free_fp, speed_q, world_q);
+            int move_side_fp = sf_scale_move_q(side_fp, speed_q, world_q);
 
-        int dx = (int) ((((int64_t) fwd_x_q * (int64_t) move_forward_fp) +
-                         ((int64_t) right_x_q * (int64_t) move_side_fp)) >> 12);
+            int dx = (int) ((((int64_t) fwd_x_q * (int64_t) move_forward_fp) +
+                             ((int64_t) right_x_q * (int64_t) move_side_fp)) >> 12);
 
-        int dy = (int) ((((int64_t) fwd_y_q * (int64_t) move_forward_fp) +
-                         ((int64_t) right_y_q * (int64_t) move_side_fp)) >> 12);
+            int dy = (int) ((((int64_t) fwd_y_q * (int64_t) move_forward_fp) +
+                             ((int64_t) right_y_q * (int64_t) move_side_fp)) >> 12);
 
-        c->cam_x_fp = sf_wrap_fp(c->cam_x_fp + dx, w << 8);
-        c->cam_y_fp = sf_wrap_fp(c->cam_y_fp + dy, rows << 8);
+            c->cam_x_fp = sf_wrap_fp(c->cam_x_fp + dx, w << 8);
+            c->cam_y_fp = sf_wrap_fp(c->cam_y_fp + dy, rows << 8);
+        }
     }
 
     cam_x_fp = c->cam_x_fp;
@@ -734,7 +738,6 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
 
     do_seed = !c->seeded;
 
-#pragma omp parallel num_threads(c->n_threads)
     {
         uint8_t *old_ht;
         uint8_t *new_ht;
@@ -1082,7 +1085,11 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 
-    c->frame++;
+#pragma omp single
+    {
+        c->frame++;
+    }
 }

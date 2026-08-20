@@ -37,7 +37,6 @@
 #define KEYSELECT_PI    3.14159265358979323846f
 
 typedef struct {
-    int n_threads;
     int last[KEYSELECT_PARAMS];
     int mag_fp;
     int cos_q_fp;
@@ -211,7 +210,6 @@ void *keyselect_malloc(int w, int h)
     s->black_clip_fp = 0;
     s->blend_mode = 3;
     s->swap = 0;
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }
@@ -276,7 +274,10 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     keyselect_t *s = (keyselect_t*) ptr;
 
-    keyselect_update_cache(s, args);
+#pragma omp single
+    {
+        keyselect_update_cache(s, args);
+    }
 
     const int mag_fp = s->mag_fp;
     const int cos_q_fp = s->cos_q_fp;
@@ -300,7 +301,7 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict bg_U = swap ? frame->data[1] : frame2->data[1];
     const uint8_t *restrict bg_V = swap ? frame->data[2] : frame2->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

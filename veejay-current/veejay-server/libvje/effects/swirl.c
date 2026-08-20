@@ -49,7 +49,6 @@ typedef struct {
     float eff_swirl_drive;
     int eff_ready;
 
-    int n_threads;
     int w;
     int h;
 } swirl_t;
@@ -229,7 +228,6 @@ void *swirl_malloc(int w, int h)
     s->w = w;
     s->h = h;
 
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*) s;
 }
@@ -320,13 +318,16 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     const float param_attack = 0.28f;
     const float param_release = 0.095f;
 
-    if(!s->eff_ready) {
-        s->eff_degrees = (float)degrees_arg;
-        s->eff_swirl_drive = (float)swirl_drive_arg;
-        s->eff_ready = 1;
-    } else {
-        swirl_smooth_i(&s->eff_degrees, degrees_arg, param_attack, param_release);
-        swirl_smooth_i(&s->eff_swirl_drive, swirl_drive_arg, param_attack * 1.16f, param_release);
+#pragma omp single
+    {
+        if(!s->eff_ready) {
+            s->eff_degrees = (float)degrees_arg;
+            s->eff_swirl_drive = (float)swirl_drive_arg;
+            s->eff_ready = 1;
+        } else {
+            swirl_smooth_i(&s->eff_degrees, degrees_arg, param_attack, param_release);
+            swirl_smooth_i(&s->eff_swirl_drive, swirl_drive_arg, param_attack * 1.16f, param_release);
+        }
     }
 
     const int degrees = clampi((int)(s->eff_degrees + 0.5f), 1, 360);
@@ -347,14 +348,16 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcCb = s->buf[1];
     uint8_t *restrict srcCr = s->buf[2];
 
-    veejay_memcpy(srcY,  Y,  len);
-    veejay_memcpy(srcCb, Cb, len);
-    veejay_memcpy(srcCr, Cr, len);
+#pragma omp single
+    {
+        veejay_memcpy(srcY,  Y,  len);
+        veejay_memcpy(srcCb, Cb, len);
+        veejay_memcpy(srcCr, Cr, len);
+    }
 
     int *restrict base_coords = s->cached_coords;
     int *restrict drive_coords = s->drive_coords;
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         if(rebuild_base)
             swirl_rebuild_map(s, width, height, degrees, mode, s->cached_coords);
@@ -390,5 +393,6 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[i] = mix_u8(srcCr[a], srcCr[b], drive_q8);
             }
         }
+    #pragma omp barrier
     }
 }

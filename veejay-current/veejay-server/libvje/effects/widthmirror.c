@@ -38,7 +38,6 @@ typedef struct {
     uint8_t *buf[3];
     int *xmap;
     uint8_t *edge;
-    int n_threads;
     int w;
     int h;
     int max_freq;
@@ -202,7 +201,6 @@ void *widthmirror_malloc(int w, int h)
     wm->glow_env = 24.0f;
     wm->drift_pos = 0.0f;
 
-    wm->n_threads = vje_advise_num_threads(len);
 
     return (void*) wm;
 }
@@ -233,22 +231,28 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
 
     const float follow = 0.185f;
 
-    wm->freq_env += ((float)frequency_arg - wm->freq_env) * follow;
-    wm->phase_env += ((float)phase_arg - wm->phase_env) * follow;
-    wm->edge_env += ((float)edge_arg - wm->edge_env) * follow;
-    wm->glow_env += ((float)glow_arg - wm->glow_env) * follow;
+#pragma omp single
+    {
+        wm->freq_env += ((float)frequency_arg - wm->freq_env) * follow;
+        wm->phase_env += ((float)phase_arg - wm->phase_env) * follow;
+        wm->edge_env += ((float)edge_arg - wm->edge_env) * follow;
+        wm->glow_env += ((float)glow_arg - wm->glow_env) * follow;
 
-    wm->freq_env = clampf(wm->freq_env, 2.0f, (float)wm->max_freq);
-    wm->phase_env = clampf(wm->phase_env, 0.0f, 1000.0f);
-    wm->edge_env = clampf(wm->edge_env, 0.0f, (float)max_edge);
-    wm->glow_env = clampf(wm->glow_env, 0.0f, 255.0f);
+        wm->freq_env = clampf(wm->freq_env, 2.0f, (float)wm->max_freq);
+        wm->phase_env = clampf(wm->phase_env, 0.0f, 1000.0f);
+        wm->edge_env = clampf(wm->edge_env, 0.0f, (float)max_edge);
+        wm->glow_env = clampf(wm->glow_env, 0.0f, 255.0f);
+    }
 
     const float band_w = (float)width / wm->freq_env;
 
     const float base_step = (float)drift_speed_arg * 0.020f;
 
-    wm->drift_pos += base_step;
-    wm->drift_pos = wm_wrapf(wm->drift_pos, (float)width);
+#pragma omp single
+    {
+        wm->drift_pos += base_step;
+        wm->drift_pos = wm_wrapf(wm->drift_pos, (float)width);
+    }
 
     const float manual_phase = ((wm->phase_env * (float)width) * 0.001f);
     const float phase_px = wm_wrapf(manual_phase + wm->drift_pos, (float)width);
@@ -266,11 +270,13 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcCb = wm->buf[1];
     uint8_t *restrict srcCr = wm->buf[2];
 
-    veejay_memcpy(srcY,  Y,  len);
-    veejay_memcpy(srcCb, Cb, len);
-    veejay_memcpy(srcCr, Cr, len);
+#pragma omp single
+    {
+        veejay_memcpy(srcY,  Y,  len);
+        veejay_memcpy(srcCb, Cb, len);
+        veejay_memcpy(srcCr, Cr, len);
+    }
 
-#pragma omp parallel num_threads(wm->n_threads)
     {
 #pragma omp for schedule(static)
         for(int x = 0; x < width; x++) {
@@ -336,5 +342,6 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
                 Cr[dst] = wm_u8(vv);
             }
         }
+    #pragma omp barrier
     }
 }

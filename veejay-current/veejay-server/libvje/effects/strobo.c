@@ -37,7 +37,6 @@ typedef struct {
     int timestamp;
     int pulse_count;
     int strobe_countdown;
-    int n_threads;
 
     float eff_threshold;
     float eff_color_hold;
@@ -219,7 +218,6 @@ void *strobo_malloc(int w, int h)
     s->eff_color_offset = 0.0f;
     s->eff_ready = 0;
 
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*) s;
 }
@@ -271,22 +269,49 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     const int interval_arg = args[P_INTERVAL];
     const int color_offset_arg = args[P_COLOR_OFFSET];
 
-    if(!s->eff_ready) {
-        s->eff_threshold = (float)threshold_arg;
-        s->eff_color_hold = (float)color_hold_arg;
-        s->eff_opacity = (float)opacity_arg;
-        s->eff_trail = (float)trail_arg;
-        s->eff_interval = (float)interval_arg;
-        s->eff_color_offset = (float)color_offset_arg;
-        s->eff_ready = 1;
+    #pragma omp single
+    {
+        if(!s->eff_ready) {
+            s->eff_threshold = (float)threshold_arg;
+            s->eff_color_hold = (float)color_hold_arg;
+            s->eff_opacity = (float)opacity_arg;
+            s->eff_trail = (float)trail_arg;
+            s->eff_interval = (float)interval_arg;
+            s->eff_color_offset = (float)color_offset_arg;
+            s->eff_ready = 1;
+        }
     }
 
-    int threshold_bias = strobo_smooth_i(&s->eff_threshold, threshold_arg, fast_a, fast_r);
-    int color_hold = strobo_smooth_i(&s->eff_color_hold, color_hold_arg, slow_a, slow_r);
-    int opacity = strobo_smooth_i(&s->eff_opacity, opacity_arg, fast_a, fast_r);
-    int trail = strobo_smooth_i(&s->eff_trail, trail_arg, slow_a, slow_r);
-    int interval = strobo_smooth_i(&s->eff_interval, interval_arg, slow_a, slow_r);
-    int color_offset = strobo_smooth_i(&s->eff_color_offset, color_offset_arg, slow_a, slow_r);
+    int threshold_bias;
+    #pragma omp single copyprivate(threshold_bias)
+    {
+        threshold_bias = strobo_smooth_i(&s->eff_threshold, threshold_arg, fast_a, fast_r);
+    }
+    int color_hold;
+    #pragma omp single copyprivate(color_hold)
+    {
+        color_hold = strobo_smooth_i(&s->eff_color_hold, color_hold_arg, slow_a, slow_r);
+    }
+    int opacity;
+    #pragma omp single copyprivate(opacity)
+    {
+        opacity = strobo_smooth_i(&s->eff_opacity, opacity_arg, fast_a, fast_r);
+    }
+    int trail;
+    #pragma omp single copyprivate(trail)
+    {
+        trail = strobo_smooth_i(&s->eff_trail, trail_arg, slow_a, slow_r);
+    }
+    int interval;
+    #pragma omp single copyprivate(interval)
+    {
+        interval = strobo_smooth_i(&s->eff_interval, interval_arg, slow_a, slow_r);
+    }
+    int color_offset;
+    #pragma omp single copyprivate(color_offset)
+    {
+        color_offset = strobo_smooth_i(&s->eff_color_offset, color_offset_arg, slow_a, slow_r);
+    }
 
     threshold_bias = clampi(threshold_bias, 0, 255);
     color_hold = clampi(color_hold, 1, 1500);
@@ -317,7 +342,11 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     const int color_total = (int)(sizeof(strobo_rainbow) / sizeof(strobo_rainbow[0]));
     const int base_color_index = (s->timestamp / color_hold) % color_total;
     const int color_index = (base_color_index + color_offset) % color_total;
-    const int update_now = strobo_clock_tick(s, interval);
+    int update_now;
+    #pragma omp single copyprivate(update_now)
+    {
+        update_now = strobo_clock_tick(s, interval);
+    }
 
     int cy = 0;
     int cu = 128;
@@ -342,7 +371,6 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     const int deposit_q8 = update_now ? opacity : 0;
     const int out_q8 = opacity;
 
-#pragma omp parallel num_threads(s->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
@@ -385,7 +413,11 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 
-    s->timestamp++;
+    #pragma omp single
+    {
+        s->timestamp++;
+    }
 }

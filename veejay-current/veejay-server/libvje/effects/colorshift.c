@@ -169,13 +169,11 @@ void colorshift_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t value = args[1];
     const int len = frame->len;
     const int uv_len = frame->uv_len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel num_threads(n_threads)
     {
         switch(type) {
             case 0:
@@ -209,6 +207,7 @@ void colorshift_apply(void *ptr, VJFrame *frame, int *args)
                 colorshift_and_2planes(Cb, Cr, uv_len, value);
                 break;
         }
+    #pragma omp barrier
     }
 }
 

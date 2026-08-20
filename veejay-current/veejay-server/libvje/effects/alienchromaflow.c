@@ -50,7 +50,6 @@ typedef struct {
     float *sin_lut;
     uint8_t contrast_lut[256];
     float last_contrast;
-    int n_threads;
 } alien_t;
 
 vj_effect *alienchromaflow_init(int w, int h)
@@ -120,7 +119,6 @@ void *alienchromaflow_malloc(int w, int h)
         c->sin_lut[i] = sinf(((float)i * PI_X2) / (float)SIN_LUT_SIZE);
 
     c->last_contrast = -1.0f;
-    c->n_threads = vje_advise_num_threads(w * h);
 
     return c;
 }
@@ -154,22 +152,25 @@ void alienchromaflow_apply(void *ptr, VJFrame *frame, int *args)
     const float contrast_val = 0.5f + (args[8] * INV_255 * 1.5f);
     const float dir          = (float)args[9];
 
-    if(contrast_val != n->last_contrast)
+    #pragma omp single
     {
-        for(int i = 0; i < 256; i++)
-            n->contrast_lut[i] = clamp_u8((int)(powf((float)i * INV_255, contrast_val) * 255.0f));
+        if(contrast_val != n->last_contrast)
+        {
+            for(int i = 0; i < 256; i++)
+                n->contrast_lut[i] = clamp_u8((int)(powf((float)i * INV_255, contrast_val) * 255.0f));
 
-        n->last_contrast = contrast_val;
+            n->last_contrast = contrast_val;
+        }
+
+        n->time += speed * dir;
     }
-
-    n->time += speed * dir;
     const float t = n->time;
 
     uint8_t *py = frame->data[0];
     uint8_t *pu = frame->data[1];
     uint8_t *pv = frame->data[2];
 
-    #pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < sz; i++)
     {
         const uint8_t y_orig = py[i];

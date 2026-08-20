@@ -25,7 +25,6 @@ typedef struct {
     uint8_t *ghost_buf[4];
     uint8_t *diff_map;
     int diff_period;
-    int n_threads;
 } ghost_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -103,7 +102,6 @@ void *ghost_malloc(int w, int h)
     g->ghost_buf[2] = g->ghost_buf[1] + len;
     g->diff_map = g->ghost_buf[2] + len;
     g->diff_period = 0;
-    g->n_threads = vje_advise_num_threads(len);
 
     return (void*) g;
 }
@@ -136,12 +134,14 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args)
 
     if(g->diff_period == 0) {
         int strides[4] = { len, len, len, 0 };
-        vj_frame_copy(frame->data, g->ghost_buf, strides);
-        g->diff_period = 1;
+        #pragma omp single
+        {
+            vj_frame_copy(frame->data, g->ghost_buf, strides);
+            g->diff_period = 1;
+        }
         return;
     }
 
-#pragma omp parallel num_threads(g->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
@@ -174,5 +174,6 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 }

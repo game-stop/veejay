@@ -190,7 +190,6 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     const double min_noise = (double)min_noise_arg / 10.0;
 
     const int len = frame->len;
-    const int n_threads = b->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -206,11 +205,14 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     if(mode == 2 && !A)
         mode = 3;
 
-    b->bg_n++;
+#pragma omp single
+    {
+        b->bg_n++;
+    }
 
     const int do_update = (b->bg_n % (uint32_t)period) == 0;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         double m = mu[i];

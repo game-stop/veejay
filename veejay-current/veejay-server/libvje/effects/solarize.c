@@ -208,21 +208,24 @@ static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mod
     const float param_attack = 0.30f;
     const float param_release = 0.085f;
 
-    if(!s->initialized) {
-        s->threshold = (float)threshold;
-        s->softness = (float)softness;
-        s->contrast = (float)contrast_arg;
-        s->chroma = (float)chroma_arg;
-        s->depth_drive = (float)depth_drive;
-        s->color_drive = (float)color_drive;
-        s->initialized = 1;
-    } else {
-        threshold = solarize_smooth_i(&s->threshold, threshold, param_attack, param_release);
-        softness = solarize_smooth_i(&s->softness, softness, param_attack, param_release);
-        contrast_arg = solarize_smooth_i(&s->contrast, contrast_arg, param_attack, param_release);
-        chroma_arg = solarize_smooth_i(&s->chroma, chroma_arg, param_attack, param_release);
-        depth_drive = solarize_smooth_i(&s->depth_drive, depth_drive, param_attack, param_release);
-        color_drive = solarize_smooth_i(&s->color_drive, color_drive, param_attack, param_release);
+#pragma omp single copyprivate(chroma_arg, color_drive, contrast_arg, depth_drive, softness, threshold)
+    {
+        if(!s->initialized) {
+            s->threshold = (float)threshold;
+            s->softness = (float)softness;
+            s->contrast = (float)contrast_arg;
+            s->chroma = (float)chroma_arg;
+            s->depth_drive = (float)depth_drive;
+            s->color_drive = (float)color_drive;
+            s->initialized = 1;
+        } else {
+            threshold = solarize_smooth_i(&s->threshold, threshold, param_attack, param_release);
+            softness = solarize_smooth_i(&s->softness, softness, param_attack, param_release);
+            contrast_arg = solarize_smooth_i(&s->contrast, contrast_arg, param_attack, param_release);
+            chroma_arg = solarize_smooth_i(&s->chroma, chroma_arg, param_attack, param_release);
+            depth_drive = solarize_smooth_i(&s->depth_drive, depth_drive, param_attack, param_release);
+            color_drive = solarize_smooth_i(&s->color_drive, color_drive, param_attack, param_release);
+        }
     }
 
     threshold = solarize_clampi(threshold, 1, 255);
@@ -254,9 +257,8 @@ static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mod
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int y = Y[i];
         const int d = y - threshold;

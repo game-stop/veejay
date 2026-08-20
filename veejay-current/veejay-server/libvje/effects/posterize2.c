@@ -187,7 +187,10 @@ void posterize2_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t lut_a[256];
     uint8_t mask[256];
 
-    posterize2_build_luts(lut_y, lut_a, mask, factor, tmin, tmax, mode);
+#pragma omp single
+    {
+        posterize2_build_luts(lut_y, lut_a, mask, factor, tmin, tmax, mode);
+    }
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -195,9 +198,7 @@ void posterize2_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict A = frame->data[3];
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel num_threads(n_threads)
     {
         if(mode <= 2) {
 #pragma omp for schedule(static)
@@ -226,5 +227,6 @@ void posterize2_apply(void *ptr, VJFrame *frame, int *args)
                     A[i] = lut_a[y];
             }
         }
+    #pragma omp barrier
     }
 }

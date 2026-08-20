@@ -36,7 +36,6 @@ typedef struct {
     uint8_t *src[3];
     uint8_t *tmp[3];
     int max_len;
-    int n_threads;
 
     float eff_kernel;
     float eff_mix;
@@ -172,7 +171,6 @@ void *softblur_malloc(int w, int h)
     sb->eff_mix_drive = 0.0f;
     sb->eff_initialized = 0;
 
-    sb->n_threads = vje_advise_num_threads(len);
 
     return (void*) sb;
 }
@@ -317,21 +315,99 @@ static inline void softblur_plane(uint8_t *restrict src,
 
 void softblur_apply_internal(VJFrame *frame)
 {
-    const int type = clampi(vje_get_quality(), 0, 2);
+    const int width = frame->width;
+    const int height = frame->height;
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
+    uint8_t *src;
+    int type;
 
-    uint8_t *src = (uint8_t*) vj_malloc((size_t)len * 2u);
+#pragma omp single copyprivate(src, type)
+    {
+        type = clampi(vje_get_quality(), 0, 2);
+        src = (uint8_t*) vj_malloc((size_t)len * 2u);
+    }
+
     if(!src)
         return;
 
     uint8_t *tmp = src + len;
+    uint8_t *plane = frame->data[0];
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        softblur_plane(src, tmp, frame->data[0], frame->width, frame->height, type, 256);
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        src[i] = plane[i];
+
+    if(type == 0) {
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
+            const uint8_t *restrict row = src + y * width;
+            uint8_t *restrict out = plane + y * width;
+
+            out[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
+
+            for(int x = 1; x < width - 1; x++)
+                out[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
+
+            out[width - 1] = (uint8_t)(((int)row[width - 2] + (int)row[width - 1] * 2 + 1) / 3);
+        }
+    }
+    else {
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
+            const uint8_t *restrict row = src + y * width;
+            uint8_t *restrict out = tmp + y * width;
+
+            out[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
+
+            for(int x = 1; x < width - 1; x++)
+                out[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
+
+            out[width - 1] = (uint8_t)(((int)row[width - 2] + (int)row[width - 1] * 2 + 1) / 3);
+        }
+
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
+            const int ym = y > 0 ? y - 1 : y;
+            const int yp = y < height - 1 ? y + 1 : y;
+            const uint8_t *restrict r0 = tmp + ym * width;
+            const uint8_t *restrict r1 = tmp + y * width;
+            const uint8_t *restrict r2 = tmp + yp * width;
+            uint8_t *restrict out = plane + y * width;
+
+            for(int x = 0; x < width; x++)
+                out[x] = (uint8_t)(((int)r0[x] + (int)r1[x] + (int)r2[x] + 1) / 3);
+        }
+
+        if(type == 2) {
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
+                const uint8_t *restrict row = plane + y * width;
+                uint8_t *restrict out = tmp + y * width;
+
+                out[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
+
+                for(int x = 1; x < width - 1; x++)
+                    out[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
+
+                out[width - 1] = (uint8_t)(((int)row[width - 2] + (int)row[width - 1] * 2 + 1) / 3);
+            }
+
+#pragma omp for schedule(static)
+            for(int y = 0; y < height; y++) {
+                const int ym = y > 0 ? y - 1 : y;
+                const int yp = y < height - 1 ? y + 1 : y;
+                const uint8_t *restrict r0 = tmp + ym * width;
+                const uint8_t *restrict r1 = tmp + y * width;
+                const uint8_t *restrict r2 = tmp + yp * width;
+                uint8_t *restrict out = plane + y * width;
+
+                for(int x = 0; x < width; x++)
+                    out[x] = (uint8_t)(((int)r0[x] + (int)r1[x] + (int)r2[x] + 1) / 3);
+            }
+        }
     }
 
+#pragma omp single
     free(src);
 }
 
@@ -348,22 +424,25 @@ void softblur_apply(void *ptr, VJFrame *frame, int *args)
     const int blur_drive_arg = args[P_BLUR_DRIVE];
     const int mix_drive_arg = args[P_MIX_DRIVE];
 
-    if(!blur->eff_initialized) {
-        blur->eff_kernel = (float)kernel_arg;
-        blur->eff_mix = (float)mix_arg;
-        blur->eff_chroma = (float)chroma_arg;
-        blur->eff_blur_drive = (float)blur_drive_arg;
-        blur->eff_mix_drive = (float)mix_drive_arg;
-        blur->eff_initialized = 1;
-    } else {
-        const float param_fast = 0.26f;
-        const float param_slow = 0.090f;
+    #pragma omp single
+    {
+        if(!blur->eff_initialized) {
+            blur->eff_kernel = (float)kernel_arg;
+            blur->eff_mix = (float)mix_arg;
+            blur->eff_chroma = (float)chroma_arg;
+            blur->eff_blur_drive = (float)blur_drive_arg;
+            blur->eff_mix_drive = (float)mix_drive_arg;
+            blur->eff_initialized = 1;
+        } else {
+            const float param_fast = 0.26f;
+            const float param_slow = 0.090f;
 
-        softblur_smooth_i(&blur->eff_kernel,     kernel_arg,     param_fast, param_slow);
-        softblur_smooth_i(&blur->eff_mix,        mix_arg,        param_fast * 0.82f, param_slow);
-        softblur_smooth_i(&blur->eff_chroma,     chroma_arg,     param_fast * 0.82f, param_slow);
-        softblur_smooth_i(&blur->eff_blur_drive, blur_drive_arg, param_fast, param_slow);
-        softblur_smooth_i(&blur->eff_mix_drive,  mix_drive_arg,  param_fast, param_slow);
+            softblur_smooth_i(&blur->eff_kernel,     kernel_arg,     param_fast, param_slow);
+            softblur_smooth_i(&blur->eff_mix,        mix_arg,        param_fast * 0.82f, param_slow);
+            softblur_smooth_i(&blur->eff_chroma,     chroma_arg,     param_fast * 0.82f, param_slow);
+            softblur_smooth_i(&blur->eff_blur_drive, blur_drive_arg, param_fast, param_slow);
+            softblur_smooth_i(&blur->eff_mix_drive,  mix_drive_arg,  param_fast, param_slow);
+        }
     }
 
     const int eff_kernel = clampi((int)(blur->eff_kernel + 0.5f), 0, 2);
@@ -386,10 +465,10 @@ void softblur_apply(void *ptr, VJFrame *frame, int *args)
     const int uv_width  = frame->ssm ? width  : frame->uv_width;
     const int uv_height = frame->ssm ? height : frame->uv_height;
 
-#pragma omp parallel num_threads(blur->n_threads)
     {
         softblur_plane(blur->src[0], blur->tmp[0], frame->data[0], width, height, type, y_mix_q8);
         softblur_plane(blur->src[1], blur->tmp[1], frame->data[1], uv_width, uv_height, type, c_mix_q8);
         softblur_plane(blur->src[2], blur->tmp[2], frame->data[2], uv_width, uv_height, type, c_mix_q8);
+    #pragma omp barrier
     }
 }

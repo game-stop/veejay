@@ -41,7 +41,6 @@ typedef struct {
     uint8_t *buf[3];
     int w;
     int h;
-    int n_threads;
     float spin_phase;
 } mirror_t;
 
@@ -169,7 +168,6 @@ void *mirror_malloc(int w, int h)
     m->buf[2] = m->buf[1] + len;
     m->w = w;
     m->h = h;
-    m->n_threads = vje_advise_num_threads(len);
     m->spin_phase = 0.0f;
 
     return (void*) m;
@@ -199,9 +197,12 @@ void mirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = m->buf[1];
     uint8_t *restrict srcV = m->buf[2];
 
-    veejay_memcpy(srcY, dstY, len);
-    veejay_memcpy(srcU, dstU, len);
-    veejay_memcpy(srcV, dstV, len);
+#pragma omp single
+    {
+        veejay_memcpy(srcY, dstY, len);
+        veejay_memcpy(srcU, dstU, len);
+        veejay_memcpy(srcV, dstV, len);
+    }
 
     const int center_x_i = args[P_CENTER_X];
     const int center_y_i = args[P_CENTER_Y];
@@ -211,12 +212,15 @@ void mirror_apply(void *ptr, VJFrame *frame, int *args)
     const int axis_width_i = args[P_AXIS_WIDTH];
     const int axis_glow_i = args[P_AXIS_GLOW];
 
-    m->spin_phase += (float)spin_i * 0.00275f;
+#pragma omp single
+    {
+        m->spin_phase += (float)spin_i * 0.00275f;
 
-    if(m->spin_phase >= 360.0f)
-        m->spin_phase -= 360.0f;
-    else if(m->spin_phase <= -360.0f)
-        m->spin_phase += 360.0f;
+        if(m->spin_phase >= 360.0f)
+            m->spin_phase -= 360.0f;
+        else if(m->spin_phase <= -360.0f)
+            m->spin_phase += 360.0f;
+    }
 
     const float cx = (float)center_x_i;
     const float cy = (float)center_y_i;
@@ -235,7 +239,7 @@ void mirror_apply(void *ptr, VJFrame *frame, int *args)
     const float rx_step = 1.0f - 2.0f * nx * nx;
     const float ry_step = -2.0f * nx * ny;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const float dy = (float)y - cy;

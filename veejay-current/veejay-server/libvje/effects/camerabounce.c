@@ -128,7 +128,6 @@ typedef struct {
     uint16_t *ywmap;
     float inv_area[CB_INV_AREA_SIZE];
     int frameNumber;
-    int n_threads;
     int last_blur_arg;
     int last_center_x_arg;
     int last_center_y_arg;
@@ -407,7 +406,6 @@ void *camerabounce_malloc(int w, int h)
     c->last_center_x_arg = -1;
     c->last_center_y_arg = -1;
     c->last_blur_energy_q = -1;
-    c->n_threads = vje_advise_num_threads(plane_size);
 
     return (void*) c;
 }
@@ -427,7 +425,10 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
     const int currentFrame = frameWithPhase % zoomInterval;
     const int pulseIndex = frameWithPhase / zoomInterval;
 
-    c->frameNumber++;
+#pragma omp single
+    {
+        c->frameNumber++;
+    }
 
     if (currentFrame > zoomDuration || zoomDuration <= 0)
         return;
@@ -451,17 +452,20 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
     const float centerX = cb_center_pos(w, args[P_CENTER_X]);
     const float centerY = cb_center_pos(h, args[P_CENTER_Y]);
 
-    camerabounce_build_maps(c, w, h, centerX, centerY, invZoom);
+#pragma omp single
+    {
+        camerabounce_build_maps(c, w, h, centerX, centerY, invZoom);
 
-    if (!no_blur &&
-        (c->last_blur_arg != args[P_BLUR] ||
-         c->last_center_x_arg != args[P_CENTER_X] ||
-         c->last_center_y_arg != args[P_CENTER_Y] ||
-         c->last_blur_energy_q != blur_energy_q)) {
-        camerabounce_build_radius_map(c, args[P_BLUR], bounceEnergy, centerX, centerY);
-        c->last_center_x_arg = args[P_CENTER_X];
-        c->last_center_y_arg = args[P_CENTER_Y];
-        c->last_blur_energy_q = blur_energy_q;
+        if (!no_blur &&
+            (c->last_blur_arg != args[P_BLUR] ||
+             c->last_center_x_arg != args[P_CENTER_X] ||
+             c->last_center_y_arg != args[P_CENTER_Y] ||
+             c->last_blur_energy_q != blur_energy_q)) {
+            camerabounce_build_radius_map(c, args[P_BLUR], bounceEnergy, centerX, centerY);
+            c->last_center_x_arg = args[P_CENTER_X];
+            c->last_center_y_arg = args[P_CENTER_Y];
+            c->last_blur_energy_q = blur_energy_q;
+        }
     }
 
     uint8_t *frameY = frame->data[0];
@@ -471,7 +475,6 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
     uint8_t *bufU = c->buf[1];
     uint8_t *bufV = c->buf[2];
 
-#pragma omp parallel num_threads(c->n_threads)
     {
 #pragma omp for schedule(static)
         for (int y = 0; y < h; y++) {
@@ -568,5 +571,6 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 }

@@ -53,7 +53,6 @@ typedef struct {
     int first_frame;
     int last_mode;
     float ratio_;
-    int n_threads;
 } radioactive_t;
 
 static inline int radioactive_clampi(int v, int lo, int hi)
@@ -210,7 +209,6 @@ void *radioactivetv_malloc(int w, int h)
 
     r->zoom_y = (int*)p;
 
-    r->n_threads = vje_advise_num_threads(w * h);
 
     radioactive_set_table(r);
 
@@ -377,22 +375,24 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
 
     const float snap_ratio = (float)zoom_ratio * 0.01f;
 
-    if(r->ratio_ != snap_ratio) {
-        r->ratio_ = snap_ratio;
-        radioactive_set_table(r);
+#pragma omp single
+    {
+        if(r->ratio_ != snap_ratio) {
+            r->ratio_ = snap_ratio;
+            radioactive_set_table(r);
+        }
+
+        if(r->first_frame) {
+            veejay_memcpy(prev, lum, len);
+            r->first_frame = 0;
+        }
+
+        if(r->last_mode != mode || strength == 0) {
+            veejay_memset(r->blurzoombuf, 0, (size_t)r->buf_area * 2u);
+            r->last_mode = mode;
+        }
     }
 
-    if(r->first_frame) {
-        veejay_memcpy(prev, lum, len);
-        r->first_frame = 0;
-    }
-
-    if(r->last_mode != mode || strength == 0) {
-        veejay_memset(r->blurzoombuf, 0, (size_t)r->buf_area * 2u);
-        r->last_mode = mode;
-    }
-
-#pragma omp parallel num_threads(r->n_threads)
     {
         if(strength > 0)
             radioactive_inject_core(r, lum, prev, width, threshold, strength, mode);
@@ -447,5 +447,6 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 }

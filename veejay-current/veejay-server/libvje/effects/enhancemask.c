@@ -22,7 +22,6 @@
 #include "enhancemask.h"
 
 typedef struct {
-    int n_threads;
     uint8_t *buf;
 } enhancemask_t;
 
@@ -90,7 +89,6 @@ void *enhancemask_malloc(int w, int h)
         return NULL;
     }
 
-    e->n_threads = vje_advise_num_threads(len);
 
     return e;
 }
@@ -121,9 +119,12 @@ void enhancemask_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dst = frame->data[0];
     uint8_t *restrict src = e->buf;
 
-    veejay_memcpy(src, dst, len);
+#pragma omp single
+    {
+        veejay_memcpy(src, dst, len);
+    }
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++)
     {
         const uint8_t *restrict p_prev = src + (y - 1) * width;

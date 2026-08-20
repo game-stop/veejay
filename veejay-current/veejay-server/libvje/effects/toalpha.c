@@ -88,9 +88,8 @@ void toalpha_apply(void *ptr, VJFrame *frame, int *args)
     toalpha_t *t = (toalpha_t*) ptr;
     int *lookup_table = t->lookup_table;
 
-    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         a[i] = copy_luma ? Y[i] : (uint8_t)lookup_table[Y[i]];
 }

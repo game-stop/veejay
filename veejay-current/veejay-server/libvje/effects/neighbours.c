@@ -364,14 +364,16 @@ void neighbours_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict src_v = n->src[2];
     uint8_t *restrict bins = n->src[3];
 
-    veejay_memcpy(src_y, dst_y, len);
+#pragma omp single
+    {
+        veejay_memcpy(src_y, dst_y, len);
 
-    if(mode) {
-        veejay_memcpy(src_u, dst_u, len);
-        veejay_memcpy(src_v, dst_v, len);
+        if(mode) {
+            veejay_memcpy(src_u, dst_u, len);
+            veejay_memcpy(src_v, dst_v, len);
+        }
     }
 
-#pragma omp parallel num_threads(n->n_threads)
     {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
@@ -381,5 +383,6 @@ void neighbours_apply(void *ptr, VJFrame *frame, int *args)
             nb_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bins, width, height, brush_size, active_bins);
         else
             nb_apply_luma(n, dst_y, src_y, bins, width, height, brush_size, active_bins);
+    #pragma omp barrier
     }
 }

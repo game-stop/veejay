@@ -520,13 +520,16 @@ void smartblur_apply(void *ptr, VJFrame *frame, int *args)
     const int mix_drive_arg = args[P_MIX_DRIVE];
     const float lane_smooth = 0.52f;
 
-    s->sm_radius = smartblur_smooth_lane(s->sm_radius, (float)radius_arg, lane_smooth, 0.11f);
-    s->sm_sharpness = smartblur_smooth_lane(s->sm_sharpness, (float)sharpness_arg, lane_smooth, 0.13f);
-    s->sm_chroma = smartblur_smooth_lane(s->sm_chroma, (float)chroma_arg, lane_smooth, 0.13f);
-    s->sm_mix = smartblur_smooth_lane(s->sm_mix, (float)mix_arg, lane_smooth, 0.13f);
-    s->sm_radius_drive = smartblur_smooth_lane(s->sm_radius_drive, (float)radius_drive_arg, lane_smooth, 0.16f);
-    s->sm_sharpness_drive = smartblur_smooth_lane(s->sm_sharpness_drive, (float)sharpness_drive_arg, lane_smooth, 0.16f);
-    s->sm_mix_drive = smartblur_smooth_lane(s->sm_mix_drive, (float)mix_drive_arg, lane_smooth, 0.16f);
+    #pragma omp single
+    {
+        s->sm_radius = smartblur_smooth_lane(s->sm_radius, (float)radius_arg, lane_smooth, 0.11f);
+        s->sm_sharpness = smartblur_smooth_lane(s->sm_sharpness, (float)sharpness_arg, lane_smooth, 0.13f);
+        s->sm_chroma = smartblur_smooth_lane(s->sm_chroma, (float)chroma_arg, lane_smooth, 0.13f);
+        s->sm_mix = smartblur_smooth_lane(s->sm_mix, (float)mix_arg, lane_smooth, 0.13f);
+        s->sm_radius_drive = smartblur_smooth_lane(s->sm_radius_drive, (float)radius_drive_arg, lane_smooth, 0.16f);
+        s->sm_sharpness_drive = smartblur_smooth_lane(s->sm_sharpness_drive, (float)sharpness_drive_arg, lane_smooth, 0.16f);
+        s->sm_mix_drive = smartblur_smooth_lane(s->sm_mix_drive, (float)mix_drive_arg, lane_smooth, 0.16f);
+    }
 
     const int radius_boost = (int)((s->sm_radius_drive * 38.0f) * 0.001f + 0.5f);
     int radius = (int)(s->sm_radius + 0.5f) + radius_boost;
@@ -552,10 +555,10 @@ void smartblur_apply(void *ptr, VJFrame *frame, int *args)
     const float chroma_strength = (float)chroma * 0.01f;
     const int mix_q8 = (mix * 256 + 500) / 1000;
 
-#pragma omp parallel num_threads(s->n_threads)
     {
         smartblur_process_plane(s, frame->data[0], s->len, radius, eps, 0.0f,   1.0f,            1, mix_q8, 0);
         smartblur_process_plane(s, frame->data[1], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
         smartblur_process_plane(s, frame->data[2], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+    #pragma omp barrier
     }
 }

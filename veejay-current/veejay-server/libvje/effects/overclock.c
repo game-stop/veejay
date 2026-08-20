@@ -31,7 +31,6 @@
 typedef struct {
     uint8_t *oc_buf;
     uint32_t seed;
-    int n_threads;
 } overclock_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -136,7 +135,6 @@ void *overclock_malloc(int w, int h)
     }
 
     o->seed = 0x0c0ffeeu ^ (uint32_t)w ^ ((uint32_t)h << 16);
-    o->n_threads = vje_advise_num_threads(len);
 
     return (void*) o;
 }
@@ -160,43 +158,50 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict B = o->oc_buf;
 
-#pragma omp parallel for schedule(static) num_threads(o->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++)
         veejay_blur2(B + (y * width), Y + (y * width), width, radius, 1, 1, 1);
 
     for(int y = N; y < height - N; ) {
-        const int r = 1 + overclock_rand_bounded(o, N);
-
-        for(int x = 0; x < width; x += r) {
-            const int bw = x + N <= width ? N : width - x;
-            const int bh = y + N <= height ? N : height - y;
-            const int area = bw * bh;
-            int sum = 0;
-
-            if(area <= 0)
-                continue;
-
-            for(int dy = 0; dy < bh; dy++) {
-                const int row = (y + dy) * width + x;
-
-                for(int dx = 0; dx < bw; dx++)
-                    sum += B[row + dx];
-            }
-
-            const uint8_t t = (uint8_t)(sum / area);
-
-            for(int dy = 0; dy < bh; dy++) {
-                const int row = (y + dy) * width + x;
-
-                for(int dx = 0; dx < bw; dx++) {
-                    const int i = row + dx;
-
-                    Y[i] = B[i] > Y[i] ? (uint8_t)((Y[i] + t) >> 1) : t;
-                }
-            }
+        int r;
+        #pragma omp single copyprivate(r)
+        {
+            r = 1 + overclock_rand_bounded(o, N);
         }
 
-        y += 1 + overclock_rand_bounded(o, N);
+        #pragma omp single
+        {
+            for(int x = 0; x < width; x += r) {
+                const int bw = x + N <= width ? N : width - x;
+                const int bh = y + N <= height ? N : height - y;
+                const int area = bw * bh;
+                int sum = 0;
+
+                if(area <= 0)
+                    continue;
+
+                for(int dy = 0; dy < bh; dy++) {
+                    const int row = (y + dy) * width + x;
+
+                    for(int dx = 0; dx < bw; dx++)
+                        sum += B[row + dx];
+                }
+
+                const uint8_t t = (uint8_t)(sum / area);
+
+                for(int dy = 0; dy < bh; dy++) {
+                    const int row = (y + dy) * width + x;
+
+                    for(int dx = 0; dx < bw; dx++) {
+                        const int i = row + dx;
+
+                        Y[i] = B[i] > Y[i] ? (uint8_t)((Y[i] + t) >> 1) : t;
+                    }
+                }
+            }
+
+            y += 1 + overclock_rand_bounded(o, N);
+        }
     }
 
     (void)len;

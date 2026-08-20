@@ -38,7 +38,6 @@ typedef struct {
     buffer_slot_t *slots;
     int write_pos;
     int filled;
-    int n_threads;
 } buffer_t;
 
 static void buffer_release(buffer_t *b)
@@ -119,7 +118,6 @@ void *buffer_malloc(int w, int h)
 
     b->write_pos = 0;
     b->filled = 0;
-    b->n_threads = vje_advise_num_threads(w * h);
 
     return b;
 }
@@ -265,7 +263,12 @@ static void buffer_mix_slot(buffer_slot_t *slot, VJFrame *dst, int opacity)
         dstV[i] = buffer_blend_u8(dstV[i], srcV[i], opacity);
     }
 
-    if(dst->data[3] && src->data[3]) {
+    int has_alpha;
+
+#pragma omp single copyprivate(has_alpha)
+    has_alpha = dst->data[3] && src->data[3];
+
+    if(has_alpha) {
         uint8_t *restrict dstA = dst->data[3];
         const uint8_t *restrict srcA = src->data[3];
 
@@ -297,7 +300,12 @@ static void buffer_feedback_slot(buffer_slot_t *slot, VJFrame *frame, int feedba
         dstV[i] = buffer_blend_u8(dstV[i], srcV[i], feedback);
     }
 
-    if(dst->data[3] && frame->data[3]) {
+    int has_alpha;
+
+#pragma omp single copyprivate(has_alpha)
+    has_alpha = dst->data[3] && frame->data[3];
+
+    if(has_alpha) {
         uint8_t *restrict dstA = dst->data[3];
         const uint8_t *restrict srcA = frame->data[3];
 
@@ -329,7 +337,11 @@ void buffer_apply(void *ptr, VJFrame *frame, int *args)
     else if(delay > MAX_FRAMES)
         delay = MAX_FRAMES;
 
-    const int write_slot = buffer_put_frame(b, frame);
+    int write_slot;
+    #pragma omp single copyprivate(write_slot)
+    {
+        write_slot = buffer_put_frame(b, frame);
+    }
     if(write_slot < 0)
         return;
 
@@ -339,29 +351,37 @@ void buffer_apply(void *ptr, VJFrame *frame, int *args)
     buffer_slot_t *tap = buffer_get_tap(b, delay);
 
     if(!tap) {
-        if(opacity >= 255)
-            buffer_black(frame);
+        #pragma omp single
+        {
+            if(opacity >= 255)
+                buffer_black(frame);
+        }
         return;
     }
 
-    if(opacity >= 255)
-        buffer_copy_slot(tap, frame);
+    #pragma omp single
+    {
+        if(opacity >= 255)
+            buffer_copy_slot(tap, frame);
+    }
 
     const int do_mix = opacity > 0 && opacity < 255;
     const int do_feedback_mix = feedback > 0 && feedback < 255;
 
     if(do_mix || do_feedback_mix) {
-#pragma omp parallel num_threads(b->n_threads)
         {
             if(do_mix)
                 buffer_mix_slot(tap, frame, opacity);
 
             if(do_feedback_mix)
                 buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
+        #pragma omp barrier
         }
     }
 
-    if(feedback >= 255)
-        buffer_store_slot(&b->slots[write_slot], frame);
+    #pragma omp single
+    {
+        if(feedback >= 255)
+            buffer_store_slot(&b->slots[write_slot], frame);
+    }
 }
-

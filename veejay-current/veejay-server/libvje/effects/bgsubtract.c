@@ -30,7 +30,6 @@ typedef struct {
     int bg_ssm;
     unsigned int bg_n;
     int auto_hist;
-    int n_threads;
 } bgsubtract_t;
 
 vj_effect *bgsubtract_init(int width, int height)
@@ -93,7 +92,6 @@ void *bgsubtract_malloc(int width, int height)
     b->bg_frame__[1] = b->bg_frame__[0] + plane_size;
     b->bg_frame__[2] = b->bg_frame__[1] + plane_size;
     b->bg_frame__[3] = b->bg_frame__[2] + plane_size;
-    b->n_threads = vje_advise_num_threads(plane_size);
 
     const char *hist = getenv("VEEJAY_BG_AUTO_HISTOGRAM_EQ");
 
@@ -187,13 +185,15 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
     int out_mode = args[3];
 
     const int len = frame->len;
-    const int n_threads = b->n_threads;
 
     if(b->auto_hist)
         vje_histogram_auto_eq(frame);
 
     if(enabled == 0 && method == 0) {
-        bgsubtract_show_bg(b, frame);
+        #pragma omp single
+        {
+            bgsubtract_show_bg(b, frame);
+        }
         return;
     }
 
@@ -206,7 +206,6 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
     if(enabled != 0 && out_mode == 0 && !A)
         out_mode = 2;
 
-#pragma omp parallel num_threads(n_threads)
     {
         if(enabled == 0) {
             if(method == 1) {
@@ -260,21 +259,28 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
+    #pragma omp barrier
     }
 
     if(enabled == 0) {
-        if(method == 1 && b->bg_n < 65535U)
-            b->bg_n++;
+        #pragma omp single
+        {
+            if(method == 1 && b->bg_n < 65535U)
+                b->bg_n++;
 
-        bgsubtract_show_bg(b, frame);
+            bgsubtract_show_bg(b, frame);
+        }
         return;
     }
 
-    if(out_mode == 1 || out_mode == 2)
+#pragma omp single
     {
-        const int uv_len = frame->uv_len;
-        veejay_memset(U, 128, uv_len);
-        veejay_memset(V, 128, uv_len);
+        if(out_mode == 1 || out_mode == 2)
+        {
+            const int uv_len = frame->uv_len;
+            veejay_memset(U, 128, uv_len);
+            veejay_memset(V, 128, uv_len);
+        }
     }
 }
 

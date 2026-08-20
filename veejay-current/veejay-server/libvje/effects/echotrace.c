@@ -35,7 +35,6 @@ typedef struct {
     uint32_t *trace_y;
     int32_t *trace_u;
     int32_t *trace_v;
-    int n_threads;
 } echotrace_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -120,7 +119,6 @@ void *echotrace_malloc(int w, int h)
     }
 
     t->trace_v = t->trace_u + len;
-    t->n_threads = vje_advise_num_threads(len);
 
     return t;
 }
@@ -163,7 +161,7 @@ void echotrace_apply(void *ptr, VJFrame *frame, int *args)
     int32_t *restrict accU = t->trace_u;
     int32_t *restrict accV = t->trace_v;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const uint32_t fp_y = (uint32_t)echotrace_div255((int)Y[i] * intensity) << FP_SHIFT;
         const int32_t u_in = (int32_t)U[i] - 128;

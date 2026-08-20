@@ -263,9 +263,7 @@ void mirrors2_apply(void *ptr, VJFrame *frame, int *args)
     const int type = args[P_SYMMETRY_MODE];
     const int width = frame->width;
     const int height = frame->height;
-    const int n_threads = vje_advise_num_threads(frame->len);
 
-#pragma omp parallel num_threads(n_threads)
     {
         switch(type) {
             case 0:
@@ -299,5 +297,6 @@ void mirrors2_apply(void *ptr, VJFrame *frame, int *args)
                 mirrors2_diag_tr_bl(frame->data, width, height, 1);
                 break;
         }
+    #pragma omp barrier
     }
 }

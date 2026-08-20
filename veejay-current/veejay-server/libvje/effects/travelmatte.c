@@ -37,7 +37,6 @@ typedef struct {
     float mix_drive_state;
 
     int state_ready;
-    int n_threads;
 } travelmatte_t;
 
 static inline int travelmatte_clampi(int v, int lo, int hi)
@@ -163,7 +162,6 @@ void *travelmatte_malloc(int w, int h)
     tm->mix_drive_state = 0.0f;
     tm->state_ready = 0;
 
-    tm->n_threads = vje_advise_num_threads(w * h);
 
     return tm;
 }
@@ -201,17 +199,20 @@ void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const float fast = 0.24f;
     const float slow = 0.085f;
 
-    if(!tm->state_ready) {
-        tm->gain_state = (float)gain;
-        tm->bias_state = (float)bias;
-        tm->soften_state = (float)soften;
-        tm->mix_drive_state = (float)mix_drive;
-        tm->state_ready = 1;
-    } else {
-        tm->gain_state += ((float)gain - tm->gain_state) * fast;
-        tm->bias_state += ((float)bias - tm->bias_state) * (fast * 0.92f);
-        tm->soften_state += ((float)soften - tm->soften_state) * slow;
-        tm->mix_drive_state += ((float)mix_drive - tm->mix_drive_state) * (fast * 1.18f);
+#pragma omp single
+    {
+        if(!tm->state_ready) {
+            tm->gain_state = (float)gain;
+            tm->bias_state = (float)bias;
+            tm->soften_state = (float)soften;
+            tm->mix_drive_state = (float)mix_drive;
+            tm->state_ready = 1;
+        } else {
+            tm->gain_state += ((float)gain - tm->gain_state) * fast;
+            tm->bias_state += ((float)bias - tm->bias_state) * (fast * 0.92f);
+            tm->soften_state += ((float)soften - tm->soften_state) * slow;
+            tm->mix_drive_state += ((float)mix_drive - tm->mix_drive_state) * (fast * 1.18f);
+        }
     }
 
     gain = travelmatte_clampi((int)(tm->gain_state + 0.5f), 0, 2000);
@@ -219,7 +220,7 @@ void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     soften = travelmatte_clampi((int)(tm->soften_state + 0.5f), 0, 255);
     mix_drive = travelmatte_clampi((int)(tm->mix_drive_state + 0.5f), 0, 1000);
 
-#pragma omp parallel for schedule(static) num_threads(tm->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int a = travelmatte_alpha_xform((int)matte[i], gain, bias, soften, mix_drive);
 

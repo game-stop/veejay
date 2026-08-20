@@ -27,7 +27,6 @@ typedef struct {
     int cnframe;
     int cnreverse;
     int chroma_restart;
-    int n_threads;
     VJFrame _tmp;
 } chromascratcher_t;
 
@@ -100,7 +99,6 @@ void *chromascratcher_malloc(int w, int h)
     c->cframe[1] = c->cframe[0] + plane_bank;
     c->cframe[2] = c->cframe[1] + plane_bank;
     c->cframe[3] = NULL;
-    c->n_threads = vje_advise_num_threads(len);
 
     vj_frame_clear1(c->cframe[0], pixel_Y_lo_, plane_bank);
     vj_frame_clear1(c->cframe[1], 128, plane_bank);
@@ -174,7 +172,6 @@ static void chromastore_frame(chromascratcher_t *c, VJFrame *src, int n, int no_
 static void chromascratcher_apply_simple(chromascratcher_t *c, VJFrame *frame, int mode, int opacity, int offset)
 {
     const int len = frame->len;
-    const int n_threads = c->n_threads;
     const int op_a = opacity;
     const int op_b = 255 - op_a;
 
@@ -186,7 +183,7 @@ static void chromascratcher_apply_simple(chromascratcher_t *c, VJFrame *frame, i
     uint8_t *restrict SU = c->cframe[1] + offset;
     uint8_t *restrict SV = c->cframe[2] + offset;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         int take = 0;
@@ -228,30 +225,39 @@ void chromascratcher_apply(void *ptr, VJFrame *frame, int *args)
     int no_reverse = args[3] == 0 ? 1 : 0;
 
     if(n <= 0) {
-        c->cnframe = 0;
-        c->cnreverse = 0;
-        c->chroma_restart = no_reverse;
+        #pragma omp single
+        {
+            c->cnframe = 0;
+            c->cnreverse = 0;
+            c->chroma_restart = no_reverse;
+        }
         return;
     }
 
-    if(no_reverse != c->chroma_restart) {
-        c->chroma_restart = no_reverse;
-        c->cnreverse = 0;
-        c->cnframe = 0;
-    }
+    #pragma omp single
+    {
+        if(no_reverse != c->chroma_restart) {
+            c->chroma_restart = no_reverse;
+            c->cnreverse = 0;
+            c->cnframe = 0;
+        }
 
-    c->cnframe = chromascratcher_clampi(c->cnframe, 0, n - 1);
+        c->cnframe = chromascratcher_clampi(c->cnframe, 0, n - 1);
+    }
 
     const int offset = len * c->cnframe;
 
-    veejay_memcpy(&c->_tmp, frame, sizeof(VJFrame));
-    c->_tmp.data[0] = c->cframe[0] + offset;
-    c->_tmp.data[1] = c->cframe[1] + offset;
-    c->_tmp.data[2] = c->cframe[2] + offset;
-    c->_tmp.data[3] = NULL;
-    c->_tmp.len = len;
-    c->_tmp.uv_len = len;
-    c->_tmp.ssm = 1;
+    #pragma omp single
+    {
+        veejay_memcpy(&c->_tmp, frame, sizeof(VJFrame));
+        c->_tmp.data[0] = c->cframe[0] + offset;
+        c->_tmp.data[1] = c->cframe[1] + offset;
+        c->_tmp.data[2] = c->cframe[2] + offset;
+        c->_tmp.data[3] = NULL;
+        c->_tmp.len = len;
+        c->_tmp.uv_len = len;
+        c->_tmp.ssm = 1;
+    }
 
     if(mode > 3) {
         int ch_args[2] = { mode - 3, opacity };
@@ -261,5 +267,8 @@ void chromascratcher_apply(void *ptr, VJFrame *frame, int *args)
         chromascratcher_apply_simple(c, frame, mode, opacity, offset);
     }
 
-    chromastore_frame(c, frame, n, no_reverse);
+    #pragma omp single
+    {
+        chromastore_frame(c, frame, n, no_reverse);
+    }
 }

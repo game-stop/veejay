@@ -50,7 +50,6 @@ typedef struct {
     int gw;
     int gh;
     int grid_len;
-    int n_threads;
     int frame;
 
     void *region;
@@ -416,7 +415,6 @@ void *darkmatter_malloc(int w, int h)
     t->gw = ((w + DM_GRID_STEP - 1) >> DM_GRID_SHIFT) + 1;
     t->gh = ((h + DM_GRID_STEP - 1) >> DM_GRID_SHIFT) + 1;
     t->grid_len = t->gw * t->gh;
-    t->n_threads = vje_advise_num_threads(w * h);
 
     total = bytes * 3 + 64 + sizeof(float) * (size_t) t->grid_len * 3;
     t->region = vj_malloc(total);
@@ -562,23 +560,35 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
     float c2a;
     int gi;
 
-    veejay_memcpy(src_y, Y, t->len);
-    veejay_memcpy(src_u, U, t->len);
-    veejay_memcpy(src_v, V, t->len);
+#pragma omp single
+    {
+        veejay_memcpy(src_y, Y, t->len);
+        veejay_memcpy(src_u, U, t->len);
+        veejay_memcpy(src_v, V, t->len);
+    }
 
     if (args[P_MASS] <= 0 || args[P_CRITICALITY] <= 0) {
-        t->frame++;
+        #pragma omp single
+        {
+            t->frame++;
+        }
         return;
     }
 
-    if ((t->frame & 7) == 0)
-        dm_update_coupling(t, src_y, coupling_i);
+#pragma omp single
+    {
+        if ((t->frame & 7) == 0)
+            dm_update_coupling(t, src_y, coupling_i);
+    }
 
     speed_step = dm_time_step(args[P_TIMESCALE]);
-    dm_update_halos(t, halos, speed_step, dynamics_t, mass_t, scale_t, coupling_t);
-    t->time += speed_step;
-    if (t->time > DM_TWO_PI || t->time < -DM_TWO_PI)
-        t->time = fmodf(t->time, DM_TWO_PI);
+#pragma omp single
+    {
+        dm_update_halos(t, halos, speed_step, dynamics_t, mass_t, scale_t, coupling_t);
+        t->time += speed_step;
+        if (t->time > DM_TWO_PI || t->time < -DM_TWO_PI)
+            t->time = fmodf(t->time, DM_TWO_PI);
+    }
 
     count_norm = 1.0f / sqrtf(1.0f + 0.08f * (float) (halos - 1));
     scale_gain = 0.70f + 1.65f * scale_t * scale_t;
@@ -661,7 +671,7 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
     max_disp = half_min * (0.025f + 1.050f * critical_t * critical_t);
     max_disp2 = max_disp * max_disp;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (gi = 0; gi < t->grid_len; gi++) {
         int gy = gi / t->gw;
         int gx = gi - gy * t->gw;
@@ -736,7 +746,7 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
         grid_y[gi] = -ay * half_min;
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (gi = 0; gi < t->grid_len; gi++) {
         int gy = gi / t->gw;
         int gx = gi - gy * t->gw;
@@ -761,7 +771,7 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
         grid_gain[gi] = gain;
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (gi = 0; gi < t->grid_len; gi++) {
         float ax = grid_x[gi] * grid_gain[gi];
         float ay = grid_y[gi] * grid_gain[gi];
@@ -777,7 +787,7 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
         grid_y[gi] = ay;
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (gi = 0; gi < h; gi++) {
         int y = gi;
         int gy = y >> DM_GRID_SHIFT;
@@ -812,5 +822,8 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    t->frame++;
+#pragma omp single
+    {
+        t->frame++;
+    }
 }
