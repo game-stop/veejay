@@ -145,7 +145,6 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args)
 
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
     const int radius_hi = (height >> 3) < 2 ? 2 : (height >> 3);
     const int n = clampi(args[P_RADIUS], 2, radius_hi);
     const int radius = args[P_VALUE];
@@ -162,15 +161,11 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args)
     for(int y = 0; y < height; y++)
         veejay_blur2(B + (y * width), Y + (y * width), width, radius, 1, 1, 1);
 
-    for(int y = N; y < height - N; ) {
-        int r;
-        #pragma omp single copyprivate(r)
-        {
-            r = 1 + overclock_rand_bounded(o, N);
-        }
+    #pragma omp single
+    {
+        for(int y = N; y < height - N; ) {
+            const int r = 1 + overclock_rand_bounded(o, N);
 
-        #pragma omp single
-        {
             for(int x = 0; x < width; x += r) {
                 const int bw = x + N <= width ? N : width - x;
                 const int bh = y + N <= height ? N : height - y;
@@ -203,6 +198,4 @@ void overclock_apply(void *ptr, VJFrame *frame, int *args)
             y += 1 + overclock_rand_bounded(o, N);
         }
     }
-
-    (void)len;
 }

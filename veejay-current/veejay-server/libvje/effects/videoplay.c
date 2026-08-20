@@ -343,23 +343,6 @@ static void take_video_plane(const uint8_t *restrict src,
     }
 }
 
-static void take_video(videowall_t *vw, VJFrame *src, int index)
-{
-    const int box_w = vw->video_list[index]->w;
-    const int box_h = vw->video_list[index]->h;
-
-    for(int p = 0; p < 3; p++) {
-        take_video_plane(
-            src->data[p],
-            vw->video_list[index]->data[p],
-            src->width,
-            src->height,
-            box_w,
-            box_h
-        );
-    }
-}
-
 static void put_video_plane(uint8_t *restrict dst,
                             const uint8_t *restrict src,
                             int dst_w,
@@ -418,104 +401,115 @@ static void put_video_plane(uint8_t *restrict dst,
     }
 }
 
-static void put_video(videowall_t *vw,
-                      VJFrame *dst,
-                      int index,
-                      matrix_t matrix,
-                      int off_x,
-                      int off_y,
-                      int boost_y)
-{
-    const int box_w = vw->video_list[index]->w;
-    const int box_h = vw->video_list[index]->h;
-    const int x = matrix.w + off_x;
-    const int y = matrix.h + off_y;
-
-    for(int p = 0; p < 3; p++) {
-        put_video_plane(
-            dst->data[p],
-            vw->video_list[index]->data[p],
-            dst->width,
-            dst->height,
-            box_w,
-            box_h,
-            x,
-            y,
-            (p == 0) ? boost_y : 0
-        );
-    }
-}
-
 void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
 {
     videowall_t *vw = (videowall_t*) ptr;
 
     const int width = frame->width;
     const int height = frame->height;
-    const int max_grid = videoplay_max_grid(width, height);
     const int grid = args[P_PHOTOS];
     const int delay_arg = args[P_WATERFALL];
-    const int max_mode = get_matrix_func_n();
     const int mode = args[P_MODE];
     const int capture_drive = args[P_CAPTURE_DRIVE];
     const int slide_drive = args[P_SLIDE_DRIVE];
     const int wanted_videos = grid * grid;
+    int ready;
+    int capture_kind;
+    int capture_a;
+    int capture_b;
 
-    if(vw->delay_env_q8 <= 0)
-        vw->delay_env_q8 = delay_arg << 8;
+    #pragma omp single copyprivate(ready, capture_kind, capture_a, capture_b)
+    {
+        ready = 1;
+        capture_kind = 0;
+        capture_a = 0;
+        capture_b = 0;
 
-    vw->delay_env_q8 = videoplay_smooth_i(vw->delay_env_q8, delay_arg << 8, 96, 44);
-    vw->capture_env_q8 = videoplay_smooth_i(vw->capture_env_q8, videoplay_param_to_q8(capture_drive), 92, 46);
-    vw->slide_env_q8 = videoplay_smooth_i(vw->slide_env_q8, videoplay_param_to_q8(slide_drive), 86, 42);
+        if(vw->delay_env_q8 <= 0)
+            vw->delay_env_q8 = delay_arg << 8;
 
-    const int delay = clampi((vw->delay_env_q8 + 128) >> 8, 1, 250);
+        vw->delay_env_q8 = videoplay_smooth_i(vw->delay_env_q8, delay_arg << 8, 96, 44);
+        vw->capture_env_q8 = videoplay_smooth_i(vw->capture_env_q8, videoplay_param_to_q8(capture_drive), 92, 46);
+        vw->slide_env_q8 = videoplay_smooth_i(vw->slide_env_q8, videoplay_param_to_q8(slide_drive), 86, 42);
 
-    if(wanted_videos != vw->num_videos || vw->num_videos <= 0 || vw->grid != grid) {
-        release_filmstrip(vw);
+        const int delay = clampi((vw->delay_env_q8 + 128) >> 8, 1, 250);
 
-        if(!prepare_filmstrip(vw, grid, width, height))
-            return;
+        if(wanted_videos != vw->num_videos || vw->num_videos <= 0 || vw->grid != grid) {
+            release_filmstrip(vw);
+            ready = prepare_filmstrip(vw, grid, width, height) != NULL;
 
-        videoplay_rebuild_order(vw, mode);
+            if(ready)
+                videoplay_rebuild_order(vw, mode);
+        }
+
+        if(ready) {
+            if(vw->last_mode != mode)
+                videoplay_rebuild_order(vw, mode);
+
+            const int capture_q8 = clampi(vw->capture_env_q8, 0, 255);
+            int effective_delay = delay - ((delay - 1) * capture_q8) / 255;
+
+            effective_delay = clampi(effective_delay, 1, delay);
+
+            if(vw->frame_delay > effective_delay)
+                vw->frame_delay = effective_delay;
+
+            int capture_now = 0;
+
+            if(vw->frame_delay <= 0) {
+                capture_now = 1;
+            } else {
+                vw->frame_delay--;
+
+                if(vw->frame_delay <= 0)
+                    capture_now = 1;
+            }
+
+            if(capture_now) {
+                capture_kind = 1;
+                capture_a = vw->frame_counter % vw->num_videos;
+                capture_b = (vw->frame_counter + 1) % vw->num_videos;
+                vw->frame_counter += 2;
+                vw->frame_delay = effective_delay;
+            } else if(vw->frame_counter > 0) {
+                capture_kind = 2;
+                capture_a = (vw->frame_counter - 1) % vw->num_videos;
+                capture_b = vw->frame_counter % vw->num_videos;
+            }
+
+            const int slide_q8 = clampi(vw->slide_env_q8, 0, 255);
+            vw->slide_phase += 2 + (slide_q8 >> 4);
+        }
     }
 
-    if(vw->last_mode != mode)
-        videoplay_rebuild_order(vw, mode);
+    if(!ready)
+        return;
 
-    const int capture_q8 = clampi(vw->capture_env_q8, 0, 255);
-    int effective_delay = delay - ((delay - 1) * capture_q8) / 255;
+    if(capture_kind != 0) {
+        #pragma omp for schedule(static)
+        for(int plane = 0; plane < 3; plane++) {
+            VJFrame *src_a = capture_kind == 1 ? B : frame;
+            VJFrame *src_b = capture_kind == 1 ? frame : B;
+            const int box_w = vw->video_list[capture_a]->w;
+            const int box_h = vw->video_list[capture_a]->h;
 
-    effective_delay = clampi(effective_delay, 1, delay);
-
-    if(vw->frame_delay > effective_delay)
-        vw->frame_delay = effective_delay;
-
-    int capture_now = 0;
-
-    if(vw->frame_delay <= 0) {
-        capture_now = 1;
-    } else {
-        vw->frame_delay--;
-
-        if(vw->frame_delay <= 0)
-            capture_now = 1;
-    }
-
-    if(capture_now) {
-        const int a = vw->frame_counter % vw->num_videos;
-        const int b = (vw->frame_counter + 1) % vw->num_videos;
-
-        take_video(vw, B, a);
-        take_video(vw, frame, b);
-
-        vw->frame_counter += 2;
-        vw->frame_delay = effective_delay;
-    } else if(vw->frame_counter > 0) {
-        const int a = (vw->frame_counter - 1) % vw->num_videos;
-        const int b = vw->frame_counter % vw->num_videos;
-
-        take_video(vw, frame, a);
-        take_video(vw, B, b);
+            take_video_plane(
+                src_a->data[plane],
+                vw->video_list[capture_a]->data[plane],
+                src_a->width,
+                src_a->height,
+                box_w,
+                box_h
+            );
+            take_video_plane(
+                src_b->data[plane],
+                vw->video_list[capture_b]->data[plane],
+                src_b->width,
+                src_b->height,
+                box_w,
+                box_h
+            );
+        }
     }
 
     matrix_f matrix_placement = NULL;
@@ -532,10 +526,6 @@ void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
     const int box_h = vw->video_list[0]->h;
 
     const int slide_q8 = clampi(vw->slide_env_q8, 0, 255);
-
-    const int phase_speed = 2 + (slide_q8 >> 4);
-    vw->slide_phase += phase_speed;
-
     const int wave_x = videoplay_tri_signed_q8(vw->slide_phase);
     const int wave_y = videoplay_tri_signed_q8(vw->slide_phase + 256);
     int amp_x = (box_w * slide_q8) / 540;
@@ -550,23 +540,27 @@ void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
     const int global_y = (amp_y * wave_y) >> 8;
     const int boost_y = (slide_q8 * 10) >> 8;
 
-    for(int i = 0; i < vw->num_videos; i++) {
-        const int slot = vw->rt[i];
-        matrix_t m = matrix_placement(slot, grid, width, height);
+    #pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++) {
+        for(int i = 0; i < vw->num_videos; i++) {
+            const int slot = vw->rt[i];
+            matrix_t m = matrix_placement(slot, grid, width, height);
+            const int row = slot / grid;
+            const int col = slot % grid;
+            const int stagger_x = ((row ^ col) & 1) ? (amp_x >> 1) : -(amp_x >> 1);
+            const int stagger_y = (row & 1) ? (amp_y >> 1) : -(amp_y >> 1);
 
-        const int row = slot / grid;
-        const int col = slot % grid;
-        const int stagger_x = ((row ^ col) & 1) ? (amp_x >> 1) : -(amp_x >> 1);
-        const int stagger_y = (row & 1) ? (amp_y >> 1) : -(amp_y >> 1);
-
-        put_video(
-            vw,
-            frame,
-            i,
-            m,
-            global_x + stagger_x,
-            global_y + stagger_y,
-            boost_y
-        );
+            put_video_plane(
+                frame->data[plane],
+                vw->video_list[i]->data[plane],
+                width,
+                height,
+                box_w,
+                box_h,
+                m.w + global_x + stagger_x,
+                m.h + global_y + stagger_y,
+                plane == 0 ? boost_y : 0
+            );
+        }
     }
 }
