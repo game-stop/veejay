@@ -6,5 +6,6 @@ includedir=@includedir@
 Name: veejay
 Description: visual instrument and realtime video sampler
 Version: @VERSION@
-Libs: -L${libdir} -lveejay 
+Libs: -L${libdir} -lveejay -lveejaycore
 Cflags: -I${includedir}
+Requires: veejaycore >= @VERSION@

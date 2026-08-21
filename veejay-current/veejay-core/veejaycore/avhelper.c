@@ -26,11 +26,11 @@
 #include <unistd.h>
 #include <stdint.h>
 #include <veejaycore/defs.h>
-#include <veejaycore/vj-msg.h>
-#include <veejaycore/vjmem.h>
+#include <libvjmsg/vj-msg.h>
+#include <libvjmem/vjmem.h>
 #include <veejaycore/vj-task.h>
 
-#include <veejaycore/yuvconv.h>
+#include <libyuv/yuvconv.h>
 #include <libavutil/avutil.h>
 #include <libavcodec/avcodec.h>
 #include <libavcodec/version.h>
@@ -39,7 +39,7 @@
 #include <libavutil/imgutils.h>
 #include <veejaycore/avhelper.h>
 #include <veejaycore/av.h>
-#include <veejaycore/hash.h>
+#include <thirdparty/libhash/hash.h>
 
 #if LIBAVCODEC_VERSION_MAJOR >= 57
 #ifndef CODEC_ID_HAP
