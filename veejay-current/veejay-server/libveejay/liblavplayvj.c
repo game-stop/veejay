@@ -5000,7 +5000,13 @@ void	veejay_auto_loop(veejay_t *info)
 	}
 }
 
-void	veejay_set_framerate( veejay_t *info , float fps )
+void veejay_set_framerate_soft(veejay_t *info, float fps);
+#ifdef HAVE_JACK
+void vj_audio_beat_set_video_fps(vj_audio_beat_shared_t *s, double fps);
+#endif
+
+static void veejay_set_framerate_internal(veejay_t *info, float fps,
+                                          int reset_presentation)
 {
     if (info == NULL || info->settings == NULL)
         return;
@@ -5008,6 +5014,11 @@ void	veejay_set_framerate( veejay_t *info , float fps )
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
     fps = vj_runtime_clamp_fps(fps);
+
+#ifdef HAVE_JACK
+    if(reset_presentation)
+        vj_audio_beat_set_video_fps(&settings->audio_beat, fps);
+#endif
 
     if(settings->output_fps > 0.0f &&
        fabs((double)settings->output_fps - (double)fps) < 0.005)
@@ -5084,15 +5095,17 @@ void	veejay_set_framerate( veejay_t *info , float fps )
     media_fps = (info->edit_list && info->edit_list->video_fps > 0.0) ? info->edit_list->video_fps : fps;
     new_runtime_rate = (double)fps / media_fps;
     atomic_store_double(&settings->runtime_playback_rate, new_runtime_rate);
-    settings->fps_generation++;
-    __atomic_add_fetch(&settings->video_present_epoch, 1, __ATOMIC_RELEASE);
+    if(reset_presentation) {
+        settings->fps_generation++;
+        __atomic_add_fetch(&settings->video_present_epoch, 1, __ATOMIC_RELEASE);
+    }
 
     vj_runtime_update_frame_fps(info, fps);
 
     pthread_mutex_unlock(&(settings->control_mutex));
 
 #ifdef HAVE_JACK
-    /* set_framerate() may be automated every frame.  Track Align treats it
+    /* Runtime framerate changes may be automated every frame. Track Align treats them
      * as leaving/returning to the external source clock only when the exact
      * floating-point FPS crosses the source-FPS tolerance; no integer FPS
      * truncation is used here.
@@ -5116,6 +5129,16 @@ void	veejay_set_framerate( veejay_t *info , float fps )
         vj_audio_sync_set_track_align_video_fps(&settings->audio_sync,
                                                 veejay_track_align_media_fps(info));
 #endif
+}
+
+void veejay_set_framerate(veejay_t *info, float fps)
+{
+    veejay_set_framerate_internal(info, fps, 1);
+}
+
+void veejay_set_framerate_soft(veejay_t *info, float fps)
+{
+    veejay_set_framerate_internal(info, fps, 0);
 }
 
 
@@ -10013,6 +10036,7 @@ int veejay_open(veejay_t * info)
      * unavailable; the detector thread can still open JACK capture later.
      */
     vj_audio_beat_init(&settings->audio_beat, 2);
+    vj_audio_beat_set_video_fps(&settings->audio_beat, settings->output_fps);
     vj_audio_beat_bind_sync(&settings->audio_beat, &settings->audio_sync);
     veejay_audio_beat_ensure_default_action(&settings->audio_beat, "open");
 #endif

@@ -58,7 +58,7 @@
 
 extern int veejay_set_speed(veejay_t *v, int speed, int force_seek);
 extern int veejay_set_frame(veejay_t *info, long framenum);
-extern void veejay_set_framerate(veejay_t *info, float fps);
+extern void veejay_set_framerate_soft(veejay_t *info, float fps);
 
 static volatile int ab_transport_command_depth = 0;
 
@@ -6376,7 +6376,7 @@ static inline void ab_breakbeat_set_fps_immediate(veejay_t *v, float fps)
     now = ab_now_ms();
 
     if(fabs((double)ab_breakbeat_runtime_fps(v) - (double)fps) >= 0.05)
-        veejay_set_framerate(v, fps);
+        veejay_set_framerate_soft(v, fps);
 
     ab_breakbeat_state.current_fps = fps;
     ab_breakbeat_state.target_fps = fps;
@@ -6469,7 +6469,7 @@ static inline void ab_breakbeat_apply_fps(veejay_t *v, float fps)
         runtime_delta >= base * 0.16f ||
         fabs((double)fps - (double)cur) < 0.08))
     {
-        veejay_set_framerate(v, cur);
+        veejay_set_framerate_soft(v, cur);
         ab_breakbeat_state.fps_write_last_ms = now;
     }
 
