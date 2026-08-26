@@ -444,7 +444,6 @@ void *datamosh_malloc(int w, int h)
     d->h = h;
     d->len = (int) len;
     d->max_blocks = (int) max_blocks;
-    d->n_threads = vje_advise_num_threads((int) len);
     d->region = region;
     d->last_block = 0;
     d->last_flow = -1;
@@ -481,7 +480,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
 
     const int w = frame->width;
     const int h = frame->height;
-    const int len = w * h;;
+    const int len = w * h;
 
     uint8_t * restrict frame_y = frame->data[0];
     uint8_t * restrict frame_u = frame->data[1];
@@ -489,19 +488,6 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const size_t llen = (size_t) len;
 
     const int reset = args[P_RESET] > 0;
-
-    if (!d->initialized) {
-        dm_fill_history(d, frame_y, frame_u, frame_v);
-        d->last_reset = reset;
-        d->frame++;
-        return;
-    }
-
-    if (reset && !d->last_reset)
-        dm_fill_history(d, frame_y, frame_u, frame_v);
-
-    d->last_reset = reset;
-
     const int strength = args[P_MOSH];
     const int history_depth = args[P_HISTORY];
     const int block = args[P_BLOCK];
@@ -513,31 +499,50 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int flow_strength = args[P_FLOW_AMT];
     const int source_opacity = args[P_SRC_OPAC];
 
-    if (block != d->last_block || flow_mode != d->last_flow) {
-        dm_clear_fields(d);
-        d->last_block = block;
-        d->last_flow = flow_mode;
+    #pragma omp single
+    {
+        if (!d->initialized) {
+            dm_fill_history(d, frame_y, frame_u, frame_v);
+            d->last_reset = reset;
+        } else if (reset && !d->last_reset) {
+            dm_fill_history(d, frame_y, frame_u, frame_v);
+        }
+        d->last_reset = reset;
+
+        if (block != d->last_block || flow_mode != d->last_flow) {
+            dm_clear_fields(d);
+            d->last_block = block;
+            d->last_flow = flow_mode;
+        }
+
+        uint8_t *dummy_y, *dummy_u, *dummy_v;
+        dm_push_history(d, frame_y, frame_u, frame_v, &dummy_y, &dummy_u, &dummy_v);
+    }
+    
+    if (strength <= 0) {
+        #pragma omp single
+        {
+            uint8_t *cur_y = d->hist[0] + (size_t) d->hist_head * llen;
+            uint8_t *cur_u = d->hist[1] + (size_t) d->hist_head * llen;
+            uint8_t *cur_v = d->hist[2] + (size_t) d->hist_head * llen;
+            for (int p = 0; p < 2; p++) {
+                veejay_memcpy(d->canvas[p][0], cur_y, llen);
+                veejay_memcpy(d->canvas[p][1], cur_u, llen);
+                veejay_memcpy(d->canvas[p][2], cur_v, llen);
+            }
+            dm_clear_fields(d);
+            d->canvas_ping = 0;
+            d->frame++;
+        }
+        return;
     }
 
-    uint8_t *cur_y;
-    uint8_t *cur_u;
-    uint8_t *cur_v;
-    dm_push_history(d, frame_y, frame_u, frame_v, &cur_y, &cur_u, &cur_v);
+    uint8_t * restrict cur_y = d->hist[0] + (size_t) d->hist_head * llen;
+    uint8_t * restrict cur_u = d->hist[1] + (size_t) d->hist_head * llen;
+    uint8_t * restrict cur_v = d->hist[2] + (size_t) d->hist_head * llen;
 
     const int prev_slot = (d->hist_head > 0) ? (d->hist_head - 1) : (DM_HISTORY_MAX - 1);
     const uint8_t * restrict prev_y = d->hist[0] + (size_t) prev_slot * llen;
-
-    if (strength <= 0) {
-        for (int p = 0; p < 2; p++) {
-            veejay_memcpy(d->canvas[p][0], cur_y, llen);
-            veejay_memcpy(d->canvas[p][1], cur_u, llen);
-            veejay_memcpy(d->canvas[p][2], cur_v, llen);
-        }
-        dm_clear_fields(d);
-        d->canvas_ping = 0;
-        d->frame++;
-        return;
-    }
 
     const int bw = (w + block - 1) / block;
     const int bh = (h + block - 1) / block;
@@ -552,6 +557,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int half_w = w >> 1;
     const int half_h = h >> 1;
     const int max_dim = (w > h) ? w : h;
+    
     const int cand_x[DM_CANDIDATES] = {
         0,
         -half_shift, half_shift, 0, 0, -half_shift, half_shift, -half_shift, half_shift,
@@ -600,7 +606,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int max_xfp_inner = ((w - 2) << DM_FP_SHIFT);
     const int max_yfp_inner = ((h - 2) << DM_FP_SHIFT);
 
-#pragma omp parallel for schedule(static) num_threads(d->n_threads)
+    #pragma omp for schedule(static)
     for (int bi = 0; bi < bw * bh; bi++) {
         const int by = bi / bw;
         const int bx = bi - by * bw;
@@ -845,8 +851,11 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    d->canvas_ping = write_ping;
-    d->frame++;
+    #pragma omp single
+    {
+        d->canvas_ping = write_ping;
+        d->frame++;
+    }
 }
 
 #undef DM_RENDER_PIXEL

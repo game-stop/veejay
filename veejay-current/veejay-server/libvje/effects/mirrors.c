@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,6 +21,7 @@
 #include "common.h"
 #include "mirrors.h"
 #include "motionmap.h"
+#include <veejaycore/vjmem.h>
 
 #define MIRRORS_PARAMS 2
 
@@ -32,6 +33,13 @@ typedef struct {
     int N__;
     int n_threads;
     void *motionmap;
+
+    int width;
+    int height;
+    int type;
+    int factor;
+    int interpolate;
+    int motion;
 } mirrors_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -61,16 +69,6 @@ vj_effect *mirrors_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     int max_factor = mirrors_max_factor_for_axis(width < height ? width : height);
     int beat_hi = max_factor < 16 ? max_factor : 16;
@@ -181,7 +179,6 @@ void *mirrors_malloc(int w, int h)
     if(!m)
         return NULL;
 
-    m->n_threads = vje_advise_num_threads(w * h);
 
     return m;
 }
@@ -207,52 +204,62 @@ void mirrors_apply(void *ptr, VJFrame *frame, int *args)
 {
     mirrors_t *m = (mirrors_t*) ptr;
 
-    const int width = frame->width;
-    const int height = frame->height;
-    const int type = args[P_MODE];
-    const int span = type < 2 ? width : height;
-    const int max_factor = mirrors_max_factor_for_axis(span);
-    int factor = clampi(args[P_NUMBER], 0, max_factor);
-    int interpolate = 0;
-    int motion = 0;
-
-    if(motionmap_active(m->motionmap)) {
-        int tmp1 = 0;
-        int tmp2 = factor;
-
-        motionmap_scale_to(m->motionmap, max_factor, max_factor, 0, 0, &tmp1, &tmp2, &(m->n__), &(m->N__));
-        factor = clampi(tmp2, 0, max_factor);
-        motion = 1;
-
-        if(m->N__ != m->n__ && m->n__ != 0)
-            interpolate = 1;
-    }
-    else {
-        m->n__ = 0;
-        m->N__ = 0;
-    }
-
-#pragma omp parallel num_threads(m->n_threads)
+    #pragma omp single
     {
-        switch(type) {
-            case 0:
-                mirrors_vertical(frame->data, width, height, factor, 0);
-                break;
-            case 1:
-                mirrors_vertical(frame->data, width, height, factor, 1);
-                break;
-            case 2:
-                mirrors_horizontal(frame->data, width, height, factor, 0);
-                break;
-            case 3:
-                mirrors_horizontal(frame->data, width, height, factor, 1);
-                break;
+        m->width = frame->width;
+        m->height = frame->height;
+        m->type = args[P_MODE];
+        const int span = m->type < 2 ? m->width : m->height;
+        const int max_factor = mirrors_max_factor_for_axis(span);
+        m->factor = clampi(args[P_NUMBER], 0, max_factor);
+        m->interpolate = 0;
+        m->motion = 0;
+
+        if(motionmap_active(m->motionmap)) {
+            int tmp1 = 0;
+            int tmp2 = m->factor;
+
+            motionmap_scale_to(m->motionmap, max_factor, max_factor, 0, 0, &tmp1, &tmp2, &(m->n__), &(m->N__));
+            m->factor = clampi(tmp2, 0, max_factor);
+            m->motion = 1;
+
+            if(m->N__ != m->n__ && m->n__ != 0)
+                m->interpolate = 1;
+        }
+        else {
+            m->n__ = 0;
+            m->N__ = 0;
         }
     }
 
-    if(interpolate)
-        motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
+    const int width = m->width;
+    const int height = m->height;
+    const int type = m->type;
+    const int factor = m->factor;
+    const int interpolate = m->interpolate;
+    const int motion = m->motion;
 
-    if(motion)
-        motionmap_store_frame(m->motionmap, frame);
+    switch(type) {
+        case 0:
+            mirrors_vertical(frame->data, width, height, factor, 0);
+            break;
+        case 1:
+            mirrors_vertical(frame->data, width, height, factor, 1);
+            break;
+        case 2:
+            mirrors_horizontal(frame->data, width, height, factor, 0);
+            break;
+        case 3:
+            mirrors_horizontal(frame->data, width, height, factor, 1);
+            break;
+    }
+
+    #pragma omp single
+    {
+        if(interpolate)
+            motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
+
+        if(motion)
+            motionmap_store_frame(m->motionmap, frame);
+    }
 }

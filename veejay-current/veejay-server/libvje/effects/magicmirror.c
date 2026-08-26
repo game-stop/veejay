@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,6 +21,8 @@
 #include "common.h"
 #include "motionmap.h"
 #include "magicmirror.h"
+#include <veejaycore/vjmem.h>
+#include <math.h>
 
 #define MAGICMIRROR_PARAMS 5
 
@@ -42,8 +44,17 @@ typedef struct {
     int cx2;
     int n__;
     int N__;
-    int n_threads;
     void *motionmap;
+
+    int cached_x_wave;
+    int cached_y_wave;
+    int cached_vx;
+    int cached_vy;
+    int cached_alpha;
+    int cached_update_x;
+    int cached_update_y;
+    int cached_motion;
+    int cached_interpolate;
 } magicmirror_t;
 
 static inline int magicmirror_clampi(int v, int lo, int hi)
@@ -62,17 +73,6 @@ vj_effect *magicmirror_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_X_DISPLACE] = w / 4;
     ve->defaults[P_Y_DISPLACE] = h / 4;
@@ -162,7 +162,6 @@ void *magicmirror_malloc(int w, int h)
 
     m->last_x_wave = -1;
     m->last_y_wave = -1;
-    m->n_threads = vje_advise_num_threads(len);
 
     return (void*) m;
 }
@@ -171,14 +170,20 @@ void magicmirror_free(void *ptr)
 {
     magicmirror_t *m = (magicmirror_t*) ptr;
 
-    if(m) {
+    if(!m)
+        return;
+
+    if(m->magicmirrorbuf[0])
         free(m->magicmirrorbuf[0]);
+    if(m->wave_x)
         free(m->wave_x);
+    if(m->wave_y)
         free(m->wave_y);
+    if(m->cache_x)
         free(m->cache_x);
+    if(m->cache_y)
         free(m->cache_y);
-        free(m);
-    }
+    free(m);
 }
 
 static void magicmirror_update_wave_x(magicmirror_t *m, int width, int x_wave)
@@ -187,7 +192,7 @@ static void magicmirror_update_wave_x(magicmirror_t *m, int width, int x_wave)
 
 #pragma omp for schedule(static)
     for(int x = 0; x < width; x++)
-        fast_sin(m->wave_x[x], (float)x * scale);
+        m->wave_x[x] = sinf((float)x * scale);
 
 #pragma omp single
     m->last_x_wave = x_wave;
@@ -199,7 +204,7 @@ static void magicmirror_update_wave_y(magicmirror_t *m, int height, int y_wave)
 
 #pragma omp for schedule(static)
     for(int y = 0; y < height; y++)
-        fast_sin(m->wave_y[y], (float)y * scale);
+        m->wave_y[y] = sinf((float)y * scale);
 
 #pragma omp single
     m->last_y_wave = y_wave;
@@ -335,69 +340,92 @@ void magicmirror_apply(void *ptr, VJFrame *frame, int *args)
 {
     magicmirror_t *m = (magicmirror_t*) ptr;
 
-    int vx = magicmirror_clampi(args[P_X_DISPLACE], 0, frame->width / 2);
-    int vy = magicmirror_clampi(args[P_Y_DISPLACE], 0, frame->height / 2);
-    int x_wave = magicmirror_clampi(args[P_X_WAVE], 0, 100);
-    int y_wave = magicmirror_clampi(args[P_Y_WAVE], 0, 100);
-    const int alpha = magicmirror_clampi(args[P_ALPHA], 0, 2);
-    int motion = 0;
-    int interpolate = 1;
+    #pragma omp single
+    {
+        int vx = magicmirror_clampi(args[P_X_DISPLACE], 0, frame->width / 2);
+        int vy = magicmirror_clampi(args[P_Y_DISPLACE], 0, frame->height / 2);
+        int x_wave = magicmirror_clampi(args[P_X_WAVE], 0, 100);
+        int y_wave = magicmirror_clampi(args[P_Y_WAVE], 0, 100);
+        const int alpha = magicmirror_clampi(args[P_ALPHA], 0, 2);
+        int motion = 0;
+        int interpolate = 1;
 
-    if(motionmap_active(m->motionmap)) {
-        if(motionmap_is_locked(m->motionmap)) {
-            x_wave = m->cx1;
-            y_wave = m->cx2;
+        if(m->motionmap && motionmap_active(m->motionmap)) {
+            if(motionmap_is_locked(m->motionmap)) {
+                x_wave = m->cx1;
+                y_wave = m->cx2;
+            }
+            else {
+                motionmap_scale_to(m->motionmap, 100, 100, 0, 0, &x_wave, &y_wave, &(m->n__), &(m->N__));
+                m->cx1 = x_wave;
+                m->cx2 = y_wave;
+            }
+            motion = 1;
         }
         else {
-            motionmap_scale_to(m->motionmap, 100, 100, 0, 0, &x_wave, &y_wave, &(m->n__), &(m->N__));
-            m->cx1 = x_wave;
-            m->cx2 = y_wave;
+            m->n__ = 0;
+            m->N__ = 0;
         }
-        motion = 1;
-    }
-    else {
-        m->n__ = 0;
-        m->N__ = 0;
+
+        if(m->N__ == m->n__ || m->n__ == 0)
+            interpolate = 0;
+
+        m->cached_update_x = (x_wave != m->last_x_wave);
+        m->cached_update_y = (y_wave != m->last_y_wave);
+        m->cached_x_wave = x_wave;
+        m->cached_y_wave = y_wave;
+        m->cached_vx = vx;
+        m->cached_vy = vy;
+        m->cached_alpha = alpha;
+        m->cached_motion = motion;
+        m->cached_interpolate = interpolate;
     }
 
-    if(m->N__ == m->n__ || m->n__ == 0)
-        interpolate = 0;
+    const int update_x = m->cached_update_x;
+    const int update_y = m->cached_update_y;
+    const int x_wave = m->cached_x_wave;
+    const int y_wave = m->cached_y_wave;
+    const int vx = m->cached_vx;
+    const int vy = m->cached_vy;
+    const int alpha = m->cached_alpha;
+    const int motion = m->cached_motion;
+    const int interpolate = m->cached_interpolate;
 
-    const int update_x = x_wave != m->last_x_wave;
-    const int update_y = y_wave != m->last_y_wave;
+    if(update_x)
+        magicmirror_update_wave_x(m, frame->width, x_wave);
+
+    if(update_y)
+        magicmirror_update_wave_y(m, frame->height, y_wave);
+
+    magicmirror_update_cache_x(m, frame->width, vx);
+    magicmirror_update_cache_y(m, frame->height, vy);
+
     const int len = frame->len;
     int strides[4] = { len, len, len, alpha ? len : 0 };
 
-#pragma omp parallel num_threads(m->n_threads)
+    #pragma omp single
     {
-        if(update_x)
-            magicmirror_update_wave_x(m, frame->width, x_wave);
-
-        if(update_y)
-            magicmirror_update_wave_y(m, frame->height, y_wave);
-
-        magicmirror_update_cache_x(m, frame->width, vx);
-        magicmirror_update_cache_y(m, frame->height, vy);
-
-#pragma omp single
         vj_frame_copy(frame->data, m->magicmirrorbuf, strides);
-
-        if(alpha == 0) {
-            magicmirror_apply_yuv(m, frame);
-        }
-        else if(alpha == 1) {
-            magicmirror_apply_alpha_mask(m, frame);
-        }
-        else {
-            magicmirror_apply_alpha_only(m, frame);
-        }
     }
 
-    if(interpolate)
-        motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
+    if(alpha == 0) {
+        magicmirror_apply_yuv(m, frame);
+    }
+    else if(alpha == 1) {
+        magicmirror_apply_alpha_mask(m, frame);
+    }
+    else {
+        magicmirror_apply_alpha_only(m, frame);
+    }
 
-    if(motion)
-        motionmap_store_frame(m->motionmap, frame);
+    #pragma omp single
+    {
+        if(m->motionmap && interpolate)
+            motionmap_interpolate_frame(m->motionmap, frame, m->N__, m->n__);
+
+        if(m->motionmap && motion)
+            motionmap_store_frame(m->motionmap, frame);
+    }
 }
 
 int magicmirror_request_fx(void)
@@ -408,5 +436,7 @@ int magicmirror_request_fx(void)
 void magicmirror_set_motionmap(void *ptr, void *priv)
 {
     magicmirror_t *m = (magicmirror_t*) ptr;
+    if(!m)
+        return;
     m->motionmap = priv;
 }

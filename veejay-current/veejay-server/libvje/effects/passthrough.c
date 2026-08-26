@@ -30,16 +30,12 @@ vj_effect *passthrough_init(int width, int height)
 	ve->sub_format = -1;
     ve->extra_frame = 1;
   	ve->has_user = 0; 
-	ve->parallel = 0;
-    return ve;
+	return ve;
 }
 
 void passthrough_apply( VJFrame *frame, VJFrame *frame2 )
 {
-	/* do nothing at all */
 
-
-	/* use this FX in combination with (manual) chain fader options */
 }
 
 

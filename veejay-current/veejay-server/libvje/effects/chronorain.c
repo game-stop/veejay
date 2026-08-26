@@ -225,16 +225,6 @@ vj_effect *chronorain_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_TRIGGER_GATE] = 0;
     ve->limits[1][P_TRIGGER_GATE] = 1000;
@@ -295,34 +285,28 @@ vj_effect *chronorain_init(int w, int h)
         "Color Energy"
     );
 
-
-{
-    const vj_beat_param_hint_t beat_hints[] = {
-        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 220, 82, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 220, 1000, 86, 100, 0, 440, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 100, 900, 80, 100, 0, 500, 0, 2, 180, VJ_BEAT_COST_MODERATE, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 160, 575, 62, 96, 80, 820, 0, 1, 220, VJ_BEAT_COST_MODERATE, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_DRIFT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_EASE_OUT, 80, 920, 74, 100, 0, 520, 0, 4, 220, VJ_BEAT_COST_MODERATE, 86, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 300, 36, 78, 160, 1200, 0, 2, 300, VJ_BEAT_COST_MODERATE, 46, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 512, 88, 100, 0, 460, 0, 2, 160, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 260, 1000, 82, 100, 0, 560, 80, 2, 180, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 300, 1000, 84, 100, 0, 460, 0, 2, 140, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-    };
-    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-}
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 220, 82, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 220, 1000, 86, 100, 0, 440, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 100, 900, 80, 100, 0, 500, 0, 2, 180, VJ_BEAT_COST_MODERATE, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 160, 575, 62, 96, 80, 820, 0, 1, 220, VJ_BEAT_COST_MODERATE, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_DRIFT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_EASE_OUT, 80, 920, 74, 100, 0, 520, 0, 4, 220, VJ_BEAT_COST_MODERATE, 86, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 300, 36, 78, 160, 1200, 0, 2, 300, VJ_BEAT_COST_MODERATE, 46, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 512, 88, 100, 0, 460, 0, 2, 160, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 260, 1000, 82, 100, 0, 560, 80, 2, 180, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 300, 1000, 84, 100, 0, 460, 0, 2, 140, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }
 
 void *chronorain_malloc(int w, int h)
 {
-    chronorain_t *c;
-
-    if(w <= 0 || h <= 0)
-        return NULL;
-
-    c = (chronorain_t *) vj_calloc(sizeof(chronorain_t));
+    chronorain_t *c = (chronorain_t *) vj_calloc(sizeof(chronorain_t));
     if(!c)
         return NULL;
 
@@ -332,7 +316,6 @@ void *chronorain_malloc(int w, int h)
     c->seeded = 0;
     c->lut_valid = 0;
 
-    c->n_threads = vje_advise_num_threads(w * h);
 
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y  = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1006,7 +989,7 @@ static void NAME(chronorain_t *c,                                               
                 int ad = diff < 0 ? -diff : diff;                                     \
                                                                                       \
                 int event_strength = EVENT[ad];                                       \
-                uint8_t event_for_adapt = (uint8_t) event_strength;                                 \
+                uint8_t event_for_adapt = (uint8_t) event_strength;                   \
                                                                                       \
                 int dx = 0;                                                           \
                 int xshift = 0;                                                       \
@@ -1497,85 +1480,67 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronorain_t *c = (chronorain_t *) ptr;
 
-    int trigger_gate;
-    int gravity;
-    int conductivity;
-    int decay;
-    int polarity_split;
-    int source_bleed;
-    int color_mode;
-    int storm;
-    int trail_gain;
-    int color_energy;
+    int trigger_gate   = cf_param1000_to_u8(args[P_TRIGGER_GATE]);
+    int gravity        = cf_param1000_to_u8(args[P_GRAVITY]);
+    int conductivity   = cf_param1000_to_u8(args[P_CONDUCTIVITY]);
+    int decay          = cf_param1000_to_u8(args[P_DECAY]);
+    int polarity_split = cf_param1000_to_u8(args[P_POLARITY_SPLIT]);
+    int source_bleed   = cf_param1000_to_u8(args[P_SOURCE_BLEED]);
+    int color_mode     = cf_clampi(args[P_COLOR_MODE], 0, 4);
+    int storm          = cf_param1000_to_u8(args[P_STORM]);
+    int trail_gain     = cf_clampi(args[P_TRAIL_GAIN], 0, 1000);
+    int color_energy   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    int conduct_power = conductivity * decay;
+    int storm_span_hint = (storm * 5 + 127) / 255;
+    
+    int use_conduct = (conduct_power >= 128);
+    int use_storm = (storm_span_hint > 0);
+
     int render_gain_q8;
 
-    int use_conduct;
-    int use_storm;
-
-    if(!c->seeded)
-        cf_seed(c, frame);
-
-    trigger_gate   = cf_param1000_to_u8(args[P_TRIGGER_GATE]);
-    gravity        = cf_param1000_to_u8(args[P_GRAVITY]);
-    conductivity   = cf_param1000_to_u8(args[P_CONDUCTIVITY]);
-    decay          = cf_param1000_to_u8(args[P_DECAY]);
-    polarity_split = cf_param1000_to_u8(args[P_POLARITY_SPLIT]);
-    source_bleed   = cf_param1000_to_u8(args[P_SOURCE_BLEED]);
-    color_mode     = cf_clampi(args[P_COLOR_MODE], 0, 4);
-    storm          = cf_param1000_to_u8(args[P_STORM]);
-    trail_gain     = cf_clampi(args[P_TRAIL_GAIN], 0, 1000);
-    color_energy   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
-
-    cf_build_luts_if_needed(
-        c,
-        trigger_gate,
-        gravity,
-        conductivity,
-        decay,
-        source_bleed,
-        storm,
-        trail_gain,
-        color_energy
-    );
-
+    #pragma omp single
     {
-        int conduct_power = conductivity * decay;
-        int storm_span_hint = (storm * 5 + 127) / 255;
+        if(!c->seeded)
+            cf_seed(c, frame);
 
-        use_conduct = (conduct_power >= 128);
-        use_storm = (storm_span_hint > 0);
-    }
-
-    render_gain_q8 = 256;
-
-#pragma omp parallel num_threads(c->n_threads)
-    {
-        if(use_conduct) {
-            if(use_storm)
-                cf_compute_rain_full(c, frame, gravity, polarity_split, storm);
-            else
-                cf_compute_rain_conduct(c, frame, gravity, polarity_split, storm);
-        }
-        else {
-            if(use_storm)
-                cf_compute_rain_storm(c, frame, gravity, polarity_split, storm);
-            else
-                cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
-        }
-
-#pragma omp single
-        {
-            cf_swap_fields(c);
-            render_gain_q8 = cf_density_render_gain_q8(c);
-        }
-
-        cf_render(
+        cf_build_luts_if_needed(
             c,
-            frame,
+            trigger_gate,
+            gravity,
+            conductivity,
+            decay,
             source_bleed,
-            color_mode,
-            render_gain_q8
+            storm,
+            trail_gain,
+            color_energy
         );
     }
-}
+    
+    if(use_conduct) {
+        if(use_storm)
+            cf_compute_rain_full(c, frame, gravity, polarity_split, storm);
+        else
+            cf_compute_rain_conduct(c, frame, gravity, polarity_split, storm);
+    }
+    else {
+        if(use_storm)
+            cf_compute_rain_storm(c, frame, gravity, polarity_split, storm);
+        else
+            cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
+    }
 
+    #pragma omp single copyprivate(render_gain_q8)
+    {
+        cf_swap_fields(c);
+        render_gain_q8 = cf_density_render_gain_q8(c);
+    }
+
+    cf_render(
+        c,
+        frame,
+        source_bleed,
+        color_mode,
+        render_gain_q8
+    );
+}

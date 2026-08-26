@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,23 +29,29 @@ typedef struct {
 vj_effect *toalpha_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
+
     ve->num_params = 1;
     ve->description = "Alpha: Set from Image";
     ve->sub_format = -1;
 
-	ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);     /* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);    /* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    
+
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1;
     ve->defaults[0] = !yuv_use_auto_ccir_jpeg();
     ve->param_description = vje_build_param_list( ve->num_params, "Scale Luminance to range 0-255 (1=on)" );
 
-	ve->alpha = FLAG_ALPHA_OUT;
+    ve->alpha = FLAG_ALPHA_OUT;
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Verbatim", "Full range" );
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0, "Verbatim", "Full range" );
 
     {
         const vj_beat_param_hint_t beat_hints[] = {
@@ -53,6 +59,9 @@ vj_effect *toalpha_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
+
+    (void)w;
+    (void)h;
 
     return ve;
 }
@@ -63,19 +72,27 @@ void *toalpha_malloc(int w, int h)
     if(!t) {
         return NULL;
     }
-	__init_lookup_table( t->lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
+    __init_lookup_table( t->lookup_table, 256, 16.0f, 235.0f, 0, 255 ); 
+
+    (void)w;
+    (void)h;
+
     return t;
 }
 
 void toalpha_free(void *ptr) {
+    if(!ptr)
+        return;
     free(ptr);
 }
 
 void toalpha_apply(void *ptr, VJFrame *frame, int *args)
 {
-    const int len = frame->len;
-
     uint8_t *a = frame->data[3];
+    if(!a)
+        return;
+
+    const int len = frame->len;
     uint8_t *Y = frame->data[0];
 
     const int mode = args[0];
@@ -88,9 +105,8 @@ void toalpha_apply(void *ptr, VJFrame *frame, int *args)
     toalpha_t *t = (toalpha_t*) ptr;
     int *lookup_table = t->lookup_table;
 
-    const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int i = 0; i < len; i++)
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
         a[i] = copy_luma ? Y[i] : (uint8_t)lookup_table[Y[i]];
+    }
 }

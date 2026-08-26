@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2007 Niels Elburg <nwelburg@gmail>
+ * Copyright(C)2007-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -42,7 +42,6 @@ typedef struct {
     uint32_t *Map;
     float *x_lut;
     int map_upd[3];
-    int n_threads;
 } radcor_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -61,17 +60,6 @@ vj_effect *radcor_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_ALPHA_X] = 1;      ve->limits[1][P_ALPHA_X] = 1000;      ve->defaults[P_ALPHA_X] = 10;
     ve->limits[0][P_ALPHA_Y] = 1;      ve->limits[1][P_ALPHA_Y] = 1000;      ve->defaults[P_ALPHA_Y] = 40;
@@ -106,6 +94,9 @@ vj_effect *radcor_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -117,6 +108,11 @@ void *radcor_malloc(int w, int h)
         return NULL;
 
     const int len = w * h;
+    if(len <= 0) {
+        free(r);
+        return NULL;
+    }
+
     const size_t plane = (size_t)len;
     const size_t badbuf_bytes = plane * 4u;
     const size_t map_bytes = plane * sizeof(uint32_t);
@@ -148,7 +144,6 @@ void *radcor_malloc(int w, int h)
     r->map_upd[0] = -1;
     r->map_upd[1] = -1;
     r->map_upd[2] = -1;
-    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -157,7 +152,11 @@ void radcor_free(void *ptr)
 {
     radcor_t *r = (radcor_t*)ptr;
 
-    free(r->block);
+    if(!r)
+        return;
+
+    if(r->block)
+        free(r->block);
     free(r);
 }
 
@@ -226,7 +225,6 @@ static void radcor_build_map(radcor_t *radcor, int width, int height, int alpha_
     radcor->map_upd[2] = direction;
 }
 
-
 void radcor_apply(void *ptr, VJFrame *frame, int *args)
 {
     radcor_t *radcor = (radcor_t*)ptr;
@@ -251,36 +249,58 @@ void radcor_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Ai = radcor->badbuf + len + len + len;
 
     uint32_t *restrict Map = radcor->Map;
+    const int has_alpha = (update_alpha && A != NULL);
 
-    if(radcor->map_upd[0] != alpha_x ||
-       radcor->map_upd[1] != alpha_y ||
-       radcor->map_upd[2] != direction)
-        radcor_build_map(radcor, width, height, alpha_x, alpha_y, direction);
-
-    veejay_memcpy(Yi, Y, len);
-    veejay_memcpy(Cbi, Cb, len);
-    veejay_memcpy(Cri, Cr, len);
-
-    if(update_alpha)
-        veejay_memcpy(Ai, A, len);
-
-#pragma omp parallel for schedule(static) num_threads(radcor->n_threads)
-    for(int i = 0; i < len; i++) {
-        const uint32_t idx = Map[i];
-
-        if(idx != RADCOR_INVALID) {
-            Y[i] = Yi[idx];
-            Cb[i] = Cbi[idx];
-            Cr[i] = Cri[idx];
-            if(update_alpha)
-                A[i] = Ai[idx];
+    #pragma omp single
+    {
+        if(radcor->map_upd[0] != alpha_x ||
+           radcor->map_upd[1] != alpha_y ||
+           radcor->map_upd[2] != direction) {
+            radcor_build_map(radcor, width, height, alpha_x, alpha_y, direction);
         }
-        else {
-            Y[i] = pixel_Y_lo_;
-            Cb[i] = 128;
-            Cr[i] = 128;
-            if(update_alpha)
+
+        veejay_memcpy(Yi, Y, (size_t)len);
+        veejay_memcpy(Cbi, Cb, (size_t)len);
+        veejay_memcpy(Cri, Cr, (size_t)len);
+
+        if(has_alpha)
+            veejay_memcpy(Ai, A, (size_t)len);
+    }
+
+    if(has_alpha) {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint32_t idx = Map[i];
+
+            if(idx != RADCOR_INVALID) {
+                Y[i] = Yi[idx];
+                Cb[i] = Cbi[idx];
+                Cr[i] = Cri[idx];
+                A[i] = Ai[idx];
+            }
+            else {
+                Y[i] = pixel_Y_lo_;
+                Cb[i] = 128;
+                Cr[i] = 128;
                 A[i] = 0;
+            }
+        }
+    }
+    else {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint32_t idx = Map[i];
+
+            if(idx != RADCOR_INVALID) {
+                Y[i] = Yi[idx];
+                Cb[i] = Cbi[idx];
+                Cr[i] = Cri[idx];
+            }
+            else {
+                Y[i] = pixel_Y_lo_;
+                Cb[i] = 128;
+                Cr[i] = 128;
+            }
         }
     }
 }

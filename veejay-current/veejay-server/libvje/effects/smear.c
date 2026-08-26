@@ -1,7 +1,7 @@
-/*
+/* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -36,7 +36,6 @@ typedef struct {
     uint8_t *tmp[3];
     int n__;
     int N__;
-    int n_threads;
     void *motionmap;
 
     float eff_value;
@@ -45,6 +44,14 @@ typedef struct {
     float eff_chroma;
     float eff_smear_drive;
     int initialized;
+
+    int cached_mode;
+    int cached_effective_value;
+    int cached_effective_length;
+    int cached_mix_q8;
+    int cached_chroma_mix_q8;
+    int cached_interpolate;
+    int cached_motion;
 } smear_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -75,8 +82,6 @@ static inline int smear_to_q8_1000(int v)
     return (v * 256 + 500) / 1000;
 }
 
-
-
 static inline int smear_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -87,8 +92,6 @@ static inline int smear_smooth_i(float *state, int target, float attack, float r
     *state = out;
     return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
-
-
 
 vj_effect *smear_init(int w, int h)
 {
@@ -102,13 +105,7 @@ vj_effect *smear_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->limits[0][P_MODE] = 0;        ve->limits[1][P_MODE] = 3;        ve->defaults[P_MODE] = 0;
     ve->limits[0][P_VALUE] = 0;       ve->limits[1][P_VALUE] = 255;     ve->defaults[P_VALUE] = 1;
@@ -157,6 +154,9 @@ vj_effect *smear_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -182,14 +182,14 @@ void *smear_malloc(int w, int h)
     s->motionmap = NULL;
     s->initialized = 0;
 
-    s->n_threads = vje_advise_num_threads(len);
-
     return (void*) s;
 }
 
 void smear_free(void *ptr)
 {
     smear_t *s = (smear_t*) ptr;
+    if(!s)
+        return;
 
     free(s->tmp[0]);
     free(s);
@@ -224,7 +224,7 @@ static void smear_apply_axis(smear_t *s,
     const uint8_t *restrict sCb = s->tmp[1];
     const uint8_t *restrict sCr = s->tmp[2];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -283,6 +283,8 @@ int smear_request_fx(void)
 void smear_set_motionmap(void *ptr, void *priv)
 {
     smear_t *s = (smear_t*) ptr;
+    if(!s)
+        return;
 
     s->motionmap = priv;
 }
@@ -300,88 +302,111 @@ void smear_apply(void *ptr, VJFrame *frame, int *args)
 
     int tmp1 = mode;
     int tmp2 = value;
-    int motion = 0;
-    int interpolate = 0;
 
-    if(s->motionmap && motionmap_active(s->motionmap)) {
-        motionmap_scale_to(
-            s->motionmap,
-            255,
-            3,
-            0,
-            0,
-            &tmp2,
-            &tmp1,
-            &(s->n__),
-            &(s->N__)
-        );
+    #pragma omp single
+    {
+        int motion = 0;
+        int interpolate = 0;
 
-        value = clampi(tmp2, 0, 255);
-        mode = clampi(tmp1, 0, 3);
+        if(s->motionmap && motionmap_active(s->motionmap)) {
+            motionmap_scale_to(
+                s->motionmap,
+                255,
+                3,
+                0,
+                0,
+                &tmp2,
+                &tmp1,
+                &(s->n__),
+                &(s->N__)
+            );
 
-        motion = 1;
-        interpolate = !(s->n__ == s->N__ || s->n__ == 0);
-    } else {
-        s->N__ = 0;
-        s->n__ = 0;
+            value = clampi(tmp2, 0, 255);
+            mode = clampi(tmp1, 0, 3);
+
+            motion = 1;
+            interpolate = !(s->n__ == s->N__ || s->n__ == 0);
+        } else {
+            s->N__ = 0;
+            s->n__ = 0;
+        }
+
+        const float fast = 0.28f;
+        const float slow = 0.115f;
+
+        if(!s->initialized) {
+            s->eff_value = (float)value;
+            s->eff_length = (float)length;
+            s->eff_mix = (float)mix;
+            s->eff_chroma = (float)chroma;
+            s->eff_smear_drive = (float)smear_drive;
+            s->initialized = 1;
+        } else {
+            value = smear_smooth_i(&s->eff_value, value, fast, slow);
+            length = smear_smooth_i(&s->eff_length, length, fast * 0.72f, slow);
+            mix = smear_smooth_i(&s->eff_mix, mix, fast * 0.80f, slow);
+            chroma = smear_smooth_i(&s->eff_chroma, chroma, fast * 0.72f, slow);
+            smear_drive = smear_smooth_i(&s->eff_smear_drive, smear_drive, fast, slow);
+        }
+
+        mode = clampi(mode, 0, 3);
+        value = clampi(value, 0, 255);
+        length = clampi(length, 0, 3000);
+        mix = clampi(mix, 0, 1000);
+        chroma = clampi(chroma, 0, 1000);
+        smear_drive = clampi(smear_drive, 0, 1000);
+
+        int effective_value = clampi(value - ((smear_drive * 96 + 500) / 1000), 0, 255);
+        int effective_length = clampi(length + ((smear_drive * 2000 + 500) / 1000), 0, 3000);
+        int effective_mix = clampi(mix + (((1000 - mix) * smear_drive + 500) / 1000), 0, 1000);
+        int effective_chroma = clampi(chroma + (((1000 - chroma) * smear_drive + 500) / 1000), 0, 1000);
+
+        int mix_q8 = smear_to_q8_1000(effective_mix);
+        int chroma_q8 = smear_to_q8_1000(effective_chroma);
+        int chroma_mix_q8 = (mix_q8 * chroma_q8 + 128) >> 8;
+
+        smear_snapshot(s, frame);
+
+        s->cached_mode = mode;
+        s->cached_effective_value = effective_value;
+        s->cached_effective_length = effective_length;
+        s->cached_mix_q8 = mix_q8;
+        s->cached_chroma_mix_q8 = chroma_mix_q8;
+        s->cached_interpolate = interpolate;
+        s->cached_motion = motion;
     }
 
-    const float fast = 0.28f;
-    const float slow = 0.115f;
+    const int mode_act = s->cached_mode;
+    const int eff_val = s->cached_effective_value;
+    const int eff_len = s->cached_effective_length;
+    const int m_q8 = s->cached_mix_q8;
+    const int cm_q8 = s->cached_chroma_mix_q8;
+    const int interpolate = s->cached_interpolate;
+    const int motion = s->cached_motion;
 
-    if(!s->initialized) {
-        s->eff_value = (float)value;
-        s->eff_length = (float)length;
-        s->eff_mix = (float)mix;
-        s->eff_chroma = (float)chroma;
-        s->eff_smear_drive = (float)smear_drive;
-        s->initialized = 1;
-    } else {
-        value = smear_smooth_i(&s->eff_value, value, fast, slow);
-        length = smear_smooth_i(&s->eff_length, length, fast * 0.72f, slow);
-        mix = smear_smooth_i(&s->eff_mix, mix, fast * 0.80f, slow);
-        chroma = smear_smooth_i(&s->eff_chroma, chroma, fast * 0.72f, slow);
-        smear_drive = smear_smooth_i(&s->eff_smear_drive, smear_drive, fast, slow);
-    }
-
-    mode = clampi(mode, 0, 3);
-    value = clampi(value, 0, 255);
-    length = clampi(length, 0, 3000);
-    mix = clampi(mix, 0, 1000);
-    chroma = clampi(chroma, 0, 1000);
-    smear_drive = clampi(smear_drive, 0, 1000);
-
-    const int effective_value = clampi(value - ((smear_drive * 96 + 500) / 1000), 0, 255);
-    const int effective_length = clampi(length + ((smear_drive * 2000 + 500) / 1000), 0, 3000);
-    const int effective_mix = clampi(mix + (((1000 - mix) * smear_drive + 500) / 1000), 0, 1000);
-    const int effective_chroma = clampi(chroma + (((1000 - chroma) * smear_drive + 500) / 1000), 0, 1000);
-
-    const int mix_q8 = smear_to_q8_1000(effective_mix);
-    const int chroma_q8 = smear_to_q8_1000(effective_chroma);
-    const int chroma_mix_q8 = (mix_q8 * chroma_q8 + 128) >> 8;
-
-    smear_snapshot(s, frame);
-
-    switch(mode) {
+    switch(mode_act) {
         case 0:
-            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 0, 0);
+            smear_apply_axis(s, frame, eff_val, eff_len, m_q8, cm_q8, 0, 0);
             break;
         case 1:
-            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 0, 1);
+            smear_apply_axis(s, frame, eff_val, eff_len, m_q8, cm_q8, 0, 1);
             break;
         case 2:
-            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 1, 0);
+            smear_apply_axis(s, frame, eff_val, eff_len, m_q8, cm_q8, 1, 0);
             break;
         case 3:
-            smear_apply_axis(s, frame, effective_value, effective_length, mix_q8, chroma_mix_q8, 1, 1);
+            smear_apply_axis(s, frame, eff_val, eff_len, m_q8, cm_q8, 1, 1);
             break;
         default:
             break;
     }
 
-    if(interpolate)
-        motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
+    #pragma omp single
+    {
+        if(interpolate)
+            motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
 
-    if(motion)
-        motionmap_store_frame(s->motionmap, frame);
+        if(motion)
+            motionmap_store_frame(s->motionmap, frame);
+    }
 }

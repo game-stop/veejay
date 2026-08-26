@@ -44,17 +44,6 @@ vj_effect *mirrors2_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[P_SYMMETRY_MODE] = 0;
     ve->limits[0][P_SYMMETRY_MODE] = 0;
     ve->limits[1][P_SYMMETRY_MODE] = 11;
@@ -263,41 +252,38 @@ void mirrors2_apply(void *ptr, VJFrame *frame, int *args)
     const int type = args[P_SYMMETRY_MODE];
     const int width = frame->width;
     const int height = frame->height;
-    const int n_threads = vje_advise_num_threads(frame->len);
-
-#pragma omp parallel num_threads(n_threads)
-    {
-        switch(type) {
-            case 0:
-            case 1:
-            case 2:
-            case 3:
-                mirrors2_quadrant(frame->data, width, height, type);
-                break;
-            case 4:
-                mirrors2_vertical(frame->data, width, height, 1);
-                break;
-            case 5:
-                mirrors2_vertical(frame->data, width, height, 0);
-                break;
-            case 6:
-                mirrors2_horizontal(frame->data, width, height, 1);
-                break;
-            case 7:
-                mirrors2_horizontal(frame->data, width, height, 0);
-                break;
-            case 8:
-                mirrors2_diag_tl_br(frame->data, width, height, 0);
-                break;
-            case 9:
-                mirrors2_diag_tl_br(frame->data, width, height, 1);
-                break;
-            case 10:
-                mirrors2_diag_tr_bl(frame->data, width, height, 0);
-                break;
-            case 11:
-                mirrors2_diag_tr_bl(frame->data, width, height, 1);
-                break;
-        }
+    
+    switch(type) {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+            mirrors2_quadrant(frame->data, width, height, type);
+            break;
+        case 4:
+            mirrors2_vertical(frame->data, width, height, 1);
+            break;
+        case 5:
+            mirrors2_vertical(frame->data, width, height, 0);
+            break;
+        case 6:
+            mirrors2_horizontal(frame->data, width, height, 1);
+            break;
+        case 7:
+            mirrors2_horizontal(frame->data, width, height, 0);
+            break;
+        case 8:
+            mirrors2_diag_tl_br(frame->data, width, height, 0);
+            break;
+        case 9:
+            mirrors2_diag_tl_br(frame->data, width, height, 1);
+            break;
+        case 10:
+            mirrors2_diag_tr_bl(frame->data, width, height, 0);
+            break;
+        case 11:
+            mirrors2_diag_tr_bl(frame->data, width, height, 1);
+            break;
     }
+    
 }

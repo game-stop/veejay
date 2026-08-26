@@ -68,18 +68,6 @@ vj_effect *contourextract_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1])
-    {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;
@@ -305,6 +293,8 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
                           int mode, int take_bg, int feather, int min_blob_weight)
 {
+        #pragma omp single
+    {
     (void) take_bg;
     (void) feather;
 
@@ -345,8 +335,7 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
         vj_frame_copy1(ud->bitmap, Y, len);
         vj_frame_clear1(Cb, 128, uv_len);
         vj_frame_clear1(Cr, 128, uv_len);
-        return;
-    }
+         skip_processing = 1; }
 
     veejay_distance_transform8(ud->bitmap, width, height, dt_map);
 
@@ -373,4 +362,5 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
     }
 
     (void) num_objects;
+    }
 }

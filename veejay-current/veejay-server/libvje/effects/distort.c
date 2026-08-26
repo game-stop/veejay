@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -11,7 +11,7 @@
 
 #include "common.h"
 #include "distort.h"
-
+#include <veejaycore/vjmem.h>
 #include <math.h>
 
 #define DISTORT_TABLE_SIZE 512
@@ -63,11 +63,15 @@ static inline int distortion_reflect_coord(int v, int limit)
 vj_effect *distortion_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+
 
     ve->defaults[0] = 5;
     ve->defaults[1] = 3;
@@ -102,14 +106,14 @@ vj_effect *distortion_init(int width, int height)
     return ve;
 }
 
-void *distortion_malloc(int w, int h)
+void *distortion_malloc(int width, int height)
 {
     distortion_t *d = (distortion_t*) vj_calloc(sizeof(distortion_t));
 
     if(!d)
         return NULL;
 
-    const int len = w * h;
+    const int len = width * height;
 
     if(len <= 0)
     {
@@ -128,14 +132,13 @@ void *distortion_malloc(int w, int h)
     d->plasma_buf[1] = d->plasma_buf[0] + len;
     d->plasma_buf[2] = d->plasma_buf[1] + len;
     d->plasma_buf[3] = NULL;
+    d->n_threads = vje_advise_num_threads(len);
 
     for(int i = 0; i < DISTORT_TABLE_SIZE; i++)
     {
         const float rad = ((float)i * 0.703125f) * 0.01745329252f;
         d->plasma_table[i] = myround(sinf(rad) * 1024.0f);
     }
-
-    d->n_threads = vje_advise_num_threads(len);
 
     return d;
 }
@@ -173,7 +176,12 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
 
     int strides[4] = { len, len, len, 0 };
 
-    vj_frame_copy(frame->data, d->plasma_buf, strides);
+    #pragma omp single
+    {
+        vj_frame_copy(frame->data, d->plasma_buf, strides);
+        d->plasma_pos1 = d->plasma_pos1 & DISTORT_TABLE_MASK;
+        d->plasma_pos2 = d->plasma_pos2 & DISTORT_TABLE_MASK;
+    }
 
     const uint8_t *restrict srcY = d->plasma_buf[0];
     const uint8_t *restrict srcCb = d->plasma_buf[1];
@@ -186,10 +194,10 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
     amp_x = clampi(amp_x, 2, 96);
     amp_y = clampi(amp_y, 2, 96);
 
-    const int plasma_pos1 = d->plasma_pos1 & DISTORT_TABLE_MASK;
-    const int plasma_pos2 = d->plasma_pos2 & DISTORT_TABLE_MASK;
+    const int plasma_pos1 = d->plasma_pos1;
+    const int plasma_pos2 = d->plasma_pos2;
 
-    #pragma omp parallel for schedule(static) num_threads(d->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++)
     {
         int tpos1 = (plasma_pos1 + y * inc_val3) & DISTORT_TABLE_MASK;
@@ -220,6 +228,9 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    d->plasma_pos1 = (plasma_pos1 + inc_val5) & DISTORT_TABLE_MASK;
-    d->plasma_pos2 = (plasma_pos2 + inc_val6) & DISTORT_TABLE_MASK;
+    #pragma omp single
+    {
+        d->plasma_pos1 = (d->plasma_pos1 + inc_val5) & DISTORT_TABLE_MASK;
+        d->plasma_pos2 = (d->plasma_pos2 + inc_val6) & DISTORT_TABLE_MASK;
+    }
 }

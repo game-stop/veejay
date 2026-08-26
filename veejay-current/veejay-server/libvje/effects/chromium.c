@@ -109,17 +109,6 @@ vj_effect *chromium_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_MODE] = 0;
     ve->limits[1][P_MODE] = 9;
     ve->defaults[P_MODE] = 0;
@@ -178,12 +167,10 @@ void chromium_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->ssm ? frame->len : frame->uv_len;
 
-    const int n_threads = vje_advise_num_threads(len);
-
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const int cb0 = Cb[i];

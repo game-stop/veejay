@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2005 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -26,10 +26,11 @@
 #include "common.h"
 #include "pixelsortalpha.h"
 #include <stdint.h>
+#include <veejaycore/vjmem.h>
 
 #ifdef _OPENMP
 #include <omp.h>
-#define PSA_OMP_FOR _Pragma("omp parallel for schedule(static) num_threads(p->n_threads)")
+#define PSA_OMP_FOR _Pragma("omp for schedule(static)")
 #define PSA_THREAD_ID() omp_get_thread_num()
 #else
 #define PSA_OMP_FOR
@@ -63,6 +64,12 @@ typedef struct {
     int n_threads;
     pixelsortalpha_worker_t *workers;
     uint32_t *scratch;
+
+    unsigned int width;
+    unsigned int height;
+    int mode;
+    int pass;
+    int skip_processing;
 } pixelsortalpha_t;
 
 vj_effect *pixelsortalpha_init(int w, int h)
@@ -76,17 +83,6 @@ vj_effect *pixelsortalpha_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_MODE] = 0; ve->limits[1][P_MODE] = 2; ve->defaults[P_MODE] = PSA_MODE_NONBLACK;
     ve->limits[0][P_PASS] = 0; ve->limits[1][P_PASS] = 3; ve->defaults[P_PASS] = PSA_PASS_ROWS_ONLY;
@@ -131,12 +127,7 @@ void *pixelsortalpha_malloc(int w, int h)
         return NULL;
 
     p->line_cap = w > h ? w : h;
-
-#ifdef _OPENMP
     p->n_threads = vje_advise_num_threads(w * h);
-#else
-    p->n_threads = 1;
-#endif
 
     p->workers = (pixelsortalpha_worker_t*) vj_calloc(sizeof(pixelsortalpha_worker_t) * (size_t)p->n_threads);
 
@@ -590,36 +581,42 @@ static inline void psa_columns(pixelsortalpha_t *p,
 void pixelsortalpha_apply(void *ptr, VJFrame *frame, int *args)
 {
     pixelsortalpha_t *p = (pixelsortalpha_t*) ptr;
-    if(!frame->data[3])
-        return;
 
-    uint8_t *P[4] = {
-        frame->data[0],
-        frame->data[1],
-        frame->data[2],
-        frame->data[3]
-    };
+    #pragma omp single
+    {
+        p->skip_processing = (frame->data[3] == NULL) ? 1 : 0;
+        if (!p->skip_processing) {
+            p->width = (unsigned int)frame->width;
+            p->height = (unsigned int)frame->height;
+            p->mode = args[P_MODE];
+            p->pass = args[P_PASS];
+        }
+    }
 
-    const unsigned int width = (unsigned int)frame->width;
-    const unsigned int height = (unsigned int)frame->height;
-    const int mode = args[P_MODE];
-    const int pass = args[P_PASS];
+    if(!p->skip_processing) {
+        uint8_t *P[4] = {
+            frame->data[0],
+            frame->data[1],
+            frame->data[2],
+            frame->data[3]
+        };
 
-    switch(pass) {
-        case PSA_PASS_ROWS_COLUMNS:
-            psa_rows(p, P, width, height, mode);
-            psa_columns(p, P, width, height, mode);
-            break;
-        case PSA_PASS_COLUMNS_ONLY:
-            psa_columns(p, P, width, height, mode);
-            break;
-        case PSA_PASS_ROWS_ONLY:
-            psa_rows(p, P, width, height, mode);
-            break;
-        case PSA_PASS_COLUMNS_ROWS:
-        default:
-            psa_columns(p, P, width, height, mode);
-            psa_rows(p, P, width, height, mode);
-            break;
+        switch(p->pass) {
+            case PSA_PASS_ROWS_COLUMNS:
+                psa_rows(p, P, p->width, p->height, p->mode);
+                psa_columns(p, P, p->width, p->height, p->mode);
+                break;
+            case PSA_PASS_COLUMNS_ONLY:
+                psa_columns(p, P, p->width, p->height, p->mode);
+                break;
+            case PSA_PASS_ROWS_ONLY:
+                psa_rows(p, P, p->width, p->height, p->mode);
+                break;
+            case PSA_PASS_COLUMNS_ROWS:
+            default:
+                psa_columns(p, P, p->width, p->height, p->mode);
+                psa_rows(p, P, p->width, p->height, p->mode);
+                break;
+        }
     }
 }

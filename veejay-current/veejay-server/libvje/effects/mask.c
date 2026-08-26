@@ -44,16 +44,6 @@ vj_effect *simplemask_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_THRESHOLD] = 0; ve->limits[1][P_THRESHOLD] = 255; ve->defaults[P_THRESHOLD] = 128;
     ve->limits[0][P_MODE] = 0;      ve->limits[1][P_MODE] = 1;       ve->defaults[P_MODE] = 0;
@@ -85,7 +75,6 @@ void simplemask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int threshold = args[P_THRESHOLD];
     const int mode = args[P_MODE];
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -95,7 +84,7 @@ void simplemask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int mask = mode == 0 ? -((int)Y[i] < threshold) : -((int)Y[i] > threshold);
 

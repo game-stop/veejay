@@ -96,7 +96,6 @@ static inline float param1000_to_float(int v)
     return (float)v * 0.001f;
 }
 
-
 static inline uint8_t avg2_u8(uint8_t a, uint8_t b)
 {
     return (uint8_t)(((int)a + (int)b + 1) >> 1);
@@ -264,14 +263,6 @@ vj_effect *ghostwash_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if (ve->defaults) free(ve->defaults);
-        if (ve->limits[0]) free(ve->limits[0]);
-        if (ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_SOURCE] = 0;
     ve->limits[1][P_SOURCE] = 1000;
     ve->defaults[P_SOURCE] = 140;
@@ -320,7 +311,6 @@ vj_effect *ghostwash_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Source",
@@ -465,7 +455,6 @@ void *ghostwash_malloc(int w, int h)
     p->initialized = 0;
     p->maturity = 0.0f;
     p->frame_no = 0;
-    p->n_threads = vje_advise_num_threads((int)clen_sz);
 
     return (void *)p;
 }
@@ -851,26 +840,10 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    if (!p->initialized) {
-        for (int y = 0; y < ch; y++) {
-            const int row = y * cw;
-            for (int x = 0; x < cw; x++) {
-                const int idx = row + x;
-                p->canvas_y[idx] = downsample_src_plane_2x2(Y, x, y, w, h);
-                p->canvas_u[idx] = downsample_src_plane_2x2(U, x, y, w, h);
-                p->canvas_v[idx] = downsample_src_plane_2x2(V, x, y, w, h);
-                p->next_y[idx] = p->canvas_y[idx];
-                p->next_u[idx] = p->canvas_u[idx];
-                p->next_v[idx] = p->canvas_v[idx];
-                p->prev_src_y[idx] = p->canvas_y[idx];
-            }
-        }
-
-        p->initialized = 1;
-        p->maturity = 0.0f;
-        p->frame_no = 0;
-    }
-
+    int grid_ok = 1;
+    int skip_processing = 0;
+    int gw = 0, gh = 0;
+    
     const float fade_param = 0.35f;
     const float source_param = param1000_to_float(args[P_SOURCE]);
     float drift_param = param1000_to_float(args[P_DRIFT]);
@@ -881,8 +854,8 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     const float flow_size_param = param1000_to_float(args[P_FLOW_SIZE]);
     float motion_param = param1000_to_float(args[P_MOTION_PULL]);
     float color_strength_param = param1000_to_float(args[P_COLOR_STRENGTH]);
-    const int mono_mode = (args[P_COLOR_MODE] != 0);
-
+    
+    int mono_mode = (args[P_COLOR_MODE] != 0);
     int geometry_mode = args[P_GEOMETRY];
 
     if (geometry_mode < 0)
@@ -905,16 +878,15 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     const float color_strength_curve = color_strength_param * color_strength_param;
 
     const float mature_rate = 0.0004f + fade_curve * 0.0350f;
-    p->maturity += (1.0f - p->maturity) * mature_rate;
+    float current_maturity = p->maturity + (1.0f - p->maturity) * mature_rate;
 
-    if (p->maturity > 1.0f)
-        p->maturity = 1.0f;
+    if (current_maturity > 1.0f)
+        current_maturity = 1.0f;
 
-    const float maturity = p->maturity;
     const float early_source = 0.004f + source_curve * 0.360f;
     const float mature_source = 0.003f + source_curve * 0.150f;
 
-    float src_mix = lerpf_local(early_source, mature_source, maturity);
+    float src_mix = lerpf_local(early_source, mature_source, current_maturity);
     src_mix *= (1.0f - persist_curve * 0.78f);
 
     if (src_mix < 0.0015f) src_mix = 0.0015f;
@@ -931,18 +903,18 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     if (chroma_src_mix < 0.018f) chroma_src_mix = 0.018f;
     if (chroma_src_mix > 0.70f) chroma_src_mix = 0.70f;
 
-    const float chroma_hist_mix = 1.0f - chroma_src_mix;
-    const float color_gain = 0.90f + color_strength_curve * 0.42f + bleed_curve * 0.16f;
+    float chroma_hist_mix = 1.0f - chroma_src_mix;
+    float color_gain = 0.90f + color_strength_curve * 0.42f + bleed_curve * 0.16f;
     const float desat = (1.0f - bleed_curve * 0.55f) * (0.10f + persist_curve * 0.20f) * (1.0f - color_strength_curve * 0.70f);
-    const float chroma_keep = clampf_local(1.0f - desat, 0.30f, 1.15f);
-    const float detail_gain = detail_curve * lerpf_local(0.55f, 0.20f, maturity);
-    const float detail_boost = detail_gain * 0.20f + 0.08f;
-    const float flow_pixels = ((0.20f + maturity * 1.55f) * (0.3f + drift_curve * 26.0f)) * 0.5f;
-    const float warp_gain = warp_curve * 3.0f;
-    const float instability_gain = instability_curve * 8.0f * (0.25f + maturity * 0.75f);
-    const float chroma_slip_gain = bleed_curve * (0.20f + color_strength_curve * 1.40f);
-    const float prism_slip_boost = 0.65f + bleed_curve * 1.35f;
-    const float motion_scale = (0.20f + motion_curve * 3.20f) * (1.0f / 255.0f);
+    float chroma_keep = clampf_local(1.0f - desat, 0.30f, 1.15f);
+    const float detail_gain = detail_curve * lerpf_local(0.55f, 0.20f, current_maturity);
+    float detail_boost = detail_gain * 0.20f + 0.08f;
+    float flow_pixels = ((0.20f + current_maturity * 1.55f) * (0.3f + drift_curve * 26.0f)) * 0.5f;
+    float warp_gain = warp_curve * 3.0f;
+    float instability_gain = instability_curve * 8.0f * (0.25f + current_maturity * 0.75f);
+    float chroma_slip_gain = bleed_curve * (0.20f + color_strength_curve * 1.40f);
+    float prism_slip_boost = 0.65f + bleed_curve * 1.35f;
+    float motion_scale = (0.20f + motion_curve * 3.20f) * (1.0f / 255.0f);
 
     int cell = 9 + (int)(flow_size_curve * 31.0f);
     cell -= (int)(instability_curve * 5.0f);
@@ -950,86 +922,115 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     if (cell < 7) cell = 7;
     if (cell > 40) cell = 40;
 
-    if (!ghostwash_ensure_grid(p, cw, ch, cell))
-        return;
-
     float lut[41];
-
-    for (int i = 0; i <= cell; i++)
+    for (int i = 0; i <= cell; i++) {
         lut[i] = smoothstepf_local((float)i / (float)cell);
+    }
 
-    build_flow_grid(p, cw, ch, cell);
+    #pragma omp single
+    {
+        if (!p->initialized) {
+            for (int y = 0; y < ch; y++) {
+                const int row = y * cw;
+                for (int x = 0; x < cw; x++) {
+                    const int idx = row + x;
+                    p->canvas_y[idx] = downsample_src_plane_2x2(Y, x, y, w, h);
+                    p->canvas_u[idx] = downsample_src_plane_2x2(U, x, y, w, h);
+                    p->canvas_v[idx] = downsample_src_plane_2x2(V, x, y, w, h);
+                    p->next_y[idx] = p->canvas_y[idx];
+                    p->next_u[idx] = p->canvas_u[idx];
+                    p->next_v[idx] = p->canvas_v[idx];
+                    p->prev_src_y[idx] = p->canvas_y[idx];
+                }
+            }
 
-    const int gw = (cw + cell - 1) / cell + 2;
-    const int gh = (ch + cell - 1) / cell + 2;
+            p->initialized = 1;
+            p->maturity = 0.0f;
+            p->frame_no = 0;
+        }
+
+        p->maturity = current_maturity;
+
+        if (!ghostwash_ensure_grid(p, cw, ch, cell)) {
+            grid_ok = 0;
+        } else {
+            build_flow_grid(p, cw, ch, cell);
+
+            if (ghostwash_grid_required(cw, ch, cell) > p->grid_capacity)
+                grid_ok = 0;
+
+            const float time_phase = (float)(p->frame_no & 1023U) * (6.28318530717958647692f / 1024.0f);
+            const float shear_phase = time_phase * (0.40f + instability_param * 1.60f);
+            const float shear_freq = 0.020f + flow_size_param * 0.090f;
+
+            if (geometry_mode == 3) {
+                for (int y = 0; y < ch; y++)
+                    p->shear_y[y] = sinf((float)y * shear_freq + shear_phase);
+
+                for (int x = 0; x < cw; x++)
+                    p->shear_x[x] = sinf((float)x * shear_freq * 0.73f + shear_phase * 1.31f);
+            }
+
+            const float inv_max_dim = 1.0f / ((float)((cw > ch) ? cw : ch) * 0.5f + 1.0f);
+            const float half_cw = (float)cw * 0.5f;
+            const float half_ch = (float)ch * 0.5f;
+
+            if (geometry_mode == 8) {
+                const float tri_angle = time_phase * (0.18f + instability_param * 0.42f);
+                const float tri_ca = cosf(tri_angle);
+                const float tri_sa = sinf(tri_angle);
+
+                for (int x = 0; x < cw; x++) {
+                    const float nx = ((float)x - half_cw) * inv_max_dim;
+                    p->poly_rx_x[x] = nx * tri_ca;
+                    p->poly_ry_x[x] = nx * tri_sa;
+                }
+
+                for (int y = 0; y < ch; y++) {
+                    const float ny = ((float)y - half_ch) * inv_max_dim;
+                    p->poly_rx_y[y] = -ny * tri_sa;
+                    p->poly_ry_y[y] =  ny * tri_ca;
+                }
+            } else if (geometry_mode == 9) {
+                const float rect_angle = -time_phase * (0.14f + instability_param * 0.36f);
+                const float rect_ca = cosf(rect_angle);
+                const float rect_sa = sinf(rect_angle);
+
+                for (int x = 0; x < cw; x++) {
+                    const float nx = ((float)x - half_cw) * inv_max_dim;
+                    p->poly_rx_x[x] = nx * rect_ca;
+                    p->poly_ry_x[x] = nx * rect_sa;
+                }
+
+                for (int y = 0; y < ch; y++) {
+                    const float ny = ((float)y - half_ch) * inv_max_dim;
+                    p->poly_rx_y[y] = -ny * rect_sa;
+                    p->poly_ry_y[y] =  ny * rect_ca;
+                }
+            }
+        }
+    }
+    
+    gw = (cw + cell - 1) / cell + 2;
+    gh = (ch + cell - 1) / cell + 2;
 
     if (gw <= 1 || gh <= 1)
-        return;
+        grid_ok = 0;
 
-    if (ghostwash_grid_required(cw, ch, cell) > p->grid_capacity)
-        return;
-
-    const float time_phase = (float)(p->frame_no & 1023U) * (6.28318530717958647692f / 1024.0f);
-    const float shear_phase = time_phase * (0.40f + instability_param * 1.60f);
-    const float shear_freq = 0.020f + flow_size_param * 0.090f;
-
-    if (geometry_mode == 3) {
-        for (int y = 0; y < ch; y++)
-            p->shear_y[y] = sinf((float)y * shear_freq + shear_phase);
-
-        for (int x = 0; x < cw; x++)
-            p->shear_x[x] = sinf((float)x * shear_freq * 0.73f + shear_phase * 1.31f);
+    if (!grid_ok) {
+        skip_processing = 1;
     }
 
-    const float inv_max_dim = 1.0f / ((float)((cw > ch) ? cw : ch) * 0.5f + 1.0f);
-    const float half_cw = (float)cw * 0.5f;
-    const float half_ch = (float)ch * 0.5f;
+    if (!skip_processing) {
+        const uint8_t *restrict old_y = p->canvas_y;
+        const uint8_t *restrict old_u = p->canvas_u;
+        const uint8_t *restrict old_v = p->canvas_v;
 
-    if (geometry_mode == 8) {
-        const float tri_angle = time_phase * (0.18f + instability_param * 0.42f);
-        const float tri_ca = cosf(tri_angle);
-        const float tri_sa = sinf(tri_angle);
+        uint8_t *restrict next_y = p->next_y;
+        uint8_t *restrict next_u = p->next_u;
+        uint8_t *restrict next_v = p->next_v;
+        uint8_t *restrict prev_y = p->prev_src_y;
 
-        for (int x = 0; x < cw; x++) {
-            const float nx = ((float)x - half_cw) * inv_max_dim;
-            p->poly_rx_x[x] = nx * tri_ca;
-            p->poly_ry_x[x] = nx * tri_sa;
-        }
-
-        for (int y = 0; y < ch; y++) {
-            const float ny = ((float)y - half_ch) * inv_max_dim;
-            p->poly_rx_y[y] = -ny * tri_sa;
-            p->poly_ry_y[y] =  ny * tri_ca;
-        }
-    } else if (geometry_mode == 9) {
-        const float rect_angle = -time_phase * (0.14f + instability_param * 0.36f);
-        const float rect_ca = cosf(rect_angle);
-        const float rect_sa = sinf(rect_angle);
-
-        for (int x = 0; x < cw; x++) {
-            const float nx = ((float)x - half_cw) * inv_max_dim;
-            p->poly_rx_x[x] = nx * rect_ca;
-            p->poly_ry_x[x] = nx * rect_sa;
-        }
-
-        for (int y = 0; y < ch; y++) {
-            const float ny = ((float)y - half_ch) * inv_max_dim;
-            p->poly_rx_y[y] = -ny * rect_sa;
-            p->poly_ry_y[y] =  ny * rect_ca;
-        }
-    }
-
-    const uint8_t *restrict old_y = p->canvas_y;
-    const uint8_t *restrict old_u = p->canvas_u;
-    const uint8_t *restrict old_v = p->canvas_v;
-
-    uint8_t *restrict next_y = p->next_y;
-    uint8_t *restrict next_u = p->next_u;
-    uint8_t *restrict next_v = p->next_v;
-    uint8_t *restrict prev_y = p->prev_src_y;
-
-#pragma omp parallel num_threads(p->n_threads)
-    {
         ghostwash_dispatch_advection(
             p,
             Y,
@@ -1073,16 +1074,16 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
             motion_scale
         );
 
-#pragma omp barrier
         ghostwash_render_fullres(p, frame, mono_mode);
-    }
 
-    {
-        uint8_t *tmp;
-        tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
-        tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
-        tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
-    }
+        #pragma omp single
+        {
+            uint8_t *tmp;
+            tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
+            tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
+            tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
 
-    p->frame_no++;
+            p->frame_no++;
+        }
+    }
 }

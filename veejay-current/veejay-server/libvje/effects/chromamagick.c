@@ -1,7 +1,7 @@
 /*
  * VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -24,6 +24,7 @@
 
 #include "common.h"
 #include "chromamagick.h"
+#include <veejaycore/vjmem.h>
 
 static inline int chromamagic_clamp_l(int v)
 {
@@ -64,10 +65,16 @@ static inline int chromamagic_soft_uv(int v)
 vj_effect *chromamagick_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
+
     ve->num_params = 2;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+
+
     ve->defaults[0] = 7;
     ve->defaults[1] = 150;
     ve->description = "Chroma Magic";
@@ -77,25 +84,24 @@ vj_effect *chromamagick_init(int w, int h)
     ve->limits[1][1] = 255;
     ve->extra_frame = 1;
     ve->sub_format = 1;
-	ve->has_user = 0;
-	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value" );
 
-	ve->hints = vje_init_value_hint_list( ve->num_params );
+    ve->hints = vje_init_value_hint_list( ve->num_params );
 
-	vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
-		"Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
-		"Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
-		"Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
-		"Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
-		"Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
-		"Darken", "Lighten", "Modulo Add", "Multiply LAB", "Quilt",
-	   // process in LAB space:	
-		"Dodge LAB", "Additive LAB" , "Divide LAB", "Freeze LAB", "Unfreeze LAB", 
-		"Darken LAB", "Lighten LAB", "Softlight LAB", "Hardlight LAB", "Difference LAB",
-		"Screen LAB", "Pixel Fuckery"
-	);
+    vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
+        "Add Subselect Luma", "Select Min", "Select Max", "Select Difference",
+        "Select Difference Negate", "Add Luma", "Select Unfreeze", "Exclusive",
+        "Difference Negate", "Additive", "Basecolor", "Freeze", "Unfreeze",
+        "Hardlight", "Multiply", "Divide", "Subtract", "Add", "Screen",
+        "Difference", "Softlight", "Dodge", "Reflect", "Difference Replace",
+        "Darken", "Lighten", "Modulo Add", "Multiply LAB", "Quilt",
+        "Dodge LAB", "Additive LAB" , "Divide LAB", "Freeze LAB", "Unfreeze LAB", 
+        "Darken LAB", "Lighten LAB", "Softlight LAB", "Hardlight LAB", "Difference LAB",
+        "Screen LAB", "Pixel Fuckery"
+    );
 
-	{
+    {
         const vj_beat_param_hint_t beat_hints[] = {
             VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
             VJ_BEAT_HINT_V2(VJ_BEAT_ALPHA_OR_OPACITY, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 16, 240, 92, 100, 10, 520, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0)
@@ -103,19 +109,19 @@ vj_effect *chromamagick_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-	return ve;
+    return ve;
 }
 
-static void chromamagic_selectmin(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_selectmin(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     const int op_b = 255 - op_a;
 #pragma omp for schedule(static)
@@ -130,16 +136,16 @@ static void chromamagic_selectmin(VJFrame *frame, VJFrame *frame2, int op_a, int
     }
 }
 
-static void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     const int op_b = 255 - op_a;
 #pragma omp for schedule(static)
@@ -163,16 +169,16 @@ static void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2, int op_
     }
 }
 
-static void chromamagic_selectmax(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_selectmax(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     const int op_b = 255 - op_a;
 #pragma omp for schedule(static)
@@ -186,16 +192,17 @@ static void chromamagic_selectmax(VJFrame *frame, VJFrame *frame2, int op_a, int
         }
     }
 }
-static void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+
+static void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     int op_b = 255 - op_a;
 #pragma omp for schedule(static)
@@ -212,10 +219,7 @@ static void chromamagic_selectdiff(VJFrame *frame, VJFrame *frame2, int op_a, in
 
 static void chromamagic_diffreplace(VJFrame *frame,
                                       VJFrame *frame2,
-                                      int threshold,
-                                      unsigned long *sum,
-                                      int *op_a,
-                                      int *op_b)
+                                      int threshold)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -225,22 +229,12 @@ static void chromamagic_diffreplace(VJFrame *frame,
     uint8_t *restrict Cb2 = frame2->data[1];
     uint8_t *restrict Cr2 = frame2->data[2];
 
-    unsigned long local_sum = 0;
-
-#pragma omp for schedule(static) nowait
+    unsigned long sum = 0;
     for(int i = 0; i < len; i++)
-        local_sum += Y[i];
+        sum += Y[i];
 
-#pragma omp atomic update
-    *sum += local_sum;
-
-#pragma omp barrier
-
-#pragma omp single
-    {
-        *op_b = *sum & 0xff;
-        *op_a = 255 - *op_b;
-    }
+    int op_b = (int)(sum & 0xff);
+    int op_a = 255 - op_b;
 
 #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
@@ -248,9 +242,9 @@ static void chromamagic_diffreplace(VJFrame *frame,
         int diff = Y[i] - Y2[i];
         int mask = ((diff >= threshold) - (diff < -threshold)) & 0xFF;
 
-        int y  = ((Y[i] * *op_a + Y2[i] * *op_b) >> 8);
-        int cb = ((Cb[i] * *op_a + Cb2[i] * *op_b) >> 8);
-        int cr = ((Cr[i] * *op_a + Cr2[i] * *op_b) >> 8);
+        int y  = ((Y[i] * op_a + Y2[i] * op_b) >> 8);
+        int cb = ((Cb[i] * op_a + Cb2[i] * op_b) >> 8);
+        int cr = ((Cr[i] * op_a + Cr2[i] * op_b) >> 8);
 
         Y[i]  = (Y[i]  & ~mask) | (CLAMP_Y(y) & mask);
         Cb[i] = (Cb[i] & ~mask) | (CLAMP_UV(cb) & mask);
@@ -258,16 +252,16 @@ static void chromamagic_diffreplace(VJFrame *frame,
     }
 }
 
-static void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     const int op_b = 255 - op_a;
 #pragma omp for schedule(static)
@@ -282,7 +276,7 @@ static void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2, int op_a,
     }
 }
 
-static void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -320,16 +314,16 @@ static void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2, int op_a
     }
 }
 
-static void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     const int op_b = 255 - op_a;
 #pragma omp for schedule(static)
@@ -342,86 +336,85 @@ static void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int op_a, int n_
     }
 }
 
-static void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int op_a) {
     unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
     for (i = 0; i < len; i++) {
         int a,b,c;
 
-		a = Y[i];
-		b = Y2[i];
- 		c = a + (2 * b) - op_a;
-		Y[i] = CLAMP_Y(c - (( a * b ) >> 8 ));
+        a = Y[i];
+        b = Y2[i];
+        c = a + (2 * b) - op_a;
+        Y[i] = CLAMP_Y(c - (( a * b ) >> 8 ));
 
-		a = Cb[i];
-		b = Cb2[i];
+        a = Cb[i];
+        b = Cb2[i];
 
-		c = a + (2 * b) - 0xff;
-		Cb[i] = CLAMP_UV(c);
+        c = a + (2 * b) - 0xff;
+        Cb[i] = CLAMP_UV(c);
 
-		a = Cr[i];
-		b = Cr2[i];
-		c = a + (2 * b) - 0xff;
-		Cr[i] = CLAMP_UV(c);
-   	 }
-
+        a = Cr[i];
+        b = Cr2[i];
+        c = a + (2 * b) - 0xff;
+        Cr[i] = CLAMP_UV(c);
+    }
 }
 
-static void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int op_a) {
 
-	unsigned int i;
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
-
-	const unsigned int o1 = op_a;
-	const unsigned int o2 = 255 - o1;
-#define MAGIC_THRESHOLD 40
-#pragma omp for schedule(static)
-	for(i=0; i < len; i++) {
-		int a = Y[i];
-		int b = Y2[i];
-		int d = abs( a - b );
-		if ( d > MAGIC_THRESHOLD )
-		{
-			a = Y[i] * o1;
-			b = Cb2[i] * o2;
-			Y[i] = CLAMP_Y(255 - ((a + b) >> 8));
-
-			a = (Cb[i] - 128) * o1;
-			b = (Cb2[i] - 128) * o2;
-			d = 128 + ((a + b) >> 8);
-			Cb[i] = CLAMP_UV(d);
-
-			a = (Cr[i] - 128) * o1;
-			b = (Cr2[i] - 128) * o2;
-			d = 128 + ((a + b) >> 8);
-			Cr[i] = CLAMP_UV(d);
-		}
-	}
-}
-
-static void chromamagic_additive2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
     unsigned int i;
     const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
+
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - o1;
+#define MAGIC_THRESHOLD 40
+#pragma omp for schedule(static)
+    for(i=0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        int d = abs( a - b );
+        if ( d > MAGIC_THRESHOLD )
+        {
+            a = Y[i] * o1;
+            b = Cb2[i] * o2;
+            Y[i] = CLAMP_Y(255 - ((a + b) >> 8));
+
+            a = (Cb[i] - 128) * o1;
+            b = (Cb2[i] - 128) * o2;
+            d = 128 + ((a + b) >> 8);
+            Cb[i] = CLAMP_UV(d);
+
+            a = (Cr[i] - 128) * o1;
+            b = (Cr2[i] - 128) * o2;
+            d = 128 + ((a + b) >> 8);
+            Cr[i] = CLAMP_UV(d);
+        }
+    }
+}
+
+static void chromamagic_additive2(VJFrame *frame, VJFrame *frame2, int op_a) {
+    unsigned int i;
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
@@ -443,7 +436,7 @@ static void chromamagic_additive2(VJFrame *frame, VJFrame *frame2, int op_a, int
     }
 }
 
-static void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int op_a) {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -472,7 +465,7 @@ static void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int op_a, int 
     }
 }
 
-static void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -505,16 +498,16 @@ static void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2, int op_a, int
     }
 }
 
-static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a) {
     const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for (int i = 0; i < len; i++) {
         int L1 = (Y[i] * 100) >> 8;
         int a1 = (((Cb[i] - 128) * 127) >> 8);
@@ -524,9 +517,9 @@ static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a, int n
         int a2 = (((Cb2[i] - 128) * 127) >> 8);
         int b2 = (((Cr2[i] - 128) * 127) >> 8);
 
-		L2 = L2 | 1;
-		a2 = a2 | 1;
-		b2 = b2 | 1;
+        L2 = L2 | 1;
+        a2 = a2 | 1;
+        b2 = b2 | 1;
 
         int c = L1 - (((op_a - L1) * (op_a - L1)) / L2);
         L1 = chromamagic_clamp_l(c);
@@ -543,64 +536,63 @@ static void chromamagic_freeze2(VJFrame *frame, VJFrame *frame2, int op_a, int n
     }
 }
 
-static void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
-
-    #pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
-		int a = Y[i];
-		int b = Y2[i];
-        int c;
-		if( b > 0 )
-			c = 255 - ((op_a -a ) * (op_a - a)) / b;
-		else
-			c = 255 - a;
-
-		Y[i] = CLAMP_Y(c);
-
-		a = Cb[i];
-		b = Cb2[i];
-
-		if(b > 0)
-			c = 255 - ((256-a) * (256 - a)) / b;
-		else
-			c = 255 - a;
-
-		Cb[i] = CLAMP_UV(c);
-
-		a = Cr[i];
-		b = Cr2[i];
-
-		if(b > 0)
-			c = 255 - (( 256 - a ) * ( 256 - a )) / b;
-		else
-			c= 255 -a;
-		Cr[i] = CLAMP_UV(c);
-	}
-
-}
-
-static void chromamagic_quilt( VJFrame *frame, VJFrame *frame2, int op_a, int n_threads ) {
-	const int len = frame->len;
-	const int width = frame->width;
-	const int height = frame->height;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
-	const float alpha = (float) op_a / 255.0f;
+static void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int op_a) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-	for ( int i = 0; i < len ; i++ ) {
-	    int x = i % width;
+    for(int i=0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        int c;
+        if( b > 0 )
+            c = 255 - ((op_a -a ) * (op_a - a)) / b;
+        else
+            c = 255 - a;
+
+        Y[i] = CLAMP_Y(c);
+
+        a = Cb[i];
+        b = Cb2[i];
+
+        if(b > 0)
+            c = 255 - ((256-a) * (256 - a)) / b;
+        else
+            c = 255 - a;
+
+        Cb[i] = CLAMP_UV(c);
+
+        a = Cr[i];
+        b = Cr2[i];
+
+        if(b > 0)
+            c = 255 - (( 256 - a ) * ( 256 - a )) / b;
+        else
+            c= 255 -a;
+        Cr[i] = CLAMP_UV(c);
+    }
+}
+
+static void chromamagic_quilt( VJFrame *frame, VJFrame *frame2, int op_a ) {
+    const int len = frame->len;
+    const int width = frame->width;
+    const int height = frame->height;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
+    const float alpha = (float) op_a / 255.0f;
+
+#pragma omp for schedule(static)
+    for ( int i = 0; i < len ; i++ ) {
+        int x = i % width;
         int y = i / width;
 
         float blendFactorX = ((float)x / (float)width) * alpha;
@@ -612,19 +604,18 @@ static void chromamagic_quilt( VJFrame *frame, VJFrame *frame2, int op_a, int n_
 
         Y[i] = (uint8_t)CLAMP_Y(y0);
         Cb[i] = (uint8_t)CLAMP_UV(u0);
-        Cr[i] = (uint8_t)CLAMP_UV(v0);	
-	}
-
+        Cr[i] = (uint8_t)CLAMP_UV(v0);    
+    }
 }
 
-static void chromamagic_pixelfuckery( VJFrame *frame, VJFrame *frame2, int op_a, int n_threads ) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+static void chromamagic_pixelfuckery( VJFrame *frame, VJFrame *frame2, int op_a ) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
     for (int i = 0; i < len; i++) {
@@ -649,9 +640,9 @@ static void chromamagic_pixelfuckery( VJFrame *frame, VJFrame *frame2, int op_a,
             Cr[i] = (uint8_t)chromamagic_soft_uv(v);
         }
     }
-
 }
-static void chromamagic_unfreeze2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+
+static void chromamagic_unfreeze2(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -698,17 +689,17 @@ static void chromamagic_unfreeze2(VJFrame *frame, VJFrame *frame2, int op_a, int
     }
 }
 
-static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a, int n_threads ) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a ) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
+    for(int i=0; i < len; i++) {
         int a = Y[i];
         int b = Y2[i];
         if (a > pixel_Y_lo_ && a != 0) {
@@ -731,10 +722,10 @@ static void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int op_a, int
             int diff = 256 - b;
             Cr[i] = CLAMP_UV(255 - ((diff * diff) / a));
         }
-	} 
+    } 
 }
 
-static void chromamagic_hardlight2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_hardlight2(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -787,46 +778,45 @@ static void chromamagic_hardlight2(VJFrame *frame, VJFrame *frame2, int op_a, in
     }
 }
 
-static void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+static void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int op_a) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
-		int a = Y[i];
-		int b = Y2[i];
-		int c;
+    for(int i=0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        int c;
         if ( b < 128 ) {
-			c = ( a * b ) >> 8;
-		}
-		else {
-			c = 255 - (( op_a - b) * ( op_a - a ) >> 8);
-		}
-		Y[i] =CLAMP_Y( c);
+            c = ( a * b ) >> 8;
+        }
+        else {
+            c = 255 - (( op_a - b) * ( op_a - a ) >> 8);
+        }
+        Y[i] =CLAMP_Y( c);
 
-		a = Cb[i]-128;
-		b = Cb2[i]-128;
-		if ( b < 128 ) c = ( a * b ) >> 8;
-		else c = 255 - (( 256 - b) * ( 256 - a) >> 8);
-		c += 128;
-		Cb[i] = CLAMP_UV(c);
+        a = Cb[i]-128;
+        b = Cb2[i]-128;
+        if ( b < 128 ) c = ( a * b ) >> 8;
+        else c = 255 - (( 256 - b) * ( 256 - a) >> 8);
+        c += 128;
+        Cb[i] = CLAMP_UV(c);
 
-		a = Cr[i]-128;
-		b = Cr2[i]-128;
-		if ( b < 128) c = ( a * b ) >> 8;
-		else c = 255 - (( 256 - b) * ( 256 - a) >> 8 );
-		c += 128;
-		Cr[i] = CLAMP_UV(c);
-
-	}
+        a = Cr[i]-128;
+        b = Cr2[i]-128;
+        if ( b < 128) c = ( a * b ) >> 8;
+        else c = 255 - (( 256 - b) * ( 256 - a) >> 8 );
+        c += 128;
+        Cr[i] = CLAMP_UV(c);
+    }
 }
 
-static void chromamagic_multiply2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_multiply2(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -876,39 +866,38 @@ static void chromamagic_multiply2(VJFrame *frame, VJFrame *frame2, int op_a, int
     }
 }
 
-static void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int op_a, int n_threads ) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+static void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int op_a ) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
-	const unsigned int o1 = op_a;
-	const unsigned int o2 = 255 - op_a;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
 #pragma omp for schedule(static)
-	for( int i=0; i < len; i++) {
-		int a = (Y[i] * o1) >> 8;
-		int b = (Y2[i] * o2) >> 8;
-		Y[i] = (a * b) >> 8;
+    for( int i=0; i < len; i++) {
+        int a = (Y[i] * o1) >> 8;
+        int b = (Y2[i] * o2) >> 8;
+        Y[i] = (a * b) >> 8;
 
-		a = Cb[i]-128;
-		b = Cb2[i]-128;
-		int c = ( a * b ) >> 8;
-		c += 128;
-		Cb[i] = CLAMP_UV(c);
+        a = Cb[i]-128;
+        b = Cb2[i]-128;
+        int c = ( a * b ) >> 8;
+        c += 128;
+        Cb[i] = CLAMP_UV(c);
 
-		a = Cr[i] - 128;
-		b = Cr2[i] - 128;
-		c = ( a * b ) >> 8;
-		c += 128;
-		Cr[i] = CLAMP_UV(c);
-
-	}
+        a = Cr[i] - 128;
+        b = Cr2[i] - 128;
+        c = ( a * b ) >> 8;
+        c += 128;
+        Cr[i] = CLAMP_UV(c);
+    }
 }
 
-static void chromamagic_divide2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_divide2(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -940,48 +929,49 @@ static void chromamagic_divide2(VJFrame *frame, VJFrame *frame2, int op_a, int n
         Cr[i] = (uint8_t)((Cr[i] * inv_alpha + Cr2[i] * alpha) >> 8);
     }
 }
-static void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads ) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
 
-	const unsigned int o1 = op_a;
+static void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int op_a ) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
+
+    const unsigned int o1 = op_a;
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
-		int a = Y[i] * Y[i];
-		int b = o1 - Y2[i];
-		if ( b > pixel_Y_lo_ )
-			Y[i] = CLAMP_Y(a / b);
-	
-		a = Cb[i] * Cb2[i];
-		b = 255 - Cb2[i];
-		if( b > pixel_U_lo_ )
-			Cb[i] = CLAMP_UV( a / b );
+    for(int i=0; i < len; i++) {
+        int a = Y[i] * Y[i];
+        int b = o1 - Y2[i];
+        if ( b > pixel_Y_lo_ )
+            Y[i] = CLAMP_Y(a / b);
+    
+        a = Cb[i] * Cb2[i];
+        b = 255 - Cb2[i];
+        if( b > pixel_U_lo_ )
+            Cb[i] = CLAMP_UV( a / b );
 
-		a = Cr[i] * Cr[i];;
-		b = 255 - Cr2[i];
-		if( b > pixel_U_lo_ )
-			Cr[i] = CLAMP_UV( a / b );
-	}
+        a = Cr[i] * Cr[i];;
+        b = 255 - Cr2[i];
+        if( b > pixel_U_lo_ )
+            Cr[i] = CLAMP_UV( a / b );
+    }
 }
 
-static void chromamagic_subtract(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+static void chromamagic_subtract(VJFrame *frame, VJFrame *frame2, int op_a) {
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
-	const unsigned int o1 = op_a;
-	const unsigned int o2 = 255 - op_a;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
 #pragma omp for schedule(static)
-	for (int i = 0; i < len; i++) {
+    for (int i = 0; i < len; i++) {
         int a = Y[i] - ((Y2[i] * o1) >> 8);
         Y[i] = CLAMP_Y(a);
 
@@ -993,49 +983,48 @@ static void chromamagic_subtract(VJFrame *frame, VJFrame *frame2, int op_a, int 
         b = Cr2[i];
         Cr[i] = CLAMP_UV(((a * o2 + b * o1) >> 8));
     }
-
 }
 
-static void chromamagic_add(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
-
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
-
-#pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
-		int a = Y[i];
-		int b = Y2[i];
-		int c = a + (( 2 * b ) - op_a);
-		Y[i] = CLAMP_Y(c);
-
-		a = Cb[i]-128;
-		b = Cb2[i]-128;
-		c = a + ( 2 * b );
-		c += 128;
-		Cb[i] = CLAMP_UV(c);
-
-		a = Cr[i]-128;
-		b = Cr2[i]-128;
-		c = a + ( 2 * b );
-		c += 128;	
-		Cr[i] = CLAMP_UV(c);
-	}
-}
-
-static void chromamagic_screen2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_add(VJFrame *frame, VJFrame *frame2, int op_a) {
 
     const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
+
+#pragma omp for schedule(static)
+    for(int i=0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        int c = a + (( 2 * b ) - op_a);
+        Y[i] = CLAMP_Y(c);
+
+        a = Cb[i]-128;
+        b = Cb2[i]-128;
+        c = a + ( 2 * b );
+        c += 128;
+        Cb[i] = CLAMP_UV(c);
+
+        a = Cr[i]-128;
+        b = Cr2[i]-128;
+        c = a + ( 2 * b );
+        c += 128;    
+        Cr[i] = CLAMP_UV(c);
+    }
+}
+
+static void chromamagic_screen2(VJFrame *frame, VJFrame *frame2, int op_a) {
+
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
@@ -1057,35 +1046,35 @@ static void chromamagic_screen2(VJFrame *frame, VJFrame *frame2, int op_a, int n
     }
 }
 
-static void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int op_a) {
 
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
-		int a = Y[i];
-		int b = Y2[i];
-		Y[i] = CLAMP_Y(255 - (((op_a - a) * (op_a - b)) >> 8));
-		a = Cb[i]-128;
-		b = Cb2[i]-128;
-		int c = 255 - ( ( 256-a) * (256 - b) >> 8);
-		c += 128;
-		Cb[i] = CLAMP_UV(c);
-		a = Cr[i]-128;
-		b = Cr2[i]-128;
-		c = 255 - ( ( 256 -a) * (256 - b)>>8);
-		c += 128;
-		Cr[i] = CLAMP_UV(c);
-	}
+    for(int i=0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        Y[i] = CLAMP_Y(255 - (((op_a - a) * (op_a - b)) >> 8));
+        a = Cb[i]-128;
+        b = Cb2[i]-128;
+        int c = 255 - ( ( 256-a) * (256 - b) >> 8);
+        c += 128;
+        Cb[i] = CLAMP_UV(c);
+        a = Cr[i]-128;
+        b = Cr2[i]-128;
+        c = 255 - ( ( 256 -a) * (256 - b)>>8);
+        c += 128;
+        Cr[i] = CLAMP_UV(c);
+    }
 }
 
-static void chromamagic_difference2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_difference2(VJFrame *frame, VJFrame *frame2, int op_a) {
 
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -1121,7 +1110,7 @@ static void chromamagic_difference2(VJFrame *frame, VJFrame *frame2, int op_a, i
     }
 }
 
-static void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int op_a) {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -1147,19 +1136,19 @@ static void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int op_a, in
     }
 }
 
-static void chromamagic_softlightmode2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_softlightmode2(VJFrame *frame, VJFrame *frame2, int op_a) {
     const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
     const unsigned int o1 = op_a;
     const unsigned int o2 = 255 - op_a;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for (int i = 0; i < len; i++) {
         int L1 = (Y[i] * 100) >> 8;
         int a1 = (((Cb[i] - 128) * 127) >> 8);
@@ -1195,21 +1184,21 @@ static void chromamagic_softlightmode2(VJFrame *frame, VJFrame *frame2, int op_a
 
 
 /* not really softlight but still cool */
-static void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2, int op_a) {
 
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++) {
-		int a = Y[i];
-		int b = Y2[i];
-		if ( a < op_a ) {
+    for(int i=0; i < len; i++) {
+        int a = Y[i];
+        int b = Y2[i];
+        if ( a < op_a ) {
             int c = (a * b) >> 8;
             Y[i] = (c + a * ( 255 - ( (255-a)*(255-b) >> 8) - c)) >> 8;
 
@@ -1226,11 +1215,11 @@ static void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2, int op_a, 
             d = (c + a * ( 255 - ( (a * b) >> 7) -c)) >> 7;
             d += 128;
             Cr[i] = CLAMP_UV(d);
-		}
-	}
+        }
+    }
 }
 
-static void chromamagic_dodge2(VJFrame *restrict frame, VJFrame *restrict frame2, int op_a, int n_threads)
+static void chromamagic_dodge2(VJFrame *restrict frame, VJFrame *restrict frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
@@ -1240,7 +1229,7 @@ static void chromamagic_dodge2(VJFrame *restrict frame, VJFrame *restrict frame2
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for (int i = 0; i < len; i++)
     {
         const int y1 = Y[i];
@@ -1262,7 +1251,7 @@ static void chromamagic_dodge2(VJFrame *restrict frame, VJFrame *restrict frame2
     }
 }
 
-static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -1295,7 +1284,7 @@ static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int op_a, int n_t
         cb_new = (cb_new < -128) ? -128 : (cb_new > 127 ? 127 : cb_new);
         Cb[i] = (uint8_t)(cb_new + 128);
 
-		int cr = Cr[i] - 128;
+        int cr = Cr[i] - 128;
         int cr2 = Cr2[i] - 128;
         int denomCr = 127 - cr2;
         denomCr = denomCr < 1 ? 1 : denomCr;
@@ -1307,7 +1296,7 @@ static void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int op_a, int n_t
     }
 }
 
-static void chromamagic_darken2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_darken2(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -1330,7 +1319,7 @@ static void chromamagic_darken2(VJFrame *frame, VJFrame *frame2, int op_a, int n
         int L2 = (Y2[i] * 100) >> 8;
         int a2 = ((Cb2[i] - 128) * 127) >> 8;
         int b2 = ((Cr2[i] - 128) * 127) >> 8;
-		int dark_L = (L2 < L1) ? L2 : L1;
+        int dark_L = (L2 < L1) ? L2 : L1;
 
         L1 = (dark_L * alpha + L1 * inv_alpha) >> 8;
         a1 = (a2 * alpha + a1 * inv_alpha) >> 8;
@@ -1346,31 +1335,31 @@ static void chromamagic_darken2(VJFrame *frame, VJFrame *frame2, int op_a, int n
     }
 }
 
-static void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_darken(VJFrame *frame, VJFrame *frame2, int op_a)
 {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
-	const unsigned int o1 = op_a;
-	const unsigned int o2 = 255 - op_a;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++)
-	{
-		if(Y[i] > Y2[i])
-		{
-			Y[i] = ((Y[i] * o1) + (Y2[i] * o2)) >> 8; 
-			Cb[i] = ((Cb[i] * o1) + (Cb2[i] * o2)) >> 8;
-			Cr[i] = ((Cr[i] * o1) + (Cr2[i] * o2)) >> 8;
-		}
-	}
+    for(int i=0; i < len; i++)
+    {
+        if(Y[i] > Y2[i])
+        {
+            Y[i] = ((Y[i] * o1) + (Y2[i] * o2)) >> 8; 
+            Cb[i] = ((Cb[i] * o1) + (Cb2[i] * o2)) >> 8;
+            Cr[i] = ((Cr[i] * o1) + (Cr2[i] * o2)) >> 8;
+        }
+    }
 }
 
-static void chromamagic_lighten2(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_lighten2(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -1412,66 +1401,66 @@ static void chromamagic_lighten2(VJFrame *frame, VJFrame *frame2, int op_a, int 
     }
 }
 
-static void chromamagic_lighten(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_lighten(VJFrame *frame, VJFrame *frame2, int op_a)
 {
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
-	const unsigned int o1 = op_a;
-	const unsigned int o2 = 255 - op_a;
+    const unsigned int o1 = op_a;
+    const unsigned int o2 = 255 - op_a;
 #pragma omp for schedule(static)
-	for(int i=0; i < len; i++)
-	{
-		if(Y[i] < Y2[i])
-		{
-			Y[i] = ((Y[i] * o1) + (Y2[i] * o2)) >> 8; 
-			Cb[i] = ((Cb[i] * o1) + (Cb2[i] * o2)) >> 8;
-			Cr[i] = ((Cr[i] * o1) + (Cr2[i] * o2)) >> 8;
-		} 
-	}
+    for(int i=0; i < len; i++)
+    {
+        if(Y[i] < Y2[i])
+        {
+            Y[i] = ((Y[i] * o1) + (Y2[i] * o2)) >> 8; 
+            Cb[i] = ((Cb[i] * o1) + (Cb2[i] * o2)) >> 8;
+            Cr[i] = ((Cr[i] * o1) + (Cr2[i] * o2)) >> 8;
+        } 
+    }
 }
 
-static void chromamagic_reflect(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads) {
+static void chromamagic_reflect(VJFrame *frame, VJFrame *frame2, int op_a) {
 
-	const int len = frame->len;
-	uint8_t *restrict Y = frame->data[0];
-	uint8_t *restrict Cb = frame->data[1];
-	uint8_t *restrict Cr = frame->data[2];
-	uint8_t *restrict Y2 = frame2->data[0];
-	uint8_t *restrict Cb2 = frame2->data[1];
-	uint8_t *restrict Cr2 = frame2->data[2];
+    const int len = frame->len;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+    uint8_t *restrict Y2 = frame2->data[0];
+    uint8_t *restrict Cb2 = frame2->data[1];
+    uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
-	for(int i=0; i < len ; i++) {
-		int a = Y[i];
-		int b = Y2[i];
+    for(int i=0; i < len ; i++) {
+        int a = Y[i];
+        int b = Y2[i];
         int c;
 
-		if ( b > op_a ) c = b;
-		else {
-			Y[i] = CLAMP_Y((a * a) / (256 - b));
+        if ( b > op_a ) c = b;
+        else {
+            Y[i] = CLAMP_Y((a * a) / (256 - b));
 
-			a = Cb[i] - 128;
-			b = Cb2[i] - 128;
-			if (b == 128) b = 127;
-			c = CLAMP_UV((a * a) / (128 - b) + 128);
-			Cb[i] = c;
+            a = Cb[i] - 128;
+            b = Cb2[i] - 128;
+            if (b == 128) b = 127;
+            c = CLAMP_UV((a * a) / (128 - b) + 128);
+            Cb[i] = c;
 
-			a = Cr[i] - 128;
-			b = Cr2[i] - 128;
-			if (b == 128) b = 127;
-			c = CLAMP_UV((a * a) / (128 - b) + 128);
-			Cr[i] = c;
-		}
-	}
+            a = Cr[i] - 128;
+            b = Cr2[i] - 128;
+            if (b == 128) b = 127;
+            c = CLAMP_UV((a * a) / (128 - b) + 128);
+            Cr[i] = c;
+        }
+    }
 }
 
-static void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int op_a, int n_threads)
+static void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int op_a)
 {
     const int len = frame->len;
     uint8_t *restrict Y  = frame->data[0];
@@ -1499,139 +1488,133 @@ static void chromamagic_modadd(VJFrame *frame, VJFrame *frame2, int op_a, int n_
 }
 
 void chromamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
-    int type = args[0];
-    int op_a = args[1];
-    int n_threads = vje_advise_num_threads(frame->len);
-    unsigned long diff_sum = 0;
-    int diff_op_a = 255;
-    int diff_op_b = 0;
+    (void)ptr;
+    const int type = args[0];
+    const int op_a = args[1];
 
-#pragma omp parallel num_threads(n_threads)
-    {
     switch (type) {
     case 0:
-	chromamagic_addsubselectlum(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_addsubselectlum(frame, frame2, op_a);
+        break;
     case 1:
-	chromamagic_selectmin(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_selectmin(frame, frame2, op_a);
+        break;
     case 2:
-	chromamagic_selectmax(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_selectmax(frame, frame2, op_a);
+        break;
     case 3:
-	chromamagic_selectdiff(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_selectdiff(frame, frame2, op_a);
+        break;
     case 4:
-	chromamagic_selectdiffneg(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_selectdiffneg(frame, frame2, op_a);
+        break;
     case 5:
-	chromamagic_addlum(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_addlum(frame, frame2, op_a);
+        break;
     case 6:
-	chromamagic_selectunfreeze(frame, frame2, op_a,n_threads);
-	break;
+        chromamagic_selectunfreeze(frame, frame2, op_a);
+        break;
     case 7:
-	chromamagic_exclusive(frame,frame2, op_a,n_threads);
-	break;
-   case 8:
-	chromamagic_diffnegate(frame,frame2, op_a,n_threads);
-	break;
-   case 9:
-	chromamagic_additive( frame,frame2, op_a,n_threads);
-	break;
-   case 10:
-	chromamagic_basecolor(frame,frame2, op_a,n_threads);
-	break;
-   case 11:
-	chromamagic_freeze(frame,frame2, op_a,n_threads);
-	break;
-   case 12:
-	chromamagic_unfreeze(frame,frame2, op_a,n_threads);
-	break;
-   case 13:
-	chromamagic_hardlight(frame,frame2, op_a,n_threads);
-	break;
-   case 14:
-	chromamagic_multiply(frame,frame2, op_a,n_threads);
-	break;
-  case 15:
-	chromamagic_divide(frame,frame2, op_a,n_threads);
-	break;
-  case 16:
-	chromamagic_subtract(frame,frame2, op_a,n_threads);
-	break;
-  case 17:
-	chromamagic_add(frame,frame2, op_a,n_threads);
-	break;
-  case 18:
-	chromamagic_screen(frame,frame2, op_a,n_threads);
-	break;
-  case 19:
-	chromamagic_difference(frame,frame2, op_a,n_threads);
-	break;
-  case 20:
-	chromamagic_softlightmode(frame,frame2, op_a,n_threads);
-	break;
-  case 21:
-	chromamagic_dodge(frame,frame2, op_a,n_threads);
-	break;
-  case 22:
-	chromamagic_reflect(frame,frame2, op_a,n_threads);
-	break;
-  case 23:
-	chromamagic_diffreplace(frame, frame2, op_a, &diff_sum, &diff_op_a, &diff_op_b);
-	break;
-  case 24:
-	chromamagic_darken( frame,frame2, op_a,n_threads);
-	break;
-  case 25:
-	chromamagic_lighten( frame,frame2, op_a,n_threads);
-	break;
-  case 26:
-	chromamagic_modadd( frame,frame2, op_a,n_threads);
-	break;
-  case 28:
-	chromamagic_quilt(frame,frame2,op_a,n_threads);
-	break;
-  case 29:
-	chromamagic_dodge2(frame,frame2,op_a,n_threads);
-	break;
-  case 30:
-	chromamagic_additive2(frame,frame2,op_a,n_threads);
-	break;
-  case 31:
-	chromamagic_divide2(frame,frame2,op_a,n_threads);
-	break;
-  case 32:
-	chromamagic_freeze2(frame,frame2,op_a,n_threads);
-	break;
-  case 33:
-	chromamagic_unfreeze2(frame,frame2,op_a,n_threads);
-	break;
-  case 34:
-	chromamagic_darken2(frame,frame2,op_a,n_threads);
-	break;
-  case 35:
-	chromamagic_lighten2(frame,frame2,op_a,n_threads);
-	break;
-  case 36:
-	chromamagic_softlightmode2(frame,frame2,op_a,n_threads);
-	break;
-  case 37:
-	chromamagic_hardlight2(frame,frame2,op_a,n_threads);
-	break;
-  case 38:
-	chromamagic_difference2(frame,frame2,op_a,n_threads);
-	break;
-  case 39:
-    chromamagic_screen2(frame,frame2,op_a,n_threads);
-	break;
-  case 27:
-	chromamagic_multiply2(frame,frame2,op_a,n_threads);
-	break;
-  case 40:
-	chromamagic_pixelfuckery( frame, frame2, op_a, n_threads );
-	break;	
-	}
+        chromamagic_exclusive(frame, frame2, op_a);
+        break;
+    case 8:
+        chromamagic_diffnegate(frame, frame2, op_a);
+        break;
+    case 9:
+        chromamagic_additive(frame, frame2, op_a);
+        break;
+    case 10:
+        chromamagic_basecolor(frame, frame2, op_a);
+        break;
+    case 11:
+        chromamagic_freeze(frame, frame2, op_a);
+        break;
+    case 12:
+        chromamagic_unfreeze(frame, frame2, op_a);
+        break;
+    case 13:
+        chromamagic_hardlight(frame, frame2, op_a);
+        break;
+    case 14:
+        chromamagic_multiply(frame, frame2, op_a);
+        break;
+    case 15:
+        chromamagic_divide(frame, frame2, op_a);
+        break;
+    case 16:
+        chromamagic_subtract(frame, frame2, op_a);
+        break;
+    case 17:
+        chromamagic_add(frame, frame2, op_a);
+        break;
+    case 18:
+        chromamagic_screen(frame, frame2, op_a);
+        break;
+    case 19:
+        chromamagic_difference(frame, frame2, op_a);
+        break;
+    case 20:
+        chromamagic_softlightmode(frame, frame2, op_a);
+        break;
+    case 21:
+        chromamagic_dodge(frame, frame2, op_a);
+        break;
+    case 22:
+        chromamagic_reflect(frame, frame2, op_a);
+        break;
+    case 23:
+        chromamagic_diffreplace(frame, frame2, op_a);
+        break;
+    case 24:
+        chromamagic_darken(frame, frame2, op_a);
+        break;
+    case 25:
+        chromamagic_lighten(frame, frame2, op_a);
+        break;
+    case 26:
+        chromamagic_modadd(frame, frame2, op_a);
+        break;
+    case 28:
+        chromamagic_quilt(frame, frame2, op_a);
+        break;
+    case 29:
+        chromamagic_dodge2(frame, frame2, op_a);
+        break;
+    case 30:
+        chromamagic_additive2(frame, frame2, op_a);
+        break;
+    case 31:
+        chromamagic_divide2(frame, frame2, op_a);
+        break;
+    case 32:
+        chromamagic_freeze2(frame, frame2, op_a);
+        break;
+    case 33:
+        chromamagic_unfreeze2(frame, frame2, op_a);
+        break;
+    case 34:
+        chromamagic_darken2(frame, frame2, op_a);
+        break;
+    case 35:
+        chromamagic_lighten2(frame, frame2, op_a);
+        break;
+    case 36:
+        chromamagic_softlightmode2(frame, frame2, op_a);
+        break;
+    case 37:
+        chromamagic_hardlight2(frame, frame2, op_a);
+        break;
+    case 38:
+        chromamagic_difference2(frame, frame2, op_a);
+        break;
+    case 39:
+        chromamagic_screen2(frame, frame2, op_a);
+        break;
+    case 27:
+        chromamagic_multiply2(frame, frame2, op_a);
+        break;
+    case 40:
+        chromamagic_pixelfuckery(frame, frame2, op_a);
+        break;
     }
 }

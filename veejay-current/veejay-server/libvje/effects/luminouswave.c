@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -44,6 +44,13 @@ typedef struct {
     int height;
     int speed;
     int n_threads;
+    
+    int current_speed;
+    int inc_y_q16;
+    int inc_x_q16;
+    int offset;
+    int cy;
+    int sy;
 } luminouswave_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -77,17 +84,6 @@ vj_effect *luminouswave_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_FREQ_X] = 0;     ve->limits[1][P_FREQ_X] = 100;   ve->defaults[P_FREQ_X] = 4;
     ve->limits[0][P_FREQ_Y] = 1;     ve->limits[1][P_FREQ_Y] = 100;   ve->defaults[P_FREQ_Y] = 5;
@@ -138,7 +134,6 @@ void *luminouswave_malloc(int w, int h)
     data->width = w;
     data->height = h;
     data->speed = 0;
-    data->n_threads = vje_advise_num_threads(w * h);
 
     for(int i = 0; i < LW_LUT_SIZE; i++) {
         const float a = ((float)i / (float)LW_LUT_SIZE) * 6.28318530718f;
@@ -167,36 +162,45 @@ void luminouswave_apply(void *ptr, VJFrame *frame, int *args)
     const int angle_x = args[P_ANGLE_X];
     const int angle_y = args[P_ANGLE_Y];
     const int break_speed = args[P_BREAK];
-
-    const int ax = luminouswave_angle_idx(angle_x);
-    const int ay = luminouswave_angle_idx(angle_y);
-
-    const int sx = data->sin_lut[ax];
-    const int cx = data->cos_lut[ax];
-    const int sy = data->sin_lut[ay];
-    const int cy = data->cos_lut[ay];
-
-    const int max_x = freq_x * width;
-    const int max_y = freq_y * height;
-    const int max_speed = max_x > max_y ? max_x : max_y;
-    int step = max_speed / (break_speed * 10);
-
-    if(step < 1)
-        step = 1;
-
-    data->speed += step;
-
-    if(data->speed > max_speed)
-        data->speed = min_speed;
-
-    const int speed = min_speed + data->speed;
-    const int inc_y_q16 = luminouswave_phase_step_q16(freq_y, sx);
-    const int inc_x_q16 = luminouswave_phase_step_q16(freq_x, cx);
-    const int offset = frame->jobnum * height;
-
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp parallel for num_threads(data->n_threads) schedule(static)
+    #pragma omp single
+    {
+        const int ax = luminouswave_angle_idx(angle_x);
+        const int ay = luminouswave_angle_idx(angle_y);
+
+        const int sx = data->sin_lut[ax];
+        const int cx = data->cos_lut[ax];
+        data->sy = data->sin_lut[ay];
+        data->cy = data->cos_lut[ay];
+
+        const int max_x = freq_x * width;
+        const int max_y = freq_y * height;
+        const int max_speed = max_x > max_y ? max_x : max_y;
+        int step = max_speed / (break_speed * 10);
+
+        if(step < 1)
+            step = 1;
+
+        data->speed += step;
+
+        if(data->speed > max_speed)
+            data->speed = min_speed;
+
+        data->current_speed = min_speed + data->speed;
+        data->inc_y_q16 = luminouswave_phase_step_q16(freq_y, sx);
+        data->inc_x_q16 = luminouswave_phase_step_q16(freq_x, cx);
+        data->offset = frame->jobnum * height;
+    }
+
+    const int speed = data->current_speed;
+    const int inc_y_q16 = data->inc_y_q16;
+    const int inc_x_q16 = data->inc_x_q16;
+    const int offset = data->offset;
+    const int cy = data->cy;
+    const int sy = data->sy;
+
+    #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         uint8_t *restrict row = Y + y * width;
         const int actual_y = y + offset;

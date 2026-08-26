@@ -45,7 +45,6 @@ vj_effect *darkreplace_init(int w, int h)
     ve->description = "Replace Dark";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Softness");
 
@@ -65,8 +64,6 @@ void *darkreplace_malloc(int w, int h)
 
     if(!dr)
         return NULL;
-
-    dr->n_threads = vje_advise_num_threads(w * h);
 
     return dr;
 }
@@ -100,7 +97,7 @@ void darkreplace_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int denom = edge - full;
     const int mul = denom > 0 ? ((255 << 16) / denom) : 0;
 
-    #pragma omp parallel for num_threads(dr->n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const int y = Y[i];

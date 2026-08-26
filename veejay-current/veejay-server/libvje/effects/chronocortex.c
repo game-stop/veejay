@@ -81,6 +81,7 @@ typedef struct {
     int last_source_bleed;
     int last_cortex_gain;
     int last_color_energy;
+    int last_color_mode;
 } chronocortex_t;
 
 static inline int cf_clampi(int v, int lo, int hi)
@@ -130,16 +131,6 @@ vj_effect *chronocortex_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_THRESHOLD] = 0;
     ve->limits[1][P_THRESHOLD] = 1000;
@@ -184,9 +175,7 @@ vj_effect *chronocortex_init(int w, int h)
 
     ve->description = "Chronofold Cortex";
     ve->sub_format = 1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
-
+    
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Trigger Gate",
@@ -222,12 +211,7 @@ vj_effect *chronocortex_init(int w, int h)
 
 void *chronocortex_malloc(int w, int h)
 {
-    chronocortex_t *c;
-
-    if(w <= 0 || h <= 0)
-        return NULL;
-
-    c = (chronocortex_t *) vj_calloc(sizeof(chronocortex_t));
+    chronocortex_t *c = (chronocortex_t *) vj_calloc(sizeof(chronocortex_t));
     if(!c)
         return NULL;
 
@@ -238,7 +222,6 @@ void *chronocortex_malloc(int w, int h)
     c->seeded = 0;
     c->lut_valid = 0;
 
-    c->n_threads = vje_advise_num_threads(w * h);
 
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->on_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -293,7 +276,7 @@ static void cf_seed(chronocortex_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-for(i = 0; i < len; i++) {
+    for(i = 0; i < len; i++) {
         c->ref_y[i] = Y[i];
 
         c->on_y[i] = 0;
@@ -905,79 +888,75 @@ static void cf_compute_cortex_direct_rect(chronocortex_t *c,
         }
     }
 
-    /*
-     * Safe outside-rectangle bands.
-     * These are small when drift is small, and only borders when drift is zero.
-     */
 #pragma omp single
     {
-    if(ymin > 0) {
-        cf_compute_safe_region(
-            c, Y,
-            0, w - 1,
-            0, ymin - 1,
-            excitation,
-            inhibition,
-            branching,
-            prop_mode,
-            prop_diag,
-            dx_on,
-            dy_on,
-            dx_off,
-            dy_off
-        );
-    }
+        if(ymin > 0) {
+            cf_compute_safe_region(
+                c, Y,
+                0, w - 1,
+                0, ymin - 1,
+                excitation,
+                inhibition,
+                branching,
+                prop_mode,
+                prop_diag,
+                dx_on,
+                dy_on,
+                dx_off,
+                dy_off
+            );
+        }
 
-    if(ymax + 1 < h) {
-        cf_compute_safe_region(
-            c, Y,
-            0, w - 1,
-            ymax + 1, h - 1,
-            excitation,
-            inhibition,
-            branching,
-            prop_mode,
-            prop_diag,
-            dx_on,
-            dy_on,
-            dx_off,
-            dy_off
-        );
-    }
+        if(ymax + 1 < h) {
+            cf_compute_safe_region(
+                c, Y,
+                0, w - 1,
+                ymax + 1, h - 1,
+                excitation,
+                inhibition,
+                branching,
+                prop_mode,
+                prop_diag,
+                dx_on,
+                dy_on,
+                dx_off,
+                dy_off
+            );
+        }
 
-    if(xmin > 0) {
-        cf_compute_safe_region(
-            c, Y,
-            0, xmin - 1,
-            ymin, ymax,
-            excitation,
-            inhibition,
-            branching,
-            prop_mode,
-            prop_diag,
-            dx_on,
-            dy_on,
-            dx_off,
-            dy_off
-        );
-    }
+        if(xmin > 0) {
+            cf_compute_safe_region(
+                c, Y,
+                0, xmin - 1,
+                ymin, ymax,
+                excitation,
+                inhibition,
+                branching,
+                prop_mode,
+                prop_diag,
+                dx_on,
+                dy_on,
+                dx_off,
+                dy_off
+            );
+        }
 
-    if(xmax + 1 < w) {
-        cf_compute_safe_region(
-            c, Y,
-            xmax + 1, w - 1,
-            ymin, ymax,
-            excitation,
-            inhibition,
-            branching,
-            prop_mode,
-            prop_diag,
-            dx_on,
-            dy_on,
-            dx_off,
-            dy_off
-        );
-    }
+        if(xmax + 1 < w) {
+            cf_compute_safe_region(
+                c, Y,
+                xmax + 1, w - 1,
+                ymin, ymax,
+                excitation,
+                inhibition,
+                branching,
+                prop_mode,
+                prop_diag,
+                dx_on,
+                dy_on,
+                dx_off,
+                dy_off
+            );
+        }
     }
 }
 
@@ -1011,12 +990,6 @@ static void cf_compute_cortex(chronocortex_t *c,
         &dy_off
     );
 
-    /*
-     * Direct interior constraints:
-     * - source edge needs x/y one pixel away from border
-     * - propagation pair also needs one pixel away from border
-     * - drift source positions must stay inside frame
-     */
     xmin = 1;
     ymin = 1;
     xmax = w - 2;
@@ -1412,89 +1385,72 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronocortex_t *c = (chronocortex_t *) ptr;
 
-    int threshold;
-    int excitation;
-    int inhibition;
-    int decay;
-    int branching;
-    int polarity_drift;
-    int source_bleed;
-    int color_mode;
-    int cortex_gain;
-    int color_energy;
+    int threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
+    int excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
+    int inhibition_ui     = cf_clampi(args[P_INHIBITION], 0, 1000);
+    int decay_ui          = cf_clampi(args[P_DECAY], 0, 1000);
+    int branching_ui      = cf_clampi(args[P_BRANCHING], 0, 1000);
+    int polarity_drift_ui = cf_clampi(args[P_POLARITY_DRIFT], 0, 1000);
+    int source_bleed_ui   = cf_clampi(args[P_SOURCE_BLEED], 0, 1000);
+    int cortex_gain_ui    = cf_clampi(args[P_CORTEX_GAIN], 0, 1000);
+    int color_energy_ui   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+    int color_mode        = cf_clampi(args[P_COLOR_MODE], 0, 4);
 
-    int threshold_ui;
-    int excitation_ui;
-    int inhibition_ui;
-    int decay_ui;
-    int branching_ui;
-    int polarity_drift_ui;
-    int source_bleed_ui;
-    int cortex_gain_ui;
-    int color_energy_ui;
+    int threshold      = cf_ui1000_to_u8(threshold_ui);
+    int excitation     = cf_ui1000_to_u8(excitation_ui);
+    int inhibition     = cf_ui1000_to_u8(inhibition_ui);
+    int decay          = cf_ui1000_to_u8(decay_ui);
+    int branching      = cf_ui1000_to_u8(branching_ui);
+    int polarity_drift = cf_ui1000_to_u8(polarity_drift_ui);
+    int source_bleed   = cf_ui1000_to_u8(source_bleed_ui);
+    int cortex_gain    = cf_ui1000_to_u8(cortex_gain_ui);
+    int color_energy   = cf_ui1000_to_u8(color_energy_ui);
 
-    int prop_mode;
+    int prop_mode = c->frame & 3;
 
-    if(!c->seeded)
-        cf_seed(c, frame);
-
-    threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
-    excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
-    inhibition_ui     = cf_clampi(args[P_INHIBITION], 0, 1000);
-    decay_ui          = cf_clampi(args[P_DECAY], 0, 1000);
-    branching_ui      = cf_clampi(args[P_BRANCHING], 0, 1000);
-    polarity_drift_ui = cf_clampi(args[P_POLARITY_DRIFT], 0, 1000);
-    source_bleed_ui   = cf_clampi(args[P_SOURCE_BLEED], 0, 1000);
-    cortex_gain_ui    = cf_clampi(args[P_CORTEX_GAIN], 0, 1000);
-    color_energy_ui   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
-    color_mode        = cf_clampi(args[P_COLOR_MODE], 0, 4);
-
-    threshold      = cf_ui1000_to_u8(threshold_ui);
-    excitation     = cf_ui1000_to_u8(excitation_ui);
-    inhibition     = cf_ui1000_to_u8(inhibition_ui);
-    decay          = cf_ui1000_to_u8(decay_ui);
-    branching      = cf_ui1000_to_u8(branching_ui);
-    polarity_drift = cf_ui1000_to_u8(polarity_drift_ui);
-    source_bleed   = cf_ui1000_to_u8(source_bleed_ui);
-    cortex_gain    = cf_ui1000_to_u8(cortex_gain_ui);
-    color_energy   = cf_ui1000_to_u8(color_energy_ui);
-
-    cf_build_luts_if_needed(
-        c,
-        threshold,
-        excitation,
-        inhibition,
-        decay,
-        branching,
-        source_bleed,
-        cortex_gain,
-        color_energy
-    );
-
-    prop_mode = c->frame & 3;
-
-#pragma omp parallel num_threads(c->n_threads)
+    #pragma omp single
     {
-        cf_compute_cortex(
+        if(!c->seeded)
+            cf_seed(c, frame);
+
+        cf_build_luts_if_needed(
             c,
-            frame,
+            threshold,
             excitation,
             inhibition,
+            decay,
             branching,
-            polarity_drift,
-            prop_mode
-        );
-
-#pragma omp single
-        cf_swap_fields(c);
-
-        cf_render_cortex(
-            c,
-            frame,
             source_bleed,
-            color_mode
+            cortex_gain,
+            color_energy
         );
     }
+    
+    cf_compute_cortex(
+        c,
+        frame,
+        excitation,
+        inhibition,
+        branching,
+        polarity_drift,
+        prop_mode
+    );
 
-    c->frame++;
+    #pragma omp single
+    {
+        cf_swap_fields(c);
+    }
+
+    cf_render_cortex(
+        c,
+        frame,
+        source_bleed,
+        color_mode
+    );
+
+    #pragma omp single
+    {
+        c->last_color_mode = color_mode;
+        c->frame++;
+    }
 }

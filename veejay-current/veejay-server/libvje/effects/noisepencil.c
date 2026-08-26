@@ -1,16 +1,17 @@
-/* 
+/*
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg [nwelburg@gmail.com]
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -37,7 +38,6 @@
 typedef struct {
     uint8_t *Yb_frame;
     uint8_t *mask;
-    int n_threads;
 } noisepencil_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -54,7 +54,6 @@ static inline uint8_t noisepencil_scale_pos(int diff, int coeff, int denom)
 {
     if(diff <= 0)
         return 0;
-
     return noisepencil_u8((diff * coeff + (denom >> 1)) / denom);
 }
 
@@ -66,7 +65,6 @@ static inline int noisepencil_in_range(int v, int lo, int hi)
 vj_effect *noisepencil_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-
     if(!ve)
         return NULL;
 
@@ -74,17 +72,6 @@ vj_effect *noisepencil_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_MODE] = NP_MODE_1X3_NONZERO;
     ve->defaults[P_AMP] = 1000;
@@ -131,35 +118,36 @@ vj_effect *noisepencil_init(int width, int height)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)width;
+    (void)height;
+
     return ve;
 }
 
 void noisepencil_free(void *ptr)
 {
-    noisepencil_t *n = (noisepencil_t*) ptr;
-
-    free(n->Yb_frame);
-    free(n);
+    noisepencil_t *n = (noisepencil_t *) ptr;
+    if(n) {
+        free(n->Yb_frame);
+        free(n);
+    }
 }
 
 void *noisepencil_malloc(int width, int height)
 {
-    noisepencil_t *n = (noisepencil_t*) vj_calloc(sizeof(noisepencil_t));
-
+    noisepencil_t *n = (noisepencil_t *) vj_calloc(sizeof(noisepencil_t));
     if(!n)
         return NULL;
 
     const int len = width * height;
 
     n->Yb_frame = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len * 2u);
-
     if(!n->Yb_frame) {
         free(n);
         return NULL;
     }
 
     n->mask = n->Yb_frame + len;
-    n->n_threads = vje_advise_num_threads(len);
 
     return (void*) n;
 }
@@ -185,72 +173,61 @@ static void noisepencil_apply_mode(noisepencil_t *n,
     uint8_t *restrict B = n->Yb_frame;
     uint8_t *restrict M = n->mask;
 
-#pragma omp parallel num_threads(n->n_threads)
-    {
-        if(use_1x3) {
+    if (use_1x3) {
 #pragma omp for schedule(static)
-            for(int y = 0; y < height; y++) {
-                const int row = y * width;
-
-                for(int x = 0; x < width; x++) {
-                    const int xl = x > 0 ? x - 1 : x;
-                    const int xr = x < width - 1 ? x + 1 : x;
-                    const int idx = row + x;
-                    const int avg = (Y[row + xl] + Y[idx] + Y[row + xr]) / 3;
-
-                    B[idx] = (uint8_t)avg;
-                    M[idx] = (uint8_t)(!thresholded || noisepencil_in_range(avg, min_t, max_t));
-                }
+        for(int y = 0; y < height; y++) {
+            const int row = y * width;
+            for(int x = 0; x < width; x++) {
+                const int xl = x > 0 ? x - 1 : x;
+                const int xr = x < width - 1 ? x + 1 : x;
+                const int idx = row + x;
+                const int avg = (Y[row + xl] + Y[idx] + Y[row + xr]) / 3;
+                B[idx] = (uint8_t)avg;
+                M[idx] = (uint8_t)(!thresholded || noisepencil_in_range(avg, min_t, max_t));
             }
         }
-        else {
+    } else {
 #pragma omp for schedule(static)
-            for(int y = 0; y < height; y++) {
-                const int ym = y > 0 ? y - 1 : y;
-                const int yp = y < height - 1 ? y + 1 : y;
-                const int row = y * width;
-                const int up = ym * width;
-                const int dn = yp * width;
-
-                for(int x = 0; x < width; x++) {
-                    const int xl = x > 0 ? x - 1 : x;
-                    const int xr = x < width - 1 ? x + 1 : x;
-                    const int idx = row + x;
-                    const int avg = (
-                        Y[up + xl] + Y[up + x] + Y[up + xr] +
-                        Y[row + xl] + Y[idx] + Y[row + xr] +
-                        Y[dn + xl] + Y[dn + x] + Y[dn + xr]
-                    ) / 9;
-
-                    B[idx] = (uint8_t)avg;
-                    M[idx] = (uint8_t)(noisepencil_in_range(avg, min_t, max_t));
-                }
+        for(int y = 0; y < height; y++) {
+            const int ym = y > 0 ? y - 1 : y;
+            const int yp = y < height - 1 ? y + 1 : y;
+            const int row = y * width;
+            const int up = ym * width;
+            const int dn = yp * width;
+            for(int x = 0; x < width; x++) {
+                const int xl = x > 0 ? x - 1 : x;
+                const int xr = x < width - 1 ? x + 1 : x;
+                const int idx = row + x;
+                const int avg = (
+                    Y[up + xl] + Y[up + x] + Y[up + xr] +
+                    Y[row + xl] + Y[idx] + Y[row + xr] +
+                    Y[dn + xl] + Y[dn + x] + Y[dn + xr]
+                ) / 9;
+                B[idx] = (uint8_t)avg;
+                M[idx] = (uint8_t)(noisepencil_in_range(avg, min_t, max_t));
             }
         }
+    }
 
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            if(!M[i]) {
-                if(gated)
-                    Y[i] = 0;
-                continue;
-            }
-
-            const int diff = invert ? ((int)Y[i] - (int)B[i]) : ((int)B[i] - (int)Y[i]);
-            const uint8_t edge = noisepencil_scale_pos(diff, coeff, denom);
-
-            if(add_mode)
-                Y[i] = noisepencil_u8((int)Y[i] + (int)edge);
-            else
-                Y[i] = edge;
+    for(int i = 0; i < len; i++) {
+        if(!M[i]) {
+            if(gated)
+                Y[i] = 0;
+            continue;
         }
+        const int diff = invert ? ((int)Y[i] - (int)B[i]) : ((int)B[i] - (int)Y[i]);
+        const uint8_t edge = noisepencil_scale_pos(diff, coeff, denom);
+        if(add_mode)
+            Y[i] = noisepencil_u8((int)Y[i] + (int)edge);
+        else
+            Y[i] = edge;
     }
 }
 
 void noisepencil_apply(void *ptr, VJFrame *frame, int *args)
 {
-    noisepencil_t *n = (noisepencil_t*) ptr;
-
+    noisepencil_t *n = (noisepencil_t *) ptr;
     int min_t = args[P_MIN_T];
     int max_t = args[P_MAX_T];
 

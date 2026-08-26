@@ -16,13 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
- */
-
+*/
 #include "common.h"
 #include "livingsignalcolony.h"
 
 #define LSC_PARAMS 10
-
 #define P_GROWTH      0
 #define P_FEED        1
 #define P_COUPLING    2
@@ -38,7 +36,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int seeded;
     int ping;
     void *region;
@@ -85,60 +82,36 @@ static inline void lsc_sample_yuv(
     int *ou,
     int *ov
 ) {
-    int x0;
-    int y0;
-    int x1;
-    int y1;
-    int wx;
-    int wy;
-    int p00;
-    int p10;
-    int p01;
-    int p11;
-    int a;
-    int b;
-    int nx;
-    int ny;
-
-    if (fx < 0.0f)
-        fx = 0.0f;
-    else if (fx > (float) (w - 1))
-        fx = (float) (w - 1);
-
-    if (fy < 0.0f)
-        fy = 0.0f;
-    else if (fy > (float) (h - 1))
-        fy = (float) (h - 1);
-
+    int x0, y0, x1, y1, wx, wy, p00, p10, p01, p11, a, b, nx, ny;
+    if (fx < 0.0f) fx = 0.0f;
+    else if (fx > (float) (w - 1)) fx = (float) (w - 1);
+    if (fy < 0.0f) fy = 0.0f;
+    else if (fy > (float) (h - 1)) fy = (float) (h - 1);
+    
     x0 = (int) fx;
     y0 = (int) fy;
     x1 = x0 + 1;
     y1 = y0 + 1;
-
-    if (x1 >= w)
-        x1 = w - 1;
-    if (y1 >= h)
-        y1 = h - 1;
-
+    if (x1 >= w) x1 = w - 1;
+    if (y1 >= h) y1 = h - 1;
+    
     wx = (int) ((fx - (float) x0) * 256.0f);
     wy = (int) ((fy - (float) y0) * 256.0f);
-
+    
     p00 = y0 * w + x0;
     p10 = y0 * w + x1;
     p01 = y1 * w + x0;
     p11 = y1 * w + x1;
-
+    
     a = (int) Y[p00] * (256 - wx) + (int) Y[p10] * wx;
     b = (int) Y[p01] * (256 - wx) + (int) Y[p11] * wx;
     *oy = (a * (256 - wy) + b * wy + 32768) >> 16;
-
+    
     nx = (int) (fx + 0.5f);
     ny = (int) (fy + 0.5f);
-    if (nx >= w)
-        nx = w - 1;
-    if (ny >= h)
-        ny = h - 1;
-
+    if (nx >= w) nx = w - 1;
+    if (ny >= h) ny = h - 1;
+    
     p00 = ny * w + nx;
     *ou = U[p00];
     *ov = V[p00];
@@ -157,14 +130,12 @@ static void lsc_seed(livingsignalcolony_t *t, VJFrame *frame, VJFrame *frame2)
     const int w = t->w;
     const int h = t->h;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;
         int row = y * w;
         int rowm = ym * w;
         int rowp = yp * w;
-
         for (int x = 0; x < w; x++) {
             int xm = x > 0 ? x - 1 : 0;
             int xp = x + 1 < w ? x + 1 : w - 1;
@@ -177,7 +148,6 @@ static void lsc_seed(livingsignalcolony_t *t, VJFrame *frame, VJFrame *frame2)
             int seed = lsc_clampi((edge * 3 + chroma + diff * 2 + ((int) B[i] >> 1)) >> 2, 0, 255);
             uint32_t h0 = lsc_hash32((uint32_t) ((x >> 2) + (y >> 2) * 4099));
             int colony_seed = ((h0 & 255U) < 74U) ? ((seed * (52 + (int) ((h0 >> 8) & 63U))) >> 7) : 0;
-
             life[i] = (uint8_t) lsc_clampi((seed >> 1) + colony_seed, 0, 255);
             nutrient[i] = (uint8_t) lsc_clampi(((int) B[i] * 3 + 255 - seed) >> 2, 0, 255);
             charge[i] = (uint8_t) lsc_clampi((edge + diff + chroma + (int) ((h0 >> 16) & 63U)) / 3, 0, 255);
@@ -196,23 +166,20 @@ static void lsc_seed(livingsignalcolony_t *t, VJFrame *frame, VJFrame *frame2)
 vj_effect *livingsignalcolony_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-
     (void) w;
     (void) h;
-
-    if (!ve)
-        return NULL;
-
+    if (!ve) return NULL;
     ve->num_params = LSC_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    
+
     ve->description = "Living Signal Colony";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
-
     ve->defaults[P_GROWTH]     = 62;
     ve->defaults[P_FEED]       = 66;
     ve->defaults[P_COUPLING]   = 72;
@@ -223,7 +190,6 @@ vj_effect *livingsignalcolony_init(int w, int h)
     ve->defaults[P_MEMBRANE]   = 76;
     ve->defaults[P_PIGMENT]    = 62;
     ve->defaults[P_MIX]        = 82;
-
     ve->limits[0][P_GROWTH]     = 0;   ve->limits[1][P_GROWTH]     = 100;
     ve->limits[0][P_FEED]       = 0;   ve->limits[1][P_FEED]       = 100;
     ve->limits[0][P_COUPLING]   = 0;   ve->limits[1][P_COUPLING]   = 100;
@@ -234,70 +200,55 @@ vj_effect *livingsignalcolony_init(int w, int h)
     ve->limits[0][P_MEMBRANE]   = 0;   ve->limits[1][P_MEMBRANE]   = 100;
     ve->limits[0][P_PIGMENT]    = 0;   ve->limits[1][P_PIGMENT]    = 100;
     ve->limits[0][P_MIX]        = 0;   ve->limits[1][P_MIX]        = 100;
-
     ve->param_description = vje_build_param_list(
         ve->num_params,
-        "Colony Growth",
-        "Nutrient Feed",
-        "Signal Coupling",
-        "State Diffusion",
-        "Excitation",
-        "Colony Scale",
-        "Regeneration",
-        "Membrane",
-        "Pigment",
-        "Colony Mix"
+        "Colony Growth", "Nutrient Feed", "Signal Coupling", "State Diffusion",
+        "Excitation", "Colony Scale", "Regeneration", "Membrane", "Pigment", "Colony Mix"
     );
-
     return ve;
 }
 
 void *livingsignalcolony_malloc(int w, int h)
 {
+    if (w <= 0 || h <= 0)
+        return NULL;
+
     livingsignalcolony_t *t = (livingsignalcolony_t *) vj_calloc(sizeof(livingsignalcolony_t));
     const size_t len = (size_t) w * (size_t) h;
     const size_t total = len * 11;
     uint8_t *base;
     size_t off = 0;
-
-    if (!t)
-        return NULL;
-
+    if (!t) return NULL;
     t->w = w;
     t->h = h;
     t->len = (int) len;
-    t->n_threads = vje_advise_num_threads(w * h);
+    
     t->region = vj_malloc(total);
     if (!t->region) {
         free(t);
         return NULL;
     }
-
     base = (uint8_t *) t->region;
     t->src_y = base + off; off += len;
     t->src_u = base + off; off += len;
     t->src_v = base + off; off += len;
-
     for (int p = 0; p < 2; p++) {
         t->life[p] = base + off; off += len;
         t->nutrient[p] = base + off; off += len;
         t->charge[p] = base + off; off += len;
         t->pigment[p] = base + off; off += len;
     }
-
     for (int i = 0; i < 256; i++) {
         float a = 6.28318530718f * (float) i / 256.0f;
         t->hue_u[i] = (int8_t) (sinf(a) * 96.0f);
         t->hue_v[i] = (int8_t) (cosf(a) * 96.0f);
     }
-
     return t;
 }
 
 void livingsignalcolony_free(void *ptr)
 {
     livingsignalcolony_t *t = (livingsignalcolony_t *) ptr;
-
     if (t) {
         free(t->region);
         free(t);
@@ -340,67 +291,40 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
     uint8_t *restrict charge2 = t->charge[nxt];
     uint8_t *restrict pigment2 = t->pigment[nxt];
 
-    veejay_memcpy(src_y, Y, len);
-    veejay_memcpy(src_u, U, len);
-    veejay_memcpy(src_v, V, len);
+    #pragma omp single
+    {
+        veejay_memcpy(src_y, Y, len);
+        veejay_memcpy(src_u, U, len);
+        veejay_memcpy(src_v, V, len);
 
-    if (!t->seeded)
-        lsc_seed(t, frame, frame2);
+        if (!t->seeded) {
+            lsc_seed(t, frame, frame2);
+        }
+    }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+    #pragma omp for schedule(static)
     for (int y = 0; y < h; y++) {
         int ym = y - radius;
         int yp = y + radius;
         int row = y * w;
-        int rowm;
-        int rowp;
-
-        if (ym < 0)
-            ym = 0;
-        if (yp >= h)
-            yp = h - 1;
+        int rowm, rowp;
+        if (ym < 0) ym = 0;
+        if (yp >= h) yp = h - 1;
         rowm = ym * w;
         rowp = yp * w;
-
         for (int x = 0; x < w; x++) {
             int xm = x - radius;
             int xp = x + radius;
             int i = row + x;
-            int il;
-            int ir;
-            int iu;
-            int id;
-            int iul;
-            int iur;
-            int idl;
-            int idr;
-            int nl;
-            int nn;
-            int nc;
-            int np;
-            int gx;
-            int gy;
-            int edge;
-            int chroma;
-            int source_delta;
-            int signal;
-            int crowd;
+            int il, ir, iu, id, iul, iur, idl, idr;
+            int nl, nn, nc, np, gx, gy, edge, chroma, source_delta, signal, crowd;
             int life_v = life[i];
             int nutrient_v = nutrient[i];
             int charge_v = charge[i];
             int pigment_v = pigment[i];
-            int feed_target;
-            int dlife;
-            int dnutrient;
-            int dcharge;
-            int pigment_target;
-            int dpigment;
-
-            if (xm < 0)
-                xm = 0;
-            if (xp >= w)
-                xp = w - 1;
-
+            int feed_target, dlife, dnutrient, dcharge, pigment_target, dpigment;
+            if (xm < 0) xm = 0;
+            if (xp >= w) xp = w - 1;
             il = row + xm;
             ir = row + xp;
             iu = rowm + x;
@@ -409,12 +333,10 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
             iur = rowm + xp;
             idl = rowp + xm;
             idr = rowp + xp;
-
             nl = (life[il] + life[ir] + life[iu] + life[id] + life[iul] + life[iur] + life[idl] + life[idr] + 4) >> 3;
             nn = (nutrient[il] + nutrient[ir] + nutrient[iu] + nutrient[id] + nutrient[iul] + nutrient[iur] + nutrient[idl] + nutrient[idr] + 4) >> 3;
             nc = (charge[il] + charge[ir] + charge[iu] + charge[id] + charge[iul] + charge[iur] + charge[idl] + charge[idr] + 4) >> 3;
             np = (pigment[il] + pigment[ir] + pigment[iu] + pigment[id] + pigment[iul] + pigment[iur] + pigment[idl] + pigment[idr] + 4) >> 3;
-
             gx = (int) Y2[ir] - (int) Y2[il];
             gy = (int) Y2[id] - (int) Y2[iu];
             edge = lsc_clampi(lsc_abs(gx) + lsc_abs(gy), 0, 255);
@@ -422,31 +344,24 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
             source_delta = lsc_abs((int) src_y[i] - (int) Y2[i]);
             signal = lsc_clampi((edge * 3 + chroma + source_delta * 2 + ((int) Y2[i] >> 1)) >> 2, 0, 255);
             crowd = 255 - (lsc_abs(nl - 118) << 1);
-            if (crowd < 0)
-                crowd = 0;
-
+            if (crowd < 0) crowd = 0;
             feed_target = lsc_clampi((((int) Y2[i] * 3 + signal * 2 + 255 - life_v) / 6), 0, 255);
-
             dlife = ((nl - life_v) * diffusion) / 190;
             dlife += (growth * crowd * nutrient_v) / 76000;
             dlife += (coupling * signal) / 720;
             dlife += (regen * nl * (255 - life_v)) / 250000;
             dlife -= (charge_v * (12 + excitation)) / 1800;
             dlife -= 1 + ((life_v * (12 + growth / 6)) >> 11);
-
             dnutrient = ((nn - nutrient_v) * diffusion) / 220;
             dnutrient += ((feed_target - nutrient_v) * feed) / 330;
             dnutrient -= (life_v * (18 + growth / 2)) >> 10;
-
             dcharge = ((nc - charge_v) * (diffusion + 28)) / 125;
             dcharge += (excitation * (life_v - charge_v)) / 190;
             dcharge += (coupling * signal) / 1100;
             dcharge -= 1;
-
             pigment_target = lsc_clampi(128 + (((int) V2[i] - (int) U2[i]) >> 1) + ((charge_v - 128) >> 2), 0, 255);
             dpigment = ((np - pigment_v) * diffusion) / 230;
             dpigment += ((pigment_target - pigment_v) * (12 + pigment_gain)) / 520;
-
             life2[i] = (uint8_t) lsc_clampi(life_v + dlife, 0, 255);
             nutrient2[i] = (uint8_t) lsc_clampi(nutrient_v + dnutrient, 0, 255);
             charge2[i] = (uint8_t) lsc_clampi(charge_v + dcharge, 0, 255);
@@ -454,14 +369,13 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
         }
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+    #pragma omp for schedule(static)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;
         int row = y * w;
         int rowm = ym * w;
         int rowp = yp * w;
-
         for (int x = 0; x < w; x++) {
             int xm = x > 0 ? x - 1 : 0;
             int xp = x + 1 < w ? x + 1 : w - 1;
@@ -484,19 +398,8 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
             float normal = ((float) (nv - 112) * (1.0f / 128.0f)) * 4.5f * ((float) colony * (1.0f / 255.0f));
             float sx = (float) x + tx * drift + (float) gx * inv * normal;
             float sy = (float) y + ty * drift + (float) gy * inv * normal;
-            int syv;
-            int suv;
-            int svv;
-            int colony_y;
-            int colony_u;
-            int colony_v;
-            int emit;
-            int hue_u;
-            int hue_v;
-            int mix_local;
-
+            int syv, suv, svv, colony_y, colony_u, colony_v, emit, hue_u, hue_v, mix_local;
             lsc_sample_yuv(src_y, src_u, src_v, sx, sy, w, h, &syv, &suv, &svv);
-
             emit = (membrane * membrane_gain) / 100;
             colony_y = syv + (((int) Y2[i] - syv) * colony * coupling) / 6502500;
             colony_y += ((255 - colony_y) * emit) >> 8;
@@ -504,7 +407,6 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
             colony_y += ((cv - 96) * activity) >> 9;
             colony_y += ((lv - cv) * colony) >> 9;
             colony_y = lsc_clampi(colony_y, 0, 255);
-
             hue_u = t->hue_u[pv];
             hue_v = t->hue_v[pv];
             colony_u = suv + (((int) U2[i] - suv) * colony * coupling) / 6502500;
@@ -513,7 +415,6 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
             colony_v += (hue_v * activity * pigment_gain) / 25500;
             colony_u = lsc_clampi(colony_u, 0, 255);
             colony_v = lsc_clampi(colony_v, 0, 255);
-
             mix_local = (mix * (96 + activity * 159 / 255)) / 255;
             Y[i] = (uint8_t) (src_y[i] + ((mix_local * (colony_y - (int) src_y[i])) / 100));
             U[i] = (uint8_t) lsc_clampi((int) src_u[i] + ((mix_local * (colony_u - (int) src_u[i])) / 100), 0, 255);
@@ -521,5 +422,8 @@ void livingsignalcolony_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *a
         }
     }
 
-    t->ping = nxt;
+    #pragma omp single
+    {
+        t->ping = nxt;
+    }
 }

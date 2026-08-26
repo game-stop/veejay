@@ -38,16 +38,6 @@ vj_effect *frameborder_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     const int max_size = height >> 1;
     const int def_size = clampi(width >> 3, 1, max_size);
@@ -75,6 +65,8 @@ vj_effect *frameborder_init(int width, int height)
 
 void frameborder_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
+    #pragma omp single
+    {
     (void) ptr;
 
     const int size = args[0];
@@ -83,4 +75,5 @@ void frameborder_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
                         frame2->data[0], frame2->data[1], frame2->data[2],
                         frame->width, frame->height, size, size, size, size,
                         frame->shift_h, frame->shift_v);
+    }
 }

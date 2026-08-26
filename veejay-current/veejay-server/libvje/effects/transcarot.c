@@ -40,13 +40,11 @@ typedef struct {
     float speed_env;
     float expand_env;
     float glow_env;
-
-    int n_threads;
 } wipe_t;
 
 static inline int transcarot_clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : (v > hi ? hi : v);
+    return (v < lo) ? lo : ((v > hi) ? hi : v);
 }
 
 static inline uint8_t transcarot_u8_add(uint8_t v, int add)
@@ -55,14 +53,10 @@ static inline uint8_t transcarot_u8_add(uint8_t v, int add)
     return (uint8_t)((r < 0) ? 0 : (r > 255 ? 255 : r));
 }
 
-
-
 static inline float transcarot_smoothf(float oldv, float target, float coef)
 {
     return oldv + (target - oldv) * coef;
 }
-
-
 
 vj_effect *transcarot_init(int width, int height)
 {
@@ -75,14 +69,6 @@ vj_effect *transcarot_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_SPEED]        = 2;
     ve->defaults[P_MODE]         = 0;
@@ -149,8 +135,6 @@ void *transcarot_malloc(int w, int h)
     wipe->expand_env = 0.0f;
     wipe->glow_env = 0.0f;
 
-    wipe->n_threads = vje_advise_num_threads(w * h);
-
     return wipe;
 }
 
@@ -172,7 +156,6 @@ static void transcarot_apply_diagonal(wipe_t *wipe,
     const int width = frame->width;
     const int height = frame->height;
 
-#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         int limit = progress + expand_px - y;
 
@@ -227,7 +210,6 @@ static void transcarot_apply_bouncybox(wipe_t *wipe,
     const int width = frame->width;
     const int height = frame->height;
 
-#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         if(y < cur_y && cur_x > 0) {
             const int off = y * width;
@@ -300,8 +282,7 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     effective_speed += (int)(expand_t * (float)(1 + max_dim / 32) + 0.5f);
     effective_speed = transcarot_clampi(effective_speed, 0, max_dim);
 
-    int expand_px = (int)(((float)max_dim * 0.42f) * expand_t + 0.5f);
-    expand_px = transcarot_clampi(expand_px, 0, max_dim);
+    const int expand_px = (int)(((float)max_dim * 0.42f) * expand_t + 0.5f);
 
     int glow_width = 0;
     int glow_strength = 0;
@@ -351,28 +332,25 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         progress = wipe->diagonal_pos;
     }
 
-#pragma omp parallel num_threads(wipe->n_threads)
-    {
-        if(mode == 1) {
-            transcarot_apply_bouncybox(
-                wipe,
-                frame,
-                frame2,
-                cur_x,
-                cur_y,
-                glow_width,
-                glow_strength
-            );
-        } else {
-            transcarot_apply_diagonal(
-                wipe,
-                frame,
-                frame2,
-                progress,
-                expand_px,
-                glow_width,
-                glow_strength
-            );
-        }
+    if(mode == 1) {
+        transcarot_apply_bouncybox(
+            wipe,
+            frame,
+            frame2,
+            cur_x,
+            cur_y,
+            glow_width,
+            glow_strength
+        );
+    } else {
+        transcarot_apply_diagonal(
+            wipe,
+            frame,
+            frame2,
+            progress,
+            expand_px,
+            glow_width,
+            glow_strength
+        );
     }
 }

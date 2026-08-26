@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -100,8 +100,6 @@ static inline int rotozoom_to_q8(int v, int max)
     return (v * 256 + (max >> 1)) / max;
 }
 
-
-
 static inline float rotozoom_follow(float current, float target, float amount)
 {
     return current + (target - current) * amount;
@@ -148,17 +146,6 @@ vj_effect *rotozoom_init(int width, int height)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_ROTATE] = 30;
     ve->defaults[P_ZOOM] = 2;
@@ -239,6 +226,7 @@ void *rotozoom_malloc(int width, int height)
     r->frameCount = 0;
     r->direction = 1;
     r->smoothing_ready = 0;
+    r->n_threads = vje_advise_num_threads(len);
 
     for(int i = 0; i < 360; i++) {
         const double rad = (double)i * M_PI / 180.0;
@@ -247,14 +235,14 @@ void *rotozoom_malloc(int width, int height)
         r->cos_lut[i] = a_cos(rad);
     }
 
-    r->n_threads = vje_advise_num_threads(len);
-
     return (void*)r;
 }
 
 void rotozoom_free(void *ptr)
 {
     rotozoom_t *r = (rotozoom_t*)ptr;
+    if(!r)
+        return;
 
     free(r->rotobuffer[0]);
     free(r);
@@ -268,86 +256,6 @@ void rotozoom_apply(void *ptr, VJFrame *frame, int *args)
     const int height = frame->height;
     const int len = frame->len;
 
-    double rotate = (double)args[P_ROTATE];
-    double zoom_arg = (double)args[P_ZOOM];
-    const int autom = args[P_AUTOMATIC] ? 1 : 0;
-    int maxFrames = args[P_DURATION];
-
-    const int mix_arg = args[P_MIX];
-    const int chroma_arg = args[P_CHROMA];
-    const int zoom_drive_arg = args[P_ZOOM_DRIVE];
-    const int spin_drive_arg = args[P_SPIN_DRIVE];
-
-    if(autom) {
-        zoom_arg = r->zoom;
-        rotate = r->rotate;
-
-        r->zoom += (double)r->direction * (2000.0 / (double)maxFrames);
-        r->rotate += (double)r->direction * (360.0 / (double)maxFrames);
-        r->frameCount++;
-
-        if(r->frameCount >= maxFrames || r->rotate <= 0.0 || r->rotate >= 360.0) {
-            r->direction *= -1;
-            r->frameCount = 0;
-
-            if(r->rotate < 0.0)
-                r->rotate = 0.0;
-            else if(r->rotate > 360.0)
-                r->rotate = 360.0;
-        }
-
-        if(r->zoom < -1000.0)
-            r->zoom = -1000.0;
-        else if(r->zoom > 1000.0)
-            r->zoom = 1000.0;
-    }
-    else {
-        r->zoom = zoom_arg;
-        r->rotate = rotate;
-        r->frameCount = 0;
-        r->direction = 1;
-    }
-
-    const float follow = 0.28f;
-
-    if(!r->smoothing_ready) {
-        r->sm_rotate = (float)rotate;
-        r->sm_zoom = (float)zoom_arg;
-        r->sm_duration = (float)maxFrames;
-        r->sm_mix = (float)mix_arg;
-        r->sm_chroma = (float)chroma_arg;
-        r->sm_zoom_drive = (float)zoom_drive_arg;
-        r->sm_spin_drive = (float)spin_drive_arg;
-        r->smoothing_ready = 1;
-    }
-    else {
-        r->sm_rotate = rotozoom_follow_angle(r->sm_rotate, (float)rotate, follow);
-        r->sm_zoom = rotozoom_follow(r->sm_zoom, (float)zoom_arg, follow);
-        r->sm_duration = rotozoom_follow(r->sm_duration, (float)maxFrames, follow);
-        r->sm_mix = rotozoom_follow(r->sm_mix, (float)mix_arg, follow);
-        r->sm_chroma = rotozoom_follow(r->sm_chroma, (float)chroma_arg, follow);
-        r->sm_zoom_drive = rotozoom_follow(r->sm_zoom_drive, (float)zoom_drive_arg, follow);
-        r->sm_spin_drive = rotozoom_follow(r->sm_spin_drive, (float)spin_drive_arg, follow);
-    }
-
-    const float zoom_drive = clampf(r->sm_zoom_drive * 0.001f, 0.0f, 1.0f);
-    const float spin_drive = clampf(r->sm_spin_drive * 0.001f, 0.0f, 1.0f);
-
-    double effective_zoom_arg = (double)r->sm_zoom;
-
-    effective_zoom_arg += (double)(zoom_drive * 840.0f);
-
-    if(effective_zoom_arg > 1000.0)
-        effective_zoom_arg = 1000.0;
-    else if(effective_zoom_arg < -1000.0)
-        effective_zoom_arg = -1000.0;
-
-    double effective_rotate = (double)r->sm_rotate;
-
-    effective_rotate += (double)(spin_drive * 360.0f);
-
-    const double zoom = rotozoom_scale_from_arg(effective_zoom_arg);
-
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
     uint8_t *restrict dstV = frame->data[2];
@@ -356,9 +264,90 @@ void rotozoom_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = r->rotobuffer[1];
     uint8_t *restrict srcV = r->rotobuffer[2];
 
-    veejay_memcpy(srcY, dstY, len);
-    veejay_memcpy(srcU, dstU, len);
-    veejay_memcpy(srcV, dstV, len);
+    double rotate = (double)args[P_ROTATE];
+    double zoom_arg = (double)args[P_ZOOM];
+    int autom = args[P_AUTOMATIC] ? 1 : 0;
+    int maxFrames = args[P_DURATION];
+
+    int mix_arg = args[P_MIX];
+    int chroma_arg = args[P_CHROMA];
+    int zoom_drive_arg = args[P_ZOOM_DRIVE];
+    int spin_drive_arg = args[P_SPIN_DRIVE];
+
+    #pragma omp single
+    {
+        if(autom) {
+            zoom_arg = r->zoom;
+            rotate = r->rotate;
+
+            r->zoom += (double)r->direction * (2000.0 / (double)maxFrames);
+            r->rotate += (double)r->direction * (360.0 / (double)maxFrames);
+            r->frameCount++;
+
+            if(r->frameCount >= maxFrames || r->rotate <= 0.0 || r->rotate >= 360.0) {
+                r->direction *= -1;
+                r->frameCount = 0;
+
+                if(r->rotate < 0.0)
+                    r->rotate = 0.0;
+                else if(r->rotate > 360.0)
+                    r->rotate = 360.0;
+            }
+
+            if(r->zoom < -1000.0)
+                r->zoom = -1000.0;
+            else if(r->zoom > 1000.0)
+                r->zoom = 1000.0;
+        }
+        else {
+            r->zoom = zoom_arg;
+            r->rotate = rotate;
+            r->frameCount = 0;
+            r->direction = 1;
+        }
+
+        const float follow = 0.28f;
+
+        if(!r->smoothing_ready) {
+            r->sm_rotate = (float)rotate;
+            r->sm_zoom = (float)zoom_arg;
+            r->sm_duration = (float)maxFrames;
+            r->sm_mix = (float)mix_arg;
+            r->sm_chroma = (float)chroma_arg;
+            r->sm_zoom_drive = (float)zoom_drive_arg;
+            r->sm_spin_drive = (float)spin_drive_arg;
+            r->smoothing_ready = 1;
+        }
+        else {
+            r->sm_rotate = rotozoom_follow_angle(r->sm_rotate, (float)rotate, follow);
+            r->sm_zoom = rotozoom_follow(r->sm_zoom, (float)zoom_arg, follow);
+            r->sm_duration = rotozoom_follow(r->sm_duration, (float)maxFrames, follow);
+            r->sm_mix = rotozoom_follow(r->sm_mix, (float)mix_arg, follow);
+            r->sm_chroma = rotozoom_follow(r->sm_chroma, (float)chroma_arg, follow);
+            r->sm_zoom_drive = rotozoom_follow(r->sm_zoom_drive, (float)zoom_drive_arg, follow);
+            r->sm_spin_drive = rotozoom_follow(r->sm_spin_drive, (float)spin_drive_arg, follow);
+        }
+
+        veejay_memcpy(srcY, dstY, len);
+        veejay_memcpy(srcU, dstU, len);
+        veejay_memcpy(srcV, dstV, len);
+    }
+
+    const float zoom_drive = clampf(r->sm_zoom_drive * 0.001f, 0.0f, 1.0f);
+    const float spin_drive = clampf(r->sm_spin_drive * 0.001f, 0.0f, 1.0f);
+
+    double effective_zoom_arg = (double)r->sm_zoom;
+    effective_zoom_arg += (double)(zoom_drive * 840.0f);
+
+    if(effective_zoom_arg > 1000.0)
+        effective_zoom_arg = 1000.0;
+    else if(effective_zoom_arg < -1000.0)
+        effective_zoom_arg = -1000.0;
+
+    double effective_rotate = (double)r->sm_rotate;
+    effective_rotate += (double)(spin_drive * 360.0f);
+
+    double zoom = rotozoom_scale_from_arg(effective_zoom_arg);
 
     int mix_q8 = rotozoom_to_q8((int)(r->sm_mix + 0.5f), 1000);
     int chroma_q8 = rotozoom_to_q8((int)(r->sm_chroma + 0.5f), 1000);
@@ -379,7 +368,7 @@ void rotozoom_apply(void *ptr, VJFrame *frame, int *args)
     const float sin_val = r->sin_lut[angle];
     const float z = (float)zoom;
 
-#pragma omp parallel for schedule(static) num_threads(r->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const float dy = (float)y - centerY;
         const int row = y * width;
@@ -398,16 +387,15 @@ void rotozoom_apply(void *ptr, VJFrame *frame, int *args)
             const int srcIndex = newY * width + newX;
             const int dstIndex = row + x;
 
-            const uint8_t oy = srcY[dstIndex];
             const uint8_t ou = srcU[dstIndex];
             const uint8_t ov = srcV[dstIndex];
-            const uint8_t wy = srcY[srcIndex];
             const uint8_t wu = srcU[srcIndex];
             const uint8_t wv = srcV[srcIndex];
+            
             const uint8_t cu = rotozoom_blend_uv(ou, wu, chroma_q8);
             const uint8_t cv = rotozoom_blend_uv(ov, wv, chroma_q8);
 
-            dstY[dstIndex] = rotozoom_blend_y(oy, wy, mix_q8);
+            dstY[dstIndex] = rotozoom_blend_y(srcY[dstIndex], srcY[srcIndex], mix_q8);
             dstU[dstIndex] = rotozoom_blend_uv(ou, cu, mix_q8);
             dstV[dstIndex] = rotozoom_blend_uv(ov, cv, mix_q8);
         }

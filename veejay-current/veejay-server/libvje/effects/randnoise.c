@@ -61,17 +61,6 @@ vj_effect *randnoise_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_MIN] = -255; ve->limits[1][P_MIN] = 255; ve->defaults[P_MIN] = -16;
     ve->limits[0][P_MAX] = -255; ve->limits[1][P_MAX] = 255; ve->defaults[P_MAX] = 16;
 
@@ -96,7 +85,6 @@ vj_effect *randnoise_init(int w, int h)
     return ve;
 }
 
-
 void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 {
     (void)ptr;
@@ -112,7 +100,7 @@ void randnoise_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->len;
     const int range = maxv - minv;
-    const int n_threads = vje_advise_num_threads(len);
+    const uint32_t span = (uint32_t)(range + 1);
 
     uint8_t *restrict Y = frame->data[0];
 
@@ -122,14 +110,15 @@ void randnoise_apply(void *ptr, VJFrame *frame, int *args)
         (uint32_t)Y[len - 1] ^
         ((uint32_t)len * 2654435761U);
 
-    const uint32_t span = (uint32_t)(range + 1);
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int i = 0; i < len; i++) {
-        if(range == 0) {
+    if(range == 0) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
             Y[i] = randnoise_u8((int)Y[i] + minv);
         }
-        else {
+    }
+    else {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
             const uint32_t h = randnoise_hash32((uint32_t)i ^ seed);
             const int n = (int)(h % span) + minv;
 

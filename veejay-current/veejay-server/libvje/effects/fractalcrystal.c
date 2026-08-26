@@ -23,6 +23,10 @@
 #define FRACTALCRYSTAL_PARAMS 10
 #define FC_TWO_PI 6.28318530718f
 #define FC_INV_TWO_PI 0.15915494309f
+#define FC_TRIG_LUT_SIZE 1024
+#define FC_TRIG_LUT_MASK 1023
+#define FC_LUT_SCALE 162.974661726f
+#define FC_BLUR_TILE 32
 
 #define P_ZOOM        0
 #define P_DENSITY     1
@@ -36,8 +40,6 @@
 #define P_SPEED       9
 
 typedef struct {
-    float site_x;
-    float site_y;
     float nx;
     float ny;
     float shift_x;
@@ -50,7 +52,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int max_cell_cols;
     int max_cell_rows;
     void *region;
@@ -59,7 +60,11 @@ typedef struct {
     uint8_t *src_v;
     uint8_t *blur;
     uint8_t *tmp;
+    float *site_x;
+    float *site_y;
     fc_cell_t *cells;
+    float sin_lut[FC_TRIG_LUT_SIZE];
+    float cos_lut[FC_TRIG_LUT_SIZE];
     float phase;
 } fractalcrystal_t;
 
@@ -97,7 +102,7 @@ static inline uint32_t fc_hash_u32(uint32_t x)
 static inline float fc_hash01(int x, int y, uint32_t salt)
 {
     uint32_t h = (uint32_t) x * 0x9e3779b1U ^ (uint32_t) y * 0x85ebca6bU ^ salt;
-    return (float) (fc_hash_u32(h) & 0x00ffffffU) * (1.0f / 16777215.0f);
+    return (float) (fc_hash_u32(h) & 0x00ffffffU) * 5.9604644775390625e-8f; // 1.0f / 16777215.0f
 }
 
 static inline float fc_wrap_2pi(float v)
@@ -113,6 +118,16 @@ static inline float fc_wrap_2pi(float v)
     return v;
 }
 
+static inline float fc_lut_sin(const fractalcrystal_t *t, float phase)
+{
+    return t->sin_lut[((int) (phase * FC_LUT_SCALE)) & FC_TRIG_LUT_MASK];
+}
+
+static inline float fc_lut_cos(const fractalcrystal_t *t, float phase)
+{
+    return t->cos_lut[((int) (phase * FC_LUT_SCALE)) & FC_TRIG_LUT_MASK];
+}
+
 static inline float fc_pingpong(float phase)
 {
     float p = fc_wrap_2pi(phase) * FC_INV_TWO_PI;
@@ -123,14 +138,10 @@ static inline float fc_pingpong(float phase)
 
 static inline float fc_time_step(int speed)
 {
-    float u;
-    float mag;
-
     if (speed == 0)
         return 0.0f;
-
-    u = fc_clampf(fc_absf((float) speed) * 0.001f, 0.0f, 1.0f);
-    mag = 0.00016f * (exp2f(10.0f * u) - 1.0f);
+    float u = fc_clampf(fc_absf((float) speed) * 0.001f, 0.0f, 1.0f);
+    float mag = 0.00016f * (exp2f(10.0f * u) - 1.0f);
     return speed < 0 ? -mag : mag;
 }
 
@@ -145,10 +156,9 @@ static void fc_box_blur(
     const int window = radius * 2 + 1;
     const int recip = (65536 + window / 2) / window;
     uint8_t *restrict tmp = t->tmp;
-    int y;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
-    for (y = 0; y < h; y++) {
+#pragma omp for schedule(static)
+    for (int y = 0; y < h; y++) {
         const uint8_t *row = src + y * w;
         uint8_t *out = tmp + y * w;
         int sum = row[0] * (radius + 1);
@@ -157,39 +167,86 @@ static void fc_box_blur(
         for (x = 1; x <= radius; x++)
             sum += row[x < w ? x : w - 1];
 
-        for (x = 0; x < w; x++) {
-            int subx = x - radius;
-            int addx = x + radius + 1;
-
-            out[x] = (uint8_t) ((sum * recip + 32768) >> 16);
-            if (subx < 0)
-                subx = 0;
-            if (addx >= w)
-                addx = w - 1;
-            sum += row[addx] - row[subx];
+        int right_edge = w - radius - 1;
+        if (right_edge < radius + 1) { 
+            for (x = 0; x < w; x++) {
+                int subx = x - radius;
+                int addx = x + radius + 1;
+                out[x] = (uint8_t) ((sum * recip + 32768) >> 16);
+                if (subx < 0) subx = 0;
+                if (addx >= w) addx = w - 1;
+                sum += row[addx] - row[subx];
+            }
+        } else {
+            for (x = 0; x <= radius; x++) {
+                out[x] = (uint8_t) ((sum * recip + 32768) >> 16);
+                sum += row[x + radius + 1] - row[0];
+            }
+            for (; x < right_edge; x++) {
+                out[x] = (uint8_t) ((sum * recip + 32768) >> 16);
+                sum += row[x + radius + 1] - row[x - radius];
+            }
+            for (; x < w; x++) {
+                out[x] = (uint8_t) ((sum * recip + 32768) >> 16);
+                sum += row[w - 1] - row[x - radius];
+            }
         }
     }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
-    for (int x = 0; x < w; x++) {
-        int sum = tmp[x] * (radius + 1);
-        int yy;
+#pragma omp for schedule(static)
+    for (int xb = 0; xb < w; xb += FC_BLUR_TILE) {
+        int sums[FC_BLUR_TILE];
+        int count = w - xb;
+        if (count > FC_BLUR_TILE) count = FC_BLUR_TILE;
 
-        for (yy = 1; yy <= radius; yy++) {
-            int sy = yy < h ? yy : h - 1;
-            sum += tmp[sy * w + x];
+        for (int k = 0; k < count; k++) {
+            int x = xb + k;
+            int sum = tmp[x] * (radius + 1);
+            for (int yy = 1; yy <= radius; yy++) {
+                int sy = yy < h ? yy : h - 1;
+                sum += tmp[sy * w + x];
+            }
+            sums[k] = sum;
         }
 
-        for (yy = 0; yy < h; yy++) {
-            int suby = yy - radius;
-            int addy = yy + radius + 1;
-
-            dst[yy * w + x] = (uint8_t) ((sum * recip + 32768) >> 16);
-            if (suby < 0)
-                suby = 0;
-            if (addy >= h)
-                addy = h - 1;
-            sum += tmp[addy * w + x] - tmp[suby * w + x];
+        int h_right_edge = h - radius - 1;
+        if (h_right_edge < radius + 1) {
+            for (int yy = 0; yy < h; yy++) {
+                int suby = yy > radius ? yy - radius : 0;
+                int addy = yy + radius + 1;
+                if (addy >= h) addy = h - 1;
+                int subrow = suby * w + xb;
+                int addrow = addy * w + xb;
+                for (int k = 0; k < count; k++) {
+                    dst[yy * w + xb + k] = (uint8_t) ((sums[k] * recip + 32768) >> 16);
+                    sums[k] += tmp[addrow + k] - tmp[subrow + k];
+                }
+            }
+        } else {
+            for (int yy = 0; yy <= radius; yy++) {
+                int addrow = (yy + radius + 1) * w + xb;
+                int subrow = xb; 
+                for (int k = 0; k < count; k++) {
+                    dst[yy * w + xb + k] = (uint8_t) ((sums[k] * recip + 32768) >> 16);
+                    sums[k] += tmp[addrow + k] - tmp[subrow + k];
+                }
+            }
+            for (int yy = radius + 1; yy < h_right_edge; yy++) {
+                int addrow = (yy + radius + 1) * w + xb;
+                int subrow = (yy - radius) * w + xb;
+                for (int k = 0; k < count; k++) {
+                    dst[yy * w + xb + k] = (uint8_t) ((sums[k] * recip + 32768) >> 16);
+                    sums[k] += tmp[addrow + k] - tmp[subrow + k];
+                }
+            }
+            for (int yy = h_right_edge; yy < h; yy++) {
+                int addrow = (h - 1) * w + xb;
+                int subrow = (yy - radius) * w + xb;
+                for (int k = 0; k < count; k++) {
+                    dst[yy * w + xb + k] = (uint8_t) ((sums[k] * recip + 32768) >> 16);
+                    sums[k] += tmp[addrow + k] - tmp[subrow + k];
+                }
+            }
         }
     }
 }
@@ -202,126 +259,33 @@ static inline void fc_sample_bilinear_y(
     int h,
     int *oy
 ) {
-    int x0;
-    int y0;
-    int x1;
-    int y1;
-    int wx;
-    int wy;
-    int p00;
-    int p10;
-    int p01;
-    int p11;
-    int a;
-    int b;
+    int x0 = fc_clampi((int) fx, 0, w - 1);
+    int y0 = fc_clampi((int) fy, 0, h - 1);
+    int x1 = fc_clampi(x0 + 1, 0, w - 1);
+    int y1 = fc_clampi(y0 + 1, 0, h - 1);
 
-    if (fx < 0.0f)
-        fx = 0.0f;
-    else if (fx > (float) (w - 1))
-        fx = (float) (w - 1);
-    if (fy < 0.0f)
-        fy = 0.0f;
-    else if (fy > (float) (h - 1))
-        fy = (float) (h - 1);
+    int wx = (int) ((fx - (float) x0) * 256.0f);
+    int wy = (int) ((fy - (float) y0) * 256.0f);
 
-    x0 = (int) fx;
-    y0 = (int) fy;
-    x1 = x0 + 1;
-    y1 = y0 + 1;
-    if (x1 >= w)
-        x1 = w - 1;
-    if (y1 >= h)
-        y1 = h - 1;
-
-    wx = (int) ((fx - (float) x0) * 256.0f);
-    wy = (int) ((fy - (float) y0) * 256.0f);
-
-    p00 = Y[y0 * w + x0];
-    p10 = Y[y0 * w + x1];
-    p01 = Y[y1 * w + x0];
-    p11 = Y[y1 * w + x1];
-    a = p00 * (256 - wx) + p10 * wx;
-    b = p01 * (256 - wx) + p11 * wx;
+    int p00 = Y[y0 * w + x0];
+    int p10 = Y[y0 * w + x1];
+    int p01 = Y[y1 * w + x0];
+    int p11 = Y[y1 * w + x1];
+    
+    int a = p00 * (256 - wx) + p10 * wx;
+    int b = p01 * (256 - wx) + p11 * wx;
     *oy = (a * (256 - wy) + b * wy + 32768) >> 16;
 }
 
-static inline int fc_sample_nearest(
-    const uint8_t *restrict p,
+static inline int fc_nearest_index(
     float fx,
     float fy,
     int w,
     int h
 ) {
-    int x = (int) (fx + 0.5f);
-    int y = (int) (fy + 0.5f);
-
-    x = fc_clampi(x, 0, w - 1);
-    y = fc_clampi(y, 0, h - 1);
-    return p[y * w + x];
-}
-
-static inline void fc_rgb_to_yuv(float r, float g, float b, int *y, int *u, int *v)
-{
-    int yy = (int) (0.299000f * r + 0.587000f * g + 0.114000f * b + 0.5f);
-    int uu = (int) (128.0f - 0.168736f * r - 0.331264f * g + 0.500000f * b + 0.5f);
-    int vv = (int) (128.0f + 0.500000f * r - 0.418688f * g - 0.081312f * b + 0.5f);
-
-    *y = fc_clampi(yy, 0, 255);
-    *u = fc_clampi(uu, 0, 255);
-    *v = fc_clampi(vv, 0, 255);
-}
-
-static inline float fc_sample_r_nearest(
-    const uint8_t *restrict Y,
-    const uint8_t *restrict U,
-    const uint8_t *restrict V,
-    float fx,
-    float fy,
-    int w,
-    int h
-) {
-    int y;
-    int v;
-
-    (void) U;
-    y = fc_sample_nearest(Y, fx, fy, w, h);
-    v = fc_sample_nearest(V, fx, fy, w, h);
-    return (float) y + 1.402000f * ((float) v - 128.0f);
-}
-
-static inline float fc_sample_g_nearest(
-    const uint8_t *restrict Y,
-    const uint8_t *restrict U,
-    const uint8_t *restrict V,
-    float fx,
-    float fy,
-    int w,
-    int h
-) {
-    int y = fc_sample_nearest(Y, fx, fy, w, h);
-    int u = fc_sample_nearest(U, fx, fy, w, h);
-    int v = fc_sample_nearest(V, fx, fy, w, h);
-    float uf = (float) u - 128.0f;
-    float vf = (float) v - 128.0f;
-    return (float) y - 0.344136f * uf - 0.714136f * vf;
-}
-
-static inline float fc_sample_b_nearest(
-    const uint8_t *restrict Y,
-    const uint8_t *restrict U,
-    const uint8_t *restrict V,
-    float fx,
-    float fy,
-    int w,
-    int h
-) {
-    int y;
-    int u;
-
-    (void) V;
-    y = fc_sample_nearest(Y, fx, fy, w, h);
-    u = fc_sample_nearest(U, fx, fy, w, h);
-    return (float) y + 1.772000f * ((float) u - 128.0f);
+    int x = fc_clampi((int) (fx + 0.5f), 0, w - 1);
+    int y = fc_clampi((int) (fy + 0.5f), 0, h - 1);
+    return y * w + x;
 }
 
 static inline size_t fc_align_size(size_t off, size_t align)
@@ -395,22 +359,6 @@ vj_effect *fractalcrystal_init(int w, int h)
         "Time Scale"
     );
 
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_WARP, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_KICK_PULSE, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 40, 80, 28, 46, 20, 250, 0, 1, 0, VJ_BEAT_COST_CHEAP, 150, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_HAT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HAT_PULSE, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 30, 76, 18, 34, 16, 120, 0, 1, 0, VJ_BEAT_COST_CHEAP, 115, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_BEAT_GATE, VJ_BEAT_OP_OFFSET_BASE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 30, 78, 34, 54, 20, 200, 0, 1, 0, VJ_BEAT_COST_CHEAP, 180, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
-
     return ve;
 }
 
@@ -422,8 +370,10 @@ void *fractalcrystal_malloc(int w, int h)
     int max_cols = (w + 7) / 8 + 3;
     int max_rows = (h + 7) / 8 + 3;
     size_t pixel_bytes = len * 5;
-    size_t cell_off = fc_align_size(pixel_bytes, sizeof(float));
     size_t cell_count = (size_t) max_cols * (size_t) max_rows;
+    size_t site_x_off = fc_align_size(pixel_bytes, sizeof(float));
+    size_t site_y_off = site_x_off + cell_count * sizeof(float);
+    size_t cell_off = site_y_off + cell_count * sizeof(float);
     size_t total = cell_off + cell_count * sizeof(fc_cell_t);
     size_t off = 0;
 
@@ -434,7 +384,6 @@ void *fractalcrystal_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
-    t->n_threads = vje_advise_num_threads(w * h);
     t->max_cell_cols = max_cols;
     t->max_cell_rows = max_rows;
     t->phase = 0.0f;
@@ -451,7 +400,15 @@ void *fractalcrystal_malloc(int w, int h)
     t->src_v = (uint8_t *) (base + off); off += len;
     t->blur  = (uint8_t *) (base + off); off += len;
     t->tmp   = (uint8_t *) (base + off);
+    t->site_x = (float *) (base + site_x_off);
+    t->site_y = (float *) (base + site_y_off);
     t->cells = (fc_cell_t *) (base + cell_off);
+
+    for (int i = 0; i < FC_TRIG_LUT_SIZE; i++) {
+        float a = FC_TWO_PI * (float) i / (float) FC_TRIG_LUT_SIZE;
+        t->sin_lut[i] = sinf(a);
+        t->cos_lut[i] = cosf(a);
+    }
 
     return (void *) t;
 }
@@ -480,61 +437,63 @@ void fractalcrystal_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict src_u = t->src_u;
     uint8_t *restrict src_v = t->src_v;
     uint8_t *restrict blur = t->blur;
+    float *restrict site_x = t->site_x;
+    float *restrict site_y = t->site_y;
     fc_cell_t *restrict cells = t->cells;
     const int w = t->w;
     const int h = t->h;
-    int len = frame->len;
-    int scale_i = args[P_ZOOM];
-    int irregular_i = args[P_DENSITY];
-    int fracture_i = args[P_ITER];
-    int displace_i = args[P_WARP];
-    int facet_i = args[P_FACET];
-    int source_i = args[P_SILHOUETTE];
-    int mix_i = args[P_MIX];
-    int prism_i = args[P_CHROMA];
-    int motion_i = args[P_PULSE];
-    int speed_i = args[P_SPEED];
-    float scale_t = (float) scale_i * 0.01f;
-    float irregular = (float) irregular_i * 0.01f;
-    float fracture = (float) fracture_i * 0.01f;
-    float displace = (float) displace_i * 0.01f;
-    float facet = (float) facet_i * 0.01f;
-    float source_gain = (float) source_i * 0.01f;
-    float mix = (float) mix_i * 0.01f;
-    float prism = (float) prism_i * 0.01f;
-    float motion = (float) motion_i * 0.01f;
+    const int len = t->len;
+    const int ssm = frame->ssm;
+    const int actual_uv_len = ssm ? len : frame->uv_len;
+    const int uv_w = ssm ? w : w / 2;
+
+    float scale_t = (float) args[P_ZOOM] * 0.01f;
+    float irregular = (float) args[P_DENSITY] * 0.01f;
+    float fracture = (float) args[P_ITER] * 0.01f;
+    float displace = (float) args[P_WARP] * 0.01f;
+    float facet = (float) args[P_FACET] * 0.01f;
+    float source_gain = (float) args[P_SILHOUETTE] * 0.01f;
+    float mix = (float) args[P_MIX] * 0.01f;
+    float prism = (float) args[P_CHROMA] * 0.01f;
+    float motion = (float) args[P_PULSE] * 0.01f;
+    
     float cell_size = 8.0f * exp2f(scale_t * 4.30f);
     float jitter = irregular * 0.43f;
     float drift = motion * 0.28f;
     float crack_width = 0.008f + fracture * 0.105f;
+    float inv_crack_width = 1.0f / crack_width;
     float displace_gain = displace * displace;
-    int cell_cols = (int) ceilf((float) w / cell_size) + 3;
-    int cell_rows = (int) ceilf((float) h / cell_size) + 3;
+    float inv_cell_size = 1.0f / cell_size;
+    float source_shape = 0.45f + source_gain * 2.25f;
+    float facet_plane_gain = 0.65f + facet * 3.4f;
+    float prism_base = prism * cell_size * (0.035f + 0.135f * facet);
+    float facet_luma_gain = facet * 138.0f;
+    float fracture_dark = fracture * (38.0f + 122.0f * mix);
+    float source_highlight = facet * 30.0f;
+    float mix_inv = 1.0f - mix;
+    
+    int cell_cols = (int) ceilf((float) w * inv_cell_size) + 3;
+    int cell_rows = (int) ceilf((float) h * inv_cell_size) + 3;
     int blur_r = 4 + (int) (cell_size * 0.055f);
-    int y;
 
-    if (len <= 0 || len > t->len)
-        len = t->len;
-
-    veejay_memcpy(src_y, Y, len);
-    veejay_memcpy(src_u, U, len);
-    veejay_memcpy(src_v, V, len);
-
+#pragma omp single
+    {
+        veejay_memcpy(src_y, Y, (size_t)len);
+        veejay_memcpy(src_u, U, (size_t)actual_uv_len);
+        veejay_memcpy(src_v, V, (size_t)actual_uv_len);
+        t->phase = fc_wrap_2pi(t->phase + fc_time_step(args[P_SPEED]));
+    }
+    
     if (blur_r > 18)
         blur_r = 18;
     fc_box_blur(t, src_y, blur, blur_r);
 
-    t->phase = fc_wrap_2pi(t->phase + fc_time_step(speed_i));
+    float travel = fc_pingpong(t->phase);
 
-    {
-        float travel = fc_pingpong(t->phase);
-
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for (int iy = 0; iy < cell_rows; iy++) {
         int cy = iy - 1;
-        int ix;
-
-        for (ix = 0; ix < cell_cols; ix++) {
+        for (int ix = 0; ix < cell_cols; ix++) {
             int cx = ix - 1;
             int ci = iy * cell_cols + ix;
             float h0 = fc_hash01(cx, cy, 0x7135U);
@@ -554,134 +513,107 @@ void fractalcrystal_apply(void *ptr, VJFrame *frame, int *args)
             float local_drift = drift * (0.62f + 0.38f * h1);
             fc_cell_t *c = &cells[ci];
 
-            c->site_x = (float) cx + 0.5f + (h0 - 0.5f) * 2.0f * jitter
-                      + cosf(motion_axis) * local_travel * local_drift;
-            c->site_y = (float) cy + 0.5f + (h1 - 0.5f) * 2.0f * jitter
-                      + sinf(motion_axis) * local_travel * local_drift;
-            c->nx = cosf(normal_angle);
-            c->ny = sinf(normal_angle);
-            c->shift_x = cosf(shard_angle) * shift;
-            c->shift_y = sinf(shard_angle) * shift;
-            c->rot_c = cosf(rot);
-            c->rot_s = sinf(rot);
+            site_x[ci] = (float) cx + 0.5f + (h0 - 0.5f) * 2.0f * jitter
+                       + fc_lut_cos(t, motion_axis) * local_travel * local_drift;
+            site_y[ci] = (float) cy + 0.5f + (h1 - 0.5f) * 2.0f * jitter
+                       + fc_lut_sin(t, motion_axis) * local_travel * local_drift;
+            c->nx = fc_lut_cos(t, normal_angle);
+            c->ny = fc_lut_sin(t, normal_angle);
+            c->shift_x = fc_lut_cos(t, shard_angle) * shift;
+            c->shift_y = fc_lut_sin(t, shard_angle) * shift;
+            c->rot_c = fc_lut_cos(t, rot);
+            c->rot_s = fc_lut_sin(t, rot);
         }
     }
-    }
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
-    for (y = 0; y < h; y++) {
+#pragma omp for schedule(static)
+    for (int y = 0; y < h; y++) {
         int row = y * w;
-        int x;
+        float gy = (float) y * inv_cell_size;
+        int by = (int) gy;
 
-        for (x = 0; x < w; x++) {
+        for (int x = 0; x < w; x++) {
             int i = row + x;
-            float gx = (float) x / cell_size;
-            float gy = (float) y / cell_size;
-            int bx = (int) floorf(gx);
-            int by = (int) floorf(gy);
+            float gx = (float) x * inv_cell_size;
+            int bx = (int) gx;
             float best = 1.0e9f;
             float second = 1.0e9f;
             int best_ci = 0;
             float best_dx = 0.0f;
             float best_dy = 0.0f;
-            int oy;
-            int ox;
 
-            for (oy = -1; oy <= 1; oy++) {
-                int cy = by + oy;
-                int iy = cy + 1;
-
-                for (ox = -1; ox <= 1; ox++) {
-                    int cx = bx + ox;
-                    int ix = cx + 1;
-                    int ci = iy * cell_cols + ix;
-                    const fc_cell_t *c = &cells[ci];
-                    float dx0 = gx - c->site_x;
-                    float dy0 = gy - c->site_y;
+            for (int oy = -1; oy <= 1; oy++) {
+                int row_offset = (by + oy + 1) * cell_cols;
+                for (int ox = -1; ox <= 1; ox++) {
+                    int ci = row_offset + (bx + ox + 1);
+                    float dx0 = gx - site_x[ci];
+                    float dy0 = gy - site_y[ci];
                     float d = dx0 * dx0 + dy0 * dy0;
 
-                    if (d < best) {
-                        second = best;
-                        best = d;
-                        best_ci = ci;
-                        best_dx = dx0;
-                        best_dy = dy0;
-                    }
-                    else if (d < second) {
-                        second = d;
-                    }
+                    int is_best = d < best;
+                    int is_second = d < second;
+
+                    second = is_best ? best : (is_second ? d : second);
+                    best_ci = is_best ? ci : best_ci;
+                    best_dx = is_best ? dx0 : best_dx;
+                    best_dy = is_best ? dy0 : best_dy;
+                    best = is_best ? d : best;
                 }
             }
 
-            {
-                const fc_cell_t *c = &cells[best_ci];
-                float gap = second - best;
-                float crack = 1.0f - fc_smooth01(gap / crack_width);
-                float source_edge = fc_clampf(fc_absf((float) src_y[i] - (float) blur[i]) * (1.0f / 38.0f), 0.0f, 1.0f);
-                float source_crack = fc_smooth01(source_edge * (0.45f + source_gain * 2.25f)) * source_gain;
-                float crack_total = crack > source_crack ? crack : source_crack;
-                float plane = best_dx * c->nx + best_dy * c->ny;
-                float facet_light = fc_clampf(0.52f + plane * (0.65f + facet * 3.4f), 0.0f, 1.0f);
-                float site_px = c->site_x * cell_size;
-                float site_py = c->site_y * cell_size;
-                float local_x = (float) x - site_px;
-                float local_y = (float) y - site_py;
-                float rx = local_x * c->rot_c - local_y * c->rot_s;
-                float ry = local_x * c->rot_s + local_y * c->rot_c;
-                float sx = site_px + rx + c->shift_x;
-                float sy = site_py + ry + c->shift_y;
-                float crystal_mix = mix * (0.42f + 0.58f * fc_smooth01(0.30f + facet_light * 0.70f));
-                float prism_px = prism * cell_size * (0.035f + 0.135f * facet) * (0.35f + 0.65f * crystal_mix);
-                int sample_y;
-                int base_u;
-                int base_v;
-                int prism_y;
-                int prism_u;
-                int prism_v;
-                int outy;
-                int outu;
-                int outv;
+            const fc_cell_t *c = &cells[best_ci];
+            float crack = 1.0f - fc_smooth01((second - best) * inv_crack_width);
+            float source_delta_f = fc_absf((float)((int)src_y[i] - (int)blur[i]));
+            
+            float source_edge = fc_clampf(source_delta_f * 0.02631578947f, 0.0f, 1.0f);
+            float source_crack = fc_smooth01(source_edge * source_shape) * source_gain;
+            float crack_total = crack > source_crack ? crack : source_crack;
+            float plane = best_dx * c->nx + best_dy * c->ny;
+            float facet_light = fc_clampf(0.52f + plane * facet_plane_gain, 0.0f, 1.0f);
+            
+            float local_x = best_dx * cell_size;
+            float local_y = best_dy * cell_size;
+            float rx = local_x * c->rot_c - local_y * c->rot_s;
+            float ry = local_x * c->rot_s + local_y * c->rot_c;
+            float sx = (float) x + rx - local_x + c->shift_x;
+            float sy = (float) y + ry - local_y + c->shift_y;
+            float crystal_mix = mix * (0.42f + 0.58f * fc_smooth01(0.30f + facet_light * 0.70f));
+            float prism_px = prism_base * (0.35f + 0.65f * crystal_mix);
 
-                fc_sample_bilinear_y(src_y, sx, sy, w, h, &sample_y);
-                base_u = fc_sample_nearest(src_u, sx, sy, w, h);
-                base_v = fc_sample_nearest(src_v, sx, sy, w, h);
-                prism_y = sample_y;
-                prism_u = base_u;
-                prism_v = base_v;
+            int sample_y;
+            fc_sample_bilinear_y(src_y, sx, sy, w, h, &sample_y);
+            int center_i = fc_nearest_index(sx, sy, w, h);
+            
+            int base_u = src_u[center_i];
+            int base_v = src_v[center_i];
+            int prism_u = base_u;
+            int prism_v = base_v;
 
-                if (prism_px > 0.05f) {
-                    float rp = fc_sample_r_nearest(src_y, src_u, src_v,
-                        sx + c->nx * prism_px, sy + c->ny * prism_px, w, h);
-                    float gc = fc_sample_g_nearest(src_y, src_u, src_v,
-                        sx, sy, w, h);
-                    float bm = fc_sample_b_nearest(src_y, src_u, src_v,
-                        sx - c->nx * prism_px, sy - c->ny * prism_px, w, h);
+            if (prism_px > 0.05f) {
+                float px = c->nx * prism_px;
+                float py = c->ny * prism_px;
+                int plus_i = fc_nearest_index(sx + px, sy + py, w, h);
+                int minus_i = fc_nearest_index(sx - px, sy - py, w, h);
 
-                    rp = fc_clampf(rp, 0.0f, 255.0f);
-                    gc = fc_clampf(gc, 0.0f, 255.0f);
-                    bm = fc_clampf(bm, 0.0f, 255.0f);
-                    fc_rgb_to_yuv(rp, gc, bm, &prism_y, &prism_u, &prism_v);
-                }
-
-                outy = (int) ((float) src_y[i] * (1.0f - mix) + (float) sample_y * mix + 0.5f);
-                outy += (int) ((float) (prism_y - sample_y) * prism * crystal_mix * 0.22f);
-                outy += (int) ((facet_light - 0.5f) * facet * 138.0f * crystal_mix);
-                outy -= (int) (crack_total * fracture * (38.0f + 122.0f * mix));
-                outy += (int) (source_crack * facet * 30.0f);
-                outy = fc_clampi(outy, 0, 255);
-
-                outu = (int) ((float) src_u[i] * (1.0f - mix) + (float) base_u * mix + 0.5f);
-                outv = (int) ((float) src_v[i] * (1.0f - mix) + (float) base_v * mix + 0.5f);
-                outu += (int) ((float) (prism_u - base_u) * prism * crystal_mix);
-                outv += (int) ((float) (prism_v - base_v) * prism * crystal_mix);
-                outu = fc_clampi(outu, 0, 255);
-                outv = fc_clampi(outv, 0, 255);
-
-                Y[i] = (uint8_t) outy;
-                U[i] = (uint8_t) outu;
-                V[i] = (uint8_t) outv;
+                prism_u = src_u[minus_i];
+                prism_v = src_v[plus_i];
             }
+
+            int outy = (int) ((float) src_y[i] * mix_inv + (float) sample_y * mix + 0.5f);
+            outy += (int) ((facet_light - 0.5f) * facet_luma_gain * crystal_mix);
+            outy -= (int) (crack_total * fracture_dark);
+            outy += (int) (source_crack * source_highlight);
+
+            int outu = (int) ((float) src_u[i] * mix_inv + (float) base_u * mix + 0.5f);
+            int outv = (int) ((float) src_v[i] * mix_inv + (float) base_v * mix + 0.5f);
+            outu += (int) ((float) (prism_u - base_u) * prism * crystal_mix);
+            outv += (int) ((float) (prism_v - base_v) * prism * crystal_mix);
+
+            Y[i] = (uint8_t) fc_clampi(outy, 0, 255);
+            
+            int uv_idx = ssm ? i : (y * uv_w + (x >> 1));
+            U[uv_idx] = (uint8_t) fc_clampi(outu, 0, 255);
+            V[uv_idx] = (uint8_t) fc_clampi(outv, 0, 255);
         }
     }
 }
-

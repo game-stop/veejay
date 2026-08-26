@@ -63,16 +63,6 @@ vj_effect *medianfilter_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_RADIUS] = 0;
     ve->limits[1][P_RADIUS] = 127;
@@ -132,30 +122,32 @@ void medianfilter_free(void *ptr)
 void medianfilter_apply(void *ptr, VJFrame *frame, int *args)
 {
     medianfilter_t *m = (medianfilter_t*) ptr;
-
     const int radius = args[P_RADIUS];
 
     if(radius == 0)
         return;
 
-    const int width = frame->width;
-    const int height = frame->height;
-    const int len = frame->len;
-    const int uv_len = frame->uv_len;
-    const int uv_width = frame->uv_width;
-    const int uv_height = frame->uv_height;
+    #pragma omp single
+    {
+        const int width = frame->width;
+        const int height = frame->height;
+        const int len = frame->len;
+        const int uv_len = frame->uv_len;
+        const int uv_width = frame->uv_width;
+        const int uv_height = frame->uv_height;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
+        uint8_t *restrict Y = frame->data[0];
+        uint8_t *restrict Cb = frame->data[1];
+        uint8_t *restrict Cr = frame->data[2];
 
-    uint8_t **buffer = m->buffer;
+        uint8_t **buffer = m->buffer;
 
-    ctmf(Y,  buffer[0], width,    height,    width,    width,    radius, 1, l2_cache_size_);
-    ctmf(Cb, buffer[1], uv_width, uv_height, uv_width, uv_width, radius, 1, l2_cache_size_);
-    ctmf(Cr, buffer[2], uv_width, uv_height, uv_width, uv_width, radius, 1, l2_cache_size_);
+        ctmf(Y,  buffer[0], width,    height,    width,    width,    radius, 1, l2_cache_size_);
+        ctmf(Cb, buffer[1], uv_width, uv_height, uv_width, uv_width, radius, 1, l2_cache_size_);
+        ctmf(Cr, buffer[2], uv_width, uv_height, uv_width, uv_width, radius, 1, l2_cache_size_);
 
-    veejay_memcpy(Y,  buffer[0], len);
-    veejay_memcpy(Cb, buffer[1], uv_len);
-    veejay_memcpy(Cr, buffer[2], uv_len);
+        veejay_memcpy(Y,  buffer[0], len);
+        veejay_memcpy(Cb, buffer[1], uv_len);
+        veejay_memcpy(Cr, buffer[2], uv_len);
+    }
 }

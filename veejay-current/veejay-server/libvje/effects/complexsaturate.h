@@ -22,4 +22,6 @@
 #define COMPLEXSATURATE_H
 vj_effect *complexsaturation_init(int w, int h);
 void complexsaturation_apply(void *ptr, VJFrame *frame, int *args);
+void *complexsaturation_malloc(int w, int h);
+void complexsaturation_free(void *ptr);
 #endif

@@ -42,9 +42,11 @@ vj_effect *alphafill_init(int w, int h)
 }
 
 void alphafill_apply( void *ptr, VJFrame *frame, int *args ) {
-    int val = args[0];
-
-	const int len = frame->len;
-	uint8_t *a = frame->data[3];
-	veejay_memset(a, val, len );
+    #pragma omp single
+    {
+        int val = args[0];
+        const int len = frame->len;
+        uint8_t *a = frame->data[3];
+        veejay_memset(a, val, len );
+    }
 }

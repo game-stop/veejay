@@ -64,16 +64,6 @@ vj_effect *nervous_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_BUFFER_LENGTH] = 1;
     ve->limits[1][P_BUFFER_LENGTH] = N_MAX;
@@ -138,50 +128,53 @@ void nervous_apply(void *ptr, VJFrame *frame, int *args)
 {
     nervous_t *n = (nervous_t*) ptr;
 
-    const int len = frame->len;
-    const int uv_len = frame->uv_len;
-    const int length = clampi(args[P_BUFFER_LENGTH], 1, N_MAX);
+    #pragma omp single
+    {
+        const int len = frame->len;
+        const int uv_len = frame->ssm == 1 ? frame->len : frame->uv_len;
+        const int length = clampi(args[P_BUFFER_LENGTH], 1, N_MAX);
 
-    if(n->write_pos >= length)
-        n->write_pos = 0;
+        if(n->write_pos >= length)
+            n->write_pos = 0;
 
-    if(n->filled > length)
-        n->filled = length;
+        if(n->filled > length)
+            n->filled = length;
 
-    const int slot = n->write_pos;
-    const size_t offset = (size_t)len * (size_t)slot;
+        const int slot = n->write_pos;
+        const size_t offset = (size_t)len * (size_t)slot;
 
-    uint8_t *dstY = n->nervous_buf[0] + offset;
-    uint8_t *dstCb = n->nervous_buf[1] + offset;
-    uint8_t *dstCr = n->nervous_buf[2] + offset;
+        uint8_t *dstY = n->nervous_buf[0] + offset;
+        uint8_t *dstCb = n->nervous_buf[1] + offset;
+        uint8_t *dstCr = n->nervous_buf[2] + offset;
 
-    veejay_memcpy(dstY, frame->data[0], len);
-    veejay_memcpy(dstCb, frame->data[1], uv_len);
-    veejay_memcpy(dstCr, frame->data[2], uv_len);
+        veejay_memcpy(dstY, frame->data[0], len);
+        veejay_memcpy(dstCb, frame->data[1], uv_len);
+        veejay_memcpy(dstCr, frame->data[2], uv_len);
 
-    const int max_age = n->filled < length ? n->filled : length - 1;
+        const int max_age = n->filled < length ? n->filled : length - 1;
 
-    if(max_age > 0) {
-        int src_slot = slot - 1 - nervous_rand_bounded(n, max_age);
+        if(max_age > 0) {
+            int src_slot = slot - 1 - nervous_rand_bounded(n, max_age);
 
-        if(src_slot < 0)
-            src_slot += length;
+            if(src_slot < 0)
+                src_slot += length;
 
-        const size_t src_offset = (size_t)len * (size_t)src_slot;
-        const uint8_t *srcY = n->nervous_buf[0] + src_offset;
-        const uint8_t *srcCb = n->nervous_buf[1] + src_offset;
-        const uint8_t *srcCr = n->nervous_buf[2] + src_offset;
+            const size_t src_offset = (size_t)len * (size_t)src_slot;
+            const uint8_t *srcY = n->nervous_buf[0] + src_offset;
+            const uint8_t *srcCb = n->nervous_buf[1] + src_offset;
+            const uint8_t *srcCr = n->nervous_buf[2] + src_offset;
 
-        veejay_memcpy(frame->data[0], srcY, len);
-        veejay_memcpy(frame->data[1], srcCb, uv_len);
-        veejay_memcpy(frame->data[2], srcCr, uv_len);
+            veejay_memcpy(frame->data[0], srcY, len);
+            veejay_memcpy(frame->data[1], srcCb, uv_len);
+            veejay_memcpy(frame->data[2], srcCr, uv_len);
+        }
+
+        n->write_pos = slot + 1;
+
+        if(n->write_pos >= length)
+            n->write_pos = 0;
+
+        if(n->filled < length)
+            n->filled++;
     }
-
-    n->write_pos = slot + 1;
-
-    if(n->write_pos >= length)
-        n->write_pos = 0;
-
-    if(n->filled < length)
-        n->filled++;
 }

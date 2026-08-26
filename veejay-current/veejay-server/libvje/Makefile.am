@@ -14,7 +14,8 @@ VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 
 libvje_la_SOURCES =	libvje.c vjert.c \
-	ctmf/ctmf.c \
+    ctmf/ctmf.c \
+    effects/hist.c \
     effects/3bar.c \
     effects/alpha2img.c \
     effects/alphablend.c \
@@ -133,7 +134,6 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/passthrough.c \
     effects/pencilsketch2.c \
     effects/pencilsketch.c \
-    effects/perspective.c \
     effects/photoplay.c \
     effects/picinpic.c \
     effects/pixelate.c \

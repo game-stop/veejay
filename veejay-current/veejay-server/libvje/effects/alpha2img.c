@@ -36,13 +36,16 @@ vj_effect *alpha2img_init(int w, int h)
 
 void alpha2img_apply(void *ptr, VJFrame *frame, int *args)
 {
-	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *a = frame->data[3];
-	const int len = frame->len;
+	#pragma omp single
+	{
+		uint8_t *Y = frame->data[0];
+		uint8_t *Cb = frame->data[1];
+		uint8_t *Cr = frame->data[2];
+		uint8_t *a = frame->data[3];
+		const int len = frame->len;
 
-	veejay_memcpy(  Y, a, len );
-	veejay_memset(  Cb,128, (frame->ssm ? len : frame->uv_len) );
-	veejay_memset(  Cr,128, (frame->ssm ? len : frame->uv_len) );
+		veejay_memcpy(  Y, a, len );
+		veejay_memset(  Cb,128, (frame->ssm ? len : frame->uv_len) );
+		veejay_memset(  Cr,128, (frame->ssm ? len : frame->uv_len) );
+	}
 }

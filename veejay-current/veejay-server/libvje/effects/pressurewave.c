@@ -187,17 +187,6 @@ vj_effect *pressurewave_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * PW_NUM_PARAMS);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * PW_NUM_PARAMS);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->description = "Pressure Wave";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -324,7 +313,7 @@ void pressurewave_free(void *ptr)
     free(ptr);
 }
 
-#define PW_ACCUM_WAVE_NB(K) do {                                             \
+#define PW_ACCUM_WAVE_NB(K) do {                                              \
     const int dx0 = x - ax[(K)];                                              \
     const int dy0 = y - ay[(K)];                                              \
     const int adx = dx0 < 0 ? -dx0 : dx0;                                     \
@@ -336,7 +325,7 @@ void pressurewave_free(void *ptr)
     int tail = aw[(K)] - pw_absi(dist - atail[(K)]);                          \
     front = front > 0 ? front : 0;                                            \
     tail = tail > 0 ? tail : 0;                                               \
-    const int wr = (((front - (tail >> 1)) * ascale[(K)]) >> 8) * apol[(K)];   \
+    const int wr = (((front - (tail >> 1)) * ascale[(K)]) >> 8) * apol[(K)];  \
     const int push = (wr * push_scale) >> 15;                                 \
     dx_acc += (dx0 * push) >> 8;                                              \
     dy_acc += (dy0 * push) >> 8;                                              \
@@ -375,7 +364,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
-    const int threads = s->n_threads;
 
     const int displace_arg = args[PW_DISPLACE];
     const int impact_arg = args[PW_IMPACT];
@@ -396,98 +384,105 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     const float snare_target = (float)snare_arg * 0.01f;
     const float hat_target = clampf((float)hat_arg * (1.0f / 200.0f), 0.0f, 1.0f);
 
-    const float impact_delta = impact_target - s->last_impact;
-    const float shock_delta  = shock_target  - s->last_shock;
-    const float snare_delta  = snare_target  - s->last_snare;
+    /* 1. SINGLE THREAD MUTATES PERSISTENT STATE */
+    #pragma omp single
+    {
+        const float impact_delta = impact_target - s->last_impact;
+        const float shock_delta  = shock_target  - s->last_shock;
+        const float snare_delta  = snare_target  - s->last_snare;
 
-    const int impact_rise =
-        s->impact_cooldown <= 0 &&
-        (
-            (impact_target > 0.34f && s->last_impact < 0.22f) ||
-            impact_delta > 0.12f
-        );
+        const int impact_rise =
+            s->impact_cooldown <= 0 &&
+            (
+                (impact_target > 0.34f && s->last_impact < 0.22f) ||
+                impact_delta > 0.12f
+            );
 
-    const int shock_rise =
-        s->shock_cooldown <= 0 &&
-        (
-            (shock_target > 0.30f && s->last_shock < 0.18f) ||
-            shock_delta > 0.10f ||
-            (impact_rise && shock_target > 0.18f)
-        );
+        const int shock_rise =
+            s->shock_cooldown <= 0 &&
+            (
+                (shock_target > 0.30f && s->last_shock < 0.18f) ||
+                shock_delta > 0.10f ||
+                (impact_rise && shock_target > 0.18f)
+            );
 
-    const int snare_rise =
-        s->snare_cooldown <= 0 &&
-        (
-            (snare_target > 0.32f && s->last_snare < 0.20f) ||
-            snare_delta > 0.12f
-        );
+        const int snare_rise =
+            s->snare_cooldown <= 0 &&
+            (
+                (snare_target > 0.32f && s->last_snare < 0.20f) ||
+                snare_delta > 0.12f
+            );
 
-    s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
-    s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
-    s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
-    s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
+        s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
+        s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
+        s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
+        s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-    if(impact_rise) {
-        pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
-        s->impact_cooldown = 3;
+        if(impact_rise) {
+            pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
+            s->impact_cooldown = 3;
+        }
+
+        if(shock_rise && !impact_rise) {
+            pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
+            s->shock_cooldown = 4;
+        }
+
+        if(snare_rise) {
+            pw_spawn_wave(
+                s,
+                impact_target * 0.35f,
+                shock_target * 0.42f + snare_target * 0.58f,
+                width_arg >> 1,
+                speed_arg + 12,
+                center_arg
+            );
+            s->snare_cooldown = 3;
+        }
+
+        if(s->impact_cooldown > 0)
+            s->impact_cooldown--;
+        if(s->shock_cooldown > 0)
+            s->shock_cooldown--;
+        if(s->snare_cooldown > 0)
+            s->snare_cooldown--;
+
+        const float decay = 0.855f + ((float)decay_arg * 0.00125f);
+        const float max_dist = (float)(w > h ? w : h) * 1.55f;
+
+        for(int i = 0; i < PW_MAX_WAVES; i++) {
+            pressure_wave_t *wv = &s->waves[i];
+
+            if(!wv->active)
+                continue;
+
+            wv->pos += wv->speed;
+            wv->amp *= decay;
+
+            if(wv->amp < 0.012f || wv->pos > max_dist)
+                wv->active = 0;
+        }
+
+        s->swing_phase +=
+            0.010f +
+            ((float)speed_arg * 0.0011f) +
+            ((float)swing_arg * 0.0009f) +
+            s->impact_env * 0.050f +
+            s->snare_env * 0.030f +
+            s->hat_env * 0.012f;
+
+        if(s->swing_phase > (float)(PW_PI * 2.0))
+            s->swing_phase -= (float)(PW_PI * 2.0);
+
+        s->last_impact = impact_target;
+        s->last_shock = shock_target;
+        s->last_snare = snare_target;
+        s->frame_count++;
     }
+    /* Implicit barrier: All threads wait here until the master thread completes state mutation */
 
-    if(shock_rise && !impact_rise) {
-        pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
-        s->shock_cooldown = 4;
-    }
 
-    if(snare_rise) {
-        pw_spawn_wave(
-            s,
-            impact_target * 0.35f,
-            shock_target * 0.42f + snare_target * 0.58f,
-            width_arg >> 1,
-            speed_arg + 12,
-            center_arg
-        );
-        s->snare_cooldown = 3;
-    }
-
-    if(s->impact_cooldown > 0)
-        s->impact_cooldown--;
-    if(s->shock_cooldown > 0)
-        s->shock_cooldown--;
-    if(s->snare_cooldown > 0)
-        s->snare_cooldown--;
-
-    const float decay = 0.855f + ((float)decay_arg * 0.00125f);
-    const float max_dist = (float)(w > h ? w : h) * 1.55f;
-
-    for(int i = 0; i < PW_MAX_WAVES; i++) {
-        pressure_wave_t *wv = &s->waves[i];
-
-        if(!wv->active)
-            continue;
-
-        wv->pos += wv->speed;
-        wv->amp *= decay;
-
-        if(wv->amp < 0.012f || wv->pos > max_dist)
-            wv->active = 0;
-    }
-
-    s->swing_phase +=
-        0.010f +
-        ((float)speed_arg * 0.0011f) +
-        ((float)swing_arg * 0.0009f) +
-        s->impact_env * 0.050f +
-        s->snare_env * 0.030f +
-        s->hat_env * 0.012f;
-
-    if(s->swing_phase > (float)(PW_PI * 2.0))
-        s->swing_phase -= (float)(PW_PI * 2.0);
-
-    s->last_impact = impact_target;
-    s->last_shock = shock_target;
-    s->last_snare = snare_target;
-    s->frame_count++;
-
+    /* 2. ALL THREADS COMPUTE LOCAL VARIABLES */
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int shock_i = (int)(s->shock_env * 256.0f);
     const int snare_i = (int)(s->snare_env * 256.0f);
@@ -534,181 +529,179 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     if(nactive <= 0 && swing_x == 0 && swing_y == 0)
-        return;
+        return; /* All threads correctly exit simultaneously here if true */
 
-#pragma omp parallel num_threads(threads)
-    {
+    /* 3. PARALLEL WORK SHARING */
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            src_y[i] = Y[i];
-            src_u[i] = U[i];
-            src_v[i] = V[i];
-        }
+    for(int i = 0; i < len; i++) {
+        src_y[i] = Y[i];
+        src_u[i] = U[i];
+        src_v[i] = V[i];
+    }
 
-        if(nactive <= 0) {
+    if(nactive <= 0) {
 #pragma omp for schedule(static)
-            for(int y = 0; y < h; y++) {
-                const int row = y * w;
-                const int row_up = (y > 0 ? y - 1 : y) * w;
-                const int row_dn = (y < h - 1 ? y + 1 : y) * w;
+        for(int y = 0; y < h; y++) {
+            const int row = y * w;
+            const int row_up = (y > 0 ? y - 1 : y) * w;
+            const int row_dn = (y < h - 1 ? y + 1 : y) * w;
 
-                for(int x = 0; x < w; x++) {
-                    const int i = row + x;
-                    const int xm = x > 0 ? x - 1 : x;
-                    const int xp = x < w - 1 ? x + 1 : x;
+            for(int x = 0; x < w; x++) {
+                const int i = row + x;
+                const int xm = x > 0 ? x - 1 : x;
+                const int xp = x < w - 1 ? x + 1 : x;
 
-                    const int edge =
-                        pw_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
-                        pw_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
+                const int edge =
+                    pw_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
+                    pw_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
 
-                    const int edge_gate = edge < 255 ? edge : 255;
-                    const int swing_gate = 64 + (edge_gate >> 2);
+                const int edge_gate = edge < 255 ? edge : 255;
+                const int swing_gate = 64 + (edge_gate >> 2);
 
-                    int px = x + ((swing_x * swing_gate) >> 7);
-                    int py = y + ((swing_y * swing_gate) >> 7);
+                int px = x + ((swing_x * swing_gate) >> 7);
+                int py = y + ((swing_y * swing_gate) >> 7);
 
-                    px = px < 0 ? 0 : (px >= w ? w - 1 : px);
-                    py = py < 0 ? 0 : (py >= h ? h - 1 : py);
+                px = px < 0 ? 0 : (px >= w ? w - 1 : px);
+                py = py < 0 ? 0 : (py >= h ? h - 1 : py);
 
-                    const int pi = py * w + px;
+                const int pi = py * w + px;
 
-                    Y[i] = src_y[pi];
-                    U[i] = src_u[pi];
-                    V[i] = src_v[pi];
-                }
+                Y[i] = src_y[pi];
+                U[i] = src_u[pi];
+                V[i] = src_v[pi];
             }
         }
-        else {
+    }
+    else {
 #pragma omp for schedule(static)
-            for(int y = 0; y < h; y++) {
-                const int row = y * w;
+        for(int y = 0; y < h; y++) {
+            const int row = y * w;
 
-                switch(nactive) {
-                    case 1:
-                        for(int x = 0; x < w; x++) {
-                            int dx_acc = 0;
-                            int dy_acc = 0;
-                            int wave_sum = 0;
-                            int glow_sum = 0;
-                            int pull_sum = 0;
-                            PW_ACCUM_WAVE_NB(0);
-                            PW_STORE_MAP();
-                        }
-                        break;
+            switch(nactive) {
+                case 1:
+                    for(int x = 0; x < w; x++) {
+                        int dx_acc = 0;
+                        int dy_acc = 0;
+                        int wave_sum = 0;
+                        int glow_sum = 0;
+                        int pull_sum = 0;
+                        PW_ACCUM_WAVE_NB(0);
+                        PW_STORE_MAP();
+                    }
+                    break;
 
-                    case 2:
-                        for(int x = 0; x < w; x++) {
-                            int dx_acc = 0;
-                            int dy_acc = 0;
-                            int wave_sum = 0;
-                            int glow_sum = 0;
-                            int pull_sum = 0;
-                            PW_ACCUM_WAVE_NB(0);
-                            PW_ACCUM_WAVE_NB(1);
-                            PW_STORE_MAP();
-                        }
-                        break;
+                case 2:
+                    for(int x = 0; x < w; x++) {
+                        int dx_acc = 0;
+                        int dy_acc = 0;
+                        int wave_sum = 0;
+                        int glow_sum = 0;
+                        int pull_sum = 0;
+                        PW_ACCUM_WAVE_NB(0);
+                        PW_ACCUM_WAVE_NB(1);
+                        PW_STORE_MAP();
+                    }
+                    break;
 
-                    case 3:
-                        for(int x = 0; x < w; x++) {
-                            int dx_acc = 0;
-                            int dy_acc = 0;
-                            int wave_sum = 0;
-                            int glow_sum = 0;
-                            int pull_sum = 0;
-                            PW_ACCUM_WAVE_NB(0);
-                            PW_ACCUM_WAVE_NB(1);
-                            PW_ACCUM_WAVE_NB(2);
-                            PW_STORE_MAP();
-                        }
-                        break;
+                case 3:
+                    for(int x = 0; x < w; x++) {
+                        int dx_acc = 0;
+                        int dy_acc = 0;
+                        int wave_sum = 0;
+                        int glow_sum = 0;
+                        int pull_sum = 0;
+                        PW_ACCUM_WAVE_NB(0);
+                        PW_ACCUM_WAVE_NB(1);
+                        PW_ACCUM_WAVE_NB(2);
+                        PW_STORE_MAP();
+                    }
+                    break;
 
-                    default:
-                        for(int x = 0; x < w; x++) {
-                            int dx_acc = 0;
-                            int dy_acc = 0;
-                            int wave_sum = 0;
-                            int glow_sum = 0;
-                            int pull_sum = 0;
-                            PW_ACCUM_WAVE_NB(0);
-                            PW_ACCUM_WAVE_NB(1);
-                            PW_ACCUM_WAVE_NB(2);
-                            PW_ACCUM_WAVE_NB(3);
-                            PW_STORE_MAP();
-                        }
-                        break;
-                }
+                default:
+                    for(int x = 0; x < w; x++) {
+                        int dx_acc = 0;
+                        int dy_acc = 0;
+                        int wave_sum = 0;
+                        int glow_sum = 0;
+                        int pull_sum = 0;
+                        PW_ACCUM_WAVE_NB(0);
+                        PW_ACCUM_WAVE_NB(1);
+                        PW_ACCUM_WAVE_NB(2);
+                        PW_ACCUM_WAVE_NB(3);
+                        PW_STORE_MAP();
+                    }
+                    break;
             }
+        }
 
 #pragma omp for schedule(static)
-            for(int y = 0; y < h; y++) {
-                const int row = y * w;
-                const int row_up = (y > 0 ? y - 1 : y) * w;
-                const int row_dn = (y < h - 1 ? y + 1 : y) * w;
-                const int spark_y = y * 17;
-                const int frame_a = (int)s->frame_count * 23;
-                const int frame_b = (int)s->frame_count * 19;
+        for(int y = 0; y < h; y++) {
+            const int row = y * w;
+            const int row_up = (y > 0 ? y - 1 : y) * w;
+            const int row_dn = (y < h - 1 ? y + 1 : y) * w;
+            const int spark_y = y * 17;
+            const int frame_a = (int)s->frame_count * 23;
+            const int frame_b = (int)s->frame_count * 19;
 
-                for(int x = 0; x < w; x++) {
-                    const int i = row + x;
-                    const int xm = x > 0 ? x - 1 : x;
-                    const int xp = x < w - 1 ? x + 1 : x;
+            for(int x = 0; x < w; x++) {
+                const int i = row + x;
+                const int xm = x > 0 ? x - 1 : x;
+                const int xp = x < w - 1 ? x + 1 : x;
 
-                    const int edge =
-                        pw_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
-                        pw_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
+                const int edge =
+                    pw_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
+                    pw_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
 
-                    const int edge_gate = edge < 255 ? edge : 255;
-                    const int pull_sum = map_pull[i];
-                    const int swing_gate = 64 + ((edge_gate + pull_sum) >> 2);
+                const int edge_gate = edge < 255 ? edge : 255;
+                const int pull_sum = map_pull[i];
+                const int swing_gate = 64 + ((edge_gate + pull_sum) >> 2);
 
-                    int px = x + map_dx[i] + ((swing_x * swing_gate) >> 7);
-                    int py = y + map_dy[i] + ((swing_y * swing_gate) >> 7);
+                int px = x + map_dx[i] + ((swing_x * swing_gate) >> 7);
+                int py = y + map_dy[i] + ((swing_y * swing_gate) >> 7);
 
-                    px = px < 0 ? 0 : (px >= w ? w - 1 : px);
-                    py = py < 0 ? 0 : (py >= h ? h - 1 : py);
+                px = px < 0 ? 0 : (px >= w ? w - 1 : px);
+                py = py < 0 ? 0 : (py >= h ? h - 1 : py);
 
-                    const int pi = py * w + px;
+                const int pi = py * w + px;
 
-                    int yy = src_y[pi];
-                    int uu = src_u[pi];
-                    int vv = src_v[pi];
+                int yy = src_y[pi];
+                int uu = src_u[pi];
+                int vv = src_v[pi];
 
-                    const int wave_sum = map_wave[i];
-                    const int glow_sum = map_glow[i];
+                const int wave_sum = map_wave[i];
+                const int glow_sum = map_glow[i];
 
-                    yy += (glow_sum * ring_glow) >> 8;
-                    yy -= ((pull_sum - glow_sum) * ring_glow) >> 11;
-                    yy += (snare_i * glow_sum) >> 8;
+                yy += (glow_sum * ring_glow) >> 8;
+                yy -= ((pull_sum - glow_sum) * ring_glow) >> 11;
+                yy += (snare_i * glow_sum) >> 8;
 
-                    if(hat_i > 10) {
-                        const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
-                        const int pull_active = pull_sum > 2 ? 1 : 0;
-                        const int pat = ((x * 13 + spark_y + frame_a) & 31) - 8;
+                if(hat_i > 10) {
+                    const int edge_active = edge_gate > 22 ? edge_gate - 22 : 0;
+                    const int pull_active = pull_sum > 2 ? 1 : 0;
+                    const int pat = ((x * 13 + spark_y + frame_a) & 31) - 8;
 
-                        yy += (pat * hat_i * edge_active * pull_active) >> 13;
-                    }
-
-                    if(chroma_push > 0) {
-                        const int cp = (wave_sum * chroma_push) >> 8;
-
-                        uu += cp;
-                        vv -= cp >> 1;
-
-                        if(hat_i > 12) {
-                            const int edge_active = edge_gate > 36 ? edge_gate - 36 : 0;
-                            const int pat = ((x * 11 + spark_y + frame_b) & 31) - 15;
-                            const int flick = (pat * hat_i * edge_active) >> 12;
-
-                            uu += flick;
-                            vv -= flick >> 1;
-                        }
-                    }
-
-                    Y[i] = pw_u8(yy);
-                    U[i] = pw_u8(uu);
-                    V[i] = pw_u8(vv);
+                    yy += (pat * hat_i * edge_active * pull_active) >> 13;
                 }
+
+                if(chroma_push > 0) {
+                    const int cp = (wave_sum * chroma_push) >> 8;
+
+                    uu += cp;
+                    vv -= cp >> 1;
+
+                    if(hat_i > 12) {
+                        const int edge_active = edge_gate > 36 ? edge_gate - 36 : 0;
+                        const int pat = ((x * 11 + spark_y + frame_b) & 31) - 15;
+                        const int flick = (pat * hat_i * edge_active) >> 12;
+
+                        uu += flick;
+                        vv -= flick >> 1;
+                    }
+                }
+
+                Y[i] = pw_u8(yy);
+                U[i] = pw_u8(uu);
+                V[i] = pw_u8(vv);
             }
         }
     }

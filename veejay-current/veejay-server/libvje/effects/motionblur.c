@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,7 +20,9 @@
 
 #include "common.h"
 #include "motionblur.h"
+#include <veejaycore/vjmem.h>
 #include <stdint.h>
+#include <math.h>
 
 #define MOTIONBLUR_PARAMS 5
 
@@ -43,7 +45,12 @@ typedef struct {
     int dir_key;
     int dx_q16;
     int dy_q16;
-    int n_threads;
+
+    int decay_q8;
+    int alpha_base_q16;
+    int cached_dx_q16;
+    int cached_dy_q16;
+    int skip_processing;
 } motionblur_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -90,8 +97,8 @@ static void motionblur_update_direction(motionblur_t *m, int dir)
 {
     const float angle = (float)dir * 0.03141592653589793f;
 
-    m->dx_q16 = (int)(a_cos(angle) * 32768.0f);
-    m->dy_q16 = (int)(a_sin(angle) * 32768.0f);
+    m->dx_q16 = (int)(cosf(angle) * 32768.0f);
+    m->dy_q16 = (int)(sinf(angle) * 32768.0f);
     m->dir_key = dir;
 }
 
@@ -107,16 +114,7 @@ vj_effect *motionblur_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->defaults[P_SHUTTER] = 8;
     ve->defaults[P_DECAY] = 90;
@@ -161,9 +159,11 @@ void motionblur_free(void *ptr)
 {
     motionblur_t *m = (motionblur_t*) ptr;
 
-    free(m->accY);
-    free(m->prevY);
-    free(m);
+    if(m) {
+        free(m->accY);
+        free(m->prevY);
+        free(m);
+    }
 }
 
 void *motionblur_malloc(int w, int h)
@@ -189,7 +189,6 @@ void *motionblur_malloc(int w, int h)
     m->dir_key = 0x7fffffff;
     m->dx_q16 = 32768;
     m->dy_q16 = 0;
-    m->n_threads = vje_advise_num_threads(size);
 
     return m;
 }
@@ -252,79 +251,85 @@ void motionblur_apply(void *ptr, VJFrame *f, int *a)
     const int velocity = a[P_VELOCITY];
     const int reset = a[P_RESET];
 
-    if(direction != m->dir_key)
-        motionblur_update_direction(m, direction);
+    #pragma omp single
+    {
+        if(direction != m->dir_key)
+            motionblur_update_direction(m, direction);
 
-    if(!m->initialized) {
-        motionblur_init_accumulators(m, Y, U, V, size);
-        return;
+        if(!m->initialized || motionblur_should_reset(m, Y, w, h, reset)) {
+            motionblur_init_accumulators(m, Y, U, V, size);
+            m->skip_processing = 1;
+        } else {
+            m->skip_processing = 0;
+            m->decay_q8 = (decay * MB_Q8_ONE + 50) / 100;
+            m->alpha_base_q16 = MB_Q16_ONE / shutter;
+            m->cached_dx_q16 = m->dx_q16;
+            m->cached_dy_q16 = m->dy_q16;
+        }
     }
 
-    if(motionblur_should_reset(m, Y, w, h, reset)) {
-        motionblur_init_accumulators(m, Y, U, V, size);
-        return;
-    }
+    if(!m->skip_processing) {
+        const int decay_q8 = m->decay_q8;
+        const int alpha_base_q16 = m->alpha_base_q16;
+        const int dx_q16 = m->cached_dx_q16;
+        const int dy_q16 = m->cached_dy_q16;
 
-    const int decay_q8 = (decay * MB_Q8_ONE + 50) / 100;
-    const int alpha_base_q16 = MB_Q16_ONE / shutter;
-    const int dx_q16 = m->dx_q16;
-    const int dy_q16 = m->dy_q16;
+        #pragma omp for schedule(static)
+        for(int y = 0; y < h; y++) {
+            const int row = y * w;
+            const int row_bias_q16 = (dy_q16 * ((y << 1) - h)) / (h << 1);
+            const int col_step_q16 = dx_q16 / w;
+            int col_bias_q16 = -(dx_q16 >> 1);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
-    for(int y = 0; y < h; y++) {
-        const int row = y * w;
-        const int row_bias_q16 = (dy_q16 * ((y << 1) - h)) / (h << 1);
-        const int col_step_q16 = dx_q16 / w;
-        int col_bias_q16 = -(dx_q16 >> 1);
+            uint8_t *restrict Y_row = Y + row;
+            uint8_t *restrict U_row = U + row;
+            uint8_t *restrict V_row = V + row;
 
-        uint8_t *restrict Y_row = Y + row;
-        uint8_t *restrict U_row = U + row;
-        uint8_t *restrict V_row = V + row;
+            int32_t *restrict accY_row = m->accY + row;
+            int32_t *restrict accU_row = m->accU + row;
+            int32_t *restrict accV_row = m->accV + row;
+            uint8_t *restrict prevY_row = m->prevY + row;
 
-        int32_t *restrict accY_row = m->accY + row;
-        int32_t *restrict accU_row = m->accU + row;
-        int32_t *restrict accV_row = m->accV + row;
-        uint8_t *restrict prevY_row = m->prevY + row;
+            for(int x = 0; x < w; x++) {
+                const int diff = motionblur_absi((int)Y_row[x] - (int)prevY_row[x]);
+                const int vel_q8 = MB_Q8_ONE + ((velocity * diff + 50) / 100);
+                int bias_q16 = MB_Q16_ONE + row_bias_q16 + col_bias_q16;
+                int alpha_q16;
+                int alpha_q8;
+                int32_t yv;
+                int32_t uv;
+                int32_t vv;
+                uint8_t yo;
 
-        for(int x = 0; x < w; x++) {
-            const int diff = motionblur_absi((int)Y_row[x] - (int)prevY_row[x]);
-            const int vel_q8 = MB_Q8_ONE + ((velocity * diff + 50) / 100);
-            int bias_q16 = MB_Q16_ONE + row_bias_q16 + col_bias_q16;
-            int alpha_q16;
-            int alpha_q8;
-            int32_t yv;
-            int32_t uv;
-            int32_t vv;
-            uint8_t yo;
+                bias_q16 = clampi(bias_q16, MB_Q16_ONE >> 1, (MB_Q16_ONE * 3) >> 1);
+                alpha_q16 = (alpha_base_q16 * vel_q8) >> MB_Q8_SHIFT;
+                alpha_q16 = (alpha_q16 * bias_q16) >> 16;
 
-            bias_q16 = clampi(bias_q16, MB_Q16_ONE >> 1, (MB_Q16_ONE * 3) >> 1);
-            alpha_q16 = (alpha_base_q16 * vel_q8) >> MB_Q8_SHIFT;
-            alpha_q16 = (alpha_q16 * bias_q16) >> 16;
+                if(alpha_q16 > MB_Q16_ONE)
+                    alpha_q16 = MB_Q16_ONE;
 
-            if(alpha_q16 > MB_Q16_ONE)
-                alpha_q16 = MB_Q16_ONE;
+                alpha_q8 = (alpha_q16 + 128) >> 8;
 
-            alpha_q8 = (alpha_q16 + 128) >> 8;
+                yv = ((accY_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + (int32_t)Y_row[x] * alpha_q8;
+                uv = ((accU_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + ((int32_t)U_row[x] - 128) * alpha_q8;
+                vv = ((accV_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + ((int32_t)V_row[x] - 128) * alpha_q8;
 
-            yv = ((accY_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + (int32_t)Y_row[x] * alpha_q8;
-            uv = ((accU_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + ((int32_t)U_row[x] - 128) * alpha_q8;
-            vv = ((accV_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + ((int32_t)V_row[x] - 128) * alpha_q8;
+                yv = motionblur_clamp_q8(yv, 0, 255 << MB_Q8_SHIFT);
+                uv = motionblur_clamp_q8(uv, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
+                vv = motionblur_clamp_q8(vv, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
 
-            yv = motionblur_clamp_q8(yv, 0, 255 << MB_Q8_SHIFT);
-            uv = motionblur_clamp_q8(uv, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
-            vv = motionblur_clamp_q8(vv, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
+                accY_row[x] = yv;
+                accU_row[x] = uv;
+                accV_row[x] = vv;
 
-            accY_row[x] = yv;
-            accU_row[x] = uv;
-            accV_row[x] = vv;
+                yo = motionblur_y_from_q8(yv);
+                Y_row[x] = yo;
+                U_row[x] = motionblur_uv_from_q8(uv);
+                V_row[x] = motionblur_uv_from_q8(vv);
+                prevY_row[x] = yo;
 
-            yo = motionblur_y_from_q8(yv);
-            Y_row[x] = yo;
-            U_row[x] = motionblur_uv_from_q8(uv);
-            V_row[x] = motionblur_uv_from_q8(vv);
-            prevY_row[x] = yo;
-
-            col_bias_q16 += col_step_q16;
+                col_bias_q16 += col_step_q16;
+            }
         }
     }
 }

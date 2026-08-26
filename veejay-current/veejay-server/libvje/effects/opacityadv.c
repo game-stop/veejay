@@ -49,16 +49,6 @@ vj_effect *opacityadv_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_OPACITY] = 0; ve->limits[1][P_OPACITY] = 255; ve->defaults[P_OPACITY] = 150;
     ve->limits[0][P_MIN_T] = 0;   ve->limits[1][P_MIN_T] = 255;   ve->defaults[P_MIN_T] = 40;
@@ -81,7 +71,6 @@ vj_effect *opacityadv_init(int w, int h)
 
     return ve;
 }
-
 void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     (void)ptr;
@@ -97,7 +86,6 @@ void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     }
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y1 = frame->data[0];
     uint8_t *restrict U1 = frame->data[1];
@@ -110,7 +98,7 @@ void opacityadv_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(opacity <= 0)
         return;
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int y = Y1[i];
         int mask = 0;

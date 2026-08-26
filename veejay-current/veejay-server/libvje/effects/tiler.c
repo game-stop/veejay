@@ -63,8 +63,6 @@ static inline uint8_t tiler_mix_u8(uint8_t src, uint8_t tile, int tile_q8)
     return (uint8_t)((((int)src * (256 - tile_q8)) + ((int)tile * tile_q8) + 128) >> 8);
 }
 
-
-
 static inline int tiler_smooth_to(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -75,8 +73,6 @@ static inline int tiler_smooth_to(float *state, int target, float attack, float 
     *state = out;
     return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
-
-
 
 vj_effect *tiler_init(int w, int h)
 {
@@ -90,13 +86,7 @@ vj_effect *tiler_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     int max_tiles = (w < h ? w : h) / 8;
     if(max_tiles < 2)
@@ -171,8 +161,6 @@ void *tiler_malloc(int w, int h)
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
 
-    s->n_threads = vje_advise_num_threads(len);
-
     s->tiles_s = 2.0f;
     s->phase_x_s = 0.0f;
     s->phase_y_s = 0.0f;
@@ -209,42 +197,16 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     const int drift_arg = args[P_DRIFT_SPEED];
     const int opacity_arg = args[P_OPACITY];
 
-    const float fast_a = 0.34f;
-    const float slow_r = 0.085f;
+    int tiles = 2;
+    int phase_px = 0;
+    int phase_py = 0;
+    int small_w = width;
+    int small_h = height;
+    int tile_q8 = 256;
+    int tile_off_x = 0;
+    int tile_off_y = 0;
+    int skip_processing = 0;
 
-    if(!s->initialized) {
-        s->tiles_s = (float)tiles_arg;
-        s->phase_x_s = (float)phase_x_arg;
-        s->phase_y_s = (float)phase_y_arg;
-        s->drift_s = (float)drift_arg;
-        s->opacity_s = (float)opacity_arg;
-        s->initialized = 1;
-    }
-
-    int tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
-    int phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
-    int phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
-    int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
-    int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
-
-    tiles = tiler_clampi(tiles, 2, max_tiles);
-    phase_x = tiler_clampi(phase_x, 0, 1000);
-    phase_y = tiler_clampi(phase_y, 0, 1000);
-    drift = tiler_clampi(drift, -1000, 1000);
-    opacity = tiler_clampi(opacity, 0, 255);
-
-    s->drift_phase += (float)drift * 0.018f;
-    if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
-        s->drift_phase = 0.0f;
-
-    if(opacity <= 0)
-        return;
-
-    const int phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
-    const int phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
-
-    const int small_w = (width  + tiles - 1) / tiles;
-    const int small_h = (height + tiles - 1) / tiles;
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -253,9 +215,53 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-#pragma omp parallel num_threads(s->n_threads)
+    #pragma omp single copyprivate(tiles, phase_px, phase_py, small_w, small_h, tile_q8, tile_off_x, tile_off_y, skip_processing)
     {
-#pragma omp for schedule(static)
+        const float fast_a = 0.34f;
+        const float slow_r = 0.085f;
+
+        if(!s->initialized) {
+            s->tiles_s = (float)tiles_arg;
+            s->phase_x_s = (float)phase_x_arg;
+            s->phase_y_s = (float)phase_y_arg;
+            s->drift_s = (float)drift_arg;
+            s->opacity_s = (float)opacity_arg;
+            s->initialized = 1;
+        }
+
+        int tiles_val = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
+        int phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
+        int phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
+        int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
+        int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
+
+        tiles = tiler_clampi(tiles_val, 2, max_tiles);
+        phase_x = tiler_clampi(phase_x, 0, 1000);
+        phase_y = tiler_clampi(phase_y, 0, 1000);
+        drift = tiler_clampi(drift, -1000, 1000);
+        opacity = tiler_clampi(opacity, 0, 255);
+
+        s->drift_phase += (float)drift * 0.018f;
+        if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
+            s->drift_phase = 0.0f;
+
+        phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
+        phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
+
+        small_w = (width  + tiles - 1) / tiles;
+        small_h = (height + tiles - 1) / tiles;
+
+        tile_q8 = (opacity * 256 + 127) / 255;
+        tile_off_x = (phase_px / tiles) % small_w;
+        tile_off_y = (phase_py / tiles) % small_h;
+
+        if(opacity <= 0) {
+            skip_processing = 1;
+        }
+    }
+
+    if(!skip_processing) {
+        #pragma omp for schedule(static)
         for(int y = 0; y < small_h; y++) {
             const int sy = tiler_wrapi(y * tiles + phase_py, height);
             const int src_row = sy * width;
@@ -272,12 +278,8 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
             }
         }
 
-        const int tile_q8 = (opacity * 256 + 127) / 255;
-        const int tile_off_x = (phase_px / tiles) % small_w;
-        const int tile_off_y = (phase_py / tiles) % small_h;
-
         if(tile_q8 >= 256) {
-#pragma omp for schedule(static)
+            #pragma omp for schedule(static)
             for(int y = 0; y < height; y++) {
                 const int src_row = y * width;
                 const int tile_y = (y + tile_off_y) % small_h;
@@ -293,7 +295,7 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         } else {
-#pragma omp for schedule(static)
+            #pragma omp for schedule(static)
             for(int y = 0; y < height; y++) {
                 const int src_row = y * width;
                 const int tile_y = (y + tile_off_y) % small_h;

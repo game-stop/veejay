@@ -67,11 +67,6 @@ vj_effect *contrast_init(int w, int h)
 
 void contrast_apply(void *ptr, VJFrame *frame, int *s)
 {
-    (void) ptr;
-
-    if(!frame || !s)
-        return;
-
     const int mode = clampi(s[0], 0, 2);
     const int luma = clampi(s[1], 0, 255);
     const int chroma = clampi(s[2], 0, 255);
@@ -84,30 +79,26 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
 
     const int scale_y = (luma << 8) / 100;
     const int scale_uv = (chroma << 8) / 100;
-    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel num_threads(n_threads)
+    if(mode == 0 || mode == 2)
     {
-        if(mode == 0 || mode == 2)
-        {
 #pragma omp for schedule(static)
-            for(int r = 0; r < len; r++)
-            {
-                int y = (((int)Y[r] - 128) * scale_y) >> 8;
-                Y[r] = contrast_u8(y + 128);
-            }
+        for(int r = 0; r < len; r++)
+        {
+            int y = (((int)Y[r] - 128) * scale_y) >> 8;
+            Y[r] = contrast_u8(y + 128);
         }
+    }
 
-        if((mode == 1 || mode == 2) && Cb && Cr && uv_len > 0)
-        {
+    if((mode == 1 || mode == 2) && Cb && Cr && uv_len > 0)
+    {
 #pragma omp for schedule(static)
-            for(int r = 0; r < uv_len; r++)
-            {
-                int cb = (((int)Cb[r] - 128) * scale_uv) >> 8;
-                int cr = (((int)Cr[r] - 128) * scale_uv) >> 8;
-                Cb[r] = contrast_u8(cb + 128);
-                Cr[r] = contrast_u8(cr + 128);
-            }
+        for(int r = 0; r < uv_len; r++)
+        {
+            int cb = (((int)Cb[r] - 128) * scale_uv) >> 8;
+            int cr = (((int)Cr[r] - 128) * scale_uv) >> 8;
+            Cb[r] = contrast_u8(cb + 128);
+            Cr[r] = contrast_u8(cr + 128);
         }
     }
 }

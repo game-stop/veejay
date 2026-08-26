@@ -110,17 +110,6 @@ vj_effect *rgbkeysmooth_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 0;
     ve->defaults[P_GREEN] = 255;
@@ -298,135 +287,132 @@ void rgbkeysmooth_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const float *restrict l_mag = rgbkey->mag_lut;
     const float *restrict l_inv = rgbkey->inv_mag_lut;
 
-#pragma omp parallel num_threads(rgbkey->n_threads)
-    {
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        const int u_int = (int)Cb[i] - 128;
+        const int v_int = (int)Cr[i] - 128;
+        const int d = u_int * u_int + v_int * v_int;
+
+        if(d < 16) {
+            AM[i] = 255;
+            continue;
+        }
+
+        const float invM = l_inv[d];
+        const float dot = ((float)u_int * kU + (float)v_int * kV) * invM;
+
+        if(dot <= wedge_cos) {
+            AM[i] = 255;
+            continue;
+        }
+
+        const float fY = (float)Y[i];
+        const float lw = rgbkeysmooth_clampf(fY * l_min_inv, 0.0f, 1.0f) *
+                         rgbkeysmooth_clampf((255.0f - fY) * l_max_inv, 0.0f, 1.0f);
+        const float raw = (dot - wedge_cos) * hue_denom * l_mag[d] * lw;
+        const float t = rgbkeysmooth_clampf((raw - m_min) * m_range_inv, 0.0f, 1.0f);
+
+        AM[i] = (uint8_t)((1.0f - (t * t * (3.0f - 2.0f * t))) * 255.0f);
+    }
+
+    if(soft > 0) {
+#pragma omp for schedule(static)
+        for(int y = 0; y < h; y++) {
+            uint8_t *restrict row_in = AM + y * w;
+            uint8_t *restrict row_out = AT + y * w;
+
+            row_out[0] = row_in[0];
+            row_out[w - 1] = row_in[w - 1];
+
+            for(int x = 1; x < w - 1; x++) {
+                const int sum = row_in[x - 1] + row_in[x] + row_in[x + 1];
+                const int avg = (sum * 21846) >> 16;
+
+                row_out[x] = row_in[x] + (((avg - row_in[x]) * soft + 128) >> 8);
+            }
+        }
+
+#pragma omp for schedule(static)
+        for(int y = 1; y < h - 1; y++) {
+            uint8_t *restrict r_top = AT + (y - 1) * w;
+            uint8_t *restrict r_mid = AT + y * w;
+            uint8_t *restrict r_bot = AT + (y + 1) * w;
+            uint8_t *restrict r_dest = AM + y * w;
+
+            for(int x = 0; x < w; x++) {
+                const int sum = r_top[x] + r_mid[x] + r_bot[x];
+                const int avg = (sum * 21846) >> 16;
+
+                r_dest[x] = r_mid[x] + (((avg - r_mid[x]) * soft + 128) >> 8);
+            }
+        }
+    }
+
+    if(mode == 1) {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
-            const int u_int = (int)Cb[i] - 128;
-            const int v_int = (int)Cr[i] - 128;
-            const int d = u_int * u_int + v_int * v_int;
-
-            if(d < 16) {
-                AM[i] = 255;
-                continue;
-            }
-
+            Y[i] = AM[i];
+            Cb[i] = 128;
+            Cr[i] = 128;
+        }
+    }
+    else if(mode == 2) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int u = (int)Cb[i] - 128;
+            const int v = (int)Cr[i] - 128;
+            const int d = u * u + v * v;
             const float invM = l_inv[d];
-            const float dot = ((float)u_int * kU + (float)v_int * kV) * invM;
+            const float dot = ((float)u * kU + (float)v * kV) * invM;
+            const float pos_dot = dot > 0.0f ? dot : 0.0f;
+            const float s = pos_dot * s_amt * l_mag[d];
 
-            if(dot <= wedge_cos) {
-                AM[i] = 255;
+            Y[i] = rgbkeysmooth_u8f((float)Y[i] + (s * l_rec_half));
+            Cb[i] = rgbkeysmooth_u8f(((float)u - kU * s) + 128.0f);
+            Cr[i] = rgbkeysmooth_u8f(((float)v - kV * s) + 128.0f);
+        }
+    }
+    else if(s_amt > 0.0f) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int a = AM[i];
+
+            if(LIKELY(a == 0)) {
+                Y[i] = Y2[i];
+                Cb[i] = Cb2[i];
+                Cr[i] = Cr2[i];
                 continue;
             }
 
-            const float fY = (float)Y[i];
-            const float lw = rgbkeysmooth_clampf(fY * l_min_inv, 0.0f, 1.0f) *
-                             rgbkeysmooth_clampf((255.0f - fY) * l_max_inv, 0.0f, 1.0f);
-            const float raw = (dot - wedge_cos) * hue_denom * l_mag[d] * lw;
-            const float t = rgbkeysmooth_clampf((raw - m_min) * m_range_inv, 0.0f, 1.0f);
+            float fU = (float)Cb[i] - 128.0f;
+            float fV = (float)Cr[i] - 128.0f;
+            float fY = (float)Y[i];
 
-            AM[i] = (uint8_t)((1.0f - (t * t * (3.0f - 2.0f * t))) * 255.0f);
+            const int d = (int)(fU * fU + fV * fV);
+            const float dot = (fU * kU + fV * kV) * l_inv[d];
+            const float pos_dot = dot > 0.0f ? dot : 0.0f;
+            const float s = pos_dot * s_amt * l_mag[d];
+
+            fU -= kU * s;
+            fV -= kV * s;
+            fY += s * l_rec_half;
+
+            const int ia = 255 - a;
+
+            Y[i] = RGBKEYSMOOTH_DIV255((int)rgbkeysmooth_clampf(fY, 0.0f, 255.0f) * a + Y2[i] * ia);
+            Cb[i] = RGBKEYSMOOTH_DIV255((int)rgbkeysmooth_clampf(fU + 128.0f, 0.0f, 255.0f) * a + Cb2[i] * ia);
+            Cr[i] = RGBKEYSMOOTH_DIV255((int)rgbkeysmooth_clampf(fV + 128.0f, 0.0f, 255.0f) * a + Cr2[i] * ia);
         }
-
-        if(soft > 0) {
+    }
+    else {
 #pragma omp for schedule(static)
-            for(int y = 0; y < h; y++) {
-                uint8_t *restrict row_in = AM + y * w;
-                uint8_t *restrict row_out = AT + y * w;
+        for(int i = 0; i < len; i++) {
+            const int a = AM[i];
+            const int ia = 255 - a;
 
-                row_out[0] = row_in[0];
-                row_out[w - 1] = row_in[w - 1];
-
-                for(int x = 1; x < w - 1; x++) {
-                    const int sum = row_in[x - 1] + row_in[x] + row_in[x + 1];
-                    const int avg = (sum * 21846) >> 16;
-
-                    row_out[x] = row_in[x] + (((avg - row_in[x]) * soft + 128) >> 8);
-                }
-            }
-
-#pragma omp for schedule(static)
-            for(int y = 1; y < h - 1; y++) {
-                uint8_t *restrict r_top = AT + (y - 1) * w;
-                uint8_t *restrict r_mid = AT + y * w;
-                uint8_t *restrict r_bot = AT + (y + 1) * w;
-                uint8_t *restrict r_dest = AM + y * w;
-
-                for(int x = 0; x < w; x++) {
-                    const int sum = r_top[x] + r_mid[x] + r_bot[x];
-                    const int avg = (sum * 21846) >> 16;
-
-                    r_dest[x] = r_mid[x] + (((avg - r_mid[x]) * soft + 128) >> 8);
-                }
-            }
-        }
-
-        if(mode == 1) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                Y[i] = AM[i];
-                Cb[i] = 128;
-                Cr[i] = 128;
-            }
-        }
-        else if(mode == 2) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const int u = (int)Cb[i] - 128;
-                const int v = (int)Cr[i] - 128;
-                const int d = u * u + v * v;
-                const float invM = l_inv[d];
-                const float dot = ((float)u * kU + (float)v * kV) * invM;
-                const float pos_dot = dot > 0.0f ? dot : 0.0f;
-                const float s = pos_dot * s_amt * l_mag[d];
-
-                Y[i] = rgbkeysmooth_u8f((float)Y[i] + (s * l_rec_half));
-                Cb[i] = rgbkeysmooth_u8f(((float)u - kU * s) + 128.0f);
-                Cr[i] = rgbkeysmooth_u8f(((float)v - kV * s) + 128.0f);
-            }
-        }
-        else if(s_amt > 0.0f) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const int a = AM[i];
-
-                if(LIKELY(a == 0)) {
-                    Y[i] = Y2[i];
-                    Cb[i] = Cb2[i];
-                    Cr[i] = Cr2[i];
-                    continue;
-                }
-
-                float fU = (float)Cb[i] - 128.0f;
-                float fV = (float)Cr[i] - 128.0f;
-                float fY = (float)Y[i];
-
-                const int d = (int)(fU * fU + fV * fV);
-                const float dot = (fU * kU + fV * kV) * l_inv[d];
-                const float pos_dot = dot > 0.0f ? dot : 0.0f;
-                const float s = pos_dot * s_amt * l_mag[d];
-
-                fU -= kU * s;
-                fV -= kV * s;
-                fY += s * l_rec_half;
-
-                const int ia = 255 - a;
-
-                Y[i] = RGBKEYSMOOTH_DIV255((int)rgbkeysmooth_clampf(fY, 0.0f, 255.0f) * a + Y2[i] * ia);
-                Cb[i] = RGBKEYSMOOTH_DIV255((int)rgbkeysmooth_clampf(fU + 128.0f, 0.0f, 255.0f) * a + Cb2[i] * ia);
-                Cr[i] = RGBKEYSMOOTH_DIV255((int)rgbkeysmooth_clampf(fV + 128.0f, 0.0f, 255.0f) * a + Cr2[i] * ia);
-            }
-        }
-        else {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const int a = AM[i];
-                const int ia = 255 - a;
-
-                Y[i] = RGBKEYSMOOTH_DIV255((int)Y[i] * a + (int)Y2[i] * ia);
-                Cb[i] = RGBKEYSMOOTH_DIV255((int)Cb[i] * a + (int)Cb2[i] * ia);
-                Cr[i] = RGBKEYSMOOTH_DIV255((int)Cr[i] * a + (int)Cr2[i] * ia);
-            }
+            Y[i] = RGBKEYSMOOTH_DIV255((int)Y[i] * a + (int)Y2[i] * ia);
+            Cb[i] = RGBKEYSMOOTH_DIV255((int)Cb[i] * a + (int)Cb2[i] * ia);
+            Cr[i] = RGBKEYSMOOTH_DIV255((int)Cr[i] * a + (int)Cr2[i] * ia);
         }
     }
 }

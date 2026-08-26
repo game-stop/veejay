@@ -6,9 +6,10 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  * You should have received a copy of the GNU General Public License
@@ -138,8 +139,6 @@ static inline int warppers_wrap_double(double v, int max)
     return iv;
 }
 
-
-
 static void warppers_init_trig_lut(warppers_t *f)
 {
     for(int i = 0; i < LUT_SIZE; i++) {
@@ -161,14 +160,6 @@ vj_effect *warppers_init(int w, int h)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     const int max_x = w - 1;
     const int max_y = h - 1;
@@ -264,8 +255,6 @@ void *warppers_malloc(int w, int h)
     s->warp_drive_env = 0.0;
     s->env_ready = 0;
 
-    s->n_threads = vje_advise_num_threads((int)len);
-
     warppers_init_trig_lut(s);
 
     return (void*) s;
@@ -302,63 +291,15 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
     const double scalar_alpha = 0.152;
     const double drive_alpha = 0.218;
 
-    if(!warp->env_ready) {
-        warp->x_angle_env = (double)x_angle_arg;
-        warp->y_angle_env = (double)y_angle_arg;
-        warp->zoom_env = (double)zoom_arg;
-        warp->x_center_env = (double)x_center_arg;
-        warp->y_center_env = (double)y_center_arg;
-        warp->falloff_env = (double)falloff_arg_in;
-        warp->strength_env = (double)strength_arg_in;
-        warp->spin_speed_env = (double)spin_arg_in;
-        warp->zoom_drive_env = (double)zoom_drive_in;
-        warp->warp_drive_env = (double)warp_drive_in;
-        warp->env_ready = 1;
-    }
-    else {
-        warp->x_angle_env = warppers_smooth_angle(warp->x_angle_env, (double)x_angle_arg, angle_alpha);
-        warp->y_angle_env = warppers_smooth_angle(warp->y_angle_env, (double)y_angle_arg, angle_alpha);
-        warp->zoom_env = warppers_smooth(warp->zoom_env, (double)zoom_arg, scalar_alpha);
-        warp->x_center_env = warppers_smooth(warp->x_center_env, (double)x_center_arg, center_alpha);
-        warp->y_center_env = warppers_smooth(warp->y_center_env, (double)y_center_arg, center_alpha);
-        warp->falloff_env = warppers_smooth(warp->falloff_env, (double)falloff_arg_in, scalar_alpha);
-        warp->strength_env = warppers_smooth(warp->strength_env, (double)strength_arg_in, scalar_alpha);
-        warp->spin_speed_env = warppers_smooth(warp->spin_speed_env, (double)spin_arg_in, scalar_alpha);
-        warp->zoom_drive_env = warppers_smooth(warp->zoom_drive_env, (double)zoom_drive_in, drive_alpha);
-        warp->warp_drive_env = warppers_smooth(warp->warp_drive_env, (double)warp_drive_in, drive_alpha);
-    }
-
-    const int x_angle_base = warppers_wrap_lut((int)(warp->x_angle_env + 0.5));
-    const int y_angle_base = warppers_wrap_lut((int)(warp->y_angle_env + 0.5));
-    const int zoom_base = clampi((int)(warp->zoom_env + 0.5), 1, 1000);
-    const int x_center = clampi((int)(warp->x_center_env + 0.5), 0, w - 1);
-    const int y_center = clampi((int)(warp->y_center_env + 0.5), 0, h - 1);
-    int falloff_arg = clampi((int)(warp->falloff_env + 0.5), 0, 1000);
-    int strength_arg = clampi((int)(warp->strength_env + 0.5), 0, 1000);
-    const int spin_arg = clampi((int)(warp->spin_speed_env + (warp->spin_speed_env >= 0.0 ? 0.5 : -0.5)), -1000, 1000);
-    const int zoom_drive = clampi((int)(warp->zoom_drive_env + 0.5), 0, 1000);
-    const int warp_drive = clampi((int)(warp->warp_drive_env + 0.5), 0, 1000);
-
-    const double zoom_t = (double)zoom_drive * 0.001;
-    const double warp_t = (double)warp_drive * 0.001;
-
-    const double spin_step = (double)spin_arg * 0.018;
-    const double drive_spin = warp_t * 15.5;
-
-    warp->spin_phase = warppers_wrap_phase(warp->spin_phase + spin_step + drive_spin);
-
-    const int spin_i = (int)(warp->spin_phase + 0.5);
-    const int drive_angle = (int)(warp_t * 112.0 + 0.5);
-
-    const int x_angle = warppers_wrap_lut(x_angle_base + spin_i + drive_angle);
-    const int y_angle = warppers_wrap_lut(y_angle_base + (spin_i * 7) / 10 - (drive_angle * 3) / 5);
-
-    int zoom_eff = zoom_base + (int)(((1450 - zoom_base) > 0 ? (1450 - zoom_base) : 0) * zoom_t * 0.82 + 0.5);
-    zoom_eff = clampi(zoom_eff, 1, 1500);
-
-    const int warp_q = clampi(warp_drive, 0, 1000);
-    falloff_arg = clampi(falloff_arg + (warp_q * 210 + 500) / 1000, 0, 1000);
-    strength_arg = clampi(strength_arg + (warp_q * 320 + 500) / 1000, 0, 1000);
+    int x_center = w / 2;
+    int y_center = h / 2;
+    double zoom = 1.0;
+    double falloff = 0.0;
+    double strength = 0.0;
+    double strength_factor = 1.0;
+    double cos_val = 1.0;
+    double sin_val = 0.0;
+    double inv_max_dist = 1.0;
 
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
@@ -370,26 +311,95 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
 
     const size_t plane_size = (size_t)w * (size_t)h;
 
-    veejay_memcpy(srcY, dstY, plane_size);
-    veejay_memcpy(srcU, dstU, plane_size);
-    veejay_memcpy(srcV, dstV, plane_size);
+    #pragma omp single copyprivate(x_center, y_center, zoom, falloff, strength, strength_factor, cos_val, sin_val, inv_max_dist, dstY, dstU, dstV, srcY, srcU, srcV)
+    {
+        if(!warp->env_ready) {
+            warp->x_angle_env = (double)x_angle_arg;
+            warp->y_angle_env = (double)y_angle_arg;
+            warp->zoom_env = (double)zoom_arg;
+            warp->x_center_env = (double)x_center_arg;
+            warp->y_center_env = (double)y_center_arg;
+            warp->falloff_env = (double)falloff_arg_in;
+            warp->strength_env = (double)strength_arg_in;
+            warp->spin_speed_env = (double)spin_arg_in;
+            warp->zoom_drive_env = (double)zoom_drive_in;
+            warp->warp_drive_env = (double)warp_drive_in;
+            warp->env_ready = 1;
+        }
+        else {
+            warp->x_angle_env = warppers_smooth_angle(warp->x_angle_env, (double)x_angle_arg, angle_alpha);
+            warp->y_angle_env = warppers_smooth_angle(warp->y_angle_env, (double)y_angle_arg, angle_alpha);
+            warp->zoom_env = warppers_smooth(warp->zoom_env, (double)zoom_arg, scalar_alpha);
+            warp->x_center_env = warppers_smooth(warp->x_center_env, (double)x_center_arg, center_alpha);
+            warp->y_center_env = warppers_smooth(warp->y_center_env, (double)y_center_arg, center_alpha);
+            warp->falloff_env = warppers_smooth(warp->falloff_env, (double)falloff_arg_in, scalar_alpha);
+            warp->strength_env = warppers_smooth(warp->strength_env, (double)strength_arg_in, scalar_alpha);
+            warp->spin_speed_env = warppers_smooth(warp->spin_speed_env, (double)spin_arg_in, scalar_alpha);
+            warp->zoom_drive_env = warppers_smooth(warp->zoom_drive_env, (double)zoom_drive_in, drive_alpha);
+            warp->warp_drive_env = warppers_smooth(warp->warp_drive_env, (double)warp_drive_in, drive_alpha);
+        }
 
-    const double zoom = (double)zoom_eff * 0.01;
-    double falloff = (double)falloff_arg * 0.01;
-    const double strength = (double)strength_arg * 0.01;
+        int x_angle_base = warppers_wrap_lut((int)(warp->x_angle_env + 0.5));
+        int y_angle_base = warppers_wrap_lut((int)(warp->y_angle_env + 0.5));
+        int zoom_base = clampi((int)(warp->zoom_env + 0.5), 1, 1000);
+        x_center = clampi((int)(warp->x_center_env + 0.5), 0, w - 1);
+        y_center = clampi((int)(warp->y_center_env + 0.5), 0, h - 1);
+        int falloff_arg = clampi((int)(warp->falloff_env + 0.5), 0, 1000);
+        int strength_arg = clampi((int)(warp->strength_env + 0.5), 0, 1000);
+        int spin_arg = clampi((int)(warp->spin_speed_env + (warp->spin_speed_env >= 0.0 ? 0.5 : -0.5)), -1000, 1000);
+        int zoom_drive = clampi((int)(warp->zoom_drive_env + 0.5), 0, 1000);
+        int warp_drive = clampi((int)(warp->warp_drive_env + 0.5), 0, 1000);
 
-    falloff *= falloff;
+        double zoom_t = (double)zoom_drive * 0.001;
+        double warp_t = (double)warp_drive * 0.001;
 
-    const double strength_factor = 1.0 - strength;
-    const double cos_val = warp->cos_lut[x_angle];
-    const double sin_val = warp->sin_lut[y_angle];
+        double spin_step = (double)spin_arg * 0.018;
+        double drive_spin = warp_t * 15.5;
 
-    int64_t half_w = w >> 1;
-    int64_t half_h = h >> 1;
-    const int64_t max_dist_i = half_w * half_w + half_h * half_h;
-    const double inv_max_dist = 1.0 / (double)max_dist_i;
+        warp->spin_phase = warppers_wrap_phase(warp->spin_phase + spin_step + drive_spin);
 
-#pragma omp parallel for schedule(static) num_threads(warp->n_threads)
+        int spin_i = (int)(warp->spin_phase + 0.5);
+        int drive_angle = (int)(warp_t * 112.0 + 0.5);
+
+        int x_angle = warppers_wrap_lut(x_angle_base + spin_i + drive_angle);
+        int y_angle = warppers_wrap_lut(y_angle_base + (spin_i * 7) / 10 - (drive_angle * 3) / 5);
+
+        int zoom_eff = zoom_base + (int)(((1450 - zoom_base) > 0 ? (1450 - zoom_base) : 0) * zoom_t * 0.82 + 0.5);
+        zoom_eff = clampi(zoom_eff, 1, 1500);
+
+        int warp_q = clampi(warp_drive, 0, 1000);
+        falloff_arg = clampi(falloff_arg + (warp_q * 210 + 500) / 1000, 0, 1000);
+        strength_arg = clampi(strength_arg + (warp_q * 320 + 500) / 1000, 0, 1000);
+
+        dstY = frame->data[0];
+        dstU = frame->data[1];
+        dstV = frame->data[2];
+
+        srcY = warp->buf[0];
+        srcU = warp->buf[1];
+        srcV = warp->buf[2];
+
+        veejay_memcpy(srcY, dstY, plane_size);
+        veejay_memcpy(srcU, dstU, plane_size);
+        veejay_memcpy(srcV, dstV, plane_size);
+
+        zoom = (double)zoom_eff * 0.01;
+        falloff = (double)falloff_arg * 0.01;
+        strength = (double)strength_arg * 0.01;
+
+        falloff *= falloff;
+
+        strength_factor = 1.0 - strength;
+        cos_val = warp->cos_lut[x_angle];
+        sin_val = warp->sin_lut[y_angle];
+
+        int64_t half_w = w >> 1;
+        int64_t half_h = h >> 1;
+        int64_t max_dist_i = half_w * half_w + half_h * half_h;
+        inv_max_dist = 1.0 / (double)max_dist_i;
+    }
+
+    #pragma omp for schedule(static)
     for(int y_pos = 0; y_pos < h; y_pos++) {
         const int row = y_pos * w;
         const int dy = y_pos - y_center;

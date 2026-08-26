@@ -25,6 +25,7 @@
 
 #include "common.h"
 #include "baltantv.h"
+#include <veejaycore/vjmem.h>
 
 #define PLANES 64
 #define MAX_TAPS 8
@@ -49,6 +50,8 @@ static inline int baltan_plane_index(int plane, int t, int stride)
 vj_effect *baltantv_init(int w, int h)
 {
     vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 5;
     ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
@@ -78,6 +81,9 @@ vj_effect *baltantv_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -89,12 +95,16 @@ void *baltantv_malloc(int w, int h)
         return NULL;
 
     const int len = w * h;
+    if(len <= 0) {
+        free(b);
+        return NULL;
+    }
 
     b->frame_size = len;
     b->uv_size = len;
-    b->historyY = (uint8_t*) vj_calloc(sizeof(uint8_t) * len * PLANES);
-    b->historyU = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
-    b->historyV = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
+    b->historyY = (uint8_t*) vj_calloc(sizeof(uint8_t) * (size_t)len * (size_t)PLANES);
+    b->historyU = (int16_t*) vj_calloc(sizeof(int16_t) * (size_t)len * (size_t)PLANES);
+    b->historyV = (int16_t*) vj_calloc(sizeof(int16_t) * (size_t)len * (size_t)PLANES);
 
     if(!b->historyY || !b->historyU || !b->historyV)
     {
@@ -103,6 +113,8 @@ void *baltantv_malloc(int w, int h)
     }
 
     b->n_threads = vje_advise_num_threads(len);
+    if(b->n_threads < 1)
+        b->n_threads = 1;
 
     return b;
 }
@@ -144,11 +156,11 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
     const int inv_taps_q16 = 65536 / taps;
     const int live_chroma = 255 - chromaPersist;
 
-    uint8_t *restrict dstY = b->historyY + (plane * len);
-    int16_t *restrict dstU = b->historyU + (plane * len);
-    int16_t *restrict dstV = b->historyV + (plane * len);
+    uint8_t *restrict dstY = b->historyY + ((size_t)plane * (size_t)len);
+    int16_t *restrict dstU = b->historyU + ((size_t)plane * (size_t)len);
+    int16_t *restrict dstV = b->historyV + ((size_t)plane * (size_t)len);
 
-    #pragma omp parallel for schedule(static) num_threads(b->n_threads)
+#pragma omp for schedule(static) 
     for(int i = 0; i < len; i++)
     {
         const int srcY = Y[i];
@@ -188,5 +200,8 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = CLAMP_UV(finalV + 128);
     }
 
-    b->plane = (plane + 1) & PLANE_MASK;
+#pragma omp single
+    {
+        b->plane = (plane + 1) & PLANE_MASK;
+    }
 }

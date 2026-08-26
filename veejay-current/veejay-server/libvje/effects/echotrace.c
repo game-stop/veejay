@@ -71,16 +71,6 @@ vj_effect *echotrace_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_INTENSITY] = 0;   ve->limits[1][P_INTENSITY] = 255;        ve->defaults[P_INTENSITY] = 255;
     ve->limits[0][P_DECAY] = 1;       ve->limits[1][P_DECAY] = MAX_OLD_FRAMES; ve->defaults[P_DECAY] = 16;
@@ -120,7 +110,6 @@ void *echotrace_malloc(int w, int h)
     }
 
     t->trace_v = t->trace_u + len;
-    t->n_threads = vje_advise_num_threads(len);
 
     return t;
 }
@@ -163,7 +152,7 @@ void echotrace_apply(void *ptr, VJFrame *frame, int *args)
     int32_t *restrict accU = t->trace_u;
     int32_t *restrict accV = t->trace_v;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static) 
     for(int i = 0; i < len; i++) {
         const uint32_t fp_y = (uint32_t)echotrace_div255((int)Y[i] * intensity) << FP_SHIFT;
         const int32_t u_in = (int32_t)U[i] - 128;

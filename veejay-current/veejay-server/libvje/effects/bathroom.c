@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@
 #include "common.h"
 #include "bathroom.h"
 #include "motionmap.h"
+#include <veejaycore/vjmem.h>
 
 typedef struct {
     uint8_t *bathroom_frame[4];
@@ -32,16 +33,6 @@ typedef struct {
 static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
-}
-
-static inline int bathroom_mini(int a, int b)
-{
-    return a < b ? a : b;
-}
-
-static inline int bathroom_maxi(int a, int b)
-{
-    return a > b ? a : b;
 }
 
 vj_effect *bathroom_init(int width, int height)
@@ -56,17 +47,6 @@ vj_effect *bathroom_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][0] = 0; ve->limits[1][0] = 3;     ve->defaults[0] = 1;
     ve->limits[0][1] = 1; ve->limits[1][1] = 64;    ve->defaults[1] = 32;
     ve->limits[0][2] = 0; ve->limits[1][2] = width; ve->defaults[2] = 0;
@@ -77,7 +57,6 @@ vj_effect *bathroom_init(int width, int height)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->motion = 1;
-    ve->parallel = 0;
     ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
     ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Distance", "X start position", "X end position");
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -94,6 +73,9 @@ vj_effect *bathroom_init(int width, int height)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)width;
+    (void)height;
+
     return ve;
 }
 
@@ -106,7 +88,7 @@ void *bathroom_malloc(int width, int height)
 
     const int len = width * height;
 
-    b->bathroom_frame[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len * 4);
+    b->bathroom_frame[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len * 4u);
 
     if(!b->bathroom_frame[0]) {
         free(b);
@@ -124,11 +106,12 @@ void bathroom_free(void *ptr)
 {
     bathroom_t *b = (bathroom_t*) ptr;
 
-    if(b) {
-        if(b->bathroom_frame[0])
-            free(b->bathroom_frame[0]);
-        free(b);
-    }
+    if(!b)
+        return;
+
+    if(b->bathroom_frame[0])
+        free(b->bathroom_frame[0]);
+    free(b);
 }
 
 static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x0, int x1, int horiz)
@@ -145,18 +128,17 @@ static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x
     int strides[4] = { len, len, len, 0 };
     const int half_val = val >> 1;
 
-    vj_frame_copy(frame->data, bf, strides);
+    #pragma omp single
+    {
+        vj_frame_copy(frame->data, bf, strides);
+    }
 
     if(horiz) {
-        int y_mod = 0;
-
+        #pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
+            const int y_mod = y % val;
             const int y_offset = y_mod - half_val;
             const int y_base = y * width;
-
-            y_mod++;
-            if(y_mod == val)
-                y_mod = 0;
 
             for(int x = x0; x < x1; x++) {
                 const int sx = clampi(x + y_offset, 0, width - 1);
@@ -170,11 +152,12 @@ static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x
         }
     }
     else {
+        #pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
             const int y_base = y * width;
-            int x_mod = 0;
 
             for(int x = x0; x < x1; x++) {
+                const int x_mod = (x - x0) % val;
                 const int y_offset = x_mod - half_val;
                 const int sy = clampi(y + y_offset, 0, height - 1);
                 const int src_idx = sy * width + x;
@@ -183,10 +166,6 @@ static void bathroom_apply_noalpha(bathroom_t *b, VJFrame *frame, int val, int x
                 Y[dst_idx] = bf[0][src_idx];
                 Cb[dst_idx] = bf[1][src_idx];
                 Cr[dst_idx] = bf[2][src_idx];
-
-                x_mod++;
-                if(x_mod == val)
-                    x_mod = 0;
             }
         }
     }
@@ -207,18 +186,17 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
     int strides[4] = { len, len, len, len };
     const int half_val = val >> 1;
 
-    vj_frame_copy(frame->data, bf, strides);
+    #pragma omp single
+    {
+        vj_frame_copy(frame->data, bf, strides);
+    }
 
     if(horiz) {
-        int y_mod = 0;
-
+        #pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
+            const int y_mod = y % val;
             const int y_offset = y_mod - half_val;
             const int y_base = y * width;
-
-            y_mod++;
-            if(y_mod == val)
-                y_mod = 0;
 
             for(int x = x0; x < x1; x++) {
                 const int sx = clampi(x + y_offset, 0, width - 1);
@@ -233,11 +211,12 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
         }
     }
     else {
+        #pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
             const int y_base = y * width;
-            int x_mod = 0;
 
             for(int x = x0; x < x1; x++) {
+                const int x_mod = (x - x0) % val;
                 const int y_offset = x_mod - half_val;
                 const int sy = clampi(y + y_offset, 0, height - 1);
                 const int src_idx = sy * width + x;
@@ -247,10 +226,6 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
                 Cb[dst_idx] = bf[1][src_idx];
                 Cr[dst_idx] = bf[2][src_idx];
                 A[dst_idx] = bf[3][src_idx];
-
-                x_mod++;
-                if(x_mod == val)
-                    x_mod = 0;
             }
         }
     }
@@ -271,8 +246,9 @@ void bathroom_apply(void *ptr, VJFrame *frame, int *args)
         x1 = tmp;
     }
 
-    if(x0 == x1)
-        return;
+    if(x1 <= x0) {
+        x1 = frame->width;
+    }
 
     if((mode == 2 || mode == 3) && !frame->data[3])
         mode = mode == 2 ? 0 : 1;
@@ -311,11 +287,14 @@ void bathroom_apply(void *ptr, VJFrame *frame, int *args)
             break;
     }
 
-    if(b->motionmap && interpolate)
-        motionmap_interpolate_frame(b->motionmap, frame, b->N__, b->n__);
+    #pragma omp single
+    {
+        if(b->motionmap && interpolate)
+            motionmap_interpolate_frame(b->motionmap, frame, b->N__, b->n__);
 
-    if(b->motionmap && motion)
-        motionmap_store_frame(b->motionmap, frame);
+        if(b->motionmap && motion)
+            motionmap_store_frame(b->motionmap, frame);
+    }
 }
 
 int bathroom_request_fx(void)

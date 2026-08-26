@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -47,7 +47,6 @@
 
 typedef struct {
     uint8_t *chrominance;
-    int n_threads;
 
     int valid;
     int last_angle;
@@ -66,6 +65,17 @@ typedef struct {
     float iv_f;
     float chroma_drive_f;
     float rotate_drive_f;
+
+    int cached_angle;
+    int cached_center_u;
+    int cached_center_v;
+    int cached_iu_factor;
+    int cached_iv_factor;
+    int cached_uv_min;
+    int cached_uv_max;
+    int cached_chroma_drive;
+    int cached_rotate_drive;
+    int cached_table_dirty;
 } uvcorrect_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -95,13 +105,7 @@ vj_effect *uvcorrect_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+    
 
     ve->limits[0][P_ANGLE] = 1;        ve->limits[1][P_ANGLE] = 360;       ve->defaults[P_ANGLE] = 1;
     ve->limits[0][P_CENTER_U] = 0;     ve->limits[1][P_CENTER_U] = 255;    ve->defaults[P_CENTER_U] = 128;
@@ -110,8 +114,8 @@ vj_effect *uvcorrect_init(int w, int h)
     ve->limits[0][P_INTENSITY_V] = 0;  ve->limits[1][P_INTENSITY_V] = 100; ve->defaults[P_INTENSITY_V] = 10;
     ve->limits[0][P_MIN_UV] = 0;       ve->limits[1][P_MIN_UV] = 255;      ve->defaults[P_MIN_UV] = pixel_U_lo_;
     ve->limits[0][P_MAX_UV] = 0;       ve->limits[1][P_MAX_UV] = 255;      ve->defaults[P_MAX_UV] = pixel_U_hi_;
-    ve->limits[0][P_CHROMA_DRIVE] = 0;ve->limits[1][P_CHROMA_DRIVE] = 1000;ve->defaults[P_CHROMA_DRIVE] = 320;
-    ve->limits[0][P_ROTATE_DRIVE] = 0;ve->limits[1][P_ROTATE_DRIVE] = 1000;ve->defaults[P_ROTATE_DRIVE] = 180;
+    ve->limits[0][P_CHROMA_DRIVE] = 0; ve->limits[1][P_CHROMA_DRIVE] = 1000;ve->defaults[P_CHROMA_DRIVE] = 320;
+    ve->limits[0][P_ROTATE_DRIVE] = 0; ve->limits[1][P_ROTATE_DRIVE] = 1000;ve->defaults[P_ROTATE_DRIVE] = 180;
 
     ve->description = "U/V Correction";
     ve->sub_format = -1;
@@ -147,6 +151,9 @@ vj_effect *uvcorrect_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -162,8 +169,6 @@ void *uvcorrect_malloc(int w, int h)
         return NULL;
     }
 
-    uv->n_threads = vje_advise_num_threads(w * h);
-
     uv->valid = 0;
     uv->smooth_valid = 0;
     uv->angle_f = 1.0f;
@@ -174,14 +179,20 @@ void *uvcorrect_malloc(int w, int h)
     uv->chroma_drive_f = 0.0f;
     uv->rotate_drive_f = 0.0f;
 
+    (void)w;
+    (void)h;
+
     return uv;
 }
 
 void uvcorrect_free(void *ptr)
 {
     uvcorrect_t *uv = (uvcorrect_t*) ptr;
+    if(!uv)
+        return;
 
-    free(uv->chrominance);
+    if(uv->chrominance)
+        free(uv->chrominance);
     free(uv);
 }
 
@@ -317,68 +328,87 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
 
     const int uv_len = frame->uv_len;
 
-    int angle         = args[P_ANGLE];
-    int center_u      = args[P_CENTER_U];
-    int center_v      = args[P_CENTER_V];
-    int iu_factor     = args[P_INTENSITY_U];
-    int iv_factor     = args[P_INTENSITY_V];
-    int uv_min        = args[P_MIN_UV];
-    int uv_max        = args[P_MAX_UV];
-    int chroma_drive  = args[P_CHROMA_DRIVE];
-    int rotate_drive  = args[P_ROTATE_DRIVE];
-
-    const float slow = 0.118f;
-    const float fast = 0.176f;
-
-    if(!uv->smooth_valid) {
-        uv->angle_f = (float)angle;
-        uv->center_u_f = (float)center_u;
-        uv->center_v_f = (float)center_v;
-        uv->iu_f = (float)iu_factor;
-        uv->iv_f = (float)iv_factor;
-        uv->chroma_drive_f = (float)chroma_drive;
-        uv->rotate_drive_f = (float)rotate_drive;
-        uv->smooth_valid = 1;
-    } else {
-        uv->angle_f = uvcorrect_smoothf(uv->angle_f, (float)angle, fast);
-        uv->center_u_f = uvcorrect_smoothf(uv->center_u_f, (float)center_u, slow);
-        uv->center_v_f = uvcorrect_smoothf(uv->center_v_f, (float)center_v, slow);
-        uv->iu_f = uvcorrect_smoothf(uv->iu_f, (float)iu_factor, fast * 0.92f);
-        uv->iv_f = uvcorrect_smoothf(uv->iv_f, (float)iv_factor, fast * 0.92f);
-        uv->chroma_drive_f = uvcorrect_smoothf(uv->chroma_drive_f, (float)chroma_drive, fast * 1.08f);
-        uv->rotate_drive_f = uvcorrect_smoothf(uv->rotate_drive_f, (float)rotate_drive, fast * 1.08f);
-    }
-
-    angle = clampi((int)(uv->angle_f + 0.5f), 1, 360);
-    center_u = clampi((int)(uv->center_u_f + 0.5f), 0, 255);
-    center_v = clampi((int)(uv->center_v_f + 0.5f), 0, 255);
-    iu_factor = clampi((int)(uv->iu_f + 0.5f), 0, 100);
-    iv_factor = clampi((int)(uv->iv_f + 0.5f), 0, 100);
-    chroma_drive = clampi((int)(uv->chroma_drive_f + 0.5f), 0, 1000);
-    rotate_drive = clampi((int)(uv->rotate_drive_f + 0.5f), 0, 1000);
-
-    if(uv_min > uv_max) {
-        const int tmp = uv_min;
-        uv_min = uv_max;
-        uv_max = tmp;
-    }
-
-    const int table_dirty = uvcorrect_table_dirty(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
-
-#pragma omp parallel num_threads(uv->n_threads)
+    #pragma omp single
     {
-        if(table_dirty)
-            uvcorrect_rebuild_table(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
+        int angle = args[P_ANGLE];
+        int center_u = args[P_CENTER_U];
+        int center_v = args[P_CENTER_V];
+        int iu_factor = args[P_INTENSITY_U];
+        int iv_factor = args[P_INTENSITY_V];
+        int uv_min = args[P_MIN_UV];
+        int uv_max = args[P_MAX_UV];
+        int chroma_drive = args[P_CHROMA_DRIVE];
+        int rotate_drive = args[P_ROTATE_DRIVE];
 
-        uvcorrect_chrominance_treatment(
+        const float slow = 0.118f;
+        const float fast = 0.176f;
+
+        if(!uv->smooth_valid) {
+            uv->angle_f = (float)angle;
+            uv->center_u_f = (float)center_u;
+            uv->center_v_f = (float)center_v;
+            uv->iu_f = (float)iu_factor;
+            uv->iv_f = (float)iv_factor;
+            uv->chroma_drive_f = (float)chroma_drive;
+            uv->rotate_drive_f = (float)rotate_drive;
+            uv->smooth_valid = 1;
+        } else {
+            uv->angle_f = uvcorrect_smoothf(uv->angle_f, (float)angle, fast);
+            uv->center_u_f = uvcorrect_smoothf(uv->center_u_f, (float)center_u, slow);
+            uv->center_v_f = uvcorrect_smoothf(uv->center_v_f, (float)center_v, slow);
+            uv->iu_f = uvcorrect_smoothf(uv->iu_f, (float)iu_factor, fast * 0.92f);
+            uv->iv_f = uvcorrect_smoothf(uv->iv_f, (float)iv_factor, fast * 0.92f);
+            uv->chroma_drive_f = uvcorrect_smoothf(uv->chroma_drive_f, (float)chroma_drive, fast * 1.08f);
+            uv->rotate_drive_f = uvcorrect_smoothf(uv->rotate_drive_f, (float)rotate_drive, fast * 1.08f);
+        }
+
+        angle = clampi((int)(uv->angle_f + 0.5f), 1, 360);
+        center_u = clampi((int)(uv->center_u_f + 0.5f), 0, 255);
+        center_v = clampi((int)(uv->center_v_f + 0.5f), 0, 255);
+        iu_factor = clampi((int)(uv->iu_f + 0.5f), 0, 100);
+        iv_factor = clampi((int)(uv->iv_f + 0.5f), 0, 100);
+        chroma_drive = clampi((int)(uv->chroma_drive_f + 0.5f), 0, 1000);
+        rotate_drive = clampi((int)(uv->rotate_drive_f + 0.5f), 0, 1000);
+
+        if(uv_min > uv_max) {
+            const int tmp = uv_min;
+            uv_min = uv_max;
+            uv_max = tmp;
+        }
+
+        uv->cached_table_dirty = uvcorrect_table_dirty(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
+        uv->cached_angle = angle;
+        uv->cached_center_u = center_u;
+        uv->cached_center_v = center_v;
+        uv->cached_iu_factor = iu_factor;
+        uv->cached_iv_factor = iv_factor;
+        uv->cached_uv_min = uv_min;
+        uv->cached_uv_max = uv_max;
+        uv->cached_chroma_drive = chroma_drive;
+        uv->cached_rotate_drive = rotate_drive;
+    }
+
+    if(uv->cached_table_dirty) {
+        uvcorrect_rebuild_table(
             uv,
-            frame->data[1],
-            frame->data[2],
-            uv_len,
-            chroma_drive,
-            rotate_drive,
-            uv_min,
-            uv_max
+            uv->cached_angle,
+            uv->cached_center_u,
+            uv->cached_center_v,
+            uv->cached_iu_factor,
+            uv->cached_iv_factor,
+            uv->cached_uv_min,
+            uv->cached_uv_max
         );
     }
+
+    uvcorrect_chrominance_treatment(
+        uv,
+        frame->data[1],
+        frame->data[2],
+        uv_len,
+        uv->cached_chroma_drive,
+        uv->cached_rotate_drive,
+        uv->cached_uv_min,
+        uv->cached_uv_max
+    );
 }

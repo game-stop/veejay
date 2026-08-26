@@ -85,7 +85,6 @@ vj_effect *buffer_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->parallel = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Memory Tap", "Opacity", "Feedback");
 
     {
@@ -119,7 +118,6 @@ void *buffer_malloc(int w, int h)
 
     b->write_pos = 0;
     b->filled = 0;
-    b->n_threads = vje_advise_num_threads(w * h);
 
     return b;
 }
@@ -329,39 +327,37 @@ void buffer_apply(void *ptr, VJFrame *frame, int *args)
     else if(delay > MAX_FRAMES)
         delay = MAX_FRAMES;
 
-    const int write_slot = buffer_put_frame(b, frame);
-    if(write_slot < 0)
-        return;
-
-    if(delay == 0)
-        return;
-
-    buffer_slot_t *tap = buffer_get_tap(b, delay);
-
-    if(!tap) {
-        if(opacity >= 255)
-            buffer_black(frame);
-        return;
-    }
-
-    if(opacity >= 255)
-        buffer_copy_slot(tap, frame);
-
-    const int do_mix = opacity > 0 && opacity < 255;
-    const int do_feedback_mix = feedback > 0 && feedback < 255;
-
-    if(do_mix || do_feedback_mix) {
-#pragma omp parallel num_threads(b->n_threads)
-        {
-            if(do_mix)
-                buffer_mix_slot(tap, frame, opacity);
-
-            if(do_feedback_mix)
-                buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
+    #pragma omp single
+    {
+        int write_slot = buffer_put_frame(b, frame);
+        
+        if(write_slot >= 0 && delay > 0) {
+            buffer_slot_t *tap = buffer_get_tap(b, delay);
+            
+            if(!tap) {
+                if(opacity >= 255) {
+                    buffer_black(frame);
+                }
+            } else {
+                if(opacity >= 255) {
+                    buffer_copy_slot(tap, frame);
+                }
+                
+                int do_mix = (opacity > 0 && opacity < 255);
+                int do_feedback_mix = (feedback > 0 && feedback < 255);
+                
+                if(do_mix) {
+                    buffer_mix_slot(tap, frame, opacity);
+                }
+                
+                if(do_feedback_mix) {
+                    buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
+                }
+                
+                if(feedback >= 255) {
+                    buffer_store_slot(&b->slots[write_slot], frame);
+                }
+            }
         }
     }
-
-    if(feedback >= 255)
-        buffer_store_slot(&b->slots[write_slot], frame);
 }
-

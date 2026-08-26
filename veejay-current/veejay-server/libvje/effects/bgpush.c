@@ -33,8 +33,6 @@ vj_effect *bgpush_init(int w, int h)
     ve->num_params = 0;
     ve->description = "Background take-frame";
     ve->sub_format = -1;
-    ve->extra_frame = 0;
-    ve->has_user = 0;
     ve->global = 1;
     ve->static_bg = 1;
     return ve;
@@ -42,9 +40,6 @@ vj_effect *bgpush_init(int w, int h)
 
 void *bgpush_malloc(int w, int h)
 {
-    if(w <= 0 || h <= 0)
-        return NULL;
-
     bgpush_t *b = (bgpush_t*) vj_calloc(sizeof(bgpush_t));
     if(!b)
         return NULL;

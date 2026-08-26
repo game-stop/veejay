@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -82,16 +82,7 @@ vj_effect *greyselect_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 255;
@@ -166,6 +157,8 @@ void *greyselect_malloc(int w, int h)
 
 void greyselect_free(void *ptr)
 {
+    if(!ptr)
+        return;
     free(ptr);
 }
 
@@ -223,7 +216,15 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
 {
     greyselect_t *g = (greyselect_t*) ptr;
 
-    greyselect_update_cache(g, args);
+    const int len = frame->len;
+
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    #pragma omp single
+    {
+        greyselect_update_cache(g, args);
+    }
 
     const int mag_fp = g->mag_fp;
     const int cos_q_fp = g->cos_q_fp;
@@ -232,12 +233,8 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
     const int inv_range_fp = g->inv_range_fp;
     const int black_clip_fp = g->black_clip_fp;
     const int swap = g->swap;
-    const int len = frame->len;
 
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-#pragma omp parallel for schedule(static) num_threads(g->n_threads)
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

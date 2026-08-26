@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,9 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
- */
-
+*/
+#include <config.h>
 #include "common.h"
+#include <math.h>
+#include <stdint.h>
 #include <veejaycore/vjmem.h>
 #include "scanline.h"
 
@@ -111,17 +113,6 @@ vj_effect *scanline_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_DIRECTION] = 0;   ve->limits[1][P_DIRECTION] = 3;    ve->defaults[P_DIRECTION] = 0;
     ve->limits[0][P_SPEED] = 1;       ve->limits[1][P_SPEED] = 500;      ve->defaults[P_SPEED] = 1;
@@ -217,7 +208,6 @@ void *scanline_malloc(int w, int h)
     s->beat_env = 0.0f;
     s->beat_kick = 0.0f;
     s->sm_ready = 0;
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*)s;
 }
@@ -241,7 +231,7 @@ static void scanline_fade_buffer(scanline_t *s, int len, int hold)
     uint8_t *restrict u = s->buf[1];
     uint8_t *restrict v = s->buf[2];
 
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         y[i] = scanline_clamp_y((((int)y[i] * hold) + (pixel_Y_lo_ * inv) + 127) / 255);
         u[i] = scanline_clamp_uv((((int)u[i] * hold) + (128 * inv) + 127) / 255);
@@ -259,7 +249,7 @@ static void scanline_mix_output(uint8_t *restrict dstY,
                                 int mix_q8)
 {
     if(mix_q8 >= 256) {
-#pragma omp for schedule(static)
+        #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             dstY[i] = bufY[i];
             dstU[i] = bufU[i];
@@ -271,14 +261,13 @@ static void scanline_mix_output(uint8_t *restrict dstY,
     if(mix_q8 <= 0)
         return;
 
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         dstY[i] = scanline_blend_y(dstY[i], bufY[i], mix_q8);
         dstU[i] = scanline_blend_uv(dstU[i], bufU[i], mix_q8);
         dstV[i] = scanline_blend_uv(dstV[i], bufV[i], mix_q8);
     }
 }
-
 
 static void scanline_overlay_horizontal(uint8_t *restrict y,
                                         int width,
@@ -298,7 +287,7 @@ static void scanline_overlay_horizontal(uint8_t *restrict y,
     if(y1 >= height)
         y1 = height - 1;
 
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int row = y0; row <= y1; row++) {
         int d = row - center;
 
@@ -334,7 +323,7 @@ static void scanline_overlay_vertical(uint8_t *restrict y,
     if(x1 >= width)
         x1 = width - 1;
 
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int row = 0; row < height; row++) {
         uint8_t *restrict p = y + row * width;
 
@@ -384,57 +373,83 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     const float smooth = (float)smooth_arg * 0.001f;
     const float param_a = 0.46f - smooth * 0.32f;
 
-    if(!s->sm_ready) {
-        s->sm_speed = (float)speed_arg;
-        s->sm_stop = (float)stop_arg;
-        s->sm_beam = (float)beam_arg;
-        s->sm_hold = (float)hold_arg;
-        s->sm_mix = (float)mix_arg;
-        s->sm_beat_speed = (float)bs_arg;
-        s->sm_beat_beam = (float)bb_arg;
-        s->sm_beat_glow = (float)glow_arg;
-        s->sm_beat_decay = (float)decay_arg;
-        s->sm_ready = 1;
+    int stopped = 0;
+
+    #pragma omp single copyprivate(stopped)
+    {
+        if(!s->sm_ready) {
+            s->sm_speed = (float)speed_arg;
+            s->sm_stop = (float)stop_arg;
+            s->sm_beam = (float)beam_arg;
+            s->sm_hold = (float)hold_arg;
+            s->sm_mix = (float)mix_arg;
+            s->sm_beat_speed = (float)bs_arg;
+            s->sm_beat_beam = (float)bb_arg;
+            s->sm_beat_glow = (float)glow_arg;
+            s->sm_beat_decay = (float)decay_arg;
+            s->sm_ready = 1;
+        }
+        else {
+            s->sm_speed = scanline_smooth_to(s->sm_speed, (float)speed_arg, param_a);
+            s->sm_stop = scanline_smooth_to(s->sm_stop, (float)stop_arg, param_a);
+            s->sm_beam = scanline_smooth_to(s->sm_beam, (float)beam_arg, param_a);
+            s->sm_hold = scanline_smooth_to(s->sm_hold, (float)hold_arg, param_a);
+            s->sm_mix = scanline_smooth_to(s->sm_mix, (float)mix_arg, param_a);
+            s->sm_beat_speed = scanline_smooth_to(s->sm_beat_speed, (float)bs_arg, param_a);
+            s->sm_beat_beam = scanline_smooth_to(s->sm_beat_beam, (float)bb_arg, param_a);
+            s->sm_beat_glow = scanline_smooth_to(s->sm_beat_glow, (float)glow_arg, param_a);
+            s->sm_beat_decay = scanline_smooth_to(s->sm_beat_decay, (float)decay_arg, param_a);
+        }
+
+        const int beat_shaped = scanline_beat_shape(beat_arg);
+        const float target = (float)beat_shaped * 0.001f;
+        const float attack = 0.18f + (1.0f - smooth) * 0.38f;
+        const float release = 0.028f + (1.0f - smooth) * 0.095f;
+        const float old_env = s->beat_env;
+
+        if(target > s->beat_env)
+            s->beat_env += (target - s->beat_env) * attack;
+        else
+            s->beat_env += (target - s->beat_env) * release;
+
+        if(s->beat_env < 0.0001f)
+            s->beat_env = 0.0f;
+        else if(s->beat_env > 1.0f)
+            s->beat_env = 1.0f;
+
+        const float rise = s->beat_env - old_env;
+
+        if(rise > 0.0f)
+            s->beat_kick += rise * 1.55f;
+
+        s->beat_kick *= 0.50f + smooth * 0.30f;
+
+        if(s->beat_kick > 1.0f)
+            s->beat_kick = 1.0f;
+        else if(s->beat_kick < 0.0001f)
+            s->beat_kick = 0.0f;
+
+        stopped = s->stopCount > 0;
+        if(stopped) {
+            int long_axis_pre = mode < 2 ? height : width;
+            int speed_base_pre = clampi((int)(s->sm_speed + 0.5f), 1, 500);
+            int beat_speed_pre = clampi((int)(s->sm_beat_speed + 0.5f), 0, 1000);
+            int beat_q_pre = clampi((int)(s->beat_env * 700.0f + s->beat_kick * 520.0f + 0.5f), 0, 1000);
+            int skip_pre = 1 + ((beat_speed_pre * 6 + beat_q_pre * 7 + 1000) / 2000);
+
+            s->stopCount -= skip_pre;
+            if(s->stopCount <= 0) {
+                s->prevRow = 0;
+                s->prevCol = 0;
+                s->stopCount = 0;
+
+                veejay_memset(bufY, pixel_Y_lo_, len);
+                veejay_memset(bufU, 128, len);
+                veejay_memset(bufV, 128, len);
+                stopped = 0;
+            }
+        }
     }
-    else {
-        s->sm_speed = scanline_smooth_to(s->sm_speed, (float)speed_arg, param_a);
-        s->sm_stop = scanline_smooth_to(s->sm_stop, (float)stop_arg, param_a);
-        s->sm_beam = scanline_smooth_to(s->sm_beam, (float)beam_arg, param_a);
-        s->sm_hold = scanline_smooth_to(s->sm_hold, (float)hold_arg, param_a);
-        s->sm_mix = scanline_smooth_to(s->sm_mix, (float)mix_arg, param_a);
-        s->sm_beat_speed = scanline_smooth_to(s->sm_beat_speed, (float)bs_arg, param_a);
-        s->sm_beat_beam = scanline_smooth_to(s->sm_beat_beam, (float)bb_arg, param_a);
-        s->sm_beat_glow = scanline_smooth_to(s->sm_beat_glow, (float)glow_arg, param_a);
-        s->sm_beat_decay = scanline_smooth_to(s->sm_beat_decay, (float)decay_arg, param_a);
-    }
-
-    const int beat_shaped = scanline_beat_shape(beat_arg);
-    const float target = (float)beat_shaped * 0.001f;
-    const float attack = 0.18f + (1.0f - smooth) * 0.38f;
-    const float release = 0.028f + (1.0f - smooth) * 0.095f;
-    const float old_env = s->beat_env;
-
-    if(target > s->beat_env)
-        s->beat_env += (target - s->beat_env) * attack;
-    else
-        s->beat_env += (target - s->beat_env) * release;
-
-    if(s->beat_env < 0.0001f)
-        s->beat_env = 0.0f;
-    else if(s->beat_env > 1.0f)
-        s->beat_env = 1.0f;
-
-    const float rise = s->beat_env - old_env;
-
-    if(rise > 0.0f)
-        s->beat_kick += rise * 1.55f;
-
-    s->beat_kick *= 0.50f + smooth * 0.30f;
-
-    if(s->beat_kick > 1.0f)
-        s->beat_kick = 1.0f;
-    else if(s->beat_kick < 0.0001f)
-        s->beat_kick = 0.0f;
 
     const int beat_q = clampi((int)(s->beat_env * 700.0f + s->beat_kick * 520.0f + 0.5f), 0, 1000);
     const int long_axis = mode < 2 ? height : width;
@@ -475,160 +490,111 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     eff_mix = clampi(eff_mix, 0, 1000);
 
     const int mix_q8 = (eff_mix * 256 + 500) / 1000;
-
-
-    int stopped = 0;
-    int head = 0;
-    int horizontal = mode < 2;
-
-    if(s->stopCount > 0) {
-        const int skip = 1 + ((beat_speed * 6 + beat_q * 7 + 1000) / 2000);
-
-        s->stopCount -= skip;
-        stopped = 1;
-
-        if(s->stopCount <= 0) {
-            s->prevRow = 0;
-            s->prevCol = 0;
-            s->stopCount = 0;
-
-            veejay_memset(bufY, pixel_Y_lo_, len);
-            veejay_memset(bufU, 128, len);
-            veejay_memset(bufV, 128, len);
-        }
+    
+    if(stopped) {
+        scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
     }
+    else {
+        scanline_fade_buffer(s, len, eff_hold);
 
-#pragma omp parallel num_threads(s->n_threads)
-    {
-        if(stopped) {
-            scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
-        }
-        else {
-            scanline_fade_buffer(s, len, eff_hold);
+        int head = 0;
+        int horizontal = mode < 2;
+        int start = 0;
+        int stop = 0;
 
-#pragma omp single
-            {
-                switch(mode) {
-                    case 0:
-                    {
-                        const int start = s->prevRow;
-                        int stop = start + eff_speed;
-
-                        if(stop > height)
-                            stop = height;
-
-                        for(int row = start; row < stop; row++) {
-                            const int offset = row * width;
-
-                            veejay_memcpy(bufY + offset, dstY + offset, width);
-                            veejay_memcpy(bufU + offset, dstU + offset, width);
-                            veejay_memcpy(bufV + offset, dstV + offset, width);
-                        }
-
-                        head = stop > 0 ? stop - 1 : start;
-
-                        if(stop == height)
-                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-                        s->prevRow = (start + eff_speed) % height;
-                        break;
-                    }
-
-                    case 1:
-                    {
-                        const int start = height - 1 - s->prevRow;
-                        int stop = height - s->prevRow - eff_speed;
-
-                        if(stop < 0)
-                            stop = 0;
-
-                        for(int row = start; row >= stop; row--) {
-                            const int offset = row * width;
-
-                            veejay_memcpy(bufY + offset, dstY + offset, width);
-                            veejay_memcpy(bufU + offset, dstU + offset, width);
-                            veejay_memcpy(bufV + offset, dstV + offset, width);
-                        }
-
-                        head = stop;
-
-                        if(stop == 0)
-                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-                        s->prevRow = (s->prevRow + eff_speed) % height;
-                        break;
-                    }
-
-                    case 2:
-                    {
-                        const int start = s->prevCol;
-                        int stop = start + eff_speed;
-
-                        if(stop > width)
-                            stop = width;
-
-                        for(int row = 0; row < height; row++) {
-                            const int base = row * width;
-
-                            for(int col = start; col < stop; col++) {
-                                const int idx = base + col;
-
-                                bufY[idx] = dstY[idx];
-                                bufU[idx] = dstU[idx];
-                                bufV[idx] = dstV[idx];
-                            }
-                        }
-
-                        head = stop > 0 ? stop - 1 : start;
-                        horizontal = 0;
-
-                        if(stop == width)
-                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-                        s->prevCol = (start + eff_speed) % width;
-                        break;
-                    }
-
-                    case 3:
-                    default:
-                    {
-                        const int start = width - 1 - s->prevCol;
-                        int stop = width - s->prevCol - eff_speed;
-
-                        if(stop < 0)
-                            stop = 0;
-
-                        for(int row = 0; row < height; row++) {
-                            const int base = row * width;
-
-                            for(int col = start; col >= stop; col--) {
-                                const int idx = base + col;
-
-                                bufY[idx] = dstY[idx];
-                                bufU[idx] = dstU[idx];
-                                bufV[idx] = dstV[idx];
-                            }
-                        }
-
-                        head = stop;
-                        horizontal = 0;
-
-                        if(stop == 0)
-                            s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
-
-                        s->prevCol = (s->prevCol + eff_speed) % width;
-                        break;
-                    }
-                }
+        #pragma omp single
+        {
+            switch(mode) {
+                case 0:
+                    start = s->prevRow;
+                    stop = start + eff_speed;
+                    if(stop > height) stop = height;
+                    head = stop > 0 ? stop - 1 : start;
+                    break;
+                case 1:
+                    start = height - 1 - s->prevRow;
+                    stop = height - s->prevRow - eff_speed;
+                    if(stop < 0) stop = 0;
+                    head = stop;
+                    break;
+                case 2:
+                    start = s->prevCol;
+                    stop = start + eff_speed;
+                    if(stop > width) stop = width;
+                    head = stop > 0 ? stop - 1 : start;
+                    break;
+                case 3:
+                default:
+                    start = width - 1 - s->prevCol;
+                    stop = width - s->prevCol - eff_speed;
+                    if(stop < 0) stop = 0;
+                    head = stop;
+                    break;
             }
 
-            scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
+            switch(mode) {
+                case 0:
+                    for(int row = start; row < stop; row++) {
+                        const int offset = row * width;
+                        veejay_memcpy(bufY + offset, dstY + offset, width);
+                        veejay_memcpy(bufU + offset, dstU + offset, width);
+                        veejay_memcpy(bufV + offset, dstV + offset, width);
+                    }
+                    if(stop == height)
+                        s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+                    s->prevRow = (start + eff_speed) % height;
+                    break;
 
-            if(horizontal)
-                scanline_overlay_horizontal(dstY, width, height, head, eff_beam, eff_glow);
-            else
-                scanline_overlay_vertical(dstY, width, height, head, eff_beam, eff_glow);
+                case 1:
+                    for(int row = start; row >= stop; row--) {
+                        const int offset = row * width;
+                        veejay_memcpy(bufY + offset, dstY + offset, width);
+                        veejay_memcpy(bufU + offset, dstU + offset, width);
+                        veejay_memcpy(bufV + offset, dstV + offset, width);
+                    }
+                    if(stop == 0)
+                        s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+                    s->prevRow = (s->prevRow + eff_speed) % height;
+                    break;
+
+                case 2:
+                    for(int row = 0; row < height; row++) {
+                        const int base = row * width;
+                        for(int col = start; col < stop; col++) {
+                            const int idx = base + col;
+                            bufY[idx] = dstY[idx];
+                            bufU[idx] = dstU[idx];
+                            bufV[idx] = dstV[idx];
+                        }
+                    }
+                    if(stop == width)
+                        s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+                    s->prevCol = (start + eff_speed) % width;
+                    break;
+
+                case 3:
+                default:
+                    for(int row = 0; row < height; row++) {
+                        const int base = row * width;
+                        for(int col = start; col >= stop; col--) {
+                            const int idx = base + col;
+                            bufY[idx] = dstY[idx];
+                            bufU[idx] = dstU[idx];
+                            bufV[idx] = dstV[idx];
+                        }
+                    }
+                    if(stop == 0)
+                        s->stopCount = (stop_base * (1000 - (beat_q >> 1)) + 500) / 1000;
+                    s->prevCol = (s->prevCol + eff_speed) % width;
+                    break;
+            }
         }
+
+        scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
+
+        if(horizontal)
+            scanline_overlay_horizontal(dstY, width, height, head, eff_beam, eff_glow);
+        else
+            scanline_overlay_vertical(dstY, width, height, head, eff_beam, eff_glow);
     }
 }
-

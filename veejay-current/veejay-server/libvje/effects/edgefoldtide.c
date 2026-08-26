@@ -497,14 +497,6 @@ vj_effect *edgefoldtide_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if (ve->defaults) free(ve->defaults);
-        if (ve->limits[0]) free(ve->limits[0]);
-        if (ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_SOURCE] = 0; ve->limits[1][P_SOURCE] = 100; ve->defaults[P_SOURCE] = 56;
     ve->limits[0][P_FLOW] = 0; ve->limits[1][P_FLOW] = 100; ve->defaults[P_FLOW] = 62;
     ve->limits[0][P_GEOM] = 0; ve->limits[1][P_GEOM] = 100; ve->defaults[P_GEOM] = 74;
@@ -519,7 +511,6 @@ vj_effect *edgefoldtide_init(int w, int h)
     ve->description = "Stained Current";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -574,7 +565,6 @@ void *edgefoldtide_malloc(int w, int h)
     e->len = (int) len;
     e->seeded = 0;
     e->frame = 0;
-    e->n_threads = vje_advise_num_threads((int) len);
 
     gridcap = (size_t) (((w + 7) / 8) + 3) * (size_t) (((h + 7) / 8) + 3);
     total = len * 10 + sizeof(float) * gridcap * 3 + 128;
@@ -815,6 +805,9 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     float soft_t;
     float speed_curve;
     float mature_rate;
+    float new_maturity;
+    float new_time;
+    float new_phase;
     float source_base;
     float flow_pixels;
     float cell_px;
@@ -837,8 +830,6 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     U = frame->data[1];
     V = frame->data[2];
 
-    if (!e->seeded)
-        eh_seed(e, frame);
     source_i = args[P_SOURCE];
     flow_i = args[P_FLOW];
     geom_i = args[P_GEOM];
@@ -851,6 +842,7 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     soft_i = args[P_SOFT];
     do_soft = soft_i > 0;
 
+    /* All threads evaluate floats locally */
     source_t = (float) source_i * 0.01f;
     flow_t = (float) flow_i * 0.01f;
     geom_t = (float) geom_i * 0.01f;
@@ -864,20 +856,16 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     speed_curve = speed_t * speed_t * (3.0f - 2.0f * speed_t);
 
     mature_rate = 0.004f + source_t * 0.018f;
-    e->maturity += (1.0f - e->maturity) * mature_rate;
-    if (e->maturity > 1.0f) e->maturity = 1.0f;
+    
+    /* Pre-calculate new state values locally based on the CURRENT state */
+    new_maturity = e->maturity + (1.0f - e->maturity) * mature_rate;
+    if (new_maturity > 1.0f) new_maturity = 1.0f;
+
+    new_time = eh_wrap_2pi(e->time + (0.0015f + flow_t * 0.006f + geom_t * 0.003f) * (0.16f + speed_curve * 1.85f));
+    new_phase = eh_wrap_2pi(e->phase + (0.0020f + mirror_t * 0.011f) * (0.10f + speed_curve * 1.60f) * (speed_i < 0 ? -1.0f : 1.0f));
 
     tone_mix_f = 0.18f + glow_t * 0.18f + color_t * 0.16f;
     tone_mix = eh_clampi((int) (tone_mix_f * 255.0f + 0.5f), 0, 255);
-    eh_build_luts(e, source_i, glow_i, trail_i, color_i, tone_mix);
-
-    e->time = eh_wrap_2pi(e->time + (0.0015f + flow_t * 0.006f + geom_t * 0.003f) * (0.16f + speed_curve * 1.85f));
-    e->phase = eh_wrap_2pi(e->phase + (0.0020f + mirror_t * 0.011f) * (0.10f + speed_curve * 1.60f) * (speed_i < 0 ? -1.0f : 1.0f));
-    eh_lut_sincos_fast(e, e->phase, &phase_s, &phase_c);
-
-    e->grid_cell = 18 + (soft_i >> 3) - (flow_i >> 4);
-    if (e->grid_cell < 10) e->grid_cell = 10;
-    else if (e->grid_cell > 34) e->grid_cell = 34;
 
     src_y = e->src_y;
     old_y = e->paint_y;
@@ -895,9 +883,28 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     decay_lut = e->decay_lut;
     glow_lut = e->glow_lut;
 
-    veejay_memcpy(src_y, Y, len);
+    /* Master thread commits the changes safely */
+    #pragma omp single
+    {
+        if (!e->seeded)
+            eh_seed(e, frame);
 
-    eh_build_cathedral_force(e, src_y, prev_y, flow_i, geom_i, mirror_i, pull_i, trail_i, speed_i, soft_i);
+        e->maturity = new_maturity;
+        e->time = new_time;
+        e->phase = new_phase;
+
+        eh_build_luts(e, source_i, glow_i, trail_i, color_i, tone_mix);
+
+        e->grid_cell = 18 + (soft_i >> 3) - (flow_i >> 4);
+        if (e->grid_cell < 10) e->grid_cell = 10;
+        else if (e->grid_cell > 34) e->grid_cell = 34;
+
+        veejay_memcpy(src_y, Y, len);
+        eh_build_cathedral_force(e, src_y, prev_y, flow_i, geom_i, mirror_i, pull_i, trail_i, speed_i, soft_i);
+    }
+    /* Implicit barrier ensures new values are visible before trigonometric evaluation */
+
+    eh_lut_sincos_fast(e, new_phase, &phase_s, &phase_c);
 
     source_base = (0.004f + source_t * source_t * 0.078f) * (1.0f - trail_t * 0.48f);
     source_base = eh_clampf(source_base, 0.003f, 0.095f);
@@ -910,7 +917,7 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
     qcols = (w + 3) >> 2;
     qrows = (h + 3) >> 2;
 
-#pragma omp parallel for schedule(static) num_threads(e->n_threads)
+#pragma omp for schedule(static)
     for (qy = 0; qy < qrows; qy++) {
         int yy = qy << 2;
         int qx;
@@ -965,111 +972,94 @@ void edgefoldtide_apply(void *ptr, VJFrame *frame, int *args)
 
             src_us = (float) U[center_pos] - 128.0f;
             src_vs = (float) V[center_pos] - 128.0f;
-            eh_palette_source(src_us, src_vs, e->time + ff_m * EH_TWO_PI, color_t, tile_charge, &pal_u, &pal_v);
-
-            {
-                float hist_u = (float) adv_u - 128.0f;
-                float hist_v = (float) adv_v - 128.0f;
-                float src_chroma = 0.016f + source_t * 0.045f + (1.0f - trail_t) * 0.012f;
-                float neutral = soft_t * 0.018f + (1.0f - color_t) * 0.010f;
-                float hist_keep = 1.0f - src_chroma;
-                float neutral_keep = 1.0f - neutral;
-                float out_u = hist_u * hist_keep + src_us * src_chroma + pal_u;
-                float out_v = hist_v * hist_keep + src_vs * src_chroma + pal_v;
-                out_u *= neutral_keep;
-                out_v *= neutral_keep;
-                chroma_limit = 28.0f + color_t * 42.0f;
-                eh_limit_chroma(&out_u, &out_v, chroma_limit);
-                adv_u = eh_u8f(128.0f + out_u);
-                adv_v = eh_u8f(128.0f + out_v);
-            }
-
-            ff_m_boost = ff_m * 24.0f;
-            glow_y_scale = (0.20f + glow_t * 0.42f) * (0.65f + ff_m * 0.70f);
-            soft_tile_base = soft_t * (0.07f + mirror_depth * 0.08f);
+            
+            /* Passed new_phase explicitly */
+            eh_palette_source(src_us, src_vs, new_phase, color_t, tile_charge, &pal_u, &pal_v);
+            
+            ff_m_boost = ff_m * geom_t * 1.5f;
+            glow_y_scale = glow_display_scale * (0.5f + ff_m);
+            soft_tile_base = soft_t * 0.35f;
+            chroma_limit = 112.0f + color_t * 15.0f;
 
             for (y0 = 0; y0 < tylim; y0++) {
-                int y = yy + y0;
-                int row = y * w;
-                int has_y_neighbors = (y > 0 && y + 1 < h);
+                int py = yy + y0;
+                int poff = py * w + xx;
                 for (x0 = 0; x0 < txlim; x0++) {
-                    int x = xx + x0;
-                    int pos = row + x;
-                    int src_l = src_y[pos];
-                    int motion = eh_absi((int) src_l - (int) prev_y[pos]);
-                    int edge = 0;
-                    int event;
-                    int old_c;
-                    int ch;
-                    float px = (float) x + 0.5f;
-                    float py = (float) y + 0.5f;
+                    int px = xx + x0;
+                    int p = poff + x0;
                     float sx;
                     float sy;
+                    int cur_y;
                     int adv_y;
-                    int src_tone;
-                    int glowv;
-                    float ch_t;
-                    float local_src;
-                    float out_yf;
-                    float display_yf;
+                    int new_y;
+                    int src_lum;
+                    int src_uv_mix;
+                    float mix_src;
+                    float mix_adv;
+                    int old_ch;
+                    int new_ch;
+                    float final_u;
+                    float final_v;
 
-                    if (x > 0 && x + 1 < w)
-                        edge += eh_absi((int) src_y[pos + 1] - (int) src_y[pos - 1]);
-                    if (has_y_neighbors)
-                        edge += eh_absi((int) src_y[pos + w] - (int) src_y[pos - w]);
-                    if (edge > 255) edge = 255;
-                    event = edge + motion;
-                    if (event > 255) event = 255;
-                    old_c = charge[pos];
-                    ch = decay_lut[old_c] + charge_lut[event] / 3 + (int) ff_m_boost;
-                    if (ch > 255) ch = 255;
-                    next_charge[pos] = (uint8_t) ch;
-                    prev_y[pos] = (uint8_t) src_l;
-
-                    eh_cathedral_sample(px, py, vx, vy, ff_m, cell_px, mirror_depth, phase_s, phase_c, &sx, &sy);
-                    adv_y = eh_sample_y_bilinear_mirror(old_y, sx, sy, w, h);
-                    src_tone = tone_lut[src_l];
-                    ch_t = (float) ch * (1.0f / 255.0f);
-                    local_src = source_base + ((float) source_lut[ch] * (1.0f / 255.0f)) * source_t * 0.18f;
-                    local_src *= 1.0f - mirror_depth * ch_t * 0.28f;
-                    local_src = eh_clampf(local_src, 0.002f, 0.135f);
-
-                    out_yf = (float) adv_y * (1.0f - local_src) + (float) src_tone * local_src;
-                    out_yf += ((float) src_tone - (float) adv_y) * source_delta_base * (1.0f - ch_t * soft_t * 0.55f);
-
-                    if (do_soft && ch > 24 && x > 0 && x + 1 < w && has_y_neighbors) {
-                        int nsum = (int) old_y[pos - 1] + (int) old_y[pos + 1] + (int) old_y[pos - w] + (int) old_y[pos + w];
-                        float smooth = ch_t * soft_tile_base;
-                        if (smooth > 0.18f) smooth = 0.18f;
-                        out_yf = out_yf * (1.0f - smooth) + (float) (nsum >> 2) * smooth;
-                    }
-
-                    glowv = glow_lut[ch];
-                    out_yf += (float) glowv * glow_y_scale;
-                    if (out_yf > 238.0f)
-                        out_yf = 238.0f + (out_yf - 238.0f) * 0.25f;
-
-                    display_yf = out_yf + (float) glowv * glow_display_scale;
-                    if (display_yf > 255.0f) display_yf = 255.0f;
-
-                    next_y[pos] = eh_u8f(out_yf);
-                    next_u[pos] = (uint8_t) adv_u;
-                    next_v[pos] = (uint8_t) adv_v;
-                    Y[pos] = eh_u8f(display_yf);
-                    U[pos] = (uint8_t) adv_u;
-                    V[pos] = (uint8_t) adv_v;
+                    eh_cathedral_sample((float) px + 0.5f, (float) py + 0.5f, vx, vy, ff_m, 
+                                        cell_px, mirror_depth, phase_s, phase_c, &sx, &sy);
+                    
+                    adv_y = do_soft ? 
+                            eh_sample_y_bilinear_mirror(old_y, sx, sy, w, h) : 
+                            old_y[eh_index_clamped(w, h, (int)(sx + 0.5f), (int)(sy + 0.5f))];
+                    
+                    src_lum = src_y[p];
+                    old_ch = charge[p];
+                    
+                    mix_src = source_base + source_lut[src_lum] * (1.0f / 255.0f) * source_delta_base;
+                    mix_src *= (1.0f - soft_tile_base);
+                    mix_adv = 1.0f - mix_src;
+                    
+                    new_y = (int) ((float) adv_y * mix_adv + (float) src_lum * mix_src + 0.5f);
+                    new_y = tone_lut[eh_clampi(new_y, 0, 255)];
+                    
+                    new_ch = (int) ((float) charge_lut[old_ch] * 0.95f + (float) src_lum * mix_src * tile_charge + 0.5f);
+                    new_ch = eh_clampi(new_ch - decay_lut[255 - src_lum] / 16, 0, 255);
+                    
+                    cur_y = new_y + glow_lut[new_ch] * glow_y_scale;
+                    next_y[p] = eh_u8i(cur_y);
+                    next_charge[p] = (uint8_t) new_ch;
+                    
+                    src_uv_mix = (src_lum > 128) ? 1 : 0;
+                    final_u = (float) adv_u - 128.0f;
+                    final_v = (float) adv_v - 128.0f;
+                    
+                    final_u = final_u * 0.98f + pal_u * mix_src * 2.0f + (src_uv_mix ? src_us * 0.05f : 0.0f);
+                    final_v = final_v * 0.98f + pal_v * mix_src * 2.0f + (src_uv_mix ? src_vs * 0.05f : 0.0f);
+                    
+                    eh_limit_chroma(&final_u, &final_v, chroma_limit);
+                    
+                    next_u[p] = eh_u8i((int) (final_u + 128.5f));
+                    next_v[p] = eh_u8i((int) (final_v + 128.5f));
                 }
             }
         }
     }
 
+    #pragma omp single
     {
         uint8_t *tmp;
+        
         tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
         tmp = e->paint_u; e->paint_u = e->next_u; e->next_u = tmp;
         tmp = e->paint_v; e->paint_v = e->next_v; e->next_v = tmp;
+        
         tmp = e->charge; e->charge = e->next_charge; e->next_charge = tmp;
+        veejay_memcpy(e->prev_y, src_y, len);
+        
+        e->frame++;
     }
 
-    e->frame++;
+    #pragma omp single
+    {
+        veejay_memcpy( Y, e->paint_y, len );
+        veejay_memcpy( U, e->paint_u, len );
+        veejay_memcpy( V, e->paint_v, len );
+    }    
+
 }

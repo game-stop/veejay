@@ -40,6 +40,10 @@
 #include <assert.h>
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 #define MAX_EFFECTS 4096
 #define NUM_CHAINS 2
 #define MAX_ENTRY_PER_CHAIN 20
@@ -174,7 +178,6 @@ static struct {
     { pixelate_init,NULL,NULL,NULL,NULL,pixelate_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PIXELATE },
     { picinpic_init,picinpic_malloc,picinpic_free,NULL,NULL,NULL,picinpic_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_PICINPIC },
     { photoplay_init,photoplay_malloc,photoplay_free,NULL,NULL,photoplay_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_PHOTOPLAY },
-    { perspective_init,perspective_malloc,perspective_free,NULL,NULL,perspective_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PERSPECTIVE },
     { pencilsketch_init,NULL,NULL,NULL,NULL,pencilsketch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PENCILSKETCH },
     { pencilsketch2_init,pencilsketch2_malloc,pencilsketch2_free,NULL,NULL,pencilsketch2_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PENCILSKETCH2 },
     { overclock_init,overclock_malloc,overclock_free,NULL,NULL,overclock_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_OVERCLOCK },
@@ -239,8 +242,8 @@ static struct {
     { magicscratcher_init,magicscratcher_malloc,magicscratcher_free,NULL,NULL,magicscratcher_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MAGICSCRATCHER },
     { lumamask_init,lumamask_malloc,lumamask_free,NULL,NULL,NULL,lumamask_apply,NULL,lumamask_requests_fx, lumamask_set_motionmap, VJ_VIDEO_EFFECT_LUMAMASK },
     { lumamagick_init,lumamagick_malloc,lumamagick_free,NULL,NULL,NULL,lumamagick_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAMAGICK },
-    { lumakey_init,lumakey_malloc,lumakey_free,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
-    { lumablend_init, lumablend_malloc,lumablend_free,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
+    { lumakey_init,NULL,NULL,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
+    { lumablend_init, NULL,NULL,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
     { levelcorrection_init,levelcorrection_malloc,levelcorrection_free,NULL,NULL,levelcorrection_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_LEVELCORRECTION },
     { killchroma_init,NULL,NULL,NULL,NULL,killchroma_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_KILLCHROMA },
     { keyselect_init,keyselect_malloc,keyselect_free,NULL,NULL,NULL,keyselect_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_KEYSELECT },
@@ -260,7 +263,7 @@ static struct {
     { feathermask_init, feathermask_malloc, feathermask_free,NULL,NULL, feathermask_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
     { integralblur_init, integralblur_malloc, integralblur_free,NULL,NULL, integralblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_INTEGRALBLUR },
     { enhancemask_init, enhancemask_malloc, enhancemask_free, NULL,NULL, enhancemask_apply,NULL,NULL, NULL,NULL, VJ_IMAGE_EFFECT_ENHANCEMASK },
-    { emboss_init, NULL, NULL, NULL, NULL, emboss_apply, NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EMBOSS }, 
+    { emboss_init, emboss_malloc, emboss_free, NULL, NULL, emboss_apply, NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EMBOSS }, 
     { dupmagic_init, NULL, NULL, NULL, NULL, NULL, dupmagic_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_DUPMAGIC },
     { dotillism_init, dotillism_malloc, dotillism_free, NULL,NULL, dotillism_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_DOTILLISM },
     { ghostwash_init, ghostwash_malloc, ghostwash_free, NULL,NULL, ghostwash_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_GHOSTWASH },
@@ -273,16 +276,16 @@ static struct {
     { diff_init,diff_malloc,diff_free,diff_prepare,NULL,NULL,diff_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DIFF },
     { dices_init,dices_malloc,dices_free,NULL,NULL,dices_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DICES },
     { gradientfield_init,gradientfield_malloc,gradientfield_free,NULL,NULL,gradientfield_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_GRADIENTFIELD },
-    { deinterlace_init,NULL,NULL,NULL,NULL,deinterlace_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DEINTERLACE },
+    { deinterlace_init,deinterlace_malloc,deinterlace_free,NULL,NULL,deinterlace_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_DEINTERLACE },
     { cutstop_init,cutstop_malloc,cutstop_free,NULL,NULL,cutstop_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CUTSTOP },
     { crosspixel_init,crosspixel_malloc,crosspixel_free,NULL,NULL,crosspixel_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CROSSPIXEL },
     { contrast_init,NULL,NULL,NULL,NULL,contrast_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CONTRAST },
     { constantblend_init,NULL,NULL,NULL,NULL,constantblend_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CONSTANTBLEND },
     { complexthreshold_init,complexthreshold_malloc,complexthreshold_free,NULL,NULL,NULL,complexthreshold_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_COMPLEXTHRESHOLD },
     { complexsync_init,complexsync_malloc,complexsync_free,NULL,NULL,NULL,complexsync_apply,complexsync_ready,NULL,NULL,VJ_VIDEO_EFFECT_COMPLEXSYNC },
-    { complexsaturation_init,NULL,NULL,NULL,NULL,complexsaturation_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_COMPLEXSATURATE },
+    { complexsaturation_init,complexsaturation_malloc,complexsaturation_free,NULL,NULL,complexsaturation_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_COMPLEXSATURATE },
     { complexopacity_init,NULL,NULL,NULL,NULL,NULL,complexopacity_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_COMPLEXOPACITY },
-    { complexinvert_init,NULL,NULL,NULL,NULL,complexinvert_apply,NULL,NULL,NULL,NULL,  VJ_IMAGE_EFFECT_COMPLEXINVERT },
+    { complexinvert_init,complexinvert_malloc,complexinvert_free,NULL,NULL,complexinvert_apply,NULL,NULL,NULL,NULL,  VJ_IMAGE_EFFECT_COMPLEXINVERT },
     { colorshift_init,NULL,NULL,NULL,NULL,colorshift_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_COLORSHIFT },
     { colormap_init,NULL,NULL,NULL,NULL,colormap_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COLORMAP },
     { colorhis_init,colorhis_malloc,colorhis_free,NULL,NULL,colorhis_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_COLORHIS },
@@ -332,7 +335,7 @@ static struct {
     { bar_init,bar_malloc,bar_free,NULL,NULL,NULL,bar_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_3BAR },
     { flashopacity_init,flashopacity_malloc,flashopacity_free,NULL,NULL,NULL,flashopacity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FLASHOPACITY },
     { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
-    { blackreplace_init,blackreplace_malloc,blackreplace_free,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
+    { blackreplace_init,NULL,NULL,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
     { darkreplace_init,darkreplace_malloc,darkreplace_free,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
     { morphologymixer_init, morphologymixer_malloc, morphologymixer_free, NULL,NULL,NULL, morphologymixer_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_MORPHOLOGY },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
@@ -350,6 +353,10 @@ static int num_fx = 0;
 static int VJ_INTERNAL = 0;
 static int LAST_ID = 0;
 static VJFrame *vj_fx_bg = NULL;
+
+#ifdef _OPENMP
+static int vje_openmp_threads = 1;
+#endif
 
 uint8_t  pixel_Y_hi_ = 235;
 uint8_t  pixel_U_hi_ = 240;
@@ -449,6 +456,14 @@ void	vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 int vje_init(int w, int h)
 {   
     int i;
+
+#ifdef _OPENMP
+    vje_openmp_threads = vje_advise_num_threads(w * h);
+    omp_set_dynamic(0);
+    omp_set_max_active_levels(1);
+    omp_set_num_threads(vje_openmp_threads);
+#endif
+
     vj_fx_map = (int*) vj_malloc( sizeof(int) * MAX_EFFECTS );
     if(vj_fx_map == NULL)
         return 0;
@@ -462,13 +477,9 @@ int vje_init(int w, int h)
     for( i = 0; i < MAX_EFFECTS; i ++ )
         vj_fx_map[i] = -1;
 
-    int parallel_fx = 0;
-
     for( i = 0; vj_fx[i].fx_id != 0; i ++ ) {
         vj_fx_map[ vj_fx[i].fx_id ] = i;
         vj_effect_map[ i ] = vj_fx[i].fx_init(w,h);
-        if(vj_effect_map[i]->parallel > 0)
-            parallel_fx ++;
         num_fx ++;
         if( vj_fx[i].fx_id > LAST_ID ) {
             LAST_ID = vj_fx[i].fx_id;
@@ -491,18 +502,9 @@ int vje_init(int w, int h)
         LAST_ID = VJ_PLUGIN + ( i - offset );
         num_fx ++;
     }   
-
-
-#ifdef _OPENMP
-    //omp_set_dynamic(0);
-    //omp_set_max_active_levels(1);
-#endif
-
     init_sqrt_map_pixel_values();
 
     plug_sys_init( PIX_FMT_YUVA444P, w,h, 0 );
-
-    veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Have %d FX (%d support parallelization)", num_fx, parallel_fx);
 
     return 1;
 }
@@ -510,6 +512,17 @@ int vje_init(int w, int h)
 int vje_get_plugin_id(int fx_id)
 {
     return (vj_fx_map[ fx_id ] - VJ_INTERNAL);
+}
+
+
+int vje_fx_needs_instance(int fx_id)
+{
+    if (fx_id >= VJ_PLUGIN)
+        return 1;
+    int idx = vj_fx_map[fx_id];
+    if (idx < 0)
+        return 0;
+    return (vj_fx[idx].fx_malloc != NULL);
 }
 
 void *vje_fx_malloc(int fx_id, int chain_id, int entry, int w, int h, int *error )
@@ -587,10 +600,10 @@ static void vje_fx_parallel_apply( void *arg )
         vj_fx[ idx ].fx_filter( v->ptr, &a, param_values );
     }
 }
-
+/*
 static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A, VJFrame *B, int *args )
 {
-    if(!fx->parallel)
+    if(fx->parallel != 2)
         return 0;
 
     if( vj_task_get_workers() <= 0 )
@@ -610,7 +623,7 @@ static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A,
     vj_task_run( A->data, B->data, NULL, NULL, 4, (performer_job_routine) &vje_fx_parallel_apply, (fx->parallel == 2) );
 
     return 1;
-}
+}*/
 
 static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B, int *args, vj_effect *fx )
 {
@@ -637,6 +650,22 @@ static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B,
     plug_process( ptr, A->timecode );
 }
 
+static void vje_fx_direct_apply( int idx, void *ptr, VJFrame *A, VJFrame *B, int *args )
+{
+    if(vj_effect_map[idx]->extra_frame) {
+#ifdef STRICT_CHECKING
+        assert( vj_fx[ idx ].fx_process != NULL );
+#endif
+        vj_fx[ idx ].fx_process( ptr, A, B, args );
+    }
+    else {
+#ifdef STRICT_CHECKING
+        assert( vj_fx[ idx ].fx_filter != NULL );
+#endif
+        vj_fx[ idx ].fx_filter( ptr, A, args );
+    }
+}
+
 void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
 {
     int idx = vj_fx_map[ fx_id ];
@@ -647,30 +676,65 @@ void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
 #endif
 
     if(fx_id >= VJ_PLUGIN) {
-        vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
-    }
-    else {
-        int doneProcessing = 0;
-
-        if( parallel_enabled && fx->parallel ) {
-            doneProcessing = vje_fx_parallize( fx, ptr, idx, A, B, args );
+#ifdef _OPENMP
+        if(omp_in_parallel()) {
+#pragma omp single
+            {
+                vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
+            }
         }
+        else
+#endif
+        {
+            vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
+        }
+        return;
+    }
 
-        if(doneProcessing)
+#ifdef _OPENMP
+    if(fx->parallel == 0) {
+        if(omp_in_parallel()) {
+            vje_fx_direct_apply( idx, ptr, A, B, args );
+        }
+        else if(parallel_enabled) {
+#pragma omp parallel num_threads(vje_openmp_threads)
+            {
+                vje_fx_direct_apply( idx, ptr, A, B, args );
+            }
+        }
+        else {
+            vje_fx_direct_apply( idx, ptr, A, B, args );
+        }
+        return;
+    }
+#endif
+
+    /*if(parallel_enabled && fx->parallel == 2) {
+#ifdef _OPENMP
+        if(omp_in_parallel()) {
+#pragma omp single
+            {
+                if(!vje_fx_parallize( fx, ptr, idx, A, B, args ))
+                    vje_fx_direct_apply( idx, ptr, A, B, args );
+            }
             return;
-
-        if(fx->extra_frame) {
-#ifdef STRICT_CHECKING
-            assert( vj_fx[ idx ].fx_process != NULL );
-#endif
-            vj_fx[ idx ].fx_process( ptr, A, B, args );
-        } else {
-#ifdef STRICT_CHECKING
-            assert( vj_fx[ idx ].fx_filter != NULL );
-#endif
-            vj_fx[ idx ].fx_filter( ptr, A, args );
         }
+#endif
+        if(vje_fx_parallize( fx, ptr, idx, A, B, args ))
+            return;
+    }*/
+
+#ifdef _OPENMP
+    if(omp_in_parallel()) {
+#pragma omp single
+        {
+            vje_fx_direct_apply( idx, ptr, A, B, args );
+        }
+        return;
     }
+#endif
+
+    vje_fx_direct_apply( idx, ptr, A, B, args );
 }
 
 void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A )
@@ -1449,7 +1513,13 @@ int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *ds
 }
 
 int vje_max_threads(int len) {
-    return vje_advise_num_threads(len);
+#ifdef _OPENMP
+    (void) len;
+    return vje_openmp_threads;
+#else
+    (void) len;
+    return 1;
+#endif
 }
 
 void vje_dump(void) {

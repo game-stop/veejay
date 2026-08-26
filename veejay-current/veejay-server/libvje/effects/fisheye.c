@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,13 +20,14 @@
 
 #include "common.h"
 #include "fisheye.h"
+#include <veejaycore/vjmem.h>
+#include <math.h>
 
 typedef struct {
     int w;
     int h;
     int len;
     int curve_key;
-    int n_threads;
     float *polar_map;
     float *fish_angle;
     int *cached_coords;
@@ -50,17 +51,6 @@ vj_effect *fisheye_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][0] = -1000; ve->limits[1][0] = 1000; ve->defaults[0] = 1;
     ve->limits[0][1] = 0;     ve->limits[1][1] = 1;    ve->defaults[1] = 0;
 
@@ -79,6 +69,9 @@ vj_effect *fisheye_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -95,7 +88,6 @@ void *fisheye_malloc(int w, int h)
     f->h = h;
     f->len = len;
     f->curve_key = 0x7fffffff;
-    f->n_threads = vje_advise_num_threads(len);
 
     f->buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)len * 3);
     f->polar_map = (float*) vj_malloc(sizeof(float) * (size_t)len);
@@ -113,7 +105,6 @@ void *fisheye_malloc(int w, int h)
     const int w2 = w >> 1;
     const int h2 = h >> 1;
 
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
     for(int y = -h2; y < h - h2; y++) {
         const int py = h2 + y;
         const int row = py * w;
@@ -133,11 +124,17 @@ void *fisheye_malloc(int w, int h)
 void fisheye_free(void *ptr)
 {
     fisheye_t *f = (fisheye_t*) ptr;
+    if(!f)
+        return;
 
-    free(f->buf[0]);
-    free(f->polar_map);
-    free(f->fish_angle);
-    free(f->cached_coords);
+    if(f->buf[0])
+        free(f->buf[0]);
+    if(f->polar_map)
+        free(f->polar_map);
+    if(f->fish_angle)
+        free(f->fish_angle);
+    if(f->cached_coords)
+        free(f->cached_coords);
     free(f);
 }
 
@@ -171,6 +168,7 @@ static void fisheye_rebuild_map(fisheye_t *f, int curve_key)
     const float *restrict fish_angle = f->fish_angle;
     int *restrict cached_coords = f->cached_coords;
 
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const float r = polar_map[i];
 
@@ -203,7 +201,10 @@ static void fisheye_rebuild_map(fisheye_t *f, int curve_key)
         cached_coords[i] = py * w + px;
     }
 
-    f->curve_key = curve_key;
+    #pragma omp single
+    {
+        f->curve_key = curve_key;
+    }
 }
 
 void fisheye_apply(void *ptr, VJFrame *frame, int *args)
@@ -217,8 +218,19 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
     if(curve_key == 0)
         curve_key = 1;
 
-    if(curve_key != f->curve_key)
+    if(curve_key != f->curve_key) {
         fisheye_rebuild_map(f, curve_key);
+    }
+
+    #pragma omp single
+    {
+        veejay_memcpy(f->buf[0], frame->data[0], len);
+
+        if(alpha == 0) {
+            veejay_memcpy(f->buf[1], frame->data[1], len);
+            veejay_memcpy(f->buf[2], frame->data[2], len);
+        }
+    }
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -227,14 +239,7 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
     const int *restrict cached_coords = f->cached_coords;
     uint8_t **buf = f->buf;
 
-    veejay_memcpy(buf[0], Y, len);
-
-    if(alpha == 0) {
-        veejay_memcpy(buf[1], Cb, len);
-        veejay_memcpy(buf[2], Cr, len);
-    }
-
-#pragma omp parallel for schedule(static) num_threads(f->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int coord = cached_coords[i];
 
@@ -255,4 +260,3 @@ void fisheye_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 }
-

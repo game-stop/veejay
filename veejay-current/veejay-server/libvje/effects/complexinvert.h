@@ -22,4 +22,6 @@
 #define COMPLEXINVERT_H
 vj_effect *complexinvert_init(int w, int h);
 void complexinvert_apply(void *ptr, VJFrame *frame, int *args);
+void *complexinvert_malloc(int w, int h);
+void complexinvert_free(void *ptr);
 #endif

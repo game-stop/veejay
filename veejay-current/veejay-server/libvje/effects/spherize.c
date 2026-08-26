@@ -18,7 +18,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-
 #include "common.h"
 #include <math.h>
 #include <limits.h>
@@ -112,7 +111,6 @@ static inline int reflecti(int v, int max)
     return (v <= hi) ? v : period - v;
 }
 
-
 static inline int spherize_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -163,13 +161,7 @@ vj_effect *spherize_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     const int max_radius = (int)sqrtf(((float)w * (float)w * 0.25f) + ((float)h * (float)h * 0.25f));
     const int radius_hi = max_radius > 1 ? max_radius : 1;
@@ -247,7 +239,6 @@ vj_effect *spherize_init(int w, int h)
 
 static void spherize_rebuild_center_luts(spherize_t *s, int w, int h, int cx, int cy)
 {
-#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         const float dy = (float)(y - cy);
         const int row = y * w;
@@ -261,22 +252,17 @@ static void spherize_rebuild_center_luts(spherize_t *s, int w, int h, int cx, in
         }
     }
 
-#pragma omp single
-    {
-        s->last_cx = cx;
-        s->last_cy = cy;
-        s->last_angle = -999999.0f;
-        s->last_radius = -1;
-    }
+    s->last_cx = cx;
+    s->last_cy = cy;
+    s->last_angle = -999999.0f;
+    s->last_radius = -1;
 }
 
 static void spherize_rebuild_sin_lut(spherize_t *s, int len, float angle)
 {
-#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         s->sin_lut[i] = sinf(s->atan2_lut[i] - angle);
 
-#pragma omp single
     s->last_angle = angle;
 }
 
@@ -285,13 +271,11 @@ static void spherize_rebuild_exp_lut(spherize_t *s, int len, int radius)
     const float r = (float)(radius > 0 ? radius : 1);
     const float inv_sigma = 1.0f / (2.0f * r * r);
 
-#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const float d = s->dist_lut[i];
         s->exp_lut[i] = expf(-(d * d) * inv_sigma);
     }
 
-#pragma omp single
     s->last_radius = radius;
 }
 
@@ -340,8 +324,6 @@ void *spherize_malloc(int w, int h)
     s->eff_radius_drive = 0.0f;
     s->eff_initialized = 0;
 
-    s->n_threads = vje_advise_num_threads(pixels);
-
     return (void*) s;
 }
 
@@ -362,84 +344,32 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
     const int height = frame->height;
     const int len = frame->len;
 
-    const int max_radius = (int)sqrtf(((float)width * (float)width * 0.25f) + ((float)height * (float)height * 0.25f));
-    const int radius_max = (max_radius > 1) ? max_radius : 1;
-
-    int strength_arg = args[P_STRENGTH];
-    int angle_arg = args[P_ANGLE];
-    int radius_arg = args[P_RADIUS];
-    int ratio_x_arg = args[P_RATIO_X];
-    int ratio_y_arg = args[P_RATIO_Y];
-    int center_x_arg = args[P_CENTER_X];
-    int center_y_arg = args[P_CENTER_Y];
+    const int strength_arg = args[P_STRENGTH];
+    const int angle_arg = args[P_ANGLE];
+    const int radius_arg = args[P_RADIUS];
+    const int ratio_x_arg = args[P_RATIO_X];
+    const int ratio_y_arg = args[P_RATIO_Y];
+    const int center_x_arg = args[P_CENTER_X];
+    const int center_y_arg = args[P_CENTER_Y];
     const int mode = args[P_MODE];
 
     const int warp_drive_arg = clampi(args[P_WARP_DRIVE], 0, 1000);
     const int radius_drive_arg = clampi(args[P_RADIUS_DRIVE], 0, 1000);
 
-    if(!s->eff_initialized) {
-        s->eff_strength = (float)strength_arg;
-        s->eff_angle = (float)angle_arg;
-        s->eff_radius = (float)radius_arg;
-        s->eff_ratio_x = (float)ratio_x_arg;
-        s->eff_ratio_y = (float)ratio_y_arg;
-        s->eff_center_x = (float)center_x_arg;
-        s->eff_center_y = (float)center_y_arg;
-        s->eff_warp_drive = (float)warp_drive_arg;
-        s->eff_radius_drive = (float)radius_drive_arg;
-        s->eff_initialized = 1;
-    }
+    const int max_radius = (int)sqrtf(((float)width * (float)width * 0.25f) + ((float)height * (float)height * 0.25f));
+    const int radius_max = (max_radius > 1) ? max_radius : 1;
 
-    const float geo_attack = 0.18f;
-    const float geo_release = 0.095f;
-    const float slow_attack = 0.115f;
-    const float slow_release = 0.070f;
+    int center_x = width / 2;
+    int center_y = height / 2;
+    int effective_radius = radius_max / 2;
+    float strength = 0.0f;
+    float angle = 0.0f;
+    float ratio_x = 1.0f;
+    float ratio_y = 1.0f;
 
-    strength_arg = clampi(spherize_smooth_i(&s->eff_strength, strength_arg, geo_attack, geo_release), 0, 100);
-    angle_arg = (int)(spherize_smooth_angle_deg(&s->eff_angle, (float)angle_arg, slow_attack, slow_release) + 0.5f);
-    radius_arg = clampi(spherize_smooth_i(&s->eff_radius, radius_arg, slow_attack, slow_release), 1, radius_max);
-    ratio_x_arg = clampi(spherize_smooth_i(&s->eff_ratio_x, ratio_x_arg, slow_attack, slow_release), 10, 200);
-    ratio_y_arg = clampi(spherize_smooth_i(&s->eff_ratio_y, ratio_y_arg, slow_attack, slow_release), 10, 200);
-    center_x_arg = clampi(spherize_smooth_i(&s->eff_center_x, center_x_arg, slow_attack, slow_release), 0, width);
-    center_y_arg = clampi(spherize_smooth_i(&s->eff_center_y, center_y_arg, slow_attack, slow_release), 0, height);
-
-    const int warp_drive = clampi(spherize_smooth_i(&s->eff_warp_drive, warp_drive_arg, geo_attack, geo_release), 0, 1000);
-    const int radius_drive = clampi(spherize_smooth_i(&s->eff_radius_drive, radius_drive_arg, geo_attack, geo_release), 0, 1000);
-
-    int effective_strength = strength_arg;
-    effective_strength += (warp_drive * 44 + 500) / 1000;
-    effective_strength = clampi(effective_strength, 0, 100);
-
-    int effective_radius = radius_arg;
-    effective_radius += (radius_drive * radius_max * 36 + 50000) / 100000;
-    effective_radius = clampi(effective_radius, 1, radius_max);
-
-    float effective_angle_deg = (float)angle_arg;
-    effective_angle_deg += (float)warp_drive * 0.055f;
-    while(effective_angle_deg >= 360.0f)
-        effective_angle_deg -= 360.0f;
-    while(effective_angle_deg < 0.0f)
-        effective_angle_deg += 360.0f;
-
-    const float ratio_spread = (float)radius_drive * 0.00018f;
-    float ratio_x = (float)ratio_x_arg * 0.01f;
-    float ratio_y = (float)ratio_y_arg * 0.01f;
-    ratio_x *= (1.0f + ratio_spread);
-    ratio_y *= (1.0f - (ratio_spread * 0.55f));
-    ratio_x = clampf(ratio_x, 0.10f, 2.40f);
-    ratio_y = clampf(ratio_y, 0.10f, 2.40f);
-
-    const int center_dx = (int)((float)radius_drive * 0.000035f * (float)width);
-    const int center_dy = (int)((float)warp_drive * -0.000025f * (float)height);
-    const int center_x = clampi(center_x_arg + center_dx, 0, width);
-    const int center_y = clampi(center_y_arg + center_dy, 0, height);
-
-    const float strength = (float)effective_strength * 0.01f;
-    const float angle = effective_angle_deg * ((float)M_PI / 180.0f);
-
-    const int rebuild_center = (s->last_cx != center_x || s->last_cy != center_y);
-    const int rebuild_angle = rebuild_center || (s->last_angle != angle);
-    const int rebuild_radius = rebuild_center || (s->last_radius != effective_radius);
+    int rebuild_center = 0;
+    int rebuild_angle = 0;
+    int rebuild_radius = 0;
 
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
@@ -449,27 +379,92 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-    veejay_memcpy(bufY, srcY, len);
-    veejay_memcpy(bufU, srcU, len);
-    veejay_memcpy(bufV, srcV, len);
+    #pragma omp single copyprivate(center_x, center_y, effective_radius, strength, angle, ratio_x, ratio_y, rebuild_center, rebuild_angle, rebuild_radius)
+    {
+        if(!s->eff_initialized) {
+            s->eff_strength = (float)strength_arg;
+            s->eff_angle = (float)angle_arg;
+            s->eff_radius = (float)radius_arg;
+            s->eff_ratio_x = (float)ratio_x_arg;
+            s->eff_ratio_y = (float)ratio_y_arg;
+            s->eff_center_x = (float)center_x_arg;
+            s->eff_center_y = (float)center_y_arg;
+            s->eff_warp_drive = (float)warp_drive_arg;
+            s->eff_radius_drive = (float)radius_drive_arg;
+            s->eff_initialized = 1;
+        }
+
+        float geo_attack = 0.18f;
+        float geo_release = 0.095f;
+        float slow_attack = 0.115f;
+        float slow_release = 0.070f;
+
+        int sm_strength = clampi(spherize_smooth_i(&s->eff_strength, strength_arg, geo_attack, geo_release), 0, 100);
+        int sm_angle = (int)(spherize_smooth_angle_deg(&s->eff_angle, (float)angle_arg, slow_attack, slow_release) + 0.5f);
+        int sm_radius = clampi(spherize_smooth_i(&s->eff_radius, radius_arg, slow_attack, slow_release), 1, radius_max);
+        int sm_ratio_x = clampi(spherize_smooth_i(&s->eff_ratio_x, ratio_x_arg, slow_attack, slow_release), 10, 200);
+        int sm_ratio_y = clampi(spherize_smooth_i(&s->eff_ratio_y, ratio_y_arg, slow_attack, slow_release), 10, 200);
+        int sm_center_x = clampi(spherize_smooth_i(&s->eff_center_x, center_x_arg, slow_attack, slow_release), 0, width);
+        int sm_center_y = clampi(spherize_smooth_i(&s->eff_center_y, center_y_arg, slow_attack, slow_release), 0, height);
+
+        int sm_warp = clampi(spherize_smooth_i(&s->eff_warp_drive, warp_drive_arg, geo_attack, geo_release), 0, 1000);
+        int sm_radius_drv = clampi(spherize_smooth_i(&s->eff_radius_drive, radius_drive_arg, geo_attack, geo_release), 0, 1000);
+
+        int effective_strength = sm_strength;
+        effective_strength += (sm_warp * 44 + 500) / 1000;
+        effective_strength = clampi(effective_strength, 0, 100);
+
+        effective_radius = sm_radius;
+        effective_radius += (sm_radius_drv * radius_max * 36 + 50000) / 100000;
+        effective_radius = clampi(effective_radius, 1, radius_max);
+
+        float effective_angle_deg = (float)sm_angle;
+        effective_angle_deg += (float)sm_warp * 0.055f;
+        while(effective_angle_deg >= 360.0f)
+            effective_angle_deg -= 360.0f;
+        while(effective_angle_deg < 0.0f)
+            effective_angle_deg += 360.0f;
+
+        float ratio_spread = (float)sm_radius_drv * 0.00018f;
+        ratio_x = (float)sm_ratio_x * 0.01f;
+        ratio_y = (float)sm_ratio_y * 0.01f;
+        ratio_x *= (1.0f + ratio_spread);
+        ratio_y *= (1.0f - (ratio_spread * 0.55f));
+        ratio_x = clampf(ratio_x, 0.10f, 2.40f);
+        ratio_y = clampf(ratio_y, 0.10f, 2.40f);
+
+        int center_dx = (int)((float)sm_radius_drv * 0.000035f * (float)width);
+        int center_dy = (int)((float)sm_warp * -0.000025f * (float)height);
+        center_x = clampi(sm_center_x + center_dx, 0, width);
+        center_y = clampi(sm_center_y + center_dy, 0, height);
+
+        strength = (float)effective_strength * 0.01f;
+        angle = effective_angle_deg * ((float)M_PI / 180.0f);
+
+        rebuild_center = (s->last_cx != center_x || s->last_cy != center_y);
+        rebuild_angle = rebuild_center || (s->last_angle != angle);
+        rebuild_radius = rebuild_center || (s->last_radius != effective_radius);
+
+        veejay_memcpy(bufY, srcY, len);
+        veejay_memcpy(bufU, srcU, len);
+        veejay_memcpy(bufV, srcV, len);
+    }
+
+    if(rebuild_center)
+        spherize_rebuild_center_luts(s, width, height, center_x, center_y);
+
+    if(rebuild_angle)
+        spherize_rebuild_sin_lut(s, len, angle);
+
+    if(rebuild_radius)
+        spherize_rebuild_exp_lut(s, len, effective_radius);
 
     const float *restrict sin_lut = s->sin_lut;
     const float *restrict exp_lut = s->exp_lut;
 
-#pragma omp parallel num_threads(s->n_threads)
-    {
-        if(rebuild_center)
-            spherize_rebuild_center_luts(s, width, height, center_x, center_y);
-
-        if(rebuild_angle)
-            spherize_rebuild_sin_lut(s, len, angle);
-
-        if(rebuild_radius)
-            spherize_rebuild_exp_lut(s, len, effective_radius);
-
-        if(mode == 0) {
-#pragma omp for schedule(static)
-            for(int y = 0; y < height; y++) {
+    if(mode == 0) {
+        #pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
             const int row = y * width;
             const float dy_scaled = (float)(y - center_y) * ratio_y;
 
@@ -491,9 +486,9 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
                 srcV[idx] = bufV[src];
             }
         }
-        } else if(mode == 1) {
-#pragma omp for schedule(static)
-            for(int y = 0; y < height; y++) {
+    } else if(mode == 1) {
+        #pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
             const int row = y * width;
             const float dy_scaled = (float)(y - center_y) * ratio_y;
 
@@ -515,9 +510,9 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
                 srcV[idx] = bufV[src];
             }
         }
-        } else {
-#pragma omp for schedule(static)
-            for(int y = 0; y < height; y++) {
+    } else {
+        #pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
             const int row = y * width;
             const float dy_scaled = (float)(y - center_y) * ratio_y;
 
@@ -538,7 +533,6 @@ void spherize_apply(void *ptr, VJFrame *frame, int *args)
                 srcU[idx] = bufU[src];
                 srcV[idx] = bufV[src];
             }
-        }
         }
     }
 }

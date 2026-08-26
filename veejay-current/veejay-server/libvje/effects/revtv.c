@@ -76,17 +76,6 @@ vj_effect *revtv_init(int max_width, int max_height)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[P_LINE_SPACING] = 2;
     ve->defaults[P_VERTICAL_SCALE] = 42;
     ve->defaults[P_LUMA_INTENSITY] = 201;
@@ -163,7 +152,6 @@ void *revtv_malloc(int w, int h)
 
     r->src[1] = r->src[0] + len;
     r->src[2] = r->src[1] + len;
-    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -262,86 +250,86 @@ void revtv_apply(void *ptr, VJFrame *frame, int *args)
 
     const float lane_a = 0.28f;
 
-    if(!r->initialized) {
-        r->sm_linespace = (float)linespace_arg;
-        r->sm_vscale = (float)vscale_arg;
-        r->sm_luma = (float)color_y_arg;
-        r->sm_mix = (float)mix_arg;
-        r->sm_chroma = (float)chroma_arg;
-        r->sm_lines_drive = (float)lines_drive;
-        r->sm_scale_drive = (float)scale_drive;
-        r->sm_intensity_drive = (float)intensity_drive;
-        r->initialized = 1;
-    }
-    else {
-        revtv_smooth_lane(&r->sm_linespace, (float)linespace_arg, lane_a);
-        revtv_smooth_lane(&r->sm_vscale, (float)vscale_arg, lane_a);
-        revtv_smooth_lane(&r->sm_luma, (float)color_y_arg, lane_a);
-        revtv_smooth_lane(&r->sm_mix, (float)mix_arg, lane_a);
-        revtv_smooth_lane(&r->sm_chroma, (float)chroma_arg, lane_a);
-        revtv_smooth_lane(&r->sm_lines_drive, (float)lines_drive, lane_a);
-        revtv_smooth_lane(&r->sm_scale_drive, (float)scale_drive, lane_a);
-        revtv_smooth_lane(&r->sm_intensity_drive, (float)intensity_drive, lane_a);
-    }
-
-    const int line_q = revtv_clampi((int)(r->sm_lines_drive + 0.5f), 0, 1000);
-    const int scale_q = revtv_clampi((int)(r->sm_scale_drive + 0.5f), 0, 1000);
-    const int inten_q = revtv_clampi((int)(r->sm_intensity_drive + 0.5f), 0, 1000);
-
-    int linespace = revtv_clampi((int)(r->sm_linespace + 0.5f), 1, height);
-    int vscale = revtv_clampi((int)(r->sm_vscale + 0.5f), 1, width);
-    int color_y = revtv_clampi((int)(r->sm_luma + 0.5f), 0, 255);
-    const int mix_q = revtv_clampi((int)(r->sm_mix + 0.5f), 0, 1000);
-    const int chroma_q = revtv_clampi((int)(r->sm_chroma + 0.5f), 0, 1000);
-
-    if(linespace > 1)
-        linespace -= ((linespace - 1) * line_q + 500) / 1000;
-
-    if(linespace < 1)
-        linespace = 1;
-
-    if(vscale > 1) {
-        const int pull = ((vscale - 1) * scale_q * 82 + 50000) / 100000;
-
-        vscale -= pull;
-
-        if(vscale < 1)
-            vscale = 1;
-    }
-
-    color_y += ((255 - color_y) * inten_q + 500) / 1000;
-    color_y = revtv_clampi(color_y, 0, 255);
-
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    veejay_memcpy(r->src[0], Y, len);
-    veejay_memcpy(r->src[1], Cb, uv_len);
-    veejay_memcpy(r->src[2], Cr, uv_len);
-
-    const uint8_t color_cb = (uint8_t)bl_pix_get_color_cb(color_num);
-    const uint8_t color_cr = (uint8_t)bl_pix_get_color_cr(color_num);
-
-    revtv_luma(Y, width, height, linespace, vscale, (uint8_t)color_y);
-
-    if(color_num > 0 && chroma_q > 0) {
-        int uv_linespace = linespace >> frame->shift_v;
-        int uv_vscale = vscale >> frame->shift_v;
-
-        if(uv_linespace < 1)
-            uv_linespace = 1;
-        if(uv_vscale < 1)
-            uv_vscale = 1;
-
-        revtv_chroma(Cb, uv_width, uv_height, uv_linespace, uv_vscale, color_cb);
-        revtv_chroma(Cr, uv_width, uv_height, uv_linespace, uv_vscale, color_cr);
-    }
-
-    const int chroma_mix_q = (mix_q * chroma_q + 500) / 1000;
-
-#pragma omp parallel num_threads(r->n_threads)
+    #pragma omp single
     {
+        if(!r->initialized) {
+            r->sm_linespace = (float)linespace_arg;
+            r->sm_vscale = (float)vscale_arg;
+            r->sm_luma = (float)color_y_arg;
+            r->sm_mix = (float)mix_arg;
+            r->sm_chroma = (float)chroma_arg;
+            r->sm_lines_drive = (float)lines_drive;
+            r->sm_scale_drive = (float)scale_drive;
+            r->sm_intensity_drive = (float)intensity_drive;
+            r->initialized = 1;
+        }
+        else {
+            revtv_smooth_lane(&r->sm_linespace, (float)linespace_arg, lane_a);
+            revtv_smooth_lane(&r->sm_vscale, (float)vscale_arg, lane_a);
+            revtv_smooth_lane(&r->sm_luma, (float)color_y_arg, lane_a);
+            revtv_smooth_lane(&r->sm_mix, (float)mix_arg, lane_a);
+            revtv_smooth_lane(&r->sm_chroma, (float)chroma_arg, lane_a);
+            revtv_smooth_lane(&r->sm_lines_drive, (float)lines_drive, lane_a);
+            revtv_smooth_lane(&r->sm_scale_drive, (float)scale_drive, lane_a);
+            revtv_smooth_lane(&r->sm_intensity_drive, (float)intensity_drive, lane_a);
+        }
+
+        const int line_q = revtv_clampi((int)(r->sm_lines_drive + 0.5f), 0, 1000);
+        const int scale_q = revtv_clampi((int)(r->sm_scale_drive + 0.5f), 0, 1000);
+        const int inten_q = revtv_clampi((int)(r->sm_intensity_drive + 0.5f), 0, 1000);
+
+        int linespace = revtv_clampi((int)(r->sm_linespace + 0.5f), 1, height);
+        int vscale = revtv_clampi((int)(r->sm_vscale + 0.5f), 1, width);
+        int color_y = revtv_clampi((int)(r->sm_luma + 0.5f), 0, 255);
+        const int mix_q = revtv_clampi((int)(r->sm_mix + 0.5f), 0, 1000);
+        const int chroma_q = revtv_clampi((int)(r->sm_chroma + 0.5f), 0, 1000);
+
+        if(linespace > 1)
+            linespace -= ((linespace - 1) * line_q + 500) / 1000;
+
+        if(linespace < 1)
+            linespace = 1;
+
+        if(vscale > 1) {
+            const int pull = ((vscale - 1) * scale_q * 82 + 50000) / 100000;
+
+            vscale -= pull;
+
+            if(vscale < 1)
+                vscale = 1;
+        }
+
+        color_y += ((255 - color_y) * inten_q + 500) / 1000;
+        color_y = revtv_clampi(color_y, 0, 255);
+
+        uint8_t *restrict Y = frame->data[0];
+        uint8_t *restrict Cb = frame->data[1];
+        uint8_t *restrict Cr = frame->data[2];
+
+        veejay_memcpy(r->src[0], Y, len);
+        veejay_memcpy(r->src[1], Cb, uv_len);
+        veejay_memcpy(r->src[2], Cr, uv_len);
+
+        const uint8_t color_cb = (uint8_t)bl_pix_get_color_cb(color_num);
+        const uint8_t color_cr = (uint8_t)bl_pix_get_color_cr(color_num);
+
+        revtv_luma(Y, width, height, linespace, vscale, (uint8_t)color_y);
+
+        if(color_num > 0 && chroma_q > 0) {
+            int uv_linespace = linespace >> frame->shift_v;
+            int uv_vscale = vscale >> frame->shift_v;
+
+            if(uv_linespace < 1)
+                uv_linespace = 1;
+            if(uv_vscale < 1)
+                uv_vscale = 1;
+
+            revtv_chroma(Cb, uv_width, uv_height, uv_linespace, uv_vscale, color_cb);
+            revtv_chroma(Cr, uv_width, uv_height, uv_linespace, uv_vscale, color_cr);
+        }
+
+        const int chroma_mix_q = (mix_q * chroma_q + 500) / 1000;
+
         revtv_blend_plane(Y, r->src[0], len, mix_q);
         revtv_blend_plane(Cb, r->src[1], uv_len, chroma_mix_q);
         revtv_blend_plane(Cr, r->src[2], uv_len, chroma_mix_q);

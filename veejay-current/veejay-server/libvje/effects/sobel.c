@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -84,7 +84,6 @@ static inline uint8_t sobel_norm_grad(int gx, int gy)
     return (uint8_t)clampi(norm, 0, 255);
 }
 
-
 static inline int sobel_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -108,13 +107,7 @@ vj_effect *sobel_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->limits[0][P_THRESHOLD] = 0;    ve->limits[1][P_THRESHOLD] = 255;  ve->defaults[P_THRESHOLD] = 0;
     ve->limits[0][P_MODE] = 0;         ve->limits[1][P_MODE] = 2;         ve->defaults[P_MODE] = 1;
@@ -181,8 +174,6 @@ void *sobel_malloc(int w, int h)
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
     s->max_len = len;
-
-    s->n_threads = vje_advise_num_threads(len);
 
     s->eff_initialized = 0;
 
@@ -315,25 +306,23 @@ static void sobel_postprocess(sobel_t *s,
     const uint8_t *restrict srcCb = s->buf[1];
     const uint8_t *restrict srcCr = s->buf[2];
 
-    {
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            if(mix_q8 < 256)
-                Y[i] = sobel_mix_y(srcY[i], Y[i], mix_q8);
-        }
+    for(int i = 0; i < len; i++) {
+        if(mix_q8 < 256)
+            Y[i] = sobel_mix_y(srcY[i], Y[i], mix_q8);
+    }
 
 #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            const int e = Y[i];
-            const int q = (e * chroma_q8 + 127) / 255;
+    for(int i = 0; i < uv_len; i++) {
+        const int e = Y[i];
+        const int q = (e * chroma_q8 + 127) / 255;
 
-            if(q <= 0) {
-                Cb[i] = 128;
-                Cr[i] = 128;
-            } else {
-                Cb[i] = sobel_mix_uv(128, srcCb[i], q);
-                Cr[i] = sobel_mix_uv(128, srcCr[i], q);
-            }
+        if(q <= 0) {
+            Cb[i] = 128;
+            Cr[i] = 128;
+        } else {
+            Cb[i] = sobel_mix_uv(128, srcCb[i], q);
+            Cr[i] = sobel_mix_uv(128, srcCr[i], q);
         }
     }
 }
@@ -342,65 +331,69 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
 {
     sobel_t *s = (sobel_t*) ptr;
 
-    const int len = frame->len;
-    const int width = frame->width;
-    const int height = frame->height;
-    const int uv_len = frame->uv_len;
-    int threshold = args[P_THRESHOLD];
-    const int mode = args[P_MODE];
-    int mix = args[P_MIX];
-    int gain = args[P_EDGE_GAIN];
-    int chroma = args[P_CHROMA_EDGE];
+    int threshold = 0;
+    int mode = 1;
+    int mix = 1000;
+    int gain = 1000;
+    int chroma = 0;
 
-    const float param_fast = 0.30f;
-    const float param_slow = 0.085f;
-
-    if(!s->eff_initialized) {
-        s->eff_threshold = (float)threshold;
-        s->eff_mix = (float)mix;
-        s->eff_gain = (float)gain;
-        s->eff_chroma = (float)chroma;
-        s->eff_initialized = 1;
-    } else {
-        threshold    = sobel_smooth_i(&s->eff_threshold, threshold,    param_fast, param_slow);
-        mix          = sobel_smooth_i(&s->eff_mix,       mix,          param_fast * 0.88f, param_slow);
-        gain         = sobel_smooth_i(&s->eff_gain,      gain,         param_fast * 0.88f, param_slow);
-        chroma       = sobel_smooth_i(&s->eff_chroma,    chroma,       param_fast * 0.80f, param_slow);
-    }
-
-    threshold = clampi(threshold, 0, 255);
-    mix = clampi(mix, 0, 1000);
-    gain = clampi(gain, 0, 2000);
-    chroma = clampi(chroma, 0, 1000);
-
-    uint8_t *restrict Y = frame->data[0];
-
-    veejay_memcpy(s->buf[0], Y, len);
-
-    veejay_memcpy(s->buf[1], frame->data[1], uv_len);
-    veejay_memcpy(s->buf[2], frame->data[2], uv_len);
-
-    veejay_memset(Y, pixel_Y_lo_, len);
-
-#pragma omp parallel num_threads(s->n_threads)
+    #pragma omp single copyprivate(threshold, mode, mix, gain, chroma)
     {
-        switch(mode) {
-            case 0:
-                sobel_binary_3x3(s, frame, threshold);
-                break;
-            case 1:
-                sobel_gradient_3x3(s, frame, threshold, gain);
-                break;
-            case 2:
-                if(width >= 5 && height >= 5)
-                    sobel_gradient_wide(s, frame, threshold, gain);
-                else
-                    sobel_gradient_3x3(s, frame, threshold, gain);
-                break;
-            default:
-                break;
+        int len = frame->len;
+        int uv_len = frame->uv_len;
+        
+        int t = args[P_THRESHOLD];
+        mode = args[P_MODE];
+        int m = args[P_MIX];
+        int g = args[P_EDGE_GAIN];
+        int c = args[P_CHROMA_EDGE];
+
+        float param_fast = 0.30f;
+        float param_slow = 0.085f;
+
+        if(!s->eff_initialized) {
+            s->eff_threshold = (float)t;
+            s->eff_mix = (float)m;
+            s->eff_gain = (float)g;
+            s->eff_chroma = (float)c;
+            s->eff_initialized = 1;
+        } else {
+            t = sobel_smooth_i(&s->eff_threshold, t, param_fast, param_slow);
+            m = sobel_smooth_i(&s->eff_mix, m, param_fast * 0.88f, param_slow);
+            g = sobel_smooth_i(&s->eff_gain, g, param_fast * 0.88f, param_slow);
+            c = sobel_smooth_i(&s->eff_chroma, c, param_fast * 0.80f, param_slow);
         }
 
-        sobel_postprocess(s, frame, mix, chroma);
+        threshold = clampi(t, 0, 255);
+        mix = clampi(m, 0, 1000);
+        gain = clampi(g, 0, 2000);
+        chroma = clampi(c, 0, 1000);
+
+        veejay_memcpy(s->buf[0], frame->data[0], len);
+        veejay_memcpy(s->buf[1], frame->data[1], uv_len);
+        veejay_memcpy(s->buf[2], frame->data[2], uv_len);
+        veejay_memset(frame->data[0], pixel_Y_lo_, len);
     }
+
+    const int width = frame->width;
+    const int height = frame->height;
+
+    switch(mode) {
+        case 0:
+            sobel_binary_3x3(s, frame, threshold);
+            break;
+        case 1:
+            sobel_gradient_3x3(s, frame, threshold, gain);
+            break;
+        case 2:
+            if(width >= 5 && height >= 5)
+                sobel_gradient_wide(s, frame, threshold, gain);
+            else
+                sobel_gradient_3x3(s, frame, threshold, gain);
+            break;
+        default:
+            break;
+    }
+
+    sobel_postprocess(s, frame, mix, chroma);
 }

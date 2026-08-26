@@ -29,7 +29,6 @@
 #define ATS_PI 3.14159265358979323846f
 #endif
 
-
 #define ATS_FP 14
 #define ATS_ONE (1 << ATS_FP)
 #define ATS_MFP 10
@@ -392,17 +391,6 @@ vj_effect *tessaractslide_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ATS_NUM_PARAMS);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ATS_NUM_PARAMS);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     const int min_dim = w < h ? w : h;
     const int max_dim = w > h ? w : h;
 
@@ -495,8 +483,7 @@ vj_effect *tessaractslide_init(int w, int h)
 void *tessaractslide_malloc(int w, int h)
 {
     const int len = w * h;
-    const int n_threads = vje_advise_num_threads(len);
-
+    
     const size_t plane = (size_t)len;
     const size_t x_bytes = sizeof(int) * (size_t)w;
     const size_t y_bytes = sizeof(int) * (size_t)h;
@@ -519,7 +506,6 @@ void *tessaractslide_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = n_threads;
     s->seed = 0x51ed270bU ^ (uint32_t)(w * 73856093U) ^ (uint32_t)(h * 19349663U);
 
     uint8_t *p = (uint8_t *)(s + 1);
@@ -595,331 +581,313 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
 {
     ats_t *s = (ats_t *)ptr;
 
-    uint8_t * restrict Y = frame->data[0];
-    uint8_t * restrict U = frame->data[1];
-    uint8_t * restrict V = frame->data[2];
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
-    uint8_t * restrict src_y = s->src_y;
-    uint8_t * restrict src_u = s->src_u;
-    uint8_t * restrict src_v = s->src_v;
+    uint8_t *restrict src_y = s->src_y;
+    uint8_t *restrict src_u = s->src_u;
+    uint8_t *restrict src_v = s->src_v;
 
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
-    const int threads = s->n_threads;
 
-    const int slice_target = args[ATS_SLICE_WIDTH];
-    const int impact_arg = args[ATS_IMPACT];
-    const int axis_arg = args[ATS_AXIS_ANGLE];
-    const int depth_push_arg = args[ATS_DEPTH_PUSH];
-    const int slab_scale_arg = args[ATS_SLAB_SCALE];
-    const int slide_speed_arg = args[ATS_SLIDE_SPEED];
-    const int edge_flash_arg = args[ATS_EDGE_FLASH];
-    const int snare_arg = args[ATS_SNARE_FLASH];
-    const int hat_arg = args[ATS_HAT_FLICKER];
-    const int layers_arg = args[ATS_LAYERS];
-    const int hinge_arg = args[ATS_HINGE_FOLD];
-    const int settle_arg = args[ATS_SETTLE];
-
-    if(!s->smooth_ready) {
-        s->slice_width_f = (float)slice_target;
-        s->axis_angle_f = (float)axis_arg;
-        s->depth_push_f = (float)depth_push_arg;
-        s->slab_scale_f = (float)slab_scale_arg;
-        s->slide_speed_f = (float)slide_speed_arg;
-        s->edge_flash_f = (float)edge_flash_arg;
-        s->hat_flicker_f = (float)hat_arg;
-        s->hinge_fold_f = (float)hinge_arg;
-        s->smooth_ready = 1;
-    }
-
-    const float impact_target = (float)impact_arg * 0.01f;
-    const float snare_target = (float)snare_arg * 0.01f;
-    const float hat_target = ats_clampf((float)hat_arg * (1.0f / 220.0f), 0.0f, 1.0f);
-
-    const int impact_rise =
-        s->impact_cooldown <= 0 &&
-        ((impact_target > 0.30f && s->last_impact < 0.18f) ||
-         ((impact_target - s->last_impact) > 0.12f));
-
-    const int snare_rise =
-        s->snare_cooldown <= 0 &&
-        ((snare_target > 0.30f && s->last_snare < 0.18f) ||
-         ((snare_target - s->last_snare) > 0.12f));
-
-    const int hat_rise =
-        s->hat_cooldown <= 0 &&
-        ((hat_target > 0.24f && s->last_hat < 0.12f) ||
-         ((hat_target - s->last_hat) > 0.10f));
-
-    const float release = 0.010f + ((float)(100 - settle_arg) * 0.00105f);
-
-    s->impact_env = ats_env(s->impact_env, impact_target, 0.82f, release);
-    s->snare_env = ats_env(s->snare_env, snare_target, 0.86f, 0.130f);
-    s->hat_env = ats_env(s->hat_env, hat_target, 0.74f, 0.280f);
-
-    if(impact_rise || snare_rise) {
-        const float reseed_impact = impact_target > 0.22f ? impact_target : s->impact_env;
-        const float reseed_snare = snare_target > 0.22f ? snare_target : s->snare_env;
-        ats_reseed_bands(s, reseed_impact, reseed_snare);
-        s->impact_cooldown = impact_rise ? 4 : s->impact_cooldown;
-        s->snare_cooldown = snare_rise ? 4 : s->snare_cooldown;
-    }
-
-    if(hat_rise)
-        s->hat_cooldown = 2;
-
-    if(s->impact_cooldown > 0)
-        s->impact_cooldown--;
-    if(s->snare_cooldown > 0)
-        s->snare_cooldown--;
-    if(s->hat_cooldown > 0)
-        s->hat_cooldown--;
-
-    const float slice_alpha = (float)slice_target > s->slice_width_f ? 0.160f : 0.070f;
-    s->slice_width_f += ((float)slice_target - s->slice_width_f) * slice_alpha;
-    s->axis_angle_f += ((float)axis_arg - s->axis_angle_f) * 0.055f;
-    s->depth_push_f = ats_env(s->depth_push_f, (float)depth_push_arg, 0.260f, 0.085f);
-    s->slab_scale_f = ats_env(s->slab_scale_f, (float)slab_scale_arg, 0.235f, 0.080f);
-    s->slide_speed_f = ats_env(s->slide_speed_f, (float)slide_speed_arg, 0.280f, 0.095f);
-    s->edge_flash_f = ats_env(s->edge_flash_f, (float)edge_flash_arg, 0.360f, 0.150f);
-    s->hat_flicker_f = ats_env(s->hat_flicker_f, (float)hat_arg, 0.420f, 0.230f);
-    s->hinge_fold_f = ats_env(s->hinge_fold_f, (float)hinge_arg, 0.245f, 0.085f);
-
-    const int slice_width = clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
-    const int axis_eff = clampi((int)lrintf(s->axis_angle_f), 0, 360);
-    const int depth_push_eff = clampi((int)lrintf(s->depth_push_f), 0, 280);
-    const int slab_scale_eff = clampi((int)lrintf(s->slab_scale_f), 0, 240);
-    const int slide_speed_base = clampi((int)lrintf(s->slide_speed_f), 0, 220);
-    const int edge_flash_eff = clampi((int)lrintf(s->edge_flash_f), 0, 260);
-    const int hat_flicker_eff = clampi((int)lrintf(s->hat_flicker_f), 0, 220);
-    const int hinge_eff = clampi((int)lrintf(s->hinge_fold_f), 0, 240);
-
-    const int impact_i = (int)(s->impact_env * 256.0f);
-    const int snare_i = (int)(s->snare_env * 256.0f);
-    const int hat_i = (int)(s->hat_env * 256.0f);
-
-    s->last_impact = impact_target;
-    s->last_snare = snare_target;
-    s->last_hat = hat_target;
-
-    const int beat_activity = impact_i > snare_i ? impact_i : snare_i;
-    const int speed_gate = clampi((beat_activity - 4) * 2, 0, 256);
-    const int slide_speed_eff = clampi(
-        1 + ((slide_speed_base * (64 + (speed_gate >> 1))) >> 8) + (impact_i >> 5),
-        1,
-        320);
-
-    const int phase_target =
-        ((7 + slide_speed_eff * 2 + (impact_i >> 3) + (snare_i >> 4)) << ATS_FP) >> 5;
-
-    const int phase2_target =
-        ((4 + slide_speed_eff + (impact_i >> 4) + (hat_i >> 4)) << ATS_FP) >> 5;
-
-    s->phase_vel += ((float)phase_target - s->phase_vel) * 0.105f;
-    s->phase2_vel += ((float)phase2_target - s->phase2_vel) * 0.085f;
-
-    s->phase_fp += (int)s->phase_vel;
-    s->phase2_fp -= (int)s->phase2_vel;
-
-    const float axis_target =
-        0.0018f +
-        ((float)slide_speed_eff * 0.000045f) +
-        s->impact_env * 0.0065f +
-        s->snare_env * 0.0035f;
-
-    s->axis_vel += (axis_target - s->axis_vel) * 0.055f;
-    s->axis_phase += s->axis_vel;
-
-    s->axis_phase = s->axis_phase > ATS_PI * 2.0f
-        ? s->axis_phase - ATS_PI * 2.0f
-        : s->axis_phase;
-
-    const float spin_target =
-        ((float)slide_speed_eff * 0.010f) +
-        s->impact_env * 0.22f +
-        s->snare_env * 0.10f;
-
-    s->axis_spin_vel += (spin_target - s->axis_spin_vel) * 0.045f;
-    s->axis_spin += s->axis_spin_vel;
-
-    s->axis_spin = s->axis_spin >= 360.0f
-        ? s->axis_spin - 360.0f
-        : (s->axis_spin < 0.0f ? s->axis_spin + 360.0f : s->axis_spin);
-
-    ats_update_projection(s, axis_eff, layers_arg);
-
-    ats_update_bands(
-        s,
-        layers_arg,
-        clampi(depth_push_eff + ((impact_i * 118) >> 8) + ((snare_i * 32) >> 8), 0, 360),
-        clampi(slab_scale_eff + ((snare_i * 86) >> 8) + ((impact_i * 42) >> 8), 0, 310),
-        clampi(hinge_eff + ((impact_i * 96) >> 8) + ((snare_i * 62) >> 8), 0, 340),
-        clampi(edge_flash_eff + ((snare_i * 175) >> 8) + ((impact_i * 55) >> 8), 0, 420),
-        clampi(hat_flicker_eff + ((hat_i * 140) >> 8), 0, 360),
-        impact_i,
-        snare_i,
-        hat_i
-    );
-
-    s->frame_count++;
-
-    const int hw = w >> 1;
-    const int hh = h >> 1;
-
-    const int slice_fp = slice_width << ATS_FP;
-    const int slice2_width = clampi(slice_width + (slice_width >> 1) + layers_arg * 2, 12, 200);
-    const int slice2_fp = slice2_width << ATS_FP;
-
-    const int phase_wrap = slice_fp * ATS_PHASE_BANDS;
-    const int phase2_wrap = slice2_fp * ATS_PHASE_BANDS;
-
-    if(s->phase_fp >= phase_wrap || s->phase_fp < 0)
-        s->phase_fp %= phase_wrap;
-
-    if(s->phase_fp < 0)
-        s->phase_fp += phase_wrap;
-
-    if(s->phase2_fp >= phase2_wrap || s->phase2_fp < 0)
-        s->phase2_fp %= phase2_wrap;
-
-    if(s->phase2_fp < 0)
-        s->phase2_fp += phase2_wrap;
-
-    const int edge_width = clampi(2 + (slice_width >> 5) + ((edge_flash_eff + snare_i) >> 7), 2, 8);
-
-    const int q_offset = (w + h + slice_width * ATS_PHASE_BANDS + 512) << ATS_FP;
-    const int q2_offset = (w + h + slice2_width * ATS_PHASE_BANDS + 512) << ATS_FP;
-
-    const uint32_t frame_a = s->frame_count * 19U;
-
-    const int * restrict x_proj = s->x_proj;
-    const int * restrict y_proj = s->y_proj;
-    const int * restrict x_proj2 = s->x_proj2;
-    const int * restrict y_proj2 = s->y_proj2;
-    const ats_band_t * restrict bands = s->bands;
-    const int16_t * restrict wave_lut = s->wave_lut;
-    const int edge_glow_active = edge_flash_eff > 0;
-
-#pragma omp parallel num_threads(threads)
+    #pragma omp single
     {
-#pragma omp for schedule(static) nowait
-        for(int i = 0; i < len; i++)
-            src_y[i] = Y[i];
+        int slice_target = args[ATS_SLICE_WIDTH];
+        int impact_arg = args[ATS_IMPACT];
+        int axis_arg = args[ATS_AXIS_ANGLE];
+        int depth_push_arg = args[ATS_DEPTH_PUSH];
+        int slab_scale_arg = args[ATS_SLAB_SCALE];
+        int slide_speed_arg = args[ATS_SLIDE_SPEED];
+        int edge_flash_arg = args[ATS_EDGE_FLASH];
+        int snare_arg = args[ATS_SNARE_FLASH];
+        int hat_arg = args[ATS_HAT_FLICKER];
+        int layers_arg = args[ATS_LAYERS];
+        int hinge_arg = args[ATS_HINGE_FOLD];
+        int settle_arg = args[ATS_SETTLE];
 
-#pragma omp for schedule(static) nowait
-        for(int i = 0; i < len; i++)
-            src_u[i] = U[i];
+        if(!s->smooth_ready) {
+            s->slice_width_f = (float)slice_target;
+            s->axis_angle_f = (float)axis_arg;
+            s->depth_push_f = (float)depth_push_arg;
+            s->slab_scale_f = (float)slab_scale_arg;
+            s->slide_speed_f = (float)slide_speed_arg;
+            s->edge_flash_f = (float)edge_flash_arg;
+            s->hat_flicker_f = (float)hat_arg;
+            s->hinge_fold_f = (float)hinge_arg;
+            s->smooth_ready = 1;
+        }
 
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            src_v[i] = V[i];
+        float impact_target = (float)impact_arg * 0.01f;
+        float snare_target = (float)snare_arg * 0.01f;
+        float hat_target = ats_clampf((float)hat_arg * (1.0f / 220.0f), 0.0f, 1.0f);
 
-#pragma omp for schedule(static)
-        for(int y = 0; y < h; y++) {
-            const int row = y * w;
-            const int row_up = (y > 0 ? y - 1 : y) * w;
-            const int row_dn = (y < h - 1 ? y + 1 : y) * w;
-            const int yq = y_proj[y];
-            const int yq2 = y_proj2[y];
+        int impact_rise = s->impact_cooldown <= 0 &&
+                      ((impact_target > 0.30f && s->last_impact < 0.18f) ||
+                       ((impact_target - s->last_impact) > 0.12f));
 
-            for(int x = 0; x < w; x++) {
-                const int i = row + x;
+        int snare_rise = s->snare_cooldown <= 0 &&
+                     ((snare_target > 0.30f && s->last_snare < 0.18f) ||
+                      ((snare_target - s->last_snare) > 0.12f));
 
-                const int q = x_proj[x] + yq + s->phase_fp + q_offset;
-                const int band_raw = q / slice_fp;
-                const int band_idx = band_raw & ATS_BAND_MASK;
-                const int local_fp = q - band_raw * slice_fp;
-                const int local_pix = local_fp >> ATS_FP;
+        int hat_rise = s->hat_cooldown <= 0 &&
+                   ((hat_target > 0.24f && s->last_hat < 0.12f) ||
+                    ((hat_target - s->last_hat) > 0.10f));
 
-                const int q2 = x_proj2[x] + yq2 + s->phase2_fp + q2_offset;
-                const int sub_raw = q2 / slice2_fp;
-                const int sub_local_fp = q2 - sub_raw * slice2_fp;
-                const int sub_local_pix = sub_local_fp >> ATS_FP;
+        float release = 0.010f + ((float)(100 - settle_arg) * 0.00105f);
 
-                const ats_band_t *b = &bands[band_idx];
+        s->impact_env = ats_env(s->impact_env, impact_target, 0.82f, release);
+        s->snare_env = ats_env(s->snare_env, snare_target, 0.86f, 0.130f);
+        s->hat_env = ats_env(s->hat_env, hat_target, 0.74f, 0.280f);
 
-                const int dx = x - hw;
-                const int dy = y - hh;
+        if(impact_rise || snare_rise) {
+            const float reseed_impact = impact_target > 0.22f ? impact_target : s->impact_env;
+            const float reseed_snare = snare_target > 0.22f ? snare_target : s->snare_env;
+            ats_reseed_bands(s, reseed_impact, reseed_snare);
+            s->impact_cooldown = impact_rise ? 4 : s->impact_cooldown;
+            s->snare_cooldown = snare_rise ? 4 : s->snare_cooldown;
+        }
 
-                const int local_center = local_pix - (slice_width >> 1);
-                const int hinge_px = (local_center * b->hinge) >> 7;
+        if(hat_rise) s->hat_cooldown = 2;
 
-                const int sub_idx = (sub_local_pix * ATS_WAVE_LUT_SIZE) / slice2_width;
-                const int sub_wave = wave_lut[sub_idx & ATS_WAVE_LUT_MASK];
-                const int sub_px = (b->subshift * sub_wave) >> 10;
+        if(s->impact_cooldown > 0) s->impact_cooldown--;
+        if(s->snare_cooldown > 0) s->snare_cooldown--;
+        if(s->hat_cooldown > 0) s->hat_cooldown--;
 
-                int px =
-                    hw +
-                    ((dx * b->m00 + dy * b->m01) >> ATS_MFP) -
-                    b->tx -
-                    ((s->nx * hinge_px) >> ATS_FP) -
-                    ((s->sx_axis * sub_px) >> ATS_FP);
+        float slice_alpha = (float)slice_target > s->slice_width_f ? 0.160f : 0.070f;
+        s->slice_width_f += ((float)slice_target - s->slice_width_f) * slice_alpha;
+        s->axis_angle_f += ((float)axis_arg - s->axis_angle_f) * 0.055f;
+        s->depth_push_f = ats_env(s->depth_push_f, (float)depth_push_arg, 0.260f, 0.085f);
+        s->slab_scale_f = ats_env(s->slab_scale_f, (float)slab_scale_arg, 0.235f, 0.080f);
+        s->slide_speed_f = ats_env(s->slide_speed_f, (float)slide_speed_arg, 0.280f, 0.095f);
+        s->edge_flash_f = ats_env(s->edge_flash_f, (float)edge_flash_arg, 0.360f, 0.150f);
+        s->hat_flicker_f = ats_env(s->hat_flicker_f, (float)hat_arg, 0.420f, 0.230f);
+        s->hinge_fold_f = ats_env(s->hinge_fold_f, (float)hinge_arg, 0.245f, 0.085f);
 
-                int py =
-                    hh +
-                    ((dx * b->m10 + dy * b->m11) >> ATS_MFP) -
-                    b->ty -
-                    ((s->ny * hinge_px) >> ATS_FP) -
-                    ((s->sy_axis * sub_px) >> ATS_FP);
+        s->last_impact = impact_target;
+        s->last_snare = snare_target;
+        s->last_hat = hat_target;
 
-                px = px < 0 ? 0 : (px >= w ? w - 1 : px);
-                py = py < 0 ? 0 : (py >= h ? h - 1 : py);
+        int impact_i_tmp = (int)(s->impact_env * 256.0f);
+        int snare_i_tmp = (int)(s->snare_env * 256.0f);
+        int hat_i_tmp = (int)(s->hat_env * 256.0f);
 
-                const int pi = py * w + px;
+        int beat_activity = impact_i_tmp > snare_i_tmp ? impact_i_tmp : snare_i_tmp;
+        int speed_gate = clampi((beat_activity - 4) * 2, 0, 256);
+        int slide_speed_base = clampi((int)lrintf(s->slide_speed_f), 0, 220);
+        int slide_speed_eff = clampi(
+            1 + ((slide_speed_base * (64 + (speed_gate >> 1))) >> 8) + (impact_i_tmp >> 5),
+            1,
+            320);
 
-                int yy = src_y[pi];
-                int uu = src_u[pi];
-                int vv = src_v[pi];
+        int phase_target = ((7 + slide_speed_eff * 2 + (impact_i_tmp >> 3) + (snare_i_tmp >> 4)) << ATS_FP) >> 5;
+        int phase2_target = ((4 + slide_speed_eff + (impact_i_tmp >> 4) + (hat_i_tmp >> 4)) << ATS_FP) >> 5;
 
-                const int dist_a = local_pix;
-                const int dist_b = slice_width - local_pix;
-                const int edge_dist = dist_a < dist_b ? dist_a : dist_b;
+        s->phase_vel += ((float)phase_target - s->phase_vel) * 0.105f;
+        s->phase2_vel += ((float)phase2_target - s->phase2_vel) * 0.085f;
 
-                int edge = edge_width - edge_dist;
-                edge = edge > 0 ? edge : 0;
+        s->phase_fp += (int)s->phase_vel;
+        s->phase2_fp -= (int)s->phase2_vel;
 
-                const int edge_total = edge;
+        float axis_target = 0.0018f +
+                      ((float)slide_speed_eff * 0.000045f) +
+                      s->impact_env * 0.0065f +
+                      s->snare_env * 0.0035f;
 
-                if(edge_total > 0 && (edge_glow_active || b->glow > 0)) {
-                    const int xm = x > 0 ? x - 1 : x;
-                    const int xp = x < w - 1 ? x + 1 : x;
+        s->axis_vel += (axis_target - s->axis_vel) * 0.055f;
+        s->axis_phase += s->axis_vel;
 
-                    const int source_edge =
-                        ats_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
-                        ats_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
+        s->axis_phase = s->axis_phase > ATS_PI * 2.0f
+            ? s->axis_phase - ATS_PI * 2.0f
+            : s->axis_phase;
 
-                    const int edge_gate = source_edge < 255 ? source_edge : 255;
-                    const int texture = edge_gate > 22 ? edge_gate - 22 : 0;
-                    const int break_mask =
-                        5 + (int)(((uint32_t)(x * 13 + y * 17 + b->base_phase) + frame_a) & 7U);
+        float spin_target = ((float)slide_speed_eff * 0.010f) +
+                      s->impact_env * 0.22f +
+                      s->snare_env * 0.10f;
 
-                    int glint =
-                        (edge_total * edge_flash_eff * (14 + (b->energy >> 6))) >> 12;
+        s->axis_spin_vel += (spin_target - s->axis_spin_vel) * 0.045f;
+        s->axis_spin += s->axis_spin_vel;
 
-                    glint += texture > 0
-                        ? ((edge_total * texture * snare_i * b->glow) >> 17)
-                        : 0;
+        s->axis_spin = s->axis_spin >= 360.0f
+            ? s->axis_spin - 360.0f
+            : (s->axis_spin < 0.0f ? s->axis_spin + 360.0f : s->axis_spin);
 
-                    yy += (glint * break_mask) >> 3;
-                }
+        int axis_eff = clampi((int)lrintf(s->axis_angle_f), 0, 360);
+        ats_update_projection(s, axis_eff, layers_arg);
 
-                if(b->flicker > 0 && hat_i > 10) {
-                    const int pat =
-                        (int)(((uint32_t)(x * 13 + y * 17 + b->base_phase) + frame_a) & 31U) - 15;
-                    const int flicker_gate = 5 + edge_total * 12;
-                    const int flicker_y = (pat * hat_i * b->flicker * flicker_gate) >> 18;
-                    const int flicker_uv = (pat * hat_i * b->flicker) >> 18;
+        int depth_push_eff = clampi((int)lrintf(s->depth_push_f), 0, 280);
+        int slab_scale_eff = clampi((int)lrintf(s->slab_scale_f), 0, 240);
+        int hinge_eff = clampi((int)lrintf(s->hinge_fold_f), 0, 240);
+        int edge_flash_eff = clampi((int)lrintf(s->edge_flash_f), 0, 260);
+        int hat_flicker_eff = clampi((int)lrintf(s->hat_flicker_f), 0, 220);
 
-                    yy += flicker_y;
-                    uu += flicker_uv;
-                    vv -= flicker_uv >> 1;
-                }
+        ats_update_bands(
+            s,
+            layers_arg,
+            clampi(depth_push_eff + ((impact_i_tmp * 118) >> 8) + ((snare_i_tmp * 32) >> 8), 0, 360),
+            clampi(slab_scale_eff + ((snare_i_tmp * 86) >> 8) + ((impact_i_tmp * 42) >> 8), 0, 310),
+            clampi(hinge_eff + ((impact_i_tmp * 96) >> 8) + ((snare_i_tmp * 62) >> 8), 0, 340),
+            clampi(edge_flash_eff + ((snare_i_tmp * 175) >> 8) + ((impact_i_tmp * 55) >> 8), 0, 420),
+            clampi(hat_flicker_eff + ((hat_i_tmp * 140) >> 8), 0, 360),
+            impact_i_tmp,
+            snare_i_tmp,
+            hat_i_tmp
+        );
 
-                Y[i] = ats_u8(yy);
-                U[i] = ats_u8(uu);
-                V[i] = ats_u8(vv);
+        int slice_width_tmp = clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
+        int slice_fp_tmp = slice_width_tmp << ATS_FP;
+        int slice2_width_tmp = clampi(slice_width_tmp + (slice_width_tmp >> 1) + layers_arg * 2, 12, 200);
+        int slice2_fp_tmp = slice2_width_tmp << ATS_FP;
+        int phase_wrap = slice_fp_tmp * ATS_PHASE_BANDS;
+        int phase2_wrap = slice2_fp_tmp * ATS_PHASE_BANDS;
+
+        if(s->phase_fp >= phase_wrap || s->phase_fp < 0) s->phase_fp %= phase_wrap;
+        if(s->phase_fp < 0) s->phase_fp += phase_wrap;
+        if(s->phase2_fp >= phase2_wrap || s->phase2_fp < 0) s->phase2_fp %= phase2_wrap;
+        if(s->phase2_fp < 0) s->phase2_fp += phase2_wrap;
+
+        s->frame_count++;
+    } 
+
+    int layers_arg = args[ATS_LAYERS];
+    int slice_width = clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
+    int edge_flash_eff = clampi((int)lrintf(s->edge_flash_f), 0, 260);
+    
+    int impact_i = (int)(s->impact_env * 256.0f);
+    int snare_i = (int)(s->snare_env * 256.0f);
+    int hat_i = (int)(s->hat_env * 256.0f);
+
+    int hw = w >> 1;
+    int hh = h >> 1;
+
+    int slice_fp = slice_width << ATS_FP;
+    int slice2_width = clampi(slice_width + (slice_width >> 1) + layers_arg * 2, 12, 200);
+    int slice2_fp = slice2_width << ATS_FP;
+
+    int edge_width = clampi(2 + (slice_width >> 5) + ((edge_flash_eff + snare_i) >> 7), 2, 8);
+
+    int q_offset = (w + h + slice_width * ATS_PHASE_BANDS + 512) << ATS_FP;
+    int q2_offset = (w + h + slice2_width * ATS_PHASE_BANDS + 512) << ATS_FP;
+
+    uint32_t frame_a = s->frame_count * 19U;
+    int edge_glow_active = edge_flash_eff > 0;
+
+    const int *restrict x_proj = s->x_proj;
+    const int *restrict y_proj = s->y_proj;
+    const int *restrict x_proj2 = s->x_proj2;
+    const int *restrict y_proj2 = s->y_proj2;
+    const ats_band_t *restrict bands = s->bands;
+    const int16_t *restrict wave_lut = s->wave_lut;
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        src_y[i] = Y[i];
+        src_u[i] = U[i];
+        src_v[i] = V[i];
+    }
+
+    #pragma omp for schedule(static)
+    for(int y = 0; y < h; y++) {
+        const int row = y * w;
+        const int row_up = (y > 0 ? y - 1 : y) * w;
+        const int row_dn = (y < h - 1 ? y + 1 : y) * w;
+        const int yq = y_proj[y];
+        const int yq2 = y_proj2[y];
+
+        for(int x = 0; x < w; x++) {
+            const int i = row + x;
+
+            const int q = x_proj[x] + yq + s->phase_fp + q_offset;
+            const int band_raw = q / slice_fp;
+            const int band_idx = band_raw & ATS_BAND_MASK;
+            const int local_fp = q - band_raw * slice_fp;
+            const int local_pix = local_fp >> ATS_FP;
+
+            const int q2 = x_proj2[x] + yq2 + s->phase2_fp + q2_offset;
+            const int sub_raw = q2 / slice2_fp;
+            const int sub_local_fp = q2 - sub_raw * slice2_fp;
+            const int sub_local_pix = sub_local_fp >> ATS_FP;
+
+            const ats_band_t *b = &bands[band_idx];
+
+            const int dx = x - hw;
+            const int dy = y - hh;
+
+            const int local_center = local_pix - (slice_width >> 1);
+            const int hinge_px = (local_center * b->hinge) >> 7;
+
+            const int sub_idx = (sub_local_pix * ATS_WAVE_LUT_SIZE) / slice2_width;
+            const int sub_wave = wave_lut[sub_idx & ATS_WAVE_LUT_MASK];
+            const int sub_px = (b->subshift * sub_wave) >> 10;
+
+            int px = hw +
+                     ((dx * b->m00 + dy * b->m01) >> ATS_MFP) -
+                     b->tx -
+                     ((s->nx * hinge_px) >> ATS_FP) -
+                     ((s->sx_axis * sub_px) >> ATS_FP);
+
+            int py = hh +
+                     ((dx * b->m10 + dy * b->m11) >> ATS_MFP) -
+                     b->ty -
+                     ((s->ny * hinge_px) >> ATS_FP) -
+                     ((s->sy_axis * sub_px) >> ATS_FP);
+
+            px = px < 0 ? 0 : (px >= w ? w - 1 : px);
+            py = py < 0 ? 0 : (py >= h ? h - 1 : py);
+
+            const int pi = py * w + px;
+
+            int yy = src_y[pi];
+            int uu = src_u[pi];
+            int vv = src_v[pi];
+
+            const int dist_a = local_pix;
+            const int dist_b = slice_width - local_pix;
+            const int edge_dist = dist_a < dist_b ? dist_a : dist_b;
+
+            int edge = edge_width - edge_dist;
+            edge = edge > 0 ? edge : 0;
+
+            const int edge_total = edge;
+
+            if(edge_total > 0 && (edge_glow_active || b->glow > 0)) {
+                const int xm = x > 0 ? x - 1 : x;
+                const int xp = x < w - 1 ? x + 1 : x;
+
+                const int source_edge =
+                    ats_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
+                    ats_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
+
+                const int edge_gate = source_edge < 255 ? source_edge : 255;
+                const int texture = edge_gate > 22 ? edge_gate - 22 : 0;
+                const int break_mask =
+                    5 + (int)(((uint32_t)(x * 13 + y * 17 + b->base_phase) + frame_a) & 7U);
+
+                int glint = (edge_total * edge_flash_eff * (14 + (b->energy >> 6))) >> 12;
+
+                glint += texture > 0
+                    ? ((edge_total * texture * snare_i * b->glow) >> 17)
+                    : 0;
+
+                yy += (glint * break_mask) >> 3;
             }
+
+            if(b->flicker > 0 && hat_i > 10) {
+                const int pat = (int)(((uint32_t)(x * 13 + y * 17 + b->base_phase) + frame_a) & 31U) - 15;
+                const int flicker_gate = 5 + edge_total * 12;
+                const int flicker_y = (pat * hat_i * b->flicker * flicker_gate) >> 18;
+                const int flicker_uv = (pat * hat_i * b->flicker) >> 18;
+                
+                yy += flicker_y;
+                uu += flicker_uv;
+                vv -= flicker_uv >> 1;
+            }
+
+            Y[i] = ats_u8(yy);
+            U[i] = ats_u8(uu);
+            V[i] = ats_u8(vv);
         }
     }
 }

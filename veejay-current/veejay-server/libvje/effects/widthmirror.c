@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -47,6 +47,11 @@ typedef struct {
     float edge_env;
     float glow_env;
     float drift_pos;
+
+    float band_w;
+    float phase_px;
+    float edge_width;
+    int glow;
 } widthmirror_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -94,14 +99,6 @@ vj_effect *widthmirror_init(int max_width, int h)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     int max_freq = max_width;
     if(max_freq > 256)
@@ -202,8 +199,6 @@ void *widthmirror_malloc(int w, int h)
     wm->glow_env = 24.0f;
     wm->drift_pos = 0.0f;
 
-    wm->n_threads = vje_advise_num_threads(len);
-
     return (void*) wm;
 }
 
@@ -233,27 +228,38 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
 
     const float follow = 0.185f;
 
-    wm->freq_env += ((float)frequency_arg - wm->freq_env) * follow;
-    wm->phase_env += ((float)phase_arg - wm->phase_env) * follow;
-    wm->edge_env += ((float)edge_arg - wm->edge_env) * follow;
-    wm->glow_env += ((float)glow_arg - wm->glow_env) * follow;
+    #pragma omp single
+    {
+        wm->freq_env += ((float)frequency_arg - wm->freq_env) * follow;
+        wm->phase_env += ((float)phase_arg - wm->phase_env) * follow;
+        wm->edge_env += ((float)edge_arg - wm->edge_env) * follow;
+        wm->glow_env += ((float)glow_arg - wm->glow_env) * follow;
 
-    wm->freq_env = clampf(wm->freq_env, 2.0f, (float)wm->max_freq);
-    wm->phase_env = clampf(wm->phase_env, 0.0f, 1000.0f);
-    wm->edge_env = clampf(wm->edge_env, 0.0f, (float)max_edge);
-    wm->glow_env = clampf(wm->glow_env, 0.0f, 255.0f);
+        wm->freq_env = clampf(wm->freq_env, 2.0f, (float)wm->max_freq);
+        wm->phase_env = clampf(wm->phase_env, 0.0f, 1000.0f);
+        wm->edge_env = clampf(wm->edge_env, 0.0f, (float)max_edge);
+        wm->glow_env = clampf(wm->glow_env, 0.0f, 255.0f);
 
-    const float band_w = (float)width / wm->freq_env;
+        wm->band_w = (float)width / wm->freq_env;
+        const float base_step = (float)drift_speed_arg * 0.020f;
 
-    const float base_step = (float)drift_speed_arg * 0.020f;
+        wm->drift_pos += base_step;
+        wm->drift_pos = wm_wrapf(wm->drift_pos, (float)width);
 
-    wm->drift_pos += base_step;
-    wm->drift_pos = wm_wrapf(wm->drift_pos, (float)width);
+        const float manual_phase = ((wm->phase_env * (float)width) * 0.001f);
+        wm->phase_px = wm_wrapf(manual_phase + wm->drift_pos, (float)width);
+        wm->edge_width = wm->edge_env;
+        wm->glow = clampi((int)(wm->glow_env + 0.5f), 0, 255);
 
-    const float manual_phase = ((wm->phase_env * (float)width) * 0.001f);
-    const float phase_px = wm_wrapf(manual_phase + wm->drift_pos, (float)width);
-    const float edge_width = wm->edge_env;
-    const int glow = clampi((int)(wm->glow_env + 0.5f), 0, 255);
+        veejay_memcpy(wm->buf[0], frame->data[0], len);
+        veejay_memcpy(wm->buf[1], frame->data[1], len);
+        veejay_memcpy(wm->buf[2], frame->data[2], len);
+    }
+
+    const float band_w = wm->band_w;
+    const float phase_px = wm->phase_px;
+    const float edge_width = wm->edge_width;
+    const int glow = wm->glow;
 
     int *restrict xmap = wm->xmap;
     uint8_t *restrict edge = wm->edge;
@@ -266,75 +272,68 @@ void widthmirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcCb = wm->buf[1];
     uint8_t *restrict srcCr = wm->buf[2];
 
-    veejay_memcpy(srcY,  Y,  len);
-    veejay_memcpy(srcCb, Cb, len);
-    veejay_memcpy(srcCr, Cr, len);
+    #pragma omp for schedule(static)
+    for(int x = 0; x < width; x++) {
+        float u = (float)x + phase_px;
+        if(u >= (float)width)
+            u -= (float)width;
 
-#pragma omp parallel num_threads(wm->n_threads)
-    {
-#pragma omp for schedule(static)
-        for(int x = 0; x < width; x++) {
-            float u = (float)x + phase_px;
-            if(u >= (float)width)
-                u -= (float)width;
+        const int band = (int)(u / band_w);
+        const float band_start = (float)band * band_w;
+        float band_end = band_start + band_w;
+        if(band_end > (float)width)
+            band_end = (float)width;
 
-            const int band = (int)(u / band_w);
-            const float band_start = (float)band * band_w;
-            float band_end = band_start + band_w;
-            if(band_end > (float)width)
-                band_end = (float)width;
+        const float local = u - band_start;
+        const float src_u = (band & 1)
+            ? (band_end - 1.0f - local)
+            : (band_start + local);
 
-            const float local = u - band_start;
-            const float src_u = (band & 1)
-                ? (band_end - 1.0f - local)
-                : (band_start + local);
+        float src_x = src_u - phase_px;
+        if(src_x < 0.0f)
+            src_x += (float)width;
+        else if(src_x >= (float)width)
+            src_x -= (float)width;
 
-            float src_x = src_u - phase_px;
-            if(src_x < 0.0f)
-                src_x += (float)width;
-            else if(src_x >= (float)width)
-                src_x -= (float)width;
+        int sx = (int)(src_x + 0.5f);
+        if(sx >= width)
+            sx = width - 1;
 
-            int sx = (int)(src_x + 0.5f);
-            if(sx >= width)
-                sx = width - 1;
+        xmap[x] = sx;
 
-            xmap[x] = sx;
-
-            if(edge_width > 0.1f) {
-                float dist = local < (band_end - band_start - local)
-                    ? local
-                    : (band_end - band_start - local);
-                float q = 1.0f - clampf(dist / edge_width, 0.0f, 1.0f);
-                edge[x] = (uint8_t)(q * 255.0f + 0.5f);
-            }
-            else {
-                edge[x] = 0;
-            }
+        if(edge_width > 0.1f) {
+            float dist = local < (band_end - band_start - local)
+                ? local
+                : (band_end - band_start - local);
+            float q = 1.0f - clampf(dist / edge_width, 0.0f, 1.0f);
+            edge[x] = (uint8_t)(q * 255.0f + 0.5f);
         }
+        else {
+            edge[x] = 0;
+        }
+    }
 
-#pragma omp for schedule(static)
-        for(int y = 0; y < height; y++) {
-            const int row = y * width;
+    #pragma omp for schedule(static)
+    for(int y = 0; y < height; y++) {
+        const int row = y * width;
 
-            for(int x = 0; x < width; x++) {
-                const int dst = row + x;
-                const int src = row + xmap[x];
-                const int q = edge[x];
+        for(int x = 0; x < width; x++) {
+            const int dst = row + x;
+            const int src = row + xmap[x];
+            const int q = edge[x];
 
-                int yy = srcY[src];
-                int uu = srcCb[src];
-                int vv = srcCr[src];
+            int yy = srcY[src];
+            int uu = srcCb[src];
+            int vv = srcCr[src];
 
-                if(q > 0 && glow > 0) {
-                    const int g = (q * glow + 127) / 255;
-                    yy += g;
-                }
-
-                Y[dst]  = wm_u8(yy);
-                Cb[dst] = wm_u8(uu);
-                Cr[dst] = wm_u8(vv);
+            if(q > 0 && glow > 0) {
+                const int g = (q * glow + 127) / 255;
+                yy += g;
             }
+
+            Y[dst]  = wm_u8(yy);
+            Cb[dst] = wm_u8(uu);
+            Cr[dst] = wm_u8(vv);
         }
     }
 }

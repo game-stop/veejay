@@ -115,47 +115,50 @@ void complexsync_free(void *ptr)
 
 void complexsync_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    complexsync_t *c = (complexsync_t*) ptr;
-
-    const int width = frame->width;
-    const int height = frame->height;
-    const int len = frame->len;
-    const int val = clampi(args[0], 1, height - 1);
-    const int auto_inc = clampi(args[1], 0, 1);
-    int duration = clampi(args[2], 1, 25 * 10);
-
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    int planes[4] = { len, len, len, 0 };
-
-    if(auto_inc == 1)
+    #pragma omp single
     {
-        c->position += (val / duration) + 1;
+        complexsync_t *c = (complexsync_t*) ptr;
 
-        if(c->position > height - 2)
-            c->position = 1;
-    }
-    else
-    {
-        c->position = val;
-    }
+        const int width = frame->width;
+        const int height = frame->height;
+        const int len = frame->len;
+        const int val = clampi(args[0], 1, height - 1);
+        const int auto_inc = clampi(args[1], 0, 1);
+        int duration = clampi(args[2], 1, 25 * 10);
 
-    c->position = clampi(c->position, 1, height - 1);
+        uint8_t *restrict Y = frame->data[0];
+        uint8_t *restrict Cb = frame->data[1];
+        uint8_t *restrict Cr = frame->data[2];
 
-    const int region = width * c->position;
+        int planes[4] = { len, len, len, 0 };
 
-    vj_frame_copy(frame->data, c->c_outofsync_buffer, planes);
-    vj_frame_copy(frame2->data, frame->data, planes);
+        if(auto_inc == 1)
+        {
+            c->position += (val / duration) + 1;
 
-    c->complex_not_completed = (len - region) > 0;
+            if(c->position > height - 2)
+                c->position = 1;
+        }
+        else
+        {
+            c->position = val;
+        }
 
-    if(c->complex_not_completed)
-    {
-        uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
-        int dst_strides[4] = { len - region, len - region, len - region, 0 };
+        c->position = clampi(c->position, 1, height - 1);
 
-        vj_frame_copy(c->c_outofsync_buffer, dest, dst_strides);
+        const int region = width * c->position;
+
+        vj_frame_copy(frame->data, c->c_outofsync_buffer, planes);
+        vj_frame_copy(frame2->data, frame->data, planes);
+
+        c->complex_not_completed = (len - region) > 0;
+
+        if(c->complex_not_completed)
+        {
+            uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
+            int dst_strides[4] = { len - region, len - region, len - region, 0 };
+
+            vj_frame_copy(c->c_outofsync_buffer, dest, dst_strides);
+        }
     }
 }

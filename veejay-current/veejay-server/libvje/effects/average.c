@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,13 +23,15 @@
 
 typedef struct {
     float *running_sum[3];
-    int n_threads;
     int seeded;
+    int need_seed;
 } average_t;
 
 vj_effect *average_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 1;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -53,6 +55,9 @@ vj_effect *average_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -73,9 +78,8 @@ void *average_malloc(int width, int height)
 
     a->running_sum[1] = a->running_sum[0] + (width * height);
     a->running_sum[2] = a->running_sum[1] + (width * height);
-    a->n_threads = vje_advise_num_threads(width * height);
     a->seeded = 0;
-
+    a->need_seed = 0;
     return a;
 }
 
@@ -105,11 +109,19 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
 {
     average_t *a = (average_t *) ptr;
 
-    int max_sum = args[0];
+    #pragma omp single
+    {
+        if (!a->seeded) {
+            a->seeded = 1;
+            a->need_seed = 1;
+        } else {
+            a->need_seed = 0;
+        }
+    }
 
+    const int need_seed = a->need_seed;
     const int len = frame->len;
-    const int n_threads = a->n_threads;
-    const int need_seed = !a->seeded;
+    const int max_sum = args[0];
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -122,41 +134,35 @@ void average_apply(void *ptr, VJFrame *frame, int *args)
     const float w = 1.0f / (float)max_sum;
     const float iw = 1.0f - w;
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        if(need_seed) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                rsY[i] = (float)Y[i];
-                rsCb[i] = (float)Cb[i] - 128.0f;
-                rsCr[i] = (float)Cr[i] - 128.0f;
-            }
-        }
-
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            float y = rsY[i];
-            float cb = rsCb[i];
-            float cr = rsCr[i];
-
-            const float inY = (float)Y[i];
-            const float inCb = (float)Cb[i] - 128.0f;
-            const float inCr = (float)Cr[i] - 128.0f;
-
-            y = iw * y + w * inY;
-            cb = iw * cb + w * inCb;
-            cr = iw * cr + w * inCr;
-
-            rsY[i] = y;
-            rsCb[i] = cb;
-            rsCr[i] = cr;
-
-            Y[i] = clamp_u8f(y);
-            Cb[i] = clamp_u8f(128.0f + cb);
-            Cr[i] = clamp_u8f(128.0f + cr);
+    if (need_seed) {
+        #pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            rsY[i] = (float)Y[i];
+            rsCb[i] = (float)Cb[i] - 128.0f;
+            rsCr[i] = (float)Cr[i] - 128.0f;
         }
     }
 
-    if(need_seed)
-        a->seeded = 1;
+    #pragma omp for schedule(static)
+    for (int i = 0; i < len; i++) {
+        float y = rsY[i];
+        float cb = rsCb[i];
+        float cr = rsCr[i];
+
+        const float inY = (float)Y[i];
+        const float inCb = (float)Cb[i] - 128.0f;
+        const float inCr = (float)Cr[i] - 128.0f;
+
+        y = iw * y + w * inY;
+        cb = iw * cb + w * inCb;
+        cr = iw * cr + w * inCr;
+
+        rsY[i] = y;
+        rsCb[i] = cb;
+        rsCr[i] = cr;
+
+        Y[i] = clamp_u8f(y);
+        Cb[i] = clamp_u8f(128.0f + cb);
+        Cr[i] = clamp_u8f(128.0f + cr);
+    }
 }

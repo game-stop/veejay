@@ -43,16 +43,6 @@ vj_effect *killchroma_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_MODE] = 0;
     ve->limits[1][P_MODE] = 2;
@@ -80,16 +70,19 @@ vj_effect *killchroma_init(int w, int h)
 
 void killchroma_apply(void *ptr, VJFrame *frame, int *args)
 {
-    (void) ptr;
+    #pragma omp single
+    {
+        (void) ptr;
 
-    const int mode = args[P_MODE];
-    const int len = frame->ssm ? frame->len : frame->uv_len;
+        const int mode = args[P_MODE];
+        const int len = frame->ssm ? frame->len : frame->uv_len;
 
-    if(mode == 0) {
-        veejay_memset(frame->data[1], 128, len);
-        veejay_memset(frame->data[2], 128, len);
-    }
-    else {
-        veejay_memset(frame->data[mode], 128, len);
+        if(mode == 0) {
+            veejay_memset(frame->data[1], 128, len);
+            veejay_memset(frame->data[2], 128, len);
+        }
+        else {
+            veejay_memset(frame->data[mode], 128, len);
+        }
     }
 }

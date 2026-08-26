@@ -39,7 +39,6 @@ vj_effect *blackreplace_init(int w, int h)
     ve->description = "Replace Black with Color (Darkness Key)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Softness", "Red", "Green", "Blue");
 
@@ -57,30 +56,6 @@ vj_effect *blackreplace_init(int w, int h)
     return ve;
 }
 
-typedef struct {
-    int n_threads;
-} blackreplace_t;
-
-void *blackreplace_malloc(int w, int h)
-{
-    blackreplace_t *br = (blackreplace_t*) vj_calloc(sizeof(blackreplace_t));
-
-    if(!br)
-        return NULL;
-
-    br->n_threads = vje_advise_num_threads(w * h);
-
-    return br;
-}
-
-void blackreplace_free(void *ptr)
-{
-    blackreplace_t *br = (blackreplace_t*) ptr;
-
-    if(br)
-        free(br);
-}
-
 static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 {
     return (uint8_t)((a * (255 - t) + b * t) >> 8);
@@ -88,15 +63,12 @@ static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 
 void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
 {
-    blackreplace_t *br = (blackreplace_t*) ptr;
-
     const int threshold = args[0];
     const int softness = args[1];
     const int red = args[2];
     const int green = args[3];
     const int blue = args[4];
     const int len = frame->len;
-    const int n_threads = br->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -113,7 +85,7 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
     const int denom = edge - full;
     const int mul = (255 << 16) / denom;
 
-    #pragma omp parallel for simd num_threads(n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const int y = Y[i];
@@ -145,4 +117,5 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
         Cb[i] = blend_u8((uint8_t)cb, (uint8_t)colorCb, t);
         Cr[i] = blend_u8((uint8_t)cr, (uint8_t)colorCr, t);
     }
+    
 }

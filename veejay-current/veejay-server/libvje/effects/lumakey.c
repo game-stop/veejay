@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -30,10 +30,6 @@
 #define P_SOFTNESS 3
 #define P_INVERT   4
 
-typedef struct {
-    int n_threads;
-} lumakey_t;
-
 static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -55,17 +51,6 @@ vj_effect *lumakey_init(int width, int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_OPACITY] = 0;  ve->limits[1][P_OPACITY] = 255;  ve->defaults[P_OPACITY] = 255;
     ve->limits[0][P_LUMA_MIN] = 0; ve->limits[1][P_LUMA_MIN] = 255; ve->defaults[P_LUMA_MIN] = 0;
@@ -93,24 +78,10 @@ vj_effect *lumakey_init(int width, int height)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)width;
+    (void)height;
+
     return ve;
-}
-
-void *lumakey_malloc(int w, int h)
-{
-    lumakey_t *lk = (lumakey_t*) vj_malloc(sizeof(lumakey_t));
-
-    if(!lk)
-        return NULL;
-
-    lk->n_threads = vje_advise_num_threads(w * h);
-
-    return (void*) lk;
-}
-
-void lumakey_free(void *ptr)
-{
-    free(ptr);
 }
 
 static void lumakey_build_lut(uint16_t *restrict alpha_lut,
@@ -152,8 +123,6 @@ static void lumakey_build_lut(uint16_t *restrict alpha_lut,
 
 void lumakey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    lumakey_t *lk = (lumakey_t*) ptr;
-
     const int opacity = args[P_OPACITY];
     const int luma_min = args[P_LUMA_MIN];
     const int luma_max = args[P_LUMA_MAX];
@@ -162,18 +131,16 @@ void lumakey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int len = frame->len;
 
     uint16_t alpha_lut[256];
-
-    lumakey_build_lut(alpha_lut, opacity, luma_min, luma_max, softness, invert);
-
     uint8_t *restrict Y1 = frame->data[0];
     uint8_t *restrict Cb1 = frame->data[1];
     uint8_t *restrict Cr1 = frame->data[2];
-
     const uint8_t *restrict Y2 = frame2->data[0];
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(lk->n_threads)
+    lumakey_build_lut(alpha_lut, opacity, luma_min, luma_max, softness, invert);
+
+    #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
         const int aq = alpha_lut[Y1[pos]];
 

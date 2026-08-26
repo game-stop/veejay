@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * vvCutStop - ported from vvFFPP_basic
  * Copyright(C)2005 Maciek Szczesniak <maciek@visualvinyl.net>
@@ -23,11 +23,11 @@
 
 #include "common.h"
 #include "cutstop.h"
+#include <veejaycore/vjmem.h>
 
 typedef struct {
     uint8_t *vvcutstop_buffer[4];
     unsigned int frq_cnt;
-    int n_threads;
 } cutstop_t;
 
 vj_effect *cutstop_init(int width, int height)
@@ -59,6 +59,9 @@ vj_effect *cutstop_init(int width, int height)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
+
+    (void)width;
+    (void)height;
 
     return ve;
 }
@@ -92,7 +95,6 @@ void *cutstop_malloc(int width, int height)
     veejay_memset(c->vvcutstop_buffer[1], 128, len * 2);
 
     c->frq_cnt = 256;
-    c->n_threads = vje_advise_num_threads(len);
 
     return c;
 }
@@ -108,71 +110,6 @@ void cutstop_free(void *ptr)
         free(c->vvcutstop_buffer[0]);
 
     free(c);
-}
-
-static void cutstop_copy_held_444(uint8_t *restrict Yd,
-                                  uint8_t *restrict Ud,
-                                  uint8_t *restrict Vd,
-                                  const uint8_t *restrict Yb,
-                                  const uint8_t *restrict Ub,
-                                  const uint8_t *restrict Vb,
-                                  int len,
-                                  int threshold,
-                                  int cutmode,
-                                  int holdmode)
-{
-    if(cutmode && !holdmode)
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            if(threshold > Yb[i])
-            {
-                Yd[i] = Yb[i];
-                Ud[i] = Ub[i];
-                Vd[i] = Vb[i];
-            }
-        }
-    }
-    else if(cutmode && holdmode)
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            if(threshold > Yd[i])
-            {
-                Yd[i] = Yb[i];
-                Ud[i] = Ub[i];
-                Vd[i] = Vb[i];
-            }
-        }
-    }
-    else if(!cutmode && holdmode)
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            if(threshold < Yd[i])
-            {
-                Yd[i] = Yb[i];
-                Ud[i] = Ub[i];
-                Vd[i] = Vb[i];
-            }
-        }
-    }
-    else
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            if(threshold < Yb[i])
-            {
-                Yd[i] = Yb[i];
-                Ud[i] = Ub[i];
-                Vd[i] = Vb[i];
-            }
-        }
-    }
 }
 
 void cutstop_apply(void *ptr, VJFrame *frame, int *args)
@@ -194,60 +131,70 @@ void cutstop_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Ud = frame->data[1];
     uint8_t *restrict Vd = frame->data[2];
 
-    c->frq_cnt += (unsigned int)freq;
-
-    if(freq == 255 || c->frq_cnt > 255)
+    #pragma omp single
     {
-        veejay_memcpy(Yb, Yd, len);
-        veejay_memcpy(Ub, Ud, uv_len);
-        veejay_memcpy(Vb, Vd, uv_len);
-        c->frq_cnt = 0;
+        c->frq_cnt += (unsigned int)freq;
+
+        if(freq == 255 || c->frq_cnt > 255)
+        {
+            veejay_memcpy(Yb, Yd, len);
+            veejay_memcpy(Ub, Ud, uv_len);
+            veejay_memcpy(Vb, Vd, uv_len);
+            c->frq_cnt = 0;
+        }
     }
 
-#pragma omp parallel num_threads(c->n_threads)
+    if(uv_len == len)
     {
-        if(uv_len == len)
-        {
-            cutstop_copy_held_444(Yd, Ud, Vd, Yb, Ub, Vb, len, threshold, cutmode, holdmode);
-        }
-        else
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
         {
             if(cutmode && !holdmode)
             {
-#pragma omp for schedule(static)
-                for(int i = 0; i < len; i++)
-                    if(threshold > Yb[i])
-                        Yd[i] = Yb[i];
+                if(threshold > Yb[i]) { Yd[i] = Yb[i]; Ud[i] = Ub[i]; Vd[i] = Vb[i]; }
             }
             else if(cutmode && holdmode)
             {
-#pragma omp for schedule(static)
-                for(int i = 0; i < len; i++)
-                    if(threshold > Yd[i])
-                        Yd[i] = Yb[i];
+                if(threshold > Yd[i]) { Yd[i] = Yb[i]; Ud[i] = Ub[i]; Vd[i] = Vb[i]; }
             }
             else if(!cutmode && holdmode)
             {
-#pragma omp for schedule(static)
-                for(int i = 0; i < len; i++)
-                    if(threshold < Yd[i])
-                        Yd[i] = Yb[i];
+                if(threshold < Yd[i]) { Yd[i] = Yb[i]; Ud[i] = Ub[i]; Vd[i] = Vb[i]; }
             }
             else
             {
-#pragma omp for schedule(static)
-                for(int i = 0; i < len; i++)
-                    if(threshold < Yb[i])
-                        Yd[i] = Yb[i];
-            }
-
-#pragma omp for schedule(static)
-            for(int i = 0; i < uv_len; i++)
-            {
-                Ud[i] = Ub[i];
-                Vd[i] = Vb[i];
+                if(threshold < Yb[i]) { Yd[i] = Yb[i]; Ud[i] = Ub[i]; Vd[i] = Vb[i]; }
             }
         }
     }
+    else
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+        {
+            if(cutmode && !holdmode)
+            {
+                if(threshold > Yb[i]) Yd[i] = Yb[i];
+            }
+            else if(cutmode && holdmode)
+            {
+                if(threshold > Yd[i]) Yd[i] = Yb[i];
+            }
+            else if(!cutmode && holdmode)
+            {
+                if(threshold < Yd[i]) Yd[i] = Yb[i];
+            }
+            else
+            {
+                if(threshold < Yb[i]) Yd[i] = Yb[i];
+            }
+        }
 
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            Ud[i] = Ub[i];
+            Vd[i] = Vb[i];
+        }
+    }
 }

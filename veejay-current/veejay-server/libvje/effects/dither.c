@@ -103,7 +103,6 @@ void *dither_malloc(int w, int h)
     d->last_size = -1;
     d->last_mode = -1;
     d->seed = 0x1234abcdU;
-    d->n_threads = vje_advise_num_threads(w * h);
     return d;
 }
 
@@ -147,18 +146,20 @@ void dither_apply(void *ptr, VJFrame *frame, int *args)
     const int height = frame->height;
     const int len = frame->len;
 
-
     const int size = clampi(args[0], 2, dh->w);
     const int random_on = args[1];
     
     uint8_t *restrict Y = frame->data[0];
 
-    if(dh->last_size != size || dh->last_mode != random_on || random_on)
-        dither_build_matrix(dh, size, random_on);
+    #pragma omp single
+    {
+        if(dh->last_size != size || dh->last_mode != random_on || random_on)
+            dither_build_matrix(dh, size, random_on);
+    }
 
     const int *restrict dith = dh->dith;
 
-    #pragma omp parallel for schedule(static) num_threads(dh->n_threads)
+    #pragma omp for schedule(static)
     for(int y = 0; y < height; y++)
     {
         const int j = y % size;

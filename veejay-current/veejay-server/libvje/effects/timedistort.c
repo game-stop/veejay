@@ -75,16 +75,22 @@ typedef struct {
     int eff_initialized;
 
     void *motionmap;
+
+    int cached_skip_processing;
+    int cached_update_internal_diff;
+    uint8_t *cached_diff;
+    int cached_interpolate;
+    int cached_motion;
+    int cached_value;
+    int cached_diff_gain_q8;
+    int cached_depth_q;
+    int cached_hold_q;
 } timedistort_t;
 
 static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
-
-
-
-
 
 static inline int td_smooth_i(float *state, int target, float attack, float release)
 {
@@ -98,7 +104,6 @@ static inline int td_smooth_i(float *state, int target, float attack, float rele
     return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
 
-
 vj_effect *timedistort_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -110,17 +115,6 @@ vj_effect *timedistort_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_VALUE] = 5;
     ve->limits[1][P_VALUE] = 100;
@@ -250,6 +244,8 @@ void *timedistort_malloc(int w, int h)
     td->eff_initialized = 0;
 
     td->n_threads = vje_advise_num_threads(len);
+    if(td->n_threads < 1)
+        td->n_threads = 1;
 
     return (void*) td;
 }
@@ -257,8 +253,11 @@ void *timedistort_malloc(int w, int h)
 void timedistort_free(void *ptr)
 {
     timedistort_t *td = (timedistort_t*) ptr;
+    if(!td)
+        return;
 
-    free(td->region);
+    if(td->region)
+        free(td->region);
     free(td);
 }
 
@@ -270,10 +269,11 @@ int timedistort_request_fx(void)
 void timedistort_set_motionmap(void *ptr, void *priv)
 {
     timedistort_t *td = (timedistort_t*) ptr;
+    if(!td)
+        return;
 
     td->motionmap = priv;
 }
-
 
 static void timedistort_soft_bg_seed(timedistort_t *td, const uint8_t *restrict src, int w, int h)
 {
@@ -381,114 +381,115 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
     const int trail_hold_arg = args[P_TRAIL_HOLD];
     const int depth_drive_arg = args[P_DEPTH_DRIVE];
 
-    if(!td->eff_initialized) {
-        td->eff_value = (float)value_arg;
-        td->eff_time_depth = (float)time_depth_arg;
-        td->eff_scratch = (float)scratch_arg;
-        td->eff_trail_hold = (float)trail_hold_arg;
-        td->eff_depth_drive = (float)depth_drive_arg;
-        td->eff_initialized = 1;
-    }
+    #pragma omp single
+    {
+        if(!td->eff_initialized) {
+            td->eff_value = (float)value_arg;
+            td->eff_time_depth = (float)time_depth_arg;
+            td->eff_scratch = (float)scratch_arg;
+            td->eff_trail_hold = (float)trail_hold_arg;
+            td->eff_depth_drive = (float)depth_drive_arg;
+            td->eff_initialized = 1;
+        }
 
-    const float fast = 0.26f;
-    const float slow = 0.080f;
+        const float fast = 0.26f;
+        const float slow = 0.080f;
 
-    const int value_s = td_smooth_i(&td->eff_value, value_arg, fast, slow);
-    const int time_depth_s = td_smooth_i(&td->eff_time_depth, time_depth_arg, fast * 0.68f, slow);
-    const int scratch_s = td_smooth_i(&td->eff_scratch, scratch_arg, fast * 0.90f, slow);
-    const int trail_hold_s = td_smooth_i(&td->eff_trail_hold, trail_hold_arg, fast * 0.58f, slow);
-    const int depth_drive_s = td_smooth_i(&td->eff_depth_drive, depth_drive_arg, fast * 1.08f, slow);
+        const int value_s = td_smooth_i(&td->eff_value, value_arg, fast, slow);
+        const int time_depth_s = td_smooth_i(&td->eff_time_depth, time_depth_arg, fast * 0.68f, slow);
+        const int scratch_s = td_smooth_i(&td->eff_scratch, scratch_arg, fast * 0.90f, slow);
+        const int trail_hold_s = td_smooth_i(&td->eff_trail_hold, trail_hold_arg, fast * 0.58f, slow);
+        const int depth_drive_s = td_smooth_i(&td->eff_depth_drive, depth_drive_arg, fast * 1.08f, slow);
 
-    const int musical_depth = clampi(depth_drive_s, 0, 1000);
-    const int threshold_drop = ((scratch_s * 26) + (musical_depth * 34) + 500) / 1000;
-    const int value = clampi(value_s - threshold_drop, 1, 100);
-    const int diff_gain_q8 = clampi(256 + ((scratch_s * 560) / 1000) + ((musical_depth * 540) / 1000), 256, 1536);
-    int depth_q = time_depth_s + ((musical_depth * 360 + 500) / 1000);
+        const int musical_depth = clampi(depth_drive_s, 0, 1000);
+        const int threshold_drop = ((scratch_s * 26) + (musical_depth * 34) + 500) / 1000;
+        td->cached_value = clampi(value_s - threshold_drop, 1, 100);
+        td->cached_diff_gain_q8 = clampi(256 + ((scratch_s * 560) / 1000) + ((musical_depth * 540) / 1000), 256, 1536);
+        td->cached_depth_q = time_depth_s + ((musical_depth * 360 + 500) / 1000);
+        td->cached_depth_q = clampi(td->cached_depth_q, 0, 1000);
 
-    depth_q = clampi(depth_q, 0, 1000);
+        td->cached_hold_q = trail_hold_s + ((musical_depth * 130 + 500) / 1000);
+        td->cached_hold_q = clampi(td->cached_hold_q, 0, 1000);
 
-    int hold_q = trail_hold_s + ((musical_depth * 130 + 500) / 1000);
+        td->cached_skip_processing = 0;
+        td->cached_update_internal_diff = 0;
+        td->cached_interpolate = 0;
+        td->cached_motion = 0;
+        td->cached_diff = td->diff;
 
-    hold_q = clampi(hold_q, 0, 1000);
+        if(td->motionmap && motionmap_active(td->motionmap)) {
+            int tmp1 = td->cached_value;
+            int tmp2 = td->cached_value;
 
-    int interpolate = 0;
-    int motion = 0;
-    int update_internal_diff = 0;
+            motionmap_scale_to(
+                td->motionmap,
+                255,
+                255,
+                1,
+                1,
+                &tmp1,
+                &tmp2,
+                &(td->n__),
+                &(td->N__)
+            );
 
-    uint8_t *restrict diff = td->diff;
-
-    if(td->motionmap && motionmap_active(td->motionmap)) {
-        int tmp1 = value;
-        int tmp2 = value;
-
-        motionmap_scale_to(
-            td->motionmap,
-            255,
-            255,
-            1,
-            1,
-            &tmp1,
-            &tmp2,
-            &(td->n__),
-            &(td->N__)
-        );
-
-        uint8_t *mm = motionmap_bgmap(td->motionmap);
-        if(mm) {
-            diff = mm;
-            motion = 1;
+            uint8_t *mm = motionmap_bgmap(td->motionmap);
+            if(mm) {
+                td->cached_diff = mm;
+                td->cached_motion = 1;
+            } else {
+                td->n__ = 0;
+                td->N__ = 0;
+            }
         } else {
             td->n__ = 0;
             td->N__ = 0;
+
+            if(!td->have_bg) {
+                timedistort_soft_bg_seed(td, Y, width, height);
+
+                veejay_memcpy(td->planetableY[0], Y,  len);
+                veejay_memcpy(td->planetableU[0], Cb, len);
+                veejay_memcpy(td->planetableV[0], Cr, len);
+
+                veejay_memset(td->diff, 0, (size_t)len);
+                veejay_memset(td->warptime[0], 0, (size_t)len);
+                veejay_memset(td->warptime[1], 0, (size_t)len);
+
+                td->have_bg = 1;
+                td->plane = 1 & td->plane_mask;
+                td->plane_populated = 1;
+                td->cached_skip_processing = 1;
+            } else {
+                td->cached_update_internal_diff = 1;
+                td->cached_diff = td->diff;
+            }
         }
-    } else {
-        td->n__ = 0;
-        td->N__ = 0;
 
-        if(!td->have_bg) {
-            timedistort_soft_bg_seed(td, Y, width, height);
+        if(!(td->n__ == td->N__ || td->n__ == 0))
+            td->cached_interpolate = 1;
 
-            veejay_memcpy(td->planetableY[0], Y,  len);
-            veejay_memcpy(td->planetableU[0], Cb, len);
-            veejay_memcpy(td->planetableV[0], Cr, len);
+        veejay_memcpy(td->planetableY[td->plane], Y,  len);
+        veejay_memcpy(td->planetableU[td->plane], Cb, len);
+        veejay_memcpy(td->planetableV[td->plane], Cr, len);
 
-            veejay_memset(td->diff, 0, len);
-            veejay_memset(td->warptime[0], 0, len);
-            veejay_memset(td->warptime[1], 0, len);
-
-            td->have_bg = 1;
-            td->plane = 1 & td->plane_mask;
-            td->plane_populated = 1;
-            return;
-        }
-
-        update_internal_diff = 1;
-        diff = td->diff;
+        if(td->plane_populated < td->n_planes)
+            td->plane_populated++;
     }
 
-    if(!(td->n__ == td->N__ || td->n__ == 0))
-        interpolate = 1;
+    if(td->cached_skip_processing)
+        return;
 
-    veejay_memcpy(td->planetableY[td->plane], Y,  len);
-    veejay_memcpy(td->planetableU[td->plane], Cb, len);
-    veejay_memcpy(td->planetableV[td->plane], Cr, len);
+    if(td->cached_update_internal_diff) {
+        timedistort_build_diff(td, Y, td->cached_value, td->cached_diff_gain_q8, len);
+        timedistort_soft_bg(td, Y, width, height);
+    }
 
-    if(td->plane_populated < td->n_planes)
-        td->plane_populated++;
-
-    uint8_t *restrict wt_old = td->warptime[td->warptimeFrame];
-    uint8_t *restrict wt_new = td->warptime[td->warptimeFrame ^ 1];
-
-#pragma omp parallel num_threads(td->n_threads)
-    {
-        if(update_internal_diff) {
-            timedistort_build_diff(td, Y, value, diff_gain_q8, len);
-            timedistort_soft_bg(td, Y, width, height);
-        }
-
-#pragma omp for schedule(static)
-        for(int y = 0; y < height; y++) {
+    #pragma omp for schedule(static)
+    for(int y = 0; y < height; y++) {
         const int row = y * width;
+        uint8_t *restrict wt_old = td->warptime[td->warptimeFrame];
+        uint8_t *restrict wt_new = td->warptime[td->warptimeFrame ^ 1];
 
         for(int x = 0; x < width; x++) {
             const int idx = row + x;
@@ -519,7 +520,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
                 sum = (sum + (count >> 1)) / count;
 
             if(sum > 0) {
-                const int decay_step = 1 + (((1000 - hold_q) * 5 + 500) / 1000);
+                const int decay_step = 1 + (((1000 - td->cached_hold_q) * 5 + 500) / 1000);
 
                 sum -= decay_step;
 
@@ -535,10 +536,12 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
     const int plane_mask = td->plane_mask;
     const int plane_now = td->plane;
     const int populated = td->plane_populated;
+    const uint8_t *restrict diff = td->cached_diff;
+    const int depth_q = td->cached_depth_q;
 
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-        int age = wt_new[i];
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        int age = td->warptime[td->warptimeFrame ^ 1][i];
 
         if(diff[i]) {
             const int max_age = 1 + (((n_planes - 2) * depth_q + 500) / 1000);
@@ -550,7 +553,7 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
             if(inject_age > age)
                 age = inject_age;
 
-            wt_new[i] = (uint8_t)age;
+            td->warptime[td->warptimeFrame ^ 1][i] = (uint8_t)age;
         }
 
         if(populated < n_planes && age >= populated)
@@ -563,16 +566,18 @@ void timedistort_apply(void *ptr, VJFrame *frame, int *args)
 
         Y[i]  = td->planetableY[n_plane][i];
         Cb[i] = td->planetableU[n_plane][i];
-            Cr[i] = td->planetableV[n_plane][i];
-        }
+        Cr[i] = td->planetableV[n_plane][i];
     }
 
-    td->plane = (td->plane + 1) & td->plane_mask;
-    td->warptimeFrame ^= 1;
+    #pragma omp single
+    {
+        td->plane = (td->plane + 1) & td->plane_mask;
+        td->warptimeFrame ^= 1;
 
-    if(interpolate)
-        motionmap_interpolate_frame(td->motionmap, frame, td->N__, td->n__);
+        if(td->cached_interpolate)
+            motionmap_interpolate_frame(td->motionmap, frame, td->N__, td->n__);
 
-    if(motion)
-        motionmap_store_frame(td->motionmap, frame);
+        if(td->cached_motion)
+            motionmap_store_frame(td->motionmap, frame);
+    }
 }

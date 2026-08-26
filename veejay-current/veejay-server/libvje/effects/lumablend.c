@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include "lumablend.h"
+#include <veejaycore/vjmem.h>
 
 #define LUMABLEND_PARAMS 4
 
@@ -27,10 +28,6 @@
 #define P_THRESH_A   1
 #define P_THRESH_B   2
 #define P_OPACITY    3
-
-typedef struct {
-    int n_threads;
-} lumablend_t;
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -54,16 +51,6 @@ vj_effect *lumablend_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_MODE] = 0;     ve->limits[1][P_MODE] = 1;     ve->defaults[P_MODE] = 0;
     ve->limits[0][P_THRESH_A] = 0; ve->limits[1][P_THRESH_A] = 255; ve->defaults[P_THRESH_A] = 0;
@@ -88,30 +75,14 @@ vj_effect *lumablend_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
-}
-
-void *lumablend_malloc(int w, int h)
-{
-    lumablend_t *lb = (lumablend_t*) vj_malloc(sizeof(lumablend_t));
-
-    if(!lb)
-        return NULL;
-
-    lb->n_threads = vje_advise_num_threads(w * h);
-
-    return (void*) lb;
-}
-
-void lumablend_free(void *ptr)
-{
-    free(ptr);
 }
 
 void lumablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    lumablend_t *lb = (lumablend_t*) ptr;
-
     const int mode = args[P_MODE];
     const int a = args[P_THRESH_A];
     const int b = args[P_THRESH_B];
@@ -134,7 +105,7 @@ void lumablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict u2 = frame2->data[1];
     const uint8_t *restrict v2 = frame2->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(lb->n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int trigger = mode ? y2[i] : y1[i];
         int mask = 0;

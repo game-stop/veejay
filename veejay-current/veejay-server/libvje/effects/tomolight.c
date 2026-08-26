@@ -28,8 +28,6 @@
 
 #define TL_PARAMS 12
 
-/* UI parameter order: choose the look first, then strength/memory,
- * then depth/slice/scan controls, then color/reset. */
 #define P_RENDER_MODE      0
 #define P_AMOUNT           1
 #define P_LIGHT            2
@@ -56,18 +54,6 @@
 #define TL_MOTION_BOUNCE   4
 #define TL_MOTION_STEPPED  5
 
-/* Render Mode UI order:
- * 0 Scan        - clean light-slice scanner, good default
- * 1 Volume      - broad volumetric body
- * 2 Fog         - soft density cloud
- * 3 Light Sheet - horizontal/vertical sheet illumination
- * 4 Radar       - moving sweep through the density
- * 5 XRay        - bright diagnostic negative/edge mix
- * 6 MRI         - dense medical/tomographic response
- * 7 Contour     - source-gradient contour relief
- * 8 Shells      - broad quantized depth bodies
- * 9 Fossil      - edge emboss / stone-patina look
- */
 #define TL_MODE_SCAN       0
 #define TL_MODE_VOLUME     1
 #define TL_MODE_FOG        2
@@ -112,8 +98,6 @@ static inline uint8_t tl_blend_q8_u8(int a, int b, int q)
 {
     return (uint8_t)(a + (((b - a) * q) >> 8));
 }
-
-
 
 typedef struct {
     int w;
@@ -209,8 +193,6 @@ typedef struct {
     int *blur_y_ap;
 } tomolight_t;
 
-
-
 static inline int tl_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -259,14 +241,6 @@ vj_effect *tomolight_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_RENDER_MODE] = 0;
     ve->limits[1][P_RENDER_MODE] = 9;
     ve->defaults[P_RENDER_MODE] = TL_MODE_SCAN;
@@ -314,7 +288,6 @@ vj_effect *tomolight_init(int w, int h)
     ve->limits[0][P_RESET] = 0;
     ve->limits[1][P_RESET] = 1;
     ve->defaults[P_RESET] = 0;
-
 
     ve->sub_format = 1;
     ve->description = "Tomographic Light Sculpture";
@@ -393,14 +366,6 @@ static void tl_rebuild_shape_luts(tomolight_t *t, int slices, int center, int wi
         return;
 
     if(slices_changed) {
-        /*
-         * Keep the original high-frequency contour family for the modes that
-         * already looked good, but do NOT drive modes 3/4/6 from it anymore.
-         * Those modes now get their own softer/non-periodic relief tables:
-         *   - 3 Contour: source-edge contour relief, no equal-depth islands.
-         *   - 4 Shells : broad posterized depth bodies, no razor ridges.
-         *   - 6 Fossil : edge emboss + mild depth patina, no shell ringing.
-         */
         int period_q8 = 65536 / slices;
         if(period_q8 < 1024) period_q8 = 1024;
 
@@ -412,7 +377,7 @@ static void tl_rebuild_shape_luts(tomolight_t *t, int slices, int center, int wi
         if(halo_w_q8 < 512) halo_w_q8 = 512;
         if(halo_w_q8 > 2304) halo_w_q8 = 2304;
 
-        int shell_levels = 3 + (((slices - 2) * 9 + 31) / 62); /* 3..12 */
+        int shell_levels = 3 + (((slices - 2) * 9 + 31) / 62);
         if(shell_levels < 3) shell_levels = 3;
         if(shell_levels > 12) shell_levels = 12;
         int shell_step = 256 / shell_levels;
@@ -439,14 +404,9 @@ static void tl_rebuild_shape_luts(tomolight_t *t, int slices, int center, int wi
             int cv = ridge + ((halo * (255 - ridge)) >> 8);
             if(cv > 255) cv = 255;
 
-            /* Mode 3 helper: monotonic depth relief. The line work comes from
-             * the source gradient in the pixel loop, not from periodic depth. */
             int contour_relief = 12 + ((d * 42) >> 8) + ((d * d) >> 12);
             if(contour_relief > 96) contour_relief = 96;
 
-            /* Mode 4 helper: broad shell bodies. Slice Count controls the number
-             * of large bands, compressed to 3..12 so HD video does not turn into
-             * dense contour-map ringing. Boundary accent is intentionally weak. */
             int bucket = d / shell_step;
             if(bucket >= shell_levels) bucket = shell_levels - 1;
             int base = (shell_levels > 1) ? ((bucket * 196) / (shell_levels - 1)) : 0;
@@ -460,13 +420,10 @@ static void tl_rebuild_shape_luts(tomolight_t *t, int slices, int center, int wi
             int shell_body = 22 + ((base * 150) >> 8) + (d >> 4) + soft_boundary;
             if(shell_body > 230) shell_body = 230;
 
-            /* Mode 6 helper: old-stone patina only. Real fossil detail is the
-             * source edge/emboss term in the edge path. */
             int inv = 255 - d;
             int fossil = 18 + (d >> 5) + ((inv * inv) >> 13);
             if(fossil > 96) fossil = 96;
 
-            /* Mode 8: dense monotonic MRI response. No periodic shell/ridge term. */
             int mid = d - 128;
             if(mid < 0) mid = -mid;
             int shoulder = 255 - (mid << 1);
@@ -561,15 +518,9 @@ static void tl_rebuild_light_lut(tomolight_t *t, int render_mode)
                 v = scan + (contour >> 3) + ((scan * contour) >> 9);
                 break;
             case TL_MODE_VOLUME:
-                /* Broad volumetric density.  Do not add contour ridges here:
-                 * they make codec/DCT block boundaries look like internal
-                 * volume slices after residue/glow has integrated them. */
                 v = ((d * 176) >> 8) + ((scan * 56) >> 8) + ((d * (255 - d)) >> 12);
                 break;
             case TL_MODE_FOG:
-                /* Fog must be density, not contour.  The old contour term made
-                 * low-amplitude codec/blocking noise look like decompression
-                 * artifacts after residue/glow accumulated it. */
                 v = ((d * 118) >> 8) + ((scan * 72) >> 8) + ((d * (255 - d)) >> 11);
                 break;
             case TL_MODE_XRAY:
@@ -749,12 +700,12 @@ static int tl_init_geometry_maps(tomolight_t *t)
     const int gh = t->gh;
 
     size_t total = 64;
-    total += (sizeof(uint16_t) * 2u + sizeof(uint8_t) * 2u) * (size_t) w; /* glow x */
-    total += sizeof(uint16_t) * 2u * (size_t) w;                         /* edge x */
-    total += (sizeof(int) * 2u + sizeof(uint8_t) * 3u) * (size_t) h;      /* glow y + y band */
-    total += sizeof(int) * 2u * (size_t) h;                              /* edge rows */
-    total += sizeof(uint16_t) * 5u * (size_t) gw;                        /* glow downsample + hblur */
-    total += sizeof(int) * 5u * (size_t) gh;                             /* glow downsample + vblur */
+    total += (sizeof(uint16_t) * 2u + sizeof(uint8_t) * 2u) * (size_t) w;
+    total += sizeof(uint16_t) * 2u * (size_t) w;
+    total += (sizeof(int) * 2u + sizeof(uint8_t) * 3u) * (size_t) h;
+    total += sizeof(int) * 2u * (size_t) h;
+    total += sizeof(uint16_t) * 5u * (size_t) gw;
+    total += sizeof(int) * 5u * (size_t) gh;
     total += 128;
 
     t->map_region = (uint8_t*) vj_calloc(total);
@@ -939,7 +890,6 @@ void *tomolight_malloc(int w, int h)
     t->seeded = 0;
     t->last_reset = 0;
     t->prev_valid = 0;
-    t->n_threads = vje_advise_num_threads(len);
 
     if(!tl_init_geometry_maps(t)) {
         free(t->region);
@@ -1304,192 +1254,168 @@ void tomolight_free(void *ptr)
 void tomolight_apply(void *ptr, VJFrame *frame, int *args)
 {
     tomolight_t *t = (tomolight_t*) ptr;
+    
+    int reset = args[P_RESET] ? 1 : 0;
+    int depth_source = clampi(args[P_DEPTH_SOURCE], 0, 4);
+    int use_motion = (depth_source == TL_SRC_MOTION || depth_source == TL_SRC_LUMA_MOTION);
+    int render_mode = clampi(args[P_RENDER_MODE], 0, 9);
+    int color_mode = clampi(args[P_COLOR_MODE], 0, 8);
+    
+    int fog_mode = (render_mode == TL_MODE_FOG);
+    int mode_radar = (render_mode == TL_MODE_RADAR);
+    int soft_depth_mode = fog_mode || (render_mode == TL_MODE_VOLUME) || mode_radar;
+    int scan_dependent_mode = (render_mode == TL_MODE_VOLUME) || (render_mode == TL_MODE_SCAN) || (render_mode == TL_MODE_XRAY) || mode_radar || (render_mode == TL_MODE_LIGHTSHEET) || fog_mode;
+    int true_edge = (depth_source == TL_SRC_EDGE) || (render_mode == TL_MODE_XRAY) || (render_mode == TL_MODE_CONTOUR) || (render_mode == TL_MODE_SHELLS) || (render_mode == TL_MODE_FOSSIL) || (render_mode == TL_MODE_LIGHTSHEET);
+    int needs_src_copy = true_edge || soft_depth_mode;
 
-    const int len = t->len;
-    const int reset = args[P_RESET] ? 1 : 0;
-
-    if(!t->seeded || (reset && !t->last_reset))
-        tl_seed(t, frame);
-
-    t->last_reset = reset;
-
-    const int depth_source = clampi(args[P_DEPTH_SOURCE], 0, 4);
-    const int use_motion = (depth_source == TL_SRC_MOTION || depth_source == TL_SRC_LUMA_MOTION);
-
-    const int w = t->w;
-    const int h = t->h;
-    const int gw = t->gw;
-    const int gh = t->gh;
-    const int frame_no = t->frame;
-
-    int amount_arg = args[P_AMOUNT];
-    int light_arg = args[P_LIGHT];
-    int residue_arg = args[P_RESIDUE];
-    int depth_arg = args[P_DEPTH_SCALE];
-    int slices_arg = args[P_SLICES];
-    int scan_pos_arg = args[P_SCAN_POS];
-    int scan_width_arg = args[P_SCAN_WIDTH];
-
-
-    if(!t->eff_initialized) {
-        t->eff_amount = (float)amount_arg;
-        t->eff_light = (float)light_arg;
-        t->eff_residue = (float)residue_arg;
-        t->eff_depth_scale = (float)depth_arg;
-        t->eff_slices = (float)slices_arg;
-        t->eff_scan_pos = (float)scan_pos_arg;
-        t->eff_scan_width = (float)scan_width_arg;
-        t->eff_initialized = 1;
-    }
-
-    const int amount_eff = clampi(tl_smooth_i(&t->eff_amount, amount_arg, 0.20f, 0.090f), 0, 100);
-    const int light_strength = clampi(tl_smooth_i(&t->eff_light, light_arg, 0.24f, 0.115f), 0, 100);
-    const int residue_eff = clampi(tl_smooth_i(&t->eff_residue, residue_arg, 0.120f, 0.060f), 0, 99);
-    depth_arg = clampi(tl_smooth_i(&t->eff_depth_scale, depth_arg, 0.145f, 0.070f), 0, 300);
-    const int slices = clampi(tl_smooth_i(&t->eff_slices, slices_arg, 0.110f, 0.055f), 2, 64);
-    const int scan_pos_eff = tl_smooth_wrap1000_i(&t->eff_scan_pos, scan_pos_arg, 0.185f);
-    const int scan_width_eff = clampi(tl_smooth_i(&t->eff_scan_width, scan_width_arg, 0.180f, 0.080f), 1, 100);
-
-    if(amount_eff <= 0) {
-        if(use_motion) {
-            memcpy(t->prev_y, frame->data[0], (size_t) len);
-            t->prev_valid = 1;
-        } else {
-            t->prev_valid = 0;
-        }
-        t->frame++;
-        return;
-    }
-
-    const int amount_q8 = (amount_eff * 256 + 50) / 100;
-    const int residue_q8 = (residue_eff * 256 + 50) / 100;
-    const int inject_q8 = 256 - residue_q8;
-    const int depth_scale_q8 = (depth_arg * 256 + 50) / 100;
-    const int motion_react_q8 = ((clampi(50 + (depth_arg / 5), 50, 110)) * 256 + 50) / 100;
-    const int render_mode = clampi(args[P_RENDER_MODE], 0, 9);
-    const int color_mode = clampi(args[P_COLOR_MODE], 0, 8);
-    const int fog_mode = (render_mode == TL_MODE_FOG);
-    const int mode_radar = (render_mode == TL_MODE_RADAR);
-    const int soft_depth_mode = fog_mode ||
-                                (render_mode == TL_MODE_VOLUME) ||
-                                mode_radar;
-    const int scan_dependent_mode =
-        (render_mode == TL_MODE_VOLUME) ||
-        (render_mode == TL_MODE_SCAN) ||
-        (render_mode == TL_MODE_XRAY) ||
-        mode_radar ||
-        (render_mode == TL_MODE_LIGHTSHEET) ||
-        fog_mode;
-    const int center = scan_dependent_mode ?
-        tl_scan_center(frame_no, scan_pos_eff,
-                       clampi(args[P_SCAN_MOTION], 0, 5)) :
-        ((t->last_center >= 0) ? t->last_center : 128);
-    int width = scan_dependent_mode ?
-        ((scan_width_eff * 255 + 50) / 100) :
-        ((t->last_width >= 1) ? t->last_width : 46);
-    width = (width < 1) ? 1 : width;
-
-    const int true_edge =
-        (depth_source == TL_SRC_EDGE) ||
-        (render_mode == TL_MODE_XRAY) ||
-        (render_mode == TL_MODE_CONTOUR) ||
-        (render_mode == TL_MODE_SHELLS) ||
-        (render_mode == TL_MODE_FOSSIL) ||
-        (render_mode == TL_MODE_LIGHTSHEET);
-
-    const int needs_src_copy = true_edge || soft_depth_mode;
-
-    tl_rebuild_shape_luts(t, slices, center, width);
-    tl_rebuild_depth_luts(t, depth_scale_q8, motion_react_q8);
-    tl_rebuild_light_lut(t, render_mode);
-    tl_rebuild_blend_luts(t, amount_q8, inject_q8);
-    tl_rebuild_light_scale_luts(t, light_strength);
-    tl_rebuild_fixed_chroma_luts(t, color_mode);
-
-    if(use_motion && !t->prev_valid) {
-        memcpy(t->prev_y, frame->data[0], (size_t) len);
-        t->prev_valid = 1;
-    }
-
-    uint8_t * restrict Y = frame->data[0];
-    uint8_t * restrict U = frame->data[1];
-    uint8_t * restrict V = frame->data[2];
-
-    uint8_t * restrict src_y = t->src_y;
-    uint8_t * restrict prev_y = t->prev_y;
-    uint8_t * restrict res_y = t->res_y;
-    uint8_t * restrict glow = t->glow;
-    uint8_t * restrict glow_tmp = t->glow_tmp;
-    uint8_t * restrict glow_next = t->glow_next;
-
-    const uint8_t * restrict contour_lut = t->contour_lut;
-    const uint8_t * restrict contour_relief_lut = t->contour_relief_lut;
-    const uint8_t * restrict shell_body_lut = t->shell_body_lut;
-    const uint8_t * restrict fossil_lut = t->fossil_lut;
-    const uint8_t * restrict mri_lut = t->mri_lut;
-    const uint8_t * restrict scan_lut = t->scan_lut;
-    const uint8_t * restrict light_lut = t->light_lut;
-    const uint8_t * restrict depth_luma_lut = t->depth_luma_lut;
-    const uint8_t * restrict depth_inv_lut = t->depth_inv_lut;
-    const uint8_t * restrict edge_depth_lut = t->edge_depth_lut;
-    const uint8_t * restrict motion_depth_lut = t->motion_depth_lut;
-    const uint8_t * restrict motion_add_lut = t->motion_add_lut;
-    const uint8_t * restrict glow_lut = t->glow_lut;
-    const uint8_t * restrict shadow_lut = t->shadow_lut;
-    const uint8_t * restrict res_blend_lut = t->res_blend_lut;
-    const uint8_t * restrict y_amount_lut = t->y_amount_lut;
-    const uint8_t * restrict chroma_amount_lut = t->chroma_amount_lut;
-    const uint8_t * restrict src_chroma_lut = t->src_chroma_lut;
-    const uint8_t * restrict inv_chroma_lut = t->inv_chroma_lut;
-    const uint8_t * restrict fixed_u_lut = t->fixed_u_lut;
-    const uint8_t * restrict fixed_v_lut = t->fixed_v_lut;
-    const uint8_t * restrict absdiff_lut = t->absdiff_lut;
-    const uint8_t * restrict lightsheet_lut = t->lightsheet_lut;
-
-    const uint16_t * restrict glow_x0 = t->glow_x0;
-    const uint16_t * restrict glow_x1 = t->glow_x1;
-    const uint8_t * restrict glow_fx = t->glow_fx;
-    const uint8_t * restrict glow_wx0 = t->glow_wx0;
-    const int * restrict glow_y0 = t->glow_y0;
-    const int * restrict glow_y1 = t->glow_y1;
-    const uint8_t * restrict glow_fy = t->glow_fy;
-    const uint8_t * restrict glow_wy0 = t->glow_wy0;
-    const uint8_t * restrict y_band_lut = t->y_band_lut;
-    const uint16_t * restrict edge_xm = t->edge_xm;
-    const uint16_t * restrict edge_xp = t->edge_xp;
-    const int * restrict edge_rowm = t->edge_rowm;
-    const int * restrict edge_rowp = t->edge_rowp;
-    const uint16_t * restrict down_x0 = t->down_x0;
-    const uint16_t * restrict down_x1 = t->down_x1;
-    const uint16_t * restrict down_x2 = t->down_x2;
-    const uint16_t * restrict blur_x_rm = t->blur_x_rm;
-    const uint16_t * restrict blur_x_ap = t->blur_x_ap;
-    const int * restrict down_row0 = t->down_row0;
-    const int * restrict down_row1 = t->down_row1;
-    const int * restrict down_row2 = t->down_row2;
-    const int * restrict blur_y_rm = t->blur_y_rm;
-    const int * restrict blur_y_ap = t->blur_y_ap;
-
-    if(t->last_apply_render_mode != render_mode) {
-        memset(res_y, 0, (size_t) len);
-        memset(glow, 0, (size_t) t->glen);
-        memset(glow_tmp, 0, (size_t) t->glen);
-        memset(glow_next, 0, (size_t) t->glen);
-        t->last_apply_render_mode = render_mode;
-    }
-
-    uint8_t radar_lut[256];
-    if(mode_radar) {
-        const int phase = (frame_no << 2) & 255;
-        for(int i = 0; i < 256; i++) {
-            const int sweep = absdiff_lut[((i + phase) & 255) + 127];
-            const int v = 255 - (sweep << 1);
-            radar_lut[i] = (uint8_t)((v < 0) ? 0 : v);
-        }
-    }
-
-#pragma omp parallel num_threads(t->n_threads)
+    #pragma omp single
     {
+        if(!t->seeded || (reset && !t->last_reset))
+            tl_seed(t, frame);
+
+        t->last_reset = reset;
+
+        if(!t->eff_initialized) {
+            t->eff_amount = (float)args[P_AMOUNT];
+            t->eff_light = (float)args[P_LIGHT];
+            t->eff_residue = (float)args[P_RESIDUE];
+            t->eff_depth_scale = (float)args[P_DEPTH_SCALE];
+            t->eff_slices = (float)args[P_SLICES];
+            t->eff_scan_pos = (float)args[P_SCAN_POS];
+            t->eff_scan_width = (float)args[P_SCAN_WIDTH];
+            t->eff_initialized = 1;
+        }
+
+        int amount_eff = clampi(tl_smooth_i(&t->eff_amount, args[P_AMOUNT], 0.20f, 0.090f), 0, 100);
+        
+        if(amount_eff <= 0) {
+            if(use_motion) {
+                veejay_memcpy(t->prev_y, frame->data[0], (size_t) t->len);
+                t->prev_valid = 1;
+            } else {
+                t->prev_valid = 0;
+            }
+        } else {
+            int light_strength = clampi(tl_smooth_i(&t->eff_light, args[P_LIGHT], 0.24f, 0.115f), 0, 100);
+            int residue_eff = clampi(tl_smooth_i(&t->eff_residue, args[P_RESIDUE], 0.120f, 0.060f), 0, 99);
+            int depth_arg = clampi(tl_smooth_i(&t->eff_depth_scale, args[P_DEPTH_SCALE], 0.145f, 0.070f), 0, 300);
+            int slices = clampi(tl_smooth_i(&t->eff_slices, args[P_SLICES], 0.110f, 0.055f), 2, 64);
+            int scan_pos_eff = tl_smooth_wrap1000_i(&t->eff_scan_pos, args[P_SCAN_POS], 0.185f);
+            int scan_width_eff = clampi(tl_smooth_i(&t->eff_scan_width, args[P_SCAN_WIDTH], 0.180f, 0.080f), 1, 100);
+
+            int amount_q8 = (amount_eff * 256 + 50) / 100;
+            int residue_q8 = (residue_eff * 256 + 50) / 100;
+            int inject_q8 = 256 - residue_q8;
+            int depth_scale_q8 = (depth_arg * 256 + 50) / 100;
+            int motion_react_q8 = ((clampi(50 + (depth_arg / 5), 50, 110)) * 256 + 50) / 100;
+
+            int center = scan_dependent_mode ? tl_scan_center(t->frame, scan_pos_eff, clampi(args[P_SCAN_MOTION], 0, 5)) : ((t->last_center >= 0) ? t->last_center : 128);
+            int width = scan_dependent_mode ? ((scan_width_eff * 255 + 50) / 100) : ((t->last_width >= 1) ? t->last_width : 46);
+            width = (width < 1) ? 1 : width;
+
+            tl_rebuild_shape_luts(t, slices, center, width);
+            tl_rebuild_depth_luts(t, depth_scale_q8, motion_react_q8);
+            tl_rebuild_light_lut(t, render_mode);
+            tl_rebuild_blend_luts(t, amount_q8, inject_q8);
+            tl_rebuild_light_scale_luts(t, light_strength);
+            tl_rebuild_fixed_chroma_luts(t, color_mode);
+
+            if(use_motion && !t->prev_valid) {
+                memcpy(t->prev_y, frame->data[0], (size_t) t->len);
+                t->prev_valid = 1;
+            }
+
+            if(t->last_apply_render_mode != render_mode) {
+                memset(t->res_y, 0, (size_t) t->len);
+                memset(t->glow, 0, (size_t) t->glen);
+                memset(t->glow_tmp, 0, (size_t) t->glen);
+                memset(t->glow_next, 0, (size_t) t->glen);
+                t->last_apply_render_mode = render_mode;
+            }
+        }
+    }
+    
+    int skip_processing = (clampi((int)(t->eff_amount + 0.5f), 0, 100) <= 0);
+
+    if (!skip_processing) {
+        int len = t->len;
+        int w = t->w;
+        int h = t->h;
+        int gw = t->gw;
+        int gh = t->gh;
+        int frame_no = t->frame;
+
+        uint8_t * restrict Y = frame->data[0];
+        uint8_t * restrict U = frame->data[1];
+        uint8_t * restrict V = frame->data[2];
+
+        uint8_t * restrict src_y = t->src_y;
+        uint8_t * restrict prev_y = t->prev_y;
+        uint8_t * restrict res_y = t->res_y;
+        uint8_t * restrict glow = t->glow;
+        uint8_t * restrict glow_tmp = t->glow_tmp;
+        uint8_t * restrict glow_next = t->glow_next;
+
+        const uint8_t * restrict contour_lut = t->contour_lut;
+        const uint8_t * restrict contour_relief_lut = t->contour_relief_lut;
+        const uint8_t * restrict shell_body_lut = t->shell_body_lut;
+        const uint8_t * restrict fossil_lut = t->fossil_lut;
+        const uint8_t * restrict mri_lut = t->mri_lut;
+        const uint8_t * restrict scan_lut = t->scan_lut;
+        const uint8_t * restrict light_lut = t->light_lut;
+        const uint8_t * restrict depth_luma_lut = t->depth_luma_lut;
+        const uint8_t * restrict depth_inv_lut = t->depth_inv_lut;
+        const uint8_t * restrict edge_depth_lut = t->edge_depth_lut;
+        const uint8_t * restrict motion_depth_lut = t->motion_depth_lut;
+        const uint8_t * restrict motion_add_lut = t->motion_add_lut;
+        const uint8_t * restrict glow_lut = t->glow_lut;
+        const uint8_t * restrict shadow_lut = t->shadow_lut;
+        const uint8_t * restrict res_blend_lut = t->res_blend_lut;
+        const uint8_t * restrict y_amount_lut = t->y_amount_lut;
+        const uint8_t * restrict chroma_amount_lut = t->chroma_amount_lut;
+        const uint8_t * restrict src_chroma_lut = t->src_chroma_lut;
+        const uint8_t * restrict inv_chroma_lut = t->inv_chroma_lut;
+        const uint8_t * restrict fixed_u_lut = t->fixed_u_lut;
+        const uint8_t * restrict fixed_v_lut = t->fixed_v_lut;
+        const uint8_t * restrict absdiff_lut = t->absdiff_lut;
+        const uint8_t * restrict lightsheet_lut = t->lightsheet_lut;
+
+        const uint16_t * restrict glow_x0 = t->glow_x0;
+        const uint16_t * restrict glow_x1 = t->glow_x1;
+        const uint8_t * restrict glow_fx = t->glow_fx;
+        const uint8_t * restrict glow_wx0 = t->glow_wx0;
+        const int * restrict glow_y0 = t->glow_y0;
+        const int * restrict glow_y1 = t->glow_y1;
+        const uint8_t * restrict glow_fy = t->glow_fy;
+        const uint8_t * restrict glow_wy0 = t->glow_wy0;
+        const uint8_t * restrict y_band_lut = t->y_band_lut;
+        const uint16_t * restrict edge_xm = t->edge_xm;
+        const uint16_t * restrict edge_xp = t->edge_xp;
+        const int * restrict edge_rowm = t->edge_rowm;
+        const int * restrict edge_rowp = t->edge_rowp;
+        const uint16_t * restrict down_x0 = t->down_x0;
+        const uint16_t * restrict down_x1 = t->down_x1;
+        const uint16_t * restrict down_x2 = t->down_x2;
+        const uint16_t * restrict blur_x_rm = t->blur_x_rm;
+        const uint16_t * restrict blur_x_ap = t->blur_x_ap;
+        const int * restrict down_row0 = t->down_row0;
+        const int * restrict down_row1 = t->down_row1;
+        const int * restrict down_row2 = t->down_row2;
+        const int * restrict blur_y_rm = t->blur_y_rm;
+        const int * restrict blur_y_ap = t->blur_y_ap;
+        
+        uint8_t radar_lut[256];
+
+        if(mode_radar) {
+            const int phase = (frame_no << 2) & 255;
+            for(int i = 0; i < 256; i++) {
+                const int sweep = absdiff_lut[((i + phase) & 255) + 127];
+                const int v = 255 - (sweep << 1);
+                radar_lut[i] = (uint8_t)((v < 0) ? 0 : v);
+            }
+        }
+
+        /* 5. WORKSHARING EXECUTION */
         if(needs_src_copy) {
             TL_OMP_FOR
             for(int i = 0; i < len; i++)
@@ -1572,8 +1498,11 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    if(!use_motion)
-        t->prev_valid = 0;
+    #pragma omp single
+    {
+        if(!use_motion)
+            t->prev_valid = 0;
 
-    t->frame++;
+        t->frame++;
+    }
 }

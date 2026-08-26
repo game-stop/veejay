@@ -63,6 +63,8 @@ static inline void bar_copy_wrap_row(uint8_t *restrict dst, const uint8_t *restr
 vj_effect *bar_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 5;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -75,7 +77,7 @@ vj_effect *bar_init(int width, int height)
     ve->defaults[3] = 1;
     ve->defaults[4] = 2;
 
-    ve->limits[0][0] = 1; ve->limits[1][0] = height;
+    ve->limits[0][0] = 1; ve->limits[1][0] = height > 0 ? height : 1;
     ve->limits[0][1] = 0; ve->limits[1][1] = height;
     ve->limits[0][2] = 0; ve->limits[1][2] = height;
     ve->limits[0][3] = 0; ve->limits[1][3] = width;
@@ -85,7 +87,6 @@ vj_effect *bar_init(int width, int height)
     ve->description = "Horizontal Sliding Bars";
     ve->extra_frame = 1;
     ve->has_user = 0;
-    ve->parallel = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Divider", "Top Y", "Bot Y", "Top X", "Bot X");
 
     {

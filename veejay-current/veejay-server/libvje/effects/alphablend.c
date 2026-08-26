@@ -49,11 +49,11 @@ vj_effect *alphablend_init(int w, int h)
 void alphablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     const int opacity = args[0];
-    if(opacity == 0)
+    if (opacity == 0) {
         return;
+    }
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict U  = frame->data[1];
@@ -64,11 +64,9 @@ void alphablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict V2 = frame2->data[2];
     uint8_t *restrict A2 = frame2->data[3];
 
-    if(opacity == 255)
-    {
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-        for(int i = 0; i < len; i++)
-        {
+    if (opacity == 255) {
+        #pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
             const unsigned int a = A2[i];
             const unsigned int ia = 255 - a;
 
@@ -76,17 +74,15 @@ void alphablend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             U[i] = (uint8_t) alphablend_div255(ia * U[i] + a * U2[i]);
             V[i] = (uint8_t) alphablend_div255(ia * V[i] + a * V2[i]);
         }
-        return;
-    }
+    } else {
+        #pragma omp for schedule(static)
+        for (int i = 0; i < len; i++) {
+            const unsigned int a = alphablend_div255((unsigned int) A2[i] * opacity);
+            const unsigned int ia = 255 - a;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
-    for(int i = 0; i < len; i++)
-    {
-        const unsigned int a = alphablend_div255((unsigned int) A2[i] * opacity);
-        const unsigned int ia = 255 - a;
-
-        Y[i] = (uint8_t) alphablend_div255(ia * Y[i] + a * Y2[i]);
-        U[i] = (uint8_t) alphablend_div255(ia * U[i] + a * U2[i]);
-        V[i] = (uint8_t) alphablend_div255(ia * V[i] + a * V2[i]);
+            Y[i] = (uint8_t) alphablend_div255(ia * Y[i] + a * Y2[i]);
+            U[i] = (uint8_t) alphablend_div255(ia * U[i] + a * U2[i]);
+            V[i] = (uint8_t) alphablend_div255(ia * V[i] + a * V2[i]);
+        }
     }
 }

@@ -143,7 +143,6 @@
 #include "./effects/passthrough.h"
 #include "./effects/pencilsketch2.h"
 #include "./effects/pencilsketch.h"
-#include "./effects/perspective.h"
 #include "./effects/photoplay.h"
 #include "./effects/picinpic.h"
 #include "./effects/pixelate.h"
@@ -285,7 +284,7 @@
 #include "./effects/xraysolarization.h"
 #include "./effects/livingsignalcolony.h"
 
-#define VJ_IMAGE_EFFECT_MIN 2
+#define VJ_IMAGE_EFFECT_MIN 3
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -498,7 +497,7 @@ enum {
     VJ_IMAGE_EFFECT_LENSCORRECTION  =   189,
     VJ_IMAGE_EFFECT_CALI        =   190,
     VJ_IMAGE_EFFECT_MEDIANFILTER    =   191,
-    VJ_IMAGE_EFFECT_PERSPECTIVE = 192,
+    VJ_IMAGE_EFFECT_XRAYSOLARIZATION = 192,
     VJ_IMAGE_EFFECT_ALPHAFILL = 193,
     VJ_IMAGE_EFFECT_ALPHA2IMG = 194,
     VJ_IMAGE_EFFECT_TOALPHA = 195,
@@ -603,7 +602,6 @@ enum {
     VJ_IMAGE_EFFECT_FRACTALORGANISM = 5,
     VJ_IMAGE_EFFECT_FRACTALCRYSTAL = 4,
     VJ_IMAGE_EFFECT_FRACTALBIOME = 3,
-    VJ_IMAGE_EFFECT_XRAYSOLARIZATION = 2,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

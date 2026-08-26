@@ -61,7 +61,6 @@ void *average_blend_malloc(int w, int h)
     if(!t)
         return NULL;
 
-    t->n_threads = vje_advise_num_threads(w * h);
 
     return t;
 }
@@ -71,14 +70,10 @@ void average_blend_free(void *ptr)
     if(ptr)
         free(ptr);
 }
-
 void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    avgblend_t *t = (avgblend_t *) ptr;
-
     const int recursions = args[0] < 1 ? 1 : args[0];
     const int weight = args[1];
-    const int n_threads = t->n_threads;
     const int len = frame->len;
 
     uint8_t *restrict Y1 = frame->data[0];
@@ -88,23 +83,24 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Y2 = frame2->data[0];
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
-
-    #pragma omp parallel num_threads(n_threads)
+    
+    #pragma omp for schedule(static)
+    for (int i = 0; i < len; i++)
     {
-        for(int r = 0; r < recursions; r++)
-        {
-            #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-            {
-                const int y = Y1[i];
-                const int u = U1[i];
-                const int v = V1[i];
+        int y = Y1[i];
+        int u = U1[i];
+        int v = V1[i];
 
-                Y1[i] = (uint8_t)(y + ((weight * ((int)Y2[i] - y)) >> 8));
-                U1[i] = (uint8_t)(u + ((weight * ((int)U2[i] - u)) >> 8));
-                V1[i] = (uint8_t)(v + ((weight * ((int)V2[i] - v)) >> 8));
-            }
+        for (int r = 0; r < recursions; r++)
+        {
+            y = y + ((weight * ((int)Y2[i] - y)) >> 8);
+            u = u + ((weight * ((int)U2[i] - u)) >> 8);
+            v = v + ((weight * ((int)V2[i] - v)) >> 8);
         }
+
+        Y1[i] = (uint8_t)y;
+        U1[i] = (uint8_t)u;
+        V1[i] = (uint8_t)v;
     }
 }
 

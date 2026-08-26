@@ -10,13 +10,7 @@
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
+ * as published by.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -206,7 +200,7 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
     uint8_t *restrict dstU = dest->data[1];
     uint8_t *restrict dstV = dest->data[2];
 
-#pragma omp parallel for simd num_threads(cb->n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < video_area; i++)
     {
         const int y = srcY[i];
@@ -235,58 +229,57 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
         }
     }
 
-    cb->plane = (cb->plane + 1) & (PLANES - 1);
+#pragma omp single
+    {
+        cb->plane = (cb->plane + 1) & (PLANES - 1);
+    }
 }
-
 
 void chameleonblend_apply(void *ptr, VJFrame *frame, VJFrame *source, int *args)
 {
     chameleonblend_t *c = (chameleonblend_t*) ptr;
-
     const int mode = args[0];
+    int appearing = 0;
 
-    if(!c->has_bg)
-        chameleonblend_prepare(c, frame);
-
-    if(c->last_mode_ != mode) {
-        chameleonblend_reset_history(c, source->len);
-        c->last_mode_ = mode;
-    }
-
-    uint32_t activity = 0;
-    int auto_switch = 0;
-    int tmp1 = 0;
-    int tmp2 = 0;
-
-    if(c->motionmap && motionmap_active(c->motionmap))
+#pragma omp single
     {
-        motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
-        auto_switch = 1;
-        activity = motionmap_activity(c->motionmap);
-    }
-    else
-    {
-        c->N__ = 0;
-        c->n__ = 0;
+        if(!c->has_bg) {
+            chameleonblend_prepare(c, frame);
+        }
+
+        if(c->last_mode_ != mode) {
+            chameleonblend_reset_history(c, source->len);
+            c->last_mode_ = mode;
+        }
+
+        uint32_t activity = 0;
+        int auto_switch = 0;
+        int tmp1 = 0;
+        int tmp2 = 0;
+
+        if(c->motionmap && motionmap_active(c->motionmap)) {
+            motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
+            auto_switch = 1;
+            activity = motionmap_activity(c->motionmap);
+        }
+        else {
+            c->N__ = 0;
+            c->n__ = 0;
+        }
+
+        if(c->n__ == c->N__ || c->n__ == 0) {
+            auto_switch = 0;
+        }
+
+        if(auto_switch) {
+            appearing = (activity > 40) ? 1 : 0;
+        }
+        else {
+            appearing = (mode == 0) ? 0 : 1;
+        }
     }
 
-    if(c->n__ == c->N__ || c->n__ == 0)
-        auto_switch = 0;
-
-    if(auto_switch)
-    {
-        if(activity <= 40)
-            drawChameleonBlend(c, source, frame, 0);
-        else
-            drawChameleonBlend(c, source, frame, 1);
-    }
-    else
-    {
-        if(mode == 0)
-            drawChameleonBlend(c, source, frame, 0);
-        else
-            drawChameleonBlend(c, source, frame, 1);
-    }
+    drawChameleonBlend(c, source, frame, appearing);
 }
 
 int chameleonblend_request_fx(void)

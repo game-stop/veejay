@@ -50,7 +50,6 @@ typedef struct {
     float *sin_lut;
     uint8_t contrast_lut[256];
     float last_contrast;
-    int n_threads;
 } alien_t;
 
 vj_effect *alienchromaflow_init(int w, int h)
@@ -120,7 +119,6 @@ void *alienchromaflow_malloc(int w, int h)
         c->sin_lut[i] = sinf(((float)i * PI_X2) / (float)SIN_LUT_SIZE);
 
     c->last_contrast = -1.0f;
-    c->n_threads = vje_advise_num_threads(w * h);
 
     return c;
 }
@@ -169,7 +167,7 @@ void alienchromaflow_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *pu = frame->data[1];
     uint8_t *pv = frame->data[2];
 
-    #pragma omp parallel for schedule(static) num_threads(n->n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < sz; i++)
     {
         const uint8_t y_orig = py[i];

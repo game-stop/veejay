@@ -1,7 +1,7 @@
 /*
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include "diffimg.h"
+#include <veejaycore/vjmem.h>
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -29,11 +30,15 @@ static inline int clampi(int v, int lo, int hi)
 vj_effect *diffimg_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 3;
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+
 
     ve->limits[0][0] = 0; ve->limits[1][0] = 6;   ve->defaults[0] = 6;
     ve->limits[0][1] = 1; ve->limits[1][1] = 255; ve->defaults[1] = 15;
@@ -56,6 +61,9 @@ vj_effect *diffimg_init(int width, int height)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
+
+    (void)width;
+    (void)height;
 
     return ve;
 }
@@ -82,13 +90,12 @@ void diffimg_apply(void *ptr, VJFrame *frame, int *args)
     if(!_pff)
         return;
 
-    const int n_threads = vje_advise_num_threads(len);
     const int lo = pixel_Y_lo_ ? pixel_Y_lo_ : 1;
     const int hi = pixel_Y_hi_;
     const int range = threshold_max - threshold_min + 1;
     const int out_range = hi - lo;
 
-    #pragma omp parallel for num_threads(n_threads) schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         const uint8_t y = Y[i];

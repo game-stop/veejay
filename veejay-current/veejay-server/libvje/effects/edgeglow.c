@@ -92,7 +92,6 @@ void *edgeglow_malloc(int w, int h)
     }
 
     s->blurmask = s->buf + len;
-    s->n_threads = vje_advise_num_threads(len);
 
     return s;
 }
@@ -126,20 +125,26 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict B = s->buf;
     uint8_t *restrict C = s->blurmask;
 
-    int nY = 0;
-    int nU = 128;
-    int nV = 128;
+    int L2 = 0;
+    int a2 = 128;
+    int b2 = 128;
 
-    _rgb2yuv(red, green, blue, nY, nU, nV);
+    #pragma omp single copyprivate(L2, a2, b2)
+    {
+        int nY = 0;
+        int nU = 128;
+        int nV = 128;
 
-    const int L2 = (nY * 100) >> 8;
-    const int a2 = ((nU - 128) * 127) >> 8;
-    const int b2 = ((nV - 128) * 127) >> 8;
+        _rgb2yuv(red, green, blue, nY, nU, nV);
 
-    veejay_memset(B, 0, len);
-    veejay_memset(C, 0, len);
+        L2 = (nY * 100) >> 8;
+        a2 = ((nU - 128) * 127) >> 8;
+        b2 = ((nV - 128) * 127) >> 8;
 
-#pragma omp parallel num_threads(s->n_threads)
+        veejay_memset(B, 0, len);
+        veejay_memset(C, 0, len);
+    }
+
     {
 #pragma omp for schedule(static)
         for(int y = 1; y < height - 1; y++)

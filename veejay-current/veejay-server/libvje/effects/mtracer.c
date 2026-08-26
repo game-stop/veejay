@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -225,13 +225,9 @@ static void overlaymagic1_apply_n(VJFrame *frame, VJFrame *frame2, int mode)
 void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n)
 {
     (void)ptr;
-
-    const int n_threads = vje_advise_num_threads(frame->len);
-
-#pragma omp parallel num_threads(n_threads)
-    {
-        overlaymagic1_apply_n(frame, frame2, n);
-    }
+    (void)n;
+    (void)frame;
+    (void)frame2;
 }
 
 vj_effect *mtracer_init(int w, int h)
@@ -246,16 +242,7 @@ vj_effect *mtracer_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+    
 
     ve->limits[0][P_MODE] = 0;           ve->limits[1][P_MODE] = MTRACER_MAX_MODE; ve->defaults[P_MODE] = 0;
     ve->limits[0][P_STRENGTH] = 1;       ve->limits[1][P_STRENGTH] = 255;          ve->defaults[P_STRENGTH] = 200;
@@ -313,8 +300,11 @@ vj_effect *mtracer_init(int w, int h)
 void mtracer_free(void *ptr)
 {
     m_tracer_t *m = (m_tracer_t*) ptr;
+    if(!m)
+        return;
 
-    free(m->mtrace_buffer[0]);
+    if(m->mtrace_buffer[0])
+        free(m->mtrace_buffer[0]);
     free(m);
 }
 
@@ -345,7 +335,6 @@ void *mtracer_malloc(int w, int h)
     m->mode_transition = 0;
     m->mode_transition_len = 12;
     m->prev_mode = 0;
-    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }
@@ -358,116 +347,121 @@ static void mtracer_motion_mask(uint8_t *restrict cur,
     for(int i = 0; i < len; i++)
         cur[i] = (uint8_t)mtracer_absi((int)cur[i] - (int)prev[i]);
 }
+
 void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     m_tracer_t *m = (m_tracer_t*) ptr;
 
     const int len = frame->len;
     const int uv_len = frame->uv_len;
-    const int n_threads = m->n_threads;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
+    uint8_t *Y = frame->data[0];
+    uint8_t *U = frame->data[1];
+    uint8_t *V = frame->data[2];
 
-    const int mode = args[P_MODE];
-    const int strength = args[P_STRENGTH];
-    const int classic = args[P_CLASSIC];
-    const int character = args[P_CHARACTER];
-    const int decay_val = args[P_DECAY];
-    const int motion_only = args[P_MOTION_ONLY];
-    const int frame2_opacity = args[P_FRAME2_OPACITY];
+    int mode = 0, strength = 0, classic = 0, character = 0, decay_val = 0, motion_only = 0, frame2_opacity = 0;
+    uint8_t *feedback_buf = NULL, *blended_result = NULL, *prev_frame = NULL, *mode_buf = NULL;
+    int transition_active = 0, transition_alpha = 0, combined_scale = 0, decay = 0, inject = 0;
+    VJFrame blend_frame, feedback_frame;
 
-    uint8_t *restrict feedback_buf = m->mtrace_buffer[0];
-    uint8_t *restrict blended_result = m->mtrace_buffer[1];
-    uint8_t *restrict prev_frame = m->mtrace_buffer[2];
-
-    VJFrame blend_frame;
-    VJFrame feedback_frame;
-
-    veejay_memcpy(&blend_frame, frame, sizeof(VJFrame));
-    blend_frame.data[0] = blended_result;
-    veejay_memcpy(&feedback_frame, frame, sizeof(VJFrame));
-    feedback_frame.data[0] = feedback_buf;
-
-    if(!m->started) {
-        veejay_memcpy(feedback_buf, Y, len);
-        veejay_memcpy(prev_frame, Y, len);
-        m->prev_mode = mode;
-        m->mode_transition = 0;
-        m->started = 1;
-    }
-
-    if(mode != m->prev_mode) {
-        veejay_memcpy(m->mode_buffer, feedback_buf, len);
-        m->mode_transition = m->mode_transition_len;
-        m->prev_mode = mode;
-    }
-
-    const int transition_active = m->mode_transition > 0;
-    int transition_alpha = 0;
-
-    if(transition_active) {
-        const int t = m->mode_transition_len - m->mode_transition;
-        const int x = (t << 8) / m->mode_transition_len;
-        transition_alpha = (x * x * (768 - (x << 1))) >> 16;
-    }
-
-    veejay_memcpy(blended_result, Y, len);
-
-    const int combined_scale = mtracer_clampi((strength * character + 127) / 255, 1, 255);
-    const int decay = 256 - (256 / decay_val);
-    const int inject = 256 - decay;
-    uint8_t *restrict mode_buf = m->mode_buffer;
-
-#pragma omp parallel num_threads(n_threads)
+    #pragma omp single copyprivate(mode, strength, classic, character, decay_val, motion_only, frame2_opacity, feedback_buf, blended_result, prev_frame, mode_buf, transition_active, transition_alpha, combined_scale, decay, inject, blend_frame, feedback_frame)
     {
-        overlaymagic1_apply_n(&blend_frame, frame2, mode);
+        mode = args[P_MODE];
+        strength = args[P_STRENGTH];
+        classic = args[P_CLASSIC];
+        character = args[P_CHARACTER];
+        decay_val = args[P_DECAY];
+        motion_only = args[P_MOTION_ONLY];
+        frame2_opacity = args[P_FRAME2_OPACITY];
 
-        if(frame2_opacity < 255) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                blended_result[i] = mtracer_blend255(Y[i], blended_result[i], frame2_opacity);
+        feedback_buf = m->mtrace_buffer[0];
+        blended_result = m->mtrace_buffer[1];
+        prev_frame = m->mtrace_buffer[2];
+        mode_buf = m->mode_buffer;
+
+        veejay_memcpy(&blend_frame, frame, sizeof(VJFrame));
+        blend_frame.data[0] = blended_result;
+        veejay_memcpy(&feedback_frame, frame, sizeof(VJFrame));
+        feedback_frame.data[0] = feedback_buf;
+
+        if(!m->started) {
+            veejay_memcpy(feedback_buf, Y, len);
+            veejay_memcpy(prev_frame, Y, len);
+            m->prev_mode = mode;
+            m->mode_transition = 0;
+            m->started = 1;
         }
+
+        if(mode != m->prev_mode) {
+            veejay_memcpy(mode_buf, feedback_buf, len);
+            m->mode_transition = m->mode_transition_len;
+            m->prev_mode = mode;
+        }
+
+        transition_active = m->mode_transition > 0;
+        transition_alpha = 0;
 
         if(transition_active) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                blended_result[i] = mtracer_blend255(mode_buf[i], blended_result[i], transition_alpha);
+            const int t = m->mode_transition_len - m->mode_transition;
+            const int x = (t << 8) / m->mode_transition_len;
+            transition_alpha = (x * x * (768 - (x << 1))) >> 16;
         }
 
-        if(motion_only)
-            mtracer_motion_mask(blended_result, prev_frame, len);
+        veejay_memcpy(blended_result, Y, len);
 
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            const int f = feedback_buf[i];
-            const int b = blended_result[i];
-            const int accum = ((f * decay + 128) >> 8) + ((b * combined_scale * inject + 32768) >> 16);
-
-            feedback_buf[i] = mtracer_u8(accum);
-        }
-
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            prev_frame[i] = Y[i];
-
-        if(classic) {
-            overlaymagic1_apply_n(frame, &feedback_frame, mode);
-        }
-        else {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                Y[i] = feedback_buf[i];
-        }
-
-#pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            U[i] = 128;
-            V[i] = 128;
-        }
+        combined_scale = mtracer_clampi((strength * character + 127) / 255, 1, 255);
+        decay = 256 - (256 / decay_val);
+        inject = 256 - decay;
     }
 
-    if(transition_active)
-        m->mode_transition--;
+    overlaymagic1_apply_n(&blend_frame, frame2, mode);
+
+    if(frame2_opacity < 255) {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            blended_result[i] = mtracer_blend255(Y[i], blended_result[i], frame2_opacity);
+    }
+
+    if(transition_active) {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            blended_result[i] = mtracer_blend255(mode_buf[i], blended_result[i], transition_alpha);
+    }
+
+    if(motion_only)
+        mtracer_motion_mask(blended_result, prev_frame, len);
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        const int f = feedback_buf[i];
+        const int b = blended_result[i];
+        const int accum = ((f * decay + 128) >> 8) + ((b * combined_scale * inject + 32768) >> 16);
+
+        feedback_buf[i] = mtracer_u8(accum);
+    }
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        prev_frame[i] = Y[i];
+
+    if(classic) {
+        overlaymagic1_apply_n(frame, &feedback_frame, mode);
+    }
+    else {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = feedback_buf[i];
+    }
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        U[i] = 128;
+        V[i] = 128;
+    }
+
+    #pragma omp single
+    {
+        if(transition_active)
+            m->mode_transition--;
+    }
 }

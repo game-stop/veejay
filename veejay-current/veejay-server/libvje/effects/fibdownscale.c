@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -10,7 +10,8 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR more details.
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -34,16 +35,6 @@ vj_effect *fibdownscale_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[0] = 0;
     ve->defaults[1] = 1;
@@ -132,10 +123,13 @@ void fibdownscale_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[0];
     const int repeat = args[1];
 
-    for(int i = 0; i < repeat; i++) {
-        if(mode == 0)
-            fibdownscale1_apply(frame);
-        else
-            fibrectangle1_apply(frame);
+    #pragma omp single
+    {
+        for(int i = 0; i < repeat; i++) {
+            if(mode == 0)
+                fibdownscale1_apply(frame);
+            else
+                fibrectangle1_apply(frame);
+        }
     }
 }

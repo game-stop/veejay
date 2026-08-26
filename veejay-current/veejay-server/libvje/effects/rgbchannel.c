@@ -40,16 +40,6 @@ vj_effect *rgbchannel_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     for(int i = 0; i < ve->num_params; i++) {
         ve->limits[0][i] = 0;
@@ -99,11 +89,9 @@ void rgbchannel_apply(void *ptr, VJFrame *frame, int *args)
         return;
 
     const int pixels = frame->width * frame->height;
-    const int n_threads = vje_advise_num_threads(pixels);
-
     uint8_t *restrict rgba = frame->data[0];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+    #pragma omp for schedule(static)
     for(int i = 0; i < pixels; i++) {
         uint8_t *restrict p = rgba + (i << 2);
 

@@ -44,6 +44,9 @@ void vje_disable_parallel();
 int vje_init(int w, int h);
 int vje_is_parallel_enabled();
 
+int vje_fx_needs_instance(int fx_id);
+
+
 // FX calls
 void *vje_fx_malloc(int fx_id, int chain_id, int chain_pos, int w, int h, int *error );
 void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A );

@@ -143,7 +143,6 @@ static inline int topo_push_abs(const int v, const int target_abs, const int bea
     return sign * out;
 }
 
-
 static inline int topo_soft_luma_i(const int y)
 {
     if (y > 232) {
@@ -153,11 +152,6 @@ static inline int topo_soft_luma_i(const int y)
 
     return y < 0 ? 0 : y;
 }
-
-
-
-
-
 
 static inline int topo_smooth_i(float *restrict state, const int target, const float attack, const float release)
 {
@@ -481,8 +475,6 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     const int w = t->width; \
     const int h = t->height; \
     const int size = w * h; \
-    t->time += (double)args[P_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000100 + (double)args[P_WARP_KICK] * 0.0000200; \
-    t->phase += (double)args[P_ROT_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000140; \
     const float branches = (float)args[P_BRANCHES]; \
     const float swirl = (float)args[P_SWIRL] * 0.001f; \
     const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
@@ -510,7 +502,7 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     const float time_f = (float)t->time; \
     const float phase_f = (float)t->phase; \
     (void)args[P_WARP_PHASE]; \
-    _Pragma("omp parallel for schedule(static) num_threads(t->n_threads)") \
+    _Pragma("omp for schedule(static)") \
     for (int y = 0; y < h; y++) { \
         const int row = y * w; \
         const float dy = (float)y * inv_cy - 1.0f; \
@@ -533,9 +525,12 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
             blend_store_pixel(t, i, py, pu, pv, fb, inv_fb); \
         } \
     } \
-    veejay_memcpy(outY, t->dstY, size); \
-    veejay_memcpy(outU, t->dstU, size); \
-    veejay_memcpy(outV, t->dstV, size); \
+    _Pragma("omp single") \
+    { \
+        veejay_memcpy(outY, t->dstY, size); \
+        veejay_memcpy(outU, t->dstU, size); \
+        veejay_memcpy(outV, t->dstV, size); \
+    } \
 }
 
 #define DEFINE_MIRROR_KERNEL(MODE_ID, RADIUS_ID, RADIUS_FN, SAMPLE_ID, SAMPLE_FN, MAP_FN) \
@@ -546,8 +541,6 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     const int size = w * h; \
     const int half_w = w >> 1; \
     const int half_h = h >> 1; \
-    t->time += (double)args[P_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000150; \
-    t->phase += (double)args[P_ROT_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000060 + (double)args[P_WARP_KICK] * 0.0000110; \
     const float branches = (float)args[P_BRANCHES]; \
     const float swirl = (float)args[P_SWIRL] * 0.001f; \
     const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
@@ -577,7 +570,7 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     (void)args[P_WARP_PHASE]; \
     float rs, rc; \
     topo_lut_sincos(t, (float)args[P_ROT_SPEED] * 0.001f, &rs, &rc); \
-    _Pragma("omp parallel for schedule(static) num_threads(t->n_threads)") \
+    _Pragma("omp for schedule(static)") \
     for (int y = 0; y < half_h; y++) { \
         const float dy = (float)y * inv_hh; \
         const int row_top = (half_h - 1 - y) * w; \
@@ -611,9 +604,12 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
             blend_store_pixel(t, row_top + mx, py, pu, pv, fb, inv_fb); \
         } \
     } \
-    veejay_memcpy(outY, t->dstY, size); \
-    veejay_memcpy(outU, t->dstU, size); \
-    veejay_memcpy(outV, t->dstV, size); \
+    _Pragma("omp single") \
+    { \
+        veejay_memcpy(outY, t->dstY, size); \
+        veejay_memcpy(outU, t->dstU, size); \
+        veejay_memcpy(outV, t->dstV, size); \
+    } \
 }
 
 #define DEFINE_MODE_RADIUS(MODE_ID, MAP_FN, RADIUS_ID, RADIUS_FN) \
@@ -729,14 +725,6 @@ vj_effect *topomorph_init(int width, int height)
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if (ve->defaults) free(ve->defaults);
-        if (ve->limits[0]) free(ve->limits[0]);
-        if (ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[P_SPEED]       = 100;
     ve->defaults[P_SCALE]       = 256;
     ve->defaults[P_BRANCHES]    = 1;
@@ -844,7 +832,6 @@ void *topomorph_malloc(int width, int height)
 
     t->width = width;
     t->height = height;
-    t->n_threads = vje_advise_num_threads(size);
 
     t->histY = (int32_t*)p;
     t->histU = t->histY + size;
@@ -982,111 +969,123 @@ void topomorph_apply(void *ptr, VJFrame *frame, int *args)
     box_topomorph_t *t = (box_topomorph_t*) ptr;
     int eff[TOPOMORPH_INTERNAL_PARAMS];
 
-    eff[P_SPEED]      = args[P_SPEED];
-    eff[P_SCALE]      = args[P_SCALE];
-    eff[P_BRANCHES]   = args[P_BRANCHES];
-    eff[P_SWIRL]      = args[P_SWIRL];
-    eff[P_ROT_SPEED]  = args[P_ROT_SPEED];
-    eff[P_FEEDBACK]   = args[P_FEEDBACK];
-    eff[P_PITCH]      = args[P_PITCH];
-    eff[P_TOPO_MODE]  = args[P_TOPO_MODE];
-    eff[P_SALIENCY]   = args[P_SALIENCY];
-    eff[P_SHAPE_P]    = args[P_SHAPE_P];
-    eff[P_MIRROR]     = args[P_MIRROR];
-    eff[P_WARP_DRIVE] = args[P_WARP_DRIVE];
-
-    if(!t->eff_initialized) {
-        t->eff_speed = (float)eff[P_SPEED];
-        t->eff_scale = (float)eff[P_SCALE];
-        t->eff_swirl = (float)eff[P_SWIRL];
-        t->eff_rot_speed = (float)eff[P_ROT_SPEED];
-        t->eff_feedback = (float)eff[P_FEEDBACK];
-        t->eff_pitch = (float)eff[P_PITCH];
-        t->eff_saliency = (float)eff[P_SALIENCY];
-        t->eff_warp_drive = (float)eff[P_WARP_DRIVE];
-        t->eff_initialized = 1;
-    } else {
-        const float warp_s = (float)eff[P_WARP_DRIVE] * 0.001f;
-        const float fast = 0.095f + warp_s * 0.060f;
-        const float slow = 0.040f + warp_s * 0.040f;
-
-        eff[P_SPEED]      = topo_smooth_i(&t->eff_speed,      eff[P_SPEED],      fast,        slow);
-        eff[P_SCALE]      = topo_smooth_i(&t->eff_scale,      eff[P_SCALE],      fast * 0.84f, slow);
-        eff[P_SWIRL]      = topo_smooth_i(&t->eff_swirl,      eff[P_SWIRL],      fast,        slow);
-        eff[P_ROT_SPEED]  = topo_smooth_i(&t->eff_rot_speed,  eff[P_ROT_SPEED],  fast * 0.84f, slow);
-        eff[P_FEEDBACK]   = topo_smooth_i(&t->eff_feedback,   eff[P_FEEDBACK],   fast * 0.42f, slow * 0.78f);
-        eff[P_PITCH]      = topo_smooth_i(&t->eff_pitch,      eff[P_PITCH],      fast * 0.76f, slow);
-        eff[P_SALIENCY]   = topo_smooth_i(&t->eff_saliency,   eff[P_SALIENCY],   fast * 0.68f, slow);
-        eff[P_WARP_DRIVE] = topo_smooth_i(&t->eff_warp_drive, eff[P_WARP_DRIVE], fast * 1.16f, slow);
-    }
-
+    #pragma omp single copyprivate(eff)
     {
-        const int mode = clampi(eff[P_TOPO_MODE], 0, 5);
-        const int complex_mode = (mode <= 2);
-        const int warp = eff[P_WARP_DRIVE];
+        eff[P_SPEED]      = args[P_SPEED];
+        eff[P_SCALE]      = args[P_SCALE];
+        eff[P_BRANCHES]   = args[P_BRANCHES];
+        eff[P_SWIRL]      = args[P_SWIRL];
+        eff[P_ROT_SPEED]  = args[P_ROT_SPEED];
+        eff[P_FEEDBACK]   = args[P_FEEDBACK];
+        eff[P_PITCH]      = args[P_PITCH];
+        eff[P_TOPO_MODE]  = args[P_TOPO_MODE];
+        eff[P_SALIENCY]   = args[P_SALIENCY];
+        eff[P_SHAPE_P]    = args[P_SHAPE_P];
+        eff[P_MIRROR]     = args[P_MIRROR];
+        eff[P_WARP_DRIVE] = args[P_WARP_DRIVE];
 
-        const int travel_q = clampi((warp * 82 + 50) / 100, 0, 1000);
-        const int warp_q = clampi((warp * 92 + 50) / 100, 0, 1000);
-        const int pulse_q = warp;
+        if(!t->eff_initialized) {
+            t->eff_speed = (float)eff[P_SPEED];
+            t->eff_scale = (float)eff[P_SCALE];
+            t->eff_swirl = (float)eff[P_SWIRL];
+            t->eff_rot_speed = (float)eff[P_ROT_SPEED];
+            t->eff_feedback = (float)eff[P_FEEDBACK];
+            t->eff_pitch = (float)eff[P_PITCH];
+            t->eff_saliency = (float)eff[P_SALIENCY];
+            t->eff_warp_drive = (float)eff[P_WARP_DRIVE];
+            t->eff_initialized = 1;
+        } else {
+            const float warp_s = (float)eff[P_WARP_DRIVE] * 0.001f;
+            const float fast = 0.095f + warp_s * 0.060f;
+            const float slow = 0.040f + warp_s * 0.040f;
 
-        if(travel_q > 0) {
-            const int speed_target = complex_mode ? 820 : 680;
-            const int rot_target = complex_mode ? 760 : 620;
-            const int pitch_target = complex_mode ? 1600 : 1280;
-            const int q = clampi((travel_q * 680 + pulse_q * 320 + 500) / 1000, 0, 1000);
-
-            eff[P_SPEED] = clampi(topo_push_abs(eff[P_SPEED], speed_target, q, 54), -1000, 1000);
-            eff[P_ROT_SPEED] = clampi(topo_push_abs(eff[P_ROT_SPEED], rot_target, q, 44), -1000, 1000);
-            eff[P_PITCH] = clampi(topo_push_abs(eff[P_PITCH], pitch_target, q, 34), -3000, 3000);
+            eff[P_SPEED]      = topo_smooth_i(&t->eff_speed,      eff[P_SPEED],      fast,        slow);
+            eff[P_SCALE]      = topo_smooth_i(&t->eff_scale,      eff[P_SCALE],      fast * 0.84f, slow);
+            eff[P_SWIRL]      = topo_smooth_i(&t->eff_swirl,      eff[P_SWIRL],      fast,        slow);
+            eff[P_ROT_SPEED]  = topo_smooth_i(&t->eff_rot_speed,  eff[P_ROT_SPEED],  fast * 0.84f, slow);
+            eff[P_FEEDBACK]   = topo_smooth_i(&t->eff_feedback,   eff[P_FEEDBACK],   fast * 0.42f, slow * 0.78f);
+            eff[P_PITCH]      = topo_smooth_i(&t->eff_pitch,      eff[P_PITCH],      fast * 0.76f, slow);
+            eff[P_SALIENCY]   = topo_smooth_i(&t->eff_saliency,   eff[P_SALIENCY],   fast * 0.68f, slow);
+            eff[P_WARP_DRIVE] = topo_smooth_i(&t->eff_warp_drive, eff[P_WARP_DRIVE], fast * 1.16f, slow);
         }
 
-        if(warp_q > 0) {
-            const int swirl_target = complex_mode ? 780 : 640;
-            const int scale_target = complex_mode ? 118 : 150;
-            const int saliency_target = complex_mode ? 930 : 960;
-            const int feedback_target = warp > 760 ? 520 : 640;
-            const int q = clampi((warp_q * 720 + pulse_q * 280 + 500) / 1000, 0, 1000);
+        {
+            const int mode = clampi(eff[P_TOPO_MODE], 0, 5);
+            const int complex_mode = (mode <= 2);
+            const int warp = eff[P_WARP_DRIVE];
 
-            eff[P_SCALE] = clampi(topo_push_towards(eff[P_SCALE], scale_target, q, 46), 2, 500);
-            eff[P_SWIRL] = clampi(topo_push_abs(eff[P_SWIRL], swirl_target, q, 56), -1000, 1000);
-            eff[P_FEEDBACK] = clampi(topo_push_towards(eff[P_FEEDBACK], feedback_target, q, 22), 0, 860);
-            eff[P_SALIENCY] = clampi(topo_push_towards(eff[P_SALIENCY], saliency_target, q, 38), 0, 1000);
+            const int travel_q = clampi((warp * 82 + 50) / 100, 0, 1000);
+            const int warp_q = clampi((warp * 92 + 50) / 100, 0, 1000);
+            const int pulse_q = warp;
+
+            if(travel_q > 0) {
+                const int speed_target = complex_mode ? 820 : 680;
+                const int rot_target = complex_mode ? 760 : 620;
+                const int pitch_target = complex_mode ? 1600 : 1280;
+                const int q = clampi((travel_q * 680 + pulse_q * 320 + 500) / 1000, 0, 1000);
+
+                eff[P_SPEED] = clampi(topo_push_abs(eff[P_SPEED], speed_target, q, 54), -1000, 1000);
+                eff[P_ROT_SPEED] = clampi(topo_push_abs(eff[P_ROT_SPEED], rot_target, q, 44), -1000, 1000);
+                eff[P_PITCH] = clampi(topo_push_abs(eff[P_PITCH], pitch_target, q, 34), -3000, 3000);
+            }
+
+            if(warp_q > 0) {
+                const int swirl_target = complex_mode ? 780 : 640;
+                const int scale_target = complex_mode ? 118 : 150;
+                const int saliency_target = complex_mode ? 930 : 960;
+                const int feedback_target = warp > 760 ? 520 : 640;
+                const int q = clampi((warp_q * 720 + pulse_q * 280 + 500) / 1000, 0, 1000);
+
+                eff[P_SCALE] = clampi(topo_push_towards(eff[P_SCALE], scale_target, q, 46), 2, 500);
+                eff[P_SWIRL] = clampi(topo_push_abs(eff[P_SWIRL], swirl_target, q, 56), -1000, 1000);
+                eff[P_FEEDBACK] = clampi(topo_push_towards(eff[P_FEEDBACK], feedback_target, q, 22), 0, 860);
+                eff[P_SALIENCY] = clampi(topo_push_towards(eff[P_SALIENCY], saliency_target, q, 38), 0, 1000);
+            }
+
+            if(warp > 0) {
+                const int dir = (eff[P_SPEED] < 0) ? -1 : 1;
+
+                eff[P_SPEED] += dir * ((warp * 54 + 500) / 1000);
+                eff[P_ROT_SPEED] += dir * ((warp * 38 + 500) / 1000);
+                eff[P_SCALE] -= (warp * 10 + 500) / 1000;
+                eff[P_FEEDBACK] -= (warp * 14 + 500) / 1000;
+            }
         }
 
-        if(warp > 0) {
-            const int dir = (eff[P_SPEED] < 0) ? -1 : 1;
+        eff[P_SPEED]      = clampi(eff[P_SPEED], -1000, 1000);
+        eff[P_SCALE]      = clampi(eff[P_SCALE], 2, 500);
+        eff[P_SWIRL]      = clampi(eff[P_SWIRL], -1000, 1000);
+        eff[P_ROT_SPEED]  = clampi(eff[P_ROT_SPEED], -1000, 1000);
+        eff[P_FEEDBACK]   = clampi(eff[P_FEEDBACK], 0, 860);
+        eff[P_PITCH]      = clampi(eff[P_PITCH], -3000, 3000);
+        eff[P_SALIENCY]   = clampi(eff[P_SALIENCY], 0, 1000);
+        eff[P_WARP_DRIVE] = clampi(eff[P_WARP_DRIVE], 0, 1000);
 
-            eff[P_SPEED] += dir * ((warp * 54 + 500) / 1000);
-            eff[P_ROT_SPEED] += dir * ((warp * 38 + 500) / 1000);
-            eff[P_SCALE] -= (warp * 10 + 500) / 1000;
-            eff[P_FEEDBACK] -= (warp * 14 + 500) / 1000;
+        t->warp_phase = (t->warp_phase + 3 + ((eff[P_WARP_DRIVE] * 20 + 500) / 1000)) & 1023;
+        eff[P_WARP_ENV] = eff[P_WARP_DRIVE];
+        eff[P_WARP_KICK] = 0;
+        eff[P_WARP_PHASE] = t->warp_phase;
+
+        topo_rebuild_shape_lut(t, eff[P_SHAPE_P]);
+
+        if(eff[P_SALIENCY] > 0)
+            update_saliency_poles(t, frame->data[0]);
+
+        if (eff[P_MIRROR] == 1) {
+            t->time += (double)eff[P_SPEED] * 0.00005 + (double)eff[P_WARP_ENV] * 0.0000075 + (double)eff[P_WARP_KICK] * 0.0000150;
+            t->phase += (double)eff[P_ROT_SPEED] * 0.00005 + (double)eff[P_WARP_ENV] * 0.0000060 + (double)eff[P_WARP_KICK] * 0.0000110;
+        } else {
+            t->time += (double)eff[P_SPEED] * 0.0000725 + (double)eff[P_WARP_ENV] * 0.0000100 + (double)eff[P_WARP_KICK] * 0.0000200;
+            t->phase += (double)eff[P_ROT_SPEED] * 0.0000725 + (double)eff[P_WARP_ENV] * 0.0000075 + (double)eff[P_WARP_KICK] * 0.0000140;
         }
     }
-
-    eff[P_SPEED]      = clampi(eff[P_SPEED], -1000, 1000);
-    eff[P_SCALE]      = clampi(eff[P_SCALE], 2, 500);
-    eff[P_SWIRL]      = clampi(eff[P_SWIRL], -1000, 1000);
-    eff[P_ROT_SPEED]  = clampi(eff[P_ROT_SPEED], -1000, 1000);
-    eff[P_FEEDBACK]   = clampi(eff[P_FEEDBACK], 0, 860);
-    eff[P_PITCH]      = clampi(eff[P_PITCH], -3000, 3000);
-    eff[P_SALIENCY]   = clampi(eff[P_SALIENCY], 0, 1000);
-    eff[P_WARP_DRIVE] = clampi(eff[P_WARP_DRIVE], 0, 1000);
-
-    t->warp_phase = (t->warp_phase + 3 + ((eff[P_WARP_DRIVE] * 20 + 500) / 1000)) & 1023;
-    eff[P_WARP_ENV] = eff[P_WARP_DRIVE];
-    eff[P_WARP_KICK] = 0;
-    eff[P_WARP_PHASE] = t->warp_phase;
-
-    topo_rebuild_shape_lut(t, eff[P_SHAPE_P]);
-
-    if(eff[P_SALIENCY] > 0)
-        update_saliency_poles(t, frame->data[0]);
 
     if(eff[P_MIRROR] == 1)
         process_core_mirror(t, frame, eff);
     else
         process_core_no_mirror(t, frame, eff);
 }
+
 void topomorph_free(void *ptr)
 {
     box_topomorph_t *t = (box_topomorph_t*) ptr;

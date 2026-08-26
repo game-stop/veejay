@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include <stdint.h>
+#include <stdlib.h>
 #include <veejaycore/vjmem.h>
 #include "slicer.h"
 
@@ -94,7 +95,6 @@ static inline int slicer_rand_range(uint32_t *state, int lo, int hi)
     return lo + (int)(slicer_rand(state) % (uint32_t)(hi - lo + 1));
 }
 
-
 static inline float slicer_smooth_value(float current, float target, float speed)
 {
     return current + ((target - current) * speed);
@@ -111,17 +111,6 @@ vj_effect *slicer_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     int min_dim = w < h ? w : h;
     int max_block_size = min_dim / 2;
@@ -143,8 +132,8 @@ vj_effect *slicer_init(int w, int h)
     if(max_shift < 2)
         max_shift = 2;
 
-    ve->limits[0][P_WIDTH] = 1;        ve->limits[1][P_WIDTH] = w;              ve->defaults[P_WIDTH] = w >= 16 ? 16 : w;
-    ve->limits[0][P_HEIGHT] = 1;       ve->limits[1][P_HEIGHT] = h;             ve->defaults[P_HEIGHT] = h >= 16 ? 16 : h;
+    ve->limits[0][P_WIDTH] = 1;        ve->limits[1][P_WIDTH] = w > 0 ? w : 1;              ve->defaults[P_WIDTH] = w >= 16 ? 16 : (w > 0 ? w : 1);
+    ve->limits[0][P_HEIGHT] = 1;       ve->limits[1][P_HEIGHT] = h > 0 ? h : 1;             ve->defaults[P_HEIGHT] = h >= 16 ? 16 : (h > 0 ? h : 1);
     ve->limits[0][P_SHATTER] = 0;      ve->limits[1][P_SHATTER] = 128;          ve->defaults[P_SHATTER] = 8;
     ve->limits[0][P_PERIOD] = 0;       ve->limits[1][P_PERIOD] = 500;           ve->defaults[P_PERIOD] = 0;
     ve->limits[0][P_MODE] = 0;         ve->limits[1][P_MODE] = 1;               ve->defaults[P_MODE] = 0;
@@ -335,7 +324,6 @@ void *slicer_malloc(int width, int height)
     s->sm_slice_drive = 0.0f;
     s->sm_shatter_drive = 0.0f;
     s->sm_mix_drive = 0.0f;
-    s->n_threads = vje_advise_num_threads((int)frame_sz);
 
     return s;
 }
@@ -343,8 +331,11 @@ void *slicer_malloc(int width, int height)
 void slicer_free(void *ptr)
 {
     slicer_t *s = (slicer_t*)ptr;
+    if(!s)
+        return;
 
-    free(s->block);
+    if(s->block)
+        free(s->block);
     free(s);
 }
 
@@ -379,94 +370,103 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_step = 0.24f;
 
-    if(!s->smooth_ready) {
-        s->sm_width = (float)base_w;
-        s->sm_height = (float)base_h;
-        s->sm_shatter = (float)base_shatter;
-        s->sm_period = (float)base_period;
-        s->sm_smoothness = (float)base_smooth;
-        s->sm_dominance = (float)base_dom;
-        s->sm_block = (float)base_block;
-        s->sm_slice_drive = (float)slice_drive_arg;
-        s->sm_shatter_drive = (float)shatter_drive_arg;
-        s->sm_mix_drive = (float)mix_drive_arg;
-        s->smooth_ready = 1;
+    int val1 = 0, val2 = 0, shatter = 0, period = 0, smoothness = 0, dominance = 0, block_shift = 2;
+    int slice_drive = 0, shatter_drive = 0, mix_drive = 0;
+    int extra_mix_q8 = 0;
+    uint8_t *dY = NULL, *dCb = NULL, *dCr = NULL;
+    const uint8_t *s1Y = NULL, *s1Cb = NULL, *s1Cr = NULL;
+    const uint8_t *s2Y = NULL, *s2Cb = NULL, *s2Cr = NULL;
+    const int *sx_row = NULL, *sy_col = NULL;
+
+    #pragma omp single copyprivate(val1, val2, shatter, period, smoothness, dominance, block_shift, slice_drive, shatter_drive, mix_drive, extra_mix_q8, dY, dCb, dCr, s1Y, s1Cb, s1Cr, s2Y, s2Cb, s2Cr, sx_row, sy_col)
+    {
+        if(!s->smooth_ready) {
+            s->sm_width = (float)base_w;
+            s->sm_height = (float)base_h;
+            s->sm_shatter = (float)base_shatter;
+            s->sm_period = (float)base_period;
+            s->sm_smoothness = (float)base_smooth;
+            s->sm_dominance = (float)base_dom;
+            s->sm_block = (float)base_block;
+            s->sm_slice_drive = (float)slice_drive_arg;
+            s->sm_shatter_drive = (float)shatter_drive_arg;
+            s->sm_mix_drive = (float)mix_drive_arg;
+            s->smooth_ready = 1;
+        }
+        else {
+            s->sm_width = slicer_smooth_value(s->sm_width, (float)base_w, param_step);
+            s->sm_height = slicer_smooth_value(s->sm_height, (float)base_h, param_step);
+            s->sm_shatter = slicer_smooth_value(s->sm_shatter, (float)base_shatter, param_step);
+            s->sm_period = slicer_smooth_value(s->sm_period, (float)base_period, param_step);
+            s->sm_smoothness = slicer_smooth_value(s->sm_smoothness, (float)base_smooth, param_step);
+            s->sm_dominance = slicer_smooth_value(s->sm_dominance, (float)base_dom, param_step);
+            s->sm_block = slicer_smooth_value(s->sm_block, (float)base_block, param_step);
+            s->sm_slice_drive = slicer_smooth_value(s->sm_slice_drive, (float)slice_drive_arg, param_step);
+            s->sm_shatter_drive = slicer_smooth_value(s->sm_shatter_drive, (float)shatter_drive_arg, param_step);
+            s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
+        }
+
+        slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
+        shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
+        mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
+
+        val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
+        val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
+        shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
+        period = clampi((int)(s->sm_period + 0.5f), 0, 500);
+        smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
+        dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
+        block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
+
+        val1 = clampi(val1 + (((width - val1) * slice_drive + 500) / 1000), 1, width);
+        val2 = clampi(val2 + (((height - val2) * slice_drive + 500) / 1000), 1, height);
+        shatter = clampi(shatter + (((128 - shatter) * shatter_drive + 500) / 1000), 0, 128);
+
+        dominance = clampi(dominance + (((100 - dominance) * mix_drive + 500) / 1000), 0, 100);
+        block_shift = clampi(block_shift - ((mix_drive + 333) / 500), 2, 9);
+
+        extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
+
+        if(s->last_period != period) {
+            s->last_period = period;
+            s->current_period = 0;
+        }
+
+        if(s->current_period <= 0 || !s->have_shift) {
+            s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
+            s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
+            s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
+            s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
+            s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
+
+            recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
+
+            s->current_period = period > 0 ? period : 1;
+        }
+
+        s->current_period--;
+
+        dY = frame->data[0];
+        dCb = frame->data[1];
+        dCr = frame->data[2];
+
+        veejay_memcpy(s->tmp[0], dY, len);
+        veejay_memcpy(s->tmp[1], dCb, len);
+        veejay_memcpy(s->tmp[2], dCr, len);
+
+        s1Y = s->tmp[0];
+        s1Cb = s->tmp[1];
+        s1Cr = s->tmp[2];
+
+        s2Y = frame2->data[0];
+        s2Cb = frame2->data[1];
+        s2Cr = frame2->data[2];
+
+        sx_row = s->slice_xshift;
+        sy_col = s->slice_yshift;
     }
-    else {
-        s->sm_width = slicer_smooth_value(s->sm_width, (float)base_w, param_step);
-        s->sm_height = slicer_smooth_value(s->sm_height, (float)base_h, param_step);
-        s->sm_shatter = slicer_smooth_value(s->sm_shatter, (float)base_shatter, param_step);
-        s->sm_period = slicer_smooth_value(s->sm_period, (float)base_period, param_step);
-        s->sm_smoothness = slicer_smooth_value(s->sm_smoothness, (float)base_smooth, param_step);
-        s->sm_dominance = slicer_smooth_value(s->sm_dominance, (float)base_dom, param_step);
-        s->sm_block = slicer_smooth_value(s->sm_block, (float)base_block, param_step);
-        s->sm_slice_drive = slicer_smooth_value(s->sm_slice_drive, (float)slice_drive_arg, param_step);
-        s->sm_shatter_drive = slicer_smooth_value(s->sm_shatter_drive, (float)shatter_drive_arg, param_step);
-        s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
-    }
 
-    const int slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
-    const int shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
-    const int mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
-
-    int val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
-    int val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
-    int shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
-    int period = clampi((int)(s->sm_period + 0.5f), 0, 500);
-    int smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
-    int dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
-    int block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
-
-    val1 = clampi(val1 + (((width - val1) * slice_drive + 500) / 1000), 1, width);
-    val2 = clampi(val2 + (((height - val2) * slice_drive + 500) / 1000), 1, height);
-    shatter = clampi(shatter + (((128 - shatter) * shatter_drive + 500) / 1000), 0, 128);
-
-
-    dominance = clampi(dominance + (((100 - dominance) * mix_drive + 500) / 1000), 0, 100);
-    block_shift = clampi(block_shift - ((mix_drive + 333) / 500), 2, 9);
-
-    const int extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
-
-    if(s->last_period != period) {
-        s->last_period = period;
-        s->current_period = 0;
-    }
-
-
-    if(s->current_period <= 0 || !s->have_shift) {
-        s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
-        s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
-        s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
-        s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
-        s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
-
-        recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
-
-        s->current_period = period > 0 ? period : 1;
-    }
-
-    s->current_period--;
-
-    uint8_t *restrict dY = frame->data[0];
-    uint8_t *restrict dCb = frame->data[1];
-    uint8_t *restrict dCr = frame->data[2];
-
-    veejay_memcpy(s->tmp[0], dY, len);
-    veejay_memcpy(s->tmp[1], dCb, len);
-    veejay_memcpy(s->tmp[2], dCr, len);
-
-    const uint8_t *restrict s1Y = s->tmp[0];
-    const uint8_t *restrict s1Cb = s->tmp[1];
-    const uint8_t *restrict s1Cr = s->tmp[2];
-
-    const uint8_t *restrict s2Y = frame2->data[0];
-    const uint8_t *restrict s2Cb = frame2->data[1];
-    const uint8_t *restrict s2Cr = frame2->data[2];
-
-    int *restrict sx_row = s->slice_xshift;
-    int *restrict sy_col = s->slice_yshift;
-
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const int shift_x = sx_row[y];

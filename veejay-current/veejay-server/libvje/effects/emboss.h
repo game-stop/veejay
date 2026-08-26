@@ -22,4 +22,6 @@
 #define EMBOSS_H
 vj_effect *emboss_init(int w, int h);
 void emboss_apply(void *ptr, VJFrame *frame, int *args);
+void *emboss_malloc(int w, int h);
+void emboss_free(void *ptr);
 #endif

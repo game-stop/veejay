@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2015 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "levelcorrection.h"
 
 #define LEVELCORRECTION_PARAMS 4
@@ -49,16 +50,6 @@ vj_effect *levelcorrection_init(int w,int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_LEVEL_MIN] = 0;
     ve->defaults[P_LEVEL_MAX] = 255;
@@ -105,19 +96,22 @@ void *levelcorrection_malloc(int w, int h)
     if(!t)
         return NULL;
 
-    t->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) t;
 }
 
 void levelcorrection_free(void *ptr)
 {
-    free(ptr);
+    if(ptr) free(ptr);
 }
 
 void levelcorrection_apply(void *ptr, VJFrame *frame, int *args)
 {
     level_t *t = (level_t*) ptr;
+    (void)t;
+
+    uint8_t *restrict A = frame->data[3];
+    if(!A)
+        return;
 
     const int min = args[P_LEVEL_MIN];
     const int max = args[P_LEVEL_MAX];
@@ -149,10 +143,9 @@ void levelcorrection_apply(void *ptr, VJFrame *frame, int *args)
         __init_lookup_table(lut, 256, 0.0f, 255.0f, bmin, bmax);
     }
 
-    uint8_t *restrict A = frame->data[3];
     const int len = frame->len;
 
-#pragma omp parallel for schedule(static) num_threads(t->n_threads)
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
         A[pos] = lut[A[pos]];
 }

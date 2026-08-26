@@ -44,17 +44,6 @@ vj_effect *fadecolorrgb_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[0] = 150;
     ve->defaults[1] = 0;
     ve->defaults[2] = 0;
@@ -100,7 +89,6 @@ void *fadecolorrgb_malloc(int w, int h)
 
     state->value_q8 = 0;
     state->last_mode = -1;
-    state->n_threads = vje_advise_num_threads(w * h);
 
     return state;
 }
@@ -115,7 +103,6 @@ void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args)
     fc_t *state = (fc_t*) ptr;
 
     const int len = frame->len;
-
     const int opacity_arg = args[0];
     const int r_arg = args[1];
     const int g_arg = args[2];
@@ -135,51 +122,50 @@ void fadecolorrgb_apply(void *ptr, VJFrame *frame, int *args)
     if(step_q8 < 1)
         step_q8 = 1;
 
-    if(mode != state->last_mode) {
-        state->value_q8 = mode ? target_q8 : 0;
-        state->last_mode = mode;
-    }
+    #pragma omp single
+    {
+        if(mode != state->last_mode) {
+            state->value_q8 = mode ? target_q8 : 0;
+            state->last_mode = mode;
+        }
 
-    if(mode == 0) {
-        state->value_q8 += step_q8;
-        if(state->value_q8 > target_q8)
-            state->value_q8 = target_q8;
-    }
-    else {
-        state->value_q8 -= step_q8;
-        if(state->value_q8 < 0)
-            state->value_q8 = 0;
+        if(mode == 0) {
+            state->value_q8 += step_q8;
+            if(state->value_q8 > target_q8)
+                state->value_q8 = target_q8;
+        }
+        else {
+            state->value_q8 -= step_q8;
+            if(state->value_q8 < 0)
+                state->value_q8 = 0;
+        }
     }
 
     const int op1 = clampi((state->value_q8 + 128) >> 8, 0, 255);
     const int op0 = 255 - op1;
 
-    if(op1 <= 0)
-        return;
+    if(op1 > 0) {
+        int colorY = 0;
+        int colorCb = 128;
+        int colorCr = 128;
 
-    int colorY = 0;
-    int colorCb = 128;
-    int colorCr = 128;
+        _rgb2yuv(r, g, b, colorY, colorCb, colorCr);
 
-    _rgb2yuv(r, g, b, colorY, colorCb, colorCr);
+        colorY = clampi(colorY, 0, 255);
+        colorCb = clampi(colorCb, 0, 255);
+        colorCr = clampi(colorCr, 0, 255);
 
-    colorY = clampi(colorY, 0, 255);
-    colorCb = clampi(colorCb, 0, 255);
-    colorCr = clampi(colorCr, 0, 255);
+        uint8_t *restrict Y = frame->data[0];
+        uint8_t *restrict Cb = frame->data[1];
+        uint8_t *restrict Cr = frame->data[2];
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
+        const int uv_len = frame->ssm ? len : frame->uv_len;
 
-    const int uv_len = frame->ssm ? len : frame->uv_len;
-
-#pragma omp parallel num_threads(state->n_threads)
-    {
-#pragma omp for schedule(static)
+        #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             Y[i] = (uint8_t)((op0 * Y[i] + op1 * colorY + 127) / 255);
 
-#pragma omp for schedule(static)
+        #pragma omp for schedule(static)
         for(int i = 0; i < uv_len; i++) {
             Cb[i] = (uint8_t)((op0 * Cb[i] + op1 * colorCb + 127) / 255);
             Cr[i] = (uint8_t)((op0 * Cr[i] + op1 * colorCr + 127) / 255);

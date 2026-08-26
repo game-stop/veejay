@@ -1,7 +1,7 @@
-/*
+/* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,9 +19,25 @@
  */
 
 #include "common.h"
+#include <veejaycore/vjmem.h>
 #include "complexinvert.h"
+#include <math.h>
 
 #define DIV255(x) (((x) + 1 + ((x) >> 8)) >> 8)
+
+typedef struct {
+    int n_threads;
+    int last_args[8];
+    int cos_q_fp;
+    int sin_q_fp;
+    int inv_wedge_slope_fp;
+    int inv_range_fp;
+    int black_clip_fp;
+    int spill_factor_fp;
+    int mag_fp;
+    int ut_i;
+    int vt_i;
+} complexinvert_t;
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -31,11 +47,15 @@ static inline int clampi(int v, int lo, int hi)
 vj_effect *complexinvert_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 8;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+
 
     ve->defaults[0] = 3000;
     ve->defaults[1] = 0;
@@ -79,9 +99,38 @@ vj_effect *complexinvert_init(int w, int h)
     return ve;
 }
 
-void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
+void *complexinvert_malloc(int w, int h)
 {
-    (void) ptr;
+    complexinvert_t *ci = (complexinvert_t*) vj_calloc(sizeof(complexinvert_t));
+    if(!ci)
+        return NULL;
+
+    for(int i = 0; i < 8; i++)
+        ci->last_args[i] = -999999;
+
+    ci->n_threads = vje_advise_num_threads(w * h);
+    return (void*) ci;
+}
+
+void complexinvert_free(void *ptr)
+{
+    if(!ptr)
+        return;
+    free(ptr);
+}
+
+static void complexinvert_update_cache(complexinvert_t *ci, const int *args)
+{
+    int changed = 0;
+    for(int i = 0; i < 8; i++) {
+        if(args[i] != ci->last_args[i]) {
+            changed = 1;
+            break;
+        }
+    }
+
+    if(!changed)
+        return;
 
     const int i_angle = args[0];
     const int r = args[1];
@@ -90,12 +139,6 @@ void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
     const int i_threshold = args[4];
     const int i_solidity = args[5];
     const int i_spill = args[6];
-    const int swap = args[7];
-    const int len = frame->len;
-
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
 
     int iy = 0;
     int iu = 128;
@@ -111,29 +154,59 @@ void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
         mag_f = 1.0f;
 
     const int scale = 4096;
-    const int cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
-    const int sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
+    ci->cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
+    ci->sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
+
     const float angle_rad = ((float)i_angle / 100.0f) * (float)(M_PI / 180.0f);
     float tan_v = tanf(angle_rad);
 
     if(tan_v > -0.0001f && tan_v < 0.0001f)
         tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
 
-    const int inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
+    ci->inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
     float diff = (float)i_solidity - (float)i_threshold;
 
     if(diff < 10.0f)
         diff = 10.0f;
 
-    const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
-    const int black_clip_fp = i_threshold * scale;
-    const int spill_factor_fp = (int)((((float)i_spill / 255.0f) / mag_f) * (float)scale);
-    const int mag_fp = (int)(mag_f * (float)scale);
-    const int ut_i = (int)ut_f;
-    const int vt_i = (int)vt_f;
-    const int n_threads = vje_advise_num_threads(len);
+    ci->inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
+    ci->black_clip_fp = i_threshold * scale;
+    ci->spill_factor_fp = (int)((((float)i_spill / 255.0f) / mag_f) * (float)scale);
+    ci->mag_fp = (int)(mag_f * (float)scale);
+    ci->ut_i = (int)ut_f;
+    ci->vt_i = (int)vt_f;
 
-    #pragma omp parallel for schedule(static) num_threads(n_threads)
+    for(int i = 0; i < 8; i++)
+        ci->last_args[i] = args[i];
+}
+
+void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
+{
+    complexinvert_t *ci = (complexinvert_t*) ptr;
+
+    const int len = frame->len;
+    const int swap = args[7];
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    #pragma omp single
+    {
+        complexinvert_update_cache(ci, args);
+    }
+
+    const int cos_q_fp = ci->cos_q_fp;
+    const int sin_q_fp = ci->sin_q_fp;
+    const int inv_wedge_slope_fp = ci->inv_wedge_slope_fp;
+    const int inv_range_fp = ci->inv_range_fp;
+    const int black_clip_fp = ci->black_clip_fp;
+    const int spill_factor_fp = ci->spill_factor_fp;
+    const int mag_fp = ci->mag_fp;
+    const int ut_i = ci->ut_i;
+    const int vt_i = ci->vt_i;
+
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;
@@ -156,8 +229,8 @@ void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
         {
             int suppress_fp = xx * spill_factor_fp;
 
-            if(suppress_fp > scale)
-                suppress_fp = scale;
+            if(suppress_fp > 4096)
+                suppress_fp = 4096;
 
             cur_u -= (suppress_fp * ut_i) >> 12;
             cur_v -= (suppress_fp * vt_i) >> 12;

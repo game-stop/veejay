@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -37,7 +37,13 @@
 
 typedef struct {
     uint8_t *binary_img;
-    int n_threads;
+
+    int cached_threshold;
+    int cached_mode;
+    int cached_width;
+    int cached_height;
+    uint16_t cached_kernel;
+    uint8_t *cached_dst;
 } morphology_t;
 
 static const uint16_t morphology_kernel_bits[8] = {
@@ -85,17 +91,6 @@ vj_effect *morphology_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_THRESHOLD] = 0; ve->limits[1][P_THRESHOLD] = 255; ve->defaults[P_THRESHOLD] = 140;
     ve->limits[0][P_KERNEL] = 0;    ve->limits[1][P_KERNEL] = 7;     ve->defaults[P_KERNEL] = 0;
     ve->limits[0][P_MODE] = 0;      ve->limits[1][P_MODE] = 1;       ve->defaults[P_MODE] = MORPH_DILATE;
@@ -132,6 +127,9 @@ vj_effect *morphology_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
@@ -149,16 +147,17 @@ void *morphology_malloc(int w, int h)
         return NULL;
     }
 
-    m->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) m;
 }
 
 void morphology_free(void *ptr)
 {
     morphology_t *m = (morphology_t*) ptr;
+    if(!m)
+        return;
 
-    free(m->binary_img);
+    if(m->binary_img)
+        free(m->binary_img);
     free(m);
 }
 
@@ -209,39 +208,59 @@ static void morphology_erode(uint8_t *restrict dst,
         }
     }
 }
+
 void morphology_apply(void *ptr, VJFrame *frame, int *args)
 {
     morphology_t *m = (morphology_t*) ptr;
 
-    const int threshold = clampi(args[P_THRESHOLD], 0, 255);
-    const int convolution_kernel = clampi(args[P_KERNEL], 0, 7);
-    const int mode = clampi(args[P_MODE], 0, 1);
-    const int channel = clampi(args[P_CHANNEL], 0, 1);
-    const int len = frame->len;
-    const int width = frame->width;
-    const int height = frame->height;
-    const int uv_len = frame->uv_len;
-    const uint16_t kernel = morphology_kernel_bits[convolution_kernel];
-
-    uint8_t *restrict dst = channel == MORPH_CHANNEL_ALPHA ? frame->data[3] : frame->data[0];
-    uint8_t *restrict binary_img = m->binary_img;
-
-    if(threshold == 0)
-        veejay_memcpy(binary_img, dst, len);
-
-    if(channel == MORPH_CHANNEL_LUMA) {
-        veejay_memset(frame->data[1], 128, uv_len);
-        veejay_memset(frame->data[2], 128, uv_len);
-    }
-
-#pragma omp parallel num_threads(m->n_threads)
+    #pragma omp single
     {
-        if(threshold != 0)
-            morphology_threshold_image(binary_img, dst, len, threshold);
+        const int threshold = clampi(args[P_THRESHOLD], 0, 255);
+        const int convolution_kernel = clampi(args[P_KERNEL], 0, 7);
+        const int mode = clampi(args[P_MODE], 0, 1);
+        const int channel = clampi(args[P_CHANNEL], 0, 1);
+        const int len = frame->len;
+        const int width = frame->width;
+        const int height = frame->height;
+        const int uv_len = frame->uv_len;
+        const uint16_t kernel = morphology_kernel_bits[convolution_kernel];
 
-        if(mode == MORPH_DILATE)
-            morphology_dilate(dst, binary_img, width, height, kernel);
-        else
-            morphology_erode(dst, binary_img, width, height, kernel);
+        uint8_t *dst = (channel == MORPH_CHANNEL_ALPHA && frame->data[3]) ? frame->data[3] : frame->data[0];
+        uint8_t *binary_img = m->binary_img;
+
+        if(threshold == 0)
+            veejay_memcpy(binary_img, dst, len);
+
+        if(channel == MORPH_CHANNEL_LUMA) {
+            veejay_memset(frame->data[1], 128, uv_len);
+            veejay_memset(frame->data[2], 128, uv_len);
+        }
+
+        m->cached_threshold = threshold;
+        m->cached_mode = mode;
+        m->cached_width = width;
+        m->cached_height = height;
+        m->cached_kernel = kernel;
+        m->cached_dst = dst;
     }
+
+    const int threshold = m->cached_threshold;
+    const int mode = m->cached_mode;
+    const int width = m->cached_width;
+    const int height = m->cached_height;
+    const uint16_t kernel = m->cached_kernel;
+    uint8_t *restrict dst = m->cached_dst;
+    uint8_t *restrict binary_img = m->binary_img;
+    const int len = frame->len;
+
+    if(!dst)
+        return;
+
+    if(threshold != 0)
+        morphology_threshold_image(binary_img, dst, len, threshold);
+
+    if(mode == MORPH_DILATE)
+        morphology_dilate(dst, binary_img, width, height, kernel);
+    else
+        morphology_erode(dst, binary_img, width, height, kernel);
 }

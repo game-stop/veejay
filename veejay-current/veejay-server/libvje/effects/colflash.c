@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2006 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2006-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,13 +20,13 @@
 
 #include "common.h"
 #include "colflash.h"
+#include <veejaycore/vjmem.h>
 
 typedef struct {
     int color_flash_;
     int color_delay_;
     int delay_;
 } colflash_t;
-
 
 vj_effect *colflash_init(int w, int h)
 {
@@ -50,17 +50,19 @@ vj_effect *colflash_init(int w, int h)
     ve->rgb_conv = 1;
     ve->param_description = vje_build_param_list(ve->num_params, "Frametime", "Red", "Green", "Blue", "Delay");
 
-    
-{
-    const vj_beat_param_hint_t beat_hints[] = {
-        VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_BPM, VJ_BEAT_OP_BEAT_TIME, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, 2, 30, 100, 100, 0, 0, 0, 1, 180, VJ_BEAT_COST_CHEAP, 90, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 92, 100, 0, 260, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 88, 100, 0, 300, 0, 1, 80, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_HAT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 84, 100, 0, 220, 0, 1, 80, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_INERTIA, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 1, 6, 78, 100, 0, 300, 0, 1, 120, VJ_BEAT_COST_CHEAP, 86, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-    };
-    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-}
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_BPM, VJ_BEAT_OP_BEAT_TIME, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, 2, 30, 100, 100, 0, 0, 0, 1, 180, VJ_BEAT_COST_CHEAP, 90, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_KICK, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 92, 100, 0, 260, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SNARE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 88, 100, 0, 300, 0, 1, 80, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_HAT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 0, 255, 84, 100, 0, 220, 0, 1, 80, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_INERTIA, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 1, 6, 78, 100, 0, 300, 0, 1, 120, VJ_BEAT_COST_CHEAP, 86, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
+
+    (void)w;
+    (void)h;
 
     return ve;
 }
@@ -68,6 +70,13 @@ vj_effect *colflash_init(int w, int h)
 void *colflash_malloc(int w, int h)
 {
     colflash_t *c = (colflash_t*) vj_calloc(sizeof(colflash_t));
+
+    if(!c)
+        return NULL;
+
+    c->color_flash_ = 0;
+    c->color_delay_ = 0;
+    c->delay_ = 0;
 
     (void) w;
     (void) h;
@@ -95,34 +104,38 @@ void colflash_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
 
-    if(d != c->delay_)
+    #pragma omp single
     {
-        c->delay_ = d;
-        c->color_delay_ = d;
-        c->color_flash_ = 0;
-    }
+        if(d != c->delay_)
+        {
+            c->delay_ = d;
+            c->color_delay_ = d;
+            c->color_flash_ = 0;
+        }
 
-    if(c->color_delay_ > 0)
-    {
-        int y = 0;
-        int u = 128;
-        int v = 128;
+        if(c->color_delay_ > 0)
+        {
+            int y = 0;
+            int u = 128;
+            int v = 128;
 
-        _rgb2yuv(r, g, b, y, u, v);
+            _rgb2yuv(r, g, b, y, u, v);
 
-        veejay_memset(frame->data[0], y, len);
-        veejay_memset(frame->data[1], u, uv_len);
-        veejay_memset(frame->data[2], v, uv_len);
+            veejay_memset(frame->data[0], y, len);
+            veejay_memset(frame->data[1], u, uv_len);
+            veejay_memset(frame->data[2], v, uv_len);
 
-        c->color_delay_--;
-        return;
-    }
+            c->color_delay_--;
+        }
+        else
+        {
+            c->color_flash_++;
 
-    c->color_flash_++;
-
-    if(c->color_flash_ >= f)
-    {
-        c->color_delay_ = c->delay_;
-        c->color_flash_ = 0;
+            if(c->color_flash_ >= f)
+            {
+                c->color_delay_ = c->delay_;
+                c->color_flash_ = 0;
+            }
+        }
     }
 }

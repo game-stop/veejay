@@ -63,6 +63,7 @@ void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int opacity = args[0];
     const int len = frame->len;
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -71,21 +72,21 @@ void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    if(opacity == 0)
-        return;
+    int skip_processing = 0;
 
-    if(opacity == 255)
+    #pragma omp single
     {
-        veejay_memcpy(Y, Y2, len);
-        veejay_memcpy(Cb, Cb2, uv_len);
-        veejay_memcpy(Cr, Cr2, uv_len);
-        return;
+        if(opacity == 0) {
+            skip_processing = 1;
+        } else if(opacity == 255) {
+            veejay_memcpy(Y, Y2, len);
+            veejay_memcpy(Cb, Cb2, uv_len);
+            veejay_memcpy(Cr, Cr2, uv_len);
+            skip_processing = 1;
+        }
     }
 
-    const int n_threads = vje_advise_num_threads(len);
-
-    #pragma omp parallel num_threads(n_threads)
-    {
+    if(!skip_processing) {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             Y[i] = dissolve_blend255(Y[i], Y2[i], opacity);

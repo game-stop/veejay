@@ -853,6 +853,7 @@ static inline int clampi(int v, int lo, int hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
+
 void colortemp_apply(void *ptr, VJFrame *frame, int *args)
 {
     (void) ptr;
@@ -870,40 +871,28 @@ void colortemp_apply(void *ptr, VJFrame *frame, int *args)
     int iy = pixel_Y_lo_;
     int iu = 128;
     int iv = 128;
-    uint64_t sum = 0;
-    const int n_threads = vje_advise_num_threads(len);
 
     _rgb2yuv(blackbody_t[temperature].r, blackbody_t[temperature].g, blackbody_t[temperature].b, iy, iu, iv);
-
     iu -= 128;
     iv -= 128;
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        if(mode == 1)
-        {
-#pragma omp for reduction(+:sum) schedule(static)
-            for(int i = 0; i < len; i++)
-                sum += Y[i];
-
-#pragma omp single
-            {
-                opacity = (int)(sum / (uint64_t)len);
-            }
+    if(mode == 1) {
+        uint64_t total_sum = 0;
+        for(int i = 0; i < len; i++) {
+            total_sum += Y[i];
         }
+        opacity = (int)(total_sum / (uint64_t)len);
+    }
 
 #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++)
-        {
-            int u = (int)U[i] - 128;
-            int v = (int)V[i] - 128;
+    for(int i = 0; i < uv_len; i++) {
+        int u = (int)U[i] - 128;
+        int v = (int)V[i] - 128;
 
-            u = 128 + (((opacity * (u - iu)) >> 8) + u);
-            v = 128 + (((opacity * (v - iv)) >> 8) + v);
+        u = 128 + (((opacity * (u - iu)) >> 8) + u);
+        v = 128 + (((opacity * (v - iv)) >> 8) + v);
 
-            U[i] = (uint8_t)clampi(u, 0, 255);
-            V[i] = (uint8_t)clampi(v, 0, 255);
-        }
+        U[i] = (uint8_t)clampi(u, 0, 255);
+        V[i] = (uint8_t)clampi(v, 0, 255);
     }
 }
-

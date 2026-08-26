@@ -31,6 +31,8 @@ static inline int complexopacity_clampi(int v, int lo, int hi)
 vj_effect *complexopacity_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 7;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -59,7 +61,7 @@ vj_effect *complexopacity_init(int w, int h)
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-
+    
     {
         const vj_beat_param_hint_t beat_hints[] = {
             VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_RATE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_LINEAR, 700, 8300, 60, 90, 0, 260, 0, 25, 0, VJ_BEAT_COST_CHEAP, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
@@ -72,6 +74,9 @@ vj_effect *complexopacity_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
+
+    (void)w;
+    (void)h;
 
     return ve;
 }
@@ -97,38 +102,12 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int swap = complexopacity_clampi(swap_arg, 0, 1);
     const int len = frame->len;
 
-    int iy = 0;
-    int iu = 128;
-    int iv = 128;
-
-    _rgb2yuv(r, g, b, iy, iu, iv);
-
-    const int scale = 4096;
-    const float ut_f = (float)iu - 128.0f;
-    const float vt_f = (float)iv - 128.0f;
-    float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
-
-    if(mag_f < 1.0f)
-        mag_f = 1.0f;
-
-    const int mag_fp = (int)(mag_f * (float)scale);
-    const int cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
-    const int sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
-    const float angle_rad = ((float)angle / 100.0f) * (float)(M_PI / 180.0f);
-    float tan_v = tanf(angle_rad);
-
-    if(tan_v > -0.0001f && tan_v < 0.0001f)
-        tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
-
-    const int inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
-    float diff = (float)solidity - (float)threshold;
-
-    if(diff < 1.0f)
-        diff = 1.0f;
-
-    const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
-    const int black_clip_fp = threshold * scale;
-    const int n_threads = vje_advise_num_threads(len);
+    int mag_fp = 0;
+    int cos_q_fp = 0;
+    int sin_q_fp = 0;
+    int inv_wedge_slope_fp = 0;
+    int inv_range_fp = 0;
+    int black_clip_fp = 0;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -138,7 +117,41 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp single copyprivate(mag_fp, cos_q_fp, sin_q_fp, inv_wedge_slope_fp, inv_range_fp, black_clip_fp)
+    {
+        int iy = 0;
+        int iu = 128;
+        int iv = 128;
+        _rgb2yuv(r, g, b, iy, iu, iv);
+
+        const int scale = 4096;
+        const float ut_f = (float)iu - 128.0f;
+        const float vt_f = (float)iv - 128.0f;
+        float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
+
+        if(mag_f < 1.0f)
+            mag_f = 1.0f;
+
+        mag_fp = (int)(mag_f * (float)scale);
+        cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
+        sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
+        const float angle_rad = ((float)angle / 100.0f) * (float)(M_PI / 180.0f);
+        float tan_v = tanf(angle_rad);
+
+        if(tan_v > -0.0001f && tan_v < 0.0001f)
+            tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
+
+        inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
+        float diff = (float)solidity - (float)threshold;
+
+        if(diff < 1.0f)
+            diff = 1.0f;
+
+        inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
+        black_clip_fp = threshold * scale;
+    }
+
+    #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;

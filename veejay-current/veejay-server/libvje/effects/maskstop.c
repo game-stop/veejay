@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2005 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2005-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * vvMaskStop - ported from vvFFPP_basic
  * Copyright(C)2005 Maciek Szczesniak <maciek@visualvinyl.net>
@@ -9,7 +9,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -23,6 +23,7 @@
 
 #include "common.h"
 #include "maskstop.h"
+#include <veejaycore/vjmem.h>
 
 #define MASKSTOP_PARAMS 4
 
@@ -35,7 +36,9 @@ typedef struct {
     uint8_t *vvmaskstop_buffer[6];
     int frq_frame;
     int frq_mask;
-    int n_threads;
+
+    int cached_negmask;
+    int cached_swapmask;
 } vvmask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -64,17 +67,6 @@ vj_effect *maskstop_init(int width, int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_NEGATE_MASK] = 0;
     ve->defaults[P_SWAP_MASK] = 0;
@@ -113,6 +105,9 @@ vj_effect *maskstop_init(int width, int height)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)width;
+    (void)height;
+
     return ve;
 }
 
@@ -144,7 +139,6 @@ void *maskstop_malloc(int width, int height)
 
     v->frq_frame = 256;
     v->frq_mask = 256;
-    v->n_threads = vje_advise_num_threads(len);
 
     return (void*) v;
 }
@@ -152,8 +146,11 @@ void *maskstop_malloc(int width, int height)
 void maskstop_free(void *ptr)
 {
     vvmask_t *v = (vvmask_t*) ptr;
+    if(!v)
+        return;
 
-    free(v->vvmaskstop_buffer[0]);
+    if(v->vvmaskstop_buffer[0])
+        free(v->vvmaskstop_buffer[0]);
     free(v);
 }
 
@@ -172,7 +169,7 @@ static void maskstop_blend(vvmask_t *v, VJFrame *frame, int swapmask, int negmas
     uint8_t *restrict Udest = frame->data[1];
     uint8_t *restrict Vdest = frame->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(v->n_threads)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         if(swapmask) {
             if(negmask) {
@@ -202,32 +199,38 @@ void maskstop_apply(void *ptr, VJFrame *frame, int *args)
 {
     vvmask_t *v = (vvmask_t*) ptr;
 
-    const int negmask = args[P_NEGATE_MASK];
-    const int swapmask = args[P_SWAP_MASK];
-    const int framefreq = args[P_FRAME_FREQ];
-    const int maskfreq = args[P_MASK_FREQ];
-    const int len = frame->len;
+    #pragma omp single
+    {
+        const int negmask = args[P_NEGATE_MASK];
+        const int swapmask = args[P_SWAP_MASK];
+        const int framefreq = args[P_FRAME_FREQ];
+        const int maskfreq = args[P_MASK_FREQ];
+        const int len = frame->len;
 
-    uint8_t *restrict Ydest = frame->data[0];
-    uint8_t *restrict Udest = frame->data[1];
-    uint8_t *restrict Vdest = frame->data[2];
+        uint8_t *Ydest = frame->data[0];
+        uint8_t *Udest = frame->data[1];
+        uint8_t *Vdest = frame->data[2];
 
-    v->frq_frame += framefreq;
-    v->frq_mask += maskfreq;
+        v->frq_frame += framefreq;
+        v->frq_mask += maskfreq;
 
-    if(v->frq_frame > 255) {
-        veejay_memcpy(v->vvmaskstop_buffer[0], Ydest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[1], Udest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[2], Vdest, len);
-        v->frq_frame = 0;
+        if(v->frq_frame > 255) {
+            veejay_memcpy(v->vvmaskstop_buffer[0], Ydest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[1], Udest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[2], Vdest, len);
+            v->frq_frame = 0;
+        }
+
+        if(v->frq_mask > 255) {
+            veejay_memcpy(v->vvmaskstop_buffer[3], Ydest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[4], Udest, len);
+            veejay_memcpy(v->vvmaskstop_buffer[5], Vdest, len);
+            v->frq_mask = 0;
+        }
+
+        v->cached_negmask = negmask;
+        v->cached_swapmask = swapmask;
     }
 
-    if(v->frq_mask > 255) {
-        veejay_memcpy(v->vvmaskstop_buffer[3], Ydest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[4], Udest, len);
-        veejay_memcpy(v->vvmaskstop_buffer[5], Vdest, len);
-        v->frq_mask = 0;
-    }
-
-    maskstop_blend(v, frame, swapmask, negmask);
+    maskstop_blend(v, frame, v->cached_swapmask, v->cached_negmask);
 }

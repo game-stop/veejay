@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2015 Niels Elburg <nelburg@gmail.com>
+ * Copyright(C)2015-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,11 +20,14 @@
 
 #include "common.h"
 #include "alphaselect.h"
+#include <veejaycore/vjmem.h>
+#include <math.h>
 
 vj_effect *alphaselect_init(int w, int h)
 {
-    vj_effect *ve;
-    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if (!ve)
+        return NULL;
 
     ve->num_params = 8;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -60,12 +63,20 @@ vj_effect *alphaselect_init(int w, int h)
     ve->param_description = vje_build_param_list(ve->num_params,
         "Hue Angle", "Red", "Green", "Blue", "Threshold", "Solidity", "Show Mask", "Invert");
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
-
 void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
 {
+    (void)ptr;
+
+    uint8_t *restrict A = frame->data[3];
+    if (!A)
+        return;
+
     const int i_angle   = args[0];
     const int r         = args[1];
     const int g         = args[2];
@@ -76,15 +87,13 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
     const int invert    = args[7];
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
-
+    
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
-    uint8_t *restrict A  = frame->data[3];
 
-    int iy = 0, iu = 128, iv = 128;
-    _rgb2yuv(r, g, b, iy, iu, iv);
+    int iy = 0, iu = 128, iv = 128;    
+    _rgb2yuv(r, g, b, iy, iu, iv); 
 
     const int SCALE = 4096;
 
@@ -110,41 +119,36 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
     const int inv_range_fp = (int)((255.0f / diff) * (1 << 8));
     const int black_clip_fp = (int)(threshold * SCALE);
 
-    #pragma omp parallel num_threads(n_threads)
+    #pragma omp for schedule(static)
+    for (int pos = 0; pos < len; pos++)
     {
-        #pragma omp for schedule(static)
-        for (int pos = 0; pos < len; pos++)
+        const int uc = (int)Cb[pos] - 128;
+        const int vc = (int)Cr[pos] - 128;
+
+        const int xx = (uc * cos_q_fp + vc * sin_q_fp);
+        const int yy = (vc * cos_q_fp - uc * sin_q_fp);
+
+        const int abs_yy = (yy < 0) ? -yy : yy;
+        const int dx = mag_fp - xx;
+        const int abs_dx = (dx < 0) ? -dx : dx;
+
+        int dist_fp = abs_dx + ((abs_yy * inv_wedge_slope_fp) >> 12);
+
+        int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+
+        if (alpha < 0) alpha = 0;
+        if (alpha > 255) alpha = 255;
+
+        if (invert)
+            alpha = 255 - alpha;
+
+        A[pos] = (uint8_t)alpha;
+
+        if (show_mask)
         {
-            const int uc = (int)Cb[pos] - 128;
-            const int vc = (int)Cr[pos] - 128;
-
-            const int xx = (uc * cos_q_fp + vc * sin_q_fp);
-            const int yy = (vc * cos_q_fp - uc * sin_q_fp);
-
-            const int abs_yy = (yy < 0) ? -yy : yy;
-            const int dx = mag_fp - xx;
-            const int abs_dx = (dx < 0) ? -dx : dx;
-
-            int dist_fp =
-                abs_dx +
-                ((abs_yy * inv_wedge_slope_fp) >> 12);
-
-            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
-
-            if (alpha < 0) alpha = 0;
-            if (alpha > 255) alpha = 255;
-
-            if (invert)
-                alpha = 255 - alpha;
-
-            A[pos] = (uint8_t)alpha;
-
-            if (show_mask)
-            {
-                Y[pos]  = (uint8_t)alpha;
-                Cb[pos] = 128;
-                Cr[pos] = 128;
-            }
+            Y[pos]  = (uint8_t)alpha;
+            Cb[pos] = 128;
+            Cr[pos] = 128;
         }
     }
 }

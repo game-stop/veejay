@@ -1,4 +1,5 @@
-/* * Linux VeeJay
+/* 
+ * Linux VeeJay
  *
  * Copyright(C)2023 Niels Elburg <nwelburg@gmail.com>
  *
@@ -98,7 +99,6 @@ void *boxfit_malloc(int w, int h)
     s->buf[2] = s->buf[1] + plane_size;
     s->integralU = s->integralY + integral_size;
     s->integralV = s->integralU + integral_size;
-    s->n_threads = vje_advise_num_threads(plane_size);
 
     return s;
 }
@@ -157,7 +157,7 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
         size_lut[i] = boxfit_clampi(sz, min_s, max_s);
     }
 
-    #pragma omp parallel for num_threads(s->n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int c = 0; c < 3; c++)
     {
         const uint8_t *restrict src = frame->data[c];

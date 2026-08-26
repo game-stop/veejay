@@ -65,6 +65,11 @@ typedef struct {
     int small_len;
     int max_sdim;
     int n_threads;
+
+    int radius;
+    float eps;
+    float chroma_strength;
+    int mix_q8;
 } smartblur_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -126,13 +131,7 @@ vj_effect *smartblur_init(int w, int h)
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->limits[0][P_RADIUS] = 1;
     ve->limits[1][P_RADIUS] = 100;
@@ -216,8 +215,7 @@ void *smartblur_malloc(int w, int h)
     s->sh = (h + 1) >> 1;
     s->small_len = s->sw * s->sh;
     s->max_sdim = (s->sw > s->sh) ? s->sw : s->sh;
-
-    s->n_threads = vje_advise_num_threads(s->len);
+    s->n_threads = vje_advise_num_threads(w * h);
 
     const size_t small_bytes = (size_t)s->small_len;
     const size_t plane_bytes = (size_t)s->len;
@@ -356,42 +354,40 @@ static void smartblur_build_coefficients(smartblur_t *s, int r, float eps, float
         }
     }
 
-    {
+#pragma omp for schedule(static)
+    for(int x = 0; x < sw; x++) {
         const int tid = omp_get_thread_num();
 
         float *restrict colI  = s->mI  + (size_t)tid * (size_t)(max_sdim + 1);
         float *restrict colII = s->mII + (size_t)tid * (size_t)(max_sdim + 1);
 
-#pragma omp for schedule(static)
-        for(int x = 0; x < sw; x++) {
-            colI[0] = 0.0f;
-            colII[0] = 0.0f;
+        colI[0] = 0.0f;
+        colII[0] = 0.0f;
 
-            for(int y = 0; y < sh; y++) {
-                const int idx = y * sw + x;
+        for(int y = 0; y < sh; y++) {
+            const int idx = y * sw + x;
 
-                colI[y + 1] = colI[y] + s->tmp_mu[idx];
-                colII[y + 1] = colII[y] + s->tmp_var[idx];
-            }
+            colI[y + 1] = colI[y] + s->tmp_mu[idx];
+            colII[y + 1] = colII[y] + s->tmp_var[idx];
+        }
 
-            for(int y = 0; y < sh; y++) {
-                const int r1 = (y - r < 0) ? 0 : y - r;
-                const int r2 = (y + r >= sh) ? sh - 1 : y + r;
-                const int count = r2 - r1 + 1;
-                const float ic = inv[count];
+        for(int y = 0; y < sh; y++) {
+            const int r1 = (y - r < 0) ? 0 : y - r;
+            const int r2 = (y + r >= sh) ? sh - 1 : y + r;
+            const int count = r2 - r1 + 1;
+            const float ic = inv[count];
 
-                const float mu = (colI[r2 + 1] - colI[r1]) * ic;
-                float var = (colII[r2 + 1] - colII[r1]) * ic - mu * mu;
+            const float mu = (colI[r2 + 1] - colI[r1]) * ic;
+            float var = (colII[r2 + 1] - colII[r1]) * ic - mu * mu;
 
-                if(var < 0.0f)
-                    var = 0.0f;
+            if(var < 0.0f)
+                var = 0.0f;
 
-                const float a = var / (var + eps);
-                const int idx = y * sw + x;
+            const float a = var / (var + eps);
+            const int idx = y * sw + x;
 
-                s->a_buf[idx] = a;
-                s->b_buf[idx] = (1.0f - a) * mu;
-            }
+            s->a_buf[idx] = a;
+            s->b_buf[idx] = (1.0f - a) * mu;
         }
     }
 }
@@ -520,42 +516,48 @@ void smartblur_apply(void *ptr, VJFrame *frame, int *args)
     const int mix_drive_arg = args[P_MIX_DRIVE];
     const float lane_smooth = 0.52f;
 
-    s->sm_radius = smartblur_smooth_lane(s->sm_radius, (float)radius_arg, lane_smooth, 0.11f);
-    s->sm_sharpness = smartblur_smooth_lane(s->sm_sharpness, (float)sharpness_arg, lane_smooth, 0.13f);
-    s->sm_chroma = smartblur_smooth_lane(s->sm_chroma, (float)chroma_arg, lane_smooth, 0.13f);
-    s->sm_mix = smartblur_smooth_lane(s->sm_mix, (float)mix_arg, lane_smooth, 0.13f);
-    s->sm_radius_drive = smartblur_smooth_lane(s->sm_radius_drive, (float)radius_drive_arg, lane_smooth, 0.16f);
-    s->sm_sharpness_drive = smartblur_smooth_lane(s->sm_sharpness_drive, (float)sharpness_drive_arg, lane_smooth, 0.16f);
-    s->sm_mix_drive = smartblur_smooth_lane(s->sm_mix_drive, (float)mix_drive_arg, lane_smooth, 0.16f);
-
-    const int radius_boost = (int)((s->sm_radius_drive * 38.0f) * 0.001f + 0.5f);
-    int radius = (int)(s->sm_radius + 0.5f) + radius_boost;
-    radius = clampi(radius, 1, 100);
-
-    const int sharpness_boost = (int)((s->sm_sharpness_drive * 820.0f) * 0.001f + 0.5f);
-    int sharpness = (int)(s->sm_sharpness + 0.5f) + sharpness_boost;
-    sharpness = clampi(sharpness, 1, 1000);
-
-    int chroma = (int)(s->sm_chroma + 0.5f);
-    chroma = clampi(chroma, 0, 100);
-
-    int mix = (int)(s->sm_mix + 0.5f);
-    mix -= (int)((s->sm_mix_drive * 420.0f) * 0.001f + 0.5f);
-    mix = clampi(mix, 0, 1000);
-
-    float eps = (float)sharpness * 0.1f;
-    eps *= eps;
-
-    if(eps < 0.0001f)
-        eps = 0.0001f;
-
-    const float chroma_strength = (float)chroma * 0.01f;
-    const int mix_q8 = (mix * 256 + 500) / 1000;
-
-#pragma omp parallel num_threads(s->n_threads)
+    #pragma omp single
     {
-        smartblur_process_plane(s, frame->data[0], s->len, radius, eps, 0.0f,   1.0f,            1, mix_q8, 0);
-        smartblur_process_plane(s, frame->data[1], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
-        smartblur_process_plane(s, frame->data[2], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+        s->sm_radius = smartblur_smooth_lane(s->sm_radius, (float)radius_arg, lane_smooth, 0.11f);
+        s->sm_sharpness = smartblur_smooth_lane(s->sm_sharpness, (float)sharpness_arg, lane_smooth, 0.13f);
+        s->sm_chroma = smartblur_smooth_lane(s->sm_chroma, (float)chroma_arg, lane_smooth, 0.13f);
+        s->sm_mix = smartblur_smooth_lane(s->sm_mix, (float)mix_arg, lane_smooth, 0.13f);
+        s->sm_radius_drive = smartblur_smooth_lane(s->sm_radius_drive, (float)radius_drive_arg, lane_smooth, 0.16f);
+        s->sm_sharpness_drive = smartblur_smooth_lane(s->sm_sharpness_drive, (float)sharpness_drive_arg, lane_smooth, 0.16f);
+        s->sm_mix_drive = smartblur_smooth_lane(s->sm_mix_drive, (float)mix_drive_arg, lane_smooth, 0.16f);
+
+        const int radius_boost = (int)((s->sm_radius_drive * 38.0f) * 0.001f + 0.5f);
+        int radius = (int)(s->sm_radius + 0.5f) + radius_boost;
+        s->radius = clampi(radius, 1, 100);
+
+        const int sharpness_boost = (int)((s->sm_sharpness_drive * 820.0f) * 0.001f + 0.5f);
+        int sharpness = (int)(s->sm_sharpness + 0.5f) + sharpness_boost;
+        sharpness = clampi(sharpness, 1, 1000);
+
+        int chroma = (int)(s->sm_chroma + 0.5f);
+        chroma = clampi(chroma, 0, 100);
+
+        int mix = (int)(s->sm_mix + 0.5f);
+        mix -= (int)((s->sm_mix_drive * 420.0f) * 0.001f + 0.5f);
+        mix = clampi(mix, 0, 1000);
+
+        float eps = (float)sharpness * 0.1f;
+        eps *= eps;
+
+        if(eps < 0.0001f)
+            eps = 0.0001f;
+
+        s->eps = eps;
+        s->chroma_strength = (float)chroma * 0.01f;
+        s->mix_q8 = (mix * 256 + 500) / 1000;
     }
+
+    const int radius = s->radius;
+    const float eps = s->eps;
+    const float chroma_strength = s->chroma_strength;
+    const int mix_q8 = s->mix_q8;
+
+    smartblur_process_plane(s, frame->data[0], s->len, radius, eps, 0.0f,   1.0f,            1, mix_q8, 0);
+    smartblur_process_plane(s, frame->data[1], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
+    smartblur_process_plane(s, frame->data[2], s->len, radius, eps, 128.0f, chroma_strength, 0, mix_q8, 1);
 }

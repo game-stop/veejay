@@ -153,16 +153,6 @@ vj_effect *kineticdisplay_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_AMOUNT] = 0;      ve->limits[1][P_AMOUNT] = 100;       ve->defaults[P_AMOUNT] = 100;
     ve->limits[0][P_CELL_SIZE] = 4;   ve->limits[1][P_CELL_SIZE] = 64;     ve->defaults[P_CELL_SIZE] = 12;
@@ -249,7 +239,6 @@ void *kineticdisplay_malloc(int w, int h)
     k->w = w;
     k->h = h;
     k->len = w * h;
-    k->n_threads = vje_advise_num_threads(k->len);
     k->max_cols = (w + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_rows = (h + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_cells = k->max_cols * k->max_rows;
@@ -798,56 +787,60 @@ void kineticdisplay_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    const int amount = args[P_AMOUNT];
-    const int cell_size = args[P_CELL_SIZE];
-    const int threshold = args[P_THRESHOLD];
-    const int dither = args[P_DITHER];
-    const int speed = args[P_FLIP_SPEED];
-    const int lag = args[P_LAG];
-    const int persistence = args[P_PERSIST];
-    const int brightness = args[P_BRIGHTNESS];
-    const int contrast = args[P_CONTRAST];
-    const int mode = args[P_MODE];
-    const int motion_react = args[P_MOTION];
-    const int reset = args[P_RESET];
+    int amount = args[P_AMOUNT];
+    int cell_size = args[P_CELL_SIZE];
+    int threshold = args[P_THRESHOLD];
+    int dither = args[P_DITHER];
+    int speed = args[P_FLIP_SPEED];
+    int lag = args[P_LAG];
+    int persistence = args[P_PERSIST];
+    int brightness = args[P_BRIGHTNESS];
+    int contrast = args[P_CONTRAST];
+    int mode = args[P_MODE];
+    int motion_react = args[P_MOTION];
+    int reset = args[P_RESET];
 
-    if(cell_size != k->last_cell_size) {
-        kd_configure_grid(k, cell_size);
-        kd_clear_cells(k);
-        k->seeded = 0;
-    }
+    int do_reconfigure = (cell_size != k->last_cell_size);
+    int do_seed = (!k->seeded || (reset && !k->last_reset)) || do_reconfigure;
 
-    const int do_seed = !k->seeded || (reset && !k->last_reset);
-    k->last_reset = reset;
-
-#pragma omp parallel num_threads(k->n_threads)
+    #pragma omp single
     {
-        if(do_seed) {
-            kd_seed_cells(k, Y, U, V, cell_size);
-
-#pragma omp for schedule(static)
-            for(int i = 0; i < k->len; i++)
-                k->prev_y[i] = Y[i];
+        if(do_reconfigure) {
+            kd_configure_grid(k, cell_size);
+            kd_clear_cells(k);
+            k->seeded = 0;
         }
+        k->last_reset = reset;
+    }
+    
+    if(do_seed) {
+        kd_seed_cells(k, Y, U, V, cell_size);
 
-        if(amount > 0) {
-            kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode);
-
-#pragma omp for schedule(static)
-            for(int i = 0; i < k->len; i++)
-                k->prev_y[i] = Y[i];
-
-            kd_render_cells(k, frame, cell_size, amount, brightness, mode);
-        }
-        else {
-#pragma omp for schedule(static)
-            for(int i = 0; i < k->len; i++)
-                k->prev_y[i] = Y[i];
-        }
+        #pragma omp for schedule(static)
+        for(int i = 0; i < k->len; i++)
+            k->prev_y[i] = Y[i];
     }
 
-    if(do_seed)
-        k->seeded = 1;
+    if(amount > 0) {
+        kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode);
 
-    k->frame++;
+        #pragma omp for schedule(static)
+        for(int i = 0; i < k->len; i++)
+            k->prev_y[i] = Y[i];
+
+        kd_render_cells(k, frame, cell_size, amount, brightness, mode);
+    }
+    else {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < k->len; i++)
+            k->prev_y[i] = Y[i];
+    }
+
+    #pragma omp single
+    {
+        if(do_seed)
+            k->seeded = 1;
+
+        k->frame++;
+    }
 }

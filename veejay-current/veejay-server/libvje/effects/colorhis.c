@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2007 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2007-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,9 +19,11 @@
  */
 
 #include "common.h"
+#include "hist.h"
 #include "colorhis.h"
 #include <veejaycore/yuvconv.h>
 #include <libavutil/pixfmt.h>
+#include <veejaycore/vjmem.h>
 
 typedef struct {
     void *histogram_;
@@ -29,16 +31,22 @@ typedef struct {
     uint8_t *rgb_;
     void *convert_yuv;
     void *convert_rgb;
+
+    int skip_processing;
 } colorhis_t;
 
 vj_effect *colorhis_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    
 
     ve->limits[0][0] = 0; ve->limits[1][0] = 3;   ve->defaults[0] = 0;
     ve->limits[0][1] = 0; ve->limits[1][1] = 1;   ve->defaults[1] = 0;
@@ -54,16 +62,18 @@ vj_effect *colorhis_init(int w, int h)
 
     vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Red Channel", "Green Channel", "Blue Channel", "All Channels");
 
-    
-{
-    const vj_beat_param_hint_t beat_hints[] = {
-        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 64, 245, 74, 100, 80, 900, 0, 1, 0, VJ_BEAT_COST_CHEAP, 88, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 48, 240, 82, 100, 0, 520, 0, 1, 0, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-    };
-    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-}
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 64, 245, 74, 100, 80, 900, 0, 1, 0, VJ_BEAT_COST_CHEAP, 88, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_CONTRAST, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 48, 240, 82, 100, 0, 520, 0, 1, 0, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
+
+    (void)w;
+    (void)h;
 
     return ve;
 }
@@ -82,7 +92,7 @@ void *colorhis_malloc(int w, int h)
         return NULL;
     }
 
-    c->rgb_ = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h * 3));
+    c->rgb_ = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)w * (size_t)h * 3u);
 
     if(!c->rgb_) {
         veejay_histogram_del(c->histogram_);
@@ -136,28 +146,39 @@ void colorhis_apply(void *ptr, VJFrame *frame, int *args)
     const int intensity = args[2];
     const int strength = args[3];
 
-    if(!c->convert_yuv)
-        c->convert_yuv = yuv_fx_context_create(frame, c->rgb_frame_);
+    #pragma omp single
+    {
+        if(!c->convert_yuv)
+            c->convert_yuv = yuv_fx_context_create(frame, c->rgb_frame_);
 
-    if(!c->convert_yuv)
+        if(!c->convert_yuv) {
+            c->skip_processing = 1;
+        } else {
+            c->skip_processing = 0;
+            if(draw != 0 && !c->convert_rgb)
+                c->convert_rgb = yuv_fx_context_create(c->rgb_frame_, frame);
+        }
+    }
+
+    if(c->skip_processing)
         return;
 
+    #pragma omp single
     yuv_fx_context_process(c->convert_yuv, frame, c->rgb_frame_);
 
     if(draw == 0)
     {
         veejay_histogram_draw_rgb(c->histogram_, frame, c->rgb_, intensity, strength, mode);
-        return;
     }
+    else
+    {
+        veejay_histogram_analyze_rgb(c->histogram_, c->rgb_, frame);
+        veejay_histogram_equalize_rgb(c->histogram_, frame, c->rgb_, intensity, strength, mode);
 
-    veejay_histogram_analyze_rgb(c->histogram_, c->rgb_, frame);
-    veejay_histogram_equalize_rgb(c->histogram_, frame, c->rgb_, intensity, strength, mode);
-
-    if(!c->convert_rgb)
-        c->convert_rgb = yuv_fx_context_create(c->rgb_frame_, frame);
-
-    if(!c->convert_rgb)
-        return;
-
-    yuv_fx_context_process(c->convert_rgb, c->rgb_frame_, frame);
+        #pragma omp single
+        {
+            if(c->convert_rgb)
+                yuv_fx_context_process(c->convert_rgb, c->rgb_frame_, frame);
+        }
+    }
 }

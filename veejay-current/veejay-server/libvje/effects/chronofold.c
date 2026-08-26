@@ -40,7 +40,7 @@
 #define CF_COLOR_THERMAL    3
 #define CF_COLOR_INVERT     4
 
-#define CF_OMP_FOR _Pragma("omp parallel for schedule(static) num_threads(c->n_threads)")
+#define CF_OMP_FOR _Pragma("omp for schedule(static)")
 
 typedef struct {
     int w;
@@ -139,17 +139,6 @@ vj_effect *chronofold_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-
-        free(ve);
-        return NULL;
-    }
     /*
      * input frame + adaptive reference + temporal difference
      *     -> event field
@@ -226,33 +215,28 @@ vj_effect *chronofold_init(int w, int h)
     );
     
     
-{
-    const vj_beat_param_hint_t beat_hints[] = {
-        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 20, 220, 82, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 520, 980, 68, 100, 60, 720, 0, 2, 220, VJ_BEAT_COST_MODERATE, 90, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 88, 100, 0, 380, 0, 2, 160, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_INERTIA, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 40, 520, 42, 82, 120, 1100, 0, 4, 300, VJ_BEAT_COST_MODERATE, 58, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 60, 1000, 84, 100, 0, 440, 0, 2, 180, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SQUARE, 0, 320, 50, 92, 0, 520, 0, 2, 300, VJ_BEAT_COST_MODERATE, 48, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 260, 30, 70, 180, 1500, 0, 2, 320, VJ_BEAT_COST_MODERATE, 42, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 280, 1000, 88, 100, 0, 420, 80, 2, 120, VJ_BEAT_COST_CHEAP, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-    };
-    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-}
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 20, 220, 82, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 520, 980, 68, 100, 60, 720, 0, 2, 220, VJ_BEAT_COST_MODERATE, 90, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 88, 100, 0, 380, 0, 2, 160, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_INERTIA, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 40, 520, 42, 82, 120, 1100, 0, 4, 300, VJ_BEAT_COST_MODERATE, 58, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 60, 1000, 84, 100, 0, 440, 0, 2, 180, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SQUARE, 0, 320, 50, 92, 0, 520, 0, 2, 300, VJ_BEAT_COST_MODERATE, 48, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 260, 30, 70, 180, 1500, 0, 2, 320, VJ_BEAT_COST_MODERATE, 42, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 280, 1000, 88, 100, 0, 420, 80, 2, 120, VJ_BEAT_COST_CHEAP, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }
 
 void *chronofold_malloc(int w, int h)
 {
-    chronofold_t *c;
-
-    if(w <= 0 || h <= 0)
-        return NULL;
-
-    c = (chronofold_t *) vj_calloc(sizeof(chronofold_t));
+    chronofold_t *c = (chronofold_t *) vj_calloc(sizeof(chronofold_t));
     if(!c)
         return NULL;
 
@@ -264,7 +248,6 @@ void *chronofold_malloc(int w, int h)
     c->lut_valid = 0;
     c->last_color_mode = -1;
 
-    c->n_threads = vje_advise_num_threads(w * h);
 
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
 
@@ -336,7 +319,7 @@ static void cf_seed(chronofold_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-    CF_OMP_FOR
+    /* Removed CF_OMP_FOR to prevent nested work-sharing deadlock */
     for(i = 0; i < len; i++) {
         c->ref_y[i] = Y[i];
 
@@ -880,56 +863,44 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronofold_t *c = (chronofold_t *) ptr;
 
-    int threshold;
-    int decay;
-    int gain;
-    int memory;
-    int trail;
-    int color_mode;
-    int noise;
-    int source_bleed;
-    int flash_gain;
-    int color_energy;
+    int threshold    = cf_scale_1000_to_255(args[P_THRESHOLD]);
+    int decay        = cf_scale_1000_to_255(args[P_DECAY]);
+    int gain         = cf_scale_1000_to_255(args[P_GAIN]);
+    int memory       = cf_clampi(cf_scale_1000_to_255(args[P_MEMORY]), 1, 255);
+    int trail        = cf_scale_1000_to_255(args[P_TRAIL]);
+    int color_mode   = cf_clampi(args[P_COLOR_MODE], 0, 4);
+    int noise        = cf_scale_1000_to_255(args[P_NOISE]);
+    int source_bleed = cf_scale_1000_to_255(args[P_SOURCE_BLEED]);
+    int flash_gain   = cf_clampi(args[P_FLASH_GAIN], 0, 1000);
+    int color_energy = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    int use_white = (color_mode == CF_COLOR_WHITE);
+    int use_trail = (trail > 0);
+    int use_noise = (noise > 0);
 
     uint8_t *swap;
 
-    int use_white;
-    int use_trail;
-    int use_noise;
+    #pragma omp single
+    {
+        if(!c->seeded)
+            cf_seed(c, frame);
 
-    if(!c->seeded)
-        cf_seed(c, frame);
+        if(c->last_color_mode == CF_COLOR_WHITE && !use_white)
+            cf_neutralize_chroma_buffers(c);
 
-    threshold    = cf_scale_1000_to_255(args[P_THRESHOLD]);
-    decay        = cf_scale_1000_to_255(args[P_DECAY]);
-    gain         = cf_scale_1000_to_255(args[P_GAIN]);
-    memory       = cf_clampi(cf_scale_1000_to_255(args[P_MEMORY]), 1, 255);
-    trail        = cf_scale_1000_to_255(args[P_TRAIL]);
-    color_mode   = cf_clampi(args[P_COLOR_MODE], 0, 4);
-    noise        = cf_scale_1000_to_255(args[P_NOISE]);
-    source_bleed = cf_scale_1000_to_255(args[P_SOURCE_BLEED]);
-    flash_gain   = cf_clampi(args[P_FLASH_GAIN], 0, 1000);
-    color_energy = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
-
-    use_white = (color_mode == CF_COLOR_WHITE);
-    use_trail = (trail > 0);
-    use_noise = (noise > 0);
-
-    if(c->last_color_mode == CF_COLOR_WHITE && !use_white)
-        cf_neutralize_chroma_buffers(c);
-
-    cf_build_luts_if_needed(
-        c,
-        threshold,
-        decay,
-        gain,
-        memory,
-        trail,
-        noise,
-        source_bleed,
-        flash_gain,
-        color_energy
-    );
+        cf_build_luts_if_needed(
+            c,
+            threshold,
+            decay,
+            gain,
+            memory,
+            trail,
+            noise,
+            source_bleed,
+            flash_gain,
+            color_energy
+        );
+    }
 
     if(use_white) {
         if(use_trail) {
@@ -945,10 +916,12 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
                 cf_compute_white_plain(c, frame);
         }
 
-        swap = c->ev_y;
-        c->ev_y = c->nx_y;
-        c->nx_y = swap;
-
+        #pragma omp single
+        {
+            swap = c->ev_y;
+            c->ev_y = c->nx_y;
+            c->nx_y = swap;
+        }
     }
     else {
         if(use_trail) {
@@ -964,17 +937,20 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
                 cf_compute_color_plain(c, frame, color_mode);
         }
 
-        swap = c->ev_y;
-        c->ev_y = c->nx_y;
-        c->nx_y = swap;
+        #pragma omp single
+        {
+            swap = c->ev_y;
+            c->ev_y = c->nx_y;
+            c->nx_y = swap;
 
-        swap = c->ev_u;
-        c->ev_u = c->nx_u;
-        c->nx_u = swap;
+            swap = c->ev_u;
+            c->ev_u = c->nx_u;
+            c->nx_u = swap;
 
-        swap = c->ev_v;
-        c->ev_v = c->nx_v;
-        c->nx_v = swap;
+            swap = c->ev_v;
+            c->ev_v = c->nx_v;
+            c->nx_v = swap;
+        }
     }
 
     if(use_white) {
@@ -990,6 +966,9 @@ void chronofold_apply(void *ptr, VJFrame *frame, int *args)
             cf_render_color_bleed(c, frame);
     }
 
-    c->last_color_mode = color_mode;
-    c->frame++;
+    #pragma omp single
+    {
+        c->last_color_mode = color_mode;
+        c->frame++;
+    }
 }

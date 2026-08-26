@@ -63,8 +63,6 @@ static inline uint8_t threshold_blend_neutral_uv(uint8_t b, int q8)
     return (uint8_t)(128 + ((((int)b - 128) * q8 + 128) >> 8));
 }
 
-
-
 static inline int threshold_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -76,8 +74,6 @@ static inline int threshold_smooth_i(float *state, int target, float attack, flo
 
     return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
-
-
 
 vj_effect *threshold_init(int w, int h)
 {
@@ -91,13 +87,7 @@ vj_effect *threshold_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults) free(ve->defaults);
-        if(ve->limits[0]) free(ve->limits[0]);
-        if(ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->limits[0][P_THRESHOLD] = 0;  ve->limits[1][P_THRESHOLD] = 255;  ve->defaults[P_THRESHOLD] = 40;
     ve->limits[0][P_REVERSE] = 0;    ve->limits[1][P_REVERSE] = 1;      ve->defaults[P_REVERSE] = 0;
@@ -161,8 +151,6 @@ void *threshold_malloc(int w, int h)
     t->glow_state = 0.0f;
     t->mix_drive_state = 0.0f;
     t->initialized = 0;
-
-    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }
@@ -232,95 +220,102 @@ static inline int threshold_matte_q8(int m, int threshold, int softness, int rev
 void threshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     threshold_t *t = (threshold_t*) ptr;
+    int w, h, len;
+    int threshold, reverse, softness, edge_glow, mix_drive;
+    float fast, slow;
+    int threshold_shift, mix_floor_q8, glow_radius;
+    uint8_t *restrict Y, *restrict Cb, *restrict Cr;
+    const uint8_t *restrict Y2, *restrict Cb2, *restrict Cr2;
+    uint8_t *restrict mask;
 
-    const int w = frame->width;
-    const int h = frame->height;
-    const int len = frame->len;
+    #pragma omp single
+    {
+        w = frame->width;
+        h = frame->height;
+        len = frame->len;
 
-    int threshold = args[P_THRESHOLD];
-    const int reverse = args[P_REVERSE] ? 1 : 0;
-    int softness = args[P_SOFTNESS];
-    int edge_glow = args[P_EDGE_GLOW];
-    int mix_drive = args[P_MIX_DRIVE];
+        threshold = args[P_THRESHOLD];
+        reverse = args[P_REVERSE] ? 1 : 0;
+        softness = args[P_SOFTNESS];
+        edge_glow = args[P_EDGE_GLOW];
+        mix_drive = args[P_MIX_DRIVE];
 
-    const float fast = 0.245f;
-    const float slow = 0.112f;
+        fast = 0.245f;
+        slow = 0.112f;
 
-    if(!t->initialized) {
-        t->threshold_state = (float)threshold;
-        t->softness_state = (float)softness;
-        t->glow_state = (float)edge_glow;
-        t->mix_drive_state = (float)mix_drive;
-        t->initialized = 1;
-    } else {
-        threshold = threshold_smooth_i(&t->threshold_state, threshold, fast, slow);
-        softness = threshold_smooth_i(&t->softness_state, softness, fast * 0.90f, slow);
-        edge_glow = threshold_smooth_i(&t->glow_state, edge_glow, fast * 1.08f, slow);
-        mix_drive = threshold_smooth_i(&t->mix_drive_state, mix_drive, fast * 1.16f, slow);
+        if(!t->initialized) {
+            t->threshold_state = (float)threshold;
+            t->softness_state = (float)softness;
+            t->glow_state = (float)edge_glow;
+            t->mix_drive_state = (float)mix_drive;
+            t->initialized = 1;
+        } else {
+            threshold = threshold_smooth_i(&t->threshold_state, threshold, fast, slow);
+            softness = threshold_smooth_i(&t->softness_state, softness, fast * 0.90f, slow);
+            edge_glow = threshold_smooth_i(&t->glow_state, edge_glow, fast * 1.08f, slow);
+            mix_drive = threshold_smooth_i(&t->mix_drive_state, mix_drive, fast * 1.16f, slow);
+        }
+
+        mix_drive = clampi(mix_drive, 0, 1000);
+
+        threshold_shift = (mix_drive * 92 + 500) / 1000;
+
+        if(reverse)
+            threshold = clampi(threshold + threshold_shift, 0, 255);
+        else
+            threshold = clampi(threshold - threshold_shift, 0, 255);
+
+        softness = clampi(softness + ((mix_drive * 54 + 500) / 1000), 0, 255);
+        edge_glow = clampi(edge_glow + ((mix_drive * 96 + 500) / 1000), 0, 255);
+
+        mix_floor_q8 = clampi((mix_drive * 118 + 500) / 1000, 0, 192);
+        glow_radius = clampi((softness >> 1) + 8 + ((mix_drive * 16 + 500) / 1000), 1, 255);
+
+        Y  = frame->data[0];
+        Cb = frame->data[1];
+        Cr = frame->data[2];
+
+        Y2  = frame2->data[0];
+        Cb2 = frame2->data[1];
+        Cr2 = frame2->data[2];
+
+        mask = t->mask;
     }
 
-    mix_drive = clampi(mix_drive, 0, 1000);
+    threshold_build_soft_mask(t, Y, w, h);
 
-    const int threshold_shift = (mix_drive * 92 + 500) / 1000;
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        const int m = mask[i];
+        int q8 = threshold_matte_q8(m, threshold, softness, reverse);
 
-    if(reverse)
-        threshold = clampi(threshold + threshold_shift, 0, 255);
-    else
-        threshold = clampi(threshold - threshold_shift, 0, 255);
+        if(q8 < mix_floor_q8)
+            q8 = mix_floor_q8;
 
-    softness = clampi(softness + ((mix_drive * 54 + 500) / 1000), 0, 255);
-    edge_glow = clampi(edge_glow + ((mix_drive * 96 + 500) / 1000), 0, 255);
+        int yv = threshold_blend_black_y(Y2[i], q8);
+        int uv = threshold_blend_neutral_uv(Cb2[i], q8);
+        int vv = threshold_blend_neutral_uv(Cr2[i], q8);
 
-    const int mix_floor_q8 = clampi((mix_drive * 118 + 500) / 1000, 0, 192);
-    const int glow_radius = clampi((softness >> 1) + 8 + ((mix_drive * 16 + 500) / 1000), 1, 255);
+        if(edge_glow > 0) {
+            int d = m - threshold;
+            if(d < 0)
+                d = -d;
 
-    uint8_t *restrict Y  = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
+            if(d < glow_radius) {
+                const int q = glow_radius - d;
+                const int glow = (edge_glow * q + (glow_radius >> 1)) / glow_radius;
+                yv += glow;
 
-    const uint8_t *restrict Y2  = frame2->data[0];
-    const uint8_t *restrict Cb2 = frame2->data[1];
-    const uint8_t *restrict Cr2 = frame2->data[2];
-
-    uint8_t *restrict mask = t->mask;
-
-#pragma omp parallel num_threads(t->n_threads)
-    {
-        threshold_build_soft_mask(t, Y, w, h);
-
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            const int m = mask[i];
-            int q8 = threshold_matte_q8(m, threshold, softness, reverse);
-
-            if(q8 < mix_floor_q8)
-                q8 = mix_floor_q8;
-
-            int yv = threshold_blend_black_y(Y2[i], q8);
-            int uv = threshold_blend_neutral_uv(Cb2[i], q8);
-            int vv = threshold_blend_neutral_uv(Cr2[i], q8);
-
-            if(edge_glow > 0) {
-                int d = m - threshold;
-                if(d < 0)
-                    d = -d;
-
-                if(d < glow_radius) {
-                    const int q = glow_radius - d;
-                    const int glow = (edge_glow * q + (glow_radius >> 1)) / glow_radius;
-                    yv += glow;
-
-                    if(mix_drive > 0) {
-                        const int chroma_kick = (glow * mix_drive + 500) / 1000;
-                        uv += chroma_kick >> 3;
-                        vv += chroma_kick >> 4;
-                    }
+                if(mix_drive > 0) {
+                    const int chroma_kick = (glow * mix_drive + 500) / 1000;
+                    uv += chroma_kick >> 3;
+                    vv += chroma_kick >> 4;
                 }
             }
-
-            Y[i]  = threshold_u8(yv);
-            Cb[i] = threshold_u8(uv);
-            Cr[i] = threshold_u8(vv);
         }
+
+        Y[i]  = threshold_u8(yv);
+        Cb[i] = threshold_u8(uv);
+        Cr[i] = threshold_u8(vv);
     }
 }

@@ -74,16 +74,6 @@ vj_effect *gradientfield_init(int w, int h)
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_WINDOW] = 2;  ve->limits[1][P_WINDOW] = 30;  ve->defaults[P_WINDOW] = 6;
     ve->limits[0][P_OPACITY] = 0; ve->limits[1][P_OPACITY] = 255; ve->defaults[P_OPACITY] = 0;
@@ -91,7 +81,6 @@ vj_effect *gradientfield_init(int w, int h)
     ve->description = "Kuwahara Painting";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Window Size", "Opacity");
 
@@ -153,7 +142,6 @@ void *gradientfield_malloc(int w, int h)
     s->width = w;
     s->height = h;
     s->len = (int)len;
-    s->n_threads = vje_advise_num_threads((int)len);
 
     for(int i = 1; i < 1024; i++)
         s->inv_area_lut[i] = (1u << 16) / (uint32_t)i;
@@ -409,18 +397,18 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    veejay_memcpy(s->copyY, Y, len);
-    veejay_memcpy(s->copyU, U, len);
-    veejay_memcpy(s->copyV, V, len);
-
-#pragma omp parallel num_threads(s->n_threads)
+    #pragma omp single
     {
-        gradientfield_integral_y(s->copyY, s->intY_sum, s->intY_sq, w, h);
-        gradientfield_integral_sum(s->copyU, s->intU_sum, w, h);
-        gradientfield_integral_sum(s->copyV, s->intV_sum, w, h);
-
-#pragma omp for schedule(static)
-        for(int y = 0; y < h - 1; y += 2)
-            gradientfield_apply_rowpair(s, Y, U, V, a, opacity, y);
+        veejay_memcpy(s->copyY, Y, len);
+        veejay_memcpy(s->copyU, U, len);
+        veejay_memcpy(s->copyV, V, len);
     }
+
+    gradientfield_integral_y(s->copyY, s->intY_sum, s->intY_sq, w, h);
+    gradientfield_integral_sum(s->copyU, s->intU_sum, w, h);
+    gradientfield_integral_sum(s->copyV, s->intV_sum, w, h);
+
+    #pragma omp for schedule(static)
+    for(int y = 0; y < h - 1; y += 2)
+        gradientfield_apply_rowpair(s, Y, U, V, a, opacity, y);
 }

@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2018 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2018-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,17 +45,6 @@ vj_effect *posterize2_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_FACTOR] = 4;
     ve->defaults[P_TMIN] = 16;
@@ -195,36 +184,32 @@ void posterize2_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict A = frame->data[3];
 
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        if(mode <= 2) {
+    if(mode <= 2) {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const uint8_t y = Y[i];
+        for(int i = 0; i < len; i++) {
+            const uint8_t y = Y[i];
 
-                Y[i] = lut_y[y];
+            Y[i] = lut_y[y];
 
-                if(mask[y]) {
-                    Cb[i] = 128;
-                    Cr[i] = 128;
-                }
+            if(mask[y]) {
+                Cb[i] = 128;
+                Cr[i] = 128;
             }
         }
-        else if(mode == 5) {
+    }
+    else if(mode == 5) {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++)
-                A[i] = lut_a[Y[i]];
-        }
-        else {
+        for(int i = 0; i < len; i++)
+            A[i] = lut_a[Y[i]];
+    }
+    else {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const uint8_t y = Y[i];
+        for(int i = 0; i < len; i++) {
+            const uint8_t y = Y[i];
 
-                if(mask[y])
-                    A[i] = lut_a[y];
-            }
+            if(mask[y])
+                A[i] = lut_a[y];
         }
     }
 }

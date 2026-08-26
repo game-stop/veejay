@@ -55,14 +55,13 @@ vj_effect *colorshift_init(int w, int h)
         "Chroma Blue and Red (AND)"
     );
 
-    
-{
-    const vj_beat_param_hint_t beat_hints[] = {
-        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 16, 255, 84, 100, 0, 360, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-    };
-    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-}
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 16, 255, 84, 100, 0, 360, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }
@@ -72,7 +71,7 @@ static void colorshift_or_plane(uint8_t *restrict p, int len, uint8_t value)
     if(!p || len <= 0)
         return;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         p[i] = (uint8_t)(p[i] | value);
 }
@@ -82,7 +81,7 @@ static void colorshift_and_plane(uint8_t *restrict p, int len, uint8_t value)
     if(!p || len <= 0)
         return;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         p[i] = (uint8_t)(p[i] & value);
 }
@@ -92,7 +91,7 @@ static void colorshift_or_2planes(uint8_t *restrict p0, uint8_t *restrict p1, in
     if(!p0 || !p1 || len <= 0)
         return;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         p0[i] = (uint8_t)(p0[i] | value);
         p1[i] = (uint8_t)(p1[i] | value);
@@ -104,7 +103,7 @@ static void colorshift_and_2planes(uint8_t *restrict p0, uint8_t *restrict p1, i
     if(!p0 || !p1 || len <= 0)
         return;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         p0[i] = (uint8_t)(p0[i] & value);
         p1[i] = (uint8_t)(p1[i] & value);
@@ -123,16 +122,14 @@ static void colorshift_or_ycbcr(VJFrame *frame, uint8_t value)
     if(!Y || !Cb || !Cr || len <= 0)
         return;
 
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = (uint8_t)(Y[i] | value);
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        Y[i] = (uint8_t)(Y[i] | value);
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            Cb[i] = (uint8_t)(Cb[i] | value);
-            Cr[i] = (uint8_t)(Cr[i] | value);
-        }
+#pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        Cb[i] = (uint8_t)(Cb[i] | value);
+        Cr[i] = (uint8_t)(Cr[i] | value);
     }
 }
 
@@ -148,16 +145,14 @@ static void colorshift_and_ycbcr(VJFrame *frame, uint8_t value)
     if(!Y || !Cb || !Cr || len <= 0)
         return;
 
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = (uint8_t)(Y[i] & value);
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        Y[i] = (uint8_t)(Y[i] & value);
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            Cb[i] = (uint8_t)(Cb[i] & value);
-            Cr[i] = (uint8_t)(Cr[i] & value);
-        }
+#pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        Cb[i] = (uint8_t)(Cb[i] & value);
+        Cr[i] = (uint8_t)(Cr[i] & value);
     }
 }
 
@@ -169,46 +164,41 @@ void colorshift_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t value = args[1];
     const int len = frame->len;
     const int uv_len = frame->uv_len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        switch(type) {
-            case 0:
-                colorshift_or_plane(Y, len, value);
-                break;
-            case 1:
-                colorshift_or_plane(Cb, uv_len, value);
-                break;
-            case 2:
-                colorshift_or_plane(Cr, uv_len, value);
-                break;
-            case 3:
-                colorshift_or_2planes(Cb, Cr, uv_len, value);
-                break;
-            case 4:
-                colorshift_or_ycbcr(frame, value);
-                break;
-            case 5:
-                colorshift_and_ycbcr(frame, value);
-                break;
-            case 6:
-                colorshift_and_plane(Y, len, value);
-                break;
-            case 7:
-                colorshift_and_plane(Cb, uv_len, value);
-                break;
-            case 8:
-                colorshift_and_plane(Cr, uv_len, value);
-                break;
-            case 9:
-                colorshift_and_2planes(Cb, Cr, uv_len, value);
-                break;
-        }
+    switch(type) {
+        case 0:
+            colorshift_or_plane(Y, len, value);
+            break;
+        case 1:
+            colorshift_or_plane(Cb, uv_len, value);
+            break;
+        case 2:
+            colorshift_or_plane(Cr, uv_len, value);
+            break;
+        case 3:
+            colorshift_or_2planes(Cb, Cr, uv_len, value);
+            break;
+        case 4:
+            colorshift_or_ycbcr(frame, value);
+            break;
+        case 5:
+            colorshift_and_ycbcr(frame, value);
+            break;
+        case 6:
+            colorshift_and_plane(Y, len, value);
+            break;
+        case 7:
+            colorshift_and_plane(Cb, uv_len, value);
+            break;
+        case 8:
+            colorshift_and_plane(Cr, uv_len, value);
+            break;
+        case 9:
+            colorshift_and_2planes(Cb, Cr, uv_len, value);
+            break;
     }
 }
-

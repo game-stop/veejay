@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2016 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2016-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,9 +23,6 @@
 #include "bgsubtractgauss.h"
 #include <libsubsample/subsample.h>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
 
 typedef struct {
     uint8_t *static_bg__;
@@ -35,6 +32,9 @@ typedef struct {
     uint32_t bg_n;
     int auto_hist;
     int n_threads;
+
+    int do_update;
+    int effective_mode;
 } bgsubtract_t;
 
 vj_effect *bgsubtractgauss_init(int width, int height)
@@ -143,7 +143,8 @@ int bgsubtractgauss_prepare(void *ptr, VJFrame *frame)
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
 
-    #pragma omp parallel for num_threads(b->n_threads) schedule(static)
+    b->bg_n = 0;
+
     for(int i = 0; i < len; i++) {
         b->pMu[i] = (double)Y[i];
         b->pVar[i] = 100.0;
@@ -159,8 +160,6 @@ int bgsubtractgauss_prepare(void *ptr, VJFrame *frame)
         veejay_memcpy(b->static_bg_frame__[2], frame->data[2], frame->uv_len);
         chroma_supersample(SSM_422_444, frame, b->static_bg_frame__);
     }
-
-    b->bg_n = 0;
 
     return 1;
 }
@@ -182,7 +181,7 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     const int alpha_arg = args[0];
     const int threshold_arg = args[1];
     const int min_noise_arg = args[2];
-    int mode = args[3];
+    const int mode = args[3];
     const int period = args[4];
 
     const double alpha = (double)alpha_arg / 10000.0;
@@ -190,7 +189,6 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     const double min_noise = (double)min_noise_arg / 10.0;
 
     const int len = frame->len;
-    const int n_threads = b->n_threads;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -203,14 +201,20 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     double *restrict mu = b->pMu;
     double *restrict var = b->pVar;
 
-    if(mode == 2 && !A)
-        mode = 3;
+    #pragma omp single
+    {
+        b->effective_mode = mode;
+        if(b->effective_mode == 2 && !A)
+            b->effective_mode = 3;
 
-    b->bg_n++;
+        b->bg_n++;
+        b->do_update = (b->bg_n % (uint32_t)(period > 0 ? period : 1)) == 0 ? 1 : 0;
+    }
 
-    const int do_update = (b->bg_n % (uint32_t)period) == 0;
+    const int do_update = b->do_update;
+    const int eff_mode = b->effective_mode;
 
-#pragma omp parallel for num_threads(n_threads) schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
         double m = mu[i];
@@ -237,25 +241,25 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
             BG_U[i] = U[i];
             BG_V[i] = V[i];
         }
-        else if(v != var[i])
+        else
         {
             var[i] = v;
         }
 
-        if(mode == 0)
+        if(eff_mode == 0)
         {
             Y[i] = BG_Y[i];
             U[i] = BG_U[i];
             V[i] = BG_V[i];
         }
-        else if(mode == 1)
+        else if(eff_mode == 1)
         {
             if(!is_fg)
                 Y[i] = 16;
             U[i] = 128;
             V[i] = 128;
         }
-        else if(mode == 2)
+        else if(eff_mode == 2)
         {
             A[i] = is_fg ? 255 : 0;
         }

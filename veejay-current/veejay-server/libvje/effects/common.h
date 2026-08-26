@@ -479,16 +479,6 @@ void veejay_draw_balloon( uint8_t *data, int cx, int cy, const int bw, const int
 void veejay_draw_circle( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );
 void veejay_draw_circle_border(uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value, int borderThickness, uint8_t borderValue);
 
-void veejay_histogram_analyze( void *his, VJFrame *f , int t);
-void veejay_histogram_del(void *his);
-void *veejay_histogram_new();
-void veejay_histogram_draw( void *his, VJFrame *src, VJFrame *dst , int intensity, int strength );
-void veejay_histogram_equalize( void *his, VJFrame *f, int intensity, int strength );
-void vje_histogram_auto_eq( VJFrame *frame );
-void veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f );
-void veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
-void veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
-
 void veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output);
 void veejay_distance_transform8( uint8_t *plane, int w, int h, uint32_t *output);
 

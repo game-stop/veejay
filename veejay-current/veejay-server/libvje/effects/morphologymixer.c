@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -78,16 +78,7 @@ vj_effect *morphologymixer_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+    
 
     ve->limits[0][P_PROGRESS] = 0;  ve->limits[1][P_PROGRESS] = 255; ve->defaults[P_PROGRESS] = 128;
     ve->limits[0][P_WARP] = 0;      ve->limits[1][P_WARP] = 255;     ve->defaults[P_WARP] = 64;
@@ -130,8 +121,13 @@ void morphologymixer_free(void *ptr)
 {
     morph_t *m = (morph_t*) ptr;
 
-    free(m->tmpY);
-    free(m->pix_x);
+    if(!m)
+        return;
+
+    if(m->tmpY)
+        free(m->tmpY);
+    if(m->pix_x)
+        free(m->pix_x);
     free(m);
 }
 
@@ -167,8 +163,6 @@ void *morphologymixer_malloc(int w, int h)
     m->grid_x2 = m->grid_y1 + grid_cells;
     m->grid_y2 = m->grid_x2 + grid_cells;
 
-    m->n_threads = vje_advise_num_threads(size);
-
     return (void*) m;
 }
 
@@ -180,6 +174,7 @@ static void morphologymixer_blend_plain(morph_t *m,
                                         const uint8_t *restrict sCr,
                                         int progress)
 {
+    (void)m;
     const int size = frame->len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -206,6 +201,7 @@ static void morphologymixer_mode_gradient(morph_t *m,
                                           int warp_amt,
                                           int response)
 {
+    (void)m;
     const int w = frame->width;
     const int h = frame->height;
     const int inv_progress = 255 - progress;
@@ -413,38 +409,36 @@ static void morphologymixer_mode_persistent(morph_t *m,
         }
     }
 }
+
 void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     morph_t *m = (morph_t*) ptr;
+    int size = 0, progress = 0, warp_amt = 0, mode = 0, response = 0, stability = 0;
 
-    const int size = frame->len;
-    const int progress = clampi(args[P_PROGRESS], 0, 255);
-    const int warp_amt = clampi(args[P_WARP], 0, 255);
-    const int mode = clampi(args[P_MODE], 0, 2);
-    const int response = clampi(args[P_RESPONSE], 0, 255);
-    const int stability = clampi(args[P_STABILITY], 0, 255);
-
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    veejay_memcpy(m->tmpY, Y, (size_t)size);
-    veejay_memcpy(m->tmpCb, Cb, (size_t)size);
-    veejay_memcpy(m->tmpCr, Cr, (size_t)size);
-
-#pragma omp parallel num_threads(m->n_threads)
+    #pragma omp single copyprivate(size, progress, warp_amt, mode, response, stability)
     {
-        if(warp_amt == 0) {
-            morphologymixer_blend_plain(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress);
-        }
-        else if(mode == MM_MODE_GRADIENT) {
-            morphologymixer_mode_gradient(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response);
-        }
-        else if(mode == MM_MODE_GRID) {
-            morphologymixer_mode_grid(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
-        }
-        else {
-            morphologymixer_mode_persistent(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
-        }
+        size = frame->len;
+        progress = clampi(args[P_PROGRESS], 0, 255);
+        warp_amt = clampi(args[P_WARP], 0, 255);
+        mode = clampi(args[P_MODE], 0, 2);
+        response = clampi(args[P_RESPONSE], 0, 255);
+        stability = clampi(args[P_STABILITY], 0, 255);
+
+        veejay_memcpy(m->tmpY, frame->data[0], (size_t)size);
+        veejay_memcpy(m->tmpCb, frame->data[1], (size_t)size);
+        veejay_memcpy(m->tmpCr, frame->data[2], (size_t)size);
+    }
+
+    if(warp_amt == 0) {
+        morphologymixer_blend_plain(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress);
+    }
+    else if(mode == MM_MODE_GRADIENT) {
+        morphologymixer_mode_gradient(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response);
+    }
+    else if(mode == MM_MODE_GRID) {
+        morphologymixer_mode_grid(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
+    }
+    else {
+        morphologymixer_mode_persistent(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
     }
 }

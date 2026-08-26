@@ -129,16 +129,6 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_MODE] = 0;  ve->limits[1][P_MODE] = 8;   ve->defaults[P_MODE] = 0;
     ve->limits[0][P_MIN_T] = 0; ve->limits[1][P_MIN_T] = 255; ve->defaults[P_MIN_T] = pixel_Y_lo_;
@@ -198,7 +188,6 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
     const int mask_mode = args[P_MASK];
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
-    const int n_threads = vje_advise_num_threads(len);
 
     if(threshold_max < threshold_min) {
         const int tmp = threshold_min;
@@ -210,49 +199,46 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        if(mask_mode) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const uint8_t y = Y[i];
+    if(mask_mode) {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t y = Y[i];
 
-                Y[i] = (y >= threshold_min && y <= threshold_max)
-                    ? ps_eval(type, y, (uint8_t)(255 - y), threshold_max)
-                    : (uint8_t)pixel_Y_hi_;
+            Y[i] = (y >= threshold_min && y <= threshold_max)
+                ? ps_eval(type, y, (uint8_t)(255 - y), threshold_max)
+                : (uint8_t)pixel_Y_hi_;
+        }
+    }
+    else {
+        const int range = threshold_max > threshold_min ? threshold_max - threshold_min : 1;
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t y = Y[i];
+
+            if(y >= threshold_min && y <= threshold_max) {
+                const uint8_t yn = ps_u8(((int)(y - threshold_min) * 255) / range);
+
+                Y[i] = ps_eval(type, yn, y, threshold_max);
+            }
+            else {
+                Y[i] = (uint8_t)pixel_Y_hi_;
             }
         }
-        else {
-            const int range = threshold_max > threshold_min ? threshold_max - threshold_min : 1;
+    }
 
-#pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const uint8_t y = Y[i];
-
-                if(y >= threshold_min && y <= threshold_max) {
-                    const uint8_t yn = ps_u8(((int)(y - threshold_min) * 255) / range);
-
-                    Y[i] = ps_eval(type, yn, y, threshold_max);
-                }
-                else {
-                    Y[i] = (uint8_t)pixel_Y_hi_;
-                }
-            }
+    if(type == 7) {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            Cb[i] = ps_chroma_color(128, Cb[i]);
+            Cr[i] = ps_chroma_color(128, Cr[i]);
         }
-
-        if(type == 7) {
-#pragma omp for schedule(static)
-            for(int i = 0; i < uv_len; i++) {
-                Cb[i] = ps_chroma_color(128, Cb[i]);
-                Cr[i] = ps_chroma_color(128, Cr[i]);
-            }
-        }
-        else {
-#pragma omp for schedule(static)
-            for(int i = 0; i < uv_len; i++) {
-                Cb[i] = 128;
-                Cr[i] = 128;
-            }
+    }
+    else {
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            Cb[i] = 128;
+            Cr[i] = 128;
         }
     }
 }

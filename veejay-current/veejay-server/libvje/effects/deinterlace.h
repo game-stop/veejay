@@ -22,4 +22,6 @@
 #define DEINTERLACE_H
 vj_effect *deinterlace_init(int w , int h);
 void deinterlace_apply(void *ptr, VJFrame *frame, int *args);
+void *deinterlace_malloc(int w, int h);
+void deinterlace_free(void *ptr);
 #endif

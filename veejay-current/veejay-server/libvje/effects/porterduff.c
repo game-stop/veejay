@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -55,17 +55,6 @@ vj_effect *porterduff_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[P_OPERATOR] = 0;
     ve->limits[0][P_OPERATOR] = 0;
     ve->limits[1][P_OPERATOR] = 15;
@@ -101,7 +90,6 @@ vj_effect *porterduff_init(int w, int h)
         "Overlay"
     );
 
-
     {
         const vj_beat_param_hint_t beat_hints[] = {
             VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
@@ -109,12 +97,15 @@ vj_effect *porterduff_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)w;
+    (void)h;
+
     return ve;
 }
 
 static void porterduff_dst(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
-    veejay_memcpy(A, B, n_pixels * 4);
+    veejay_memcpy(A, B, (size_t)n_pixels * 4u);
 }
 
 static void porterduff_dst_atop(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
@@ -348,21 +339,15 @@ static void porterduff_overlay(uint8_t *restrict A, const uint8_t *restrict B, i
 
 void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    (void)ptr;
-
     const int mode = args[P_OPERATOR];
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
     uint8_t *restrict A = frame->data[0];
     const uint8_t *restrict B = frame2->data[0];
 
-#pragma omp parallel num_threads(n_threads)
-    {
-        switch(mode) {
-            case 0:
-#pragma omp single
-                porterduff_dst(A, B, len);
-                break;
+    switch(mode) {
+        case 0:
+            porterduff_dst(A, B, len);
+            break;
         case 1:
             porterduff_dst_atop(A, B, len);
             break;
@@ -405,9 +390,10 @@ void porterduff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         case 14:
             porterduff_screen(A, B, len);
             break;
-            case 15:
-                porterduff_overlay(A, B, len);
-                break;
-        }
+        case 15:
+            porterduff_overlay(A, B, len);
+            break;
+        default:
+            break;
     }
 }

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include "borders.h"
+#include <veejaycore/vjmem.h>
 
 static inline int borders_clampi(int v, int lo, int hi)
 {
@@ -29,6 +30,8 @@ static inline int borders_clampi(int v, int lo, int hi)
 vj_effect *borders_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
+    if(!ve)
+        return NULL;
 
     ve->num_params = 2;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -55,19 +58,25 @@ vj_effect *borders_init(int width, int height)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
+    (void)width;
+    (void)height;
+
     return ve;
 }
 
 void borders_apply(void *ptr, VJFrame *frame, int *args)
 {
-    (void) ptr;
+    #pragma omp single
+    {
+        (void) ptr;
 
-    const int max_size = frame->height > 1 ? frame->height / 2 : 1;
-    const int size = borders_clampi(args[0], 1, max_size);
-    const int color = args[1];
+        const int max_size = frame->height > 1 ? frame->height / 2 : 1;
+        const int size = borders_clampi(args[0], 1, max_size);
+        const int color = args[1];
 
-    blackborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
-                        frame->width, frame->height,
-                        size, size, size, size,
-                        frame->shift_h, frame->shift_v, color);
+        blackborder_yuvdata(frame->data[0], frame->data[1], frame->data[2],
+                            frame->width, frame->height,
+                            size, size, size, size,
+                            frame->shift_h, frame->shift_v, color);
+    }
 }

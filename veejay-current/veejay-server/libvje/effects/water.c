@@ -149,14 +149,6 @@ vj_effect *water_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_REFRESH_FREQ] = 1;    ve->limits[1][P_REFRESH_FREQ] = 3600; ve->defaults[P_REFRESH_FREQ] = 10;
     ve->limits[0][P_WAVESPEED]    = 1;    ve->limits[1][P_WAVESPEED]    = 16;   ve->defaults[P_WAVESPEED]    = 1;
     ve->limits[0][P_DECAY]        = 1;    ve->limits[1][P_DECAY]        = 31;   ve->defaults[P_DECAY]        = 10;
@@ -269,16 +261,17 @@ void *water_malloc(int width, int height)
     w->drops_env = -1.0f;
     w->power_env = -1.0f;
 
-    w->n_threads = vje_advise_num_threads(len);
-
     return (void*) w;
 }
 
 void water_free(void *ptr)
 {
     water_t *w = (water_t*) ptr;
+    if(!w)
+        return;
 
-    free(w->region);
+    if(w->region)
+        free(w->region);
     free(w);
 }
 
@@ -594,31 +587,6 @@ static void water_simulate(water_t *w, int loopnum, int decay)
     }
 }
 
-static void water_calc_vtable(water_t *w)
-{
-    const int wi = w->map_w;
-    const int hi = w->map_h;
-
-    if(wi <= 1 || hi <= 1)
-        return;
-
-#pragma omp for schedule(static)
-    for(int y = 0; y < hi - 1; y++) {
-        const int row = y * wi;
-
-        for(int x = 0; x < wi - 1; x++) {
-            const int idx = row + x;
-            const int vi = idx << 1;
-
-            const int dh = ((w->map1[idx] - w->map1[idx + 1]) >> (w->point - 1)) & 0xff;
-            const int dv = ((w->map1[idx] - w->map1[idx + wi]) >> (w->point - 1)) & 0xff;
-
-            w->vtable[vi]     = (int8_t)((uint8_t)w->sqrtable[dh]);
-            w->vtable[vi + 1] = (int8_t)((uint8_t)w->sqrtable[dv]);
-        }
-    }
-}
-
 static void water_render(VJFrame *frame, water_t *w)
 {
     const int width = frame->width;
@@ -684,114 +652,144 @@ static void water_render(VJFrame *frame, water_t *w)
     }
 }
 
+static void water_calc_vtable(water_t *w)
+{
+    const int wi = w->map_w;
+    const int hi = w->map_h;
+
+    if(wi <= 1 || hi <= 1)
+        return;
+
+#pragma omp for schedule(static)
+    for(int y = 0; y < hi - 1; y++) {
+        const int row = y * wi;
+
+        for(int x = 0; x < wi - 1; x++) {
+            const int idx = row + x;
+            const int vi = idx << 1;
+
+            const int dh = ((w->map1[idx] - w->map1[idx + 1]) >> (w->point - 1)) & 0xff;
+            const int dv = ((w->map1[idx] - w->map1[idx + wi]) >> (w->point - 1)) & 0xff;
+
+            w->vtable[vi]     = (int8_t)((uint8_t)w->sqrtable[dh]);
+            w->vtable[vi + 1] = (int8_t)((uint8_t)w->sqrtable[dv]);
+        }
+    }
+}
+
 void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     water_t *w = (water_t*) ptr;
-
     const int len = frame->len;
     const int width = frame->width;
     const int height = frame->height;
 
-    const int fresh_rate = args[P_REFRESH_FREQ];
-    const int loopnum_arg = args[P_WAVESPEED];
-    const int decay_arg = args[P_DECAY];
-    const int mode = args[P_MODE];
-    const int threshold_arg = args[P_THRESHOLD];
-    const int drop_drive_arg = args[P_DROP_DRIVE];
-    const int ripple_power_arg = args[P_RIPPLE_POWER];
+    int fresh_rate = 10, loopnum_arg = 1, decay_arg = 10, mode = 0, threshold_arg = 45, drop_drive_arg = 360, ripple_power_arg = 650;
+    int drive_q = 0, power_q = 0, loop_target = 1, decay_target = 10, threshold_drop = 0, threshold_target = 45;
+    int loopnum_eff = 1, decay_eff = 1, threshold_eff = 45, drop_drive = 0, ripple_power = 0;
+    int motion_mode = 0, use_motion = 0, preview = 0, motion_seeded = 0;
 
-    const int drive_q = clampi(drop_drive_arg, 0, 1000);
-    const int power_q = clampi(ripple_power_arg, 0, 1000);
-
-    const int loop_target = clampi(loopnum_arg + ((drive_q * 5 + 500) / 1000), 1, 16);
-    const int decay_target = clampi(decay_arg + ((drive_q * 8 + 500) / 1000) - ((drive_q * power_q + 500000) / 1000000), 1, 31);
-
-    const int threshold_drop =
-        ((12 + ((power_q * 72 + 500) / 1000)) * drive_q + 500) / 1000;
-    const int threshold_target = clampi(threshold_arg - threshold_drop, 0, 255);
-
-    const int loopnum_eff = water_env_i(&w->loop_env, loop_target, 1, 16, 0.34f, 0.105f);
-    const int decay_eff = water_env_i(&w->decay_env, decay_target, 1, 31, 0.26f, 0.070f);
-    const int threshold_eff = water_env_i(&w->threshold_env, threshold_target, 0, 255, 0.42f, 0.115f);
-    const int drop_drive = water_env_i(&w->drops_env, drop_drive_arg, 0, 1000, 0.40f, 0.130f);
-    const int ripple_power = water_env_i(&w->power_env, ripple_power_arg, 0, 1000, 0.36f, 0.120f);
-
-    if(w->last_fresh_rate != fresh_rate) {
-        w->last_fresh_rate = fresh_rate;
-        w->rain_period = 0;
-    }
-
-    if(w->lastmode != mode) {
-        water_clear_maps(w);
-        w->have_img = 0;
-        w->lastmode = mode;
-        w->rain_period = 0;
-    }
-
-    veejay_memcpy(w->src_img, frame->data[0], len);
-
-    if(mode == 0 && !w->have_img) {
-        veejay_memcpy(w->bg_img, frame->data[0], len);
-        w->have_img = 1;
-        return;
-    }
-
-    const int motion_mode = (mode == 3 || mode == 4) ? 1 : ((mode == 5 || mode == 6) ? 2 : 0);
-    const int use_motion = mode != 0;
-    const int preview = (mode == 1 || mode == 3 || mode == 5);
-    int motion_seeded = 0;
-
-#pragma omp parallel num_threads(w->n_threads)
+    #pragma omp single copyprivate(fresh_rate, loopnum_arg, decay_arg, mode, threshold_arg, drop_drive_arg, ripple_power_arg, drive_q, power_q, loop_target, decay_target, threshold_drop, threshold_target, loopnum_eff, decay_eff, threshold_eff, drop_drive, ripple_power, motion_mode, use_motion, preview, motion_seeded)
     {
-        if(use_motion) {
-            const uint8_t *restrict in = frame2->data[0];
+        fresh_rate = args[P_REFRESH_FREQ];
+        loopnum_arg = args[P_WAVESPEED];
+        decay_arg = args[P_DECAY];
+        mode = args[P_MODE];
+        threshold_arg = args[P_THRESHOLD];
+        drop_drive_arg = args[P_DROP_DRIVE];
+        ripple_power_arg = args[P_RIPPLE_POWER];
 
-            if(motion_mode != 0) {
-                water_blur_luma(w, frame2->data[0], width, height);
-                in = w->blur_img;
-            }
+        drive_q = clampi(drop_drive_arg, 0, 1000);
+        power_q = clampi(ripple_power_arg, 0, 1000);
 
-#pragma omp single
-            {
-                if(!w->have_img) {
-                    veejay_memcpy(w->bg_img, in, len);
-                    w->have_img = 1;
-                    veejay_memset(w->diff_img, 0, len);
-                    motion_seeded = 1;
-                }
-            }
+        loop_target = clampi(loopnum_arg + ((drive_q * 5 + 500) / 1000), 1, 16);
+        decay_target = clampi(decay_arg + ((drive_q * 8 + 500) / 1000) - ((drive_q * power_q + 500000) / 1000000), 1, 31);
 
-            if(!motion_seeded) {
-                water_build_motion_diff(w, in, threshold_eff, len, motion_mode);
-                water_inject_motion_map(w, w->diff_img, width, height);
+        threshold_drop = ((12 + ((power_q * 72 + 500) / 1000)) * drive_q + 500) / 1000;
+        threshold_target = clampi(threshold_arg - threshold_drop, 0, 255);
+
+        loopnum_eff = water_env_i(&w->loop_env, loop_target, 1, 16, 0.34f, 0.105f);
+        decay_eff = water_env_i(&w->decay_env, decay_target, 1, 31, 0.26f, 0.070f);
+        threshold_eff = water_env_i(&w->threshold_env, threshold_target, 0, 255, 0.42f, 0.115f);
+        drop_drive = water_env_i(&w->drops_env, drop_drive_arg, 0, 1000, 0.40f, 0.130f);
+        ripple_power = water_env_i(&w->power_env, ripple_power_arg, 0, 1000, 0.36f, 0.120f);
+
+        if(w->last_fresh_rate != fresh_rate) {
+            w->last_fresh_rate = fresh_rate;
+            w->rain_period = 0;
+        }
+
+        if(w->lastmode != mode) {
+            water_clear_maps(w);
+            w->have_img = 0;
+            w->lastmode = mode;
+            w->rain_period = 0;
+        }
+
+        veejay_memcpy(w->src_img, frame->data[0], (size_t)len);
+
+        if(mode == 0 && !w->have_img) {
+            veejay_memcpy(w->bg_img, frame->data[0], (size_t)len);
+            w->have_img = 1;
+        }
+
+        motion_mode = (mode == 3 || mode == 4) ? 1 : ((mode == 5 || mode == 6) ? 2 : 0);
+        use_motion = mode != 0;
+        preview = (mode == 1 || mode == 3 || mode == 5);
+        motion_seeded = 0;
+    }
+
+    if(use_motion) {
+        const uint8_t *restrict in = frame2 && frame2->data[0] ? frame2->data[0] : frame->data[0];
+
+        if(motion_mode != 0) {
+            water_blur_luma(w, in, width, height);
+            in = w->blur_img;
+        }
+
+        #pragma omp single
+        {
+            if(!w->have_img) {
+                veejay_memcpy(w->bg_img, in, (size_t)len);
+                w->have_img = 1;
+                veejay_memset(w->diff_img, 0, (size_t)len);
+                motion_seeded = 1;
             }
         }
 
-        if(preview) {
-            water_draw_motion_frame(frame, w);
-        }
-        else {
-#pragma omp single
-            {
-                if(mode == 0) {
-                    water_raindrop(w, fresh_rate);
-                    veejay_memcpy(w->bg_img, frame->data[0], len);
-                }
-                else if(mode == 4) {
-                    water_raindrop(w, fresh_rate);
-                }
-
-                water_inject_drive_drops(w, drop_drive, ripple_power);
-                w->loopnum = loopnum_eff;
-            }
-
-            water_simulate(w, loopnum_eff, decay_eff);
-            water_calc_vtable(w);
-            water_render(frame, w);
+        if(!motion_seeded) {
+            water_build_motion_diff(w, in, threshold_eff, len, motion_mode);
+            water_inject_motion_map(w, w->diff_img, width, height);
         }
     }
 
-    if(!preview) {
-        w->frame_counter++;
+    if(preview) {
+        water_draw_motion_frame(frame, w);
+    }
+    else {
+        #pragma omp single
+        {
+            if(mode == 0) {
+                water_raindrop(w, fresh_rate);
+                veejay_memcpy(w->bg_img, frame->data[0], (size_t)len);
+            }
+            else if(mode == 4) {
+                water_raindrop(w, fresh_rate);
+            }
+
+            water_inject_drive_drops(w, drop_drive, ripple_power);
+            w->loopnum = loopnum_eff;
+        }
+
+        water_simulate(w, loopnum_eff, decay_eff);
+        water_calc_vtable(w);
+        water_render(frame, w);
+    }
+
+    #pragma omp single
+    {
+        if(!preview) {
+            w->frame_counter++;
+        }
     }
 }

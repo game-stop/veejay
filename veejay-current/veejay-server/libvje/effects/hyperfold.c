@@ -1,26 +1,24 @@
-/* 
- * Linux VeeJay
- *
- * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
- */
-
+/*
+* Linux VeeJay
+*
+* Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
+*
+* This program is free software; you can redistribute it and/or
+* modify it under the terms of the GNU General Public License
+* as published by the Free Software Foundation; either version 2
+* of the License , or (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
+*/
 #include "common.h"
 #include "hyperfold.h"
-
 
 #define AFM_PARAMS 10
 
@@ -33,7 +31,7 @@
 #define P_MONO        6
 #define P_BG          7
 #define P_CONTRAST    8
-#define P_TURBULENCE 9
+#define P_TURBULENCE  9
 
 #define AFM_MODE_VERTICAL             0
 #define AFM_MODE_BARCODE             1
@@ -89,7 +87,6 @@
 #define AFM_MODE_LAST                 AFM_MODE_AXIS_ROULETTE
 
 #define AFM_MAX_PANELS 64
-
 #define AFM_TRIG_SIZE 1024
 #define AFM_TRIG_MASK 1023
 #define AFM_TWO_PI 6.28318530718f
@@ -156,6 +153,7 @@ typedef struct {
     int lut_valid;
     int last_strength;
     int skip_base_panel;
+
     float time;
 } mirrormadness_t;
 
@@ -240,8 +238,6 @@ static inline float afm_hash01(uint32_t x)
     return (float) (afm_hash_u32(x) & 0xffffU) * (1.0f / 65535.0f);
 }
 
-
-
 static inline float afm_lut_sin(const mirrormadness_t *m, float phase)
 {
     float fidx = phase * ((float) AFM_TRIG_SIZE * AFM_INV_TWO_PI);
@@ -254,10 +250,6 @@ static inline float afm_lut_sin(const mirrormadness_t *m, float phase)
     return a + (b - a) * frac;
 }
 
-
-
-
-
 static inline float afm_reflect_coord(float v, float maxv)
 {
     float period;
@@ -265,7 +257,6 @@ static inline float afm_reflect_coord(float v, float maxv)
 
     if (maxv <= 0.0f)
         return 0.0f;
-
     if (v >= 0.0f && v <= maxv)
         return v;
 
@@ -273,11 +264,6 @@ static inline float afm_reflect_coord(float v, float maxv)
     if (period <= 0.0f)
         return 0.0f;
 
-    /*
-     * Most render paths only drift a little outside the frame.  The old
-     * version always paid for fmodf(); this fast path only folds when needed
-     * and uses one float divide instead of libm modulo.
-     */
     if (v < 0.0f || v >= period) {
         k = (int) (v / period);
         v -= (float) k * period;
@@ -286,24 +272,20 @@ static inline float afm_reflect_coord(float v, float maxv)
         else if (v >= period)
             v -= period;
     }
-
     return (v > maxv) ? (period - v) : v;
 }
 
 static inline float afm_wrap_period_pos(float v, float period)
 {
     int k;
-
     if (period <= 0.0f)
         return 0.0f;
-
     k = (int) (v / period);
     v -= (float) k * period;
     if (v < 0.0f)
         v += period;
     else if (v >= period)
         v -= period;
-
     return v;
 }
 
@@ -311,7 +293,6 @@ static inline float afm_lut_cos(const mirrormadness_t *m, float phase)
 {
     return afm_lut_sin(m, phase + 1.57079632679f);
 }
-
 
 static inline int afm_sample_y_bilinear(const uint8_t *restrict Y, float fx, float fy, int w, int h)
 {
@@ -332,7 +313,6 @@ static inline int afm_sample_y_bilinear(const uint8_t *restrict Y, float fx, flo
         fx = 0.0f;
     else if (fx > (float) (w - 1))
         fx = (float) (w - 1);
-
     if (fy < 0.0f)
         fy = 0.0f;
     else if (fy > (float) (h - 1))
@@ -370,7 +350,6 @@ static inline int afm_sample_nearest(const uint8_t *restrict P, float fx, float 
         fx = 0.0f;
     else if (fx > (float) (w - 1))
         fx = (float) (w - 1);
-
     if (fy < 0.0f)
         fy = 0.0f;
     else if (fy > (float) (h - 1))
@@ -383,7 +362,6 @@ static inline int afm_sample_nearest(const uint8_t *restrict P, float fx, float 
         ix = 0;
     else if (ix >= w)
         ix = w - 1;
-
     if (iy < 0)
         iy = 0;
     else if (iy >= h)
@@ -405,6 +383,7 @@ static void afm_build_luts(mirrormadness_t *m, int strength)
     for (i = 0; i < 256; i++) {
         float t = (float) i * (1.0f / 255.0f);
         int yv;
+
         t = (t - 0.5f) * contrast + 0.5f;
         t = afm_clampf(t, 0.0f, 1.0f);
         yv = (int) (t * 255.0f + 0.5f);
@@ -416,15 +395,15 @@ static void afm_build_luts(mirrormadness_t *m, int strength)
 }
 
 static inline void afm_fill_full_segment(float *src,
-                                        uint8_t *mask,
-                                        uint8_t *edge,
-                                        int n,
-                                        float start,
-                                        float width,
-                                        float src_center,
-                                        float src_width,
-                                        int flip,
-                                        float seam_width)
+                                           uint8_t *mask,
+                                           uint8_t *edge,
+                                           int n,
+                                           float start,
+                                           float width,
+                                           float src_center,
+                                           float src_width,
+                                           int flip,
+                                           float seam_width)
 {
     int x0 = clampi((int) floorf(start), 0, n - 1);
     int x1 = clampi((int) ceilf(start + width), 0, n - 1);
@@ -458,16 +437,17 @@ static inline void afm_fill_full_segment(float *src,
     }
 }
 
-
 static inline float afm_width_from_param(int n, float t)
 {
     float domain = (float) n;
     float min_px = 2.0f;
     float max_px = domain * 0.46f;
+
     if (max_px < 8.0f)
         max_px = 8.0f;
     if (max_px > domain * 0.92f)
         max_px = domain * 0.92f;
+
     t = afm_clampf(t, 0.0f, 1.0f);
     return min_px + (max_px - min_px) * t * t;
 }
@@ -573,15 +553,16 @@ static void afm_build_axis_map(mirrormadness_t *m,
         src_center = domain * 0.5f - side * (0.92f + range_t * 0.28f);
         src_center += (r0 - 0.5f) * avg * range_t * 0.72f;
         src_center += afm_lut_sin(m, time + (float) strip * 0.61f) * avg * range_t * 0.14f;
+
         flip = ((strip + layer + horizontal_axis) & 1);
         seam = 0.75f + width * (0.012f + range_t * 0.008f);
 
         afm_fill_full_segment(src, mask, edge, n, pos, width, src_center, src_width, flip, seam);
+
         pos += width;
         strip++;
     }
 }
-
 
 static void afm_prepare_axis_index(const float *restrict src,
                                    const uint8_t *restrict mask,
@@ -592,7 +573,6 @@ static void afm_prepare_axis_index(const float *restrict src,
                                    int *restrict nearest)
 {
     int i;
-
     for (i = 0; i < n; i++) {
         float f = src[i];
         int a;
@@ -660,7 +640,7 @@ static void afm_render_vertical_fast(mirrormadness_t *m,
     const int seam_gain = (int) (6.0f + seam_t * 62.0f + 0.5f);
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -713,7 +693,7 @@ static void afm_render_horizontal_fast(mirrormadness_t *m,
     const int seam_gain = (int) (6.0f + seam_t * 62.0f + 0.5f);
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -754,21 +734,22 @@ static void afm_build_strip_maps(mirrormadness_t *m,
                                  float offset,
                                  float time)
 {
-    if (mode == AFM_MODE_HORIZONTAL) {
-        afm_build_axis_map(m, 0, 1, m->h, min_width_t, max_width_t, -offset * 0.83f, time * 0.91f,
-                           m->y_src,
-                           m->y_mask,
-                           m->y_edge);
-    }
-    else {
-        afm_build_axis_map(m, 0, 0, m->w, min_width_t, max_width_t, offset, time,
-                           m->x_src,
-                           m->x_mask,
-                           m->x_edge);
+#pragma omp single
+    {
+        if (mode == AFM_MODE_HORIZONTAL) {
+            afm_build_axis_map(m, 0, 1, m->h, min_width_t, max_width_t, -offset * 0.83f, time * 0.91f,
+                               m->y_src,
+                               m->y_mask,
+                               m->y_edge);
+        }
+        else {
+            afm_build_axis_map(m, 0, 0, m->w, min_width_t, max_width_t, offset, time,
+                               m->x_src,
+                               m->x_mask,
+                               m->x_edge);
+        }
     }
 }
-
-
 
 static inline void afm_sample_yuv_layer(const uint8_t *restrict sy,
                                         const uint8_t *restrict su,
@@ -815,9 +796,7 @@ static void afm_add_panel(mirrormadness_t *m,
     if (m->panel_count >= AFM_MAX_PANELS)
         return;
 
-    if (m->skip_base_panel &&
-        x <= 0.0f && y <= 0.0f &&
-        ww >= (float) m->w && hh >= (float) m->h)
+    if (m->skip_base_panel && x <= 0.0f && y <= 0.0f && ww >= (float) m->w && hh >= (float) m->h)
         return;
 
     if (ww < 4.0f || hh < 4.0f)
@@ -871,7 +850,6 @@ static void afm_build_panel_layout(mirrormadness_t *m,
     }
 
     (void) mode;
-
     m->panel_count = 0;
 
     {
@@ -956,11 +934,10 @@ static void afm_render_panels(mirrormadness_t *m,
     const int mono_amount_base = (int) (mono_t * 255.0f + 0.5f);
     int y;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
-
         for (x = 0; x < w; x++) {
             const afm_panel_t *p = NULL;
             float u = 0.0f;
@@ -975,23 +952,18 @@ static void afm_render_panels(mirrormadness_t *m,
 
             for (pi = panel_count - 1; pi >= 0; pi--) {
                 const afm_panel_t *q = &m->panels[pi];
-
                 if (x < q->x0 || x >= q->x1 || y < q->y0 || y >= q->y1)
                     continue;
-
                 u = (px - q->x) * q->inv_w;
                 v = (py - q->y) * q->inv_h;
-
                 if (u < 0.0f || u > 1.0f || v < 0.0f || v > 1.0f)
                     continue;
-
                 if (q->round) {
                     float dx = u * 2.0f - 1.0f;
                     float dy = v * 2.0f - 1.0f;
                     if (dx * dx + dy * dy > 1.0f)
                         continue;
                 }
-
                 p = q;
                 break;
             }
@@ -1007,7 +979,6 @@ static void afm_render_panels(mirrormadness_t *m,
                 int mono_amount;
 
                 afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-
                 out_y = m->tone_lut[clampi(out_y, 0, 255)];
                 out_y -= (int) ((float) p->shade * (0.08f + seam_t * 0.34f));
 
@@ -1030,7 +1001,6 @@ static void afm_render_panels(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_render_circular_mirror(mirrormadness_t *m,
                                        VJFrame *frame,
@@ -1074,11 +1044,10 @@ static void afm_render_circular_mirror(mirrormadness_t *m,
 
     phase = offset_t * ring_w * 0.85f + time * ring_w * 0.085f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
-
         for (x = 0; x < w; x++) {
             float dx = ((float) x + 0.5f) - cx;
             float r2 = dx * dx + dy * dy;
@@ -1132,7 +1101,6 @@ static void afm_render_circular_mirror(mirrormadness_t *m,
         }
     }
 }
-
 
 static inline void afm_apply_mono_amount(int *u, int *v, int mono_amount)
 {
@@ -1249,12 +1217,16 @@ static void afm_render_staircase_mirror(mirrormadness_t *m,
     step_w = min_w + (max_w - min_w) * 0.42f;
     if (step_w < 2.0f)
         step_w = 2.0f;
+
     step_y = (0.045f + afm_absf(offset_t) * 0.23f + max_width_t * 0.060f) * (float) h;
 
-    afm_build_axis_map(m, 0, 0, w, min_width_t, max_width_t, offset_t, time,
-                       m->x_src, m->x_mask, m->x_edge);
+#pragma omp single
+    {
+        afm_build_axis_map(m, 0, 0, w, min_width_t, max_width_t, offset_t, time,
+                           m->x_src, m->x_mask, m->x_edge);
+    }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1264,6 +1236,7 @@ static void afm_render_staircase_mirror(mirrormadness_t *m,
             int out_u;
             int out_v;
             int msk = m->x_mask[x];
+
             if (msk <= 0) {
                 out_y = 3 + (int) (seam_t * 4.0f);
                 out_u = 128;
@@ -1275,11 +1248,13 @@ static void afm_render_staircase_mirror(mirrormadness_t *m,
                 int band = (int) bandf;
                 float syf = afm_reflect_coord((float) y + (float) band * step_y, (float) (h - 1));
                 float edge = (float) m->x_edge[x] * (1.0f / 255.0f);
+
                 afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
                 out_y = m->tone_lut[clampi(out_y, 0, 255)];
                 out_y -= (int) (edge * (8.0f + seam_t * 68.0f));
                 afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 2);
             }
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -1319,11 +1294,12 @@ static void afm_render_tunnel_mirror(mirrormadness_t *m,
         max_px = min_px;
         min_px = t;
     }
+
     rect_w = (min_px + (max_px - min_px) * 0.48f) / (min_dim * 0.5f);
     rect_w = afm_clampf(rect_w, 0.025f, 0.65f);
     phase = offset_t * rect_w * 0.88f + time * 0.075f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = ((float) y + 0.5f - cy) / cy;
@@ -1345,11 +1321,13 @@ static void afm_render_tunnel_mirror(mirrormadness_t *m,
             int out_y;
             int out_u;
             int out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (rect_w * (0.10f + seam_t * 0.22f) + 0.00001f), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 84.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -1390,16 +1368,18 @@ static void afm_render_iris_mirror(mirrormadness_t *m,
     if (sectors < 6) sectors = 6;
     if (sectors > 24) sectors = 24;
     sector_w = AFM_TWO_PI / (float) sectors;
+
     if (max_px < min_px) {
         float t = max_px;
         max_px = min_px;
         min_px = t;
     }
+
     ring_w = min_px + (max_px - min_px) * 0.52f;
     if (ring_w < 6.0f) ring_w = 6.0f;
     phase_r = offset_t * ring_w * 0.90f + time * ring_w * 0.080f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -1424,12 +1404,14 @@ static void afm_render_iris_mirror(mirrormadness_t *m,
             int out_y;
             int out_u;
             int out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             ring_edge = 1.0f - afm_smooth01(afm_clampf(ring_edge / (1.4f + seam_t * 8.0f), 0.0f, 1.0f));
             sector_edge = 1.0f - afm_smooth01(afm_clampf(sector_edge / (sector_w * (0.12f + seam_t * 0.10f)), 0.0f, 1.0f));
             out_y -= (int) ((ring_edge * 58.0f + sector_edge * 34.0f) * (0.25f + seam_t));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -1467,7 +1449,7 @@ static void afm_render_shutter_mirror(mirrormadness_t *m,
     if (blades > 28) blades = 28;
     blade_w = AFM_TWO_PI / (float) blades;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -1490,19 +1472,19 @@ static void afm_render_shutter_mirror(mirrormadness_t *m,
             int out_y;
             int out_u;
             int out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (blade_w * (0.11f + seam_t * 0.12f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (16.0f + seam_t * 78.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
         }
     }
 }
-
-
 
 static void afm_build_broken_window_layout(mirrormadness_t *m,
                                            float min_width_t,
@@ -1611,9 +1593,12 @@ static void afm_render_barcode_mirror(mirrormadness_t *m,
         min_t = t;
     }
 
-    afm_build_axis_map(m, 3, 0, m->w, min_t, max_t, offset_t * 1.25f, time * 1.10f,
-                       m->x_src, m->x_mask, m->x_edge);
-    afm_prepare_axis_index(m->x_src, m->x_mask, m->w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+#pragma omp single
+    {
+        afm_build_axis_map(m, 3, 0, m->w, min_t, max_t, offset_t * 1.25f, time * 1.10f,
+                           m->x_src, m->x_mask, m->x_edge);
+        afm_prepare_axis_index(m->x_src, m->x_mask, m->w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+    }
     afm_render_vertical_fast(m, frame, afm_clampf(seam_t * 1.12f, 0.0f, 1.0f));
 }
 
@@ -1634,9 +1619,12 @@ static void afm_render_letterbox_mirror(mirrormadness_t *m,
         min_t = t;
     }
 
-    afm_build_axis_map(m, 4, 1, m->h, min_t, max_t, -offset_t * 0.92f, time * 0.84f,
-                       m->y_src, m->y_mask, m->y_edge);
-    afm_prepare_axis_index(m->y_src, m->y_mask, m->h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+#pragma omp single
+    {
+        afm_build_axis_map(m, 4, 1, m->h, min_t, max_t, -offset_t * 0.92f, time * 0.84f,
+                           m->y_src, m->y_mask, m->y_edge);
+        afm_prepare_axis_index(m->y_src, m->y_mask, m->h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+    }
     afm_render_horizontal_fast(m, frame, afm_clampf(seam_t * 1.08f, 0.0f, 1.0f));
 }
 
@@ -1680,9 +1668,10 @@ static void afm_render_diagonal_slats(mirrormadness_t *m,
     stripe_w = min_px + (max_px - min_px) * 0.38f;
     if (stripe_w < 3.0f)
         stripe_w = 3.0f;
+
     phase = offset_t * stripe_w * 1.35f + time * stripe_w * 0.075f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = ((float) y + 0.5f) - cy;
@@ -1710,13 +1699,13 @@ static void afm_render_diagonal_slats(mirrormadness_t *m,
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 7.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (10.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
         }
     }
 }
-
 
 static void afm_render_serpentine_slits(mirrormadness_t *m,
                                         VJFrame *frame,
@@ -1758,7 +1747,7 @@ static void afm_render_serpentine_slits(mirrormadness_t *m,
     wobble = strip_w * (0.70f + max_width_t * 1.85f);
     freq = (5.0f + min_width_t * 18.0f) / (float) (h > 1 ? h : 1);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1827,7 +1816,7 @@ static void afm_render_quad_portal(mirrormadness_t *m,
     if (fold_x < 8.0f) fold_x = 8.0f;
     if (fold_y < 8.0f) fold_y = 8.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1860,11 +1849,13 @@ static void afm_render_quad_portal(mirrormadness_t *m,
 
             sx = afm_reflect_coord(sx, (float) (w - 1));
             syf = afm_reflect_coord(syf, (float) (h - 1));
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.4f + seam_t * 8.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (9.0f + seam_t * 68.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -1903,7 +1894,7 @@ static void afm_render_moebius_ribbon(mirrormadness_t *m,
     if (strip_w < 5.0f)
         strip_w = 5.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -1936,6 +1927,7 @@ static void afm_render_moebius_ribbon(mirrormadness_t *m,
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.3f + seam_t * 7.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (9.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -1986,6 +1978,7 @@ static void afm_build_orbit_collage_layout(mirrormadness_t *m,
         float px = cx + cosf(a) * orbit_r - (float) p_w * 0.5f;
         float py = cy + sinf(a * 0.83f) * orbit_r * 0.62f - (float) p_h * 0.5f;
         int shade = 44 + (i * 9) % 42;
+
         afm_add_panel(m, px, py, (float) p_w, (float) p_h,
                       cx + cosf(a + 1.2f) * (float) w * 0.17f,
                       cy + sinf(a - 0.6f) * (float) h * 0.14f,
@@ -1999,7 +1992,6 @@ static void afm_build_orbit_collage_layout(mirrormadness_t *m,
                   cx, cy, (float) center_w * 1.04f, (float) center_h * 1.04f,
                   0, 0, 0, 0, 0);
 }
-
 
 static void afm_render_triangle_mirror(mirrormadness_t *m,
                                        VJFrame *frame,
@@ -2032,12 +2024,15 @@ static void afm_render_triangle_mirror(mirrormadness_t *m,
 
     if (sectors < 3) sectors = 3;
     if (sectors > 18) sectors = 18;
+
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     band_w = min_px + (max_px - min_px) * 0.45f;
     if (band_w < 5.0f) band_w = 5.0f;
+
     sector_w = AFM_TWO_PI / (float) sectors;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -2060,12 +2055,14 @@ static void afm_render_triangle_mirror(mirrormadness_t *m,
             float edge_r = rl < band_w - rl ? rl : band_w - rl;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge_a = 1.0f - afm_smooth01(afm_clampf(edge_a / (sector_w * (0.08f + seam_t * 0.13f)), 0.0f, 1.0f));
             edge_r = 1.0f - afm_smooth01(afm_clampf(edge_r / (1.0f + seam_t * 7.0f), 0.0f, 1.0f));
             out_y -= (int) ((edge_a * 42.0f + edge_r * 36.0f) * (0.28f + seam_t));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2103,12 +2100,13 @@ static void afm_render_hex_mirror(mirrormadness_t *m,
     int y;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     cell = min_px + (max_px - min_px) * 0.72f;
     cell *= 1.22f;
     if (cell < 10.0f) cell = 10.0f;
     inv_cell = 1.0f / cell;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = ((float) y + 0.5f) - cy;
@@ -2128,15 +2126,19 @@ static void afm_render_hex_mirror(mirrormadness_t *m,
             float edge = m0;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             if (m1 < edge) edge = m1;
             if (m2 < edge) edge = m2;
+
             sx = afm_reflect_coord(sx, (float) (w - 1));
             syf = afm_reflect_coord(syf, (float) (h - 1));
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge * cell / (1.0f + seam_t * 7.5f), 0.0f, 1.0f));
             out_y -= (int) (edge * (10.0f + seam_t * 72.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2167,10 +2169,12 @@ static void afm_render_tunnel_xl(mirrormadness_t *m,
     float band = afm_width_from_param((int) min_dim, max_width_t) * 0.72f + min_dim * 0.06f;
     int mono_amount = (int) (mono_t * 255.0f + 0.5f);
     int y;
+
     (void) min_width_t;
+
     if (band < 24.0f) band = 24.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float ny = (((float) y + 0.5f) - cy) / cy;
@@ -2192,11 +2196,13 @@ static void afm_render_tunnel_xl(mirrormadness_t *m,
             float edge = local < band - local ? local : band - local;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (band * (0.035f + seam_t * 0.10f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (16.0f + seam_t * 92.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2252,10 +2258,13 @@ static void afm_render_wave_bars(mirrormadness_t *m,
     inv_stripe_w = 1.0f / stripe_w;
     x_phase = time;
 
-    for (x = 0; x < w; x++)
-        x_warp[x] = afm_lut_sin(m, (float) x * 0.012f + x_phase) * stripe_w * 0.24f;
+#pragma omp single
+    {
+        for (x = 0; x < w; x++)
+            x_warp[x] = afm_lut_sin(m, (float) x * 0.012f + x_phase) * stripe_w * 0.24f;
+    }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int xx;
         int row = y * w;
@@ -2280,11 +2289,9 @@ static void afm_render_wave_bars(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-
             edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
             out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
-
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
 
             Y[pos] = afm_u8i(out_y);
@@ -2293,7 +2300,6 @@ static void afm_render_wave_bars(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_build_center_stack_layout(mirrormadness_t *m,
                                           float min_width_t,
@@ -2310,9 +2316,13 @@ static void afm_build_center_stack_layout(mirrormadness_t *m,
     float cx = (float) w * 0.5f;
     float cy = (float) h * 0.5f;
     int i;
+
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     m->panel_count = 0;
+
     afm_add_panel(m, 0.0f, 0.0f, (float) w, (float) h, cx, cy, (float) w * 1.08f, (float) h * 1.08f, 1, 0, 1, 0, 54);
+
     for (i = 0; i < 7; i++) {
         float k = (float) i / 6.0f;
         float ww = afm_size_from_range((float) w * (0.18f + k * 0.66f), min_px, max_px * 2.2f);
@@ -2320,6 +2330,7 @@ static void afm_build_center_stack_layout(mirrormadness_t *m,
         float x = cx - ww * 0.5f + sinf(time * (0.5f + k) + k * 3.1f) * (float) w * 0.025f + offset_t * (float) w * (0.04f - k * 0.02f);
         float y = cy - hh * 0.5f + (k - 0.5f) * (float) h * 0.10f;
         int mono = (i < 5);
+
         afm_add_panel(m, x, y, ww, hh, cx, cy + (k - 0.5f) * (float) h * 0.12f, ww * 1.04f, hh * 1.02f, i & 1, 0, mono, 0, 42 + i * 6);
     }
 }
@@ -2345,9 +2356,12 @@ static void afm_render_corner_pull(mirrormadness_t *m,
     float band = afm_width_from_param((int) min_dim, min_width_t) * 0.85f + 12.0f;
     int mono_amount = (int) (mono_t * 255.0f + 0.5f);
     int y;
+
     (void) max_width_t;
+
     if (band < 12.0f) band = 12.0f;
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2366,11 +2380,13 @@ static void afm_render_corner_pull(mirrormadness_t *m,
             float edge = l < band - l ? l : band - l;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 8.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (13.0f + seam_t * 78.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2426,29 +2442,31 @@ static void afm_render_slit_scan(mirrormadness_t *m,
 
     inv_stripe_w = 1.0f / stripe_w;
 
-    for (x = 0; x < w; x++) {
-        float coord = (float) x + phase_x;
-        float q = coord * inv_stripe_w;
-        int band = afm_floor_to_int(q);
-        float band_start = (float) band * stripe_w;
-        float l = coord - band_start;
-        float ml = (band & 1) ? (stripe_w - l) : l;
-        float edge = l < stripe_w - l ? l : stripe_w - l;
-        float sy_shift = afm_lut_sin(m, (float) band * 0.71f + time * 2.8f) * shift_scale +
-                         (float) (band & 3) * stripe_w * 0.20f;
+#pragma omp single
+    {
+        for (x = 0; x < w; x++) {
+            float coord = (float) x + phase_x;
+            float q = coord * inv_stripe_w;
+            int band = afm_floor_to_int(q);
+            float band_start = (float) band * stripe_w;
+            float l = coord - band_start;
+            float ml = (band & 1) ? (stripe_w - l) : l;
+            float edge = l < stripe_w - l ? l : stripe_w - l;
+            float sy_shift = afm_lut_sin(m, (float) band * 0.71f + time * 2.8f) * shift_scale +
+                             (float) (band & 3) * stripe_w * 0.20f;
 
-        sx_tab[x] = afm_reflect_coord(band_start + ml, wmax);
-        yshift_fp[x] = (int) (sy_shift * 256.0f);
-        edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
-        edge_tab[x] = (uint8_t) clampi((int) (edge * 255.0f + 0.5f), 0, 255);
+            sx_tab[x] = afm_reflect_coord(band_start + ml, wmax);
+            yshift_fp[x] = (int) (sy_shift * 256.0f);
+            edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
+            edge_tab[x] = (uint8_t) clampi((int) (edge * 255.0f + 0.5f), 0, 255);
+        }
     }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int xx;
         int row = y * w;
         float yf = (float) y;
-
         for (xx = 0; xx < w; xx++) {
             float syf = afm_reflect_coord(yf + (float) yshift_fp[xx] * (1.0f / 256.0f), hmax);
             int pos = row + xx;
@@ -2458,10 +2476,8 @@ static void afm_render_slit_scan(mirrormadness_t *m,
             int edge_i = edge_tab[xx];
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx_tab[xx], syf, &out_y, &out_u, &out_v);
-
             out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (edge_i * seam_dark + 127) / 255;
-
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
 
             Y[pos] = afm_u8i(out_y);
@@ -2470,9 +2486,6 @@ static void afm_render_slit_scan(mirrormadness_t *m,
         }
     }
 }
-
-
-
 
 static void afm_build_contact_sheet_layout(mirrormadness_t *m,
                                            float min_width_t,
@@ -2534,6 +2547,7 @@ static void afm_build_contact_sheet_layout(mirrormadness_t *m,
         float hh = ((float) h - gap * (float) (rows + 1)) / (float) rows * 1.12f;
         float x = ((float) w - ww) * 0.5f + drift_x * 0.22f;
         float y = ((float) h - hh) * 0.5f + drift_y * 0.20f;
+
         afm_add_panel(m, x, y, ww, hh,
                       (float) w * 0.5f, (float) h * 0.5f,
                       ww * 1.04f, hh * 1.04f,
@@ -2571,7 +2585,7 @@ static void afm_render_venetian_fan(mirrormadness_t *m,
     if (blades > 32) blades = 32;
     blade_w = AFM_TWO_PI / (float) blades;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2589,11 +2603,13 @@ static void afm_render_venetian_fan(mirrormadness_t *m,
             float edge = l < blade_w - l ? l : blade_w - l;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (blade_w * (0.10f + seam_t * 0.14f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2627,16 +2643,18 @@ static void afm_render_hourglass_mirror(mirrormadness_t *m,
     int y;
 
     if (max_w < min_w) { float t = max_w; max_w = min_w; min_w = t; }
+
     base_w = min_w + (max_w - min_w) * 0.42f;
     if (base_w < 3.0f) base_w = 3.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float yn = (((float) y + 0.5f) - cy) / cy;
         float waist = 0.30f + 0.70f * afm_absf(yn);
         float strip_w = base_w * (0.38f + waist * 1.24f);
         float yshift = afm_lut_sin(m, time * 1.7f + yn * 2.4f) * (float) h * 0.018f * max_width_t;
+
         for (x = 0; x < w; x++) {
             float warped_x = cx + (((float) x + 0.5f) - cx) / waist;
             float coord = warped_x + offset_t * (float) w * 0.38f;
@@ -2648,11 +2666,13 @@ static void afm_render_hourglass_mirror(mirrormadness_t *m,
             float edge = l < strip_w - l ? l : strip_w - l;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 7.2f), 0.0f, 1.0f));
             out_y -= (int) (edge * (8.0f + seam_t * 64.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 2);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2689,7 +2709,7 @@ static void afm_render_pinwheel_panels(mirrormadness_t *m,
     if (panels > 16) panels = 16;
     pane_w = AFM_TWO_PI / (float) panels;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
@@ -2708,11 +2728,13 @@ static void afm_render_pinwheel_panels(mirrormadness_t *m,
             float edge = l < pane_w - l ? l : pane_w - l;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (pane_w * (0.09f + seam_t * 0.12f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (10.0f + seam_t * 72.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2743,11 +2765,13 @@ static void afm_render_accordion_mirror(mirrormadness_t *m,
     float amp = (float) h * (0.035f + max_width_t * 0.11f);
     int mono_amount = (int) (mono_t * 255.0f + 0.5f);
     int y;
+
     if (max_w < min_w) { float t = max_w; max_w = min_w; min_w = t; }
+
     fold_w = min_w + (max_w - min_w) * 0.50f;
     if (fold_w < 3.0f) fold_w = 3.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2762,12 +2786,14 @@ static void afm_render_accordion_mirror(mirrormadness_t *m,
             float edge = l < fold_w - l ? l : fold_w - l;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             out_y += (int) ((hinge - 0.5f) * (8.0f + seam_t * 14.0f));
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (0.8f + seam_t * 6.5f), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 2);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2792,7 +2818,9 @@ static void afm_build_prism_stack_layout(mirrormadness_t *m,
     int i;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     m->panel_count = 0;
+
     afm_add_panel(m, 0.0f, 0.0f, (float) w, (float) h,
                   cx, cy, (float) w * 1.10f, (float) h * 1.10f,
                   1, 0, 1, 0, 62);
@@ -2803,6 +2831,7 @@ static void afm_build_prism_stack_layout(mirrormadness_t *m,
         float y = ((float) i + 0.42f) * (float) h / (float) bands - hh * 0.5f + drift * ((float) i - 2.0f) * 0.45f;
         float x = ((float) w - ww) * 0.5f + offset_t * (float) w * 0.035f * ((float) i - 2.0f);
         int front = (i == 2);
+
         afm_add_panel(m, x, y, ww, hh,
                       cx + ((float) i - 2.0f) * (float) w * 0.035f,
                       y + hh * 0.5f,
@@ -2834,10 +2863,12 @@ static void afm_render_corner_kaleido(mirrormadness_t *m,
     float sector_w;
     int mono_amount = (int) (mono_t * 255.0f + 0.5f);
     int y;
+
     if (sectors < 4) sectors = 4;
     if (sectors > 24) sectors = 24;
     sector_w = (AFM_TWO_PI * 0.25f) / (float) sectors;
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -2861,11 +2892,13 @@ static void afm_render_corner_kaleido(mirrormadness_t *m,
             float edge = l < sector_w - l ? l : sector_w - l;
             int pos = y * w + x;
             int out_y, out_u, out_v;
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (sector_w * (0.12f + seam_t * 0.12f)), 0.0f, 1.0f));
             out_y -= (int) (edge * (12.0f + seam_t * 74.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -2894,7 +2927,9 @@ static void afm_build_film_gate_layout(mirrormadness_t *m,
     int i;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     m->panel_count = 0;
+
     afm_add_panel(m, 0.0f, 0.0f, (float) w, (float) h,
                   cx, cy, (float) w * 1.08f, (float) h * 1.08f,
                   1, 0, 1, 0, 70);
@@ -2906,9 +2941,11 @@ static void afm_build_film_gate_layout(mirrormadness_t *m,
 
     for (i = 0; i < 5; i++) {
         float yy = (float) i * (float) h * 0.20f + drift - gate_h * 0.10f;
+
         afm_add_panel(m, side_w * 0.22f + offset_t * (float) w * 0.020f, yy, side_w, gate_h,
                       (float) w * 0.28f, yy + gate_h * 0.5f, side_w * 1.8f, gate_h * 1.5f,
                       i & 1, 0, 1, 0, 86);
+
         afm_add_panel(m, (float) w - side_w * 1.22f - offset_t * (float) w * 0.020f, yy + gate_h * 0.24f, side_w, gate_h,
                       (float) w * 0.72f, yy + gate_h * 0.5f, side_w * 1.8f, gate_h * 1.5f,
                       (i + 1) & 1, 0, 1, 0, 86);
@@ -2919,7 +2956,6 @@ static void afm_build_film_gate_layout(mirrormadness_t *m,
                   cx, cy, center_w * 1.02f, center_h * 1.02f,
                   0, 0, 0, 0, 0);
 }
-
 
 static void afm_render_elastic_strip_mirror(mirrormadness_t *m,
                                             VJFrame *frame,
@@ -2968,7 +3004,7 @@ static void afm_render_elastic_strip_mirror(mirrormadness_t *m,
     inv_stripe_w = 1.0f / stripe_w;
     lens_scale = stripe_w * (0.45f + seam_t * 0.42f);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -2999,11 +3035,9 @@ static void afm_render_elastic_strip_mirror(mirrormadness_t *m,
             syf = afm_reflect_coord(syf, hmax);
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-
             edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
             out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
-
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
 
             Y[pos] = afm_u8i(out_y);
@@ -3012,7 +3046,6 @@ static void afm_render_elastic_strip_mirror(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_render_sliced_lens_mirror(mirrormadness_t *m,
                                           VJFrame *frame,
@@ -3062,7 +3095,7 @@ static void afm_render_sliced_lens_mirror(mirrormadness_t *m,
     inv_stripe_w = 1.0f / stripe_w;
     ybend_scale = stripe_w * (0.28f + max_width_t * 0.44f);
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         const int row = y * w;
@@ -3090,12 +3123,10 @@ static void afm_render_sliced_lens_mirror(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, sy_base, &out_y, &out_u, &out_v);
-
             edge = 1.0f - afm_smooth01(afm_clampf(edge * inv_seam_px, 0.0f, 1.0f));
             out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
             out_y += (int) ((1.0f - afm_absf(f)) * (float) lens_gain);
-
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
 
             Y[pos] = afm_u8i(out_y);
@@ -3104,7 +3135,6 @@ static void afm_render_sliced_lens_mirror(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_render_torn_poster_mirror(mirrormadness_t *m,
                                           VJFrame *frame,
@@ -3150,7 +3180,7 @@ static void afm_render_torn_poster_mirror(mirrormadness_t *m,
 
     inv_strip_h = 1.0f / strip_h;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         int row = y * w;
@@ -3176,10 +3206,8 @@ static void afm_render_torn_poster_mirror(mirrormadness_t *m,
             int out_v;
 
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
-
             out_y = tone[clampi(out_y, 0, 255)];
             out_y -= (int) (edge * (float) seam_dark);
-
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
 
             Y[pos] = afm_u8i(out_y);
@@ -3188,7 +3216,6 @@ static void afm_render_torn_poster_mirror(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_build_cascade_collage_layout(mirrormadness_t *m,
                                              float min_width_t,
@@ -3210,6 +3237,7 @@ static void afm_build_cascade_collage_layout(mirrormadness_t *m,
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
 
     m->panel_count = 0;
+
     afm_add_panel(m, 0.0f, 0.0f, (float) w, (float) h,
                   cx, cy, (float) w * 1.10f, (float) h * 1.10f,
                   1, 0, 1, 0, 58);
@@ -3222,6 +3250,7 @@ static void afm_build_cascade_collage_layout(mirrormadness_t *m,
         float y = -hh * 0.05f + (float) h * 0.105f * k + drift * ((i & 1) ? -1.0f : 1.0f);
         float srcx = (float) w * (0.22f + 0.070f * (float) (i % 5));
         float srcy = (float) h * (0.18f + 0.080f * (float) (i % 4));
+
         afm_add_panel(m, x, y, ww, hh,
                       srcx, srcy, ww * (1.18f + 0.05f * (float) (i & 3)), hh * 1.18f,
                       i & 1, (i >> 1) & 1, 1, 0, 48 + i * 5);
@@ -3230,6 +3259,7 @@ static void afm_build_cascade_collage_layout(mirrormadness_t *m,
     {
         float fw = afm_size_from_range((float) w * 0.54f, min_px * 1.6f, max_px * 2.3f);
         float fh = afm_size_from_range((float) h * 0.48f, min_px * 1.4f, max_px * 2.1f);
+
         afm_add_panel(m, cx - fw * 0.50f + offset_t * (float) w * 0.035f,
                       cy - fh * 0.50f - drift * 0.35f,
                       fw, fh, cx, cy, fw * 1.05f, fh * 1.05f,
@@ -3265,7 +3295,7 @@ static void afm_render_spiral_stair_mirror(mirrormadness_t *m,
     if (band < 5.0f)
         band = 5.0f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -3293,15 +3323,13 @@ static void afm_render_spiral_stair_mirror(mirrormadness_t *m,
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.2f + seam_t * 8.0f), 0.0f, 1.0f));
             out_y -= (int) (edge * (16.0f + seam_t * 88.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount >> 1);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
         }
     }
 }
-
-
-
 
 static void afm_build_sliding_doors_layout(mirrormadness_t *m,
                                            float min_width_t,
@@ -3409,6 +3437,7 @@ static void afm_build_spiral_shards_layout(mirrormadness_t *m,
     {
         float ww = (float) afm_size_from_range((float) w * 0.34f, min_px, max_px * 1.70f);
         float hh = (float) afm_size_from_range((float) h * 0.44f, min_px, max_px * 1.90f);
+
         afm_add_panel(m, cx - ww * 0.50f, cy - hh * 0.50f, ww, hh,
                       cx, cy, ww * 1.10f, hh * 1.10f,
                       0, 0, 0, 0, 0);
@@ -3463,6 +3492,7 @@ static void afm_build_nested_film_gates_layout(mirrormadness_t *m,
     {
         float ww = afm_size_from_range((float) w * 0.42f, min_px * 1.3f, max_px * 2.0f);
         float hh = afm_size_from_range((float) h * 0.38f, min_px * 1.1f, max_px * 1.8f);
+
         afm_add_panel(m, cx - ww * 0.5f, cy - hh * 0.5f, ww, hh,
                       cx, cy, ww * 1.06f, hh * 1.06f,
                       0, 0, 0, 0, 0);
@@ -3507,7 +3537,7 @@ static void afm_render_waterfall_strips(mirrormadness_t *m,
     phase = offset_t * (float) h * 0.46f + time * (float) h * 0.035f;
     seam_px = 1.1f + seam_t * 6.8f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float yy = (float) y + 0.5f + phase;
@@ -3532,6 +3562,7 @@ static void afm_render_waterfall_strips(mirrormadness_t *m,
             out_y = m->tone_lut[clampi(out_y, 0, 255)];
             out_y -= (int) (ed * (12.0f + seam_t * 70.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -3579,11 +3610,10 @@ static void afm_render_fan_blades(mirrormadness_t *m,
     phase = offset_t * AFM_TWO_PI + time * 0.42f;
     seam_ang = 0.018f + seam_t * 0.050f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
-
         for (x = 0; x < w; x++) {
             float dx = ((float) x + 0.5f) - cx;
             float r = sqrtf(dx * dx + dy * dy);
@@ -3603,6 +3633,7 @@ static void afm_render_fan_blades(mirrormadness_t *m,
 
             if (a < 0.0f)
                 a += AFM_TWO_PI * (1.0f + floorf(-a * AFM_INV_TWO_PI));
+
             bandf = floorf(a / blade_w);
             band = (int) bandf;
             local = a - bandf * blade_w;
@@ -3618,6 +3649,7 @@ static void afm_render_fan_blades(mirrormadness_t *m,
             edge = 1.0f - afm_smooth01(afm_clampf(edge / seam_ang, 0.0f, 1.0f));
             out_y = m->tone_lut[clampi(out_y, 0, 255)] - (int) (edge * (10.0f + seam_t * 64.0f));
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -3662,15 +3694,15 @@ static void afm_render_diamond_tunnel(mirrormadness_t *m,
     band_w = min_px + (max_px - min_px) * 0.52f;
     if (band_w < 5.0f)
         band_w = 5.0f;
+
     phase = offset_t * band_w * 1.8f + time * band_w * 0.065f;
     seam_px = 1.4f + seam_t * 7.2f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = ((float) y + 0.5f) - cy;
         float ady = afm_absf(dy);
-
         for (x = 0; x < w; x++) {
             float dx = ((float) x + 0.5f) - cx;
             float d = afm_absf(dx) + ady;
@@ -3692,12 +3724,14 @@ static void afm_render_diamond_tunnel(mirrormadness_t *m,
 
             sx = afm_reflect_coord(sx, (float) (w - 1));
             syf = afm_reflect_coord(syf, (float) (h - 1));
+
             afm_sample_yuv_layer(sy, su, sv, w, h, sx, syf, &out_y, &out_u, &out_v);
             edge = 1.0f - afm_smooth01(afm_clampf(edge / seam_px, 0.0f, 1.0f));
             out_y = m->tone_lut[clampi(out_y, 0, 255)] - (int) (edge * (12.0f + seam_t * 74.0f));
             if (d < band_w * 0.80f)
                 out_y += (int) ((1.0f - d / (band_w * 0.80f)) * 12.0f);
             afm_apply_mono_amount(&out_u, &out_v, mono_amount);
+
             Y[pos] = afm_u8i(out_y);
             U[pos] = afm_u8i(out_u);
             V[pos] = afm_u8i(out_v);
@@ -3730,11 +3764,11 @@ static inline void afm_emit_sample(mirrormadness_t *m,
     out_y -= (int) (edge * (10.0f + seam_t * 72.0f));
     out_y -= extra_shade;
     afm_apply_mono_amount(&out_u, &out_v, mono_amount);
+
     Y[pos] = afm_u8i(out_y);
     U[pos] = afm_u8i(out_u);
     V[pos] = afm_u8i(out_v);
 }
-
 
 static inline void afm_emit_background(mirrormadness_t *m,
                                        VJFrame *frame,
@@ -3786,7 +3820,7 @@ static void afm_render_voronoi_plates(mirrormadness_t *m,
     if (cell > (float) min_dim * 0.58f) cell = (float) min_dim * 0.58f;
     inv_cell = 1.0f / cell;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -3814,6 +3848,7 @@ static void afm_render_voronoi_plates(mirrormadness_t *m,
                     float dx = px - ccx;
                     float dy = py - ccy;
                     float d = dx * dx + dy * dy;
+
                     if (d < best_d) {
                         second_d = best_d;
                         best_d = d;
@@ -3835,6 +3870,7 @@ static void afm_render_voronoi_plates(mirrormadness_t *m,
                 float syf = py;
                 float edge = 1.0f - afm_smooth01(afm_clampf((second_d - best_d) / (cell * cell * (0.08f + seam_t * 0.16f)), 0.0f, 1.0f));
                 int shade = (int) (afm_hash01(best_hash ^ 0xa53c91U) * 22.0f * seam_t);
+
                 if (axis == 0) {
                     sx = best_cx - dx;
                     syf = best_cy + dy;
@@ -3851,6 +3887,7 @@ static void afm_render_voronoi_plates(mirrormadness_t *m,
                     sx = best_cx - dy;
                     syf = best_cy - dx;
                 }
+
                 afm_emit_sample(m, frame, y * w + x, sx, syf, edge, seam_t, mono_amount, shade);
             }
         }
@@ -3888,11 +3925,10 @@ static void afm_render_polar_barcode(mirrormadness_t *m,
     inv_band_w = 1.0f / band_w;
     phase = offset_t * 1.7f + time * 0.28f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float dy = (float) y + 0.5f - cy;
-
         for (x = 0; x < w; x++) {
             float dx = (float) x + 0.5f - cx;
             float r = sqrtf(dx * dx + dy * dy);
@@ -3915,7 +3951,6 @@ static void afm_render_polar_barcode(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_render_ribbon_lattice(mirrormadness_t *m,
                                       VJFrame *frame,
@@ -3941,14 +3976,16 @@ static void afm_render_ribbon_lattice(mirrormadness_t *m,
     int y;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     band_w = min_px + (max_px - min_px) * 0.58f;
     if (band_w < 10.0f) band_w = 10.0f;
+
     gap = band_w * (1.65f - max_width_t * 0.45f);
     inv_gap = 1.0f / gap;
     off1 = offset_t * diag * 0.22f + time * diag * 0.010f;
     off2 = -offset_t * diag * 0.18f - time * diag * 0.008f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         float py = (float) y + 0.5f;
@@ -3990,7 +4027,6 @@ static void afm_render_ribbon_lattice(mirrormadness_t *m,
         }
     }
 }
-
 
 static void afm_render_woven_mirror(mirrormadness_t *m,
                                     VJFrame *frame,
@@ -4037,15 +4073,18 @@ static void afm_render_woven_mirror(mirrormadness_t *m,
     xoff = -offset_t * pitch_x * 0.5f - time * pitch_x * 0.018f;
     yoff =  offset_t * pitch_y * 0.4f + time * pitch_y * 0.02f;
 
-    for (x = 0; x < w; x++) {
-        float px = (float) x + 0.5f;
-        float vx = px + xoff;
-        int hx = afm_floor_to_int(vx * inv_pitch_x);
-        hx_tab[x] = hx;
-        lx_tab[x] = vx - (float) hx * pitch_x;
+#pragma omp single
+    {
+        for (x = 0; x < w; x++) {
+            float px = (float) x + 0.5f;
+            float vx = px + xoff;
+            int hx = afm_floor_to_int(vx * inv_pitch_x);
+            hx_tab[x] = hx;
+            lx_tab[x] = vx - (float) hx * pitch_x;
+        }
     }
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int xx;
         float py = (float) y + 0.5f;
@@ -4090,7 +4129,6 @@ static void afm_render_woven_mirror(mirrormadness_t *m,
     }
 }
 
-
 static void afm_render_corner_tunnel(mirrormadness_t *m,
                                      VJFrame *frame,
                                      float min_width_t,
@@ -4113,11 +4151,13 @@ static void afm_render_corner_tunnel(mirrormadness_t *m,
     int y;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     band_w = min_px + (max_px - min_px) * 0.62f;
     if (band_w < 8.0f) band_w = 8.0f;
+
     phase = time * band_w * 0.05f + offset_t * band_w * 1.6f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -4134,6 +4174,7 @@ static void afm_render_corner_tunnel(mirrormadness_t *m,
             float sx = ox + (((float) x + 0.5f) - ox) * scale;
             float syf = oy + (((float) y + 0.5f) - oy) * scale;
             float edge = local < band_w - local ? local : band_w - local;
+
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.5f + seam_t * 8.5f), 0.0f, 1.0f));
             afm_emit_sample(m, frame, y * w + x, sx, syf, edge, seam_t, mono_amount, (int) (bf * 0.75f));
         }
@@ -4163,11 +4204,12 @@ static void afm_render_lens_array(mirrormadness_t *m,
     (void) time;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     cell = min_px + (max_px - min_px) * 0.66f;
     if (cell < 28.0f) cell = 28.0f;
     inv_cell = 1.0f / cell;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -4188,6 +4230,7 @@ static void afm_render_lens_array(mirrormadness_t *m,
             float syf;
             float edge = 0.0f;
             int shade = 0;
+
             if (q <= 1.0f) {
                 float bend = 0.36f + mag * (0.62f + max_width_t * 0.30f);
                 sx = cx - dx * bend;
@@ -4198,6 +4241,7 @@ static void afm_render_lens_array(mirrormadness_t *m,
                 afm_emit_background(m, frame, y * w + x, seam_t, background_source);
                 continue;
             }
+
             afm_emit_sample(m, frame, y * w + x, sx, syf, edge, seam_t, mono_amount, shade);
         }
     }
@@ -4222,11 +4266,13 @@ static void afm_render_axis_roulette(mirrormadness_t *m,
     int y;
 
     if (max_px < min_px) { float t = max_px; max_px = min_px; min_px = t; }
+
     band_w = min_px + (max_px - min_px) * 0.48f;
     if (band_w < 10.0f) band_w = 10.0f;
+
     phase = offset_t * band_w * 1.3f + time * band_w * 0.05f;
 
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+#pragma omp for schedule(static)
     for (y = 0; y < h; y++) {
         int x;
         for (x = 0; x < w; x++) {
@@ -4240,6 +4286,7 @@ static void afm_render_axis_roulette(mirrormadness_t *m,
             float sx = px;
             float syf = py;
             float edge;
+
             if (axis == 0)
                 sx = (float) (w - 1) - px;
             else if (axis == 1)
@@ -4252,6 +4299,7 @@ static void afm_render_axis_roulette(mirrormadness_t *m,
                 sx = afm_reflect_coord((float) w - py * ((float) w / (float) h), (float) (w - 1));
                 syf = afm_reflect_coord((float) h - px * ((float) h / (float) w), (float) (h - 1));
             }
+
             edge = local < band_w - local ? local : band_w - local;
             edge = 1.0f - afm_smooth01(afm_clampf(edge / (1.4f + seam_t * 8.0f), 0.0f, 1.0f));
             afm_emit_sample(m, frame, y * w + x, sx, syf, edge, seam_t, mono_amount, 0);
@@ -4270,14 +4318,6 @@ vj_effect *hyperfold_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if (ve->defaults) free(ve->defaults);
-        if (ve->limits[0]) free(ve->limits[0]);
-        if (ve->limits[1]) free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->limits[0][P_MODE] = 0; ve->limits[1][P_MODE] = AFM_MODE_LAST; ve->defaults[P_MODE] = AFM_MODE_VERTICAL;
     ve->limits[0][P_MINWIDTH] = 0; ve->limits[1][P_MINWIDTH] = 1000; ve->defaults[P_MINWIDTH] = 120;
     ve->limits[0][P_MAXWIDTH] = 0; ve->limits[1][P_MAXWIDTH] = 1000; ve->defaults[P_MAXWIDTH] = 820;
@@ -4292,7 +4332,6 @@ vj_effect *hyperfold_init(int w, int h)
     ve->description = "Mirror Madness";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -4310,6 +4349,7 @@ vj_effect *hyperfold_init(int w, int h)
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
+
     vje_build_value_hint_list(
         ve->hints,
         ve->limits[1][P_MODE],
@@ -4374,6 +4414,7 @@ vj_effect *hyperfold_init(int w, int h)
         "Black",
         "Original Source"
     );
+
     {
         const vj_beat_param_hint_t beat_hints[] = {
             VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
@@ -4392,6 +4433,7 @@ vj_effect *hyperfold_init(int w, int h)
 
     return ve;
 }
+
 void *hyperfold_malloc(int w, int h)
 {
     mirrormadness_t *m;
@@ -4409,35 +4451,28 @@ void *hyperfold_malloc(int w, int h)
         return NULL;
 
     len = (size_t) w * (size_t) h;
-
     if (len > (size_t) 0x7fffffff)
         return NULL;
 
     axis = (size_t) w + (size_t) h;
-
     if (axis < (size_t) w)
         return NULL;
 
     if (len > ((size_t) -1) / 3)
         return NULL;
-
     if (axis > ((size_t) -1) / 3)
         return NULL;
 
     byte_size = len * 3;
-
     if (byte_size > ((size_t) -1) - axis * 3)
         return NULL;
-
     byte_size += axis * 3;
 
     float_count = axis;
-
     if (float_count > ((size_t) -1) / sizeof(float))
         return NULL;
 
     int_count = axis * 3;
-
     if (int_count > ((size_t) -1) / sizeof(int))
         return NULL;
 
@@ -4455,7 +4490,6 @@ void *hyperfold_malloc(int w, int h)
     m->last_strength = -1;
     m->skip_base_panel = 0;
     m->time = 0.0f;
-
     m->n_threads = vje_advise_num_threads((int) len);
 
     m->region = vj_malloc(byte_size);
@@ -4480,11 +4514,9 @@ void *hyperfold_malloc(int w, int h)
     }
 
     b = (uint8_t *) m->region;
-
     m->src_y = b; b += len;
     m->src_u = b; b += len;
     m->src_v = b; b += len;
-
     m->x_mask = b; b += (size_t) w;
     m->y_mask = b; b += (size_t) h;
     m->x_edge = b; b += (size_t) w;
@@ -4493,12 +4525,10 @@ void *hyperfold_malloc(int w, int h)
     m->y_w    = b; b += (size_t) h;
 
     f = m->x_src;
-
     m->x_src = f;
     m->y_src = f + (size_t) w;
 
     ip = m->x_i0;
-
     m->x_i0 = ip; ip += (size_t) w;
     m->x_i1 = ip; ip += (size_t) w;
     m->y_i0 = ip; ip += (size_t) h;
@@ -4509,7 +4539,6 @@ void *hyperfold_malloc(int w, int h)
     veejay_memset(m->region, 0, byte_size);
     veejay_memset(m->src_u, 128, len);
     veejay_memset(m->src_v, 128, len);
-
     veejay_memset(m->x_src, 0, sizeof(float) * float_count);
     veejay_memset(m->x_i0, 0, sizeof(int) * int_count);
 
@@ -4530,13 +4559,10 @@ void hyperfold_free(void *ptr)
 
     if (m->x_i0)
         free(m->x_i0);
-
     if (m->x_src)
         free(m->x_src);
-
     if (m->region)
         free(m->region);
-
     free(m);
 }
 
@@ -4576,7 +4602,6 @@ static inline void afm_sample_yuv_layer(const uint8_t *restrict sy,
         sx = 0.0f;
     else if (sx > (float) (w - 1))
         sx = (float) (w - 1);
-
     if (syf < 0.0f)
         syf = 0.0f;
     else if (syf > (float) (h - 1))
@@ -4588,7 +4613,6 @@ static inline void afm_sample_yuv_layer(const uint8_t *restrict sy,
     x1 = ix + 1;
     if (x1 >= w)
         x1 = ix;
-
     y1 = iy + 1;
     if (y1 >= h)
         y1 = iy;
@@ -4603,6 +4627,7 @@ static inline void afm_sample_yuv_layer(const uint8_t *restrict sy,
 
     a = (int) sy[p00] * (256 - wx) + (int) sy[p10] * wx;
     b = (int) sy[p01] * (256 - wx) + (int) sy[p11] * wx;
+
     *oy = ((a * (256 - wy) + b * wy) + 32768) >> 16;
 
     nx = (int) (sx + 0.5f);
@@ -4616,7 +4641,6 @@ static inline void afm_sample_yuv_layer(const uint8_t *restrict sy,
     *ou = su[p00];
     *ov = sv[p00];
 }
-
 
 typedef struct {
     float width_push;
@@ -4650,7 +4674,6 @@ static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
             p.contrast_push = 0.22f;
             p.turbulence_push = 0.12f;
             break;
-
         case AFM_MODE_VENETIAN_FAN:
         case AFM_MODE_ELASTIC_STRIP:
         case AFM_MODE_STAIRCASE:
@@ -4667,7 +4690,6 @@ static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
             p.contrast_push = 0.18f;
             p.turbulence_push = 0.28f;
             break;
-
         case AFM_MODE_SQUARE:
         case AFM_MODE_BROKEN_WINDOW:
         case AFM_MODE_SPLIT_PORTRAIT:
@@ -4687,7 +4709,6 @@ static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
             p.contrast_push = 0.22f;
             p.turbulence_push = 0.10f;
             break;
-
         case AFM_MODE_ROUND:
         case AFM_MODE_TUNNEL:
         case AFM_MODE_TUNNEL_XL:
@@ -4704,7 +4725,6 @@ static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
             p.contrast_push = 0.20f;
             p.turbulence_push = 0.18f;
             break;
-
         case AFM_MODE_IRIS:
         case AFM_MODE_SHUTTER:
         case AFM_MODE_PINWHEEL_PANELS:
@@ -4720,7 +4740,6 @@ static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
             p.contrast_push = 0.24f;
             p.turbulence_push = 0.14f;
             break;
-
         case AFM_MODE_VORONOI_PLATES:
         case AFM_MODE_LENS_ARRAY:
             p.width_push = 0.12f;
@@ -4730,89 +4749,45 @@ static inline afm_motion_profile_t afm_mode_motion_profile(int mode)
             p.contrast_push = 0.18f;
             p.turbulence_push = 0.35f;
             break;
-
         default:
             break;
     }
-
     return p;
 }
 
 void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
 {
     mirrormadness_t *m = (mirrormadness_t *) ptr;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
+    int w = m->w;
+    int h = m->h;
+    int len = m->len;
 
-    uint8_t *restrict Y;
-    uint8_t *restrict U;
-    uint8_t *restrict V;
-    uint8_t *restrict src_y;
-    uint8_t *restrict src_u;
-    uint8_t *restrict src_v;
+    int mode_i = args[P_MODE];
+    int background_i = args[P_BG];
+    int contrast_i = args[P_CONTRAST];
 
-    int w;
-    int h;
-    int len;
-
-    int mode_i;
-    int minwidth_i;
-    int maxwidth_i;
-    int offset_i;
-    int seam_i;
-    int speed_i;
-    int mono_i;
-    int background_i;
-    int contrast_i;
-    int turbulence_i;
-
-    float minwidth_t;
-    float maxwidth_t;
-    float offset_t;
-    float seam_t;
-    float speed_t;
-    float mono_t;
-    float turbulence_t;
-    float time;
-    afm_motion_profile_t motion_profile;
-
-    w = m->w;
-    h = m->h;
-    len = m->len;
-
-    Y = frame->data[0];
-    U = frame->data[1];
-    V = frame->data[2];
-
-    if (!m->seeded)
-        afm_seed(m, frame);
-
-    mode_i = args[P_MODE];
-    minwidth_i = args[P_MINWIDTH];
-    maxwidth_i = args[P_MAXWIDTH];
-    offset_i = args[P_OFFSET];
-    seam_i = args[P_SEAM];
-    speed_i = args[P_SPEED];
-    mono_i = args[P_MONO];
-    background_i = args[P_BG];
-    contrast_i = args[P_CONTRAST];
-    turbulence_i = args[P_TURBULENCE];
-
-    minwidth_t = (float) minwidth_i * 0.001f;
-    maxwidth_t = (float) maxwidth_i * 0.001f;
-    offset_t = ((float) offset_i * 0.001f - 0.5f) * 1.65f;
-    seam_t = (float) seam_i * 0.001f;
-    speed_t = (float) speed_i * 0.001f;
-    mono_t = (float) mono_i * 0.001f;
-    turbulence_t = (float) turbulence_i * 0.001f;
+    float minwidth_t = (float) args[P_MINWIDTH] * 0.001f;
+    float maxwidth_t = (float) args[P_MAXWIDTH] * 0.001f;
+    float offset_t = ((float) args[P_OFFSET] * 0.001f - 0.5f) * 1.65f;
+    float seam_t = (float) args[P_SEAM] * 0.001f;
+    float speed_t = (float) args[P_SPEED] * 0.001f;
+    float mono_t = (float) args[P_MONO] * 0.001f;
+    float turbulence_t = (float) args[P_TURBULENCE] * 0.001f;
 
     speed_t = (speed_t < 0.0f ? -1.0f : 1.0f) * afm_absf(speed_t) * afm_absf(speed_t);
-    if (speed_i == 0)
+    if (args[P_SPEED] == 0)
         speed_t = 0.0f;
 
-    motion_profile = afm_mode_motion_profile(mode_i);
+    float current_time = m->time;
+    
+    afm_motion_profile_t motion_profile = afm_mode_motion_profile(mode_i);
 
     if (turbulence_t > 0.0f) {
-        float a = afm_lut_sin(m, m->time * 1.73f + (float) m->frame * 0.013f);
-        float b = afm_lut_sin(m, m->time * 2.41f + 2.10f);
+        float a = afm_lut_sin(m, current_time * 1.73f + (float) m->frame * 0.013f);
+        float b = afm_lut_sin(m, current_time * 2.41f + 2.10f);
         float turb_lfo = (a * 0.63f + b * 0.37f) * turbulence_t;
         float tw = afm_absf(turb_lfo);
 
@@ -4824,249 +4799,246 @@ void hyperfold_apply(void *ptr, VJFrame *frame, int *args)
         contrast_i = clampi(contrast_i + (int)(tw * motion_profile.contrast_push * 220.0f + 0.5f), 0, 1000);
     }
 
-    afm_build_luts(m, contrast_i);
-
-    m->time = afm_wrap_2pi(m->time + (0.0012f + seam_t * 0.0020f + maxwidth_t * 0.0012f) * speed_t);
-    time = m->time;
-
-    src_y = m->src_y;
-    src_u = m->src_u;
-    src_v = m->src_v;
-
-    veejay_memcpy(src_y, Y, (size_t) len);
-    veejay_memcpy(src_u, U, (size_t) len);
-    veejay_memcpy(src_v, V, (size_t) len);
-
     if (maxwidth_t < minwidth_t) {
         float t = maxwidth_t;
         maxwidth_t = minwidth_t;
         minwidth_t = t;
     }
 
-    m->skip_base_panel = 1;
+    #pragma omp single
+    {
+        if (!m->seeded)
+            afm_seed(m, frame);
+
+        afm_build_luts(m, contrast_i);
+        m->time = afm_wrap_2pi(current_time + (0.0012f + seam_t * 0.0020f + maxwidth_t * 0.0012f) * speed_t);
+        m->skip_base_panel = 1;
+    }
+    
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        m->src_y[i] = Y[i];
+        m->src_u[i] = U[i];
+        m->src_v[i] = V[i];
+    }
 
     switch (mode_i) {
         case AFM_MODE_VERTICAL:
         default:
-            afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
-            afm_prepare_axis_index(m->x_src, m->x_mask, w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+            afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, current_time);
+            #pragma omp single
+            {
+                afm_prepare_axis_index(m->x_src, m->x_mask, w, m->x_i0, m->x_i1, m->x_w, m->x_n);
+            }
             afm_render_vertical_fast(m, frame, seam_t);
             break;
-
         case AFM_MODE_BARCODE:
-            afm_render_barcode_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, time);
+            afm_render_barcode_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, current_time);
             break;
-
         case AFM_MODE_VENETIAN_FAN:
-            afm_render_venetian_fan(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_venetian_fan(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_ELASTIC_STRIP:
-            afm_render_elastic_strip_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_elastic_strip_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_HORIZONTAL:
-            afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
-            afm_prepare_axis_index(m->y_src, m->y_mask, h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+            afm_build_strip_maps(m, mode_i, minwidth_t, maxwidth_t, offset_t, current_time);
+            #pragma omp single
+            {
+                afm_prepare_axis_index(m->y_src, m->y_mask, h, m->y_i0, m->y_i1, m->y_w, m->y_n);
+            }
             afm_render_horizontal_fast(m, frame, seam_t);
             break;
-
         case AFM_MODE_LETTERBOX:
-            afm_render_letterbox_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, time);
+            afm_render_letterbox_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, current_time);
             break;
-
         case AFM_MODE_STAIRCASE:
-            afm_render_staircase_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_staircase_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_WAVE_BARS:
-            afm_render_wave_bars(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_wave_bars(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_SERPENTINE_SLITS:
-            afm_render_serpentine_slits(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_serpentine_slits(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_TORN_POSTER:
-            afm_render_torn_poster_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_torn_poster_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_DIAGONAL_SLATS:
-            afm_render_diagonal_slats(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time, 0);
+            afm_render_diagonal_slats(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time, 0);
             break;
-
         case AFM_MODE_ANTIDIAGONAL_SLATS:
-            afm_render_diagonal_slats(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time, 1);
+            afm_render_diagonal_slats(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time, 1);
             break;
-
         case AFM_MODE_SLICED_LENS:
-            afm_render_sliced_lens_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_sliced_lens_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_SLIT_SCAN:
-            afm_render_slit_scan(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_slit_scan(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_SQUARE:
-            afm_build_panel_layout(m, mode_i, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_panel_layout(m, mode_i, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_BROKEN_WINDOW:
-            afm_build_broken_window_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_broken_window_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_SPLIT_PORTRAIT:
-            afm_build_split_portrait_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_split_portrait_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_CENTER_STACK:
-            afm_build_center_stack_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_center_stack_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_CONTACT_SHEET:
-            afm_build_contact_sheet_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_contact_sheet_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_CASCADE_COLLAGE:
-            afm_build_cascade_collage_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_cascade_collage_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_PRISM_STACK:
-            afm_build_prism_stack_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_prism_stack_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_FILM_GATE:
-            afm_build_film_gate_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_film_gate_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_ORBIT_COLLAGE:
-            afm_build_orbit_collage_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_orbit_collage_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_ROUND:
-            afm_render_circular_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_circular_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_IRIS:
-            afm_render_iris_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_iris_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_SHUTTER:
-            afm_render_shutter_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_shutter_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_PINWHEEL_PANELS:
-            afm_render_pinwheel_panels(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_pinwheel_panels(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_CORNER_KALEIDO:
-            afm_render_corner_kaleido(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_corner_kaleido(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_CORNER_PULL:
-            afm_render_corner_pull(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_corner_pull(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_TRIANGLE_MIRROR:
-            afm_render_triangle_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_triangle_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_HEX_MIRROR:
-            afm_render_hex_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_hex_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_TUNNEL:
-            afm_render_tunnel_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_tunnel_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_TUNNEL_XL:
-            afm_render_tunnel_xl(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_tunnel_xl(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_SPIRAL_STAIR:
-            afm_render_spiral_stair_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_spiral_stair_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_QUAD_PORTAL:
-            afm_render_quad_portal(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_quad_portal(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_MOEBIUS_RIBBON:
-            afm_render_moebius_ribbon(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_moebius_ribbon(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_ACCORDION:
-            afm_render_accordion_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_accordion_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_HOURGLASS:
-            afm_render_hourglass_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_hourglass_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_SPIRAL_SHARDS:
-            afm_build_spiral_shards_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_spiral_shards_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_SLIDING_DOORS:
-            afm_build_sliding_doors_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_sliding_doors_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_DIAMOND_TUNNEL:
-            afm_render_diamond_tunnel(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_diamond_tunnel(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_FAN_BLADES:
-            afm_render_fan_blades(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_fan_blades(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_WATERFALL_STRIPS:
-            afm_render_waterfall_strips(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_waterfall_strips(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_NESTED_FILM_GATES:
-            afm_build_nested_film_gates_layout(m, minwidth_t, maxwidth_t, offset_t, time);
+            #pragma omp single
+            {
+                afm_build_nested_film_gates_layout(m, minwidth_t, maxwidth_t, offset_t, current_time);
+            }
             afm_render_panels(m, frame, seam_t, mono_t, background_i);
             break;
-
         case AFM_MODE_VORONOI_PLATES:
-            afm_render_voronoi_plates(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_voronoi_plates(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_POLAR_BARCODE:
-            afm_render_polar_barcode(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_polar_barcode(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_RIBBON_LATTICE:
-            afm_render_ribbon_lattice(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time, background_i);
+            afm_render_ribbon_lattice(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time, background_i);
             break;
-
         case AFM_MODE_WOVEN_MIRROR:
-            afm_render_woven_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time, background_i);
+            afm_render_woven_mirror(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time, background_i);
             break;
-
         case AFM_MODE_CORNER_TUNNEL:
-            afm_render_corner_tunnel(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_corner_tunnel(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
-
         case AFM_MODE_LENS_ARRAY:
-            afm_render_lens_array(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time, background_i);
+            afm_render_lens_array(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time, background_i);
             break;
-
         case AFM_MODE_AXIS_ROULETTE:
-            afm_render_axis_roulette(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, time);
+            afm_render_axis_roulette(m, frame, minwidth_t, maxwidth_t, offset_t, seam_t, mono_t, current_time);
             break;
     }
 
-    m->frame++;
+    #pragma omp single
+    {
+        m->frame++;
+    }
 }

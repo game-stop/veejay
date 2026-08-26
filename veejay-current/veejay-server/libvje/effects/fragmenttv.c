@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
@@ -16,15 +16,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
- */
-
-
+*/
 #include "common.h"
 #include "fragmenttv.h"
 
 #define MAX_TILES       4096
 #define MAX_TILE_SIZE   128
-
 #define FRAGMENTTV_PARAMS 10
 
 #define P_TILE_SIZE     0
@@ -70,7 +67,6 @@ typedef struct
     int drift_accum;
 } fragmenttv_t;
 
-
 static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
@@ -83,27 +79,15 @@ static inline uint8_t clamp8(int v)
 
 vj_effect *fragmenttv_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
-
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     if(!ve)
         return NULL;
 
     ve->num_params = FRAGMENTTV_PARAMS;
-
     ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_TILE_SIZE]     = 32;
     ve->defaults[P_SIZE_RANDOM]   = 8;
@@ -131,7 +115,6 @@ vj_effect *fragmenttv_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Tile Size",
@@ -166,45 +149,39 @@ vj_effect *fragmenttv_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
     return ve;
 }
 
-
 void *fragmenttv_malloc(int w, int h)
 {
-    fragmenttv_t *m = (fragmenttv_t*) vj_calloc(sizeof(fragmenttv_t));
+    fragmenttv_t *m = (fragmenttv_t *) vj_calloc(sizeof(fragmenttv_t));
     if(!m)
         return NULL;
 
     const size_t len = (size_t)w * (size_t)h;
-
     m->w = w;
     m->h = h;
     m->len = (int)len;
-
     m->tmp[0] = (uint8_t*) vj_malloc(len * 3);
     if(!m->tmp[0]) {
         free(m);
         return NULL;
     }
-
     m->tmp[1] = m->tmp[0] + len;
     m->tmp[2] = m->tmp[1] + len;
-
     m->n_threads = vje_advise_num_threads((int)len);
     m->first = 1;
     m->drift_accum = 0;
-
     return m;
 }
 
 void fragmenttv_free(void *ptr)
 {
-    fragmenttv_t *m = (fragmenttv_t*) ptr;
-
-    free(m->tmp[0]);
-    free(m);
+    fragmenttv_t *m = (fragmenttv_t *) ptr;
+    if(m) {
+        free(m->tmp[0]);
+        free(m);
+    }
 }
 
 static void make_alpha(uint8_t *dst, int size)
@@ -218,7 +195,6 @@ static void make_alpha(uint8_t *dst, int size)
             dst[i] = 255;
     }
 }
-
 
 static void generate_tiles(fragmenttv_t *m,
                            int w, int h,
@@ -238,7 +214,6 @@ static void generate_tiles(fragmenttv_t *m,
 
             uint32_t seed = (uint32_t)(gx * 73856093u ^ gy * 19349663u ^ m->frame_count * 83492791u);
             int r = (seed >> 16) & 0x7fff;
-
             int local_cover = cover;
             int cx = gx / tile;
             int cy = gy / tile;
@@ -251,13 +226,11 @@ static void generate_tiles(fragmenttv_t *m,
                 continue;
 
             frag_tile *t = &m->tiles[m->tile_count++];
-
             int size = tile + (r % (vary + 1));
             size = clampi(size, 4, MAX_TILE_SIZE);
 
             int dx = gx + ((int)(seed >> 8) % (m->drift_accum * 2 + 1)) - m->drift_accum;
             int dy = gy + ((int)(seed >> 12) % (m->drift_accum * 2 + 1)) - m->drift_accum;
-
             dx = clampi(dx, 0, w - 1);
             dy = clampi(dy, 0, h - 1);
 
@@ -268,7 +241,6 @@ static void generate_tiles(fragmenttv_t *m,
 
             t->dx = dx;
             t->dy = dy;
-
             t->sx = clampi(gx + ((int)(seed >> 4) % (scatter * 2 + 1)) - scatter, 0, w - size);
             t->sy = clampi(gy + ((int)(seed >> 6) % (scatter * 2 + 1)) - scatter, 0, h - size);
             t->size = size;
@@ -305,15 +277,13 @@ static inline void do_blend(uint8_t *Y, uint8_t *U, uint8_t *V,
                             int a,
                             int mode)
 {
-    switch(mode)
-    {
+    switch(mode) {
         default:
         case BLEND_NORMAL:
             Y[i] = blend_fast(Y[i], sy, a);
             U[i] = blend_fast(U[i], su, a);
             V[i] = blend_fast(V[i], sv, a);
             break;
-
         case BLEND_ADD:
         {
             int y = Y[i] + ((sy * a) >> 8);
@@ -322,15 +292,12 @@ static inline void do_blend(uint8_t *Y, uint8_t *U, uint8_t *V,
             V[i] = blend_fast(V[i], sv, a);
             break;
         }
-
         case BLEND_DIFF:
             Y[i] = blend_diff(Y[i], sy);
             break;
-
         case BLEND_MULTIPLY:
             Y[i] = blend_mul(Y[i], sy);
             break;
-
         case BLEND_LUMA:
             Y[i] = blend_fast(Y[i], sy, a);
             break;
@@ -345,7 +312,6 @@ static void draw_tiles_serial(fragmenttv_t *m,
 {
     for(int t = 0; t < m->tile_count; t++) {
         frag_tile *q = &m->tiles[t];
-
         const int base_x = q->dx;
         const int base_y = q->dy;
         const int size = q->size;
@@ -359,7 +325,6 @@ static void draw_tiles_serial(fragmenttv_t *m,
                 const int idx = di + x;
                 const int sidx = si + x;
                 const int a = (q->alphaX[x] * ay) >> 8;
-
                 do_blend(Y, U, V, idx, sY[sidx], sU[sidx], sV[sidx], a, mode);
             }
         }
@@ -372,10 +337,9 @@ static void draw_tiles_parallel_no_overlap(fragmenttv_t *m,
                                            int w,
                                            int mode)
 {
-#pragma omp parallel for schedule(static) num_threads(m->n_threads)
+    #pragma omp for schedule(static)
     for(int t = 0; t < m->tile_count; t++) {
         frag_tile *q = &m->tiles[t];
-
         const int base_x = q->dx;
         const int base_y = q->dy;
         const int size = q->size;
@@ -389,24 +353,10 @@ static void draw_tiles_parallel_no_overlap(fragmenttv_t *m,
                 const int idx = di + x;
                 const int sidx = si + x;
                 const int a = (q->alphaX[x] * ay) >> 8;
-
                 do_blend(Y, U, V, idx, sY[sidx], sU[sidx], sV[sidx], a, mode);
             }
         }
     }
-}
-
-static void draw_tiles(fragmenttv_t *m,
-                       uint8_t *Y, uint8_t *U, uint8_t *V,
-                       uint8_t *sY, uint8_t *sU, uint8_t *sV,
-                       int w,
-                       int mode,
-                       int overlap_risk)
-{
-    if(overlap_risk)
-        draw_tiles_serial(m, Y, U, V, sY, sU, sV, w, mode);
-    else
-        draw_tiles_parallel_no_overlap(m, Y, U, V, sY, sU, sV, w, mode);
 }
 
 static void draw_borders_serial(fragmenttv_t *m,
@@ -419,7 +369,6 @@ static void draw_borders_serial(fragmenttv_t *m,
 
     for(int t = 0; t < m->tile_count; t++) {
         frag_tile *q = &m->tiles[t];
-
         const int x0 = q->dx;
         const int y0 = q->dy;
         const int x1 = q->dx + q->size - 1;
@@ -429,7 +378,6 @@ static void draw_borders_serial(fragmenttv_t *m,
         for(int x = x0; x <= x1; x++) {
             const int i_top = y0 * w + x;
             const int i_bot = y1 * w + x;
-
             Y[i_top] = clamp8(Y[i_top] + s);
             Y[i_bot] = clamp8(Y[i_bot] + s);
         }
@@ -438,39 +386,18 @@ static void draw_borders_serial(fragmenttv_t *m,
             const int row = y * w;
             const int i_l = row + x0;
             const int i_r = row + x1;
-
             Y[i_l] = clamp8(Y[i_l] + s);
             Y[i_r] = clamp8(Y[i_r] + s);
         }
     }
 }
 
-static void draw_borders_parallel_no_overlap(fragmenttv_t *m,
-                                             uint8_t *Y,
-                                             int w,
-                                             int strength)
-{
-    draw_borders_serial(m, Y, w, strength);
-}
-
-static void draw_borders(fragmenttv_t *m,
-                         uint8_t *Y,
-                         int w,
-                         int strength,
-                         int overlap_risk)
-{
-    (void) overlap_risk;
-    draw_borders_serial(m, Y, w, strength);
-}
-
 void fragmenttv_apply(void *ptr, VJFrame *frame, int *args)
 {
-    fragmenttv_t *m = (fragmenttv_t*) ptr;
-
+    fragmenttv_t *m = (fragmenttv_t *) ptr;
     const int w = frame->width;
     const int h = frame->height;
     const int len = frame->len;
-
     const int tile = args[P_TILE_SIZE];
     const int vary = args[P_SIZE_RANDOM];
     const int scatter = args[P_SOURCE_OFFSET];
@@ -498,37 +425,47 @@ void fragmenttv_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    veejay_memcpy(m->tmp[0], Y, len);
-    veejay_memcpy(m->tmp[1], U, len);
-    veejay_memcpy(m->tmp[2], V, len);
-
-    if(blackbg) {
-        veejay_memset(Y, 0, len);
-        veejay_memset(U, 128, len);
-        veejay_memset(V, 128, len);
-    }
-
-    int changed =
-        m->first ||
-        (refresh > 0 && (m->frame_count % refresh) == 0) ||
-        memcmp(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
-
-    if(changed) {
-        generate_tiles(m, w, h, tile, vary, scatter, drift, cover);
-        veejay_memcpy(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
-    }
-
     const int overlap_risk = (vary > 0 || drift > 0);
 
-    draw_tiles(m, Y, U, V, m->tmp[0], m->tmp[1], m->tmp[2], w, mode, overlap_risk);
+    #pragma omp single
+    {
+        veejay_memcpy(m->tmp[0], Y, len);
+        veejay_memcpy(m->tmp[1], U, len);
+        veejay_memcpy(m->tmp[2], V, len);
 
-    if(edge_mode == 2) {
-        draw_borders(m, Y, w, border, overlap_risk);
-        m->frame_count = 0;
-        m->drift_accum = 0;
-        m->first = 1;
+        if(blackbg) {
+            veejay_memset(Y, 0, len);
+            veejay_memset(U, 128, len);
+            veejay_memset(V, 128, len);
+        }
+
+        int changed =
+            m->first ||
+            (refresh > 0 && (m->frame_count % refresh) == 0) ||
+            memcmp(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
+
+        if(changed) {
+            generate_tiles(m, w, h, tile, vary, scatter, drift, cover);
+            veejay_memcpy(m->prev, stable_args, sizeof(int) * FRAGMENTTV_PARAMS);
+        }
     }
 
-    m->frame_count++;
-    m->first = 0;
+    if(overlap_risk) {
+        #pragma omp single
+        draw_tiles_serial(m, Y, U, V, m->tmp[0], m->tmp[1], m->tmp[2], w, mode);
+    } else {
+        draw_tiles_parallel_no_overlap(m, Y, U, V, m->tmp[0], m->tmp[1], m->tmp[2], w, mode);
+    }
+
+    #pragma omp single
+    {
+        if(edge_mode == 2) {
+            draw_borders_serial(m, Y, w, border);
+            m->frame_count = 0;
+            m->drift_accum = 0;
+            m->first = 1;
+        }
+        m->frame_count++;
+        m->first = 0;
+    }
 }

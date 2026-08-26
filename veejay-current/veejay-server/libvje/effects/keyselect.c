@@ -1,7 +1,7 @@
-/*
+/* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,8 +19,10 @@
  */
 
 #include "common.h"
+#include <stdint.h>
+#include <stdlib.h>
 #include <veejaycore/vjmem.h>
-#include <math.h>
+#include "keyselect.h"
 
 #define KEYSELECT_PARAMS 8
 
@@ -68,7 +70,7 @@ static inline uint8_t keyselect_u8(int v)
 static inline uint8_t keyselect_blend255(uint8_t a, uint8_t b, int opacity)
 {
     const int inv = 255 - opacity;
-    const int x = (int)a * opacity + (int)b * inv;
+    const int x = (int)a * inv + (int)b * opacity;
     return (uint8_t)(((x + 1) + (x >> 8)) >> 8);
 }
 
@@ -114,16 +116,7 @@ vj_effect *keyselect_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+    
 
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 0;
@@ -211,7 +204,6 @@ void *keyselect_malloc(int w, int h)
     s->black_clip_fp = 0;
     s->blend_mode = 3;
     s->swap = 0;
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }
@@ -276,31 +268,45 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     keyselect_t *s = (keyselect_t*) ptr;
 
-    keyselect_update_cache(s, args);
+    int mag_fp = 0, cos_q_fp = 0, sin_q_fp = 0, inv_wedge_slope_fp = 0, inv_range_fp = 0, black_clip_fp = 0, blend_mode = 0, swap = 0, len = 0;
+    uint8_t *Y = NULL;
+    uint8_t *Cb = NULL;
+    uint8_t *Cr = NULL;
+    const uint8_t *src_Y = NULL;
+    const uint8_t *src_Cb = NULL;
+    const uint8_t *src_Cr = NULL;
+    const uint8_t *bg_Y = NULL;
+    const uint8_t *bg_U = NULL;
+    const uint8_t *bg_V = NULL;
 
-    const int mag_fp = s->mag_fp;
-    const int cos_q_fp = s->cos_q_fp;
-    const int sin_q_fp = s->sin_q_fp;
-    const int inv_wedge_slope_fp = s->inv_wedge_slope_fp;
-    const int inv_range_fp = s->inv_range_fp;
-    const int black_clip_fp = s->black_clip_fp;
-    const int blend_mode = s->blend_mode;
-    const int swap = s->swap;
-    const int len = frame->len;
+    #pragma omp single copyprivate(mag_fp, cos_q_fp, sin_q_fp, inv_wedge_slope_fp, inv_range_fp, black_clip_fp, blend_mode, swap, len, Y, Cb, Cr, src_Y, src_Cb, src_Cr, bg_Y, bg_U, bg_V)
+    {
+        keyselect_update_cache(s, args);
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
+        mag_fp = s->mag_fp;
+        cos_q_fp = s->cos_q_fp;
+        sin_q_fp = s->sin_q_fp;
+        inv_wedge_slope_fp = s->inv_wedge_slope_fp;
+        inv_range_fp = s->inv_range_fp;
+        black_clip_fp = s->black_clip_fp;
+        blend_mode = s->blend_mode;
+        swap = s->swap;
+        len = frame->len;
 
-    const uint8_t *restrict src_Y = swap ? frame2->data[0] : frame->data[0];
-    const uint8_t *restrict src_Cb = swap ? frame2->data[1] : frame->data[1];
-    const uint8_t *restrict src_Cr = swap ? frame2->data[2] : frame->data[2];
+        Y = frame->data[0];
+        Cb = frame->data[1];
+        Cr = frame->data[2];
 
-    const uint8_t *restrict bg_Y = swap ? frame->data[0] : frame2->data[0];
-    const uint8_t *restrict bg_U = swap ? frame->data[1] : frame2->data[1];
-    const uint8_t *restrict bg_V = swap ? frame->data[2] : frame2->data[2];
+        src_Y = swap ? frame2->data[0] : frame->data[0];
+        src_Cb = swap ? frame2->data[1] : frame->data[1];
+        src_Cr = swap ? frame2->data[2] : frame->data[2];
 
-#pragma omp parallel for schedule(static) num_threads(s->n_threads)
+        bg_Y = swap ? frame->data[0] : frame2->data[0];
+        bg_U = swap ? frame->data[1] : frame2->data[1];
+        bg_V = swap ? frame->data[2] : frame2->data[2];
+    }
+
+    #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

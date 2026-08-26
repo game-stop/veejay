@@ -1,4 +1,4 @@
-/*
+/* 
  * Linux VeeJay
  *
  * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
@@ -65,17 +65,6 @@ vj_effect *binaryoverlay_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
-
     ve->defaults[0] = 0;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 14;
@@ -121,35 +110,31 @@ vj_effect *binaryoverlay_init(int w, int h)
     return ve;
 }
 
-#define APPLY_BINARY_OP(OP) do {                                       \
-    _Pragma("omp parallel for num_threads(n_threads) schedule(static)") \
-    for(int i = 0; i < len; i++) {                                      \
-        const uint8_t ya = Y[i];                                        \
-        const uint8_t yb = Y2[i];                                       \
-        const uint8_t ua = binary_center_chroma(Cb[i]);                 \
-        const uint8_t ub = binary_center_chroma(Cb2[i]);                \
-        const uint8_t va = binary_center_chroma(Cr[i]);                 \
-        const uint8_t vb = binary_center_chroma(Cr2[i]);                \
-        Y[i] = OP(ya, yb);                                              \
-        Cb[i] = binary_uncenter_chroma(OP(ua, ub));                     \
-        Cr[i] = binary_uncenter_chroma(OP(va, vb));                     \
-    }                                                                   \
-} while(0)
+#define APPLY_BINARY_OP(OP) \
+    _Pragma("omp for schedule(static)") \
+    for (int i = 0; i < len; i++) { \
+        const uint8_t ya = Y[i]; \
+        const uint8_t yb = Y2[i]; \
+        const uint8_t ua = binary_center_chroma(Cb[i]); \
+        const uint8_t ub = binary_center_chroma(Cb2[i]); \
+        const uint8_t va = binary_center_chroma(Cr[i]); \
+        const uint8_t vb = binary_center_chroma(Cr2[i]); \
+        Y[i] = OP(ya, yb); \
+        Cb[i] = binary_uncenter_chroma(OP(ua, ub)); \
+        Cr[i] = binary_uncenter_chroma(OP(va, vb)); \
+    }
 
 void binaryoverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     (void) ptr;
 
     const int len = frame->len;
-
     int mode = args[0];
 
     if(mode < 0)
         mode = 0;
     else if(mode > 14)
         mode = 14;
-
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];

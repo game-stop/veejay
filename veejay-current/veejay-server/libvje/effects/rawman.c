@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or at your option) any later version.
+ * of the License , or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -56,16 +56,6 @@ vj_effect *rawman_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[P_MODE] = RAWMAN_ADDITIVE;
     ve->defaults[P_VALUE] = 15;
@@ -151,18 +141,19 @@ void rawman_apply(void *ptr, VJFrame *frame, int *args)
 {
     (void)ptr;
 
+    uint8_t *restrict Y = frame->data[0];
+    if(!Y)
+        return;
+
     const int mode = args[P_MODE];
     const int value = args[P_VALUE];
     const int len = frame->len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t lut[256];
-
     rawman_build_lut(lut, mode, value);
 
-    uint8_t *restrict Y = frame->data[0];
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-    for(int i = 0; i < len; i++)
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
         Y[i] = lut[Y[i]];
+    }
 }

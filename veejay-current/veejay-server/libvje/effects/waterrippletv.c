@@ -5,7 +5,7 @@
  * Copyright (C) 2001 - 2002 FUKUCHI Kentaro
  * 
  * ported to Linux VeeJay by:
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published
@@ -54,7 +54,6 @@ typedef struct {
 
     int tick;
     int last_fresh_rate;
-    int n_threads;
 
     unsigned int wfastrand_val;
 
@@ -71,6 +70,9 @@ typedef struct {
     float drops_env;
     float power_env;
     int smooth_ready;
+
+    int effective_loopnum;
+    int effective_decay;
 } ripple_tv;
 
 static inline int clampi(int v, int lo, int hi)
@@ -118,13 +120,7 @@ vj_effect *waterrippletv_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
+
 
     ve->limits[0][P_REFRESH_FREQ] = 1;
     ve->limits[1][P_REFRESH_FREQ] = 3600;
@@ -146,7 +142,7 @@ vj_effect *waterrippletv_init(int width, int height)
     ve->limits[1][P_RIPPLE_POWER] = 1000;
     ve->defaults[P_RIPPLE_POWER] = 620;
 
-    ve->description = "RippleTV Drop Drive";
+    ve->description = "RippleTV";
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
@@ -169,6 +165,9 @@ vj_effect *waterrippletv_init(int width, int height)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
+
+    (void)width;
+    (void)height;
 
     return ve;
 }
@@ -224,14 +223,14 @@ void *waterrippletv_malloc(int width, int height)
     r->power_env = 620.0f;
     r->smooth_ready = 0;
 
-    r->n_threads = vje_advise_num_threads(len);
-
     return (void*) r;
 }
 
 void waterrippletv_free(void *ptr)
 {
     ripple_tv *r = (ripple_tv*) ptr;
+    if(!r)
+        return;
 
     free(r->region);
     free(r);
@@ -567,56 +566,58 @@ static void waterripple_render(VJFrame *frame, ripple_tv *rip)
 void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
 {
     ripple_tv *rip = (ripple_tv*) ptr;
-
     const int len = frame->len;
 
-    const int fresh_rate = args[P_REFRESH_FREQ];
-    const int loopnum_arg = args[P_WAVESPEED];
-    const int decay_arg = args[P_DECAY];
-    const int drop_drive_arg = args[P_DROP_DRIVE];
-    const int ripple_power_arg = args[P_RIPPLE_POWER];
-
-    const float fast = 0.235f;
-    const float slow = 0.118f;
-
-    if(!rip->smooth_ready) {
-        rip->wavespeed_env = (float)loopnum_arg;
-        rip->decay_env = (float)decay_arg;
-        rip->drops_env = (float)drop_drive_arg;
-        rip->power_env = (float)ripple_power_arg;
-        rip->smooth_ready = 1;
-    }
-
-    const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
-    const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
-    const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
-    const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
-
-    if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
-        rip->last_fresh_rate = fresh_rate;
-        rip->tick = 0;
-        rip->rain_period = 0;
-        waterripple_clear_maps(rip);
-    }
-
-    rip->tick++;
-
-    veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
-
-    raindrop(rip);
-    waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
-
-    int effective_loopnum = loopnum + ((drop_drive * 3 + 500) / 1000);
-    if(drop_drive > 760)
-        effective_loopnum++;
-
-    int effective_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
-    effective_decay = clampi(effective_decay, 1, 31);
-
-#pragma omp parallel num_threads(rip->n_threads)
+    #pragma omp single
     {
-        waterripple_simulate(rip, effective_loopnum, effective_decay);
-        waterripple_calc_vtable(rip);
-        waterripple_render(frame, rip);
+        const int fresh_rate = args[P_REFRESH_FREQ];
+        const int loopnum_arg = args[P_WAVESPEED];
+        const int decay_arg = args[P_DECAY];
+        const int drop_drive_arg = args[P_DROP_DRIVE];
+        const int ripple_power_arg = args[P_RIPPLE_POWER];
+
+        const float fast = 0.235f;
+        const float slow = 0.118f;
+
+        if(!rip->smooth_ready) {
+            rip->wavespeed_env = (float)loopnum_arg;
+            rip->decay_env = (float)decay_arg;
+            rip->drops_env = (float)drop_drive_arg;
+            rip->power_env = (float)ripple_power_arg;
+            rip->smooth_ready = 1;
+        }
+
+        const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
+        const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
+        const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
+        const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
+
+        if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
+            rip->last_fresh_rate = fresh_rate;
+            rip->tick = 0;
+            rip->rain_period = 0;
+            waterripple_clear_maps(rip);
+        }
+
+        rip->tick++;
+
+        veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
+
+        raindrop(rip);
+        waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
+
+        int eff_loop = loopnum + ((drop_drive * 3 + 500) / 1000);
+        if(drop_drive > 760)
+            eff_loop++;
+
+        int eff_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
+        eff_decay = clampi(eff_decay, 1, 31);
+
+        rip->effective_loopnum = eff_loop;
+        rip->effective_decay = eff_decay;
     }
+
+    waterripple_simulate(rip, rip->effective_loopnum, rip->effective_decay);
+    waterripple_calc_vtable(rip);
+    waterripple_render(frame, rip);
 }

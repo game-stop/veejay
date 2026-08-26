@@ -57,16 +57,6 @@ vj_effect *mixtoalpha_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_MODE] = 0;  ve->limits[1][P_MODE] = 1;  ve->defaults[P_MODE] = 0;
     ve->limits[0][P_SCALE] = 0; ve->limits[1][P_SCALE] = 1; ve->defaults[P_SCALE] = !yuv_use_auto_ccir_jpeg();
@@ -105,13 +95,12 @@ void mixtoalpha_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict src = mode == 0 ? frame2->data[0] : frame2->data[3];
 
     if(scale && frame->range == 0) {
-        const int n_threads = vje_advise_num_threads(len);
-
-#pragma omp parallel for schedule(static) num_threads(n_threads)
-        for(int i = 0; i < len; i++)
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
             A[i] = mixtoalpha_scale_full(src[i]);
-    }
-    else {
+        }
+    } else {
+        #pragma omp single
         veejay_memcpy(A, src, len);
     }
 }

@@ -43,16 +43,6 @@ vj_effect *negation_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        if(ve->defaults)
-            free(ve->defaults);
-        if(ve->limits[0])
-            free(ve->limits[0]);
-        if(ve->limits[1])
-            free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->limits[0][P_VALUE] = 0;
     ve->limits[1][P_VALUE] = 255;
@@ -81,22 +71,19 @@ void negation_apply(void *ptr, VJFrame *frame, int *args)
     const int val = args[P_VALUE];
     const int len = frame->len;
     const int uv_len = frame->ssm ? len : frame->uv_len;
-    const int n_threads = vje_advise_num_threads(len);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-#pragma omp parallel num_threads(n_threads)
-    {
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = (uint8_t)(val - Y[i]);
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        Y[i] = (uint8_t)(val - Y[i]);
+    }
 
-#pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            Cb[i] = (uint8_t)(val - Cb[i]);
-            Cr[i] = (uint8_t)(val - Cr[i]);
-        }
+    #pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        Cb[i] = (uint8_t)(val - Cb[i]);
+        Cr[i] = (uint8_t)(val - Cr[i]);
     }
 }
