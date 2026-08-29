@@ -1,27 +1,8 @@
-/* 
- * veejay  
- *
- * Copyright (C) 2000-2026 Niels Elburg <nwelburg@gmail.com>
- * 
- * This program is free software you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- *
- */
 #include <config.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <pthread.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/defs.h>
@@ -33,6 +14,20 @@
 #include <libstream/vj-cali.h>
 #include <veejaycore/vevo.h>
 #include <veejaycore/libvevo.h>
+
+extern void vje_fx_apply_collective( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args );
+
+static pthread_mutex_t vjert_frame_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void vjert_frame_begin(void)
+{
+    pthread_mutex_lock(&vjert_frame_lock);
+}
+
+void vjert_frame_end(void)
+{
+    pthread_mutex_unlock(&vjert_frame_lock);
+}
 
 static int vjert_new_fx( sample_eff_chain *entry,int chain_id, int chain_position, VJFrame *frame)
 {
@@ -52,6 +47,7 @@ static int vjert_new_fx( sample_eff_chain *entry,int chain_id, int chain_positio
 
 void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ) {
     sample_eff_chain *entry  = (sample_eff_chain*) ptr;
+    pthread_mutex_lock(&vjert_frame_lock);
     if( entry->fx_instance && entry->fx_instance != (void*)0x1 ) {
         if( entry->effect_id >= VJ_PLUGIN ) {
             plug_deactivate( entry->fx_instance );
@@ -72,102 +68,107 @@ void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ) {
         }
         entry->kf = vpn( VEVO_ANONYMOUS_PORT );
     }
+    pthread_mutex_unlock(&vjert_frame_lock);
 }
 
-static void vjert_process_plugin( sample_eff_chain *entry, VJFrame **frames, int *args )
+static void vjert_process_plugin( int effect_id, void *fx_instance, VJFrame **frames, int *args )
 {
-    const int plug_id = vje_get_plugin_id( entry->effect_id );
+    const int plug_id = vje_get_plugin_id( effect_id );
     int num_inputs = plug_get_num_input_channels( plug_id );
-    int num_params = vje_get_num_params( entry->effect_id );
+    int num_params = vje_get_num_params( effect_id );
     int i;
 
-    if( entry->fx_instance == NULL ) {
-        entry->fx_instance = plug_activate( plug_id );
-    }
-
-    if( entry->fx_instance == NULL || entry->e_flag == 0 ) {
-        return;
-    }
-
-    if( plug_is_frei0r( entry->fx_instance ) ) {
-        plug_set_parameters( entry->fx_instance, num_params, args);
+    if( plug_is_frei0r( fx_instance ) ) {
+        plug_set_parameters( fx_instance, num_params, args);
     }
     else {
         for( i = 0; i < num_params; i ++ ) {
-            plug_set_parameter( entry->fx_instance, i, 1, &(args[i]) );
+            plug_set_parameter( fx_instance, i, 1, &(args[i]) );
         }
     }
 
     for( i = 0; i < num_inputs; i ++ ) {
-        plug_push_frame( entry->fx_instance, 0, i, frames[i] );
+        plug_push_frame( fx_instance, 0, i, frames[i] );
     }
 
     if( plug_get_num_output_channels( plug_id ) > 0 ) {
-        plug_push_frame( entry->fx_instance, 1, 0, frames[0] );
+        plug_push_frame( fx_instance, 1, 0, frames[0] );
     }
 
-    plug_process( entry->fx_instance, frames[0]->timecode );
-
+    plug_process( fx_instance, frames[0]->timecode );
 }
 
-
-static void vjert_process_fx( sample_eff_chain *entry, VJFrame **frames, int chain_id, int chain_position, int *args )
+int vjert_prepare_frame( void *ptr, int chain_id, int chain_position,
+                         VJFrame *frame, int *effect_id, int *e_flag,
+                         void **fx_instance )
 {
-    int run_fx = 0;
-    int needs_init = 0;
-    int needs_instance = 0;
+    sample_eff_chain *entry = (sample_eff_chain*) ptr;
+    const int frozen_effect_id = entry->effect_id;
+    const int frozen_e_flag = entry->e_flag;
 
-#pragma omp single copyprivate(run_fx, needs_init, needs_instance)
-    {
-        if (entry->e_flag && entry->effect_id > 0) {
-            run_fx = 1;
-            needs_instance = vje_fx_needs_instance(entry->effect_id);
-            if (entry->fx_instance == NULL) {
-                if (needs_instance) {
-                    needs_init = 1;
-                } else {
-                    entry->fx_instance = (void*) 0x1;
-                }
-            }
+    *effect_id = frozen_effect_id;
+    *e_flag = frozen_e_flag;
+    *fx_instance = NULL;
+
+    if(!frozen_e_flag || frozen_effect_id <= 0)
+        return 0;
+
+    if(frozen_effect_id >= VJ_PLUGIN) {
+        if(entry->fx_instance == NULL) {
+            const int plug_id = vje_get_plugin_id(frozen_effect_id);
+            entry->fx_instance = plug_activate(plug_id);
+        }
+        if(entry->fx_instance == NULL)
+            return 0;
+    }
+    else if(entry->fx_instance == NULL) {
+        if(vje_fx_needs_instance(frozen_effect_id)) {
+            if(!vjert_new_fx(entry, chain_id, chain_position, frame))
+                return 0;
+        }
+        else {
+            entry->fx_instance = (void*) 0x1;
         }
     }
 
-    if (!run_fx)
+    *fx_instance = entry->fx_instance;
+    return 1;
+}
+
+void vjert_apply_frame( int effect_id, int e_flag, void *fx_instance,
+                        VJFrame **frames, int *args )
+{
+    if(!e_flag || effect_id <= 0 || fx_instance == NULL)
         return;
 
-    if (needs_init) {
+    if(effect_id >= VJ_PLUGIN) {
 #pragma omp single
         {
-            vjert_new_fx(entry, chain_id, chain_position, frames[0]);
+            vjert_process_plugin(effect_id, fx_instance, frames, args);
         }
+        return;
     }
 
-    if (needs_instance && entry->fx_instance == NULL)
-        return;
-
-    
-    void *instance_ptr = (entry->fx_instance == (void*)0x1) ? NULL : entry->fx_instance;
-    vje_fx_apply(entry->effect_id, instance_ptr, frames[0], frames[1], args);
+    void *instance_ptr = (fx_instance == (void*)0x1) ? NULL : fx_instance;
+    vje_fx_apply_collective(effect_id, instance_ptr, frames[0], frames[1], args);
 }
 
 void vjert_apply( void *ptr, VJFrame **frames, int chain_id, int chain_position, int *args )
 {
-    sample_eff_chain *entry = (sample_eff_chain*) ptr;
-    int is_plugin = 0;
-    
-#pragma omp single copyprivate(is_plugin)
-    {
-        is_plugin = (entry->effect_id >= VJ_PLUGIN);
-    }
+    int effect_id = -1;
+    int e_flag = 0;
+    void *fx_instance = NULL;
 
-    if (is_plugin) {
-#pragma omp single
-        {
-            vjert_process_plugin( entry, frames, args );
-        }
+    if(!vjert_prepare_frame(ptr, chain_id, chain_position, frames[0],
+                            &effect_id, &e_flag, &fx_instance))
+        return;
+
+    if(effect_id >= VJ_PLUGIN) {
+        vjert_process_plugin(effect_id, fx_instance, frames, args);
     }
     else {
-        vjert_process_fx( entry, frames, chain_id, chain_position, args );
+        void *instance_ptr = (fx_instance == (void*)0x1) ? NULL : fx_instance;
+        vje_fx_apply(effect_id, instance_ptr, frames[0], frames[1], args);
     }
 }
 
@@ -176,15 +177,15 @@ void vjert_update( void *ptr, VJFrame *frame )
     sample_eff_chain **chain = (sample_eff_chain**) ptr;
     int i;
 
-    #pragma omp single
-    {
-        vje_set_bg(frame);
+    pthread_mutex_lock(&vjert_frame_lock);
+    vje_set_bg(frame);
 
-        for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
-            sample_eff_chain *entry = chain[i];
-            if(entry->fx_instance) {
-                vje_fx_prepare( entry->effect_id, entry->fx_instance, frame );
-            }
+    for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+        sample_eff_chain *entry = chain[i];
+        if(entry->fx_instance && entry->fx_instance != (void*)0x1 &&
+           entry->effect_id > 0 && entry->effect_id < VJ_PLUGIN) {
+            vje_fx_prepare( entry->effect_id, entry->fx_instance, frame );
         }
     }
+    pthread_mutex_unlock(&vjert_frame_lock);
 }

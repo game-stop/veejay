@@ -79,6 +79,8 @@ typedef struct {
     int last_storm;
     int last_trail_gain;
     int last_color_energy;
+
+    int render_gain_q8;
 } chronorain_t;
 
 static inline int cf_clampi(int v, int lo, int hi)
@@ -315,7 +317,7 @@ void *chronorain_malloc(int w, int h)
     c->len = w * h;
     c->seeded = 0;
     c->lut_valid = 0;
-
+    c->render_gain_q8 = 256;
 
     c->prev_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->ref_y  = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -1497,8 +1499,6 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
     int use_conduct = (conduct_power >= 128);
     int use_storm = (storm_span_hint > 0);
 
-    int render_gain_q8;
-
     #pragma omp single
     {
         if(!c->seeded)
@@ -1530,11 +1530,13 @@ void chronorain_apply(void *ptr, VJFrame *frame, int *args)
             cf_compute_rain_plain(c, frame, gravity, polarity_split, storm);
     }
 
-    #pragma omp single copyprivate(render_gain_q8)
+    #pragma omp single
     {
         cf_swap_fields(c);
-        render_gain_q8 = cf_density_render_gain_q8(c);
+        c->render_gain_q8 = cf_density_render_gain_q8(c);
     }
+    
+    const int render_gain_q8 = c->render_gain_q8;
 
     cf_render(
         c,

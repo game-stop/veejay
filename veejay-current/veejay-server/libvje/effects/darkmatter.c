@@ -477,8 +477,8 @@ void darkmatter_apply(void *ptr, VJFrame *frame, int *args)
     #pragma omp single
     {
         veejay_memcpy(src_y, Y, len);
-        if (U && src_u) veejay_memcpy(src_u, U, len);
-        if (V && src_v) veejay_memcpy(src_v, V, len);
+        veejay_memcpy(src_u, U, len);
+        veejay_memcpy(src_v, V, len);
 
         if (do_processing) {
             if ((t->frame & 7) == 0)

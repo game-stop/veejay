@@ -125,96 +125,90 @@ void edgeglow_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict B = s->buf;
     uint8_t *restrict C = s->blurmask;
 
-    int L2 = 0;
-    int a2 = 128;
-    int b2 = 128;
+    int nY = 0;
+    int nU = 128;
+    int nV = 128;
 
-    #pragma omp single copyprivate(L2, a2, b2)
-    {
-        int nY = 0;
-        int nU = 128;
-        int nV = 128;
+    _rgb2yuv(red, green, blue, nY, nU, nV);
 
-        _rgb2yuv(red, green, blue, nY, nU, nV);
+    int L2 = (nY * 100) >> 8;
+    int a2 = ((nU - 128) * 127) >> 8;
+    int b2 = ((nV - 128) * 127) >> 8;
 
-        L2 = (nY * 100) >> 8;
-        a2 = ((nU - 128) * 127) >> 8;
-        b2 = ((nV - 128) * 127) >> 8;
-
-        veejay_memset(B, 0, len);
-        veejay_memset(C, 0, len);
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        B[i] = 0;
+        C[i] = 0;
     }
 
+#pragma omp for schedule(static)
+    for(int y = 1; y < height - 1; y++)
     {
-#pragma omp for schedule(static)
-        for(int y = 1; y < height - 1; y++)
-        {
-            const int row = y * width;
+        const int row = y * width;
 
 #pragma omp simd
-            for(int x = 1; x < width - 1; x++)
-            {
-                const int idx = row + x;
-                const int gx =
-                    Y[idx - width - 1] - Y[idx - width + 1] +
-                    ((Y[idx - 1] - Y[idx + 1]) << 1) +
-                    Y[idx + width - 1] - Y[idx + width + 1];
-                const int gy =
-                    Y[idx - width - 1] + (Y[idx - width] << 1) + Y[idx - width + 1] -
-                    Y[idx + width - 1] - (Y[idx + width] << 1) - Y[idx + width + 1];
-                const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
-                const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
-                const int grad = abs_gx + abs_gy;
-                const int norm = (grad * 255) / 1020;
-                const int mask = -(norm > threshold);
+        for(int x = 1; x < width - 1; x++)
+        {
+            const int idx = row + x;
+            const int gx =
+                Y[idx - width - 1] - Y[idx - width + 1] +
+                ((Y[idx - 1] - Y[idx + 1]) << 1) +
+                Y[idx + width - 1] - Y[idx + width + 1];
+            const int gy =
+                Y[idx - width - 1] + (Y[idx - width] << 1) + Y[idx - width + 1] -
+                Y[idx + width - 1] - (Y[idx + width] << 1) - Y[idx + width + 1];
+            const int abs_gx = (gx ^ (gx >> 31)) - (gx >> 31);
+            const int abs_gy = (gy ^ (gy >> 31)) - (gy >> 31);
+            const int grad = abs_gx + abs_gy;
+            const int norm = (grad * 255) / 1020;
+            const int mask = -(norm > threshold);
 
-                B[idx] = (uint8_t)(clampi(grad, 0, 255) & mask);
-            }
+            B[idx] = (uint8_t)(clampi(grad, 0, 255) & mask);
         }
+    }
 
 #pragma omp for schedule(static)
-        for(int y = 1; y < height - 1; y++)
-        {
-            const int row = y * width;
+    for(int y = 1; y < height - 1; y++)
+    {
+        const int row = y * width;
 
 #pragma omp simd
-            for(int x = 1; x < width - 1; x++)
-            {
-                const int idx = row + x;
-                const int sum =
-                    B[idx - width - 1] + B[idx - width] + B[idx - width + 1] +
-                    B[idx - 1]         + B[idx]         + B[idx + 1] +
-                    B[idx + width - 1] + B[idx + width] + B[idx + width + 1];
+        for(int x = 1; x < width - 1; x++)
+        {
+            const int idx = row + x;
+            const int sum =
+                B[idx - width - 1] + B[idx - width] + B[idx - width + 1] +
+                B[idx - 1]         + B[idx]         + B[idx + 1] +
+                B[idx + width - 1] + B[idx + width] + B[idx + width + 1];
 
-                C[idx] = (uint8_t)((sum * 29) >> 8);
-            }
+            C[idx] = (uint8_t)((sum * 29) >> 8);
         }
+    }
 
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            int edgeIntensity = (C[i] * scale_q8) >> 8;
+    for(int i = 0; i < len; i++)
+    {
+        int edgeIntensity = (C[i] * scale_q8) >> 8;
 
-            if(edgeIntensity > 255)
-                edgeIntensity = 255;
+        if(edgeIntensity > 255)
+            edgeIntensity = 255;
 
-            const int mask = -(edgeIntensity > 0);
+        const int mask = -(edgeIntensity > 0);
 
-            int L1 = (Y[i] * 100) >> 8;
-            int a1 = ((Cb[i] - 128) * 127) >> 8;
-            int b1 = ((Cr[i] - 128) * 127) >> 8;
+        int L1 = (Y[i] * 100) >> 8;
+        int a1 = ((Cb[i] - 128) * 127) >> 8;
+        int b1 = ((Cr[i] - 128) * 127) >> 8;
 
-            L1 += ((L2 - L1) * edgeIntensity) / 255;
-            a1 += ((a2 - a1) * edgeIntensity) / 255;
-            b1 += ((b2 - b1) * edgeIntensity) / 255;
+        L1 += ((L2 - L1) * edgeIntensity) / 255;
+        a1 += ((a2 - a1) * edgeIntensity) / 255;
+        b1 += ((b2 - b1) * edgeIntensity) / 255;
 
-            const int L_out = clampi((L1 * 255) / 100, 0, 255);
-            const int a_out = clampi(a1 + 128, 0, 255);
-            const int b_out = clampi(b1 + 128, 0, 255);
+        const int L_out = clampi((L1 * 255) / 100, 0, 255);
+        const int a_out = clampi(a1 + 128, 0, 255);
+        const int b_out = clampi(b1 + 128, 0, 255);
 
-            Y[i] = (uint8_t)((L_out & mask) | (Y[i] & ~mask));
-            Cb[i] = (uint8_t)((a_out & mask) | (Cb[i] & ~mask));
-            Cr[i] = (uint8_t)((b_out & mask) | (Cr[i] & ~mask));
-        }
+        Y[i] = (uint8_t)((L_out & mask) | (Y[i] & ~mask));
+        Cb[i] = (uint8_t)((a_out & mask) | (Cb[i] & ~mask));
+        Cr[i] = (uint8_t)((b_out & mask) | (Cr[i] & ~mask));
     }
 }

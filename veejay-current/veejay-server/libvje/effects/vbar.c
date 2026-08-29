@@ -48,7 +48,6 @@ typedef struct {
     float slide_phase;
 
     int initialized;
-    int n_threads;
 } vbar_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -92,10 +91,6 @@ static inline int vbar_tri_signed_q8(int phase)
 
     return tri - 256;
 }
-
-
-
-
 
 vj_effect *vbar_init(int width, int height)
 {
@@ -161,6 +156,9 @@ vj_effect *vbar_init(int width, int height)
 
 void *vbar_malloc(int w, int h)
 {
+    (void)w;
+    (void)h;
+
     vbar_t *v = (vbar_t*) vj_calloc(sizeof(vbar_t));
     if(!v)
         return NULL;
@@ -178,14 +176,13 @@ void *vbar_malloc(int w, int h)
     v->slide_phase = 0.0f;
     v->initialized = 0;
 
-    v->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) v;
 }
 
 void vbar_free(void *ptr)
 {
-    free(ptr);
+    if(ptr)
+        free(ptr);
 }
 
 static void vbar_copy_region(VJFrame *frame,
@@ -193,8 +190,7 @@ static void vbar_copy_region(VJFrame *frame,
                              int x0,
                              int x1,
                              int y_off,
-                             int x_off,
-                             int n_threads)
+                             int x_off)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -210,7 +206,7 @@ static void vbar_copy_region(VJFrame *frame,
     x0 = clampi(x0, 0, width);
     x1 = clampi(x1, 0, width);
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int dst_row = y * width;
         const int src_y = wrapi(y + y_off, height);
@@ -231,8 +227,7 @@ static void vbar_copy_region(VJFrame *frame,
 static void vbar_apply_divider_glow(VJFrame *frame,
                                     int divider_x,
                                     int glow_width,
-                                    int glow_strength,
-                                    int n_threads)
+                                    int glow_strength)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -242,7 +237,7 @@ static void vbar_apply_divider_glow(VJFrame *frame,
 
     uint8_t *restrict Y = frame->data[0];
 
-#pragma omp parallel for schedule(static) num_threads(n_threads)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -269,71 +264,74 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int width = frame->width;
     const int height = frame->height;
-
+    
     const int divider = args[P_DIVIDER];
-    const int top_y_delta = args[P_TOP_Y];
-    const int bot_y_delta = args[P_BOT_Y];
-    const int top_x_delta = args[P_TOP_X];
-    const int bot_x_delta = args[P_BOT_X];
-    const int slide_drive = args[P_SLIDE_DRIVE];
-    const int edge_glow = args[P_EDGE_GLOW];
 
-    const float fast = 0.245f;
-    const float slow = 0.112f;
+    #pragma omp single
+    {
+        const int top_y_delta = args[P_TOP_Y];
+        const int bot_y_delta = args[P_BOT_Y];
+        const int top_x_delta = args[P_TOP_X];
+        const int bot_x_delta = args[P_BOT_X];
+        const int slide_drive = args[P_SLIDE_DRIVE];
+        const int edge_glow = args[P_EDGE_GLOW];
 
-    if(!vbar->initialized) {
-        vbar->top_y_env = (float)top_y_delta;
-        vbar->bot_y_env = (float)bot_y_delta;
-        vbar->top_x_env = (float)top_x_delta;
-        vbar->bot_x_env = (float)bot_x_delta;
-        vbar->slide_env = (float)slide_drive;
-        vbar->glow_env = (float)edge_glow;
-        vbar->initialized = 1;
-    } else {
-        vbar->top_y_env = vbar_smooth(vbar->top_y_env, (float)top_y_delta, fast, slow);
-        vbar->bot_y_env = vbar_smooth(vbar->bot_y_env, (float)bot_y_delta, fast, slow);
-        vbar->top_x_env = vbar_smooth(vbar->top_x_env, (float)top_x_delta, fast * 0.90f, slow);
-        vbar->bot_x_env = vbar_smooth(vbar->bot_x_env, (float)bot_x_delta, fast * 0.90f, slow);
-        vbar->slide_env = vbar_smooth(vbar->slide_env, (float)slide_drive, fast * 1.18f, slow);
-        vbar->glow_env = vbar_smooth(vbar->glow_env, (float)edge_glow, fast, slow);
+        const float fast = 0.245f;
+        const float slow = 0.112f;
+
+        if(!vbar->initialized) {
+            vbar->top_y_env = (float)top_y_delta;
+            vbar->bot_y_env = (float)bot_y_delta;
+            vbar->top_x_env = (float)top_x_delta;
+            vbar->bot_x_env = (float)bot_x_delta;
+            vbar->slide_env = (float)slide_drive;
+            vbar->glow_env = (float)edge_glow;
+            vbar->initialized = 1;
+        } else {
+            vbar->top_y_env = vbar_smooth(vbar->top_y_env, (float)top_y_delta, fast, slow);
+            vbar->bot_y_env = vbar_smooth(vbar->bot_y_env, (float)bot_y_delta, fast, slow);
+            vbar->top_x_env = vbar_smooth(vbar->top_x_env, (float)top_x_delta, fast * 0.90f, slow);
+            vbar->bot_x_env = vbar_smooth(vbar->bot_x_env, (float)bot_x_delta, fast * 0.90f, slow);
+            vbar->slide_env = vbar_smooth(vbar->slide_env, (float)slide_drive, fast * 1.18f, slow);
+            vbar->glow_env = vbar_smooth(vbar->glow_env, (float)edge_glow, fast, slow);
+        }
+
+        const int top_y_base = clampi((int)(vbar->top_y_env + 0.5f), 0, height);
+        const int bot_y_base = clampi((int)(vbar->bot_y_env + 0.5f), 0, height);
+        const int top_x_base = clampi((int)(vbar->top_x_env + 0.5f), 0, width);
+        const int bot_x_base = clampi((int)(vbar->bot_x_env + 0.5f), 0, width);
+        const int slide_q = clampi((int)(vbar->slide_env + 0.5f), 0, 1000);
+
+        const int slide_limit = width > height ? width : height;
+        const int slide_depth_q = slide_q;
+
+        if(slide_depth_q > 0) {
+            vbar->slide_phase += 2.0f + (float)slide_depth_q * 0.072f;
+            if(vbar->slide_phase > 8192.0f)
+                vbar->slide_phase -= 8192.0f;
+        }
+
+        const int phase_i = (int)vbar->slide_phase;
+        const int wave_x = vbar_tri_signed_q8(phase_i);
+        const int wave_y = vbar_tri_signed_q8(phase_i + 256);
+
+        const int slide_amp = clampi((slide_limit * slide_depth_q + 9000) / 18000, 0, slide_limit >> 2);
+
+        const int lfo_x = (slide_amp * wave_x) >> 8;
+        const int lfo_y = (slide_amp * wave_y) >> 8;
+
+        const int top_y_eff = top_y_base + lfo_y;
+        const int bot_y_eff = bot_y_base - (lfo_y >> 1);
+        const int top_x_eff = top_x_base + lfo_x;
+        const int bot_x_eff = bot_x_base - lfo_x;
+
+        vbar->bar_top_auto = wrap_add(vbar->bar_top_auto, top_y_eff, height);
+        vbar->bar_top_vert = wrap_add(vbar->bar_top_vert, top_x_eff, width);
+        vbar->bar_bot_auto = wrap_add(vbar->bar_bot_auto, bot_y_eff, height);
+        vbar->bar_bot_vert = wrap_add(vbar->bar_bot_vert, bot_x_eff, width);
     }
-
-    const int top_y_base = clampi((int)(vbar->top_y_env + 0.5f), 0, height);
-    const int bot_y_base = clampi((int)(vbar->bot_y_env + 0.5f), 0, height);
-    const int top_x_base = clampi((int)(vbar->top_x_env + 0.5f), 0, width);
-    const int bot_x_base = clampi((int)(vbar->bot_x_env + 0.5f), 0, width);
-    const int slide_q = clampi((int)(vbar->slide_env + 0.5f), 0, 1000);
-    const int glow_q = clampi((int)(vbar->glow_env + 0.5f), 0, 1000);
-
-    const int slide_limit = width > height ? width : height;
-    const int slide_depth_q = slide_q;
-
-    if(slide_depth_q > 0) {
-        vbar->slide_phase += 2.0f + (float)slide_depth_q * 0.072f;
-        if(vbar->slide_phase > 8192.0f)
-            vbar->slide_phase -= 8192.0f;
-    }
-
-    const int phase_i = (int)vbar->slide_phase;
-    const int wave_x = vbar_tri_signed_q8(phase_i);
-    const int wave_y = vbar_tri_signed_q8(phase_i + 256);
-
-    const int slide_amp = clampi((slide_limit * slide_depth_q + 9000) / 18000, 0, slide_limit >> 2);
-
-    const int lfo_x = (slide_amp * wave_x) >> 8;
-    const int lfo_y = (slide_amp * wave_y) >> 8;
-
-    const int top_y_eff = top_y_base + lfo_y;
-    const int bot_y_eff = bot_y_base - (lfo_y >> 1);
-    const int top_x_eff = top_x_base + lfo_x;
-    const int bot_x_eff = bot_x_base - lfo_x;
-
+    
     const int left_width = width / divider;
-
-    vbar->bar_top_auto = wrap_add(vbar->bar_top_auto, top_y_eff, height);
-    vbar->bar_top_vert = wrap_add(vbar->bar_top_vert, top_x_eff, width);
-    vbar->bar_bot_auto = wrap_add(vbar->bar_bot_auto, bot_y_eff, height);
-    vbar->bar_bot_vert = wrap_add(vbar->bar_bot_vert, bot_x_eff, width);
 
     vbar_copy_region(
         frame,
@@ -341,8 +339,7 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         0,
         left_width,
         vbar->bar_top_auto,
-        vbar->bar_top_vert,
-        vbar->n_threads
+        vbar->bar_top_vert
     );
 
     vbar_copy_region(
@@ -351,16 +348,17 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         left_width,
         width,
         vbar->bar_bot_auto,
-        vbar->bar_bot_vert,
-        vbar->n_threads
+        vbar->bar_bot_vert
     );
 
+    const int glow_q = clampi((int)(vbar->glow_env + 0.5f), 0, 1000);
+    
     if(glow_q > 0) {
         const int glow_width = 1 + ((glow_q * 13 + 500) / 1000);
         int glow_strength = (glow_q * 150 + 500) / 1000;
 
         glow_strength = clampi(glow_strength, 0, 240);
 
-        vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength, vbar->n_threads);
+        vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength);
     }
 }

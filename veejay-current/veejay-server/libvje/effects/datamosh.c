@@ -519,21 +519,26 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         dm_push_history(d, frame_y, frame_u, frame_v, &dummy_y, &dummy_u, &dummy_v);
     }
     
-    if (strength <= 0) {
+    if(strength <= 0) {
+        const uint8_t *cur[3] = {
+            d->hist[0] + (size_t)d->hist_head * llen,
+            d->hist[1] + (size_t)d->hist_head * llen,
+            d->hist[2] + (size_t)d->hist_head * llen
+        };
+
+        #pragma omp for schedule(static)
+        for(int plane = 0; plane < 3; plane++) {
+            veejay_memcpy(d->canvas[0][plane], cur[plane], llen);
+            veejay_memcpy(d->canvas[1][plane], cur[plane], llen);
+        }
+
         #pragma omp single
         {
-            uint8_t *cur_y = d->hist[0] + (size_t) d->hist_head * llen;
-            uint8_t *cur_u = d->hist[1] + (size_t) d->hist_head * llen;
-            uint8_t *cur_v = d->hist[2] + (size_t) d->hist_head * llen;
-            for (int p = 0; p < 2; p++) {
-                veejay_memcpy(d->canvas[p][0], cur_y, llen);
-                veejay_memcpy(d->canvas[p][1], cur_u, llen);
-                veejay_memcpy(d->canvas[p][2], cur_v, llen);
-            }
             dm_clear_fields(d);
             d->canvas_ping = 0;
             d->frame++;
         }
+
         return;
     }
 

@@ -65,6 +65,15 @@ typedef struct {
     float sm_slice_drive;
     float sm_shatter_drive;
     float sm_mix_drive;
+
+    int val1;
+    int val2;
+    int shatter;
+    int smoothness;
+    int dominance;
+    int block_shift;
+    int extra_mix_q8;
+    int mode;
 } slicer_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -370,15 +379,22 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_step = 0.24f;
 
-    int val1 = 0, val2 = 0, shatter = 0, period = 0, smoothness = 0, dominance = 0, block_shift = 2;
-    int slice_drive = 0, shatter_drive = 0, mix_drive = 0;
-    int extra_mix_q8 = 0;
-    uint8_t *dY = NULL, *dCb = NULL, *dCr = NULL;
-    const uint8_t *s1Y = NULL, *s1Cb = NULL, *s1Cr = NULL;
-    const uint8_t *s2Y = NULL, *s2Cb = NULL, *s2Cr = NULL;
-    const int *sx_row = NULL, *sy_col = NULL;
+    const uint8_t *srcY = frame->data[0];
+    const uint8_t *srcCb = frame->data[1];
+    const uint8_t *srcCr = frame->data[2];
 
-    #pragma omp single copyprivate(val1, val2, shatter, period, smoothness, dominance, block_shift, slice_drive, shatter_drive, mix_drive, extra_mix_q8, dY, dCb, dCr, s1Y, s1Cb, s1Cr, s2Y, s2Cb, s2Cr, sx_row, sy_col)
+    uint8_t *restrict tmpY = s->tmp[0];
+    uint8_t *restrict tmpCb = s->tmp[1];
+    uint8_t *restrict tmpCr = s->tmp[2];
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        tmpY[i] = srcY[i];
+        tmpCb[i] = srcCb[i];
+        tmpCr[i] = srcCr[i];
+    }
+
+    #pragma omp single
     {
         if(!s->smooth_ready) {
             s->sm_width = (float)base_w;
@@ -406,26 +422,27 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
         }
 
-        slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
-        shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
-        mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
+        int slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
+        int shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
+        int mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
 
-        val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
-        val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
-        shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
-        period = clampi((int)(s->sm_period + 0.5f), 0, 500);
-        smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
-        dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
-        block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
+        s->val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
+        s->val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
+        s->shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
+        int period = clampi((int)(s->sm_period + 0.5f), 0, 500);
+        s->smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
+        s->dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
+        s->block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
 
-        val1 = clampi(val1 + (((width - val1) * slice_drive + 500) / 1000), 1, width);
-        val2 = clampi(val2 + (((height - val2) * slice_drive + 500) / 1000), 1, height);
-        shatter = clampi(shatter + (((128 - shatter) * shatter_drive + 500) / 1000), 0, 128);
+        s->val1 = clampi(s->val1 + (((width - s->val1) * slice_drive + 500) / 1000), 1, width);
+        s->val2 = clampi(s->val2 + (((height - s->val2) * slice_drive + 500) / 1000), 1, height);
+        s->shatter = clampi(s->shatter + (((128 - s->shatter) * shatter_drive + 500) / 1000), 0, 128);
 
-        dominance = clampi(dominance + (((100 - dominance) * mix_drive + 500) / 1000), 0, 100);
-        block_shift = clampi(block_shift - ((mix_drive + 333) / 500), 2, 9);
+        s->dominance = clampi(s->dominance + (((100 - s->dominance) * mix_drive + 500) / 1000), 0, 100);
+        s->block_shift = clampi(s->block_shift - ((mix_drive + 333) / 500), 2, 9);
 
-        extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
+        s->extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
+        s->mode = mode;
 
         if(s->last_period != period) {
             s->last_period = period;
@@ -434,37 +451,38 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
         if(s->current_period <= 0 || !s->have_shift) {
             s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
-            s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
-            s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
-            s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
+            s->seed ^= (uint32_t)(s->val1 * 0x45d9f3bu);
+            s->seed ^= (uint32_t)(s->val2 * 0x119de1f3u);
+            s->seed ^= (uint32_t)(s->shatter * 0x27d4eb2du);
             s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
 
-            recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
+            recalc(s, width, height, tmpY, s->val1, s->val2, s->shatter, s->seed, s->smoothness);
 
             s->current_period = period > 0 ? period : 1;
         }
 
         s->current_period--;
-
-        dY = frame->data[0];
-        dCb = frame->data[1];
-        dCr = frame->data[2];
-
-        veejay_memcpy(s->tmp[0], dY, len);
-        veejay_memcpy(s->tmp[1], dCb, len);
-        veejay_memcpy(s->tmp[2], dCr, len);
-
-        s1Y = s->tmp[0];
-        s1Cb = s->tmp[1];
-        s1Cr = s->tmp[2];
-
-        s2Y = frame2->data[0];
-        s2Cb = frame2->data[1];
-        s2Cr = frame2->data[2];
-
-        sx_row = s->slice_xshift;
-        sy_col = s->slice_yshift;
     }
+ 
+    const int block_shift = s->block_shift;
+    const int dominance = s->dominance;
+    const int extra_mix_q8 = s->extra_mix_q8;
+    const int mode_val = s->mode;
+
+    uint8_t *restrict dY  = frame->data[0];
+    uint8_t *restrict dCb = frame->data[1];
+    uint8_t *restrict dCr = frame->data[2];
+
+    const uint8_t *restrict s1Y  = s->tmp[0];
+    const uint8_t *restrict s1Cb = s->tmp[1];
+    const uint8_t *restrict s1Cr = s->tmp[2];
+
+    const uint8_t *restrict s2Y  = frame2->data[0];
+    const uint8_t *restrict s2Cb = frame2->data[1];
+    const uint8_t *restrict s2Cr = frame2->data[2];
+
+    const int *restrict sx_row = s->slice_xshift;
+    const int *restrict sy_col = s->slice_yshift;
 
 #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
@@ -480,7 +498,7 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             uint8_t out_cb = s1Cb[dst];
             uint8_t out_cr = s1Cr[dst];
 
-            if(mode == 0) {
+            if(mode_val == 0) {
                 if((unsigned)ix < (unsigned)width && (unsigned)iy < (unsigned)height) {
                     const int src = iy * width + ix;
                     const int chunk_x = ix >> block_shift;

@@ -104,7 +104,7 @@ void gamma_apply(void *ptr, VJFrame *frame, int *args)
     const int gamma_value = args[0];
     const int len = frame->len;
 
-    #pragma omp single
+    #pragma omp critical
     {
         if(gamma_value != g->gamma_key)
             gamma_setup(g, gamma_value);

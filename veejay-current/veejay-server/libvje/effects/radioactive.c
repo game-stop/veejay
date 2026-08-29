@@ -53,6 +53,7 @@ typedef struct {
     int first_frame;
     int last_mode;
     float ratio_;
+    int n_threads;
 } radioactive_t;
 
 static inline int radioactive_clampi(int v, int lo, int hi)
@@ -352,24 +353,20 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
 {
     radioactive_t *r = (radioactive_t*)ptr;
 
-    int width = 0, len = 0, mode = 0, zoom_ratio = 0, strength = 0, threshold = 0;
-    uint8_t *lum = NULL, *prev = NULL;
-    float snap_ratio = 0.0f;
+    const int width = frame->width;
+    const int len = frame->len;
 
-    #pragma omp single copyprivate(width, len, mode, zoom_ratio, strength, threshold, lum, prev, snap_ratio)
+    const int mode = args[P_MODE];
+    const int zoom_ratio = args[P_ZOOM];
+    const int strength = args[P_STRENGTH];
+    const int threshold = args[P_THRESHOLD];
+
+    uint8_t *restrict lum = frame->data[0];
+    uint8_t *restrict prev = r->diffbuf;
+
+    #pragma omp single
     {
-        width = frame->width;
-        len = frame->len;
-
-        mode = args[P_MODE];
-        zoom_ratio = args[P_ZOOM];
-        strength = args[P_STRENGTH];
-        threshold = args[P_THRESHOLD];
-
-        lum = frame->data[0];
-        prev = r->diffbuf;
-
-        snap_ratio = (float)zoom_ratio * 0.01f;
+        const float snap_ratio = (float)zoom_ratio * 0.01f;
 
         if(r->ratio_ != snap_ratio) {
             r->ratio_ = snap_ratio;
@@ -377,7 +374,8 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
         }
 
         if(r->first_frame) {
-            veejay_memcpy(prev, lum, len);
+            for(int i = 0; i < len; i++)
+                prev[i] = lum[i];
             r->first_frame = 0;
         }
 
@@ -386,13 +384,13 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
             r->last_mode = mode;
         }
     }
-
+    
     if(strength > 0)
         radioactive_inject_core(r, lum, prev, width, threshold, strength, mode);
 
-    #pragma omp single
-    {
-        veejay_memcpy(prev, lum, len);
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        prev[i] = lum[i];
     }
 
     radioactive_blur(r);

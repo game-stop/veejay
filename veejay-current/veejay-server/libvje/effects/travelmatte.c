@@ -186,11 +186,11 @@ void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *aB = frame2->data[3];
 
     const int source = args[P_MATTE_SOURCE] ? 1 : 0;
+    
     const uint8_t *matte = source == 0 ? (aA ? aA : a0) : (aB ? aB : b0);
-
     const uint8_t *lut = tm->alpha_lut;
 
-    #pragma omp single copyprivate(matte)
+    #pragma omp single
     {
         const float fast = 0.24f;
         const float slow = 0.085f;
@@ -217,7 +217,7 @@ void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             tm->alpha_lut[i] = (uint8_t)travelmatte_alpha_xform(i, gain, bias, soften, mix_drive);
         }
     }
-
+   
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int a = (int)lut[matte[i]];

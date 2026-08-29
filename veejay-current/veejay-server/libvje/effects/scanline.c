@@ -41,6 +41,7 @@
 #define P_BEAT_PUSH   10
 #define P_BEAT_SMOOTH 11
 
+
 typedef struct {
     uint8_t *buf[3];
     int prevRow;
@@ -58,8 +59,12 @@ typedef struct {
     float sm_beat_glow;
     float sm_beat_decay;
     int sm_ready;
-    int n_threads;
+    
+    int stopped;
+    int head;
+    int horizontal;
 } scanline_t;
+
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -373,9 +378,7 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     const float smooth = (float)smooth_arg * 0.001f;
     const float param_a = 0.46f - smooth * 0.32f;
 
-    int stopped = 0;
-
-    #pragma omp single copyprivate(stopped)
+    #pragma omp single
     {
         if(!s->sm_ready) {
             s->sm_speed = (float)speed_arg;
@@ -429,10 +432,8 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
         else if(s->beat_kick < 0.0001f)
             s->beat_kick = 0.0f;
 
-        stopped = s->stopCount > 0;
-        if(stopped) {
-            int long_axis_pre = mode < 2 ? height : width;
-            int speed_base_pre = clampi((int)(s->sm_speed + 0.5f), 1, 500);
+        s->stopped = s->stopCount > 0;
+        if(s->stopped) {
             int beat_speed_pre = clampi((int)(s->sm_beat_speed + 0.5f), 0, 1000);
             int beat_q_pre = clampi((int)(s->beat_env * 700.0f + s->beat_kick * 520.0f + 0.5f), 0, 1000);
             int skip_pre = 1 + ((beat_speed_pre * 6 + beat_q_pre * 7 + 1000) / 2000);
@@ -446,11 +447,11 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
                 veejay_memset(bufY, pixel_Y_lo_, len);
                 veejay_memset(bufU, 128, len);
                 veejay_memset(bufV, 128, len);
-                stopped = 0;
+                s->stopped = 0;
             }
         }
     }
-
+  
     const int beat_q = clampi((int)(s->beat_env * 700.0f + s->beat_kick * 520.0f + 0.5f), 0, 1000);
     const int long_axis = mode < 2 ? height : width;
     const int speed_base = clampi((int)(s->sm_speed + 0.5f), 1, 500);
@@ -465,70 +466,64 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
     const int speed_headroom = long_axis / 4 + 4;
 
     int eff_speed = speed_base;
-
     eff_speed += (beat_speed * speed_headroom + 500) / 1000;
     eff_speed += (beat_q * (long_axis / 8 + 3) + 500) / 1000;
     eff_speed = clampi(eff_speed, 1, long_axis);
 
     int eff_beam = beam_base;
-
     eff_beam += (beat_beam * 96 + 500) / 1000;
     eff_beam += (beat_q * 34 + 500) / 1000;
     eff_beam = clampi(eff_beam, 1, 160);
 
     int eff_glow = beat_glow + ((beat_q * 176 + 500) / 1000);
-
     eff_glow = clampi(eff_glow, 0, 255);
 
     int eff_hold = hold_base - ((beat_decay * hold_base + 500) / 1000);
-
     eff_hold += (beat_q * (255 - eff_hold) + 500) / 1000;
     eff_hold = clampi(eff_hold, 0, 255);
 
     int eff_mix = mix_base + ((beat_q * (1000 - mix_base) + 500) / 1000);
-
     eff_mix = clampi(eff_mix, 0, 1000);
 
     const int mix_q8 = (eff_mix * 256 + 500) / 1000;
     
-    if(stopped) {
+    if(s->stopped) {
         scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
     }
     else {
         scanline_fade_buffer(s, len, eff_hold);
 
-        int head = 0;
-        int horizontal = mode < 2;
-        int start = 0;
-        int stop = 0;
-
         #pragma omp single
         {
+            s->horizontal = mode < 2;
+            int start = 0;
+            int stop = 0;
+
             switch(mode) {
                 case 0:
                     start = s->prevRow;
                     stop = start + eff_speed;
                     if(stop > height) stop = height;
-                    head = stop > 0 ? stop - 1 : start;
+                    s->head = stop > 0 ? stop - 1 : start;
                     break;
                 case 1:
                     start = height - 1 - s->prevRow;
                     stop = height - s->prevRow - eff_speed;
                     if(stop < 0) stop = 0;
-                    head = stop;
+                    s->head = stop;
                     break;
                 case 2:
                     start = s->prevCol;
                     stop = start + eff_speed;
                     if(stop > width) stop = width;
-                    head = stop > 0 ? stop - 1 : start;
+                    s->head = stop > 0 ? stop - 1 : start;
                     break;
                 case 3:
                 default:
                     start = width - 1 - s->prevCol;
                     stop = width - s->prevCol - eff_speed;
                     if(stop < 0) stop = 0;
-                    head = stop;
+                    s->head = stop;
                     break;
             }
 
@@ -589,12 +584,12 @@ void scanline_apply(void *ptr, VJFrame *frame, int *args)
                     break;
             }
         }
-
+ 
         scanline_mix_output(dstY, dstU, dstV, bufY, bufU, bufV, len, mix_q8);
 
-        if(horizontal)
-            scanline_overlay_horizontal(dstY, width, height, head, eff_beam, eff_glow);
+        if(s->horizontal)
+            scanline_overlay_horizontal(dstY, width, height, s->head, eff_beam, eff_glow);
         else
-            scanline_overlay_vertical(dstY, width, height, head, eff_beam, eff_glow);
+            scanline_overlay_vertical(dstY, width, height, s->head, eff_beam, eff_glow);
     }
 }

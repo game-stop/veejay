@@ -60,7 +60,17 @@ typedef struct {
     float spin_drive_state;
     float zoom_drive_state;
     int state_ready;
+
+    int segments;
+    int half;
+    float sample_cx;
+    float sample_cy;
+    float m00[TRIMIRROR_MAX_SEGMENTS];
+    float m01[TRIMIRROR_MAX_SEGMENTS];
+    float m10[TRIMIRROR_MAX_SEGMENTS];
+    float m11[TRIMIRROR_MAX_SEGMENTS];
 } trimirror_t;
+
 
 static inline int trimirror_clampi(int v, int lo, int hi)
 {
@@ -242,19 +252,22 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
     const int raw_spin_drive = args[P_SPIN_DRIVE];
     const int raw_zoom_drive = args[P_ZOOM_DRIVE];
 
-    int segments = 3;
-    int half = 1;
-    float sample_cx = 0.0f, sample_cy = 0.0f;
-    float m00[TRIMIRROR_MAX_SEGMENTS] = {0};
-    float m01[TRIMIRROR_MAX_SEGMENTS] = {0};
-    float m10[TRIMIRROR_MAX_SEGMENTS] = {0};
-    float m11[TRIMIRROR_MAX_SEGMENTS] = {0};
-
     uint8_t *restrict srcY = s->buf[0];
     uint8_t *restrict srcU = s->buf[1];
     uint8_t *restrict srcV = s->buf[2];
 
-    #pragma omp single copyprivate(segments, half, sample_cx, sample_cy, m00, m01, m10, m11)
+    const uint8_t *restrict Y = frame->data[0];
+    const uint8_t *restrict U = frame->data[1];
+    const uint8_t *restrict V = frame->data[2];
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        srcY[i] = Y[i];
+        srcU[i] = U[i];
+        srcV[i] = V[i];
+    }
+
+    #pragma omp single
     {
         if(!s->state_ready) {
             s->segment_state = (float)raw_segments;
@@ -279,17 +292,9 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
         s->spin_drive_state = trimirror_smooth(s->spin_drive_state, (float)raw_spin_drive, geom_fast);
         s->zoom_drive_state = trimirror_smooth(s->zoom_drive_state, (float)raw_zoom_drive, geom_fast);
 
-        segments = trimirror_clampi((int)(s->segment_state + 0.5f), 1, TRIMIRROR_MAX_SEGMENTS);
+        s->segments = trimirror_clampi((int)(s->segment_state + 0.5f), 1, TRIMIRROR_MAX_SEGMENTS);
         float spin_drive = s->spin_drive_state * 0.001f;
         float zoom_drive = s->zoom_drive_state * 0.001f;
-
-        uint8_t *restrict Y = frame->data[0];
-        uint8_t *restrict U = frame->data[1];
-        uint8_t *restrict V = frame->data[2];
-
-        veejay_memcpy(srcY, Y, len);
-        veejay_memcpy(srcU, U, len);
-        veejay_memcpy(srcV, V, len);
 
         const float spin = s->spin_state * 0.00125f;
         const float direct_spin = spin_drive * 0.0125f;
@@ -304,28 +309,36 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
 
         float cx = ((float)w - 1.0f) * 0.5f;
         float cy = ((float)h - 1.0f) * 0.5f;
-        sample_cx = cx + (s->center_x_state * 0.001f) * cx;
-        sample_cy = cy + (s->center_y_state * 0.001f) * cy;
+        s->sample_cx = cx + (s->center_x_state * 0.001f) * cx;
+        s->sample_cy = cy + (s->center_y_state * 0.001f) * cy;
 
-        float angle_step = TRIMIRROR_TWO_PI / (float)segments;
-        for(int i = 0; i < segments; i++) {
+        float angle_step = TRIMIRROR_TWO_PI / (float)s->segments;
+        for(int i = 0; i < s->segments; i++) {
             const float a = base_angle + (float)i * angle_step;
             const float cs = cosf(a) * zoom;
             const float sn = sinf(a) * zoom;
-            m00[i] = cs;
-            m01[i] = -sn;
-            m10[i] = sn;
-            m11[i] = cs;
+            s->m00[i] = cs;
+            s->m01[i] = -sn;
+            s->m10[i] = sn;
+            s->m11[i] = cs;
         }
 
-        half = segments >> 1;
+        s->half = s->segments >> 1;
     }
+    
+    const int segments = s->segments;
+    const float sample_cx = s->sample_cx;
+    const float sample_cy = s->sample_cy;
+    const float *restrict m00 = s->m00;
+    const float *restrict m01 = s->m01;
+    const float *restrict m10 = s->m10;
+    const float *restrict m11 = s->m11;
 
     const float *restrict vx = s->vec_x;
     const float *restrict vy = s->vec_y;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
+    uint8_t *restrict outY = frame->data[0];
+    uint8_t *restrict outU = frame->data[1];
+    uint8_t *restrict outV = frame->data[2];
     const float cx = ((float)w - 1.0f) * 0.5f;
     const float cy = ((float)h - 1.0f) * 0.5f;
 
@@ -346,12 +359,12 @@ void trimirror_apply(void *ptr, VJFrame *frame, int *args)
             acc_u += (int)srcU[idx] - 128;
             acc_v += (int)srcV[idx] - 128;
         }
-        Y[p] = trimirror_y((acc_y + half) / segments);
-        U[p] = trimirror_uv(128 + ((acc_u >= 0)
-            ? ((acc_u + half) / segments)
-            : -((-acc_u + half) / segments)));
-        V[p] = trimirror_uv(128 + ((acc_v >= 0)
-            ? ((acc_v + half) / segments)
-            : -((-acc_v + half) / segments)));
+        outY[p] = trimirror_y((acc_y + s->half) / segments);
+        outU[p] = trimirror_uv(128 + ((acc_u >= 0)
+            ? ((acc_u + s->half) / segments)
+            : -((-acc_u + s->half) / segments)));
+        outV[p] = trimirror_uv(128 + ((acc_v >= 0)
+            ? ((acc_v + s->half) / segments)
+            : -((-acc_v + s->half) / segments)));
     }
 }

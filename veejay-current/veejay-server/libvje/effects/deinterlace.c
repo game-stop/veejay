@@ -134,11 +134,10 @@ void deinterlace_apply(void *ptr, VJFrame *frame, int *args)
     const int y_len = frame->len;
     const int uv_len = frame->uv_len;
 
-    #pragma omp single
-    {
-        veejay_memcpy(d->buf[0], frame->data[0], y_len);
-        veejay_memcpy(d->buf[1], frame->data[1], uv_len);
-        veejay_memcpy(d->buf[2], frame->data[2], uv_len);
+    #pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++) {
+        const int copy_len = (plane == 0) ? y_len : uv_len;
+        veejay_memcpy(d->buf[plane], frame->data[plane], copy_len);
     }
 
     deinterlace_plane(frame->data[0], d->buf[0], frame->width, frame->height, threshold);

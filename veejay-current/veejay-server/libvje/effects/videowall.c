@@ -50,6 +50,14 @@ typedef struct {
     int slide_env_q8;
     int slide_phase;
     uint8_t lift_lut[33][256];
+
+    int global_x;
+    int global_y;
+    int stagger_x;
+    int stagger_y;
+    int luma_lift;
+    int photo_idx1;
+    int photo_idx2;
 } videowall_t;
 
 static void destroy_filmstrip(videowall_t *vw);
@@ -592,10 +600,7 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
     const int lock_update = args[P_LOCK_UPDATE] ? 1 : 0;
     const int slide_drive = args[P_SLIDE_DRIVE];
 
-    int global_x = 0, global_y = 0, stagger_x = 0, stagger_y = 0, luma_lift = 0;
-    int photo_idx1 = 0, photo_idx2 = 0;
-
-    #pragma omp single copyprivate(global_x, global_y, stagger_x, stagger_y, luma_lift, photo_idx1, photo_idx2)
+    #pragma omp single
     {
         vw->slide_env_q8 = smooth_q8(vw->slide_env_q8, slide_drive << 8);
         vw->slide_env_q8 = clampi(vw->slide_env_q8, 0, 1000 << 8);
@@ -615,28 +620,36 @@ void videowall_apply(void *ptr, VJFrame *frameA, VJFrame *frameB, int *args)
 
         const int phase = vw->slide_phase;
         const int phase3 = (phase * 3) & 4095;
-        global_x = scale_wave(amp, triwave12(phase), 1024);
-        global_y = scale_wave(amp, triwave12(phase3), 2048);
-        stagger_x = scale_wave(amp, triwave12(phase + 1024), 2048);
-        stagger_y = scale_wave(amp, triwave12(phase3 + 1024), 4096);
-        luma_lift = (slide_q * 32 + 500) / 1000;
+        vw->global_x = scale_wave(amp, triwave12(phase), 1024);
+        vw->global_y = scale_wave(amp, triwave12(phase3), 2048);
+        vw->stagger_x = scale_wave(amp, triwave12(phase + 1024), 2048);
+        vw->stagger_y = scale_wave(amp, triwave12(phase3 + 1024), 4096);
+        vw->luma_lift = (slide_q * 32 + 500) / 1000;
 
         if(!lock_update) {
             vw->offset_table_x[slot] = x_disp;
             vw->offset_table_y[slot] = y_disp;
         }
 
-        photo_idx1 = vw->frame_counter;
-        int next = photo_idx1 + 1;
+        vw->photo_idx1 = vw->frame_counter;
+        int next = vw->photo_idx1 + 1;
         if(next >= vw->num_photos)
             next = 0;
-        photo_idx2 = next;
+        vw->photo_idx2 = next;
         next++;
         if(next >= vw->num_photos)
             next = 0;
 
         vw->frame_counter = next;
     }
+ 
+    const int global_x = vw->global_x;
+    const int global_y = vw->global_y;
+    const int stagger_x = vw->stagger_x;
+    const int stagger_y = vw->stagger_y;
+    const int luma_lift = vw->luma_lift;
+    const int photo_idx1 = vw->photo_idx1;
+    const int photo_idx2 = vw->photo_idx2;
 
     take_photo(vw, frameA, photo_idx1);
     take_photo(vw, frameB, photo_idx2);

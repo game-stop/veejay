@@ -46,6 +46,14 @@ typedef struct {
     float eff_interval;
     float eff_color_offset;
     int eff_ready;
+    int threshold;
+    int mode;
+    int persist_q8;
+    int deposit_q8;
+    int out_q8;
+    int cy;
+    int cu;
+    int cv;
 } strobo_t;
 
 static const struct {
@@ -245,15 +253,6 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     strobo_t *s = (strobo_t*) ptr;
     const int len = frame->len;
 
-    int threshold = 96;
-    int mode = 0;
-    int persist_q8 = 16;
-    int deposit_q8 = 0;
-    int out_q8 = 180;
-    int cy = 0;
-    int cu = 128;
-    int cv = 128;
-
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
@@ -262,7 +261,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bU = s->buf[1];
     uint8_t *restrict bV = s->buf[2];
 
-    #pragma omp single copyprivate(threshold, mode, persist_q8, deposit_q8, out_q8, cy, cu, cv)
+    #pragma omp single
     {
         const float fast_a = 0.30f;
         const float fast_r = 0.12f;
@@ -300,7 +299,7 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
         interval = clampi(interval, 1, 1500);
         color_offset = clampi(color_offset, 0, 13);
 
-        mode = args[P_MODE] ? 1 : 0;
+        s->mode = args[P_MODE] ? 1 : 0;
 
         uint32_t histogram[256];
         veejay_memset(histogram, 0, sizeof(histogram));
@@ -309,15 +308,15 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
             histogram[Y[i]]++;
 
         int base_threshold = (int)otsu_method(histogram);
-        threshold = clampi(base_threshold + ((threshold_bias - 128) >> 1), 0, 255);
+        s->threshold = clampi(base_threshold + ((threshold_bias - 128) >> 1), 0, 255);
         int color_total = (int)(sizeof(strobo_rainbow) / sizeof(strobo_rainbow[0]));
         int base_color_index = (s->timestamp / color_hold) % color_total;
         int color_index = (base_color_index + color_offset) % color_total;
         int update_now = strobo_clock_tick(s, interval);
 
-        cy = 0;
-        cu = 128;
-        cv = 128;
+        int cy = 0;
+        int cu = 128;
+        int cv = 128;
 
         _rgb2yuv(
             strobo_rainbow[color_index].r,
@@ -328,20 +327,28 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
             cv
         );
 
-        cy = CLAMP_Y(cy);
-        cu = CLAMP_UV(cu);
-        cv = CLAMP_UV(cv);
+        s->cy = CLAMP_Y(cy);
+        s->cu = CLAMP_UV(cu);
+        s->cv = CLAMP_UV(cv);
 
-        persist_q8 = 16 + ((trail * 234 + 50) / 100);
-        persist_q8 = clampi(persist_q8, 16, 250);
+        s->persist_q8 = 16 + ((trail * 234 + 50) / 100);
+        s->persist_q8 = clampi(s->persist_q8, 16, 250);
 
-        deposit_q8 = update_now ? opacity : 0;
-        out_q8 = opacity;
+        s->deposit_q8 = update_now ? opacity : 0;
+        s->out_q8 = opacity;
 
         s->timestamp++;
     }
-    /* Implicit barrier guarantees synchronized variables via copyprivate */
-
+    
+    const int threshold = s->threshold;
+    const int mode = s->mode;
+    const int persist_q8 = s->persist_q8;
+    const int deposit_q8 = s->deposit_q8;
+    const int out_q8 = s->out_q8;
+    const int cy = s->cy;
+    const int cu = s->cu;
+    const int cv = s->cv;
+   
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         int ty = ((int)bY[i] * persist_q8) >> 8;

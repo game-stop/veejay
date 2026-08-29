@@ -134,9 +134,10 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
     const float cross = frequency * spread;
     const float phase_b = phase_shift * 0.73f;
 
-    veejay_memcpy(s->temp_buf,                  frame->data[0], plane_size);
-    veejay_memcpy(s->temp_buf + plane_size,     frame->data[1], plane_size);
-    veejay_memcpy(s->temp_buf + plane_size * 2, frame->data[2], plane_size);
+    #pragma omp for schedule(static)
+    for( int plane = 0 ; plane < 3; plane ++ ) {
+        veejay_memcpy(s->temp_buf + (plane_size * plane),frame->data[plane], plane_size);
+    }
 
     uint8_t *restrict srcY = s->temp_buf;
     uint8_t *restrict srcU = s->temp_buf + plane_size;
@@ -145,7 +146,7 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
     uint8_t *restrict dstV = frame->data[2];
-    
+
 
     #pragma omp for schedule(static)
     for(int y = 0; y < h; y++)

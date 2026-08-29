@@ -58,7 +58,7 @@ vj_effect *dissolve_init(int w, int h)
 
 void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    (void) ptr;
+    (void)ptr;
 
     const int opacity = args[0];
     const int len = frame->len;
@@ -72,30 +72,29 @@ void dissolve_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    int skip_processing = 0;
+    if(opacity == 0)
+        return;
 
-    #pragma omp single
-    {
-        if(opacity == 0) {
-            skip_processing = 1;
-        } else if(opacity == 255) {
-            veejay_memcpy(Y, Y2, len);
-            veejay_memcpy(Cb, Cb2, uv_len);
-            veejay_memcpy(Cr, Cr2, uv_len);
-            skip_processing = 1;
+    if(opacity == 255) {
+        uint8_t *dst[3] = { Y, Cb, Cr };
+        const uint8_t *src[3] = { Y2, Cb2, Cr2 };
+
+        #pragma omp for schedule(static)
+        for(int plane = 0; plane < 3; plane++) {
+            const int copy_len = (plane == 0) ? len : uv_len;
+            veejay_memcpy(dst[plane], src[plane], copy_len);
         }
+
+        return;
     }
 
-    if(!skip_processing) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = dissolve_blend255(Y[i], Y2[i], opacity);
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        Y[i] = dissolve_blend255(Y[i], Y2[i], opacity);
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++)
-        {
-            Cb[i] = dissolve_blend255(Cb[i], Cb2[i], opacity);
-            Cr[i] = dissolve_blend255(Cr[i], Cr2[i], opacity);
-        }
+    #pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        Cb[i] = dissolve_blend255(Cb[i], Cb2[i], opacity);
+        Cr[i] = dissolve_blend255(Cr[i], Cr2[i], opacity);
     }
 }

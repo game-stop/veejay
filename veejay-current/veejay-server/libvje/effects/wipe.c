@@ -39,6 +39,10 @@ typedef struct {
     float speed_env;
     float edge_env;
     float glow_env;
+    
+    int copy_w;
+    int effective_edge;
+    int effective_glow;
 } wipe_t;
 
 static inline int wipe_clampi(int v, int lo, int hi)
@@ -174,9 +178,7 @@ void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int edge_arg = args[P_EDGE_WIDTH];
     const int glow_arg = args[P_EDGE_GLOW];
 
-    int copy_w = 0, effective_edge = 0, effective_glow = 0;
-
-    #pragma omp single copyprivate(copy_w, effective_edge, effective_glow)
+    #pragma omp single
     {
         if(!wipe->initialized) {
             wipe->speed_env = (float)speed_arg;
@@ -205,20 +207,24 @@ void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         if(wipe->wipe_position > width)
             wipe->wipe_position = width;
 
-        copy_w = wipe_clampi(wipe->wipe_position, 0, width);
+        wipe->copy_w = wipe_clampi(wipe->wipe_position, 0, width);
 
-        effective_edge = (int)(wipe->edge_env + 0.5f);
-        if(effective_edge < 0)
-            effective_edge = 0;
-        if(effective_edge > width)
-            effective_edge = width;
+        wipe->effective_edge = (int)(wipe->edge_env + 0.5f);
+        if(wipe->effective_edge < 0)
+            wipe->effective_edge = 0;
+        if(wipe->effective_edge > width)
+            wipe->effective_edge = width;
 
-        effective_glow = (int)(wipe->glow_env + 0.5f);
-        if(effective_glow < 0)
-            effective_glow = 0;
-        if(effective_glow > 255)
-            effective_glow = 255;
+        wipe->effective_glow = (int)(wipe->glow_env + 0.5f);
+        if(wipe->effective_glow < 0)
+            wipe->effective_glow = 0;
+        if(wipe->effective_glow > 255)
+            wipe->effective_glow = 255;
     }
+    
+    const int copy_w = wipe->copy_w;
+    const int effective_edge = wipe->effective_edge;
+    const int effective_glow = wipe->effective_glow;
 
     #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {

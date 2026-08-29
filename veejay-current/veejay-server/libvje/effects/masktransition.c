@@ -101,7 +101,6 @@ static void alpha_blend_transition(uint8_t *restrict Y,
     uint8_t lookup[256];
     const uint8_t *restrict alpha_map = alpha_select == USE_FROM_A ? a0 : a1;
 
-    #pragma omp single
     masktransition_build_lookup(lookup, time_index, duration);
 
     #pragma omp for schedule(static)

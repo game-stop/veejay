@@ -38,6 +38,7 @@
 #define P_MOTION_REACT 9
 #define P_PALETTE      10
 
+
 typedef struct {
     uint8_t *energy;
     uint8_t *next_energy;
@@ -63,6 +64,24 @@ typedef struct {
     int last_charge_i;
     int last_motion_i;
     uint32_t frame_no;
+
+    int grid_ensure_failed;
+    int gw;
+    int gh;
+    int original_color_mode;
+    float color_phase;
+    float charge_gain;
+    float decay_keep;
+    float discharge;
+    float flow_pixels;
+    float filament_gain;
+    float pressure_gain;
+    float noise_force_gain;
+    float noise_lap_gain;
+    int glow_mix_i;
+    int source_mix_i;
+    int plasma_mix_i;
+    int motion_render_i;
 } plasmafeedback_t;
 
 static inline uint8_t clamp_u8f(float v)
@@ -463,17 +482,7 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
     for(int i = 0; i <= cell; i++)
         lut[i] = smoothstepf_local((float)i / (float)cell);
 
-    int grid_ensure_failed = 0;
-    int gw = 0, gh = 0, original_color_mode = 0;
-    float color_phase = 0.0f;
-    int phase_i = 0, false_i = 0;
-    float charge_gain = 0, decay_keep = 0, discharge = 0, flow_pixels = 0, filament_gain = 0;
-    float pressure_gain = 0, turbulence_gain = 0, arc_gain = 0, noise_force_gain = 0, noise_lap_gain = 0;
-    float motion_gain = 0, brightness_gain = 0;
-    int charge_i = 0, motion_i = 0;
-    int glow_mix_i = 0, source_mix_i = 0, plasma_mix_i = 0, motion_render_i = 0;
-
-    #pragma omp single copyprivate(grid_ensure_failed, gw, gh, original_color_mode, color_phase, phase_i, false_i, charge_gain, decay_keep, discharge, flow_pixels, filament_gain, pressure_gain, turbulence_gain, arc_gain, noise_force_gain, noise_lap_gain, motion_gain, brightness_gain, charge_i, motion_i, glow_mix_i, source_mix_i, plasma_mix_i, motion_render_i)
+    #pragma omp single
     {
         if(!p->initialized) {
             veejay_memcpy(p->prev_src_y, Y, full_len);
@@ -484,62 +493,75 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
         }
 
         if(!plasmafeedback_ensure_grid(p, ew, eh, cell)) {
-            grid_ensure_failed = 1;
+            p->grid_ensure_failed = 1;
         } else {
-            gw = (ew + cell - 1) / cell + 1;
-            gh = (eh + cell - 1) / cell + 1;
-            original_color_mode = args[P_PALETTE_PHASE] <= 0;
-            color_phase = original_color_mode ? 0.0f : ((float)(args[P_PALETTE_PHASE] - 1) * (1.0f / 100.0f));
-            color_phase -= floorf(color_phase);
+            p->grid_ensure_failed = 0;
+            p->gw = (ew + cell - 1) / cell + 1;
+            p->gh = (eh + cell - 1) / cell + 1;
+            p->original_color_mode = args[P_PALETTE_PHASE] <= 0;
+            p->color_phase = p->original_color_mode ? 0.0f : ((float)(args[P_PALETTE_PHASE] - 1) * (1.0f / 100.0f));
+            p->color_phase -= floorf(p->color_phase);
 
-            phase_i = original_color_mode ? -2 : args[P_PALETTE_PHASE];
-            false_i = args[P_PALETTE];
+            int phase_i = p->original_color_mode ? -2 : args[P_PALETTE_PHASE];
+            int false_i = args[P_PALETTE];
 
-            if(!original_color_mode && (phase_i != p->last_phase_i || false_i != p->last_false_i)) {
-                build_plasma_lut(p, color_phase, false_color_param);
+            if(!p->original_color_mode && (phase_i != p->last_phase_i || false_i != p->last_false_i)) {
+                build_plasma_lut(p, p->color_phase, false_color_param);
                 p->last_phase_i = phase_i;
                 p->last_false_i = false_i;
             }
 
-            charge_gain = charge_curve * 258.0f;
-            decay_keep = 0.780f + decay_curve * 0.214f;
-            discharge = discharge_curve * 1.35f;
-            flow_pixels = flow_curve * 13.50f * (0.65f + decay_curve * 0.65f);
-            filament_gain = filament_curve * 6.5f;
-            pressure_gain = 2.20f + flow_curve * 3.80f;
-            turbulence_gain = turbulence_curve * 2.5f;
-            arc_gain = 0.50f + turbulence_curve * 2.50f;
-            noise_force_gain = turbulence_gain * arc_gain;
-            noise_lap_gain = turbulence_curve * 2.25f;
-            motion_gain = motion_curve * 3.0f;
-            brightness_gain = 0.10f + charge_curve * 0.50f;
+            p->charge_gain = charge_curve * 258.0f;
+            p->decay_keep = 0.780f + decay_curve * 0.214f;
+            p->discharge = discharge_curve * 1.35f;
+            p->flow_pixels = flow_curve * 13.50f * (0.65f + decay_curve * 0.65f);
+            p->filament_gain = filament_curve * 6.5f;
+            float pressure_gain = 2.20f + flow_curve * 3.80f;
+            float turbulence_gain = turbulence_curve * 2.5f;
+            float arc_gain = 0.50f + turbulence_curve * 2.50f;
+            p->noise_force_gain = turbulence_gain * arc_gain;
+            p->noise_lap_gain = turbulence_curve * 2.25f;
+            float motion_gain = motion_curve * 3.0f;
+            float brightness_gain = 0.10f + charge_curve * 0.50f;
 
-            if(turbulence_gain > 0.0001f || noise_lap_gain > 0.0001f)
+            if(turbulence_gain > 0.0001f || p->noise_lap_gain > 0.0001f)
                 build_flow_grid(p, ew, eh, cell);
 
-            charge_i = args[P_CHARGE];
-            motion_i = args[P_MOTION_REACT];
+            int charge_i = args[P_CHARGE];
+            int motion_i = args[P_MOTION_REACT];
 
             if(charge_i != p->last_charge_i || motion_i != p->last_motion_i) {
-                build_excitation_luts(p, charge_gain, brightness_gain, motion_gain);
+                build_excitation_luts(p, p->charge_gain, brightness_gain, motion_gain);
                 p->last_charge_i = charge_i;
                 p->last_motion_i = motion_i;
             }
 
-            glow_mix_i = (int)(glow_curve * 218.0f + 0.5f);
-            source_mix_i = (int)(source_curve * 256.0f + 0.5f);
-            plasma_mix_i = 256 - source_mix_i;
-            motion_render_i = (int)(motion_curve * (42.0f * 256.0f / 255.0f) + 0.5f);
+            p->glow_mix_i = (int)(glow_curve * 218.0f + 0.5f);
+            p->source_mix_i = (int)(source_curve * 256.0f + 0.5f);
+            p->plasma_mix_i = 256 - p->source_mix_i;
+            int motion_render_i = (int)(motion_curve * (42.0f * 256.0f / 255.0f) + 0.5f);
+            p->motion_render_i = motion_render_i;
+            (void)pressure_gain;
         }
     }
-
-    if(grid_ensure_failed)
+    
+    if(p->grid_ensure_failed)
         return;
 
     const uint8_t *restrict old_e = p->energy;
     uint8_t *restrict next_e = p->next_energy;
     const uint8_t *restrict prev_y = p->prev_src_y;
     uint8_t *restrict prev_y_write = p->prev_src_y;
+
+    const int gw = p->gw;
+    const int gh = p->gh;
+    const float decay_keep = p->decay_keep;
+    const float discharge = p->discharge;
+    const float flow_pixels = p->flow_pixels;
+    const float filament_gain = p->filament_gain;
+    const float pressure_gain = 2.20f + flow_curve * 3.80f;
+    const float noise_force_gain = p->noise_force_gain;
+    const float noise_lap_gain = p->noise_lap_gain;
 
     #pragma omp for collapse(2) schedule(static)
     for(int gy = 0; gy < gh - 1; gy++) {
@@ -645,7 +667,12 @@ void plasmafeedback_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    if(original_color_mode) {
+    const int glow_mix_i = p->glow_mix_i;
+    const int motion_render_i = p->motion_render_i;
+    const int plasma_mix_i = p->plasma_mix_i;
+    const int source_mix_i = p->source_mix_i;
+
+    if(p->original_color_mode) {
         #pragma omp for schedule(static)
         for(int y = 0; y < h; y++) {
             const int row = y * w;

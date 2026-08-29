@@ -268,43 +268,33 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     keyselect_t *s = (keyselect_t*) ptr;
 
-    int mag_fp = 0, cos_q_fp = 0, sin_q_fp = 0, inv_wedge_slope_fp = 0, inv_range_fp = 0, black_clip_fp = 0, blend_mode = 0, swap = 0, len = 0;
-    uint8_t *Y = NULL;
-    uint8_t *Cb = NULL;
-    uint8_t *Cr = NULL;
-    const uint8_t *src_Y = NULL;
-    const uint8_t *src_Cb = NULL;
-    const uint8_t *src_Cr = NULL;
-    const uint8_t *bg_Y = NULL;
-    const uint8_t *bg_U = NULL;
-    const uint8_t *bg_V = NULL;
+    const int len = frame->len;
 
-    #pragma omp single copyprivate(mag_fp, cos_q_fp, sin_q_fp, inv_wedge_slope_fp, inv_range_fp, black_clip_fp, blend_mode, swap, len, Y, Cb, Cr, src_Y, src_Cb, src_Cr, bg_Y, bg_U, bg_V)
+    #pragma omp single
     {
         keyselect_update_cache(s, args);
-
-        mag_fp = s->mag_fp;
-        cos_q_fp = s->cos_q_fp;
-        sin_q_fp = s->sin_q_fp;
-        inv_wedge_slope_fp = s->inv_wedge_slope_fp;
-        inv_range_fp = s->inv_range_fp;
-        black_clip_fp = s->black_clip_fp;
-        blend_mode = s->blend_mode;
-        swap = s->swap;
-        len = frame->len;
-
-        Y = frame->data[0];
-        Cb = frame->data[1];
-        Cr = frame->data[2];
-
-        src_Y = swap ? frame2->data[0] : frame->data[0];
-        src_Cb = swap ? frame2->data[1] : frame->data[1];
-        src_Cr = swap ? frame2->data[2] : frame->data[2];
-
-        bg_Y = swap ? frame->data[0] : frame2->data[0];
-        bg_U = swap ? frame->data[1] : frame2->data[1];
-        bg_V = swap ? frame->data[2] : frame2->data[2];
     }
+
+    const int mag_fp = s->mag_fp;
+    const int cos_q_fp = s->cos_q_fp;
+    const int sin_q_fp = s->sin_q_fp;
+    const int inv_wedge_slope_fp = s->inv_wedge_slope_fp;
+    const int inv_range_fp = s->inv_range_fp;
+    const int black_clip_fp = s->black_clip_fp;
+    const int blend_mode = s->blend_mode;
+    const int swap = s->swap;
+
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const uint8_t *restrict src_Y  = swap ? frame2->data[0] : frame->data[0];
+    const uint8_t *restrict src_Cb = swap ? frame2->data[1] : frame->data[1];
+    const uint8_t *restrict src_Cr = swap ? frame2->data[2] : frame->data[2];
+
+    const uint8_t *restrict bg_Y = swap ? frame->data[0] : frame2->data[0];
+    const uint8_t *restrict bg_U = swap ? frame->data[1] : frame2->data[1];
+    const uint8_t *restrict bg_V = swap ? frame->data[2] : frame2->data[2];
 
     #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {

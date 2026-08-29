@@ -56,7 +56,14 @@ typedef struct {
     float phase;
     int initialized;
 
-    int n_threads;
+    float center_x;
+    float center_y;
+    float c;
+    float s;
+    float max_x;
+    float max_y;
+    int mix_q8;
+    int chroma_q8;
 } rotate_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -254,18 +261,22 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
     const int spin_drive_arg = args[P_SPIN_DRIVE];
     const int wobble_drive_arg = args[P_WOBBLE_DRIVE];
 
-    float center_x = 0.0f;
-    float center_y = 0.0f;
-    float c = 1.0f;
-    float s = 0.0f;
-    float max_x = (float)(width - 1);
-    float max_y = (float)(height - 1);
-    int mix_q8 = 256;
-    int chroma_q8 = 256;
-    float spin_drive = 0.0f;
-    float wobble_drive = 0.0f;
+    uint8_t *restrict srcY = frame->data[0];
+    uint8_t *restrict srcU = frame->data[1];
+    uint8_t *restrict srcV = frame->data[2];
 
-    #pragma omp single copyprivate(center_x, center_y, c, s, max_x, max_y, mix_q8, chroma_q8, spin_drive, wobble_drive)
+    uint8_t *restrict bufY = r->buf[0];
+    uint8_t *restrict bufU = r->buf[1];
+    uint8_t *restrict bufV = r->buf[2];
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        bufY[i] = srcY[i];
+        bufU[i] = srcU[i];
+        bufV[i] = srcV[i];
+    }
+
+    #pragma omp single
     {
         if(!r->initialized) {
             r->sm_rotate = (float)rotate_arg;
@@ -288,8 +299,8 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
         r->sm_wobble_drive = rotate_smoothf(r->sm_wobble_drive, (float)wobble_drive_arg, fast_t);
 
         int duration = clampi((int)(r->sm_duration + 0.5f), 1, 1500);
-        spin_drive = rotate_clampf(r->sm_spin_drive * 0.001f, 0.0f, 1.0f);
-        wobble_drive = rotate_clampf(r->sm_wobble_drive * 0.001f, 0.0f, 1.0f);
+        float spin_drive = rotate_clampf(r->sm_spin_drive * 0.001f, 0.0f, 1.0f);
+        float wobble_drive = rotate_clampf(r->sm_wobble_drive * 0.001f, 0.0f, 1.0f);
 
         if(automatic) {
             const float speed_boost = 1.0f + spin_drive * 1.65f + wobble_drive * 0.35f;
@@ -318,43 +329,44 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
         if(r->phase >= 360.0f)
             r->phase -= 360.0f;
 
-        veejay_memcpy(r->buf[0], frame->data[0], len);
-        veejay_memcpy(r->buf[1], frame->data[1], len);
-        veejay_memcpy(r->buf[2], frame->data[2], len);
-
         int phase_idx = rotate_wrap360((double)r->phase);
         float wobble = r->sin_lut[phase_idx] * wobble_drive * 128.0f;
         float direct_spin = spin_drive * 360.0f;
 
         double rotate_value = r->rotate + (double)(direct_spin + wobble);
 
-        center_x = ((float)width - 1.0f) * 0.5f;
-        center_y = ((float)height - 1.0f) * 0.5f;
+        r->center_x = ((float)width - 1.0f) * 0.5f;
+        r->center_y = ((float)height - 1.0f) * 0.5f;
         int angle = rotate_wrap360(rotate_value);
-        c = r->cos_lut[angle];
-        s = r->sin_lut[angle];
-        max_x = (float)width - 1.001f;
-        max_y = (float)height - 1.001f;
+        r->c = r->cos_lut[angle];
+        r->s = r->sin_lut[angle];
+        r->max_x = (float)width - 1.001f;
+        r->max_y = (float)height - 1.001f;
 
-        mix_q8 = rotate_to_q8_1000(r->sm_mix);
-        chroma_q8 = rotate_to_q8_1000((r->sm_mix * r->sm_chroma) * 0.001f);
+        r->mix_q8 = rotate_to_q8_1000(r->sm_mix);
+        r->chroma_q8 = rotate_to_q8_1000((r->sm_mix * r->sm_chroma) * 0.001f);
 
         if(spin_drive > 0.0f || wobble_drive > 0.0f) {
             const float drive = rotate_clampf((spin_drive * 0.60f) + (wobble_drive * 0.40f), 0.0f, 1.0f);
             const int lift = (int)(drive * 38.0f + 0.5f);
 
-            mix_q8 = clampi(mix_q8 + lift, 0, 256);
-            chroma_q8 = clampi(chroma_q8 + (lift >> 1), 0, 256);
+            r->mix_q8 = clampi(r->mix_q8 + lift, 0, 256);
+            r->chroma_q8 = clampi(r->chroma_q8 + (lift >> 1), 0, 256);
         }
     }
+    
+    const float center_x = r->center_x;
+    const float center_y = r->center_y;
+    const float c = r->c;
+    const float s = r->s;
+    const float max_x = r->max_x;
+    const float max_y = r->max_y;
+    const int mix_q8 = r->mix_q8;
+    const int chroma_q8 = r->chroma_q8;
 
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
     uint8_t *restrict dstV = frame->data[2];
-
-    uint8_t *restrict srcY = r->buf[0];
-    uint8_t *restrict srcU = r->buf[1];
-    uint8_t *restrict srcV = r->buf[2];
 
     #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
@@ -374,13 +386,13 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
             const int ry_f = (int)(ry * 65536.0f);
             const int dst = row + x;
             
-            const uint8_t ryv = rotate_bilinear_u8(srcY, width, rx_f, ry_f);
-            const uint8_t ruv = rotate_bilinear_u8(srcU, width, rx_f, ry_f);
-            const uint8_t rvv = rotate_bilinear_u8(srcV, width, rx_f, ry_f);
+            const uint8_t ryv = rotate_bilinear_u8(bufY, width, rx_f, ry_f);
+            const uint8_t ruv = rotate_bilinear_u8(bufU, width, rx_f, ry_f);
+            const uint8_t rvv = rotate_bilinear_u8(bufV, width, rx_f, ry_f);
 
-            dstY[dst] = rotate_blend_y(srcY[dst], ryv, mix_q8);
-            dstU[dst] = rotate_blend_uv(srcU[dst], ruv, chroma_q8);
-            dstV[dst] = rotate_blend_uv(srcV[dst], rvv, chroma_q8);
+            dstY[dst] = rotate_blend_y(bufY[dst], ryv, mix_q8);
+            dstU[dst] = rotate_blend_uv(bufU[dst], ruv, chroma_q8);
+            dstV[dst] = rotate_blend_uv(bufV[dst], rvv, chroma_q8);
         }
     }
 }

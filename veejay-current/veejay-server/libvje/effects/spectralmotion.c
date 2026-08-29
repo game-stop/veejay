@@ -53,6 +53,18 @@ typedef struct {
     float eff_motion_persistence;
     float eff_motion_gain;
     int eff_initialized;
+
+    int sensitivity;
+    int opacity;
+    int persistence;
+    int energy_persist;
+    int motion_gain;
+    int cutoff;
+    int flash_q8;
+    uint8_t strobe_Y;
+    int strobe_U;
+    int strobe_V;
+    int adaptation;
 } spectralmotion_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -270,35 +282,6 @@ static void spectralmotion_seed(spectralmotion_t *s, VJFrame *frame)
     s->timestamp = 1;
 }
 
-static void spectralmotion_output_full(uint8_t *restrict Y,
-                                       uint8_t *restrict U,
-                                       uint8_t *restrict V,
-                                       const uint8_t *restrict vY,
-                                       const uint8_t *restrict vU,
-                                       const uint8_t *restrict vV,
-                                       int len,
-                                       int n_threads)
-{
-    (void)n_threads;
-
-#pragma omp single 
-{
-    veejay_memcpy(Y, vY, len );
-    veejay_memcpy(U, vU, len );
-    veejay_memcpy(V, vV, len );
-}
-
-/*
-#pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        Y[i] = vY[i];
-        U[i] = vU[i];
-        V[i] = vV[i];
-    }
-
-*/
-}
-
 static void spectralmotion_output_overlay(uint8_t *restrict Y,
                                           uint8_t *restrict U,
                                           uint8_t *restrict V,
@@ -338,6 +321,25 @@ static void spectralmotion_output_debug(uint8_t *restrict Y,
     }
 }
 
+static void spectralmotion_output_full(uint8_t *restrict Y,
+                                       uint8_t *restrict U,
+                                       uint8_t *restrict V,
+                                       const uint8_t *restrict vY,
+                                       const uint8_t *restrict vU,
+                                       const uint8_t *restrict vV,
+                                       int len,
+                                       int n_threads)
+{
+    (void)n_threads;
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        Y[i] = vY[i];
+        U[i] = vU[i];
+        V[i] = vV[i];
+    }
+}
+
 void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 {
     spectralmotion_t *s = (spectralmotion_t*) ptr;
@@ -363,21 +365,7 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict vV  = s->buf[3];
     uint8_t *restrict exc = s->buf[4];
 
-    int sensitivity = 0;
-    int cycle_speed = 0;
-    int opacity = 0;
-    int strobe_rate = 8;
-    int persistence = 0;
-    int energy_persist = 0;
-    int motion_gain = 0;
-    int cutoff = 0;
-    int flash_q8 = 192;
-    uint8_t strobe_Y = 0;
-    int strobe_U = 128;
-    int strobe_V = 128;
-    int adaptation = 256;
-
-    #pragma omp single copyprivate(sensitivity, opacity, persistence, energy_persist, motion_gain, cutoff, flash_q8, strobe_Y, strobe_U, strobe_V, adaptation)
+    #pragma omp single
     {
         float param_attack = 0.46f;
         float param_release = 0.14f;
@@ -401,13 +389,13 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
         int energy_persist_smooth = spectralmotion_smooth_i(&s->eff_motion_persistence, raw_motion_pers, param_attack, param_release);
         int motion_gain_smooth = spectralmotion_smooth_i(&s->eff_motion_gain, raw_motion_gain, param_attack, param_release);
 
-        sensitivity = clampi(sensitivity_smooth, 0, 255);
-        opacity = clampi(opacity_smooth, 0, 255);
-        persistence = clampi(persistence_smooth, 0, 255);
-        energy_persist = clampi(energy_persist_smooth, 0, 255);
-        motion_gain = clampi(motion_gain_smooth, 0, 1024);
-        strobe_rate = clampi(strobe_rate_smooth, 1, 120);
-        adaptation = clampi(256 - sensitivity, 1, 256);
+        s->sensitivity = clampi(sensitivity_smooth, 0, 255);
+        s->opacity = clampi(opacity_smooth, 0, 255);
+        s->persistence = clampi(persistence_smooth, 0, 255);
+        s->energy_persist = clampi(energy_persist_smooth, 0, 255);
+        s->motion_gain = clampi(motion_gain_smooth, 0, 1024);
+        int strobe_rate = clampi(strobe_rate_smooth, 1, 120);
+        s->adaptation = clampi(256 - s->sensitivity, 1, 256);
 
         if(s->timestamp == 0)
             spectralmotion_seed(s, frame);
@@ -424,8 +412,8 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 
         s->smooth_threshold = (s->smooth_threshold * 0.85f) + ((float)raw_threshold * 0.15f);
 
-        int cutoff_val = (int)s->smooth_threshold + (128 - sensitivity);
-        cutoff = clampi(cutoff_val, 0, 255);
+        int cutoff_val = (int)s->smooth_threshold + (128 - s->sensitivity);
+        s->cutoff = clampi(cutoff_val, 0, 255);
 
         int is_flash_frame = ((s->timestamp % strobe_rate) == 0);
 
@@ -436,14 +424,25 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
         if(s->phase >= 256.0f)
             s->phase = fmodf(s->phase, 256.0f);
 
-        strobe_Y = s->rainbow[color_idx][0];
-        strobe_U = (int)s->rainbow[color_idx][1];
-        strobe_V = (int)s->rainbow[color_idx][2];
+        s->strobe_Y = s->rainbow[color_idx][0];
+        s->strobe_U = (int)s->rainbow[color_idx][1];
+        s->strobe_V = (int)s->rainbow[color_idx][2];
 
-        flash_q8 = is_flash_frame ? 255 : 192;
+        s->flash_q8 = is_flash_frame ? 255 : 192;
 
         s->timestamp++;
     }
+    
+    const int persistence = s->persistence;
+    const int energy_persist = s->energy_persist;
+    const int motion_gain = s->motion_gain;
+    const int cutoff = s->cutoff;
+    const int flash_q8 = s->flash_q8;
+    const uint8_t strobe_Y = s->strobe_Y;
+    const int strobe_U = s->strobe_U;
+    const int strobe_V = s->strobe_V;
+    const int adaptation = s->adaptation;
+    const int opacity = s->opacity;
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {

@@ -38,6 +38,12 @@ typedef struct {
     float softness_env;
     float glow_env;
     float chroma_env;
+    
+    int full;
+    int edge;
+    int denom;
+    int edge_glow;
+    int chroma_edge;
 } whiteframe_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -149,12 +155,7 @@ void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int glow_arg = args[P_EDGE_GLOW];
     const int chroma_arg = args[P_CHROMA_EDGE];
 
-    int threshold = 0, softness = 0, edge_glow = 0, chroma_edge = 0;
-    int full = 0, edge = 0, denom = 1;
-    uint8_t *Y = NULL, *Cb = NULL, *Cr = NULL;
-    const uint8_t *Y2 = NULL, *Cb2 = NULL, *Cr2 = NULL;
-
-    #pragma omp single copyprivate(threshold, softness, edge_glow, chroma_edge, full, edge, denom, Y, Cb, Cr, Y2, Cb2, Cr2)
+    #pragma omp single
     {
         if(!wf->env_ready) {
             wf->threshold_env = (float)threshold_arg;
@@ -170,33 +171,38 @@ void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             wf->chroma_env = whiteframe_slew(wf->chroma_env, (float)chroma_arg, 0.285f, 0.105f);
         }
 
-        threshold = (int)(wf->threshold_env + 0.5f);
-        softness = (int)(wf->softness_env + 0.5f);
-        edge_glow = (int)(wf->glow_env + 0.5f);
-        chroma_edge = (int)(wf->chroma_env + 0.5f);
+        const int threshold = (int)(wf->threshold_env + 0.5f);
+        const int softness = (int)(wf->softness_env + 0.5f);
+        wf->edge_glow = (int)(wf->glow_env + 0.5f);
+        wf->chroma_edge = (int)(wf->chroma_env + 0.5f);
 
-        full = threshold - softness;
-        edge = threshold + softness;
+        wf->full = threshold - softness;
+        wf->edge = threshold + softness;
 
-        if(full < 0)
-            full = 0;
-        if(edge > 255)
-            edge = 255;
-        if(edge <= full)
-            edge = full + 1;
+        if(wf->full < 0)
+            wf->full = 0;
+        if(wf->edge > 255)
+            wf->edge = 255;
+        if(wf->edge <= wf->full)
+            wf->edge = wf->full + 1;
 
-        denom = edge - full;
-        if(denom <= 0)
-            denom = 1;
-
-        Y  = frame->data[0];
-        Cb = frame->data[1];
-        Cr = frame->data[2];
-
-        Y2  = frame2->data[0];
-        Cb2 = frame2->data[1];
-        Cr2 = frame2->data[2];
+        wf->denom = wf->edge - wf->full;
+        if(wf->denom <= 0)
+            wf->denom = 1;
     }
+    
+    const int full = wf->full;
+    const int denom = wf->denom;
+    const int edge_glow = wf->edge_glow;
+    const int chroma_edge = wf->chroma_edge;
+
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const uint8_t *restrict Y2  = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
 #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)

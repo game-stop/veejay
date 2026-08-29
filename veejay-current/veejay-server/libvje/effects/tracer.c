@@ -41,7 +41,12 @@ typedef struct {
     float chroma_trail_s;
     int state_ready;
 
-    int n_threads;
+    int wet_q8;
+    int feed;
+    int decay;
+    int chroma_wet_q8;
+    int chroma_feed;
+    int chroma_decay;
 } tracer_t;
 
 static inline int tracer_clampi(int v, int lo, int hi)
@@ -202,12 +207,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_coeff = 0.185f;
 
-    int wet_q8 = 0, feed = 1, decay = 255, chroma_wet_q8 = 0, chroma_feed = 1, chroma_decay = 255;
-    uint8_t *Y = NULL, *Cb = NULL, *Cr = NULL;
-    const uint8_t *Y2 = NULL, *Cb2 = NULL, *Cr2 = NULL;
-    uint8_t *tY = NULL, *tU = NULL, *tV = NULL;
-
-    #pragma omp single copyprivate(wet_q8, feed, decay, chroma_wet_q8, chroma_feed, chroma_decay, Y, Cb, Cr, Y2, Cb2, Cr2, tY, tU, tV)
+    #pragma omp single
     {
         if(!t->state_ready) {
             t->opacity_s = (float)opacity_arg;
@@ -231,41 +231,48 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         const int opacity_i = tracer_clampi((int)(t->opacity_s + 0.5f), 0, 255);
         const int buffer_i = tracer_clampi((int)(t->buffer_s + 0.5f), 1, MAX_OLD_FRAMES);
 
-        wet_q8 = tracer_to_q8(opacity_i);
+        int wet = tracer_to_q8(opacity_i);
         {
-            const int headroom = 256 - wet_q8;
+            const int headroom = 256 - wet;
             const float lift = mix_t * 0.68f;
-            wet_q8 += (int)((float)headroom * lift + 0.5f);
-            wet_q8 = tracer_clampi(wet_q8, 0, 256);
+            wet += (int)((float)headroom * lift + 0.5f);
+            t->wet_q8 = tracer_clampi(wet, 0, 256);
         }
 
-        feed = 256 / buffer_i;
-        feed += (int)(feed_t * 132.0f + 0.5f);
-        feed = tracer_clampi(feed, 1, 224);
+        int f_val = 256 / buffer_i;
+        f_val += (int)(feed_t * 132.0f + 0.5f);
+        t->feed = tracer_clampi(f_val, 1, 224);
 
-        decay = 256 - feed;
+        t->decay = 256 - t->feed;
 
-        chroma_wet_q8 = (int)((float)wet_q8 * (0.56f + chroma_t * 0.44f) + chroma_t * 18.0f + 0.5f);
-        chroma_wet_q8 = tracer_clampi(chroma_wet_q8, 0, 256);
+        int c_wet = (int)((float)t->wet_q8 * (0.56f + chroma_t * 0.44f) + chroma_t * 18.0f + 0.5f);
+        t->chroma_wet_q8 = tracer_clampi(c_wet, 0, 256);
 
-        chroma_feed = (int)((float)feed * (0.50f + chroma_t * 0.50f) + chroma_t * 18.0f + 0.5f);
-        chroma_feed = tracer_clampi(chroma_feed, 1, 224);
-        chroma_decay = 256 - chroma_feed;
-
-        Y  = frame->data[0];
-        Cb = frame->data[1];
-        Cr = frame->data[2];
-
-        Y2  = frame2->data[0];
-        Cb2 = frame2->data[1];
-        Cr2 = frame2->data[2];
-
-        tY = t->trace_buffer[0];
-        tU = t->trace_buffer[1];
-        tV = t->trace_buffer[2];
+        int c_feed = (int)((float)t->feed * (0.50f + chroma_t * 0.50f) + chroma_t * 18.0f + 0.5f);
+        t->chroma_feed = tracer_clampi(c_feed, 1, 224);
+        t->chroma_decay = 256 - t->chroma_feed;
     }
+    
+    const int wet_q8 = t->wet_q8;
+    const int feed = t->feed;
+    const int decay = t->decay;
+    const int chroma_wet_q8 = t->chroma_wet_q8;
+    const int chroma_feed = t->chroma_feed;
+    const int chroma_decay = t->chroma_decay;
 
-#pragma omp for schedule(static)
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+    const uint8_t *restrict Y2  = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+
+    uint8_t *restrict tY = t->trace_buffer[0];
+    uint8_t *restrict tU = t->trace_buffer[1];
+    uint8_t *restrict tV = t->trace_buffer[2];
+
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int mixed = ((int)Y[i] + (int)Y2[i] + 1) >> 1;
         const int accum = (((int)tY[i] * decay) + (mixed * feed) + 128) >> 8;
@@ -274,7 +281,7 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         Y[i] = tracer_mix_y(Y[i], tY[i], wet_q8);
     }
 
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int i = 0; i < uv_len; i++) {
         const int mixed_u = (((int)Cb[i] - 128) + ((int)Cb2[i] - 128)) >> 1;
         const int mixed_v = (((int)Cr[i] - 128) + ((int)Cr2[i] - 128)) >> 1;

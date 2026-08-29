@@ -592,7 +592,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
     fov_q = clampi(fov_q, 1750, 3500);
 
     int half_w = w >> 1;
-    int side_start_q12 = -fov_q << 12;
+    int side_start_q12 = -(fov_q << 12);
     int side_step_q12 = (fov_q << 12) / half_w;
 
     int height_shade_floor = 24 + height_scale;
@@ -606,23 +606,15 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
             elev_damp_q = 128;
     }
 
-    int do_seed = 0;
-    #pragma omp single copyprivate(do_seed)
+    #pragma omp single
     {
         if (!c->seeded) {
             c->seeded = 1;
-            do_seed = 1;
-        }
-    }
-
-    if (do_seed) {
-        #pragma omp for schedule(static)
-        for (int i = 0; i < plen; i++) {
-            py[i] = Y[i];
-            c->height[i] = Y[i];
-            c->height_next[i] = Y[i];
-            mu[i] = U[i];
-            mv[i] = V[i];
+            veejay_memcpy(py, Y, plen);
+            veejay_memcpy(c->height, Y, plen);
+            veejay_memcpy(c->height_next, Y, plen);
+            veejay_memcpy(mu, U, plen);
+            veejay_memcpy(mv, V, plen);
         }
     }
 
@@ -748,10 +740,10 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
             int wy1 = cam_y_fp + ((ray_y_lut[w - 1] * z) >> 4);
 
             int denom = w - 1;
-            int64_t wx_q16 = ((int64_t) wx0) << 16;
-            int64_t wy_q16 = ((int64_t) wy0) << 16;
-            int64_t wx_step_q16 = (((int64_t) wx1 - (int64_t) wx0) << 16) / denom;
-            int64_t wy_step_q16 = (((int64_t) wy1 - (int64_t) wy0) << 16) / denom;
+            int64_t wx_q16 = (int64_t) wx0 * 65536;
+            int64_t wy_q16 = (int64_t) wy0 * 65536;
+            int64_t wx_step_q16 = ((int64_t) wx1 - (int64_t) wx0) * 65536 / denom;
+            int64_t wy_step_q16 = ((int64_t) wy1 - (int64_t) wy0) * 65536 / denom;
 
             for (int x = 0; x < w; x++) {
                 int i = row + x;

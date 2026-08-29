@@ -115,12 +115,12 @@ static void porterduff_dst_atop(uint8_t *restrict A, const uint8_t *restrict B, 
         const int idx = i << 2;
         const int as = B[idx + 3];
         const int ad = A[idx + 3];
-        const int inv_as = 255 - as;
+        const int inv_ad = 255 - ad;
 
-        A[idx + 0] = pd_div255((int)B[idx + 0] * ad + (int)A[idx + 0] * inv_as);
-        A[idx + 1] = pd_div255((int)B[idx + 1] * ad + (int)A[idx + 1] * inv_as);
-        A[idx + 2] = pd_div255((int)B[idx + 2] * ad + (int)A[idx + 2] * inv_as);
-        A[idx + 3] = (uint8_t)ad;
+        A[idx + 0] = pd_div255((int)A[idx + 0] * as + (int)B[idx + 0] * inv_ad);
+        A[idx + 1] = pd_div255((int)A[idx + 1] * as + (int)B[idx + 1] * inv_ad);
+        A[idx + 2] = pd_div255((int)A[idx + 2] * as + (int)B[idx + 2] * inv_ad);
+        A[idx + 3] = (uint8_t)as;
     }
 }
 
@@ -182,6 +182,7 @@ static void porterduff_src_over(uint8_t *restrict A, const uint8_t *restrict B, 
     }
 }
 
+
 static void porterduff_src_atop(uint8_t *restrict A, const uint8_t *restrict B, int n_pixels)
 {
 #pragma omp for schedule(static)
@@ -194,7 +195,7 @@ static void porterduff_src_atop(uint8_t *restrict A, const uint8_t *restrict B, 
         A[idx + 0] = pd_div255((int)B[idx + 0] * ad + (int)A[idx + 0] * inv_as);
         A[idx + 1] = pd_div255((int)B[idx + 1] * ad + (int)A[idx + 1] * inv_as);
         A[idx + 2] = pd_div255((int)B[idx + 2] * ad + (int)A[idx + 2] * inv_as);
-        A[idx + 3] = (uint8_t)as;
+        A[idx + 3] = (uint8_t)ad;
     }
 }
 

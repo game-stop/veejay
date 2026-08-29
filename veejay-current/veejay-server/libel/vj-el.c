@@ -4216,6 +4216,30 @@ editlist	*vj_el_soft_clone(editlist *el)
 	return clone;
 }
 
+static int vj_el_range_has_interframe_ffmpeg(editlist *el, long n1, long n2)
+{
+    unsigned char checked[MAX_EDIT_LIST_FILES] = { 0 };
+
+    for(long nframe = n1; nframe <= n2; nframe++) {
+        int file_idx = (int)N_EL_FILE(el->frame_list[nframe]);
+
+        if(file_idx < 0 || file_idx >= MAX_EDIT_LIST_FILES || checked[file_idx])
+            continue;
+
+        checked[file_idx] = 1;
+        if(el->backend[file_idx] != VJ_EL_BACKEND_FFMPEG)
+            continue;
+
+        const vj_ffmpeg_input_info *info =
+            vj_ffmpeg_input_get_info(el->ffmpeg_input[file_idx]);
+
+        if(!info || !info->intra_only)
+            return 1;
+    }
+
+    return 0;
+}
+
 editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
 {
     if(!el || el->is_empty || !el->frame_list ||
@@ -4225,6 +4249,8 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
     }
 
     const uint64_t count = (uint64_t)(n2 - n1) + 1u;
+    const int isolate_decoders =
+        vj_el_range_has_interframe_ffmpeg(el, n1, n2);
 
     if(count > (uint64_t)SIZE_MAX / sizeof(uint64_t))
         return NULL;
@@ -4277,6 +4303,42 @@ editlist *vj_el_soft_clone_range(editlist *el, long n1, long n2)
     clone->video_frames = (long)k;
     clone->total_frames = k - 1u;
     clone->source_hash = editlist_source_hash(clone);
+
+    if(isolate_decoders) {
+        editlist *isolated = vj_el_clone(clone);
+
+        if(!isolated) {
+            vj_el_free(clone);
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to isolate inter-frame decoder for EDL range %ld - %ld",
+                       n1,
+                       n2);
+            return NULL;
+        }
+
+        if(el->has_audio && isolated->has_audio &&
+           (isolated->audio_rate != el->audio_rate ||
+            isolated->audio_chans != el->audio_chans ||
+            isolated->audio_bits != el->audio_bits))
+        {
+            if(vj_el_retarget_audio(isolated,
+                                    el->audio_rate,
+                                    el->audio_chans,
+                                    el->audio_bits) < 0)
+            {
+                vj_el_free(isolated);
+                vj_el_free(clone);
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Unable to preserve PCM format while isolating EDL range %ld - %ld",
+                           n1,
+                           n2);
+                return NULL;
+            }
+        }
+
+        vj_el_free(clone);
+        return isolated;
+    }
 
     return clone;
 }

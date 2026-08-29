@@ -1,4 +1,4 @@
-/*
+/* 
  * Linux VeeJay
  *
  * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
@@ -102,13 +102,6 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int swap = complexopacity_clampi(swap_arg, 0, 1);
     const int len = frame->len;
 
-    int mag_fp = 0;
-    int cos_q_fp = 0;
-    int sin_q_fp = 0;
-    int inv_wedge_slope_fp = 0;
-    int inv_range_fp = 0;
-    int black_clip_fp = 0;
-
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -117,39 +110,36 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    #pragma omp single copyprivate(mag_fp, cos_q_fp, sin_q_fp, inv_wedge_slope_fp, inv_range_fp, black_clip_fp)
-    {
-        int iy = 0;
-        int iu = 128;
-        int iv = 128;
-        _rgb2yuv(r, g, b, iy, iu, iv);
+    int iy = 0;
+    int iu = 128;
+    int iv = 128;
+    _rgb2yuv(r, g, b, iy, iu, iv);
 
-        const int scale = 4096;
-        const float ut_f = (float)iu - 128.0f;
-        const float vt_f = (float)iv - 128.0f;
-        float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
+    const int scale = 4096;
+    const float ut_f = (float)iu - 128.0f;
+    const float vt_f = (float)iv - 128.0f;
+    float mag_f = sqrtf(ut_f * ut_f + vt_f * vt_f);
 
-        if(mag_f < 1.0f)
-            mag_f = 1.0f;
+    if(mag_f < 1.0f)
+        mag_f = 1.0f;
 
-        mag_fp = (int)(mag_f * (float)scale);
-        cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
-        sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
-        const float angle_rad = ((float)angle / 100.0f) * (float)(M_PI / 180.0f);
-        float tan_v = tanf(angle_rad);
+    const int mag_fp = (int)(mag_f * (float)scale);
+    const int cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
+    const int sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
+    const float angle_rad = ((float)angle / 100.0f) * (float)(M_PI / 180.0f);
+    float tan_v = tanf(angle_rad);
 
-        if(tan_v > -0.0001f && tan_v < 0.0001f)
-            tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
+    if(tan_v > -0.0001f && tan_v < 0.0001f)
+        tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
 
-        inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
-        float diff = (float)solidity - (float)threshold;
+    const int inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
+    float diff = (float)solidity - (float)threshold;
 
-        if(diff < 1.0f)
-            diff = 1.0f;
+    if(diff < 1.0f)
+        diff = 1.0f;
 
-        inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
-        black_clip_fp = threshold * scale;
-    }
+    const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
+    const int black_clip_fp = threshold * scale;
 
     #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)

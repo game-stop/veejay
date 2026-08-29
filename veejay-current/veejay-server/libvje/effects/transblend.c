@@ -46,6 +46,9 @@ typedef struct {
     float speed_env;
     float expand_env;
     float glow_env;
+    uint16_t progress;
+    int glow_width;
+    int glow_strength;
 } wipe_t;
 
 static inline int transblend_clampi(int v, int lo, int hi)
@@ -237,13 +240,7 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int expand_drive_arg = args[P_EXPAND_DRIVE];
     const int edge_glow_arg = args[P_EDGE_GLOW];
 
-    int speed_eff = 0, progress_eff = 0, glow_width = 0, glow_strength = 0;
-    uint8_t *Y = NULL, *U = NULL, *V = NULL;
-    const uint8_t *Y2 = NULL, *U2 = NULL, *V2 = NULL;
-    const uint16_t *angle = NULL;
-    uint16_t progress = 0;
-
-    #pragma omp single copyprivate(speed_eff, progress_eff, glow_width, glow_strength, Y, U, V, Y2, U2, V2, angle, progress)
+    #pragma omp single
     {
         const float fast = 0.24f;
 
@@ -255,7 +252,7 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
         int s_eff = (int)(wipe->speed_env + 0.5f);
         s_eff += (int)((float)max_speed * expand_t * 0.045f + 0.5f);
-        speed_eff = transblend_clampi(s_eff, 0, max_speed);
+        int speed_eff = transblend_clampi(s_eff, 0, max_speed);
 
         transblend_step(wipe, speed_eff, bounce, width, height);
 
@@ -264,27 +261,34 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         int p_eff = wipe->progress_q16 + expand_q16;
         if(p_eff > 65535)
             p_eff = 65535;
-        progress_eff = p_eff;
+
+        wipe->progress = (uint16_t)p_eff;
+
+        wipe->glow_width = 0;
+        wipe->glow_strength = 0;
 
         if(wipe->glow_env > 0.5f) {
             int gw = 96 + (int)(wipe->glow_env * 9.0f + expand_t * 1800.0f + 0.5f);
-            glow_width = transblend_clampi(gw, 1, 8192);
+            wipe->glow_width = transblend_clampi(gw, 1, 8192);
 
             int gs = (int)(wipe->glow_env * 0.135f + expand_t * 36.0f + 0.5f);
-            glow_strength = transblend_clampi(gs, 0, 180);
+            wipe->glow_strength = transblend_clampi(gs, 0, 180);
         }
-
-        Y  = frame->data[0];
-        U  = frame->data[1];
-        V  = frame->data[2];
-
-        Y2 = frame2->data[0];
-        U2 = frame2->data[1];
-        V2 = frame2->data[2];
-
-        angle = wipe->angle_lut;
-        progress = (uint16_t)progress_eff;
     }
+ 
+    const uint16_t progress = wipe->progress;
+    const int glow_width = wipe->glow_width;
+    const int glow_strength = wipe->glow_strength;
+
+    uint8_t *Y  = frame->data[0];
+    uint8_t *U  = frame->data[1];
+    uint8_t *V  = frame->data[2];
+
+    const uint8_t *Y2 = frame2->data[0];
+    const uint8_t *U2 = frame2->data[1];
+    const uint8_t *V2 = frame2->data[2];
+
+    const uint16_t *angle = wipe->angle_lut;
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {

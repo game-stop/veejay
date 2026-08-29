@@ -294,9 +294,13 @@ void dices_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict sCb = d->src[1];
     uint8_t *restrict sCr = d->src[2];
 
-    #pragma omp single
+    uint8_t *dst[3] = { sY, sCb, sCr };
+    uint8_t *src[3] = { Y, Cb, Cr };
+
+    #pragma omp single nowait
     {
-        if((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation))
+        if((cube_bits != d->g_cube_bits) ||
+        (orientation != d->g_orientation))
         {
             d->g_cube_bits = cube_bits;
             d->g_orientation = (uint8_t)orientation;
@@ -307,15 +311,21 @@ void dices_apply(void *ptr, VJFrame *frame, int *args)
                 dice_create_map_orientation(d, width, height, orientation);
         }
 
-        veejay_memcpy(sY, Y, len);
-        veejay_memcpy(sCb, Cb, len);
-        veejay_memcpy(sCr, Cr, len);
+        d->shift_w =
+            (width - (d->g_cube_size * d->g_map_width)) >> 1;
 
-        d->shift_w = (width - (d->g_cube_size * d->g_map_width)) >> 1;
-        d->shift_h = (height - (d->g_cube_size * d->g_map_height)) >> 1;
+        d->shift_h =
+            (height - (d->g_cube_size * d->g_map_height)) >> 1;
 
-        d->skip_processing = (d->g_map_width <= 0 || d->g_map_height <= 0 || d->g_cube_size <= 0) ? 1 : 0;
+        d->skip_processing =
+            (d->g_map_width <= 0 ||
+            d->g_map_height <= 0 ||
+            d->g_cube_size <= 0);
     }
+
+    #pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++)
+        veejay_memcpy(dst[plane], src[plane], len);
 
     if(!d->skip_processing)
     {

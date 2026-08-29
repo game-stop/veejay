@@ -187,48 +187,43 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    int mag_target_fp = 0;
-    int cos_q_fp = 0;
-    int sin_q_fp = 0;
-    int sat_gate_sq = 0;
-    int m_range_inv_fp = 0;
-    int inv_c_thresh_fp = 0;
+    // Every thread independently computes these lightweight constants
+    const float angle_rad = ((float)key_color / 10.0f) * (float)(M_PI / 180.0f);
+    const float target_u = cosf(angle_rad) * 127.0f;
+    const float target_v = sinf(angle_rad) * 127.0f;
+    float mag_target = sqrtf(target_u * target_u + target_v * target_v);
+
+    if(mag_target < 1.0f)
+        mag_target = 1.0f;
+
+    const int scale = 4096;
+    const int mag_target_fp = (int)(mag_target * (float)scale);
+    const int cos_q_fp = (int)((target_u / mag_target) * (float)scale);
+    const int sin_q_fp = (int)((target_v / mag_target) * (float)scale);
+
+    const int sat_gate_sq = sat_gate * sat_gate;
+    const int matte_range = clampi(clip_white - clip_black, 1, 255);
+    const int m_range_inv_fp = (255 << 12) / matte_range;
+    const int inv_c_thresh_fp = (1 << 24) / (key_reach * scale);
+
     int spill_final_fp = 0;
-
-    #pragma omp single copyprivate(mag_target_fp, cos_q_fp, sin_q_fp, sat_gate_sq, m_range_inv_fp, inv_c_thresh_fp, spill_final_fp)
+    if(spill_balance >= 128)
     {
-        const float angle_rad = ((float)key_color / 10.0f) * (float)(M_PI / 180.0f);
-        const float target_u = cosf(angle_rad) * 127.0f;
-        const float target_v = sinf(angle_rad) * 127.0f;
-        float mag_target = sqrtf(target_u * target_u + target_v * target_v);
+        float spill_softness = 1.0f - ((float)(spill_balance - 128) / 160.0f);
 
-        if(mag_target < 1.0f)
-            mag_target = 1.0f;
+        if(spill_softness < 0.0f)
+            spill_softness = 0.0f;
 
-        const int scale = 4096;
-        mag_target_fp = (int)(mag_target * (float)scale);
-        cos_q_fp = (int)((target_u / mag_target) * (float)scale);
-        sin_q_fp = (int)((target_v / mag_target) * (float)scale);
+        spill_final_fp = (int)(((float)spill_amt / 255.0f) * spill_softness * 4096.0f);
+    }
 
+    // Only the shared gamma lookup table needs thread-safe single execution
+    #pragma omp single
+    {
         const float g_val = fmaxf((float)matte_gamma / 128.0f, 0.1f);
 
         for(int i = 0; i < 256; i++)
             mk->gamma_lut[i] = complexthreshold_u8((int)(powf((float)i / 255.0f, 1.0f / g_val) * 255.0f));
-
-        sat_gate_sq = sat_gate * sat_gate;
-        const int matte_range = clampi(clip_white - clip_black, 1, 255);
-        m_range_inv_fp = (255 << 12) / matte_range;
-        inv_c_thresh_fp = (1 << 24) / (key_reach * scale);
-
-        if(spill_balance >= 128)
-        {
-            float spill_softness = 1.0f - ((float)(spill_balance - 128) / 160.0f);
-
-            if(spill_softness < 0.0f)
-                spill_softness = 0.0f;
-
-            spill_final_fp = (int)(((float)spill_amt / 255.0f) * spill_softness * 4096.0f);
-        }
     }
 
     #pragma omp for schedule(static)

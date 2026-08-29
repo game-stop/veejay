@@ -43,8 +43,21 @@ typedef struct {
     int mode_transition;
     int mode_transition_len;
     int prev_mode;
-    int n_threads;
+
+    int mode;
+    int strength;
+    int classic;
+    int character;
+    int decay_val;
+    int motion_only;
+    int frame2_opacity;
+    int transition_active;
+    int transition_alpha;
+    int combined_scale;
+    int decay;
+    int inject;
 } m_tracer_t;
+
 
 static inline int mtracer_clampi(int v, int lo, int hi)
 {
@@ -348,6 +361,7 @@ static void mtracer_motion_mask(uint8_t *restrict cur,
         cur[i] = (uint8_t)mtracer_absi((int)cur[i] - (int)prev[i]);
 }
 
+
 void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     m_tracer_t *m = (m_tracer_t*) ptr;
@@ -359,77 +373,80 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    int mode = 0, strength = 0, classic = 0, character = 0, decay_val = 0, motion_only = 0, frame2_opacity = 0;
-    uint8_t *feedback_buf = NULL, *blended_result = NULL, *prev_frame = NULL, *mode_buf = NULL;
-    int transition_active = 0, transition_alpha = 0, combined_scale = 0, decay = 0, inject = 0;
-    VJFrame blend_frame, feedback_frame;
+    uint8_t *feedback_buf = m->mtrace_buffer[0];
+    uint8_t *blended_result = m->mtrace_buffer[1];
+    uint8_t *prev_frame = m->mtrace_buffer[2];
+    uint8_t *mode_buf = m->mode_buffer;
 
-    #pragma omp single copyprivate(mode, strength, classic, character, decay_val, motion_only, frame2_opacity, feedback_buf, blended_result, prev_frame, mode_buf, transition_active, transition_alpha, combined_scale, decay, inject, blend_frame, feedback_frame)
+    #pragma omp single
     {
-        mode = args[P_MODE];
-        strength = args[P_STRENGTH];
-        classic = args[P_CLASSIC];
-        character = args[P_CHARACTER];
-        decay_val = args[P_DECAY];
-        motion_only = args[P_MOTION_ONLY];
-        frame2_opacity = args[P_FRAME2_OPACITY];
-
-        feedback_buf = m->mtrace_buffer[0];
-        blended_result = m->mtrace_buffer[1];
-        prev_frame = m->mtrace_buffer[2];
-        mode_buf = m->mode_buffer;
-
-        veejay_memcpy(&blend_frame, frame, sizeof(VJFrame));
-        blend_frame.data[0] = blended_result;
-        veejay_memcpy(&feedback_frame, frame, sizeof(VJFrame));
-        feedback_frame.data[0] = feedback_buf;
+        m->mode = args[P_MODE];
+        m->strength = args[P_STRENGTH];
+        m->classic = args[P_CLASSIC];
+        m->character = args[P_CHARACTER];
+        m->decay_val = args[P_DECAY];
+        m->motion_only = args[P_MOTION_ONLY];
+        m->frame2_opacity = args[P_FRAME2_OPACITY];
 
         if(!m->started) {
             veejay_memcpy(feedback_buf, Y, len);
             veejay_memcpy(prev_frame, Y, len);
-            m->prev_mode = mode;
+            m->prev_mode = m->mode;
             m->mode_transition = 0;
             m->started = 1;
         }
 
-        if(mode != m->prev_mode) {
+        if(m->mode != m->prev_mode) {
             veejay_memcpy(mode_buf, feedback_buf, len);
             m->mode_transition = m->mode_transition_len;
-            m->prev_mode = mode;
+            m->prev_mode = m->mode;
         }
 
-        transition_active = m->mode_transition > 0;
-        transition_alpha = 0;
+        m->transition_active = m->mode_transition > 0;
+        m->transition_alpha = 0;
 
-        if(transition_active) {
+        if(m->transition_active) {
             const int t = m->mode_transition_len - m->mode_transition;
             const int x = (t << 8) / m->mode_transition_len;
-            transition_alpha = (x * x * (768 - (x << 1))) >> 16;
+            m->transition_alpha = (x * x * (768 - (x << 1))) >> 16;
         }
 
-        veejay_memcpy(blended_result, Y, len);
-
-        combined_scale = mtracer_clampi((strength * character + 127) / 255, 1, 255);
-        decay = 256 - (256 / decay_val);
-        inject = 256 - decay;
+        m->combined_scale = mtracer_clampi((m->strength * m->character + 127) / 255, 1, 255);
+        m->decay = 256 - (256 / m->decay_val);
+        m->inject = 256 - m->decay;
     }
 
-    overlaymagic1_apply_n(&blend_frame, frame2, mode);
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        blended_result[i] = Y[i];
+    }
 
-    if(frame2_opacity < 255) {
+    VJFrame blend_frame, feedback_frame;
+    veejay_memcpy(&blend_frame, frame, sizeof(VJFrame));
+    blend_frame.data[0] = blended_result;
+    veejay_memcpy(&feedback_frame, frame, sizeof(VJFrame));
+    feedback_frame.data[0] = feedback_buf;
+
+    overlaymagic1_apply_n(&blend_frame, frame2, m->mode);
+
+    if(m->frame2_opacity < 255) {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
-            blended_result[i] = mtracer_blend255(Y[i], blended_result[i], frame2_opacity);
+            blended_result[i] = mtracer_blend255(Y[i], blended_result[i], m->frame2_opacity);
     }
 
-    if(transition_active) {
+    if(m->transition_active) {
         #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
-            blended_result[i] = mtracer_blend255(mode_buf[i], blended_result[i], transition_alpha);
+            blended_result[i] = mtracer_blend255(mode_buf[i], blended_result[i], m->transition_alpha);
     }
 
-    if(motion_only)
+    if(m->motion_only)
         mtracer_motion_mask(blended_result, prev_frame, len);
+
+    const int decay = m->decay;
+    const int combined_scale = m->combined_scale;
+    const int inject = m->inject;
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
@@ -444,8 +461,8 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     for(int i = 0; i < len; i++)
         prev_frame[i] = Y[i];
 
-    if(classic) {
-        overlaymagic1_apply_n(frame, &feedback_frame, mode);
+    if(m->classic) {
+        overlaymagic1_apply_n(frame, &feedback_frame, m->mode);
     }
     else {
         #pragma omp for schedule(static)
@@ -461,7 +478,7 @@ void mtracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     #pragma omp single
     {
-        if(transition_active)
+        if(m->transition_active)
             m->mode_transition--;
     }
 }

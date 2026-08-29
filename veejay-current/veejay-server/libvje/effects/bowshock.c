@@ -696,31 +696,28 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     int adiry[BS_MAX_WAVES];
     int nactive = 0;
 
-    #pragma omp single
-    {
-        for(int i = 0; i < BS_MAX_WAVES; i++) {
-            bowshock_wave_t *wv = &s->waves[i];
+    for(int i = 0; i < BS_MAX_WAVES; i++) {
+        bowshock_wave_t *wv = &s->waves[i];
 
-            if(!wv->active || wv->amp <= 0.0f)
-                continue;
+        if(!wv->active || wv->amp <= 0.0f)
+            continue;
 
-            const int width = clampi(wv->width, 4, 120);
-            const int amp = (int)(wv->amp * 192.0f);
+        const int width = clampi(wv->width, 4, 120);
+        const int amp = (int)(wv->amp * 192.0f);
 
-            if(amp <= 0)
-                continue;
+        if(amp <= 0)
+            continue;
 
-            ax[nactive] = wv->cx;
-            ay[nactive] = wv->cy;
-            ap[nactive] = (int)wv->pos;
-            aw[nactive] = width;
-            atail[nactive] = ap[nactive] - (width << 1);
-            ascale[nactive] = (amp << 8) / width;
-            apol[nactive] = wv->polarity;
-            adirx[nactive] = wv->dir_x;
-            adiry[nactive] = wv->dir_y;
-            nactive++;
-        }
+        ax[nactive] = wv->cx;
+        ay[nactive] = wv->cy;
+        ap[nactive] = (int)wv->pos;
+        aw[nactive] = width;
+        atail[nactive] = ap[nactive] - (width << 1);
+        ascale[nactive] = (amp << 8) / width;
+        apol[nactive] = wv->polarity;
+        adirx[nactive] = wv->dir_x;
+        adiry[nactive] = wv->dir_y;
+        nactive++;
     }
 
     int skip_processing = 0;
@@ -856,10 +853,3 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 }
-
-#undef BS_ACCUM_BOW
-#undef BS_ACCUM_TORSION
-#undef BS_ACCUM_HYBRID
-#undef BS_STORE_MAP
-#undef BS_OMP_SIMD
-#undef BS_ROW_SWITCH

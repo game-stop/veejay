@@ -53,6 +53,13 @@ typedef struct {
     int grid_w;
     int grid_h;
     int n_threads;
+
+    int size;
+    int progress;
+    int warp_amt;
+    int mode;
+    int response;
+    int stability;
 } morph_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -413,32 +420,49 @@ static void morphologymixer_mode_persistent(morph_t *m,
 void morphologymixer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     morph_t *m = (morph_t*) ptr;
-    int size = 0, progress = 0, warp_amt = 0, mode = 0, response = 0, stability = 0;
+    const int size = frame->len;
 
-    #pragma omp single copyprivate(size, progress, warp_amt, mode, response, stability)
-    {
-        size = frame->len;
-        progress = clampi(args[P_PROGRESS], 0, 255);
-        warp_amt = clampi(args[P_WARP], 0, 255);
-        mode = clampi(args[P_MODE], 0, 2);
-        response = clampi(args[P_RESPONSE], 0, 255);
-        stability = clampi(args[P_STABILITY], 0, 255);
+    const uint8_t *srcY = frame->data[0];
+    const uint8_t *srcCb = frame->data[1];
+    const uint8_t *srcCr = frame->data[2];
 
-        veejay_memcpy(m->tmpY, frame->data[0], (size_t)size);
-        veejay_memcpy(m->tmpCb, frame->data[1], (size_t)size);
-        veejay_memcpy(m->tmpCr, frame->data[2], (size_t)size);
+    uint8_t *restrict tmpY = m->tmpY;
+    uint8_t *restrict tmpCb = m->tmpCb;
+    uint8_t *restrict tmpCr = m->tmpCr;
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < size; i++) {
+        tmpY[i] = srcY[i];
+        tmpCb[i] = srcCb[i];
+        tmpCr[i] = srcCr[i];
     }
+
+    #pragma omp single
+    {
+        m->size = size;
+        m->progress = clampi(args[P_PROGRESS], 0, 255);
+        m->warp_amt = clampi(args[P_WARP], 0, 255);
+        m->mode = clampi(args[P_MODE], 0, 2);
+        m->response = clampi(args[P_RESPONSE], 0, 255);
+        m->stability = clampi(args[P_STABILITY], 0, 255);
+    }
+
+    const int warp_amt = m->warp_amt;
+    const int progress = m->progress;
+    const int mode = m->mode;
+    const int response = m->response;
+    const int stability = m->stability;
 
     if(warp_amt == 0) {
-        morphologymixer_blend_plain(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress);
+        morphologymixer_blend_plain(m, frame, frame2, tmpY, tmpCb, tmpCr, progress);
     }
     else if(mode == MM_MODE_GRADIENT) {
-        morphologymixer_mode_gradient(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response);
+        morphologymixer_mode_gradient(m, frame, frame2, tmpY, tmpCb, tmpCr, progress, warp_amt, response);
     }
     else if(mode == MM_MODE_GRID) {
-        morphologymixer_mode_grid(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
+        morphologymixer_mode_grid(m, frame, frame2, tmpY, tmpCb, tmpCr, progress, warp_amt, response, stability);
     }
     else {
-        morphologymixer_mode_persistent(m, frame, frame2, m->tmpY, m->tmpCb, m->tmpCr, progress, warp_amt, response, stability);
+        morphologymixer_mode_persistent(m, frame, frame2, tmpY, tmpCb, tmpCr, progress, warp_amt, response, stability);
     }
 }

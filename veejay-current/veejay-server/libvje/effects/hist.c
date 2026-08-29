@@ -37,6 +37,10 @@ typedef struct
     uint32_t hB[256];
 } histogram_t;
 
+static uint32_t vje_auto_eq_H[256];
+static omp_lock_t vje_auto_eq_lock;
+static int vje_auto_eq_lock_initialized;
+
 static inline int vj_hist_clamp255(int v)
 {
     return (v < 0) ? 0 : ((v > 255) ? 255 : v);
@@ -262,7 +266,6 @@ static inline void veejay_histogram_qdraw(
     if (panel_w <= 0 || panel_h <= 0)
         return;
 
-    // Every thread builds a local stack copy of the bars to avoid #pragma omp single synchronization locks.
     uint8_t bars[256];
     veejay_histogram_make_bars(bars, histi, panel_h - 2);
 
@@ -280,7 +283,6 @@ static inline void veejay_histogram_qdraw(
             rowY[x] = (uint8_t)((rowY[x] >> 2) + 16);
         }
 
-        // Fix the color bleed: neutral gray the U/V planes in the histogram area
         if (U && V) {
             if (ssm) {
                 uint8_t *restrict rowU = U + (yy * w) + left;
@@ -290,7 +292,6 @@ static inline void veejay_histogram_qdraw(
                     rowV[x] = 128;
                 }
             } else {
-                // Support 4:2:2 half-width spacing
                 const int uv_w = w / 2;
                 const int uv_left = left / 2;
                 const int uv_panel_w = panel_w / 2;
@@ -337,10 +338,7 @@ void veejay_histogram_equalize(void *his, VJFrame *f, int intensity, int strengt
     uint8_t *restrict y = f->data[0];
     const int len = f->len;
 
-    #pragma omp single copyprivate(LUT)
-    {
-        veejay_lut_calc(h->hY, LUT, intensity, strength, len);
-    }
+    veejay_lut_calc(h->hY, LUT, intensity, strength, len);
 
     #pragma omp for schedule(static) 
     for (int i = 0; i < len; i++)
@@ -369,12 +367,9 @@ void veejay_histogram_equalize_rgb(
     uint8_t LUTg[256];
     uint8_t LUTb[256];
 
-    #pragma omp single copyprivate(LUTr, LUTg, LUTb)
-    {
-        if (mode == 0 || mode == 3) veejay_lut_calc(h->hR, LUTr, intensity, strength, pixels);
-        if (mode == 1 || mode == 3) veejay_lut_calc(h->hG, LUTg, intensity, strength, pixels);
-        if (mode == 2 || mode == 3) veejay_lut_calc(h->hB, LUTb, intensity, strength, pixels);
-    }
+    if (mode == 0 || mode == 3) veejay_lut_calc(h->hR, LUTr, intensity, strength, pixels);
+    if (mode == 1 || mode == 3) veejay_lut_calc(h->hG, LUTg, intensity, strength, pixels);
+    if (mode == 2 || mode == 3) veejay_lut_calc(h->hB, LUTb, intensity, strength, pixels);
 
     switch (mode)
     {
@@ -499,12 +494,22 @@ void vje_histogram_auto_eq(VJFrame *frame)
     if (!frame || !frame->data[0] || frame->len <= 0)
         return;
 
-    uint32_t *global_H = NULL;
+    uint32_t *restrict global_H = vje_auto_eq_H;
 
-    #pragma omp single copyprivate(global_H)
+    #pragma omp master
     {
-        global_H = (uint32_t*) vj_calloc(256 * sizeof(uint32_t));
+        #pragma omp critical(vje_auto_eq_lock_init)
+        {
+            if (!vje_auto_eq_lock_initialized) {
+                omp_init_lock(&vje_auto_eq_lock);
+                vje_auto_eq_lock_initialized = 1;
+            }
+        }
+
+        omp_set_lock(&vje_auto_eq_lock);
+        veejay_memset(global_H, 0, sizeof(vje_auto_eq_H));
     }
+    #pragma omp barrier
 
     uint32_t LH[256] = {0};
     const uint8_t *restrict p = frame->data[0];
@@ -515,7 +520,7 @@ void vje_histogram_auto_eq(VJFrame *frame)
         LH[p[i]]++;
     }
 
-    #pragma omp critical
+    #pragma omp critical(vje_auto_eq_merge)
     {
         for (int i = 0; i < 256; i++) {
             global_H[i] += LH[i];
@@ -525,11 +530,7 @@ void vje_histogram_auto_eq(VJFrame *frame)
 
     uint8_t LUT[256];
 
-    #pragma omp single copyprivate(LUT)
-    {
-        veejay_lut_calc(global_H, LUT, 255, 255, len);
-        free(global_H);
-    }
+    veejay_lut_calc(global_H, LUT, 255, 255, len);
 
     uint8_t *restrict Y = frame->data[0];
 
@@ -537,6 +538,9 @@ void vje_histogram_auto_eq(VJFrame *frame)
     for (int i = 0; i < len; i++) {
         Y[i] = LUT[Y[i]];
     }
+
+    #pragma omp master
+    omp_unset_lock(&vje_auto_eq_lock);
 }
 
 void vje_histogram_auto_eq_serial(VJFrame *frame)

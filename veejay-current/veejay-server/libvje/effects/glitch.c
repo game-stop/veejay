@@ -1,14 +1,3 @@
-/* 
- * Linux VeeJay
- *
- * Copyright(C)2023 Niels Elburg <nwelburg@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
- */
-
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "glitch.h"
@@ -30,6 +19,14 @@ typedef struct {
     int *lsfr_lut;
     int frame_count;
     int n_threads;
+
+    int noise_qty;
+    int half_qty;
+    int noise_mul;
+    int distortion_x;
+    int distortion_y;
+    int chroma_alpha_scale;
+    int skip_work;
 } glitch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -162,34 +159,31 @@ void glitch_free(void *ptr)
 
 void glitch_apply(void *ptr, VJFrame *frame, int *args)
 {
-    glitch_t *g = (glitch_t *) ptr;
+    glitch_t *g = (glitch_t*) ptr;
     
     const int len = frame->len;
     const int width = frame->width;
     const int height = frame->height;
     
-    int noise_qty = 2;
-    int half_qty = 1;
-    int noise_mul = 40;
-    int distortion_x = 0;
-    int distortion_y = 0;
-    int chroma_alpha_scale = 128;
-    int skip_work = 0;
-    
-    uint8_t *restrict Y = NULL;
-    uint8_t *restrict U = NULL;
-    uint8_t *restrict V = NULL;
-    uint8_t *restrict bY = NULL;
-    uint8_t *restrict bU = NULL;
-    uint8_t *restrict bV = NULL;
-    int *restrict rand_lut = NULL;
-    int *restrict lsfr_lut = NULL;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
-    #pragma omp single copyprivate(noise_qty, half_qty, noise_mul, distortion_x, distortion_y, chroma_alpha_scale, skip_work, Y, U, V, bY, bU, bV, rand_lut, lsfr_lut)
+    uint8_t *restrict bY = g->buf[0];
+    uint8_t *restrict bU = g->buf[1];
+    uint8_t *restrict bV = g->buf[2];
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        bU[i] = U[i];
+        bV[i] = V[i];
+    }
+
+    #pragma omp single
     {
         const int amplitude = args[P_AMPLITUDE];
         const int noise_gain = args[P_NOISE_GAIN];
-        noise_qty = args[P_NOISE_QTY];
+        g->noise_qty = args[P_NOISE_QTY];
         const int noise_scale = args[P_NOISE_SCALE];
         const int interval = args[P_INTERVAL];
         const int distortion_x_arg = args[P_DISTORT_X];
@@ -205,43 +199,39 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
         if(phase >= interval)
             phase = 0;
 
+        g->skip_work = 0;
         if(duration > 0 && phase >= duration) {
-            skip_work = 1;
+            g->skip_work = 1;
         }
 
-        Y = frame->data[0];
-        U = frame->data[1];
-        V = frame->data[2];
+        g->half_qty = g->noise_qty >> 1;
+        g->noise_mul = amplitude * noise_gain * noise_scale;
 
-        bY = g->buf[0];
-        bU = g->buf[1];
-        bV = g->buf[2];
+        g->distortion_x = (distortion_x_arg * width) / 100;
+        g->distortion_y = (distortion_y_arg * height) / 100;
 
-        rand_lut = g->rand_lut;
-        lsfr_lut = g->lsfr_lut;
+        if(g->distortion_x <= -width || g->distortion_x >= width)
+            g->distortion_x %= width;
 
-        veejay_memcpy(bU, U, len);
-        veejay_memcpy(bV, V, len);
-
-        half_qty = noise_qty >> 1;
-        noise_mul = amplitude * noise_gain * noise_scale;
-
-        distortion_x = (distortion_x_arg * width) / 100;
-        distortion_y = (distortion_y_arg * height) / 100;
-
-        if(distortion_x <= -width || distortion_x >= width)
-            distortion_x %= width;
-
-        if(distortion_y <= -height || distortion_y >= height)
-            distortion_y %= height;
+        if(g->distortion_y <= -height || g->distortion_y >= height)
+            g->distortion_y %= height;
 
         const int chroma_alpha_base = clampi(glitch_absi(distortion_x_arg) + glitch_absi(distortion_y_arg), 0, 200);
-        chroma_alpha_scale = 96 + ((chroma_alpha_base * 159) / 200);
+        g->chroma_alpha_scale = 96 + ((chroma_alpha_base * 159) / 200);
     }
     
+    const int skip_work = g->skip_work;
+    const int noise_qty = g->noise_qty;
+    const int half_qty = g->half_qty;
+    const int noise_mul = g->noise_mul;
+    const int distortion_x = g->distortion_x;
+    const int distortion_y = g->distortion_y;
+    const int chroma_alpha_scale = g->chroma_alpha_scale;
+
+    int *restrict rand_lut = g->rand_lut;
+    int *restrict lsfr_lut = g->lsfr_lut;
+    
     if (!skip_work) {
-        int phase_check = g->frame_count;
-        
         if (g->frame_count == 1) {
             #pragma omp for schedule(static)
             for(int i = 0; i < len; i++) {

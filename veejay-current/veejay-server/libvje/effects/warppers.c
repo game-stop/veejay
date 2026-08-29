@@ -65,6 +65,16 @@ typedef struct {
     double zoom_drive_env;
     double warp_drive_env;
     int env_ready;
+
+    int x_center;
+    int y_center;
+    double zoom;
+    double falloff;
+    double strength;
+    double strength_factor;
+    double cos_val;
+    double sin_val;
+    double inv_max_dist;
 } warppers_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -291,16 +301,6 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
     const double scalar_alpha = 0.152;
     const double drive_alpha = 0.218;
 
-    int x_center = w / 2;
-    int y_center = h / 2;
-    double zoom = 1.0;
-    double falloff = 0.0;
-    double strength = 0.0;
-    double strength_factor = 1.0;
-    double cos_val = 1.0;
-    double sin_val = 0.0;
-    double inv_max_dist = 1.0;
-
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
     uint8_t *restrict dstV = frame->data[2];
@@ -311,7 +311,14 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
 
     const size_t plane_size = (size_t)w * (size_t)h;
 
-    #pragma omp single copyprivate(x_center, y_center, zoom, falloff, strength, strength_factor, cos_val, sin_val, inv_max_dist, dstY, dstU, dstV, srcY, srcU, srcV)
+    #pragma omp for schedule(static)
+    for(size_t i = 0; i < plane_size; i++) {
+        srcY[i] = dstY[i];
+        srcU[i] = dstU[i];
+        srcV[i] = dstV[i];
+    }
+
+    #pragma omp single
     {
         if(!warp->env_ready) {
             warp->x_angle_env = (double)x_angle_arg;
@@ -342,8 +349,8 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
         int x_angle_base = warppers_wrap_lut((int)(warp->x_angle_env + 0.5));
         int y_angle_base = warppers_wrap_lut((int)(warp->y_angle_env + 0.5));
         int zoom_base = clampi((int)(warp->zoom_env + 0.5), 1, 1000);
-        x_center = clampi((int)(warp->x_center_env + 0.5), 0, w - 1);
-        y_center = clampi((int)(warp->y_center_env + 0.5), 0, h - 1);
+        warp->x_center = clampi((int)(warp->x_center_env + 0.5), 0, w - 1);
+        warp->y_center = clampi((int)(warp->y_center_env + 0.5), 0, h - 1);
         int falloff_arg = clampi((int)(warp->falloff_env + 0.5), 0, 1000);
         int strength_arg = clampi((int)(warp->strength_env + 0.5), 0, 1000);
         int spin_arg = clampi((int)(warp->spin_speed_env + (warp->spin_speed_env >= 0.0 ? 0.5 : -0.5)), -1000, 1000);
@@ -371,33 +378,31 @@ void warppers_apply(void *ptr, VJFrame *frame, int *args)
         falloff_arg = clampi(falloff_arg + (warp_q * 210 + 500) / 1000, 0, 1000);
         strength_arg = clampi(strength_arg + (warp_q * 320 + 500) / 1000, 0, 1000);
 
-        dstY = frame->data[0];
-        dstU = frame->data[1];
-        dstV = frame->data[2];
+        warp->zoom = (double)zoom_eff * 0.01;
+        warp->falloff = (double)falloff_arg * 0.01;
+        warp->strength = (double)strength_arg * 0.01;
 
-        srcY = warp->buf[0];
-        srcU = warp->buf[1];
-        srcV = warp->buf[2];
+        warp->falloff *= warp->falloff;
 
-        veejay_memcpy(srcY, dstY, plane_size);
-        veejay_memcpy(srcU, dstU, plane_size);
-        veejay_memcpy(srcV, dstV, plane_size);
-
-        zoom = (double)zoom_eff * 0.01;
-        falloff = (double)falloff_arg * 0.01;
-        strength = (double)strength_arg * 0.01;
-
-        falloff *= falloff;
-
-        strength_factor = 1.0 - strength;
-        cos_val = warp->cos_lut[x_angle];
-        sin_val = warp->sin_lut[y_angle];
+        warp->strength_factor = 1.0 - warp->strength;
+        warp->cos_val = warp->cos_lut[x_angle];
+        warp->sin_val = warp->sin_lut[y_angle];
 
         int64_t half_w = w >> 1;
         int64_t half_h = h >> 1;
         int64_t max_dist_i = half_w * half_w + half_h * half_h;
-        inv_max_dist = 1.0 / (double)max_dist_i;
+        warp->inv_max_dist = 1.0 / (double)max_dist_i;
     }
+    
+    const int x_center = warp->x_center;
+    const int y_center = warp->y_center;
+    const double zoom = warp->zoom;
+    const double falloff = warp->falloff;
+    const double strength = warp->strength;
+    const double strength_factor = warp->strength_factor;
+    const double cos_val = warp->cos_val;
+    const double sin_val = warp->sin_val;
+    const double inv_max_dist = warp->inv_max_dist;
 
     #pragma omp for schedule(static)
     for(int y_pos = 0; y_pos < h; y_pos++) {

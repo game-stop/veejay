@@ -57,7 +57,13 @@ typedef struct {
     int n_threads;
     int w;
     int h;
+
+    int start_x_fp;
+    int start_y_fp;
+    int step_x_fp;
+    int step_y_fp;
 } virtualcam_t;
+
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -299,6 +305,7 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
 
     const int w = frame->width;
     const int h = frame->height;
+    const size_t plane_size = (size_t)w * (size_t)h;
 
     const int target_x_arg = args[P_TARGET_X];
     const int target_y_arg = args[P_TARGET_Y];
@@ -311,11 +318,6 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
     const int lock_aspect  = args[P_LOCK_ASPECT] ? 1 : 0;
     const int edge_black   = args[P_EDGE_MODE] ? 1 : 0;
 
-    int start_x_fp = 0;
-    int start_y_fp = 0;
-    int step_x_fp = 0;
-    int step_y_fp = 0;
-
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -326,7 +328,7 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
 
     int *restrict xmap = c->xmap;
 
-    #pragma omp single copyprivate(start_x_fp, start_y_fp, step_x_fp, step_y_fp)
+    #pragma omp single
     {
         if(!c->is_initialized) {
             c->speed_env = (float)speed_arg;
@@ -403,11 +405,18 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
         const float step_x = c->current_fov_w / (float)w;
         const float step_y = c->current_fov_h / (float)h;
 
-        start_x_fp = (int)(start_x * (float)FP_ONE);
-        start_y_fp = (int)(start_y * (float)FP_ONE);
-        step_x_fp  = (int)(step_x  * (float)FP_ONE);
-        step_y_fp  = (int)(step_y  * (float)FP_ONE);
+        c->start_x_fp = (int)(start_x * (float)FP_ONE);
+        c->start_y_fp = (int)(start_y * (float)FP_ONE);
+        c->step_x_fp  = (int)(step_x  * (float)FP_ONE);
+        c->step_y_fp  = (int)(step_y  * (float)FP_ONE);
+
+        c->frame_no++;
     }
+    
+    const int start_x_fp = c->start_x_fp;
+    const int start_y_fp = c->start_y_fp;
+    const int step_x_fp = c->step_x_fp;
+    const int step_y_fp = c->step_y_fp;
     
     virtualcamera_build_xmap(c, w, edge_black, start_x_fp, step_x_fp);
 
@@ -466,14 +475,10 @@ void virtualcamera_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
-    {
-        const size_t plane_size = (size_t)w * (size_t)h;
-
-        veejay_memcpy(frame->data[0], dstY, plane_size);
-        veejay_memcpy(frame->data[1], dstU, plane_size);
-        veejay_memcpy(frame->data[2], dstV, plane_size);
-
-        c->frame_no++;
+    #pragma omp for schedule(static)
+    for(size_t i = 0; i < plane_size; i++) {
+        frame->data[0][i] = dstY[i];
+        frame->data[1][i] = dstU[i];
+        frame->data[2][i] = dstV[i];
     }
 }

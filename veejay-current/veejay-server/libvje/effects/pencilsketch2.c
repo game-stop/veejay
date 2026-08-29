@@ -198,25 +198,15 @@ void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args)
     const int w = frame->width;
     const int h = frame->height;
     
-    int radius = 24;
-    int gamma_arg = 1000;
-    int strength = 0;
-    int contrast = 0;
-    int levels = 0;
-    int grayscale = 1;
+    const int radius = clampi(args[P_RADIUS], 1, (w < h ? w : h));
+    const int gamma_arg = args[P_GAMMA];
+    const int strength = args[P_STRENGTH];
+    const int contrast = args[P_CONTRAST];
+    const int levels = args[P_LEVELS];
+    const int grayscale = args[P_GRAYSCALE];
     
-    #pragma omp single copyprivate(radius, gamma_arg, strength, contrast, levels, grayscale)
+    #pragma omp single
     {
-        radius = args[P_RADIUS];
-        gamma_arg = args[P_GAMMA];
-        strength = args[P_STRENGTH];
-        contrast = args[P_CONTRAST];
-        levels = args[P_LEVELS];
-        grayscale = args[P_GRAYSCALE];
-        
-        if(radius > w) radius = w;
-        if(radius > h) radius = h;
-        
         if(gamma_arg != p->prev_gamma_arg || contrast != p->prev_contrast || levels != p->prev_levels) {
             rebuild_master_lut(p, gamma_arg, contrast, levels);
         }

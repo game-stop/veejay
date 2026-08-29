@@ -1,23 +1,3 @@
-/* 
- * veejay  
- *
- * Copyright (C) 2000-2019 Niels Elburg <nwelburg@gmail.com>
- * 
- * This program is free software you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- *
- */
 #include <config.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -52,7 +32,6 @@
     if( id < 0 || id >= MAX_EFFECTS )\
         return 0;\
 }
-
 
 #define VJE_SUMMARY_VERSION 2
 #define VJE_SUMMARY_BEAT_HINT_WIDTH 61
@@ -169,7 +148,6 @@ static struct {
     { radioactivetv_init,radioactivetv_malloc,radioactivetv_free,NULL,NULL,NULL,radioactivetv_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_RADIOACTIVE },
     { radialblur_init,radialblur_malloc,radialblur_free,NULL,NULL,radialblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RADIALBLUR },
     { radcor_init,radcor_malloc,radcor_free,NULL,NULL,radcor_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_LENSCORRECTION },
-   // { cali_init,cali_malloc,cali_free,NULL,NULL,cali_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CALI },
     { posterize_init,NULL,NULL,NULL,NULL,posterize_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_POSTERIZE },
     { posterize2_init,NULL,NULL,NULL,NULL,posterize2_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_POSTERIZE2 },
     { porterduff_init,NULL,NULL,NULL,NULL,NULL,porterduff_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_PORTERDUFF },
@@ -339,10 +317,6 @@ static struct {
     { darkreplace_init,darkreplace_malloc,darkreplace_free,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
     { morphologymixer_init, morphologymixer_malloc, morphologymixer_free, NULL,NULL,NULL, morphologymixer_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_MORPHOLOGY },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
-
-    // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
-    //        1 motionmap per FX (set of FX that can request motionmap)
-    //        1 static bg per motionmap
 };
 
 static int *vj_fx_map = NULL;
@@ -399,7 +373,7 @@ void    vje_set_bg(VJFrame *bg)
 
     veejay_memcpy(vj_fx_bg, bg, sizeof(VJFrame));
     
-    vj_fx_bg->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * ( bg->len * 3 ) ); // enough space to hold 4:4:4
+    vj_fx_bg->data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * ( bg->len * 3 ) );
     vj_fx_bg->data[1] = vj_fx_bg->data[0] + bg->len;
     vj_fx_bg->data[2] = vj_fx_bg->data[1] + bg->len;
     vj_fx_bg->data[3] = NULL;
@@ -411,15 +385,15 @@ void    vje_set_bg(VJFrame *bg)
     veejay_msg(VEEJAY_MSG_DEBUG, "Frame stored in FX process chain as background frame");
 }
 
-unsigned int	get_pixel_range_min_Y(void) {
-	return pixel_Y_lo_;
+unsigned int    get_pixel_range_min_Y(void) {
+    return pixel_Y_lo_;
 }
-unsigned int	get_pixel_range_min_UV(void) {
-	return pixel_U_lo_;
+unsigned int    get_pixel_range_min_UV(void) {
+    return pixel_U_lo_;
 }
 
 int vje_is_parallel_enabled(void) {
-	return parallel_enabled;
+    return parallel_enabled;
 }
 
 void    vje_enable_parallel(void) {
@@ -445,12 +419,12 @@ int vje_get_rgb_parameter_conversion_type(void) {
     return rgb_parameter_conversion_type_;
 }
 
-void	vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
+void    vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 {
-	pixel_Y_hi_ = Yhi;
-	pixel_U_hi_ = Uhi;
-	pixel_U_lo_ = Ylo;
-	pixel_Y_lo_ = Ulo;
+    pixel_Y_hi_ = Yhi;
+    pixel_U_hi_ = Uhi;
+    pixel_U_lo_ = Ylo;
+    pixel_Y_lo_ = Ulo;
 }
 
 int vje_init(int w, int h)
@@ -527,8 +501,10 @@ int vje_fx_needs_instance(int fx_id)
 
 void *vje_fx_malloc(int fx_id, int chain_id, int entry, int w, int h, int *error )
 {
-    if( fx_id >= VJ_PLUGIN )
-        return plug_activate( vj_fx_map[ fx_id  ] );
+    if( fx_id >= VJ_PLUGIN ) {
+        *error = 0;
+        return plug_activate( vje_get_plugin_id( fx_id ) );
+    }
    
     int idx = vj_fx_map[ fx_id ];
     if( vj_fx[ idx ].fx_malloc == NULL ) {
@@ -548,7 +524,7 @@ void *vje_fx_malloc(int fx_id, int chain_id, int entry, int w, int h, int *error
     else {
         if( vj_fx[ idx ].fx_request_fx != NULL ) {
             int req_fx_id = vj_fx[ idx ].fx_request_fx();
-            vje_global_couple( chain_id, req_fx_id, fx_id, ptr ); //FIXME: design error in coupling
+            vje_global_couple( chain_id, req_fx_id, fx_id, ptr );
         }
     }
 
@@ -574,56 +550,6 @@ void vje_fx_free( int fx_id, int chain_id, int entry, void *ptr )
             vj_fx[ idx ].fx_free( ptr );
     }
 }
-
-static void vje_fx_parallel_apply( void *arg )
-{
-    vj_task_arg_t *v = (vj_task_arg_t*) arg;
-    VJFrame a,b;
-
-    int idx = v->iparams[0];
-    int extra_frame = v->iparams[1];
-    int *param_values = &(v->iparams[2]);
-
-    vj_task_set_to_frame( &a, 0, v->jobnum );
-
-    if(extra_frame) {
-#ifdef STRICT_CHECKING
-        assert( vj_fx[ idx ].fx_process != NULL );
-#endif
-	    vj_task_set_to_frame( &b, 1, v->jobnum );
-        vj_fx[ idx ].fx_process( v->ptr, &a, &b, param_values );
-    }
-    else {
-#ifdef STRICT_CHECKING
-        assert( vj_fx[ idx ].fx_filter != NULL );
-#endif
-        vj_fx[ idx ].fx_filter( v->ptr, &a, param_values );
-    }
-}
-/*
-static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A, VJFrame *B, int *args )
-{
-    if(fx->parallel != 2)
-        return 0;
-
-    if( vj_task_get_workers() <= 0 )
-	return 0;
-
-    int i;
-
-    vj_task_set_from_frame( A );
-    vj_task_set_param( idx, 0 );
-    vj_task_set_param( fx->extra_frame, 1 );
-    vj_task_set_ptr( instance ); 
-
-    for( i = 0; i < fx->num_params; i ++ ) {
-        vj_task_set_param( args[i], 2 + i );
-    }
-
-    vj_task_run( A->data, B->data, NULL, NULL, 4, (performer_job_routine) &vje_fx_parallel_apply, (fx->parallel == 2) );
-
-    return 1;
-}*/
 
 static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B, int *args, vj_effect *fx )
 {
@@ -676,27 +602,14 @@ void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
 #endif
 
     if(fx_id >= VJ_PLUGIN) {
-#ifdef _OPENMP
-        if(omp_in_parallel()) {
-#pragma omp single
-            {
-                vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
-            }
-        }
-        else
-#endif
-        {
-            vje_fx_plugin_apply( idx, ptr, A, B, args, fx );
-        }
+        int plug_id = vje_get_plugin_id(fx_id);
+        vje_fx_plugin_apply( plug_id, ptr, A, B, args, fx );
         return;
     }
 
 #ifdef _OPENMP
     if(fx->parallel == 0) {
-        if(omp_in_parallel()) {
-            vje_fx_direct_apply( idx, ptr, A, B, args );
-        }
-        else if(parallel_enabled) {
+        if(parallel_enabled) {
 #pragma omp parallel num_threads(vje_openmp_threads)
             {
                 vje_fx_direct_apply( idx, ptr, A, B, args );
@@ -709,32 +622,46 @@ void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
     }
 #endif
 
-    /*if(parallel_enabled && fx->parallel == 2) {
-#ifdef _OPENMP
-        if(omp_in_parallel()) {
-#pragma omp single
-            {
-                if(!vje_fx_parallize( fx, ptr, idx, A, B, args ))
-                    vje_fx_direct_apply( idx, ptr, A, B, args );
-            }
-            return;
-        }
+    vje_fx_direct_apply( idx, ptr, A, B, args );
+}
+
+void vje_fx_apply_collective( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
+{
+    int idx = vj_fx_map[ fx_id ];
+    vj_effect *fx = vj_effect_map [ idx ];
+
+#ifdef STRICT_CHECKING
+    assert( args != NULL );
 #endif
-        if(vje_fx_parallize( fx, ptr, idx, A, B, args ))
-            return;
-    }*/
 
 #ifdef _OPENMP
-    if(omp_in_parallel()) {
+    if(fx_id >= VJ_PLUGIN) {
+        int plug_id = vje_get_plugin_id(fx_id);
 #pragma omp single
         {
-            vje_fx_direct_apply( idx, ptr, A, B, args );
+            vje_fx_plugin_apply( plug_id, ptr, A, B, args, fx );
         }
         return;
     }
-#endif
 
-    vje_fx_direct_apply( idx, ptr, A, B, args );
+    if(fx->parallel == 0) {
+        vje_fx_direct_apply( idx, ptr, A, B, args );
+        return;
+    }
+
+#pragma omp single
+    {
+        vje_fx_direct_apply( idx, ptr, A, B, args );
+    }
+#else
+    if(fx_id >= VJ_PLUGIN) {
+        int plug_id = vje_get_plugin_id(fx_id);
+        vje_fx_plugin_apply( plug_id, ptr, A, B, args, fx );
+    }
+    else {
+        vje_fx_direct_apply( idx, ptr, A, B, args );
+    }
+#endif
 }
 
 void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A )
@@ -743,8 +670,6 @@ void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A )
 
     VJFrame *bg = A;
 
-    //FX that are tagged with static_bg = 1 get a pointer to stored VJFrame
-    //other FX, get A passed in
     if( vj_effect_map[ idx ] != NULL ) {
         if( vj_effect_map[idx]->static_bg && vj_fx_bg != NULL ) {
             bg = vj_fx_bg;
@@ -756,9 +681,6 @@ void vje_fx_prepare( int fx_id, void *ptr, VJFrame *A )
         vj_fx[ idx ].prepare( ptr, bg );
     }
 }
-
-//FIXME: add method to signal start/end of chain processing
-
 
 int vje_fx_is_transition_ready( int fx_id, void *ptr, int w, int h )
 {
@@ -1515,7 +1437,7 @@ int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *ds
 int vje_max_threads(int len) {
 #ifdef _OPENMP
     (void) len;
-    return vje_openmp_threads;
+    return parallel_enabled ? vje_openmp_threads : 1;
 #else
     (void) len;
     return 1;
@@ -1523,13 +1445,13 @@ int vje_max_threads(int len) {
 }
 
 void vje_dump(void) {
-	veejay_msg(VEEJAY_MSG_INFO, "Below follow all effects in Veejay,");
-	veejay_msg(VEEJAY_MSG_INFO, "Effect numbers starting with 2xx are effects that use");
-	veejay_msg(VEEJAY_MSG_INFO, "*two* sources (by default a copy of itself)");
-	veejay_msg(VEEJAY_MSG_INFO, "Use the channel/source commands to select another sample/stream");
-	veejay_msg(VEEJAY_MSG_INFO, "to mix with.");
-	veejay_msg(VEEJAY_MSG_INFO, "\n [effect num] [effect name] [arg 0 , min/max ] [ arg 1, min/max ] ...");
-	
+    veejay_msg(VEEJAY_MSG_INFO, "Below follow all effects in Veejay,");
+    veejay_msg(VEEJAY_MSG_INFO, "Effect numbers starting with 2xx are effects that use");
+    veejay_msg(VEEJAY_MSG_INFO, "*two* sources (by default a copy of itself)");
+    veejay_msg(VEEJAY_MSG_INFO, "Use the channel/source commands to select another sample/stream");
+    veejay_msg(VEEJAY_MSG_INFO, "to mix with.");
+    veejay_msg(VEEJAY_MSG_INFO, "\n [effect num] [effect name] [arg 0 , min/max ] [ arg 1, min/max ] ...");
+    
     for( int i = 0; i < MAX_EFFECTS; i ++ ) {
         int idx = vj_fx_map[i];
         if(idx == -1)
@@ -1548,5 +1470,4 @@ void vje_dump(void) {
                     fx->limits[1][j] );
         }
     }
-
 }

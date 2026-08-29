@@ -171,6 +171,7 @@ void mirror_free(void *ptr)
     free(m->buf[0]);
     free(m);
 }
+
 void mirror_apply(void *ptr, VJFrame *frame, int *args)
 {
     mirror_t *m = (mirror_t*) ptr;
@@ -187,52 +188,46 @@ void mirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = m->buf[1];
     uint8_t *restrict srcV = m->buf[2];
 
-    float cx, cy, nx, ny;
-    int mix_q8;
-    int glow_enabled;
-    float axis_width, inv_axis_width;
-    int glow_max;
-    float rx_step, ry_step;
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        srcY[i] = dstY[i];
+        srcU[i] = dstU[i];
+        srcV[i] = dstV[i];
+    }
 
-    #pragma omp single copyprivate(cx, cy, nx, ny, mix_q8, glow_enabled, axis_width, inv_axis_width, glow_max, rx_step, ry_step)
+    int center_x_i = args[P_CENTER_X];
+    int center_y_i = args[P_CENTER_Y];
+    int angle_i = args[P_ANGLE];
+    int spin_i = args[P_SPIN_SPEED];
+    int mix_i = args[P_REFLECT_MIX];
+    int axis_width_i = args[P_AXIS_WIDTH];
+    int axis_glow_i = args[P_AXIS_GLOW];
+
+    #pragma omp single
     {
-        veejay_memcpy(srcY, dstY, len);
-        veejay_memcpy(srcU, dstU, len);
-        veejay_memcpy(srcV, dstV, len);
-
-        int center_x_i = args[P_CENTER_X];
-        int center_y_i = args[P_CENTER_Y];
-        int angle_i = args[P_ANGLE];
-        int spin_i = args[P_SPIN_SPEED];
-        int mix_i = args[P_REFLECT_MIX];
-        int axis_width_i = args[P_AXIS_WIDTH];
-        int axis_glow_i = args[P_AXIS_GLOW];
-
         m->spin_phase += (float)spin_i * 0.00275f;
-
         if(m->spin_phase >= 360.0f)
             m->spin_phase -= 360.0f;
         else if(m->spin_phase <= -360.0f)
             m->spin_phase += 360.0f;
-
-        cx = (float)center_x_i;
-        cy = (float)center_y_i;
-        float angle_deg = (float)angle_i + m->spin_phase;
-        float rad = angle_deg * MIRROR_DEG_TO_RAD;
-        nx = cosf(rad);
-        ny = sinf(rad);
-
-        mix_q8 = (mix_i * 256 + 500) / 1000;
-        axis_width = (float)axis_width_i;
-        int glow_amount = axis_glow_i;
-        glow_enabled = glow_amount > 0 && axis_width > 0.1f;
-        inv_axis_width = glow_enabled ? 1.0f / axis_width : 0.0f;
-        glow_max = (glow_amount * 70 + 500) / 1000;
-
-        rx_step = 1.0f - 2.0f * nx * nx;
-        ry_step = -2.0f * nx * ny;
     }
-    /* Implicit barrier guarantees all threads have identical state via copyprivate */
+
+    float cx = (float)center_x_i;
+    float cy = (float)center_y_i;
+    float angle_deg = (float)angle_i + m->spin_phase;
+    float rad = angle_deg * MIRROR_DEG_TO_RAD;
+    float nx = cosf(rad);
+    float ny = sinf(rad);
+
+    int mix_q8 = (mix_i * 256 + 500) / 1000;
+    float axis_width = (float)axis_width_i;
+    int glow_amount = axis_glow_i;
+    int glow_enabled = glow_amount > 0 && axis_width > 0.1f;
+    float inv_axis_width = glow_enabled ? 1.0f / axis_width : 0.0f;
+    int glow_max = (glow_amount * 70 + 500) / 1000;
+
+    float rx_step = 1.0f - 2.0f * nx * nx;
+    float ry_step = -2.0f * nx * ny;
 
     #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {

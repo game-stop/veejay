@@ -42,6 +42,16 @@ typedef struct {
 
     float drift_phase;
     int initialized;
+
+    int tiles;
+    int phase_px;
+    int phase_py;
+    int small_w;
+    int small_h;
+    int tile_q8;
+    int tile_off_x;
+    int tile_off_y;
+    int skip_processing;
 } tiler_t;
 
 static inline int tiler_clampi(int v, int lo, int hi)
@@ -197,16 +207,6 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     const int drift_arg = args[P_DRIFT_SPEED];
     const int opacity_arg = args[P_OPACITY];
 
-    int tiles = 2;
-    int phase_px = 0;
-    int phase_py = 0;
-    int small_w = width;
-    int small_h = height;
-    int tile_q8 = 256;
-    int tile_off_x = 0;
-    int tile_off_y = 0;
-    int skip_processing = 0;
-
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -215,7 +215,7 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bufU = s->buf[1];
     uint8_t *restrict bufV = s->buf[2];
 
-    #pragma omp single copyprivate(tiles, phase_px, phase_py, small_w, small_h, tile_q8, tile_off_x, tile_off_y, skip_processing)
+    #pragma omp single
     {
         const float fast_a = 0.34f;
         const float slow_r = 0.085f;
@@ -235,7 +235,7 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
         int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
         int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
 
-        tiles = tiler_clampi(tiles_val, 2, max_tiles);
+        s->tiles = tiler_clampi(tiles_val, 2, max_tiles);
         phase_x = tiler_clampi(phase_x, 0, 1000);
         phase_y = tiler_clampi(phase_y, 0, 1000);
         drift = tiler_clampi(drift, -1000, 1000);
@@ -245,20 +245,31 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
         if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
             s->drift_phase = 0.0f;
 
-        phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
-        phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
+        s->phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
+        s->phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
 
-        small_w = (width  + tiles - 1) / tiles;
-        small_h = (height + tiles - 1) / tiles;
+        s->small_w = (width  + s->tiles - 1) / s->tiles;
+        s->small_h = (height + s->tiles - 1) / s->tiles;
 
-        tile_q8 = (opacity * 256 + 127) / 255;
-        tile_off_x = (phase_px / tiles) % small_w;
-        tile_off_y = (phase_py / tiles) % small_h;
+        s->tile_q8 = (opacity * 256 + 127) / 255;
+        s->tile_off_x = (s->phase_px / s->tiles) % s->small_w;
+        s->tile_off_y = (s->phase_py / s->tiles) % s->small_h;
 
+        s->skip_processing = 0;
         if(opacity <= 0) {
-            skip_processing = 1;
+            s->skip_processing = 1;
         }
     }
+    
+    const int skip_processing = s->skip_processing;
+    const int small_w = s->small_w;
+    const int small_h = s->small_h;
+    const int phase_px = s->phase_px;
+    const int phase_py = s->phase_py;
+    const int tile_off_x = s->tile_off_x;
+    const int tile_off_y = s->tile_off_y;
+    const int tile_q8 = s->tile_q8;
+    const int tiles = s->tiles;
 
     if(!skip_processing) {
         #pragma omp for schedule(static)

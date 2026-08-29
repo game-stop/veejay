@@ -31,6 +31,7 @@
 #define P_CAPTURE_DRIVE 3
 #define P_SLIDE_DRIVE   4
 
+
 typedef struct {
     picture_t **video_list;
     picture_t *pictures;
@@ -46,6 +47,14 @@ typedef struct {
     int delay_env_q8;
     int capture_env_q8;
     int slide_env_q8;
+
+    int skip_processing;
+    int amp_x;
+    int amp_y;
+    int global_x;
+    int global_y;
+    int boost_y;
+    matrix_f matrix_placement;
 } videowall_t;
 
 static void destroy_filmstrip(videowall_t *vw);
@@ -478,12 +487,7 @@ void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
     const int slide_drive = args[P_SLIDE_DRIVE];
     const int wanted_videos = grid * grid;
 
-    int skip_processing = 0;
-    int amp_x = 0, amp_y = 0;
-    int global_x = 0, global_y = 0, boost_y = 0;
-    matrix_f matrix_placement = NULL;
-
-    #pragma omp single copyprivate(skip_processing, amp_x, amp_y, global_x, global_y, boost_y, matrix_placement)
+    #pragma omp single
     {
         if(vw->delay_env_q8 <= 0)
             vw->delay_env_q8 = delay_arg << 8;
@@ -494,21 +498,22 @@ void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
 
         const int delay = clampi((vw->delay_env_q8 + 128) >> 8, 1, 250);
 
+        vw->skip_processing = 0;
         if(wanted_videos != vw->num_videos || vw->num_videos <= 0 || vw->grid != grid) {
             release_filmstrip(vw);
 
             if(!prepare_filmstrip(vw, grid, width, height)) {
-                skip_processing = 1;
+                vw->skip_processing = 1;
             } else {
                 videoplay_rebuild_order(vw, mode);
             }
         }
 
-        if(!skip_processing && vw->last_mode != mode) {
+        if(!vw->skip_processing && vw->last_mode != mode) {
             videoplay_rebuild_order(vw, mode);
         }
 
-        if(!skip_processing) {
+        if(!vw->skip_processing) {
             const int capture_q8 = clampi(vw->capture_env_q8, 0, 255);
             int effective_delay = delay - ((delay - 1) * capture_q8) / 255;
 
@@ -545,9 +550,9 @@ void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
                 take_video(vw, B, b);
             }
 
-            matrix_placement = (mode == 0) ? get_matrix_func(0) : get_matrix_func(mode - 1);
-            if(!matrix_placement)
-                matrix_placement = get_matrix_func(0);
+            vw->matrix_placement = (mode == 0) ? get_matrix_func(0) : get_matrix_func(mode - 1);
+            if(!vw->matrix_placement)
+                vw->matrix_placement = get_matrix_func(0);
 
             const int box_w = vw->video_list && vw->video_list[0] ? vw->video_list[0]->w : 1;
             const int box_h = vw->video_list && vw->video_list[0] ? vw->video_list[0]->h : 1;
@@ -559,19 +564,27 @@ void videoplay_apply(void *ptr, VJFrame *frame, VJFrame *B, int *args)
 
             const int wave_x = videoplay_tri_signed_q8(vw->slide_phase);
             const int wave_y = videoplay_tri_signed_q8(vw->slide_phase + 256);
-            amp_x = (box_w * slide_q8) / 540;
-            amp_y = (box_h * slide_q8) / 540;
+            vw->amp_x = (box_w * slide_q8) / 540;
+            vw->amp_y = (box_h * slide_q8) / 540;
 
-            if(amp_x > (box_w >> 1))
-                amp_x = box_w >> 1;
-            if(amp_y > (box_h >> 1))
-                amp_y = box_h >> 1;
+            if(vw->amp_x > (box_w >> 1))
+                vw->amp_x = box_w >> 1;
+            if(vw->amp_y > (box_h >> 1))
+                vw->amp_y = box_h >> 1;
 
-            global_x = (amp_x * wave_x) >> 8;
-            global_y = (amp_y * wave_y) >> 8;
-            boost_y = (slide_q8 * 10) >> 8;
+            vw->global_x = (vw->amp_x * wave_x) >> 8;
+            vw->global_y = (vw->amp_y * wave_y) >> 8;
+            vw->boost_y = (slide_q8 * 10) >> 8;
         }
     }
+
+    const int skip_processing = vw->skip_processing;
+    const matrix_f matrix_placement = vw->matrix_placement;
+    const int amp_x = vw->amp_x;
+    const int amp_y = vw->amp_y;
+    const int global_x = vw->global_x;
+    const int global_y = vw->global_y;
+    const int boost_y = vw->boost_y;
 
     if(!skip_processing && matrix_placement) {
         #pragma omp for schedule(static)

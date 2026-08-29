@@ -5517,251 +5517,7 @@ static void veejay_sequence_prepare_selected_sample_positions(veejay_t *info)
     }
 }
 
-static inline long vj_frame_rand(long long frame_num, long start, long end, unsigned long long seed) {
-    if (start >= end)
-        return start;
 
-    unsigned long long x = ((unsigned long long)frame_num ^ seed);
-
-    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
-    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
-    x ^= (x >> 31);
-
-    unsigned long long range = (unsigned long long)end - (unsigned long long)start + 1ULL;
-
-#if defined(__SIZEOF_INT128__)
-    long offset = (long)(((unsigned __int128)x * (unsigned __int128)range) >> 64);
-    return start + offset;
-#else
-    if (range <= 0xFFFFFFFFULL) {
-        uint32_t offset = (uint32_t)(((unsigned long long)(uint32_t)x * range) >> 32);
-        return start + (long)offset;
-    }
-    return start + (long)(x % range);
-#endif
-}
-
-void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
-{
-    video_playback_setup *settings = info->settings;
-    int current_pm = info->uc->playback_mode;
-    int cur_id = info->uc->sample_id;
-
-    veejay_msg(VEEJAY_MSG_DEBUG,
-               "[PLAYBACK] change %s:%d -> %s:%d seq=%d slot=%d transition_ready=%d transport=%lld",
-               vj_playback_mode_label(current_pm),
-               cur_id,
-               vj_playback_mode_label(new_pm),
-               sample_id,
-               info->seq ? info->seq->active : 0,
-               info->seq ? info->seq->current : -1,
-               settings->transition.ready,
-               atomic_load_long_long(&settings->current_frame_num));
-
-    if (!info->seq->active && 
-        atomic_load_int(&settings->transition.global_state) && 
-        !settings->transition.ready &&
-        !atomic_load_int(&settings->transition.active) &&
-        (current_pm != new_pm || cur_id != sample_id) && 
-        (current_pm == VJ_PLAYBACK_MODE_SAMPLE || current_pm == VJ_PLAYBACK_MODE_TAG)) 
-    {
-        int tx_active = (current_pm == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_active(cur_id) : vj_tag_get_transition_active(cur_id);
-        int tx_length = (current_pm == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_length(cur_id) : vj_tag_get_transition_length(cur_id);
-
-        if (tx_active && tx_length > 0) {
-            long long cur_frame = atomic_load_long_long(&settings->current_frame_num);
-            long long max_frame = atomic_load_long_long(&settings->max_frame_num);
-            long long min_frame = atomic_load_long_long(&settings->min_frame_num);
-            int speed = settings->current_playback_speed;
-            //FIXME: slow motion sfd ignored here
-            if (speed >= 0 && (cur_frame + tx_length > max_frame)) {
-                tx_length = max_frame - cur_frame;
-            } else if (speed < 0 && (cur_frame - tx_length < min_frame)) {
-                tx_length = cur_frame - min_frame;
-            }
-
-            if (tx_length > 0) {
-                int tx_shape = (current_pm == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_shape(cur_id) : vj_tag_get_transition_shape(cur_id);
-                
-                if (tx_shape == -1) {
-                    const int shape_count = shapewipe_get_shape_count(settings->transition.ptr);
-                    tx_shape = shape_count > 0 ? (int)vj_frame_rand(cur_frame, 0, shape_count - 1, 0) : 0;
-                }
-
-                long long start_tx = cur_frame;
-                long long end_tx = (speed < 0) ? cur_frame - tx_length : cur_frame + tx_length;
-
-                if (speed < 0) {
-                    start_tx = end_tx;
-                    end_tx = cur_frame;
-                }
-
-                settings->transition.shape = tx_shape;
-                settings->transition.next_type = new_pm;
-                settings->transition.next_id = sample_id;
-                settings->transition.ready = 0;
-                settings->transition.seq_bank = -1;
-                settings->transition.seq_index = -1;
-
-                atomic_store_long_long(&settings->transition.start, start_tx);
-                atomic_store_long_long(&settings->transition.end, end_tx);
-                atomic_store_int(&settings->transition.active, 1);
-                
-                veejay_msg(VEEJAY_MSG_INFO, "Armed manual transition from %s:%d to %s:%d", vj_playback_mode_label(current_pm), cur_id, vj_playback_mode_label(new_pm), sample_id);
-                return;
-            }
-        }
-    }
-
-    if(new_pm != VJ_PLAYBACK_MODE_SAMPLE &&
-       settings->randplayer.mode != RANDMODE_INACTIVE) {
-        settings->randplayer.mode = RANDMODE_INACTIVE;
-        settings->randplayer.next_id = 0;
-        settings->randplayer.next_mode = VJ_PLAYBACK_MODE_SAMPLE;
-        settings->randplayer.min_delay = 0;
-        settings->randplayer.max_delay = 0;
-    }
-
-    if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
-        if (!sample_exists(sample_id)) {
-            veejay_msg(VEEJAY_MSG_ERROR,
-                       "[Playback] Sample %d does not exist",
-                       sample_id);
-            return;
-        }
-    }
-    else if (new_pm == VJ_PLAYBACK_MODE_TAG) {
-        if (!vj_tag_exists(sample_id)) {
-            veejay_msg(VEEJAY_MSG_ERROR,
-                       "[Playback] Stream %d does not exist",
-                       sample_id);
-            return;
-        }
-    }
-    else if (new_pm == VJ_PLAYBACK_MODE_PLAIN) {
-        if (info->edit_list->video_frames < 1) {
-            veejay_msg(VEEJAY_MSG_ERROR,
-                       "[Playback] No video frames in EditList");
-            return;
-        }
-    }
-
-    if(current_pm != new_pm || cur_id != sample_id) {
-        const long long mapping_frame =
-            (new_pm == VJ_PLAYBACK_MODE_PLAIN) ? 0 :
-            atomic_load_long_long(&settings->current_frame_num);
-        veejay_video_mapping_publish(info, mapping_frame);
-        veejay_transport_epoch_bump(info);
-    }
-
-    veejay_output_hold_release_on_transport(info);
-
-    if (current_pm == VJ_PLAYBACK_MODE_SAMPLE) {
-        if (cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
-            if (!info->seq->active) {
-                if (info->settings->sample_restart) {
-                    veejay_msg(VEEJAY_MSG_INFO,
-                               "[Playback] Restarting Sample %d",
-                               cur_id);
-                    sample_set_resume_override(cur_id, -1);
-                    veejay_sample_resume_at(info, cur_id);
-                }
-                else {
-                    veejay_msg(VEEJAY_MSG_INFO,
-                               "[Playback] (Continuous mode) Sample %d already playing",
-                               sample_id);
-                }
-                return;
-            }
-        }
-        else {
-            veejay_msg(VEEJAY_MSG_INFO,
-                       "[Playback] Stopping Sample %d",
-                       cur_id);
-            veejay_stop_playing_sample(info, cur_id);
-        }
-    }
-
-    if (current_pm == VJ_PLAYBACK_MODE_TAG) {
-        if (cur_id != sample_id || new_pm != VJ_PLAYBACK_MODE_TAG) {
-            veejay_msg(VEEJAY_MSG_INFO,
-                       "[Playback] Stopping Stream %d",
-                       cur_id);
-            veejay_stop_playing_stream(info, cur_id);
-        }
-    }
-
-    atomic_store_int(&settings->sequence_boundary, 0);
-    settings->sequence_random_id = 0;
-    settings->sequence_random_ticks_left = 0;
-
-    if (new_pm == VJ_PLAYBACK_MODE_PLAIN) {
-        info->uc->playback_mode = new_pm;
-        info->current_edit_list = info->edit_list;
-        veejay_reset_el_buffer(info);
-
-        atomic_store_long_long(&settings->min_frame_num, 0);
-        atomic_store_long_long(&settings->max_frame_num,
-                               (long long)info->edit_list->total_frames);
-        atomic_store_long_long(&settings->current_frame_num, 0);
-    }
-    else if (new_pm == VJ_PLAYBACK_MODE_TAG) {
-        info->uc->playback_mode = new_pm;
-
-        int buffered_duration = vj_tag_get_buffer_duration(sample_id);
-        int transport_length = vj_tag_buffer_active(sample_id)
-            ? (buffered_duration > 0 ? buffered_duration : 1)
-            : vj_tag_get_n_frames(sample_id);
-        if(transport_length < 1)
-            transport_length = 1;
-
-        atomic_store_long_long(&settings->min_frame_num, 0);
-        atomic_store_long_long(&settings->max_frame_num, (long long)(transport_length - 1));
-        atomic_store_long_long(&settings->current_frame_num, 0);
-
-        veejay_start_playing_stream(info, sample_id);
-    }
-    else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
-        info->uc->playback_mode = new_pm;
-        veejay_start_playing_sample(info, sample_id);
-    }
-
-    if (info->seq->active) {
-        if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
-            veejay_seq_prepare_sample_position(info, sample_id);
-
-            long pos = sample_get_resume(sample_id);
-            veejay_set_frame(info, pos);
-#ifdef HAVE_DEBUG_SEQUENCER
-            veejay_log_sample_transport_state(info, "post-seed", sample_id);
-#endif
-        }
-        else if (new_pm == VJ_PLAYBACK_MODE_TAG ||
-                 new_pm == VJ_PLAYBACK_MODE_PLAIN) {
-            veejay_set_frame(info, 0);
-        }
-
-        int next_id = sample_id;
-        int next_bank = info->seq->active_bank;
-        int next_slot = info->seq->current;
-        int next_mode = new_pm;
-
-        next_id = vj_perform_next_sequence(info, &next_mode, &next_bank, &next_slot);
-
-        vj_perform_setup_transition(info,
-                                    next_id,
-                                    next_mode,
-                                    sample_id,
-                                    new_pm,
-                                    next_bank,
-                                    next_slot);
-    }
-    else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
-        veejay_sample_resume_at(info, sample_id);
-    }
-}
-
-/*
 void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 {
     video_playback_setup *settings = info->settings;
@@ -5925,7 +5681,7 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
     else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         veejay_sample_resume_at(info, sample_id);
     }
-}*/
+}
 
 void veejay_sample_set_initial_positions(veejay_t *info)
 {
@@ -11023,26 +10779,57 @@ static void veejay_producer_initialize_playmode(veejay_t *info) {
 }  
 
 /*
- * PLAIN video is presented from the presentation clock, not from the audio
- * producer's ring-buffer write head.  Keep wrapping here deliberately free of
- * audio-rate assumptions: min/max are media-frame bounds and the producer's
- * master tick supplies the cadence.
+ * Unit-speed PLAIN and normal-loop SAMPLE video are presented from the video
+ * clock, not from the audio producer's ring-buffer write head.  Keep wrapping
+ * deliberately free of audio-rate assumptions: the bounds are media frames
+ * and the producer's master tick supplies the cadence.
  */
-static long long veejay_plain_video_source_wrap(video_playback_setup *settings,
-                                                 long long frame)
+static int veejay_clocked_video_source_bounds(veejay_t *info,
+                                               long long *min_frame,
+                                               long long *max_frame)
+{
+    video_playback_setup *settings;
+
+    if(!info || !info->settings || !info->uc || !min_frame || !max_frame)
+        return 0;
+
+    settings = info->settings;
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) {
+        *min_frame = atomic_load_long_long(&settings->min_frame_num);
+        *max_frame = atomic_load_long_long(&settings->max_frame_num);
+        return *max_frame >= *min_frame;
+    }
+
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+        int start = 0;
+        int end = 0;
+        int loop = 0;
+        int speed = 0;
+
+        if(sample_get_short_info(info->uc->sample_id,
+                                 &start,
+                                 &end,
+                                 &loop,
+                                 &speed) != 0)
+            return 0;
+
+        *min_frame = start;
+        *max_frame = end;
+        return end >= start;
+    }
+
+    return 0;
+}
+
+static long long veejay_clocked_video_source_wrap(veejay_t *info,
+                                                   long long frame)
 {
     long long min_frame;
     long long max_frame;
     long long span;
     long long relative;
 
-    if(!settings)
-        return frame;
-
-    min_frame = atomic_load_long_long(&settings->min_frame_num);
-    max_frame = atomic_load_long_long(&settings->max_frame_num);
-
-    if(max_frame < min_frame)
+    if(!veejay_clocked_video_source_bounds(info, &min_frame, &max_frame))
         return frame;
     if(frame >= min_frame && frame <= max_frame)
         return frame;
@@ -11058,22 +10845,53 @@ static long long veejay_plain_video_source_wrap(video_playback_setup *settings,
     return min_frame + relative;
 }
 
-static inline int veejay_plain_video_source_is_clocked(veejay_t *info)
+static inline int veejay_video_source_is_clocked(veejay_t *info)
 {
     video_playback_setup *settings;
+    int start = 0;
+    int end = 0;
+    int loop = 0;
+    int speed = 0;
 
     if(!info || !info->settings || !info->uc)
-        return 0;
-    if(info->uc->playback_mode != VJ_PLAYBACK_MODE_PLAIN)
         return 0;
 
     settings = info->settings;
 
-    /* Keep non-unit speed and frame-dup/trick-play on the legacy transport
-     * cursor until those modes get their own explicit video transport state. */
-    if(settings->current_playback_speed != 1)
+    if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) {
+        /* Keep non-unit speed and frame-dup/trick-play on the legacy transport
+         * cursor until those modes get their own explicit video state. */
+        if(settings->current_playback_speed != 1)
+            return 0;
+        if(atomic_load_int(&settings->audio_slice_len) > 1)
+            return 0;
+        return 1;
+    }
+
+    if(info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
         return 0;
-    if(atomic_load_int(&settings->audio_slice_len) > 1)
+
+    /* Sequence, transition and random-play state is tied to the legacy
+     * transport cursor.  Preserve those semantics along with reverse,
+     * ping-pong, random-loop, speed and frame-dup trick play. */
+    if(info->seq && info->seq->active)
+        return 0;
+    if(settings->randplayer.mode != RANDMODE_INACTIVE)
+        return 0;
+    if(atomic_load_int(&settings->transition.active) &&
+       atomic_load_int(&settings->transition.global_state))
+        return 0;
+    if(sample_get_short_info(info->uc->sample_id,
+                             &start,
+                             &end,
+                             &loop,
+                             &speed) != 0)
+        return 0;
+    if(end < start || loop != 1 || speed != 1 ||
+       settings->current_playback_speed != 1)
+        return 0;
+    if(sample_get_framedup(info->uc->sample_id) > 1 ||
+       atomic_load_int(&settings->audio_slice_len) > 1)
         return 0;
 
     return 1;
@@ -13871,9 +13689,11 @@ static void *veejay_producer_thread_loop(void *ptr)
     long long tempo_bridge_reverse_reanchor_last_ms = 0;
 #endif
 
-    long long plain_source_offset = 0;
-    int plain_mapping_epoch = -1;
-    int plain_source_valid = 0;
+    long long clocked_source_offset = 0;
+    int clocked_mapping_epoch = -1;
+    int clocked_source_valid = 0;
+    int clocked_source_mode = -1;
+    int clocked_source_id = -1;
     double render_lead_s = veejay_video_render_lead_base(settings->spvf);
     double render_estimate_s = 0.0;
 
@@ -13883,15 +13703,17 @@ static void *veejay_producer_thread_loop(void *ptr)
                    veejay_sample_diag_config_.interval_ms);
 
     /* master_frame_num was just anchored to zero above.  Establish the initial
-     * PLAIN media mapping from that video tick, independently of however far
-     * ahead the audio producer has already filled JACK. */
-    if(veejay_plain_video_source_is_clocked(info)) {
+     * media mapping from that video tick, independently of however far ahead
+     * the audio producer has already filled JACK. */
+    if(veejay_video_source_is_clocked(info)) {
         long long mapping_frame = 0;
-        plain_mapping_epoch =
+        clocked_mapping_epoch =
             veejay_video_mapping_snapshot(settings, &mapping_frame);
-        plain_source_offset =
-            veejay_plain_video_source_wrap(settings, mapping_frame);
-        plain_source_valid = 1;
+        clocked_source_offset =
+            veejay_clocked_video_source_wrap(info, mapping_frame);
+        clocked_source_valid = 1;
+        clocked_source_mode = info->uc->playback_mode;
+        clocked_source_id = info->uc->sample_id;
     }
 
 	while (atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
@@ -13923,7 +13745,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         double spvf = settings->spvf;
         double skip_tolerance = 1.1 * spvf + 0.002;
         const int producer_early_render =
-            veejay_plain_video_source_is_clocked(info);
+            veejay_video_source_is_clocked(info);
         double applied_render_lead_s = 0.0;
         double display_ready_lead_s = 0.0;
 
@@ -14090,35 +13912,52 @@ static void *veejay_producer_thread_loop(void *ptr)
         const int current_mapping_epoch =
             veejay_video_mapping_snapshot(settings, &mapping_frame);
         long long source_frame = current_frame;
-        const int plain_clocked_source = veejay_plain_video_source_is_clocked(info);
+        const int clocked_source = veejay_video_source_is_clocked(info);
+        const int source_mode = info->uc ? info->uc->playback_mode : -1;
+        const int source_id = info->uc ? info->uc->sample_id : -1;
 
-        if(plain_clocked_source) {
-            if(!plain_source_valid) {
-                source_frame = veejay_plain_video_source_wrap(settings,
-                                                               mapping_frame);
-                plain_source_offset = source_frame - frame;
-                plain_mapping_epoch = current_mapping_epoch;
-                plain_source_valid = 1;
+        if(clocked_source) {
+            const int source_changed =
+                source_mode != clocked_source_mode ||
+                source_id != clocked_source_id;
+
+            if(!clocked_source_valid || source_changed) {
+                /* A mapping generation is authoritative for an explicit jump.
+                 * Re-entering from trick play without a new generation anchors
+                 * to the live transport cursor instead. */
+                const long long anchor =
+                    source_changed || current_mapping_epoch != clocked_mapping_epoch ?
+                    mapping_frame : current_frame;
+
+                source_frame = veejay_clocked_video_source_wrap(info, anchor);
+                clocked_source_offset = source_frame - frame;
+                clocked_mapping_epoch = current_mapping_epoch;
+                clocked_source_valid = 1;
             }
 
-            /* master_frame_num (snapshotted in frame) owns normal PLAIN video
+            /* master_frame_num (snapshotted in frame) owns normal video
              * cadence.  The published mapping frame is consulted only when an
-             * explicit video mapping generation says that the source jumped. */
-            if(current_mapping_epoch != plain_mapping_epoch) {
-                source_frame = veejay_plain_video_source_wrap(settings,
-                                                               mapping_frame);
-                plain_source_offset = source_frame - frame;
-                plain_mapping_epoch = current_mapping_epoch;
+             * explicit video mapping generation says the source jumped. */
+            if(current_mapping_epoch != clocked_mapping_epoch) {
+                source_frame = veejay_clocked_video_source_wrap(info,
+                                                                 mapping_frame);
+                clocked_source_offset = source_frame - frame;
+                clocked_mapping_epoch = current_mapping_epoch;
             }
             else
-                source_frame = veejay_plain_video_source_wrap(settings,
-                                                               frame + plain_source_offset);
+                source_frame = veejay_clocked_video_source_wrap(
+                    info,
+                    frame + clocked_source_offset);
 
+            clocked_source_mode = source_mode;
+            clocked_source_id = source_id;
         }
         else {
-            plain_source_valid = 0;
-            plain_source_offset = 0;
-            plain_mapping_epoch = current_mapping_epoch;
+            clocked_source_valid = 0;
+            clocked_source_offset = 0;
+            clocked_mapping_epoch = current_mapping_epoch;
+            clocked_source_mode = source_mode;
+            clocked_source_id = source_id;
         }
 
         VJFrame *vf = packet->frame;
@@ -14131,7 +13970,7 @@ static void *veejay_producer_thread_loop(void *ptr)
             atomic_load_int(&settings->video_present_epoch);
         packet->transport_epoch = atomic_load_int(&settings->transport_epoch);
         packet->video_mapping_epoch = current_mapping_epoch;
-        if(plain_clocked_source)
+        if(clocked_source)
             packet->flags |= VJ_VIDEO_PACKET_CLOCKED_SOURCE;
 
         double t_before = monotonic_now_s();
@@ -14182,7 +14021,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         const double producer_work_s =
             monotonic_now_s() - producer_work_started_s;
 
-        if(plain_clocked_source) {
+        if(clocked_source) {
             veejay_video_render_lead_update(spvf,
                                             producer_work_s,
                                             packet_ready_margin_s,

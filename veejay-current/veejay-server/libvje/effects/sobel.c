@@ -41,6 +41,12 @@ typedef struct {
     float eff_gain;
     float eff_chroma;
     int eff_initialized;
+
+    int threshold;
+    int mode;
+    int mix;
+    int gain;
+    int chroma;
 } sobel_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -331,23 +337,45 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
 {
     sobel_t *s = (sobel_t*) ptr;
 
-    int threshold = 0;
-    int mode = 1;
-    int mix = 1000;
-    int gain = 1000;
-    int chroma = 0;
+    const int len = frame->len;
+    const int uv_len = frame->uv_len;
+    const int width = frame->width;
+    const int height = frame->height;
 
-    #pragma omp single copyprivate(threshold, mode, mix, gain, chroma)
+    int t = args[P_THRESHOLD];
+    int mode_arg = args[P_MODE];
+    int m = args[P_MIX];
+    int g = args[P_EDGE_GAIN];
+    int c = args[P_CHROMA_EDGE];
+
+    const uint8_t *srcY = frame->data[0];
+    const uint8_t *srcCb = frame->data[1];
+    const uint8_t *srcCr = frame->data[2];
+
+    uint8_t *restrict bufY = s->buf[0];
+    uint8_t *restrict bufCb = s->buf[1];
+    uint8_t *restrict bufCr = s->buf[2];
+
+    uint8_t *restrict dstY = frame->data[0];
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        bufY[i] = srcY[i];
+    }
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        bufCb[i] = srcCb[i];
+        bufCr[i] = srcCr[i];
+    }
+
+    #pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        dstY[i] = pixel_Y_lo_;
+    }
+
+    #pragma omp single
     {
-        int len = frame->len;
-        int uv_len = frame->uv_len;
-        
-        int t = args[P_THRESHOLD];
-        mode = args[P_MODE];
-        int m = args[P_MIX];
-        int g = args[P_EDGE_GAIN];
-        int c = args[P_CHROMA_EDGE];
-
         float param_fast = 0.30f;
         float param_slow = 0.085f;
 
@@ -364,19 +392,18 @@ void sobel_apply(void *ptr, VJFrame *frame, int *args)
             c = sobel_smooth_i(&s->eff_chroma, c, param_fast * 0.80f, param_slow);
         }
 
-        threshold = clampi(t, 0, 255);
-        mix = clampi(m, 0, 1000);
-        gain = clampi(g, 0, 2000);
-        chroma = clampi(c, 0, 1000);
-
-        veejay_memcpy(s->buf[0], frame->data[0], len);
-        veejay_memcpy(s->buf[1], frame->data[1], uv_len);
-        veejay_memcpy(s->buf[2], frame->data[2], uv_len);
-        veejay_memset(frame->data[0], pixel_Y_lo_, len);
+        s->threshold = clampi(t, 0, 255);
+        s->mode = mode_arg;
+        s->mix = clampi(m, 0, 1000);
+        s->gain = clampi(g, 0, 2000);
+        s->chroma = clampi(c, 0, 1000);
     }
-
-    const int width = frame->width;
-    const int height = frame->height;
+    
+    const int threshold = s->threshold;
+    const int mode = s->mode;
+    const int mix = s->mix;
+    const int gain = s->gain;
+    const int chroma = s->chroma;
 
     switch(mode) {
         case 0:

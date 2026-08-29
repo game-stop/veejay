@@ -146,9 +146,13 @@ void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    bar->bar_top_auto_y = (bar->bar_top_auto_y + top_y_step) % top_span;
-    bar->bar_top_auto_x = (bar->bar_top_auto_x + top_x_step) % width_span;
+    #pragma omp single
+    {
+        bar->bar_top_auto_y = (bar->bar_top_auto_y + top_y_step) % top_span;
+        bar->bar_top_auto_x = (bar->bar_top_auto_x + top_x_step) % width_span;
+    }
 
+    #pragma omp for schedule(static)
     for(unsigned int y = 0; y < top_height; y++) {
         const unsigned int src_y = (y + bar->bar_top_auto_y) % top_height;
 
@@ -168,9 +172,13 @@ void bar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(bottom_height > 0) {
         const unsigned int bottom_start = top_height * width;
 
-        bar->bar_bot_auto_y = (bar->bar_bot_auto_y + bot_y_step) % bottom_height;
-        bar->bar_bot_auto_x = (bar->bar_bot_auto_x + bot_x_step) % width_span;
+        #pragma omp single
+        {
+            bar->bar_bot_auto_y = (bar->bar_bot_auto_y + bot_y_step) % bottom_height;
+            bar->bar_bot_auto_x = (bar->bar_bot_auto_x + bot_x_step) % width_span;
+        }
 
+        #pragma omp for schedule(static)
         for(unsigned int y = 0; y < bottom_height; y++) {
             const unsigned int src_y = (y + bar->bar_bot_auto_y) % bottom_height;
 

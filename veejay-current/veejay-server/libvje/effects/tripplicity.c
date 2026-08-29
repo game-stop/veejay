@@ -45,6 +45,10 @@ typedef struct {
     int initialized;
 
     int n_threads;
+
+    int qY;
+    int qCb;
+    int qCr;
 } tripplicity_t;
 
 static inline int tripplicity_clampi(int v, int lo, int hi)
@@ -151,11 +155,7 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int mix_drive_arg = args[P_MIX_DRIVE];
     const int chroma_drive_arg = args[P_CHROMA_DRIVE];
 
-    int qY = 0, qCb = 0, qCr = 0;
-    uint8_t *Y1 = NULL, *Cb1 = NULL, *Cr1 = NULL;
-    const uint8_t *Y2 = NULL, *Cb2 = NULL, *Cr2 = NULL;
-
-    #pragma omp single copyprivate(qY, qCb, qCr, Y1, Cb1, Cr1, Y2, Cb2, Cr2)
+    #pragma omp single
     {
         if(!t->initialized) {
             t->op_y_env = (float)op_y_arg;
@@ -178,26 +178,30 @@ void tripplicity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         const int mix_drive = tripplicity_clampi((int)(t->mix_drive_env + 0.5f), 0, 1000);
         const int chroma_drive = tripplicity_clampi((int)(t->chroma_drive_env + 0.5f), 0, 1000);
 
-        qY  = tripplicity_to_q8((int)(t->op_y_env + 0.5f));
-        qCb = tripplicity_to_q8((int)(t->op_cb_env + 0.5f));
-        qCr = tripplicity_to_q8((int)(t->op_cr_env + 0.5f));
+        int qY  = tripplicity_to_q8((int)(t->op_y_env + 0.5f));
+        int qCb = tripplicity_to_q8((int)(t->op_cb_env + 0.5f));
+        int qCr = tripplicity_to_q8((int)(t->op_cr_env + 0.5f));
 
         qY  += ((256 - qY) * mix_drive + 500) / 1000;
         qCb += ((256 - qCb) * chroma_drive + 500) / 1000;
         qCr += ((256 - qCr) * chroma_drive + 500) / 1000;
 
-        qY = tripplicity_clampi(qY, 0, 256);
-        qCb = tripplicity_clampi(qCb, 0, 256);
-        qCr = tripplicity_clampi(qCr, 0, 256);
-
-        Y1  = frame->data[0];
-        Cb1 = frame->data[1];
-        Cr1 = frame->data[2];
-
-        Y2  = frame2->data[0];
-        Cb2 = frame2->data[1];
-        Cr2 = frame2->data[2];
+        t->qY = tripplicity_clampi(qY, 0, 256);
+        t->qCb = tripplicity_clampi(qCb, 0, 256);
+        t->qCr = tripplicity_clampi(qCr, 0, 256);
     }
+    
+    const int qY = t->qY;
+    const int qCb = t->qCb;
+    const int qCr = t->qCr;
+
+    uint8_t *restrict Y1  = frame->data[0];
+    uint8_t *restrict Cb1 = frame->data[1];
+    uint8_t *restrict Cr1 = frame->data[2];
+
+    const uint8_t *restrict Y2  = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
