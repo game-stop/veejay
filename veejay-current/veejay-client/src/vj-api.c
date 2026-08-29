@@ -9289,6 +9289,22 @@ static void vj_kf_reset_panel(void)
     curve_editor_clear_local_dirty();
     vj_kf_reset_shape_combo();
 
+    if(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE])
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_ACTIVE]), FALSE);
+    if(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE])
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_ACTIVE]), FALSE);
+
+    if(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH])
+        gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_STREAM_TRANSITION_LENGTH]), 0.0);
+    if(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH])
+        gtk_spin_button_set_value( GTK_SPIN_BUTTON(widget_cache[WIDGET_SAMPLE_TRANSITION_LENGTH]), 0.0);
+
+    if(widget_cache[WIDGET_STREAM_TRANSITION_SHAPE])
+        gvr_shape_selector_set_active( widget_cache[WIDGET_STREAM_TRANSITION_SHAPE], 0);
+    if(widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE])
+        gvr_shape_selector_set_active( widget_cache[WIDGET_SAMPLE_TRANSITION_SHAPE], 0);
+
+
     for( int i = 0; i < MAX_UI_PARAMETERS; i ++ )
     {
         update_slider_state( i, FALSE );
