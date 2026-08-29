@@ -35,7 +35,7 @@ typedef struct {
     uint8_t *buf[3];
     int *xmap;
     int *ymap;
-    int n_threads;
+
     int max_size;
     int w;
     int h;
@@ -163,8 +163,6 @@ void *transform_malloc(int w, int h)
     t->phase_state = 0.0f;
     t->size_drive_state = 0.0f;
     t->drift_phase = 0.0f;
-
-    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }

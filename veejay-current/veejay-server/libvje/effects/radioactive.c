@@ -53,7 +53,6 @@ typedef struct {
     int first_frame;
     int last_mode;
     float ratio_;
-    int n_threads;
 } radioactive_t;
 
 static inline int radioactive_clampi(int v, int lo, int hi)
@@ -209,8 +208,6 @@ void *radioactivetv_malloc(int w, int h)
     p += zoom_x_bytes;
 
     r->zoom_y = (int*)p;
-
-    r->n_threads = vje_advise_num_threads(w * h);
 
     radioactive_set_table(r);
 

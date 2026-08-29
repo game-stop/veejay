@@ -47,7 +47,7 @@
 
 typedef struct {
     uint8_t *chrominance;
-    int n_threads;
+
 
     int valid;
     int last_angle;
@@ -161,8 +161,6 @@ void *uvcorrect_malloc(int w, int h)
         free(uv);
         return NULL;
     }
-
-    uv->n_threads = vje_advise_num_threads(w * h);
 
     uv->valid = 0;
     uv->smooth_valid = 0;

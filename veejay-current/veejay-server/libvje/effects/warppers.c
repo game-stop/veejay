@@ -48,7 +48,7 @@ typedef struct {
     double *lut;
     double *cos_lut;
     double *sin_lut;
-    int n_threads;
+
     int w;
     int h;
     double spin_phase;
@@ -263,8 +263,6 @@ void *warppers_malloc(int w, int h)
     s->zoom_drive_env = 0.0;
     s->warp_drive_env = 0.0;
     s->env_ready = 0;
-
-    s->n_threads = vje_advise_num_threads((int)len);
 
     warppers_init_trig_lut(s);
 

@@ -52,7 +52,7 @@ typedef struct {
 
     int grid_w;
     int grid_h;
-    int n_threads;
+
 } morph_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -167,9 +167,7 @@ void *morphologymixer_malloc(int w, int h)
     m->grid_x2 = m->grid_y1 + grid_cells;
     m->grid_y2 = m->grid_x2 + grid_cells;
 
-    m->n_threads = vje_advise_num_threads(size);
-
-    return (void*) m;
+    return (void*)m;
 }
 
 static void morphologymixer_blend_plain(morph_t *m,

@@ -67,7 +67,6 @@ typedef struct {
     float eff_radius_drive;
     int eff_initialized;
 
-    int n_threads;
 } spherize_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -339,8 +338,6 @@ void *spherize_malloc(int w, int h)
     s->eff_warp_drive = 0.0f;
     s->eff_radius_drive = 0.0f;
     s->eff_initialized = 0;
-
-    s->n_threads = vje_advise_num_threads(pixels);
 
     return (void*) s;
 }

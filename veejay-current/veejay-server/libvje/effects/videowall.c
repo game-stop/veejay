@@ -46,7 +46,7 @@ typedef struct {
     int *sample_area;
     int box_w;
     int box_h;
-    int n_threads;
+
     int slide_env_q8;
     int slide_phase;
     uint8_t lift_lut[33][256];
@@ -335,8 +335,6 @@ static void *prepare_filmstrip(int w, int h)
     vw->frame_counter = 0;
     vw->slide_env_q8 = 0;
     vw->slide_phase = 0;
-    vw->n_threads = vje_advise_num_threads(w * h);
-
     build_lift_lut(vw);
     build_sample_map(vw, w, h);
 

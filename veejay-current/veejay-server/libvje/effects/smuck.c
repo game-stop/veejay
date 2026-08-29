@@ -41,7 +41,6 @@ typedef struct {
     uint8_t *tmp[3];
     uint32_t seed;
     uint32_t beat_seed;
-    int n_threads;
 
     float eff_shimmer;
     float eff_mix;
@@ -221,8 +220,6 @@ void *smuck_malloc(int w, int h)
     s->seed = 0x1337BEEFU ^ (uint32_t)(w * 73856093u) ^ (uint32_t)(h * 19349663u);
     s->beat_seed = smuck_hash_u32(s->seed ^ 0x9e3779b9U);
 
-    s->n_threads = vje_advise_num_threads(len);
-
     s->eff_shimmer = 0.0f;
     s->eff_mix = 0.0f;
     s->eff_shimmer_drive = 0.0f;
@@ -249,11 +246,8 @@ static void smuck_apply_plane(uint8_t *restrict dst,
                               int mx,
                               int my,
                               uint32_t seed,
-                              int chroma,
-                              int n_threads)
+                              int chroma)
 {
-    (void)n_threads;
-
     const unsigned int shift = (unsigned int)(10 + shimmer);
     const unsigned int mask = chroma ? 0x3u : 0x7u;
     const int bias = chroma ? 1 : 3;
@@ -364,8 +358,7 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
         mx,
         my,
         seed,
-        0,
-        s->n_threads
+        0
         );
 
         if(mix_q8 < 256) {
@@ -397,8 +390,7 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
             mx,
             my,
             seed ^ 0x9e3779b9U,
-            1,
-            s->n_threads
+            1
             );
 
             smuck_apply_plane(
@@ -411,8 +403,7 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
             mx,
             my,
             seed ^ 0x85ebca6bU,
-            1,
-            s->n_threads
+            1
             );
 
             if(mix_q8 < 256) {

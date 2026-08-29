@@ -29,7 +29,6 @@ typedef struct {
     int width;
     int height;
     int size;
-    int n_threads;
 } emboss_data_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -47,7 +46,6 @@ void *emboss_malloc(int wid, int hei)
     data->width = wid;
     data->height = hei;
     data->size = wid * hei;
-    data->n_threads = vje_advise_num_threads(data->size);
     data->tmp_buffer = (uint8_t *)vj_calloc((size_t)data->size * sizeof(uint8_t));
 
     if (!data->tmp_buffer) {

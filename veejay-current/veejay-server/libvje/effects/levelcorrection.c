@@ -29,7 +29,6 @@
 #define P_SHRINK_MAX 3
 
 typedef struct {
-    int n_threads;
 } level_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -104,8 +103,6 @@ void *levelcorrection_malloc(int w, int h)
 
     if(!t)
         return NULL;
-
-    t->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) t;
 }

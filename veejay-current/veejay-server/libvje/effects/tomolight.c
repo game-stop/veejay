@@ -126,7 +126,7 @@ typedef struct {
     int seeded;
     int last_reset;
     int prev_valid;
-    int n_threads;
+
 
     int last_slices;
     int last_center;
@@ -946,8 +946,6 @@ void *tomolight_malloc(int w, int h)
     t->seeded = 0;
     t->last_reset = 0;
     t->prev_valid = 0;
-    t->n_threads = vje_advise_num_threads(len);
-
     if(!tl_init_geometry_maps(t)) {
         free(t->region);
         free(t);

@@ -83,7 +83,7 @@ typedef struct {
     double time;
     double phase;
     int width, height;
-    int n_threads;
+
     int cached_shape_p;
     float p1_x, p1_y;
     float p2_x, p2_y;
@@ -850,8 +850,6 @@ void *topomorph_malloc(int width, int height)
 
     t->width = width;
     t->height = height;
-    t->n_threads = vje_advise_num_threads(size);
-
     t->histY = (int32_t*)p;
     t->histU = t->histY + size;
     t->histV = t->histU + size;

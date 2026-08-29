@@ -191,7 +191,7 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
+
     int frame;
     int write_pos;
     int seeded;
@@ -1425,7 +1425,6 @@ void *slitscan_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = vje_advise_num_threads(len);
     s->history = s->region + history_off;
     s->prev_y = s->region + prev_off;
     s->geom = (uint16_t*)(void*)(s->region + geom_off);

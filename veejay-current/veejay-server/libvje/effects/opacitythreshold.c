@@ -30,7 +30,7 @@
 
 typedef struct {
     uint16_t *hblur;
-    int n_threads;
+
 } op_thres_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -115,8 +115,6 @@ void *opacitythreshold_malloc(int w, int h)
         free(opt);
         return NULL;
     }
-
-    opt->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) opt;
 }

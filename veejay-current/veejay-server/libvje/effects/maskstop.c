@@ -35,7 +35,6 @@ typedef struct {
     uint8_t *vvmaskstop_buffer[6];
     int frq_frame;
     int frq_mask;
-    int n_threads;
 } vvmask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -144,7 +143,6 @@ void *maskstop_malloc(int width, int height)
 
     v->frq_frame = 256;
     v->frq_mask = 256;
-    v->n_threads = vje_advise_num_threads(len);
 
     return (void*) v;
 }

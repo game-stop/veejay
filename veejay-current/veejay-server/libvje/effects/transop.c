@@ -50,7 +50,6 @@ typedef struct {
     float phase;
 
     int initialized;
-    int n_threads;
 } transop_t;
 
 static inline int transop_clampi(int v, int lo, int hi)
@@ -158,8 +157,6 @@ void *transop_malloc(int w, int h)
     if(!t)
         return NULL;
 
-    t->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) t;
 }
 
@@ -177,8 +174,7 @@ static void transop_copy_rect(VJFrame *frame,
                               int sy,
                               int sx,
                               int dy,
-                              int dx,
-                              int n_threads)
+                              int dx)
 {
     const int width = frame->width;
 
@@ -289,5 +285,5 @@ void transop_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     if(rect_w <= 0 || rect_h <= 0)
         return;
 
-    transop_copy_rect(frame, frame2, rect_w, rect_h, sy, sx, dy, dx, t->n_threads);
+    transop_copy_rect(frame, frame2, rect_w, rect_h, sy, sx, dy, dx);
 }

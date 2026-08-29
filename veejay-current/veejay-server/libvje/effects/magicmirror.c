@@ -42,7 +42,6 @@ typedef struct {
     int cx2;
     int n__;
     int N__;
-    int n_threads;
     void *motionmap;
 } magicmirror_t;
 
@@ -162,7 +161,6 @@ void *magicmirror_malloc(int w, int h)
 
     m->last_x_wave = -1;
     m->last_y_wave = -1;
-    m->n_threads = vje_advise_num_threads(len);
 
     return (void*) m;
 }

@@ -36,7 +36,6 @@ typedef struct {
     int N__;
     int x_scale__;
     int y_scale__;
-    int n_threads;
 } lumamask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -136,8 +135,6 @@ void *lumamask_malloc(int width, int height)
     veejay_memset(l->buf[1], 128, len);
     veejay_memset(l->buf[2], 128, len);
     veejay_memset(l->buf[3], 0, len);
-
-    l->n_threads = vje_advise_num_threads(len);
 
     return (void*) l;
 }

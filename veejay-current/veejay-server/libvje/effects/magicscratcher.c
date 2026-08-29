@@ -35,7 +35,6 @@ typedef struct {
     int read_pos;
     int reverse;
     int seeded;
-    int n_threads;
 } magicscratcher_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -114,7 +113,6 @@ void *magicscratcher_malloc(int w, int h)
         return NULL;
     }
 
-    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }

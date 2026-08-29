@@ -51,7 +51,6 @@ typedef struct {
     float sm_chroma;
     float sm_phase;
     int have_smooth;
-    int n_threads;
 } ripplewave_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -182,8 +181,6 @@ void *ripplewave_malloc(int w, int h)
     data->height = h;
     data->phase = 0.0f;
     data->have_smooth = 0;
-    data->n_threads = vje_advise_num_threads(len);
-
     return (void*)data;
 }
 

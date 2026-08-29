@@ -155,7 +155,7 @@ static void xr_box_blur2(
 static void xr_build_cdf(xraysolarization_t *t, const uint8_t *src_y, int len)
 {
     const int tid = omp_get_thread_num();
-    const int n_threads = omp_get_num_threads();
+    const int worker_count = omp_get_num_threads();
     uint32_t *worker_hist = t->hist_workers + (size_t) tid * 256;
     uint64_t accum = 0;
     uint32_t min_cdf = 0;
@@ -175,7 +175,7 @@ static void xr_build_cdf(xraysolarization_t *t, const uint8_t *src_y, int len)
     {
         for (i = 0; i < 256; i++)
             t->hist[i] = 0;
-        for (int worker = 0; worker < n_threads; worker++) {
+        for (int worker = 0; worker < worker_count; worker++) {
             const uint32_t *hist = t->hist_workers + (size_t) worker * 256;
             for (i = 0; i < 256; i++)
                 t->hist[i] += hist[i];

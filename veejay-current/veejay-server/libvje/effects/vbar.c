@@ -48,7 +48,6 @@ typedef struct {
     float slide_phase;
 
     int initialized;
-    int n_threads;
 } vbar_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -186,8 +185,6 @@ void *vbar_malloc(int w, int h)
     v->slide_phase = 0.0f;
     v->initialized = 0;
 
-    v->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) v;
 }
 
@@ -201,8 +198,7 @@ static void vbar_copy_region(VJFrame *frame,
                              int x0,
                              int x1,
                              int y_off,
-                             int x_off,
-                             int n_threads)
+                             int x_off)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -239,8 +235,7 @@ static void vbar_copy_region(VJFrame *frame,
 static void vbar_apply_divider_glow(VJFrame *frame,
                                     int divider_x,
                                     int glow_width,
-                                    int glow_strength,
-                                    int n_threads)
+                                    int glow_strength)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -349,8 +344,7 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         0,
         left_width,
         vbar->bar_top_auto,
-        vbar->bar_top_vert,
-        vbar->n_threads
+        vbar->bar_top_vert
     );
 
     vbar_copy_region(
@@ -359,8 +353,7 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         left_width,
         width,
         vbar->bar_bot_auto,
-        vbar->bar_bot_vert,
-        vbar->n_threads
+        vbar->bar_bot_vert
     );
 
     if(glow_q > 0) {
@@ -369,6 +362,6 @@ void vbar_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
         glow_strength = clampi(glow_strength, 0, 240);
 
-        vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength, vbar->n_threads);
+        vbar_apply_divider_glow(frame, left_width, glow_width, glow_strength);
     }
 }

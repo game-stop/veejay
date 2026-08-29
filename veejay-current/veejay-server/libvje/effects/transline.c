@@ -32,7 +32,6 @@
 typedef struct {
     int wipe_pos;
     int direction;
-    int n_threads;
 
     float speed_state;
     float expand_state;
@@ -142,8 +141,6 @@ void *transline_malloc(int w, int h)
     wipe->glow_state = 0.0f;
     wipe->state_ready = 0;
 
-    wipe->n_threads = vje_advise_num_threads(w * h);
-
     return wipe;
 }
 
@@ -180,8 +177,7 @@ static void transline_apply_cross_glow(VJFrame *frame,
                                        int y0,
                                        int y1,
                                        int glow_width,
-                                       int glow_strength,
-                                       int n_threads)
+                                       int glow_strength)
 {
     const int width = frame->width;
     const int height = frame->height;
@@ -329,6 +325,6 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         int glow_strength = (int)(wipe->glow_state * 0.150f + expand_t * 42.0f + 0.5f);
 
         glow_strength = transline_clampi(glow_strength, 0, 210);
-        transline_apply_cross_glow(frame, x0, x1, y0, y1, glow_width, glow_strength, wipe->n_threads);
+        transline_apply_cross_glow(frame, x0, x1, y0, y1, glow_width, glow_strength);
     }
 }

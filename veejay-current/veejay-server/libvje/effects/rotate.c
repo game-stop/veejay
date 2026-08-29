@@ -55,7 +55,6 @@ typedef struct {
     float phase;
     int initialized;
 
-    int n_threads;
 } rotate_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -238,8 +237,6 @@ void *rotate_malloc(int width, int height)
         r->sin_lut[i] = a_sin(rad);
         r->cos_lut[i] = a_cos(rad);
     }
-
-    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }

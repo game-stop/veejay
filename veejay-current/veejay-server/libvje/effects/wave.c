@@ -57,7 +57,6 @@ typedef struct {
     float factor_env;
     float speed_env;
     int env_init;
-    int n_threads;
 } wave_t;
 
 static inline int wave_clampi(int v, int lo, int hi)
@@ -183,8 +182,6 @@ void *wave_malloc(int w, int h)
     data->factor_env = 18.0f;
     data->speed_env = 8.0f;
     data->env_init = 0;
-
-    data->n_threads = vje_advise_num_threads(len);
 
     return data;
 }

@@ -37,7 +37,7 @@ typedef struct {
     int direction;
     int last_pingpong;
     int last_n;
-    int n_threads;
+
 
     float sm_opacity;
     float sm_buffer;
@@ -159,7 +159,6 @@ void *scratcher_malloc(int w, int h)
     s->direction = 1;
     s->last_pingpong = 1;
     s->last_n = 8;
-    s->n_threads = vje_advise_num_threads(len);
     s->sm_opacity = 150.0f;
     s->sm_buffer = 8.0f;
     s->sm_mix = 1000.0f;

@@ -32,7 +32,7 @@
 
 typedef struct {
     uint8_t *buf[3];
-    int n_threads;
+
 
     float tiles_s;
     float phase_x_s;
@@ -170,8 +170,6 @@ void *tiler_malloc(int w, int h)
 
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
-
-    s->n_threads = vje_advise_num_threads(len);
 
     s->tiles_s = 2.0f;
     s->phase_x_s = 0.0f;

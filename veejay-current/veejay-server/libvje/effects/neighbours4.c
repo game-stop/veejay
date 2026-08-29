@@ -60,7 +60,6 @@ typedef struct {
     nb4_point_t points[NB4_MAX_POINTS];
     int last_radius;
     int last_depth;
-    int n_threads;
 } nb4_t;
 
 static inline int nb4_clampi(int v, int lo, int hi)
@@ -233,7 +232,6 @@ void *neighbours4_malloc(int w, int h)
 
     const int len = w * h;
 
-    n->n_threads = vje_advise_num_threads(len);
     n->last_radius = -1;
     n->last_depth = -1;
     n->src[0] = (uint8_t*) vj_malloc((size_t)len * 4u);
@@ -246,7 +244,8 @@ void *neighbours4_malloc(int w, int h)
     n->src[1] = n->src[0] + len;
     n->src[2] = n->src[1] + len;
     n->bin = n->src[2] + len;
-    n->scratch = (int*) vj_calloc(sizeof(int) * NB4_SCRATCH_STRIDE * n->n_threads);
+    n->scratch = (int*) vj_calloc(
+        sizeof(int) * NB4_SCRATCH_STRIDE * (size_t)omp_get_max_threads());
 
     if(!n->scratch) {
         neighbours4_free(n);

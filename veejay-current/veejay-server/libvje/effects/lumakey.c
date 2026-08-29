@@ -30,10 +30,6 @@
 #define P_SOFTNESS 3
 #define P_INVERT   4
 
-typedef struct {
-    int n_threads;
-} lumakey_t;
-
 static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -98,14 +94,9 @@ vj_effect *lumakey_init(int width, int height)
 
 void *lumakey_malloc(int w, int h)
 {
-    lumakey_t *lk = (lumakey_t*) vj_malloc(sizeof(lumakey_t));
-
-    if(!lk)
-        return NULL;
-
-    lk->n_threads = vje_advise_num_threads(w * h);
-
-    return (void*) lk;
+    (void) w;
+    (void) h;
+    return vj_malloc(1);
 }
 
 void lumakey_free(void *ptr)
@@ -152,7 +143,7 @@ static void lumakey_build_lut(uint16_t *restrict alpha_lut,
 
 void lumakey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    lumakey_t *lk = (lumakey_t*) ptr;
+    (void) ptr;
 
     const int opacity = args[P_OPACITY];
     const int luma_min = args[P_LUMA_MIN];

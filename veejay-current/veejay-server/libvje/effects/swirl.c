@@ -49,7 +49,7 @@ typedef struct {
     float eff_swirl_drive;
     int eff_ready;
 
-    int n_threads;
+
     int w;
     int h;
 } swirl_t;
@@ -228,8 +228,6 @@ void *swirl_malloc(int w, int h)
     s->eff_ready = 0;
     s->w = w;
     s->h = h;
-
-    s->n_threads = vje_advise_num_threads(len);
 
     return (void*) s;
 }

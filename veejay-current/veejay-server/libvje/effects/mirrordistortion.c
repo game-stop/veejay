@@ -41,7 +41,7 @@ typedef struct {
     int distortion_key;
     int offset_x_key;
     int offset_y_key;
-    int n_threads;
+
 } mirror_distortion_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -150,9 +150,7 @@ void *mirrordistortion_malloc(int w, int h)
     m->distortion_key = -1;
     m->offset_x_key = 0x7fffffff;
     m->offset_y_key = 0x7fffffff;
-    m->n_threads = vje_advise_num_threads(len);
-
-    return (void*) m;
+    return (void*)m;
 }
 
 static void mirrordistortion_update_trig(mirror_distortion_t *m, int w, int h, int distortion)

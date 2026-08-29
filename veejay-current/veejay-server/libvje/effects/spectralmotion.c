@@ -40,7 +40,6 @@ typedef struct {
     uint8_t rainbow[256][3];
 
     int timestamp;
-    int n_threads;
 
     float smooth_threshold;
     float phase;
@@ -249,8 +248,6 @@ void *spectralmotion_malloc(int w, int h)
     s->eff_motion_gain = 256.0f;
     s->eff_initialized = 0;
 
-    s->n_threads = vje_advise_num_threads(len);
-
     spectralmotion_build_rainbow(s->rainbow);
 
     return (void*) s;
@@ -285,11 +282,8 @@ static void spectralmotion_output_full(uint8_t *restrict Y,
                                        const uint8_t *restrict vY,
                                        const uint8_t *restrict vU,
                                        const uint8_t *restrict vV,
-                                       int len,
-                                       int n_threads)
+                                       int len)
 {
-    (void)n_threads;
-
 #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         Y[i] = vY[i];
@@ -305,11 +299,8 @@ static void spectralmotion_output_overlay(uint8_t *restrict Y,
                                           const uint8_t *restrict vU,
                                           const uint8_t *restrict vV,
                                           int opacity,
-                                          int len,
-                                          int n_threads)
+                                          int len)
 {
-    (void)n_threads;
-
     const int q8 = (opacity * 256 + 127) / 255;
 
 #pragma omp for schedule(static)
@@ -324,11 +315,8 @@ static void spectralmotion_output_debug(uint8_t *restrict Y,
                                         uint8_t *restrict U,
                                         uint8_t *restrict V,
                                         const uint8_t *restrict exc,
-                                        int len,
-                                        int n_threads)
+                                        int len)
 {
-    (void)n_threads;
-
 #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         Y[i] = CLAMP_Y((int)exc[i] * 2);
@@ -485,14 +473,14 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 
     switch(mode) {
         case 2:
-            spectralmotion_output_debug(Y, U, V, exc, len, s->n_threads);
+            spectralmotion_output_debug(Y, U, V, exc, len);
             break;
         case 1:
-            spectralmotion_output_overlay(Y, U, V, vY, vU, vV, opacity, len, s->n_threads);
+            spectralmotion_output_overlay(Y, U, V, vY, vU, vV, opacity, len);
             break;
         case 0:
         default:
-            spectralmotion_output_full(Y, U, V, vY, vU, vV, len, s->n_threads);
+            spectralmotion_output_full(Y, U, V, vY, vU, vV, len);
             break;
     }
 

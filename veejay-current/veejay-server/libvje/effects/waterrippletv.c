@@ -54,7 +54,7 @@ typedef struct {
 
     int tick;
     int last_fresh_rate;
-    int n_threads;
+
 
     unsigned int wfastrand_val;
 
@@ -223,8 +223,6 @@ void *waterrippletv_malloc(int width, int height)
     r->drops_env = 420.0f;
     r->power_env = 620.0f;
     r->smooth_ready = 0;
-
-    r->n_threads = vje_advise_num_threads(len);
 
     return (void*) r;
 }

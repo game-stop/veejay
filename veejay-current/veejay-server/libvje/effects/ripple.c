@@ -64,7 +64,6 @@ typedef struct {
     float sm_phase_drive;
 
     int have_smooth;
-    int n_threads;
 } ripple_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -241,8 +240,6 @@ void *ripple_malloc(int width, int height)
     r->sm_attn_drive = 0.0f;
     r->sm_phase_drive = 0.0f;
     r->have_smooth = 0;
-    r->n_threads = vje_advise_num_threads(len);
-
     return (void*)r;
 }
 

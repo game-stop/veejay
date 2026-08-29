@@ -45,7 +45,6 @@ typedef struct {
     int len;
     int frame;
     int filled;
-    int n_threads;
 
     uint8_t *region;
 
@@ -628,7 +627,6 @@ void *meteorvector_malloc(int w, int h)
     c->len = w * h;
     c->frame = 0;
     c->filled = 0;
-    c->n_threads = vje_advise_num_threads(w * h);
 
     c->region = (uint8_t *) vj_malloc(total);
 

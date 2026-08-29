@@ -52,7 +52,6 @@ typedef struct {
     int32_t time_q16;
     int first_frame;
     uint32_t seed;
-    int n_threads;
 } melt_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -183,7 +182,6 @@ void *melt_malloc(int w, int h)
     t->time_q16 = 0;
     t->first_frame = 1;
     t->seed = 0x12345678u;
-    t->n_threads = vje_advise_num_threads(len);
 
     init_trig_lut_q14();
 

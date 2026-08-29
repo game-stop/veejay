@@ -43,7 +43,6 @@ typedef struct {
     uint8_t *src[3];
     uint8_t *bin;
     int *scratch;
-    int n_threads;
 } nb3_t;
 
 static inline int nb3_clampi(int v, int lo, int hi)
@@ -211,7 +210,6 @@ void *neighbours3_malloc(int w, int h)
 
     const int len = w * h;
 
-    n->n_threads = vje_advise_num_threads(len);
     n->src[0] = (uint8_t*) vj_malloc((size_t)len * 4u);
 
     if(!n->src[0]) {
@@ -222,7 +220,8 @@ void *neighbours3_malloc(int w, int h)
     n->src[1] = n->src[0] + len;
     n->src[2] = n->src[1] + len;
     n->bin = n->src[2] + len;
-    n->scratch = (int*) vj_calloc(sizeof(int) * NB3_SCRATCH_STRIDE * n->n_threads);
+    n->scratch = (int*) vj_calloc(
+        sizeof(int) * NB3_SCRATCH_STRIDE * (size_t)omp_get_max_threads());
 
     if(!n->scratch) {
         neighbours3_free(n);

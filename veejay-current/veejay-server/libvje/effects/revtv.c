@@ -36,7 +36,7 @@
 
 typedef struct {
     uint8_t *src[3];
-    int n_threads;
+
     int initialized;
 
     float sm_linespace;
@@ -163,8 +163,6 @@ void *revtv_malloc(int w, int h)
 
     r->src[1] = r->src[0] + len;
     r->src[2] = r->src[1] + len;
-    r->n_threads = vje_advise_num_threads(len);
-
     return (void*)r;
 }
 

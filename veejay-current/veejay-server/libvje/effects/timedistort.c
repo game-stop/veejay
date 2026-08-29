@@ -64,7 +64,7 @@ typedef struct {
     int plane_populated;
     int n_planes;
     int plane_mask;
-    int n_threads;
+
     int len;
 
     float eff_value;
@@ -248,8 +248,6 @@ void *timedistort_malloc(int w, int h)
     td->eff_trail_hold = 1000.0f;
     td->eff_depth_drive = 220.0f;
     td->eff_initialized = 0;
-
-    td->n_threads = vje_advise_num_threads(len);
 
     return (void*) td;
 }

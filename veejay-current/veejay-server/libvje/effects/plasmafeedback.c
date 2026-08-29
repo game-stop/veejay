@@ -57,7 +57,6 @@ typedef struct {
     int ew;
     int eh;
     int initialized;
-    int n_threads;
     int last_phase_i;
     int last_false_i;
     int last_charge_i;
@@ -420,7 +419,6 @@ void *plasmafeedback_malloc(int w, int h)
     veejay_memset(p->buffer, 0, state_len);
     veejay_memset(p->grid, 0, sizeof(float) * (size_t)p->grid_capacity * 2u);
 
-    p->n_threads = vje_advise_num_threads((int)full_len);
     p->last_phase_i = -1;
     p->last_false_i = -1;
     p->last_charge_i = -1;

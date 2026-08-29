@@ -40,7 +40,6 @@ typedef struct {
     int prev_gamma_arg;
     int prev_contrast;
     int prev_levels;
-    int n_threads;
 } pencilsketch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -193,7 +192,6 @@ void *pencilsketch2_malloc(int w, int h)
         return NULL;
     }
 
-    p->n_threads = vje_advise_num_threads(len);
     p->prev_gamma_arg = -1;
     p->prev_contrast = -1;
     p->prev_levels = -1;

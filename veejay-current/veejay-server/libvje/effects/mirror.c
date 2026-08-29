@@ -41,7 +41,6 @@ typedef struct {
     uint8_t *buf[3];
     int w;
     int h;
-    int n_threads;
     float spin_phase;
 } mirror_t;
 
@@ -258,7 +257,6 @@ void *mirror_malloc(int w, int h)
     m->buf[2] = m->buf[1] + len;
     m->w = w;
     m->h = h;
-    m->n_threads = vje_advise_num_threads(len);
     m->spin_phase = 0.0f;
 
     return (void*) m;

@@ -28,10 +28,6 @@
 #define P_OPACITY_A 1
 #define P_OPACITY_B 2
 
-typedef struct {
-    int n_threads;
-} lumamagick_t;
-
 static inline int clampi(int v, int lo, int hi)
 {
     return v < lo ? lo : (v > hi ? hi : v);
@@ -145,14 +141,9 @@ vj_effect *lumamagick_init(int width, int height)
 
 void *lumamagick_malloc(int w, int h)
 {
-    lumamagick_t *m = (lumamagick_t*) vj_malloc(sizeof(lumamagick_t));
-
-    if(!m)
-        return NULL;
-
-    m->n_threads = vje_advise_num_threads(w * h);
-
-    return (void*) m;
+    (void) w;
+    (void) h;
+    return vj_malloc(1);
 }
 
 void lumamagick_free(void *ptr)
@@ -160,7 +151,7 @@ void lumamagick_free(void *ptr)
     free(ptr);
 }
 
-static void lumamagick_lumaflow(VJFrame *frame, VJFrame *frame2, int op_a, int op_b, int n_threads)
+static void lumamagick_lumaflow(VJFrame *frame, VJFrame *frame2, int op_a, int op_b)
 {
     const int len = frame->len;
     const int flow_intensity = op_a * 5;
@@ -184,7 +175,7 @@ static void lumamagick_lumaflow(VJFrame *frame, VJFrame *frame2, int op_a, int o
     }
 }
 
-static void lumamagick_process(VJFrame *frame, VJFrame *frame2, int mode, int op_a, int op_b, int n_threads)
+static void lumamagick_process(VJFrame *frame, VJFrame *frame2, int mode, int op_a, int op_b)
 {
     const int len = frame->len;
     const int qa = lm_q_from_percent(op_a);
@@ -475,14 +466,14 @@ static void lumamagick_process(VJFrame *frame, VJFrame *frame2, int mode, int op
 
 void lumamagick_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    lumamagick_t *m = (lumamagick_t*) ptr;
+    (void) ptr;
 
     const int mode = args[P_MODE];
     const int op_a = args[P_OPACITY_A];
     const int op_b = args[P_OPACITY_B];
 
     if(mode == VJ_EFFECT_BLEND_ADDTEST7)
-        lumamagick_lumaflow(frame, frame2, op_a, op_b, m->n_threads);
+        lumamagick_lumaflow(frame, frame2, op_a, op_b);
     else
-        lumamagick_process(frame, frame2, mode, op_a, op_b, m->n_threads);
+        lumamagick_process(frame, frame2, mode, op_a, op_b);
 }

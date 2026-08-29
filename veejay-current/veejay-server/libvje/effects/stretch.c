@@ -37,7 +37,6 @@ typedef struct {
     float eff_sat;
     float eff_chroma_drive;
     int initialized;
-    int n_threads;
 } stretch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -163,8 +162,6 @@ void *stretch_malloc(int w, int h)
     s->eff_sat = 0.0f;
     s->eff_chroma_drive = 0.0f;
     s->initialized = 0;
-
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }

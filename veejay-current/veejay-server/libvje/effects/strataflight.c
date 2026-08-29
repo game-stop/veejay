@@ -45,7 +45,7 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
+
 
     int seeded;
     int frame;
@@ -363,8 +363,6 @@ void *strataflight_malloc(int w, int h)
     c->w = w;
     c->h = h;
     c->len = w * h;
-    c->n_threads = vje_advise_num_threads(c->len);
-
     c->seeded = 0;
     c->frame = 0;
     c->eff_ready = 0;

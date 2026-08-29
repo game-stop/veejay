@@ -44,7 +44,6 @@ typedef struct {
     float chroma_drive_env;
     int initialized;
 
-    int n_threads;
 } tripplicity_t;
 
 static inline int tripplicity_clampi(int v, int lo, int hi)
@@ -146,8 +145,6 @@ void *tripplicity_malloc(int w, int h)
     t->mix_drive_env = 0.0f;
     t->chroma_drive_env = 0.0f;
     t->initialized = 0;
-
-    t->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) t;
 }

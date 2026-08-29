@@ -41,7 +41,6 @@ typedef struct {
     int stride;
     int height;
     int max_radius;
-    int n_threads;
 } integralblur_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -168,7 +167,6 @@ void *integralblur_malloc(int width, int height)
     f->orig = f->planes;
     f->mask = f->orig + len;
     f->tmp  = f->mask + len;
-    f->n_threads = vje_advise_num_threads(width * height);
 
     return f;
 }

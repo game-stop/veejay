@@ -43,7 +43,6 @@ typedef struct {
     int mode_transition;
     int mode_transition_len;
     int prev_mode;
-    int n_threads;
 } m_tracer_t;
 
 static inline int mtracer_clampi(int v, int lo, int hi)
@@ -340,8 +339,6 @@ void *mtracer_malloc(int w, int h)
     m->mode_transition = 0;
     m->mode_transition_len = 12;
     m->prev_mode = 0;
-    m->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) m;
 }
 

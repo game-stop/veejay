@@ -51,7 +51,7 @@ typedef struct {
     float *vec_y;
     int w;
     int h;
-    int n_threads;
+
     float phase;
 
     float segment_state;
@@ -220,8 +220,6 @@ void *trimirror_malloc(int w, int h)
 
     s->vec_x = (float*)p;
     s->vec_y = s->vec_x + len;
-
-    s->n_threads = vje_advise_num_threads(len);
 
     s->phase = 0.0f;
     s->segment_state = 3.0f;

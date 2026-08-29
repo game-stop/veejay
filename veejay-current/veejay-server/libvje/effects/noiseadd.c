@@ -33,7 +33,6 @@
 
 typedef struct {
     uint8_t *Yb_frame;
-    int n_threads;
 } noiseadd_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -130,8 +129,6 @@ void *noiseadd_malloc(int width, int height)
         free(n);
         return NULL;
     }
-
-    n->n_threads = vje_advise_num_threads(len);
 
     return (void*) n;
 }

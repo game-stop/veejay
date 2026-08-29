@@ -67,7 +67,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
 
     uint8_t *src_y;
     uint8_t *src_u;
@@ -284,8 +283,6 @@ void *pressurewave_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
-    s->n_threads = vje_advise_num_threads(len);
-
     uint8_t *p = (uint8_t *)(s + 1);
 
     s->src_y = p;
@@ -375,7 +372,6 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     const int w = s->w;
     const int h = s->h;
     const int len = s->len;
-    const int threads = s->n_threads;
 
     const int displace_arg = args[PW_DISPLACE];
     const int impact_arg = args[PW_IMPACT];

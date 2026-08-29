@@ -62,7 +62,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int frame;
     int motor_q8;
     int seeded;
@@ -517,7 +516,6 @@ void *mechanicalpixels_malloc(int w, int h)
     k->w = w;
     k->h = h;
     k->len = w * h;
-    k->n_threads = vje_advise_num_threads(k->len);
     k->max_cols = (w + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_rows = (h + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_cells = k->max_cols * k->max_rows;

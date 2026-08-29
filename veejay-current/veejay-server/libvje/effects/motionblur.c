@@ -44,7 +44,6 @@ typedef struct {
     int dir_key;
     int dx_q16;
     int dy_q16;
-    int n_threads;
 } motionblur_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -191,7 +190,7 @@ void *motionblur_malloc(int w, int h)
     m->dir_key = 0x7fffffff;
     m->dx_q16 = 32768;
     m->dy_q16 = 0;
-    m->n_threads = vje_advise_num_threads(size);
+
 
     return m;
 }

@@ -41,7 +41,6 @@ typedef struct {
     int *reflection_map;
     int sin_index;
     int sin_index2;
-    int n_threads;
 } reflection_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -168,8 +167,6 @@ void *reflection_malloc(int width, int height)
 
     r->sin_index = 0;
     r->sin_index2 = 0;
-    r->n_threads = vje_advise_num_threads(len);
-
     const float hw = (float)width * 0.25f;
     const float hh = (float)height * 0.25f;
     const float m = (float)(width < height ? width : height) * 0.125f;

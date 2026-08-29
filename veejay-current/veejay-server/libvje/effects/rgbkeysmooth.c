@@ -49,7 +49,6 @@ typedef struct {
     uint8_t *alpha_temp;
     float mag_lut[RGBKEYSMOOTH_MAG_LUT_SIZE];
     float inv_mag_lut[RGBKEYSMOOTH_MAG_LUT_SIZE];
-    int n_threads;
 } rgbkeysmooth_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -210,8 +209,6 @@ void *rgbkeysmooth_malloc(int w, int h)
     }
 
     r->alpha_temp = r->alpha_map + len;
-    r->n_threads = vje_advise_num_threads(len);
-
     for(int i = 0; i < RGBKEYSMOOTH_MAG_LUT_SIZE; i++) {
         const float m = sqrtf((float)i);
 

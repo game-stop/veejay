@@ -36,7 +36,6 @@
 #define ISOLATE_PI    3.14159265358979323846f
 
 typedef struct {
-    int n_threads;
     int last[ISOLATE_PARAMS];
     int mag_fp;
     int cos_q_fp;
@@ -155,7 +154,6 @@ void *isolate_malloc(int w, int h)
     s->inv_range_fp = 255 << 8;
     s->black_clip_fp = 0;
     s->bg_level = 128;
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }

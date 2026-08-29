@@ -37,7 +37,6 @@
 
 typedef struct {
     uint8_t *binary_img;
-    int n_threads;
 } morphology_t;
 
 static const uint16_t morphology_kernel_bits[8] = {
@@ -149,9 +148,7 @@ void *morphology_malloc(int w, int h)
         return NULL;
     }
 
-    m->n_threads = vje_advise_num_threads(w * h);
-
-    return (void*) m;
+    return (void*)m;
 }
 
 void morphology_free(void *ptr)

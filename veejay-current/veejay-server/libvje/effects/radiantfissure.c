@@ -45,7 +45,6 @@ typedef struct {
     int len;
     int frame;
     int filled;
-    int n_threads;
 
     uint8_t *region;
 
@@ -587,8 +586,6 @@ void *radiantfissure_malloc(int w, int h)
     c->len = w * h;
     c->frame = 0;
     c->filled = 0;
-    c->n_threads = vje_advise_num_threads(w * h);
-
     len = (size_t) c->len;
 
     total = len * ((size_t)WBA_MAX_FRAMES * 3u + 5u);

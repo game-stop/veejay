@@ -32,7 +32,6 @@
 #define P_CHROMA_EDGE  3
 
 typedef struct {
-    int n_threads;
     int env_ready;
     float threshold_env;
     float softness_env;
@@ -125,8 +124,6 @@ void *whiteframe_malloc(int w, int h)
     if(!wf)
         return NULL;
 
-    wf->n_threads = vje_advise_num_threads(w * h);
-
     wf->env_ready = 0;
     wf->threshold_env = 220.0f;
     wf->softness_env = 24.0f;
@@ -172,8 +169,6 @@ void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int softness = (int)(wf->softness_env + 0.5f);
     const int edge_glow = (int)(wf->glow_env + 0.5f);
     const int chroma_edge = (int)(wf->chroma_env + 0.5f);
-    const int n_threads = wf->n_threads;
-
     int full = threshold - softness;
     int edge = threshold + softness;
 

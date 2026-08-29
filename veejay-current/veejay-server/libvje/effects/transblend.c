@@ -40,7 +40,7 @@ typedef struct {
     uint16_t *angle_lut;
     int progress_q16;
     int direction;
-    int n_threads;
+
     int w;
     int h;
 
@@ -191,8 +191,6 @@ void *transblend_malloc(int w, int h)
     wipe->speed_env = 1.0f;
     wipe->expand_env = 0.0f;
     wipe->glow_env = 0.0f;
-
-    wipe->n_threads = vje_advise_num_threads(len);
 
     transblend_build_angle_lut(wipe, w, h);
 

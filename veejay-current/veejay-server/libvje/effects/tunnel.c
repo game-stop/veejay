@@ -92,7 +92,7 @@ typedef struct {
 
     int width;
     int height;
-    int n_threads;
+
 
     int last_shape;
 
@@ -600,7 +600,6 @@ void *tunnel_malloc(int width, int height)
 
     veejay_memset(t->histY, 0, hist_bytes);
 
-    t->n_threads = vje_advise_num_threads(size);
     t->last_shape = -1;
 
     for(int i = 0; i < SIN_LUT_SIZE; i++)

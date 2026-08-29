@@ -77,7 +77,6 @@ typedef struct {
     int history_len;
     int history_pos;
     int first_frame;
-    int n_threads;
 } shutterdrag_t;
 
 static inline int shutter_clampi(int v, int lo, int hi)
@@ -250,8 +249,6 @@ void *shutterdrag_malloc(int width, int height)
     sb->historyY = sb->history_block;
     sb->historyU = sb->historyY + (pixels * hlen);
     sb->historyV = sb->historyU + (pixels * hlen);
-    sb->n_threads = vje_advise_num_threads(pixels);
-
     return (void*)sb;
 }
 

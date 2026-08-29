@@ -54,7 +54,7 @@ typedef struct {
     float shake_env;
     uint32_t frame_no;
     int is_initialized;
-    int n_threads;
+
     int w;
     int h;
 } virtualcam_t;
@@ -272,8 +272,6 @@ void *virtualcamera_malloc(int w, int h)
     c->is_initialized = 0;
     c->w = w;
     c->h = h;
-
-    c->n_threads = vje_advise_num_threads((int)plane_size);
 
     return (void*) c;
 }

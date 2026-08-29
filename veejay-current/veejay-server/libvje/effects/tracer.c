@@ -41,7 +41,6 @@ typedef struct {
     float chroma_trail_s;
     int state_ready;
 
-    int n_threads;
 } tracer_t;
 
 static inline int tracer_clampi(int v, int lo, int hi)
@@ -179,8 +178,6 @@ void *tracer_malloc(int w, int h)
     t->feed_drive_s = 0.0f;
     t->chroma_trail_s = 1000.0f;
     t->state_ready = 0;
-
-    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }

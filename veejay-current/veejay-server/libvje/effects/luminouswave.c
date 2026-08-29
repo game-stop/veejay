@@ -43,7 +43,6 @@ typedef struct {
     int width;
     int height;
     int speed;
-    int n_threads;
 } luminouswave_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -138,7 +137,6 @@ void *luminouswave_malloc(int w, int h)
     data->width = w;
     data->height = h;
     data->speed = 0;
-    data->n_threads = vje_advise_num_threads(w * h);
 
     for(int i = 0; i < LW_LUT_SIZE; i++) {
         const float a = ((float)i / (float)LW_LUT_SIZE) * 6.28318530718f;

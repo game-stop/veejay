@@ -60,7 +60,6 @@ typedef struct {
 
 typedef struct {
     int line_cap;
-    int n_threads;
     pixelsortalpha_worker_t *workers;
     uint32_t *scratch;
 } pixelsortalpha_t;
@@ -133,19 +132,21 @@ void *pixelsortalpha_malloc(int w, int h)
     p->line_cap = w > h ? w : h;
 
 #ifdef _OPENMP
-    p->n_threads = vje_advise_num_threads(w * h);
+    const int worker_count = omp_get_max_threads();
 #else
-    p->n_threads = 1;
+    const int worker_count = 1;
 #endif
 
-    p->workers = (pixelsortalpha_worker_t*) vj_calloc(sizeof(pixelsortalpha_worker_t) * (size_t)p->n_threads);
+    p->workers = (pixelsortalpha_worker_t*) vj_calloc(
+        sizeof(pixelsortalpha_worker_t) * (size_t)worker_count);
 
     if(!p->workers) {
         free(p);
         return NULL;
     }
 
-    p->scratch = (uint32_t*) vj_calloc(sizeof(uint32_t) * (size_t)p->n_threads * (size_t)p->line_cap * 2u);
+    p->scratch = (uint32_t*) vj_calloc(
+        sizeof(uint32_t) * (size_t)worker_count * (size_t)p->line_cap * 2u);
 
     if(!p->scratch) {
         free(p->workers);
@@ -153,7 +154,7 @@ void *pixelsortalpha_malloc(int w, int h)
         return NULL;
     }
 
-    for(int i = 0; i < p->n_threads; i++) {
+    for(int i = 0; i < worker_count; i++) {
         p->workers[i].line = p->scratch + ((size_t)i * (size_t)p->line_cap * 2u);
         p->workers[i].sorted = p->workers[i].line + p->line_cap;
     }

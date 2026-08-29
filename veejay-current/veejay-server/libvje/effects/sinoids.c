@@ -63,7 +63,7 @@ typedef struct {
     int ns__;
     int motion__;
     int interpolate__;
-    int n_threads;
+
     void *motionmap;
 } sinoids_t;
 
@@ -237,8 +237,6 @@ void *sinoids_malloc(int width, int height)
     s->n__ = 0;
     s->N__ = 0;
     s->motionmap = NULL;
-    s->n_threads = vje_advise_num_threads(len);
-
     return (void*)s;
 }
 

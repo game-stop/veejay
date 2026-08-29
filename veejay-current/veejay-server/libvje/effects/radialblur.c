@@ -54,7 +54,6 @@
 
 typedef struct {
     uint8_t *radial_src[3];
-    int n_threads;
 } radialblur_t;
 
 static inline int radialblur_clampi(int v, int lo, int hi)
@@ -138,8 +137,6 @@ void *radialblur_malloc(int w, int h)
 
     r->radial_src[1] = r->radial_src[0] + len;
     r->radial_src[2] = r->radial_src[1] + len;
-    r->n_threads = vje_advise_num_threads(len);
-
     return (void*)r;
 }
 

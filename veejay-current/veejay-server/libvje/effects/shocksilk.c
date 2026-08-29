@@ -42,7 +42,7 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
+
     void *region;
     uint8_t *src_y;
     uint8_t *src_u;
@@ -277,7 +277,6 @@ void *shocksilk_malloc(int w, int h)
     t->w = w;
     t->h = h;
     t->len = (int) len;
-    t->n_threads = vje_advise_num_threads(w * h);
     t->region = vj_malloc(total);
     if (!t->region) {
         free(t);

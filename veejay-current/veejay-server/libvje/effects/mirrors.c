@@ -30,7 +30,7 @@
 typedef struct {
     int n__;
     int N__;
-    int n_threads;
+
     int factor;
     int interpolate;
     int motion;
@@ -184,7 +184,7 @@ void *mirrors_malloc(int w, int h)
     if(!m)
         return NULL;
 
-    m->n_threads = vje_advise_num_threads(w * h);
+
 
     return m;
 }

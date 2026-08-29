@@ -31,7 +31,6 @@
 typedef struct {
     uint8_t *oc_buf;
     uint32_t seed;
-    int n_threads;
 } overclock_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -136,9 +135,7 @@ void *overclock_malloc(int w, int h)
     }
 
     o->seed = 0x0c0ffeeu ^ (uint32_t)w ^ ((uint32_t)h << 16);
-    o->n_threads = vje_advise_num_threads(len);
-
-    return (void*) o;
+    return (void*)o;
 }
 
 void overclock_apply(void *ptr, VJFrame *frame, int *args)

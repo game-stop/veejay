@@ -32,7 +32,7 @@
 
 typedef struct {
     uint8_t *mask;
-    int n_threads;
+
 
     float threshold_state;
     float softness_state;
@@ -161,8 +161,6 @@ void *threshold_malloc(int w, int h)
     t->glow_state = 0.0f;
     t->mix_drive_state = 0.0f;
     t->initialized = 0;
-
-    t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
 }

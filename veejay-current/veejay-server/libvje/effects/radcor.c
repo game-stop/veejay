@@ -42,7 +42,6 @@ typedef struct {
     uint32_t *Map;
     float *x_lut;
     int map_upd[3];
-    int n_threads;
 } radcor_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -148,9 +147,7 @@ void *radcor_malloc(int w, int h)
     r->map_upd[0] = -1;
     r->map_upd[1] = -1;
     r->map_upd[2] = -1;
-    r->n_threads = vje_advise_num_threads(len);
-
-    return (void*)r;
+    return (void*) r;
 }
 
 void radcor_free(void *ptr)

@@ -21,6 +21,7 @@
 #include "common.h"
 #include <limits.h>
 #include <stdint.h>
+#include <omp.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include "motionmap.h"
@@ -69,7 +70,6 @@ typedef struct {
     int scale_lock;
     int activity_decay;
     int last_act_decay;
-    int n_threads;
     int64_t activity_level;
     int64_t *activity_partials;
 } motionmap_t;
@@ -216,8 +216,8 @@ void *motionmap_malloc(int w, int h)
     mm->current_his_len = HIS_DEFAULT;
     mm->current_decay = HIS_DEFAULT;
     mm->last_act_decay = -1;
-    mm->n_threads = vje_advise_num_threads(len);
-    mm->activity_partials = (int64_t *) vj_calloc(sizeof(int64_t) * (size_t)mm->n_threads);
+    mm->activity_partials = (int64_t *) vj_calloc(
+        sizeof(int64_t) * (size_t)omp_get_max_threads());
     if(!mm->activity_partials) {
         free(mm->region);
         free(mm);
@@ -431,8 +431,8 @@ static int32_t motionmap_calc_diff(motionmap_t *mm,
 #pragma omp single
     {
         int64_t total = 0;
-        const int n_threads = omp_get_num_threads();
-        for(int i = 0; i < n_threads; i++)
+        const int worker_count = omp_get_num_threads();
+        for(int i = 0; i < worker_count; i++)
             total += mm->activity_partials[i];
         mm->activity_level = total;
     }

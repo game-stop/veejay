@@ -50,7 +50,7 @@ typedef struct {
 
     int n__;
     int N__;
-    int n_threads;
+
 
     uint32_t seed;
 
@@ -293,8 +293,6 @@ void *slice_malloc(int width, int height)
     s->sm_slice_drive = 0.0f;
     s->sm_recut_drive = 0.0f;
     s->smooth_init = 0;
-    s->n_threads = vje_advise_num_threads(len);
-
     slice_recalc(s, width, height, 63, s->seed, 0);
 
     return (void*)s;

@@ -34,7 +34,7 @@
 typedef struct {
     uint8_t *buf[3];
     int max_len;
-    int n_threads;
+
 
     float eff_threshold;
     float eff_mix;
@@ -181,8 +181,6 @@ void *sobel_malloc(int w, int h)
     s->buf[1] = s->buf[0] + len;
     s->buf[2] = s->buf[1] + len;
     s->max_len = len;
-
-    s->n_threads = vje_advise_num_threads(len);
 
     s->eff_initialized = 0;
 

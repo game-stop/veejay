@@ -123,7 +123,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
 
     void *region;
 
@@ -4455,8 +4454,6 @@ void *hyperfold_malloc(int w, int h)
     m->last_strength = -1;
     m->skip_base_panel = 0;
     m->time = 0.0f;
-
-    m->n_threads = vje_advise_num_threads((int) len);
 
     m->region = vj_malloc(byte_size);
     if (!m->region) {

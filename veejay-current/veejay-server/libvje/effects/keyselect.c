@@ -37,7 +37,6 @@
 #define KEYSELECT_PI    3.14159265358979323846f
 
 typedef struct {
-    int n_threads;
     int last[KEYSELECT_PARAMS];
     int mag_fp;
     int cos_q_fp;
@@ -211,8 +210,6 @@ void *keyselect_malloc(int w, int h)
     s->black_clip_fp = 0;
     s->blend_mode = 3;
     s->swap = 0;
-    s->n_threads = vje_advise_num_threads(w * h);
-
     return (void*) s;
 }
 

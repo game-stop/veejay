@@ -58,7 +58,7 @@ typedef struct {
     int shape_max;
     int shape_completed;
 
-    int n_threads;
+
     int have_smooth;
     float sm_threshold;
     float sm_softness;
@@ -197,7 +197,6 @@ static shape_t *init_shape_loader(void)
     s->shape_min = 0;
     s->shape_max = 255;
     s->shape_completed = 0;
-    s->n_threads = 1;
     s->have_smooth = 0;
 
     load_shapes(s->shapelist, &(s->shapeidx), MAX_NUMBER_OF_SHAPES);
@@ -539,8 +538,6 @@ void *shapewipe_malloc(int w, int h)
 
     if(!s)
         return NULL;
-
-    s->n_threads = vje_advise_num_threads(w * h);
 
     return s;
 }

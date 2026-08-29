@@ -24,7 +24,6 @@
 
 typedef struct {
     uint8_t *mean;
-    int n_threads;
 } mean_t;
 
 vj_effect *meanfilter_init(int w, int h)
@@ -53,7 +52,6 @@ void *meanfilter_malloc(int w, int h)
         return NULL;
     }
 
-    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }
@@ -69,8 +67,7 @@ void meanfilter_free(void *ptr)
 static void vje_mean_filter(const uint8_t *restrict src,
                             uint8_t *restrict dst,
                             int w,
-                            int h,
-                            int n_threads)
+                            int h)
 {
 #pragma omp for schedule(static)
     for(int y = 1; y < h - 1; y++) {
@@ -105,5 +102,5 @@ void meanfilter_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp single
     veejay_memcpy(m->mean, frame->data[0], frame->len);
-    vje_mean_filter(m->mean, frame->data[0], frame->width, frame->height, m->n_threads);
+    vje_mean_filter(m->mean, frame->data[0], frame->width, frame->height);
 }

@@ -37,7 +37,6 @@ typedef struct {
     float mix_drive_state;
 
     int state_ready;
-    int n_threads;
 } travelmatte_t;
 
 static inline int travelmatte_clampi(int v, int lo, int hi)
@@ -162,8 +161,6 @@ void *travelmatte_malloc(int w, int h)
     tm->soften_state = 0.0f;
     tm->mix_drive_state = 0.0f;
     tm->state_ready = 0;
-
-    tm->n_threads = vje_advise_num_threads(w * h);
 
     return tm;
 }

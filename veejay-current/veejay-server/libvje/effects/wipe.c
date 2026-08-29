@@ -20,7 +20,7 @@
 typedef struct {
     int wipe_position;
     int last_restart;
-    int n_threads;
+
     int initialized;
     float speed_env;
     float edge_env;
@@ -144,8 +144,6 @@ void *wipe_malloc(int w, int h)
     prv->speed_env = 0.0f;
     prv->edge_env = 0.0f;
     prv->glow_env = 0.0f;
-
-    prv->n_threads = vje_advise_num_threads(w * h);
 
     return prv;
 }

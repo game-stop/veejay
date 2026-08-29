@@ -47,7 +47,7 @@ typedef struct {
     double rotate;
     int frameCount;
     int direction;
-    int n_threads;
+
 
     float sm_rotate;
     float sm_zoom;
@@ -246,8 +246,6 @@ void *rotozoom_malloc(int width, int height)
         r->sin_lut[i] = a_sin(rad);
         r->cos_lut[i] = a_cos(rad);
     }
-
-    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }

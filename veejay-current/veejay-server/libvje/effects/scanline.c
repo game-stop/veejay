@@ -56,7 +56,7 @@ typedef struct {
     float sm_beat_glow;
     float sm_beat_decay;
     int sm_ready;
-    int n_threads;
+
     int render_stopped;
     int render_head;
     int render_horizontal;
@@ -220,8 +220,6 @@ void *scanline_malloc(int w, int h)
     s->beat_env = 0.0f;
     s->beat_kick = 0.0f;
     s->sm_ready = 0;
-    s->n_threads = vje_advise_num_threads(len);
-
     return (void*)s;
 }
 
