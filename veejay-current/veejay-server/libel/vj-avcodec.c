@@ -366,9 +366,9 @@ if(id == CODEC_ID_CUDA_MJPEG_422F || id == CODEC_ID_CUDA_MJPEG_422 ||
 #ifdef HAVE_NVJPEG_CUDA_KERNEL
     {
         const char *mode = getenv("VEEJAY_SUPERSAMPLE_MODE");
-        state->upsample_mode = (mode && strcmp(mode, "mitchell") == 0)
-            ? VJ_NVJPEG_UPSAMPLE_MITCHELL
-            : VJ_NVJPEG_UPSAMPLE_DUP;
+        state->upsample_mode = (mode && strcmp(mode, "dup") == 0)
+            ? VJ_NVJPEG_UPSAMPLE_DUP
+            : VJ_NVJPEG_UPSAMPLE_MITCHELL;
     }
 	if (state->is_422) {
         veejay_msg(VEEJAY_MSG_INFO, 
