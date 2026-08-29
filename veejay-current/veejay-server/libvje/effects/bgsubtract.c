@@ -23,6 +23,7 @@
 #include <libsubsample/subsample.h>
 #include "softblur.h"
 #include "bgsubtract.h"
+#include "hist.h"
 
 typedef struct {
     uint8_t *static_bg__;
@@ -125,7 +126,7 @@ int bgsubtract_prepare(void *ptr, VJFrame *frame)
         return 0;
 
     if(b->auto_hist)
-        vje_histogram_auto_eq(frame);
+        vje_histogram_auto_eq_serial(frame);
 
     veejay_memcpy(b->bg_frame__[0], frame->data[0], frame->len);
 
@@ -219,11 +220,8 @@ void bgsubtract_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-#pragma omp single
-    {
-        if(b->auto_hist)
-            vje_histogram_auto_eq(frame);
-    }
+    if(b->auto_hist)
+        vje_histogram_auto_eq(frame);
 
     if(enabled == 0 && method == 0) {
         bgsubtract_show_bg(b, frame);

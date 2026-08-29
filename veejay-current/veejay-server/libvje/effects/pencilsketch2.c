@@ -22,6 +22,7 @@
 #include <veejaycore/vjmem.h>
 #include <math.h>
 #include "pencilsketch2.h"
+#include "hist.h"
 
 #define PENCILSKETCH2_PARAMS 6
 
@@ -263,12 +264,9 @@ void pencilsketch2_apply(void *ptr, VJFrame *frame, int *args)
     for(int i = 0; i < len; i++)
         y_plane[i] = p->master_lut[y_plane[i]][tmp_buf[i]];
 
-#pragma omp single
-    {
-        if(strength > 0) {
-            veejay_histogram_analyze(p->histogram_, frame, 0);
-            veejay_histogram_equalize(p->histogram_, frame, 0xff, strength);
-        }
+    if(strength > 0) {
+        veejay_histogram_analyze(p->histogram_, frame, 0);
+        veejay_histogram_equalize(p->histogram_, frame, 0xff, strength);
     }
 
     if(grayscale) {
