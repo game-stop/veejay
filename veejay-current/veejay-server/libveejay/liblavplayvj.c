@@ -5703,6 +5703,7 @@ void veejay_change_playback_mode_transition(veejay_t *info,
     const int sequence_active = info->seq && info->seq->active;
 
     if(sequence_active) {
+        vj_perform_reset_transition(info);
         veejay_change_playback_mode(info, new_pm, sample_id);
         return;
     }
@@ -5710,14 +5711,30 @@ void veejay_change_playback_mode_transition(veejay_t *info,
     if(!settings->transition.ready &&
        atomic_load_int(&settings->transition.active))
     {
-        if(atomic_load_int(&settings->transition.global_state) &&
-           settings->transition.next_id == sample_id &&
-           settings->transition.next_type == new_pm)
+        const int armed_target_matches =
+            atomic_load_int(&settings->transition.global_state) &&
+            settings->transition.next_id == sample_id &&
+            settings->transition.next_type == new_pm;
+        
+        if(armed_target_matches)
             return;
 
-        vj_perform_reset_transition(info);
-        if(!source_changed)
-            return;
+        const int request_is_source_a =
+            (new_pm == current_pm && sample_id == current_id);
+        
+        const int duplicate_request =
+            (new_pm == settings->transition.next_type &&
+             sample_id == settings->transition.next_id);
+        
+        if(request_is_source_a || duplicate_request) {
+            vj_perform_reset_transition(info);
+            if(request_is_source_a || !source_changed)
+                return;
+        } else {
+            vj_perform_reset_transition(info);
+            if(!source_changed)
+                return;
+        }
     }
 
     if(source_changed &&

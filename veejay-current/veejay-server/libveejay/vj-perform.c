@@ -3639,24 +3639,32 @@ int vj_perform_setup_manual_transition(veejay_t *info,
     settings->transition.seq_bank = -1;
     settings->transition.seq_index = -1;
     settings->transition.timecode = 0.0;
-    atomic_store_int(&settings->manual_transition, 1);
-    atomic_store_int(&settings->manual_transition_target_owned,
-                     target_owned);
     atomic_store_long_long(&settings->manual_transition_elapsed, 0);
     atomic_store_long_long(&settings->manual_transition_duration,
                            length > 1 ? length - 1 : 1);
     atomic_store_long_long(&settings->transition.start, current);
     atomic_store_long_long(&settings->transition.end, end);
+    
     if(next_type == VJ_PLAYBACK_MODE_SAMPLE) {
         performer_global_t *g = (performer_global_t*)info->performer;
+        
         pthread_mutex_lock(&g->manual_transition_audio_mutex);
+        long long resume_pos = sample_get_resume(next_sample_id);
         vj_perform_seed_manual_transition_cursor(
                                                   &g->manual_transition_audio,
                                                   next_sample_id);
-        pthread_mutex_unlock(&g->manual_transition_audio_mutex);
+        if(resume_pos >= 0)
+            g->manual_transition_audio.offset = resume_pos;
+        
         vj_perform_seed_manual_transition_cursor(&g->B->sample_b,
                                                   next_sample_id);
+        if(resume_pos >= 0)
+            g->B->sample_b.offset = resume_pos;
+        pthread_mutex_unlock(&g->manual_transition_audio_mutex);
     }
+    
+    atomic_store_int(&settings->manual_transition_target_owned, target_owned);
+    atomic_store_int(&settings->manual_transition, 1);
 
     veejay_msg(VEEJAY_MSG_DEBUG,
                "[PLAYBACK] armed manual shape transition %s:%d -> %s:%d frames=%lld..%lld shape=%d",
@@ -17709,9 +17717,11 @@ static int vj_perform_transition_prepare_frame(veejay_t *info,
         frame->timecode = elapsed / (double)duration;
     }
     else if(end != start) {
-        frame->timecode =
-            (cur_frame - start) /
-            (double)(end - start);
+        long long span = end > start ? end - start : start - end;
+        long long progress = end > start ? 
+                             cur_frame - start :
+                             start - cur_frame;
+        frame->timecode = span > 0 ? (double)progress / (double)span : 0.0;
     }
     else {
         return 0;
