@@ -88,6 +88,10 @@ int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int 
 int vj_perform_next_sequence( veejay_t *info, int *type, int *next_bank, int *next_slot );
 
 void vj_perform_setup_transition(veejay_t *info, int next_sample_id, int next_type, int sample_id, int current_type, int next_seq_bank, int next_seq_idx );
+int vj_perform_setup_manual_transition(veejay_t *info, int next_sample_id, int next_type, int sample_id, int current_type);
+int vj_perform_manual_transition_audio_begin(veejay_t *info, int source_id);
+void vj_perform_manual_transition_audio_end(veejay_t *info);
+long vj_perform_take_manual_transition_audio_frame(veejay_t *info, int source_id);
 
 void    vj_perform_reset_transition(veejay_t *info);
 

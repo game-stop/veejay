@@ -76,26 +76,17 @@ static void vjert_process_plugin( int effect_id, void *fx_instance, VJFrame **fr
     const int plug_id = vje_get_plugin_id( effect_id );
     int num_inputs = plug_get_num_input_channels( plug_id );
     int num_params = vje_get_num_params( effect_id );
-    int i;
-
-    if( plug_is_frei0r( fx_instance ) ) {
-        plug_set_parameters( fx_instance, num_params, args);
+    if(num_inputs < 0 || num_inputs > 2) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Plugin %d requires %d inputs; the effect chain supports at most 2",
+                   plug_id, num_inputs);
+        return;
     }
-    else {
-        for( i = 0; i < num_params; i ++ ) {
-            plug_set_parameter( fx_instance, i, 1, &(args[i]) );
-        }
-    }
+    VJFrame *output =
+        plug_get_num_output_channels(plug_id) > 0 ? frames[0] : NULL;
 
-    for( i = 0; i < num_inputs; i ++ ) {
-        plug_push_frame( fx_instance, 0, i, frames[i] );
-    }
-
-    if( plug_get_num_output_channels( plug_id ) > 0 ) {
-        plug_push_frame( fx_instance, 1, 0, frames[0] );
-    }
-
-    plug_process( fx_instance, frames[0]->timecode );
+    plug_process_frame(fx_instance, frames, num_inputs, output,
+                       args, num_params, frames[0]->timecode);
 }
 
 int vjert_prepare_frame( void *ptr, int chain_id, int chain_position,
@@ -110,8 +101,12 @@ int vjert_prepare_frame( void *ptr, int chain_id, int chain_position,
     *e_flag = frozen_e_flag;
     *fx_instance = NULL;
 
-    if(!frozen_e_flag || frozen_effect_id <= 0)
+    if(!frozen_e_flag || frozen_effect_id <= 0) {
+        if(!frozen_e_flag && frozen_effect_id >= VJ_PLUGIN &&
+           entry->fx_instance && entry->fx_instance != (void*)0x1)
+            plug_reset(entry->fx_instance);
         return 0;
+    }
 
     if(frozen_effect_id >= VJ_PLUGIN) {
         if(entry->fx_instance == NULL) {

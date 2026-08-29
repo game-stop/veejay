@@ -65,6 +65,15 @@ typedef struct {
     float sm_glow;
     float sm_wipe_drive;
     float sm_mix_drive;
+
+    const uint8_t *work_pattern;
+    int work_ready;
+    int work_direction;
+    int work_musical;
+    int work_threshold;
+    int work_softness;
+    int work_edge_glow;
+    int work_mix_q8;
 } shape_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -304,16 +313,17 @@ static void shape_find_min_max(uint8_t *restrict data, const int len, int *min, 
     *max = b;
 }
 
-static void shape_wipe_1(uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
+static void shape_wipe_1(uint8_t *dst[4], uint8_t *src[4], const uint8_t *pattern, const int len, const int threshold)
 {
     uint8_t *restrict d0 = dst[0];
     uint8_t *restrict d1 = dst[1];
     uint8_t *restrict d2 = dst[2];
 
-    uint8_t *restrict s0 = src[0];
-    uint8_t *restrict s1 = src[1];
-    uint8_t *restrict s2 = src[2];
+    const uint8_t *restrict s0 = src[0];
+    const uint8_t *restrict s1 = src[1];
+    const uint8_t *restrict s2 = src[2];
 
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         if(pattern[i] < threshold) {
             d0[i] = s0[i];
@@ -323,16 +333,17 @@ static void shape_wipe_1(uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, con
     }
 }
 
-static void shape_wipe_2(uint8_t *dst[4], uint8_t *src[4], uint8_t *pattern, const int len, const int threshold)
+static void shape_wipe_2(uint8_t *dst[4], uint8_t *src[4], const uint8_t *pattern, const int len, const int threshold)
 {
     uint8_t *restrict d0 = dst[0];
     uint8_t *restrict d1 = dst[1];
     uint8_t *restrict d2 = dst[2];
 
-    uint8_t *restrict s0 = src[0];
-    uint8_t *restrict s1 = src[1];
-    uint8_t *restrict s2 = src[2];
+    const uint8_t *restrict s0 = src[0];
+    const uint8_t *restrict s1 = src[1];
+    const uint8_t *restrict s2 = src[2];
 
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         if(pattern[i] > threshold) {
             d0[i] = s0[i];
@@ -552,20 +563,20 @@ void shapewipe_free(void *ptr)
     free_shape_loader(s);
 }
 
-static int shapewipe_apply1(void *ptr,
-                            VJFrame *frame,
-                            VJFrame *frame2,
-                            double timecode,
-                            int shape,
-                            int threshold,
-                            int direction,
-                            int automatic,
-                            int softness,
-                            int edge_glow,
-                            int wipe_drive,
-                            int mix_drive)
+static int shapewipe_prepare(shape_t *s,
+                             VJFrame *frame,
+                             double timecode,
+                             int shape,
+                             int threshold,
+                             int direction,
+                             int automatic,
+                             int softness,
+                             int edge_glow,
+                             int wipe_drive,
+                             int mix_drive)
 {
-    shape_t *s = (shape_t*)ptr;
+    s->work_ready = 0;
+    s->shape_completed = 0;
 
     if(s->shapeidx <= 0)
         return 0;
@@ -636,16 +647,20 @@ static int shapewipe_apply1(void *ptr,
                                wipe_drive > 0 || mix_drive > 0 ||
                                threshold > 0;
 
+    s->work_pattern = src->data[0];
+    s->work_direction = direction;
+    s->work_musical = musical_active;
+    s->shape_completed = direction ?
+        done_threshold >= s->shape_max :
+        done_threshold <= s->shape_min;
+
     if(!musical_active) {
-        if(direction) {
-            shape_wipe_1(frame->data, frame2->data, src->data[0], frame->len, done_threshold);
-
-            return done_threshold >= s->shape_max;
-        }
-
-        shape_wipe_2(frame->data, frame2->data, src->data[0], frame->len, done_threshold);
-
-        return done_threshold <= s->shape_min;
+        s->work_threshold = done_threshold;
+        s->work_softness = 0;
+        s->work_edge_glow = 0;
+        s->work_mix_q8 = 0;
+        s->work_ready = 1;
+        return 1;
     }
 
     const float lane_a = 0.26f;
@@ -688,32 +703,77 @@ static int shapewipe_apply1(void *ptr,
     effective_mix += ((wipe_q * 180) + 500) / 1000;
     effective_mix = clampi(effective_mix, 0, 1000);
 
-    const int mix_q8 = (effective_mix * 256 + 500) / 1000;
+    s->work_threshold = effective_threshold;
+    s->work_softness = effective_softness;
+    s->work_edge_glow = effective_glow;
+    s->work_mix_q8 = (effective_mix * 256 + 500) / 1000;
+    s->work_ready = 1;
+    return 1;
+}
 
-    shape_wipe_musical(
-        s,
-        frame->data,
-        frame2->data,
-        src->data[0],
-        frame->len,
-        effective_threshold,
-        direction,
-        effective_softness,
-        effective_glow,
-        mix_q8
-    );
+static void shapewipe_apply_collective(void *ptr,
+                                       VJFrame *frame,
+                                       VJFrame *frame2,
+                                       double timecode,
+                                       int shape,
+                                       int threshold,
+                                       int direction,
+                                       int automatic,
+                                       int softness,
+                                       int edge_glow,
+                                       int wipe_drive,
+                                       int mix_drive)
+{
+    shape_t *s = (shape_t*)ptr;
 
-    if(direction)
-        return done_threshold >= s->shape_max;
+#pragma omp single
+    {
+        const int prepared = shapewipe_prepare(
+            s,
+            frame,
+            timecode,
+            shape,
+            threshold,
+            direction,
+            automatic,
+            softness,
+            edge_glow,
+            wipe_drive,
+            mix_drive
+        );
+        if(!prepared && timecode >= 1.0)
+            s->shape_completed = 1;
+    }
 
-    return done_threshold <= s->shape_min;
+    if(s->work_ready) {
+        if(s->work_musical) {
+            shape_wipe_musical(
+                s,
+                frame->data,
+                frame2->data,
+                s->work_pattern,
+                frame->len,
+                s->work_threshold,
+                s->work_direction,
+                s->work_softness,
+                s->work_edge_glow,
+                s->work_mix_q8
+            );
+        }
+        else if(s->work_direction) {
+            shape_wipe_1(frame->data, frame2->data,
+                         s->work_pattern, frame->len, s->work_threshold);
+        }
+        else {
+            shape_wipe_2(frame->data, frame2->data,
+                         s->work_pattern, frame->len, s->work_threshold);
+        }
+    }
 }
 
 void shapewipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    shape_t *s = (shape_t*)ptr;
-
-    s->shape_completed = shapewipe_apply1(
+    shapewipe_apply_collective(
         ptr,
         frame,
         frame2,
@@ -740,7 +800,7 @@ int shapewipe_process(void *ptr,
 {
     shape_t *s = (shape_t*)ptr;
 
-    s->shape_completed = shapewipe_apply1(
+    shapewipe_apply_collective(
         ptr,
         frame,
         frame2,

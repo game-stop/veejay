@@ -1,0 +1,6 @@
+vj-ndi.c
+vj-ndi.h
+liblavplayvj.c
+director-model.c
+director-model.h
+veejay-director.c

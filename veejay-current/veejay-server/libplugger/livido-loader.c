@@ -29,6 +29,9 @@
 #include <dlfcn.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <limits.h>
+#include <pthread.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <veejaycore/hash.h>
 #include <veejaycore/vj-msg.h>
@@ -92,6 +95,87 @@ static	int	livido_signature_ = VEVO_PLUG_LIVIDO;
 static  int read_plugin_configuration = 0;
 
 typedef	int	(*livido_set_parameter_f)( void *parameter, void *value );
+
+#define LIVIDO_ASYNC_SLOT_COUNT 2
+#define LIVIDO_FILTER_FLAGS_PROPERTY "HOST_filter_flags"
+
+typedef enum
+{
+	LIVIDO_ASYNC_INPUT_EMPTY = 0,
+	LIVIDO_ASYNC_INPUT_STAGING,
+	LIVIDO_ASYNC_INPUT_PENDING,
+	LIVIDO_ASYNC_INPUT_PROCESSING
+} livido_async_input_state_t;
+
+typedef enum
+{
+	LIVIDO_ASYNC_OUTPUT_EMPTY = 0,
+	LIVIDO_ASYNC_OUTPUT_COMPLETE,
+	LIVIDO_ASYNC_OUTPUT_DISPLAY,
+	LIVIDO_ASYNC_OUTPUT_READING
+} livido_async_output_state_t;
+
+/*
+ * A slot's input and output storage are independent: one slot may retain the
+ * displayed output while its input half holds the next bounded submission.
+ */
+typedef struct
+{
+	VJFrame *inputs;
+	uint8_t **input_storage;
+	size_t *input_capacity;
+	VJFrame output_template;
+	int pending_output_sizes[4];
+	VJFrame output;
+	int output_sizes[4];
+	uint8_t *output_storage;
+	size_t output_capacity;
+	int *parameters;
+	int parameter_count;
+	int has_output;
+	double timecode;
+	uint64_t input_sequence;
+	uint64_t input_generation;
+	uint64_t output_sequence;
+	uint64_t output_generation;
+	livido_async_input_state_t input_state;
+	livido_async_output_state_t output_state;
+} livido_async_slot_t;
+
+typedef struct livido_async_state_s
+{
+	void *instance;
+	struct livido_async_state_s *next;
+	pthread_t thread;
+	pthread_mutex_t mutex;
+	pthread_mutex_t call_mutex;
+	pthread_cond_t cond;
+	livido_async_slot_t slots[LIVIDO_ASYNC_SLOT_COUNT];
+	int flags;
+	int num_inputs;
+	int num_outputs;
+	int parameter_capacity;
+	int thread_started;
+	int stop;
+	int destroying;
+	unsigned int lifetime_refs;
+	int processing_slot;
+	int display_slot;
+	int have_frame_identity;
+	int have_frame_step;
+	long last_frame_num;
+	long last_frame_step;
+	uint64_t generation;
+	uint64_t next_sequence;
+	uint64_t completed_sequence;
+	uint64_t coalesced_frames;
+	uint64_t backpressure_waits;
+} livido_async_state_t;
+
+static int livido_plug_process_internal(void *instance, double time_code);
+static pthread_mutex_t livido_async_registry_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t livido_async_registry_cond = PTHREAD_COND_INITIALIZER;
+static livido_async_state_t *livido_async_states = NULL;
 
 static	struct
 {
@@ -195,6 +279,1226 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 	}
 	
 	return 1;
+}
+
+static livido_async_state_t *livido_async_lookup(void *instance)
+{
+	for(livido_async_state_t *state = livido_async_states;
+		state != NULL; state = state->next)
+	{
+		if(state->instance == instance)
+			return state;
+	}
+	return NULL;
+}
+
+static livido_async_state_t *livido_async_acquire(void *instance, int *known_async)
+{
+	livido_async_state_t *state = NULL;
+	int error;
+
+	if(known_async)
+		*known_async = 0;
+
+	error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock the non-real-time Livido registry: %s",
+				   strerror(error));
+		return NULL;
+	}
+
+	state = livido_async_lookup(instance);
+	if(state) {
+		if(known_async)
+			*known_async = 1;
+		if(state->destroying)
+			state = NULL;
+		else
+			state->lifetime_refs++;
+	}
+
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+	return state;
+}
+
+static void livido_async_release(livido_async_state_t *state)
+{
+	if(!state)
+		return;
+
+	int error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to release non-real-time Livido lifetime ownership: %s",
+				   strerror(error));
+		return;
+	}
+
+	if(state->lifetime_refs > 0)
+		state->lifetime_refs--;
+	else
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Non-real-time Livido lifetime ownership underflow");
+	pthread_cond_broadcast(&livido_async_registry_cond);
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+}
+
+static livido_async_state_t *livido_async_begin_destroy(void *instance)
+{
+	livido_async_state_t *state = NULL;
+	int error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock the non-real-time Livido registry for teardown: %s",
+				   strerror(error));
+		return NULL;
+	}
+
+	state = livido_async_lookup(instance);
+	if(state)
+		state->destroying = 1;
+
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+	return state;
+}
+
+static int livido_async_unregister(livido_async_state_t *state)
+{
+	int error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock the non-real-time Livido registry for removal: %s",
+				   strerror(error));
+		return 0;
+	}
+
+	livido_async_state_t **link = &livido_async_states;
+	while(*link && *link != state)
+		link = &(*link)->next;
+	if(*link == state)
+		*link = state->next;
+	else {
+		pthread_mutex_unlock(&livido_async_registry_mutex);
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Non-real-time Livido instance state was not registered");
+		return 0;
+	}
+
+	state->next = NULL;
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+	return 1;
+}
+
+static int livido_async_wait_for_references(livido_async_state_t *state)
+{
+	int error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock non-real-time Livido lifetime state: %s",
+				   strerror(error));
+		return 0;
+	}
+
+	while(state->lifetime_refs > 0) {
+		error = pthread_cond_wait(&livido_async_registry_cond,
+								  &livido_async_registry_mutex);
+		if(error != 0) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to wait for non-real-time Livido lifetime owners: %s",
+					   strerror(error));
+			pthread_mutex_unlock(&livido_async_registry_mutex);
+			return 0;
+		}
+	}
+
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+	return 1;
+}
+
+static int livido_async_frame_sizes(const VJFrame *frame, int sizes[4], size_t *total)
+{
+	if(!frame || !sizes || !total || !frame->data[0] ||
+	   frame->len <= 0 || frame->uv_len < 0 || frame->height <= 0)
+		return 0;
+
+	sizes[0] = frame->len;
+	sizes[1] = frame->data[1] ? frame->uv_len : 0;
+	sizes[2] = frame->data[2] ? frame->uv_len : 0;
+	sizes[3] = 0;
+
+	if(frame->data[3] && frame->stride[3] > 0) {
+		if(frame->height > INT_MAX / frame->stride[3])
+			return 0;
+		sizes[3] = frame->stride[3] * frame->height;
+	}
+
+	*total = 0;
+	for(int i = 0; i < 4; i++) {
+		if(sizes[i] < 0 || *total > SIZE_MAX - (size_t)sizes[i])
+			return 0;
+		*total += (size_t)sizes[i];
+	}
+
+	return *total > 0;
+}
+
+static int livido_async_ensure_storage(uint8_t **storage, size_t *capacity, size_t need)
+{
+	if(*storage && *capacity >= need)
+		return 1;
+
+	uint8_t *new_storage = (uint8_t*) vj_malloc(need);
+	if(!new_storage)
+		return 0;
+
+	if(*storage)
+		free(*storage);
+
+	*storage = new_storage;
+	*capacity = need;
+	return 1;
+}
+
+static void livido_async_map_frame(VJFrame *dst, const VJFrame *src,
+								   uint8_t *storage, const int sizes[4])
+{
+	size_t offset = 0;
+
+	*dst = *src;
+	dst->local = NULL;
+
+	for(int i = 0; i < 4; i++) {
+		if(sizes[i] > 0) {
+			dst->data[i] = storage + offset;
+			offset += (size_t)sizes[i];
+		}
+		else {
+			dst->data[i] = NULL;
+		}
+	}
+}
+
+static int livido_async_snapshot_frame(VJFrame *dst, uint8_t **storage,
+									   size_t *capacity, const VJFrame *src)
+{
+	int sizes[4];
+	size_t total;
+
+	if(!livido_async_frame_sizes(src, sizes, &total) ||
+	   !livido_async_ensure_storage(storage, capacity, total))
+		return 0;
+
+	livido_async_map_frame(dst, src, *storage, sizes);
+	for(int i = 0; i < 4; i++) {
+		if(sizes[i] > 0)
+			veejay_memcpy(dst->data[i], src->data[i], (size_t)sizes[i]);
+	}
+
+	return 1;
+}
+
+static int livido_async_set_output_template(livido_async_slot_t *slot,
+										 const VJFrame *output)
+{
+	size_t total;
+
+	if(!livido_async_frame_sizes(output, slot->pending_output_sizes, &total))
+		return 0;
+
+	slot->output_template = *output;
+	slot->output_template.local = NULL;
+	for(int i = 0; i < 4; i++)
+		slot->output_template.data[i] = NULL;
+
+	return 1;
+}
+
+static void livido_async_fill_frame(VJFrame *frame, const int sizes[4])
+{
+	const int y_value = frame->range ? 0 : 16;
+
+	for(int i = 0; i < 4; i++) {
+		if(sizes[i] <= 0 || !frame->data[i])
+			continue;
+		int value = (i == 0) ? y_value : ((i == 3) ? 255 : 128);
+		veejay_memset(frame->data[i], value, (size_t)sizes[i]);
+	}
+}
+
+static int livido_async_prepare_output(livido_async_state_t *state,
+									   livido_async_slot_t *slot)
+{
+	size_t total = 0;
+
+	if(!slot->has_output)
+		return 1;
+
+	for(int i = 0; i < 4; i++) {
+		if(slot->pending_output_sizes[i] < 0 ||
+		   total > SIZE_MAX - (size_t)slot->pending_output_sizes[i])
+			return 0;
+		total += (size_t)slot->pending_output_sizes[i];
+	}
+
+	if(total == 0 ||
+	   !livido_async_ensure_storage(&slot->output_storage,
+									&slot->output_capacity, total))
+		return 0;
+
+	livido_async_map_frame(&slot->output, &slot->output_template,
+						   slot->output_storage, slot->pending_output_sizes);
+	for(int i = 0; i < 4; i++)
+		slot->output_sizes[i] = slot->pending_output_sizes[i];
+
+	if(state->num_inputs > 0) {
+		int input_sizes[4];
+		size_t input_total;
+
+		if(!livido_async_frame_sizes(&slot->inputs[0], input_sizes, &input_total))
+			return 0;
+
+		for(int i = 0; i < 4; i++) {
+			if(slot->output_sizes[i] <= 0)
+				continue;
+			if(slot->inputs[0].data[i] &&
+			   input_sizes[i] == slot->output_sizes[i])
+			{
+				veejay_memcpy(slot->output.data[i], slot->inputs[0].data[i],
+							  (size_t)slot->output_sizes[i]);
+			}
+			else {
+				int value = (i == 0) ? (slot->output.range ? 0 : 16) :
+							((i == 3) ? 255 : 128);
+				veejay_memset(slot->output.data[i], value,
+							  (size_t)slot->output_sizes[i]);
+			}
+		}
+	}
+	else {
+		livido_async_fill_frame(&slot->output, slot->output_sizes);
+	}
+
+	return 1;
+}
+
+static int livido_async_copy_output(const livido_async_slot_t *slot,
+									VJFrame *output)
+{
+	int output_sizes[4];
+	size_t total;
+
+	if(!output ||
+	   !livido_async_frame_sizes(output, output_sizes, &total))
+		return 0;
+
+	for(int i = 0; i < 4; i++) {
+		if(output_sizes[i] != slot->output_sizes[i])
+			return 0;
+	}
+
+	for(int i = 0; i < 4; i++) {
+		if(output_sizes[i] > 0)
+			veejay_memcpy(output->data[i], slot->output.data[i],
+						  (size_t)output_sizes[i]);
+	}
+
+	return 1;
+}
+
+static int livido_async_apply_fallback(VJFrame **inputs, int num_inputs,
+									   VJFrame *output)
+{
+	if(!output)
+		return 1;
+
+	if(num_inputs <= 0) {
+		int sizes[4];
+		size_t total;
+		if(!livido_async_frame_sizes(output, sizes, &total))
+			return 0;
+		livido_async_fill_frame(output, sizes);
+		return 1;
+	}
+
+	if(!inputs || !inputs[0])
+		return 0;
+	if(inputs[0] == output)
+		return 1;
+
+	int input_sizes[4];
+	int output_sizes[4];
+	size_t input_total;
+	size_t output_total;
+
+	if(!livido_async_frame_sizes(inputs[0], input_sizes, &input_total) ||
+	   !livido_async_frame_sizes(output, output_sizes, &output_total))
+		return 0;
+
+	for(int i = 0; i < 4; i++) {
+		if(input_sizes[i] != output_sizes[i])
+			return 0;
+	}
+
+	for(int i = 0; i < 4; i++) {
+		if(output_sizes[i] > 0)
+			veejay_memcpy(output->data[i], inputs[0]->data[i],
+						  (size_t)output_sizes[i]);
+	}
+
+	return 1;
+}
+
+static int livido_async_find_complete(const livido_async_state_t *state)
+{
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		if(state->slots[i].output_state == LIVIDO_ASYNC_OUTPUT_COMPLETE)
+			return i;
+	}
+	return -1;
+}
+
+static int livido_async_publish_complete_locked(livido_async_state_t *state)
+{
+	int complete = livido_async_find_complete(state);
+	if(complete < 0)
+		return 0;
+
+	if(state->slots[complete].output_generation != state->generation) {
+		state->slots[complete].output_state = LIVIDO_ASYNC_OUTPUT_EMPTY;
+		pthread_cond_broadcast(&state->cond);
+		return 0;
+	}
+
+	if(state->display_slot >= 0) {
+		livido_async_slot_t *display = &state->slots[state->display_slot];
+		if(display->output_state == LIVIDO_ASYNC_OUTPUT_READING)
+			return 0;
+		display->output_state = LIVIDO_ASYNC_OUTPUT_EMPTY;
+	}
+
+	state->slots[complete].output_state = LIVIDO_ASYNC_OUTPUT_DISPLAY;
+	state->display_slot = complete;
+	state->completed_sequence = state->slots[complete].output_sequence;
+	pthread_cond_broadcast(&state->cond);
+	return 1;
+}
+
+static int livido_async_find_input_slot(const livido_async_state_t *state)
+{
+	int display_candidate = -1;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		if(state->slots[i].input_state != LIVIDO_ASYNC_INPUT_EMPTY)
+			continue;
+		if(state->slots[i].output_state == LIVIDO_ASYNC_OUTPUT_EMPTY)
+			return i;
+		if(state->slots[i].output_state == LIVIDO_ASYNC_OUTPUT_DISPLAY &&
+		   display_candidate < 0)
+			display_candidate = i;
+	}
+
+	return display_candidate;
+}
+
+static int livido_async_find_coalesce_slot(const livido_async_state_t *state)
+{
+	int selected = -1;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		if(state->slots[i].input_state != LIVIDO_ASYNC_INPUT_PENDING)
+			continue;
+		if(selected < 0 ||
+		   state->slots[i].input_sequence >
+		   state->slots[selected].input_sequence)
+			selected = i;
+	}
+
+	return selected;
+}
+
+static int livido_async_find_runnable_slot(const livido_async_state_t *state)
+{
+	int selected = -1;
+
+	if(livido_async_find_complete(state) >= 0)
+		return -1;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		if(state->slots[i].input_state != LIVIDO_ASYNC_INPUT_PENDING ||
+		   state->slots[i].output_state != LIVIDO_ASYNC_OUTPUT_EMPTY)
+			continue;
+		if(selected < 0 ||
+		   state->slots[i].input_sequence <
+		   state->slots[selected].input_sequence)
+			selected = i;
+	}
+
+	if(selected >= 0) {
+		for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+			if(state->slots[i].input_state == LIVIDO_ASYNC_INPUT_STAGING &&
+			   state->slots[i].input_sequence <
+			   state->slots[selected].input_sequence)
+				return -1;
+		}
+	}
+
+	return selected;
+}
+
+static int livido_async_reset_locked(livido_async_state_t *state)
+{
+	int active = state->processing_slot >= 0 || state->display_slot >= 0;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		livido_async_slot_t *slot = &state->slots[i];
+		if(slot->input_state != LIVIDO_ASYNC_INPUT_EMPTY)
+			active = 1;
+		if(slot->output_state != LIVIDO_ASYNC_OUTPUT_EMPTY)
+			active = 1;
+	}
+
+	if(!active)
+		return 0;
+
+	state->generation++;
+	state->display_slot = -1;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		livido_async_slot_t *slot = &state->slots[i];
+		if(slot->input_state == LIVIDO_ASYNC_INPUT_PENDING)
+			slot->input_state = LIVIDO_ASYNC_INPUT_EMPTY;
+		if(slot->output_state == LIVIDO_ASYNC_OUTPUT_COMPLETE ||
+		   slot->output_state == LIVIDO_ASYNC_OUTPUT_DISPLAY)
+			slot->output_state = LIVIDO_ASYNC_OUTPUT_EMPTY;
+	}
+
+	pthread_cond_broadcast(&state->cond);
+	return 1;
+}
+
+static void livido_async_record_frame_locked(livido_async_state_t *state,
+									 const VJFrame *frame)
+{
+	if(!frame)
+		return;
+
+	if(!state->have_frame_identity) {
+		state->last_frame_num = frame->frame_num;
+		state->have_frame_identity = 1;
+		return;
+	}
+
+	long step = frame->frame_num - state->last_frame_num;
+	state->last_frame_num = frame->frame_num;
+	if(step == 0)
+		return;
+
+	if(state->have_frame_step && step != state->last_frame_step) {
+		if(livido_async_reset_locked(state)) {
+			veejay_msg(VEEJAY_MSG_DEBUG,
+					   "Resetting non-real-time Livido buffers after timeline discontinuity");
+		}
+		state->have_frame_step = 0;
+	}
+	else if(!state->have_frame_step) {
+		state->last_frame_step = step;
+		state->have_frame_step = 1;
+	}
+
+	state->have_frame_identity = 1;
+}
+
+static int livido_async_process_slot(livido_async_state_t *state,
+									 livido_async_slot_t *slot)
+{
+	if(!livido_async_prepare_output(state, slot)) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to allocate output storage for non-real-time Livido plugin");
+		return LIVIDO_ERROR_MEMORY_ALLOCATION;
+	}
+
+	int lock_error = pthread_mutex_lock(&state->call_mutex);
+	if(lock_error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock non-real-time Livido plugin call mutex: %s",
+				   strerror(lock_error));
+		return LIVIDO_ERROR_INTERNAL;
+	}
+
+	for(int i = 0; i < slot->parameter_count; i++)
+		livido_set_parameter(state->instance, i, &slot->parameters[i]);
+
+	for(int i = 0; i < state->num_inputs; i++) {
+		VJFrame *input = &slot->inputs[i];
+		if(i == 0 && slot->has_output &&
+		   (state->flags & LIVIDO_FILTER_CAN_DO_INPLACE))
+			input = &slot->output;
+		if(!configure_channel(state->instance, "in_channels", i, input)) {
+			pthread_mutex_unlock(&state->call_mutex);
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to bind owned input %d for non-real-time Livido plugin",
+					   i);
+			return LIVIDO_ERROR_NO_INPUT_CHANNELS;
+		}
+	}
+
+	if(slot->has_output &&
+	   !configure_channel(state->instance, "out_channels", 0, &slot->output))
+	{
+		pthread_mutex_unlock(&state->call_mutex);
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to bind owned output for non-real-time Livido plugin");
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
+	}
+
+	int process_error = livido_plug_process_internal(state->instance,
+												 slot->timecode);
+	int unlock_error = pthread_mutex_unlock(&state->call_mutex);
+	if(unlock_error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to unlock non-real-time Livido plugin call mutex: %s",
+				   strerror(unlock_error));
+		if(process_error == LIVIDO_NO_ERROR)
+			process_error = LIVIDO_ERROR_INTERNAL;
+	}
+
+	return process_error;
+}
+
+static void *livido_async_worker(void *data)
+{
+	livido_async_state_t *state = (livido_async_state_t*) data;
+
+	for(;;) {
+		int slot_index = -1;
+		int wait_error = 0;
+
+		pthread_mutex_lock(&state->mutex);
+		while(!state->stop &&
+			  (slot_index = livido_async_find_runnable_slot(state)) < 0)
+		{
+			wait_error = pthread_cond_wait(&state->cond, &state->mutex);
+			if(wait_error != 0) {
+				veejay_msg(VEEJAY_MSG_ERROR,
+						   "Non-real-time Livido worker wait failed: %s",
+						   strerror(wait_error));
+				state->stop = 1;
+				break;
+			}
+		}
+
+		if(state->stop) {
+			pthread_mutex_unlock(&state->mutex);
+			break;
+		}
+
+		livido_async_slot_t *slot = &state->slots[slot_index];
+		slot->input_state = LIVIDO_ASYNC_INPUT_PROCESSING;
+		state->processing_slot = slot_index;
+		pthread_mutex_unlock(&state->mutex);
+
+		int process_error = livido_async_process_slot(state, slot);
+
+		pthread_mutex_lock(&state->mutex);
+		slot->input_state = LIVIDO_ASYNC_INPUT_EMPTY;
+		state->processing_slot = -1;
+		if(!state->stop &&
+		   process_error == LIVIDO_NO_ERROR &&
+		   slot->input_generation == state->generation &&
+		   slot->input_sequence > state->completed_sequence &&
+		   slot->has_output)
+		{
+			slot->output_sequence = slot->input_sequence;
+			slot->output_generation = slot->input_generation;
+			slot->output_state = LIVIDO_ASYNC_OUTPUT_COMPLETE;
+		}
+		else {
+			slot->output_state = LIVIDO_ASYNC_OUTPUT_EMPTY;
+			if(process_error != LIVIDO_NO_ERROR) {
+				veejay_msg(VEEJAY_MSG_ERROR,
+						   "Non-real-time Livido plugin processing failed with error %d",
+						   process_error);
+			}
+		}
+		pthread_cond_broadcast(&state->cond);
+		pthread_mutex_unlock(&state->mutex);
+	}
+
+	return NULL;
+}
+
+static void livido_async_slot_free(livido_async_slot_t *slot, int num_inputs)
+{
+	if(slot->input_storage) {
+		for(int i = 0; i < num_inputs; i++)
+			free(slot->input_storage[i]);
+	}
+	free(slot->inputs);
+	free(slot->input_storage);
+	free(slot->input_capacity);
+	free(slot->output_storage);
+	free(slot->parameters);
+}
+
+static int livido_async_slot_init(livido_async_slot_t *slot, int num_inputs,
+								  int parameter_capacity)
+{
+	if(num_inputs > 0) {
+		slot->inputs = (VJFrame*) vj_calloc(sizeof(VJFrame) * (size_t)num_inputs);
+		slot->input_storage = (uint8_t**) vj_calloc(sizeof(uint8_t*) * (size_t)num_inputs);
+		slot->input_capacity = (size_t*) vj_calloc(sizeof(size_t) * (size_t)num_inputs);
+		if(!slot->inputs || !slot->input_storage || !slot->input_capacity)
+			return 0;
+	}
+
+	if(parameter_capacity > 0) {
+		slot->parameters = (int*) vj_calloc(sizeof(int) * (size_t)parameter_capacity);
+		if(!slot->parameters)
+			return 0;
+	}
+
+	return 1;
+}
+
+static void livido_async_state_free(livido_async_state_t *state)
+{
+	if(!state)
+		return;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++)
+		livido_async_slot_free(&state->slots[i], state->num_inputs);
+
+	int error = pthread_cond_destroy(&state->cond);
+	if(error != 0)
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to destroy non-real-time Livido condition variable: %s",
+				   strerror(error));
+	error = pthread_mutex_destroy(&state->call_mutex);
+	if(error != 0)
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to destroy non-real-time Livido call mutex: %s",
+				   strerror(error));
+	error = pthread_mutex_destroy(&state->mutex);
+	if(error != 0)
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to destroy non-real-time Livido state mutex: %s",
+				   strerror(error));
+	free(state);
+}
+
+static int livido_async_state_create(void *instance, int flags)
+{
+	int num_inputs = vevo_property_num_elements(instance, "in_channels");
+	int num_outputs = vevo_property_num_elements(instance, "out_channels");
+	int parameter_capacity = vevo_property_num_elements(instance, "in_parameters");
+
+	if(num_inputs < 0)
+		num_inputs = 0;
+	if(num_outputs < 0)
+		num_outputs = 0;
+	if(parameter_capacity < 0)
+		parameter_capacity = 0;
+
+	livido_async_state_t *state =
+		(livido_async_state_t*) vj_calloc(sizeof(livido_async_state_t));
+	if(!state) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to allocate non-real-time Livido instance state");
+		return 0;
+	}
+
+	state->instance = instance;
+	state->flags = flags;
+	state->num_inputs = num_inputs;
+	state->num_outputs = num_outputs;
+	state->parameter_capacity = parameter_capacity;
+	state->processing_slot = -1;
+	state->display_slot = -1;
+	state->generation = 1;
+
+	int mutex_ready = 0;
+	int call_mutex_ready = 0;
+	int cond_ready = 0;
+	int error = pthread_mutex_init(&state->mutex, NULL);
+	if(error == 0)
+		mutex_ready = 1;
+	else
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to initialize non-real-time Livido state mutex: %s",
+				   strerror(error));
+
+	if(mutex_ready) {
+		error = pthread_mutex_init(&state->call_mutex, NULL);
+		if(error == 0)
+			call_mutex_ready = 1;
+		else
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to initialize non-real-time Livido call mutex: %s",
+					   strerror(error));
+	}
+
+	if(call_mutex_ready) {
+		error = pthread_cond_init(&state->cond, NULL);
+		if(error == 0)
+			cond_ready = 1;
+		else
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to initialize non-real-time Livido condition variable: %s",
+					   strerror(error));
+	}
+
+	if(!mutex_ready || !call_mutex_ready || !cond_ready)
+		goto fail;
+
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++) {
+		if(!livido_async_slot_init(&state->slots[i], num_inputs,
+								   parameter_capacity))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to allocate non-real-time Livido frame slots");
+			goto fail;
+		}
+	}
+
+	error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock the non-real-time Livido registry during activation: %s",
+				   strerror(error));
+		goto fail;
+	}
+	state->next = livido_async_states;
+	livido_async_states = state;
+
+	/*
+	 * This raw pthread is deliberately outside the host OpenMP team. A Livido
+	 * callback may therefore create its own level-one OpenMP team without
+	 * enabling nested teams for internal VeeJay effects.
+	 */
+	error = pthread_create(&state->thread, NULL, livido_async_worker, state);
+	if(error != 0) {
+		livido_async_states = state->next;
+		state->next = NULL;
+		pthread_mutex_unlock(&livido_async_registry_mutex);
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to create non-real-time Livido worker: %s",
+				   strerror(error));
+		goto fail;
+	}
+	state->thread_started = 1;
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+
+	return 1;
+
+fail:
+	for(int i = 0; i < LIVIDO_ASYNC_SLOT_COUNT; i++)
+		livido_async_slot_free(&state->slots[i], num_inputs);
+	if(cond_ready)
+		pthread_cond_destroy(&state->cond);
+	if(call_mutex_ready)
+		pthread_mutex_destroy(&state->call_mutex);
+	if(mutex_ready)
+		pthread_mutex_destroy(&state->mutex);
+	free(state);
+	return 0;
+}
+
+static int livido_async_state_stop(livido_async_state_t *state)
+{
+	if(!state)
+		return 1;
+
+	int error = pthread_mutex_lock(&state->mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock non-real-time Livido state for shutdown: %s",
+				   strerror(error));
+		return 0;
+	}
+
+	state->stop = 1;
+	pthread_cond_broadcast(&state->cond);
+	pthread_mutex_unlock(&state->mutex);
+
+	if(state->thread_started) {
+		error = pthread_join(state->thread, NULL);
+		if(error != 0) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to join non-real-time Livido worker: %s",
+					   strerror(error));
+			return 0;
+		}
+		state->thread_started = 0;
+	}
+
+	return livido_async_wait_for_references(state);
+}
+
+int livido_plug_get_filter_flags(void *instance)
+{
+	int flags = 0;
+	if(!instance)
+		return 0;
+
+	int error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock the non-real-time Livido registry for capability lookup: %s",
+				   strerror(error));
+		return 0;
+	}
+
+	livido_async_state_t *state = livido_async_lookup(instance);
+	if(state)
+		flags = state->flags;
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+	if(state)
+		return flags;
+
+	vevo_property_get(instance, LIVIDO_FILTER_FLAGS_PROPERTY, 0, &flags);
+	return flags;
+}
+
+int livido_plug_get_async_parameter_count(void *instance, int *count)
+{
+	if(!count)
+		return 0;
+
+	int known_async = 0;
+	livido_async_state_t *state =
+		livido_async_acquire(instance, &known_async);
+	if(state) {
+		*count = state->parameter_capacity;
+		livido_async_release(state);
+		return 1;
+	}
+
+	if(known_async) {
+		*count = 0;
+		return 1;
+	}
+	return 0;
+}
+
+int livido_plug_is_async(void *instance)
+{
+	int known_async = 0;
+	livido_async_state_t *state =
+		livido_async_acquire(instance, &known_async);
+	livido_async_release(state);
+	return known_async;
+}
+
+int livido_plug_call_lock(void *instance)
+{
+	int known_async = 0;
+	livido_async_state_t *state =
+		livido_async_acquire(instance, &known_async);
+	if(!state)
+		return known_async ? -1 : 0;
+
+	int error = pthread_mutex_lock(&state->call_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to serialize non-real-time Livido plugin call: %s",
+				   strerror(error));
+		livido_async_release(state);
+		return -1;
+	}
+
+	error = pthread_mutex_lock(&state->mutex);
+	if(error != 0) {
+		pthread_mutex_unlock(&state->call_mutex);
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to inspect non-real-time Livido plugin state: %s",
+				   strerror(error));
+		livido_async_release(state);
+		return -1;
+	}
+	int stopped = state->stop;
+	pthread_mutex_unlock(&state->mutex);
+
+	if(stopped) {
+		pthread_mutex_unlock(&state->call_mutex);
+		livido_async_release(state);
+		return -1;
+	}
+
+	return 1;
+}
+
+void livido_plug_call_unlock(void *instance)
+{
+	int error = pthread_mutex_lock(&livido_async_registry_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock the non-real-time Livido registry while releasing a plugin call: %s",
+				   strerror(error));
+		return;
+	}
+	livido_async_state_t *state = livido_async_lookup(instance);
+	pthread_mutex_unlock(&livido_async_registry_mutex);
+	if(!state) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Non-real-time Livido plugin call lost its instance state");
+		return;
+	}
+
+	error = pthread_mutex_unlock(&state->call_mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to release non-real-time Livido plugin call mutex: %s",
+				   strerror(error));
+	}
+	livido_async_release(state);
+}
+
+void livido_plug_reset(void *instance)
+{
+	livido_async_state_t *state = livido_async_acquire(instance, NULL);
+	if(!state)
+		return;
+
+	int error = pthread_mutex_lock(&state->mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock non-real-time Livido state for reset: %s",
+				   strerror(error));
+		livido_async_release(state);
+		return;
+	}
+
+	livido_async_reset_locked(state);
+	state->have_frame_identity = 0;
+	state->have_frame_step = 0;
+	pthread_mutex_unlock(&state->mutex);
+	livido_async_release(state);
+}
+
+int livido_plug_process_frame(void *instance, VJFrame **inputs, int num_inputs,
+							  VJFrame *output, const int *args,
+							  int num_params, double timecode)
+{
+	livido_async_state_t *state = livido_async_acquire(instance, NULL);
+	if(!state || num_inputs != state->num_inputs ||
+	   num_params < 0 || num_params > state->parameter_capacity ||
+	   (num_inputs > 0 && !inputs) ||
+	   (num_params > 0 && !args) ||
+	   (state->num_outputs > 0 && !output))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Invalid non-real-time Livido frame submission");
+		livido_async_release(state);
+		return 0;
+	}
+
+	for(int i = 0; i < num_inputs; i++) {
+		if(!inputs[i]) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Missing input %d for non-real-time Livido frame submission",
+					   i);
+			livido_async_release(state);
+			return 0;
+		}
+	}
+
+	const VJFrame *identity_frame =
+		(num_inputs > 0) ? inputs[0] : output;
+	int slot_index = -1;
+	int submission_ok = 1;
+	int read_slot = -1;
+	uint64_t read_output_generation = 0;
+	int coalesced = 0;
+	int wait_reported = 0;
+
+	int error = pthread_mutex_lock(&state->mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to lock non-real-time Livido submission state: %s",
+				   strerror(error));
+		livido_async_release(state);
+		return 0;
+	}
+
+	if(state->stop) {
+		pthread_mutex_unlock(&state->mutex);
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Cannot submit a frame to a stopping non-real-time Livido plugin");
+		livido_async_release(state);
+		return 0;
+	}
+
+	livido_async_record_frame_locked(state, identity_frame);
+
+	/* Publishing first is required before stateful backpressure can wait. */
+	for(;;) {
+		livido_async_publish_complete_locked(state);
+		slot_index = livido_async_find_input_slot(state);
+		if(slot_index >= 0)
+			break;
+
+		if(!(state->flags & LIVIDO_FILTER_NON_STATELESS)) {
+			slot_index = livido_async_find_coalesce_slot(state);
+			if(slot_index >= 0) {
+				coalesced = 1;
+				break;
+			}
+
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "No reusable slot for stateless non-real-time Livido frame");
+			submission_ok = 0;
+			break;
+		}
+
+		if(!wait_reported) {
+			state->backpressure_waits++;
+			veejay_msg(VEEJAY_MSG_DEBUG,
+					   "Applying bounded backpressure to stateful non-real-time Livido plugin");
+			wait_reported = 1;
+		}
+
+		error = pthread_cond_wait(&state->cond, &state->mutex);
+		if(error != 0) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Stateful non-real-time Livido backpressure wait failed: %s",
+					   strerror(error));
+			submission_ok = 0;
+			break;
+		}
+		if(state->stop) {
+			submission_ok = 0;
+			break;
+		}
+	}
+
+	uint64_t submission_generation = state->generation;
+	if(submission_ok) {
+		livido_async_slot_t *slot = &state->slots[slot_index];
+		slot->input_state = LIVIDO_ASYNC_INPUT_STAGING;
+		slot->input_sequence = ++state->next_sequence;
+		slot->input_generation = submission_generation;
+		if(coalesced) {
+			state->coalesced_frames++;
+			if(state->coalesced_frames == 1 ||
+			   (state->coalesced_frames % 120) == 0)
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG,
+						   "Coalesced %llu busy-frame submissions for stateless non-real-time Livido plugin",
+						   (unsigned long long)state->coalesced_frames);
+			}
+		}
+	}
+	pthread_mutex_unlock(&state->mutex);
+
+	if(submission_ok) {
+		livido_async_slot_t *slot = &state->slots[slot_index];
+
+		for(int i = 0; i < num_inputs; i++) {
+			if(!livido_async_snapshot_frame(&slot->inputs[i],
+										&slot->input_storage[i],
+										&slot->input_capacity[i],
+										inputs[i]))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR,
+						   "Unable to snapshot input %d for non-real-time Livido plugin",
+						   i);
+				submission_ok = 0;
+				break;
+			}
+		}
+
+		if(submission_ok && state->num_outputs > 0 &&
+		   !livido_async_set_output_template(slot, output))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to snapshot output metadata for non-real-time Livido plugin");
+			submission_ok = 0;
+		}
+
+		if(submission_ok && num_params > 0)
+			veejay_memcpy(slot->parameters, args,
+						  sizeof(int) * (size_t)num_params);
+
+		slot->parameter_count = num_params;
+		slot->has_output = state->num_outputs > 0;
+		slot->timecode = timecode;
+	}
+
+	error = pthread_mutex_lock(&state->mutex);
+	if(error != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to publish non-real-time Livido frame submission: %s",
+				   strerror(error));
+		livido_async_release(state);
+		return 0;
+	}
+
+	if(slot_index >= 0) {
+		livido_async_slot_t *slot = &state->slots[slot_index];
+		if(submission_ok && !state->stop &&
+		   slot->input_generation == state->generation)
+		{
+			slot->input_state = LIVIDO_ASYNC_INPUT_PENDING;
+		}
+		else {
+			slot->input_state = LIVIDO_ASYNC_INPUT_EMPTY;
+			submission_ok = 0;
+		}
+		pthread_cond_broadcast(&state->cond);
+	}
+
+	livido_async_publish_complete_locked(state);
+	if(state->display_slot >= 0) {
+		livido_async_slot_t *display = &state->slots[state->display_slot];
+		if(display->output_state == LIVIDO_ASYNC_OUTPUT_DISPLAY) {
+			read_slot = state->display_slot;
+			read_output_generation = display->output_generation;
+			display->output_state = LIVIDO_ASYNC_OUTPUT_READING;
+		}
+	}
+	pthread_mutex_unlock(&state->mutex);
+
+	int output_ok = 1;
+	if(read_slot >= 0) {
+		output_ok = livido_async_copy_output(&state->slots[read_slot], output);
+		if(!output_ok) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Completed non-real-time Livido output does not match the current frame");
+		}
+
+		pthread_mutex_lock(&state->mutex);
+		livido_async_slot_t *display = &state->slots[read_slot];
+		if(display->output_state == LIVIDO_ASYNC_OUTPUT_READING) {
+			if(output_ok && !state->stop &&
+			   read_output_generation == state->generation &&
+			   display->output_generation == read_output_generation)
+			{
+				display->output_state = LIVIDO_ASYNC_OUTPUT_DISPLAY;
+				state->display_slot = read_slot;
+			}
+			else {
+				display->output_state = LIVIDO_ASYNC_OUTPUT_EMPTY;
+				if(state->display_slot == read_slot)
+					state->display_slot = -1;
+			}
+		}
+		pthread_cond_broadcast(&state->cond);
+		pthread_mutex_unlock(&state->mutex);
+
+		if(!output_ok)
+			output_ok = livido_async_apply_fallback(inputs, num_inputs, output);
+	}
+	else {
+		output_ok = livido_async_apply_fallback(inputs, num_inputs, output);
+		if(!output_ok) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Unable to apply first-frame fallback for non-real-time Livido plugin");
+		}
+	}
+
+	livido_async_release(state);
+	return submission_ok && output_ok;
 }
 
 int	livido_plug_parameter_set_text( void *parameter, void *value )
@@ -894,6 +2198,7 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, 
 {
 	void *plug_info = NULL;
 	void *filter_templ = NULL;
+	int filter_flags = 0;
 	
     read_plugin_configuration = read_plug_cfg;
 	(void) base_fmt_;
@@ -904,8 +2209,12 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, 
 	}
 	if( vevo_property_get( plug_info, "filters",0,&filter_templ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Not a Livido filter");
+		return NULL;
 	}
+	vevo_property_get(filter_templ, "flags", 0, &filter_flags);
 	void *filter_instance = vpn( LIVIDO_PORT_TYPE_FILTER_INSTANCE );
+	vevo_property_set(filter_instance, LIVIDO_FILTER_FLAGS_PROPERTY,
+					  LIVIDO_ATOM_TYPE_INT, 1, &filter_flags);
 	init_ports_from_template(
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_CHANNEL,
@@ -987,6 +2296,15 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ , int org_fmt_, 
 	generic_deinit_f		gin = livido_plug_deinit;
 	vevo_property_set( filter_instance, "HOST_plugin_deinit_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gin);
 
+	if((filter_flags & LIVIDO_FILTER_NON_REALTIME) &&
+	   !livido_async_state_create(filter_instance, filter_flags))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to initialize asynchronous host processing for Livido plugin");
+		livido_plug_deinit(filter_instance);
+		return NULL;
+	}
+
 	return filter_instance;
 }
 
@@ -1003,22 +2321,31 @@ void	livido_push_channel( void *instance,int n,int dir, VJFrame *frame ) // in_c
 	livido_push_channel_local(instance, key, n, frame );
 }
 
-void	livido_plug_process( void *instance, double time_code )
+static int livido_plug_process_internal(void *instance, double time_code)
 {
 	void *filter_templ = NULL;
-	int error = vevo_property_get( instance, "filter_templ",0,&filter_templ);
+	if(vevo_property_get(instance, "filter_templ", 0, &filter_templ) != VEVO_NO_ERROR)
+		return LIVIDO_ERROR_INTERNAL;
 
-	livido_process_f process;
-	error = vevo_property_get( filter_templ, "process_func", 0, &process );
+	livido_process_f process = NULL;
+	if(vevo_property_get(filter_templ, "process_func", 0, &process) != VEVO_NO_ERROR ||
+	   !process)
+		return LIVIDO_ERROR_INTERNAL;
 
-	(*process)( instance, time_code );
+	int process_error = (*process)(instance, time_code);
+	if(process_error != LIVIDO_NO_ERROR)
+		return process_error;
+
+	int num_outputs = vevo_property_num_elements(instance, "out_channels");
+	if(num_outputs <= 0)
+		return LIVIDO_NO_ERROR;
 
 	void *channel = NULL;
 	//see if output channel needs downsampling
-	error = vevo_property_get( instance, "out_channels", 0, &channel );
+	int error = vevo_property_get( instance, "out_channels", 0, &channel );
 
 	if( error != LIVIDO_NO_ERROR )
-		return;
+		return LIVIDO_ERROR_NO_OUTPUT_CHANNELS;
 
 	int current_palette = 0;
 	vevo_property_get( channel, "current_palette", 0, &current_palette );
@@ -1037,16 +2364,61 @@ void	livido_plug_process( void *instance, double time_code )
 		}
 	}
 
+	return LIVIDO_NO_ERROR;
+}
+
+void	livido_plug_process( void *instance, double time_code )
+{
+	int process_error = livido_plug_process_internal(instance, time_code);
+	if(process_error != LIVIDO_NO_ERROR) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Livido plugin processing failed with error %d",
+				   process_error);
+	}
 }
 
 void	livido_plug_deinit( void *instance )
 {
+	livido_async_state_t *state = livido_async_begin_destroy(instance);
+	if(state && !livido_async_state_stop(state)) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Leaving Livido plugin allocated because its worker did not stop safely");
+		return;
+	}
+
+	if(state) {
+		int lock_error = pthread_mutex_lock(&state->call_mutex);
+		if(lock_error != 0) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Leaving Livido plugin allocated because teardown serialization failed: %s",
+					   strerror(lock_error));
+			return;
+		}
+	}
+
 	livido_deinit_f deinit;
 	void *filter_templ = NULL;
 	if( vevo_property_get( instance, "filter_templ",0,&filter_templ) == VEVO_NO_ERROR ) {
 		if( vevo_property_get( filter_templ, "deinit_func", 0, &deinit ) == VEVO_NO_ERROR ) {
-				(*deinit)( instance );
+			int deinit_error = (*deinit)( instance );
+			if(deinit_error != LIVIDO_NO_ERROR) {
+				veejay_msg(VEEJAY_MSG_ERROR,
+						   "Livido plugin deinitialization failed with error %d",
+						   deinit_error);
+			}
 		}
+	}
+
+	if(state) {
+		pthread_mutex_unlock(&state->call_mutex);
+		livido_port_recursive_free(instance);
+		if(!livido_async_unregister(state)) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Leaving non-real-time Livido host state allocated because it could not be detached");
+			return;
+		}
+		livido_async_state_free(state);
+		return;
 	}
 
 	livido_port_recursive_free( instance );
@@ -1400,6 +2772,8 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	
 	int n_inputs = livido_property_num_elements( filter_templ, "in_channel_templates" );
 	int n_outputs = livido_property_num_elements( filter_templ, "out_channel_templates" );
+	int filter_flags = 0;
+	vevo_property_get(filter_templ, "flags", 0, &filter_flags);
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Loading LiVIDO-%d plugin '%s'" , compiled_as, plugin_name);
 	
@@ -1416,6 +2790,8 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	vevo_property_set( port, "num_outputs",VEVO_ATOM_TYPE_INT,1, &n_outputs);
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
 	vevo_property_set( port, "mixer", VEVO_ATOM_TYPE_INT,1, &mixer );
+	vevo_property_set( port, "livido_filter_flags", VEVO_ATOM_TYPE_INT, 1,
+					  &filter_flags );
 	vevo_property_softref( port, "info" );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
 
@@ -1453,4 +2829,3 @@ void	livido_set_pref_palette( int pref_palette )
 	pref_palette_ffmpeg_= pref_palette;
 	pref_palette_		= host_to_palette(pref_palette);
 }
-

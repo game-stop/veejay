@@ -1025,6 +1025,9 @@ typedef struct
     volatile long long pre_projection_preview_deadline_ms;
     pthread_mutex_t pre_projection_preview_mutex;
     int pre_projection_preview_mutex_initialized;
+    pthread_mutex_t manual_transition_audio_mutex;
+    int manual_transition_audio_mutex_initialized;
+    sample_b_t manual_transition_audio;
     performer_t *A;
     performer_t *B;
     VJFrame feedback_frame;
@@ -3386,13 +3389,14 @@ int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int 
     return id;
 }
 
-void vj_perform_setup_transition(veejay_t *info,
-                                 int next_sample_id,
-                                 int next_type,
-                                 int sample_id,
-                                 int current_type,
-                                 int next_seq_bank,
-                                 int next_seq_idx)
+static int vj_perform_configure_transition(veejay_t *info,
+                                            int next_sample_id,
+                                            int next_type,
+                                            int sample_id,
+                                            int current_type,
+                                            int next_seq_bank,
+                                            int next_seq_idx,
+                                            int publish_active)
 {
     video_playback_setup *settings = info->settings;
 
@@ -3404,21 +3408,21 @@ void vj_perform_setup_transition(veejay_t *info,
 
     if (next_sample_id <= 0) {
         vj_perform_reset_transition(info);
-        return;
+        return 0;
     }
 
     int transition_active = (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_active(sample_id) : vj_tag_get_transition_active(sample_id);
 
     if (!transition_active) {
         vj_perform_reset_transition(info);
-        return;
+        return 0;
     }
 
     int transition_length = (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_length(sample_id) : vj_tag_get_transition_length(sample_id);
 
     if (transition_length <= 0) {
         vj_perform_reset_transition(info);
-        return;
+        return 0;
     }
 
     int transition_shape = (current_type == VJ_PLAYBACK_MODE_SAMPLE) ? sample_get_transition_shape(sample_id) : vj_tag_get_transition_shape(sample_id);
@@ -3456,7 +3460,7 @@ void vj_perform_setup_transition(veejay_t *info,
 
     if (end <= start) {
         vj_perform_reset_transition(info);
-        return;
+        return 0;
     }
 
     const int span = end - start;
@@ -3464,14 +3468,14 @@ void vj_perform_setup_transition(veejay_t *info,
     if (transition_length >= span) {
         if (info->seq && info->seq->active) {
             vj_perform_reset_transition(info);
-            return;
+            return 0;
         }
         transition_length = span - 1;
     }
 
     if (transition_length <= 0) {
         vj_perform_reset_transition(info);
-        return;
+        return 0;
     }
 
     if (info->seq && info->seq->active) {
@@ -3479,7 +3483,7 @@ void vj_perform_setup_transition(veejay_t *info,
 
         if (max_seq_transition < 1) {
             vj_perform_reset_transition(info);
-            return;
+            return 0;
         }
 
         if (transition_length > max_seq_transition)
@@ -3504,10 +3508,167 @@ void vj_perform_setup_transition(veejay_t *info,
     settings->transition.ready     = 0;
     settings->transition.seq_bank  = next_seq_bank;
     settings->transition.seq_index = next_seq_idx;
+    atomic_store_int(&settings->manual_transition, 0);
+    atomic_store_int(&settings->manual_transition_target_owned, 0);
+    atomic_store_long_long(&settings->manual_transition_elapsed, 0);
+    atomic_store_long_long(&settings->manual_transition_duration, 0);
 
     atomic_store_long_long(&settings->transition.start, start_tx);
     atomic_store_long_long(&settings->transition.end, end_tx);
-    atomic_store_int(&settings->transition.active, transition_active);
+    atomic_store_int(&settings->transition.active,
+                     publish_active ? transition_active : 0);
+    return transition_active;
+}
+
+void vj_perform_setup_transition(veejay_t *info,
+                                 int next_sample_id,
+                                 int next_type,
+                                 int sample_id,
+                                 int current_type,
+                                 int next_seq_bank,
+                                 int next_seq_idx)
+{
+    (void)vj_perform_configure_transition(info,
+                                          next_sample_id,
+                                          next_type,
+                                          sample_id,
+                                          current_type,
+                                          next_seq_bank,
+                                          next_seq_idx,
+                                          1);
+}
+
+static void vj_perform_seed_manual_transition_cursor(sample_b_t *cursor,
+                                                      int source_id)
+{
+    int start = 0;
+    int end = 0;
+    int loop = 0;
+    int speed = 0;
+
+    if(sample_get_short_info(source_id, &start, &end, &loop, &speed) != 0 ||
+       end < start)
+        return;
+
+    long resume = sample_get_resume(source_id);
+    if(resume < start)
+        resume = start;
+    else if(resume > end)
+        resume = end;
+
+    veejay_memset(cursor, 0, sizeof(*cursor));
+    cursor->sample_id = source_id;
+    cursor->sample_type = VJ_PLAYBACK_MODE_SAMPLE;
+    cursor->start = start;
+    cursor->end = end;
+    cursor->speed = speed;
+    cursor->direction = speed < 0 ? -1 : 1;
+    cursor->loopmode = loop;
+    cursor->max_sfd = sample_get_framedup(source_id);
+    if(cursor->max_sfd < 1)
+        cursor->max_sfd = 1;
+    atomic_store_long_long(&cursor->offset, resume - start);
+}
+
+int vj_perform_setup_manual_transition(veejay_t *info,
+                                        int next_sample_id,
+                                        int next_type,
+                                        int sample_id,
+                                        int current_type)
+{
+    video_playback_setup *settings = info->settings;
+    const int speed = settings->current_playback_speed;
+    int target_owned = 0;
+
+    if(!atomic_load_int(&settings->transition.global_state) ||
+       atomic_load_int(&settings->transition.active) ||
+       settings->transition.ready ||
+       speed == 0 ||
+       (current_type != VJ_PLAYBACK_MODE_SAMPLE &&
+        current_type != VJ_PLAYBACK_MODE_TAG) ||
+       (next_type != VJ_PLAYBACK_MODE_SAMPLE &&
+        next_type != VJ_PLAYBACK_MODE_TAG))
+        return 0;
+
+    if(next_type == VJ_PLAYBACK_MODE_TAG) {
+        target_owned = !vj_tag_get_active(next_sample_id);
+        if(target_owned && vj_tag_enable(next_sample_id) <= 0)
+            return 0;
+
+        if(vj_tag_buffer_active(next_sample_id) &&
+           vj_tag_get_buffer_duration(next_sample_id) <= 0)
+        {
+            if(target_owned)
+                vj_tag_disable(next_sample_id);
+            return 0;
+        }
+    }
+
+    if(!vj_perform_configure_transition(info,
+                                        next_sample_id,
+                                        next_type,
+                                        sample_id,
+                                        current_type,
+                                        -1,
+                                        -1,
+                                        0))
+    {
+        if(target_owned)
+            vj_tag_disable(next_sample_id);
+        return 0;
+    }
+
+    const long long configured_start =
+        atomic_load_long_long(&settings->transition.start);
+    const long long configured_end =
+        atomic_load_long_long(&settings->transition.end);
+    const long long length = configured_start > configured_end ?
+        configured_start - configured_end :
+        configured_end - configured_start;
+    if(length <= 0) {
+        vj_perform_reset_transition(info);
+        if(target_owned)
+            vj_tag_disable(next_sample_id);
+        return 0;
+    }
+
+    const long long current =
+        atomic_load_long_long(&settings->current_frame_num);
+    long long end = current + (speed < 0 ? -length : length);
+
+    settings->transition.seq_bank = -1;
+    settings->transition.seq_index = -1;
+    settings->transition.timecode = 0.0;
+    atomic_store_int(&settings->manual_transition, 1);
+    atomic_store_int(&settings->manual_transition_target_owned,
+                     target_owned);
+    atomic_store_long_long(&settings->manual_transition_elapsed, 0);
+    atomic_store_long_long(&settings->manual_transition_duration,
+                           length > 1 ? length - 1 : 1);
+    atomic_store_long_long(&settings->transition.start, current);
+    atomic_store_long_long(&settings->transition.end, end);
+    if(next_type == VJ_PLAYBACK_MODE_SAMPLE) {
+        performer_global_t *g = (performer_global_t*)info->performer;
+        pthread_mutex_lock(&g->manual_transition_audio_mutex);
+        vj_perform_seed_manual_transition_cursor(
+                                                  &g->manual_transition_audio,
+                                                  next_sample_id);
+        pthread_mutex_unlock(&g->manual_transition_audio_mutex);
+        vj_perform_seed_manual_transition_cursor(&g->B->sample_b,
+                                                  next_sample_id);
+    }
+
+    veejay_msg(VEEJAY_MSG_DEBUG,
+               "[PLAYBACK] armed manual shape transition %s:%d -> %s:%d frames=%lld..%lld shape=%d",
+               vj_playback_mode_label(current_type),
+               sample_id,
+               vj_playback_mode_label(next_type),
+               next_sample_id,
+               current,
+               end,
+               settings->transition.shape);
+    atomic_store_int(&settings->transition.active, 1);
+    return 1;
 }
 
 int vj_perform_next_sequence( veejay_t *info, int *type, int *next_bank, int *next_slot )
@@ -3845,6 +4006,14 @@ int vj_perform_allocate(veejay_t *info)
         return 1;
     }
     global->pre_projection_preview_mutex_initialized = 1;
+    if(pthread_mutex_init(&global->manual_transition_audio_mutex, NULL) != 0) {
+        pthread_mutex_destroy(&global->pre_projection_preview_mutex);
+        global->pre_projection_preview_mutex_initialized = 0;
+        free(global->pre_projection_preview_buffer);
+        global->pre_projection_preview_buffer = NULL;
+        return 1;
+    }
+    global->manual_transition_audio_mutex_initialized = 1;
 
     const long frame_len = ((w*h)+w+w);
     size_t buf_len = frame_len * 4 * sizeof(uint8_t);
@@ -3881,6 +4050,8 @@ void vj_perform_destroy(veejay_t *info) {
     free(global->pre_projection_preview_buffer);
     if(global->pre_projection_preview_mutex_initialized)
         pthread_mutex_destroy(&global->pre_projection_preview_mutex);
+    if(global->manual_transition_audio_mutex_initialized)
+        pthread_mutex_destroy(&global->manual_transition_audio_mutex);
     free(global);
 }
 
@@ -5250,6 +5421,49 @@ static long long vj_perform_take_transition_video_frame(
     }
 
     return -1;
+}
+
+int vj_perform_manual_transition_audio_begin(veejay_t *info,
+                                              int source_id)
+{
+    if(!info || !info->performer)
+        return 0;
+
+    performer_global_t *g = (performer_global_t*)info->performer;
+    pthread_mutex_lock(&g->manual_transition_audio_mutex);
+
+    if(!atomic_load_int(&info->settings->manual_transition) ||
+       !atomic_load_int(&info->settings->transition.active) ||
+       info->settings->transition.next_type != VJ_PLAYBACK_MODE_SAMPLE ||
+       info->settings->transition.next_id != source_id)
+    {
+        pthread_mutex_unlock(&g->manual_transition_audio_mutex);
+        return 0;
+    }
+
+    return 1;
+}
+
+void vj_perform_manual_transition_audio_end(veejay_t *info)
+{
+    if(!info || !info->performer)
+        return;
+
+    performer_global_t *g = (performer_global_t*)info->performer;
+    pthread_mutex_unlock(&g->manual_transition_audio_mutex);
+}
+
+long vj_perform_take_manual_transition_audio_frame(veejay_t *info,
+                                                    int source_id)
+{
+    if(!info || !info->performer)
+        return -1;
+
+    performer_global_t *g = (performer_global_t*)info->performer;
+    return (long)vj_perform_take_transition_video_frame(
+        &g->manual_transition_audio,
+        source_id,
+        VJ_PLAYBACK_MODE_SAMPLE);
 }
 
 long vj_calc_next_sub_audioframe(veejay_t *info, int b, audio_chain_entry_t *audio_entry) {
@@ -13574,15 +13788,24 @@ int vj_perform_queue_audio_chunk_crossfade(
         return client_frames_to_write;
     }
 
-    double trans_len = (double)(trans_end_frame - trans_start_frame);
-    if (trans_len <= 0.0)
-        trans_len = 1.0;
-
-    const double absolute_frame = (double)target_frame_a;
-    float t = (float)((absolute_frame - trans_start_frame) / trans_len);
+    float t;
+    if(atomic_load_int(&info->settings->manual_transition)) {
+        const long long elapsed =
+            atomic_load_long_long(&info->settings->manual_transition_elapsed);
+        const long long duration =
+            atomic_load_long_long(&info->settings->manual_transition_duration);
+        t = duration > 0 ? (float)(elapsed / (double)duration) : 1.0f;
+    }
+    else {
+        const double trans_len =
+            (double)(trans_end_frame - trans_start_frame);
+        t = trans_len != 0.0 ?
+            (float)(((double)target_frame_a - trans_start_frame) / trans_len) :
+            1.0f;
+    }
     t = fminf(fmaxf(t, 0.0f), 1.0f);
 
-    if (absolute_frame >= (double)trans_end_frame) {
+    if (t >= 1.0f) {
         vj_audio_crossfade_buffers(
             g,
             NULL,
@@ -17345,6 +17568,16 @@ void vj_perform_reset_transition(veejay_t *info)
     performer_global_t *g = (performer_global_t*) info->performer;
     performer_t *A = g->A;
     performer_t *B = g->B;
+    const int completed = settings->transition.ready;
+    const int target_id = settings->transition.next_id;
+    const int target_type = settings->transition.next_type;
+    const int target_owned =
+        atomic_load_int(&settings->manual_transition_target_owned);
+    const int manual_transition =
+        atomic_load_int(&settings->manual_transition);
+
+    if(manual_transition)
+        pthread_mutex_lock(&g->manual_transition_audio_mutex);
 
     const int seq_transition =
         info->seq &&
@@ -17358,16 +17591,21 @@ void vj_perform_reset_transition(veejay_t *info)
     settings->transition.skip_audio_edge = 1;
 
     atomic_store_int(&settings->transition.active, 0);
+    atomic_store_int(&settings->manual_transition, 0);
+    atomic_store_int(&settings->manual_transition_target_owned, 0);
     atomic_store_long_long(&settings->transition.start, 0);
     atomic_store_long_long(&settings->transition.end, 0);
+    atomic_store_long_long(&settings->manual_transition_elapsed, 0);
+    atomic_store_long_long(&settings->manual_transition_duration, 0);
 
     if (info->audio != NO_AUDIO) {
         atomic_store_int(&A->audio_edge->pending_edge, AUDIO_EDGE_NONE);
         atomic_store_int(&B->audio_edge->pending_edge, AUDIO_EDGE_NONE);
     }
 
-    if (settings->transition.next_type == VJ_PLAYBACK_MODE_SAMPLE &&
-        settings->transition.next_id > 0 &&
+    if (completed &&
+        target_type == VJ_PLAYBACK_MODE_SAMPLE &&
+        target_id > 0 &&
         !seq_transition)
     {
         sample_b_t *sb = &B->sample_b;
@@ -17375,9 +17613,19 @@ void vj_perform_reset_transition(veejay_t *info)
         long long start_pos = atomic_load_long_long(&sb->start);
 
         sample_set_resume_override(
-            settings->transition.next_id,
+            target_id,
             sample_b_pos + start_pos
         );
+    }
+
+    if(!completed &&
+       target_owned &&
+       target_type == VJ_PLAYBACK_MODE_TAG &&
+       target_id > 0 &&
+       !(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
+         info->uc->sample_id == target_id))
+    {
+        vj_tag_disable(target_id);
     }
 
     settings->transition.next_id = 0;
@@ -17387,6 +17635,9 @@ void vj_perform_reset_transition(veejay_t *info)
 
     veejay_memset(&A->sample_b, 0, sizeof(sample_b_t));
     veejay_memset(&B->sample_b, 0, sizeof(sample_b_t));
+    veejay_memset(&g->manual_transition_audio, 0, sizeof(sample_b_t));
+    if(manual_transition)
+        pthread_mutex_unlock(&g->manual_transition_audio_mutex);
 }
 
 static void vj_perform_end_transition(veejay_t *info, int mode, int sample)
@@ -17448,29 +17699,28 @@ static int vj_perform_transition_prepare_frame(veejay_t *info,
     long long start = atomic_load_long_long(&settings->transition.start);
     long long end = atomic_load_long_long(&settings->transition.end);
 
-    if (settings->current_playback_speed > 0) {
+    if(atomic_load_int(&settings->manual_transition)) {
+        const long long elapsed =
+            atomic_load_long_long(&settings->manual_transition_elapsed);
+        const long long duration =
+            atomic_load_long_long(&settings->manual_transition_duration);
+        if(duration <= 0)
+            return 0;
+        frame->timecode = elapsed / (double)duration;
+    }
+    else if(end != start) {
         frame->timecode =
             (cur_frame - start) /
             (double)(end - start);
     }
-    else if (settings->current_playback_speed < 0) {
-        frame->timecode =
-            (start - cur_frame) /
-            (double)(start - end);
-    }
     else {
-        frame->timecode = settings->transition.timecode;
-    }
-
-    if (frame->timecode < 0.0 || frame->timecode > 1.0)
-    {
-        veejay_msg(0,
-                   "invalid transition timecode: frame %lld, transition %lld - %lld",
-                   cur_frame,
-                   start,
-                   end);
         return 0;
     }
+
+    if(frame->timecode < 0.0)
+        frame->timecode = 0.0;
+    else if(frame->timecode > 1.0)
+        frame->timecode = 1.0;
 
     frame->ptr = settings->transition.ptr;
     frame->shape = settings->transition.shape;
@@ -17529,6 +17779,15 @@ static void vj_perform_transition_commit_frame(
     video_playback_setup *settings = info->settings;
 
     settings->transition.ready = frame->ready;
+    if(atomic_load_int(&settings->manual_transition) && !frame->ready) {
+        const long long elapsed =
+            atomic_load_long_long(&settings->manual_transition_elapsed);
+        const long long duration =
+            atomic_load_long_long(&settings->manual_transition_duration);
+        if(elapsed < duration)
+            atomic_store_long_long(&settings->manual_transition_elapsed,
+                                   elapsed + 1);
+    }
     vj_perform_end_transition(info, frame->next_type, frame->next_id);
 }
 
@@ -18914,11 +19173,13 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
         transition_enabled = 0;
     }
 
-    if (transition_enabled) {
+    if (transition_enabled &&
+        !atomic_load_int(&settings->manual_transition)) {
         long long start = atomic_load_long_long(&settings->transition.start);
         long long end = atomic_load_long_long(&settings->transition.end);
 
-        if (cur_frame < start || cur_frame > end)
+        if ((end > start && cur_frame < start) ||
+            (end < start && cur_frame > start))
             transition_enabled = 0;
     }
 

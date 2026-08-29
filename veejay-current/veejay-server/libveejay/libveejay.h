@@ -31,6 +31,7 @@ void	veejay_set_instance( veejay_t *info );
 veejay_t *veejay_malloc();
 
 void veejay_change_playback_mode(veejay_t *info, int pm, int sample);
+void veejay_change_playback_mode_transition(veejay_t *info, int pm, int sample);
 
 int veejay_free(veejay_t *info);
 void	vj_lock(veejay_t *info);

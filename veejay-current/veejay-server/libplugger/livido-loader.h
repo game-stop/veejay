@@ -43,6 +43,16 @@ void	livido_push_channel( void *instance,int n, int dir, VJFrame *frame );
 #define livido_push_input_channel(instance,n,frame) livido_push_channel( instance, "in_channels", n , frame )
 #define livido_push_output_channel(instance,n,frame) livido_push_channel( instance, "out_channels",n, frame )
 
+int	livido_plug_get_filter_flags( void *instance );
+int	livido_plug_get_async_parameter_count( void *instance, int *count );
+int	livido_plug_is_async( void *instance );
+int	livido_plug_process_frame( void *instance, VJFrame **inputs, int num_inputs,
+					 VJFrame *output, const int *args, int num_params,
+					 double timecode );
+void	livido_plug_reset( void *instance );
+int	livido_plug_call_lock( void *instance );
+void	livido_plug_call_unlock( void *instance );
+
 //@ get default values
 void	livido_plug_retrieve_values( void *instance, void *fx_values );
 

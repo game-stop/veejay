@@ -20,6 +20,7 @@
 
 #include "common.h"
 #include "autoeq.h"
+#include "hist.h"
 
 vj_effect *autoeq_init(int w, int h)
 {

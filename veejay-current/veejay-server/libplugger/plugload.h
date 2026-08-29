@@ -1,5 +1,6 @@
 #ifndef PLUGINLOADER_
 #define PLUGINLOADER_
+#include <veejaycore/defs.h>
 /*
  * Copyright (C) 2002-2006 Niels Elburg <nwelburg@gmail.com>
  * 
@@ -24,6 +25,25 @@
 
 	FIXME: must be refactored
  */
+typedef enum {
+	PLUG_KIND_UNKNOWN = 0,
+	PLUG_KIND_LIVIDO,
+	PLUG_KIND_FREI0R
+} plug_kind_t;
+
+typedef enum {
+	PLUG_CAPABILITY_NONE = 0,
+	PLUG_CAPABILITY_NON_REALTIME = 1 << 0,
+	PLUG_CAPABILITY_CAN_DO_INPLACE = 1 << 1,
+	PLUG_CAPABILITY_STATEFUL = 1 << 2,
+	PLUG_CAPABILITY_PARALLELIZABLE = 1 << 3
+} plug_capability_t;
+
+typedef struct {
+	plug_kind_t kind;
+	unsigned int flags;
+} plug_capabilities_t;
+
 void	plug_sys_free(void);
 void	plug_sys_init( int fmt, int w, int h, int cfg );
 void	plug_sys_set_palette( int palette );
@@ -39,6 +59,12 @@ void	*plug_activate( int fx_id );
 void	plug_deactivate( void *instance );
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame );
 void	plug_process( void *instance, double timecode );
+/* Submits one complete frame. Only NON_REALTIME Livido instances are offloaded. */
+int	plug_process_frame( void *instance, VJFrame **inputs, int num_inputs,
+				   VJFrame *output, const int *args, int num_params,
+				   double timecode );
+int	plug_get_capabilities( void *instance, plug_capabilities_t *capabilities );
+void	plug_reset( void *instance );
 void	plug_get_defaults( void *instance, void *fx_values );
 void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value );
 void	plug_set_parameters( void *instance, int n_arg, void *darg );

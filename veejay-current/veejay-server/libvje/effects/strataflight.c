@@ -725,6 +725,7 @@ void strataflight_apply(void *ptr, VJFrame *frame, int *args)
             elev_damp_q = 128;
     }
 
+#pragma omp single
     {
         int free_fp = sf_signed_speed_from_center(freeforward);
         int side_fp = sf_signed_speed_from_center(strafe);

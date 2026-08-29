@@ -392,97 +392,100 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
     const float snare_target = (float)snare_arg * 0.01f;
     const float hat_target = clampf((float)hat_arg * (1.0f / 200.0f), 0.0f, 1.0f);
 
-    const float impact_delta = impact_target - s->last_impact;
-    const float shock_delta  = shock_target  - s->last_shock;
-    const float snare_delta  = snare_target  - s->last_snare;
+#pragma omp single
+    {
+        const float impact_delta = impact_target - s->last_impact;
+        const float shock_delta  = shock_target  - s->last_shock;
+        const float snare_delta  = snare_target  - s->last_snare;
 
-    const int impact_rise =
-        s->impact_cooldown <= 0 &&
-        (
-            (impact_target > 0.34f && s->last_impact < 0.22f) ||
-            impact_delta > 0.12f
-        );
+        const int impact_rise =
+            s->impact_cooldown <= 0 &&
+            (
+                (impact_target > 0.34f && s->last_impact < 0.22f) ||
+                impact_delta > 0.12f
+            );
 
-    const int shock_rise =
-        s->shock_cooldown <= 0 &&
-        (
-            (shock_target > 0.30f && s->last_shock < 0.18f) ||
-            shock_delta > 0.10f ||
-            (impact_rise && shock_target > 0.18f)
-        );
+        const int shock_rise =
+            s->shock_cooldown <= 0 &&
+            (
+                (shock_target > 0.30f && s->last_shock < 0.18f) ||
+                shock_delta > 0.10f ||
+                (impact_rise && shock_target > 0.18f)
+            );
 
-    const int snare_rise =
-        s->snare_cooldown <= 0 &&
-        (
-            (snare_target > 0.32f && s->last_snare < 0.20f) ||
-            snare_delta > 0.12f
-        );
+        const int snare_rise =
+            s->snare_cooldown <= 0 &&
+            (
+                (snare_target > 0.32f && s->last_snare < 0.20f) ||
+                snare_delta > 0.12f
+            );
 
-    s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
-    s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
-    s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
-    s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
+        s->impact_env = pw_env(s->impact_env, impact_target, 0.82f, 0.105f);
+        s->shock_env = pw_env(s->shock_env, shock_target, 0.78f, 0.085f);
+        s->snare_env = pw_env(s->snare_env, snare_target, 0.86f, 0.220f);
+        s->hat_env = pw_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-    if(impact_rise) {
-        pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
-        s->impact_cooldown = 3;
+        if(impact_rise) {
+            pw_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg);
+            s->impact_cooldown = 3;
+        }
+
+        if(shock_rise && !impact_rise) {
+            pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
+            s->shock_cooldown = 4;
+        }
+
+        if(snare_rise) {
+            pw_spawn_wave(
+                s,
+                impact_target * 0.35f,
+                shock_target * 0.42f + snare_target * 0.58f,
+                width_arg >> 1,
+                speed_arg + 12,
+                center_arg
+            );
+            s->snare_cooldown = 3;
+        }
+
+        if(s->impact_cooldown > 0)
+            s->impact_cooldown--;
+        if(s->shock_cooldown > 0)
+            s->shock_cooldown--;
+        if(s->snare_cooldown > 0)
+            s->snare_cooldown--;
+
+        const float decay = 0.855f + ((float)decay_arg * 0.00125f);
+        const float max_dist = (float)(w > h ? w : h) * 1.55f;
+
+        for(int i = 0; i < PW_MAX_WAVES; i++) {
+            pressure_wave_t *wv = &s->waves[i];
+
+            if(!wv->active)
+                continue;
+
+            wv->pos += wv->speed;
+            wv->amp *= decay;
+
+            if(wv->amp < 0.012f || wv->pos > max_dist)
+                wv->active = 0;
+        }
+
+        s->swing_phase +=
+            0.010f +
+            ((float)speed_arg * 0.0011f) +
+            ((float)swing_arg * 0.0009f) +
+            s->impact_env * 0.050f +
+            s->snare_env * 0.030f +
+            s->hat_env * 0.012f;
+
+        if(s->swing_phase > (float)(PW_PI * 2.0))
+            s->swing_phase -= (float)(PW_PI * 2.0);
+
+        s->last_impact = impact_target;
+        s->last_shock = shock_target;
+        s->last_snare = snare_target;
+        s->frame_count++;
     }
-
-    if(shock_rise && !impact_rise) {
-        pw_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg);
-        s->shock_cooldown = 4;
-    }
-
-    if(snare_rise) {
-        pw_spawn_wave(
-            s,
-            impact_target * 0.35f,
-            shock_target * 0.42f + snare_target * 0.58f,
-            width_arg >> 1,
-            speed_arg + 12,
-            center_arg
-        );
-        s->snare_cooldown = 3;
-    }
-
-    if(s->impact_cooldown > 0)
-        s->impact_cooldown--;
-    if(s->shock_cooldown > 0)
-        s->shock_cooldown--;
-    if(s->snare_cooldown > 0)
-        s->snare_cooldown--;
-
-    const float decay = 0.855f + ((float)decay_arg * 0.00125f);
-    const float max_dist = (float)(w > h ? w : h) * 1.55f;
-
-    for(int i = 0; i < PW_MAX_WAVES; i++) {
-        pressure_wave_t *wv = &s->waves[i];
-
-        if(!wv->active)
-            continue;
-
-        wv->pos += wv->speed;
-        wv->amp *= decay;
-
-        if(wv->amp < 0.012f || wv->pos > max_dist)
-            wv->active = 0;
-    }
-
-    s->swing_phase +=
-        0.010f +
-        ((float)speed_arg * 0.0011f) +
-        ((float)swing_arg * 0.0009f) +
-        s->impact_env * 0.050f +
-        s->snare_env * 0.030f +
-        s->hat_env * 0.012f;
-
-    if(s->swing_phase > (float)(PW_PI * 2.0))
-        s->swing_phase -= (float)(PW_PI * 2.0);
-
-    s->last_impact = impact_target;
-    s->last_shock = shock_target;
-    s->last_snare = snare_target;
-    s->frame_count++;
 
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int shock_i = (int)(s->shock_env * 256.0f);
@@ -529,10 +532,15 @@ void pressurewave_apply(void *ptr, VJFrame *frame, int *args)
         nactive++;
     }
 
-#pragma omp for schedule(static)
-        for(int plane = 0; plane < 3; plane++)
-            veejay_memcpy(plane == 0 ? src_y : (plane == 1 ? src_u : src_v),
-                          plane == 0 ? Y : (plane == 1 ? U : V), len);
+#pragma omp sections
+    {
+#pragma omp section
+        { veejay_memcpy(src_y, Y, len); }
+#pragma omp section
+        { veejay_memcpy(src_u, U, len); }
+#pragma omp section
+        { veejay_memcpy(src_v, V, len); }
+    }
 
         if(nactive <= 0) {
 #pragma omp for schedule(static)

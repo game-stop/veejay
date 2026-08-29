@@ -554,26 +554,18 @@ void vje_fx_free( int fx_id, int chain_id, int entry, void *ptr )
 static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B, int *args, vj_effect *fx )
 {
     int n = plug_get_num_input_channels( plug_id );
-    int i;
-
-    if( plug_is_frei0r( ptr ) ) {
-        plug_set_parameters( ptr, fx->num_params, args );
+    VJFrame *inputs[2] = { A, B };
+    if(n < 0 || n > 2) {
+        veejay_msg(VEEJAY_MSG_ERROR,
+                   "Plugin %d requires %d inputs; the effect chain supports at most 2",
+                   plug_id, n);
+        return;
     }
-    else {
-        for( i = 0; i < fx->num_params; i ++ ) {
-            plug_set_parameter( ptr, i, 1, &(args[i]));
-        }
-    }
+    VJFrame *output =
+        plug_get_num_output_channels(plug_id) > 0 ? A : NULL;
 
-    if( n >= 1 )
-        plug_push_frame( ptr, 0, 0, A );
-    if( n >= 2 )
-        plug_push_frame( ptr, 0, 1, B );
-
-    if( plug_get_num_output_channels( plug_id ) > 0 )
-        plug_push_frame( ptr, 1, 0, A );
-
-    plug_process( ptr, A->timecode );
+    plug_process_frame(ptr, inputs, n, output, args, fx->num_params,
+                       A->timecode);
 }
 
 static void vje_fx_direct_apply( int idx, void *ptr, VJFrame *A, VJFrame *B, int *args )

@@ -650,6 +650,10 @@ typedef struct {
 	int sequence_random_id;
 	int sequence_random_ticks_left;
     volatile int sdl_visible;
+    volatile int manual_transition;
+    volatile int manual_transition_target_owned;
+    volatile long long manual_transition_elapsed;
+    volatile long long manual_transition_duration;
 } video_playback_setup;
 
 typedef struct {

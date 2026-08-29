@@ -5517,7 +5517,6 @@ static void veejay_sequence_prepare_selected_sample_positions(veejay_t *info)
     }
 }
 
-
 void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
 {
     video_playback_setup *settings = info->settings;
@@ -5568,7 +5567,16 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         }
     }
 
-    if(current_pm != new_pm || cur_id != sample_id) {
+    if(atomic_load_int(&settings->manual_transition) &&
+       atomic_load_int(&settings->transition.active) &&
+       !settings->transition.ready)
+    {
+        vj_perform_reset_transition(info);
+    }
+
+    const int source_changed = current_pm != new_pm || cur_id != sample_id;
+
+    if(source_changed) {
         const long long mapping_frame =
             (new_pm == VJ_PLAYBACK_MODE_PLAIN) ? 0 :
             atomic_load_long_long(&settings->current_frame_num);
@@ -5681,6 +5689,50 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
     else if (new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         veejay_sample_resume_at(info, sample_id);
     }
+}
+
+void veejay_change_playback_mode_transition(veejay_t *info,
+                                             int new_pm,
+                                             int sample_id)
+{
+    video_playback_setup *settings = info->settings;
+    const int current_pm = info->uc->playback_mode;
+    const int current_id = info->uc->sample_id;
+    const int source_changed =
+        current_pm != new_pm || current_id != sample_id;
+    const int sequence_active = info->seq && info->seq->active;
+
+    if(sequence_active) {
+        veejay_change_playback_mode(info, new_pm, sample_id);
+        return;
+    }
+
+    if(!settings->transition.ready &&
+       atomic_load_int(&settings->transition.active))
+    {
+        if(atomic_load_int(&settings->transition.global_state) &&
+           settings->transition.next_id == sample_id &&
+           settings->transition.next_type == new_pm)
+            return;
+
+        vj_perform_reset_transition(info);
+        if(!source_changed)
+            return;
+    }
+
+    if(source_changed &&
+       !settings->transition.ready &&
+       vj_perform_setup_manual_transition(info,
+                                           sample_id,
+                                           new_pm,
+                                           current_id,
+                                           current_pm))
+    {
+        veejay_output_hold_release_on_transport(info);
+        return;
+    }
+
+    veejay_change_playback_mode(info, new_pm, sample_id);
 }
 
 void veejay_sample_set_initial_positions(veejay_t *info)
@@ -12125,11 +12177,42 @@ void *veejay_audio_producer_thread(void *arg)
 			int decode_retries = 0;
 			const uint64_t diag_audio_decode_start_ns = vj_perf_now_ns();
 
-			if(has_audio && !stream_playback && tx_active && embedded_media_audio && !external_monitor_audio) {
-				long long b_frame = vj_calc_next_subframe(info, settings->transition.next_id);
-				long long start = atomic_load_long_long(&settings->transition.start);
-				long long end = atomic_load_long_long(&settings->transition.end);
-				decoded = vj_perform_queue_audio_chunk_crossfade(info, needed, media_frame, b_frame, audio_chunk, settings->transition.next_id,start,end);
+			if(has_audio && !stream_playback && tx_active &&
+			   settings->transition.next_type == VJ_PLAYBACK_MODE_SAMPLE &&
+			   embedded_media_audio && !external_monitor_audio) {
+				const int target_id = settings->transition.next_id;
+				const int manual =
+					atomic_load_int(&settings->manual_transition);
+				const int manual_locked =
+					manual ?
+					vj_perform_manual_transition_audio_begin(
+						info, target_id) : 0;
+
+				if(manual && !manual_locked) {
+					decoded = vj_perform_queue_audio_chunk_ext(
+						info, needed, media_frame, 0, audio_chunk);
+				}
+				else {
+					const long long b_frame =
+						manual ?
+						vj_perform_take_manual_transition_audio_frame(
+							info, target_id) :
+						vj_calc_next_subframe(info, target_id);
+					const long long start =
+						atomic_load_long_long(&settings->transition.start);
+					const long long end =
+						atomic_load_long_long(&settings->transition.end);
+
+					decoded = b_frame >= 0 ?
+						vj_perform_queue_audio_chunk_crossfade(
+							info, needed, media_frame, b_frame,
+							audio_chunk, target_id, start, end) :
+						vj_perform_queue_audio_chunk_ext(
+							info, needed, media_frame, 0, audio_chunk);
+
+					if(manual_locked)
+						vj_perform_manual_transition_audio_end(info);
+				}
 			}
 			else if(has_audio) {
 				decoded = vj_perform_queue_audio_chunk_ext(info, needed, media_frame, 0, audio_chunk);

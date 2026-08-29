@@ -94,7 +94,13 @@ static	int	select_f( const struct dirent *d )
 int		plug_set_param_from_str( void *plugin , int p, const char *str, void *values )
 {
 	//FIXME other types
-	return livido_set_parameter_from_string( plugin, p, str, values );
+	int locked = livido_plug_call_lock(plugin);
+	if(locked < 0)
+		return 0;
+	int result = livido_set_parameter_from_string( plugin, p, str, values );
+	if(locked > 0)
+		livido_plug_call_unlock(plugin);
+	return result;
 }
 
 char		*plug_describe_param( void *plugin, int p )
@@ -557,30 +563,55 @@ int	plug_sys_detect_plugins(void)
 
 void	plug_clone_from_parameters(void *instance, void *fx_values)
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	generic_reverse_clone_parameter_f	grc;
 	int error = vevo_property_get( instance, "HOST_plugin_param_reverse_f", 0, &grc );
-	if( error != VEVO_NO_ERROR )
+	if( error != VEVO_NO_ERROR ) {
+		if(locked > 0)
+			livido_plug_call_unlock(instance);
 		return;
+	}
 	// copy parameters from plugin to fx_values	
 	(*grc)( instance ,0, fx_values );
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 int	plug_clone_from_output_parameters( void *instance, void *fx_values )
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return 0;
+
 	generic_reverse_clone_out_parameter_f	grc;
 	int error = vevo_property_get( instance, "HOST_plugin_out_param_reverse_f", 0, &grc );
-	if( error != VEVO_NO_ERROR )
+	if( error != VEVO_NO_ERROR ) {
+		if(locked > 0)
+			livido_plug_call_unlock(instance);
 		return 0;
+	}
 	int n = (*grc)(instance,fx_values);	
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 	return n;
 }
 
 void	plug_clone_parameters( void *instance, void *fx_values )
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	generic_clone_parameter_f	gcc;
 	int error = vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcc );
 	if( error == VEVO_NO_ERROR )
 		(*gcc)( instance, 0, fx_values );
+
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 int	plug_is_frei0r( void *instance )
@@ -592,16 +623,66 @@ int	plug_is_frei0r( void *instance )
 	return 0;
 }
 
+int plug_get_capabilities(void *instance, plug_capabilities_t *capabilities)
+{
+	if(!instance || !capabilities)
+		return 0;
+
+	capabilities->kind = PLUG_KIND_UNKNOWN;
+	capabilities->flags = PLUG_CAPABILITY_NONE;
+
+	int livido_flags = livido_plug_get_filter_flags(instance);
+	if(livido_flags & LIVIDO_FILTER_NON_REALTIME) {
+		capabilities->kind = PLUG_KIND_LIVIDO;
+	}
+
+	int type = 0;
+	if(capabilities->kind == PLUG_KIND_UNKNOWN &&
+	   vevo_property_get(instance, "HOST_type", 0, &type) != VEVO_NO_ERROR)
+		return 0;
+
+	if(capabilities->kind == PLUG_KIND_UNKNOWN && type == VEVO_PLUG_FR) {
+		capabilities->kind = PLUG_KIND_FREI0R;
+		return 1;
+	}
+
+	if(capabilities->kind == PLUG_KIND_UNKNOWN && type != VEVO_PLUG_LIVIDO)
+		return 0;
+
+	capabilities->kind = PLUG_KIND_LIVIDO;
+	if(livido_flags & LIVIDO_FILTER_NON_REALTIME)
+		capabilities->flags |= PLUG_CAPABILITY_NON_REALTIME;
+	if(livido_flags & LIVIDO_FILTER_CAN_DO_INPLACE)
+		capabilities->flags |= PLUG_CAPABILITY_CAN_DO_INPLACE;
+	if(livido_flags & LIVIDO_FILTER_NON_STATELESS)
+		capabilities->flags |= PLUG_CAPABILITY_STATEFUL;
+	if(livido_flags & LIVIDO_FILTER_IS_PARALLELIZABLE)
+		capabilities->flags |= PLUG_CAPABILITY_PARALLELIZABLE;
+	return 1;
+}
+
 void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value )
 {
+	(void) n_elements;
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	generic_push_parameter_f	gpp;
 	int error = vevo_property_get( instance, "HOST_plugin_param_f", 0, &gpp );
 	if( error == VEVO_NO_ERROR)
 		(*gpp)( instance, seq_num, value );
+
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 void 	plug_set_parameters( void *instance, int n_args, void *values )
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	int type = 0;
 	vevo_property_get(instance, "HOST_type", 0, &type );
 	if( type == VEVO_PLUG_FR ) {
@@ -613,9 +694,15 @@ void 	plug_set_parameters( void *instance, int n_args, void *values )
 			livido_set_parameter( instance, i, &iv[i] );
 		}
 	}
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 void	plug_get_parameters( void *instance, int *args, int *n_args)
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	int type = 0;
 	vevo_property_get(instance, "HOST_type", 0, &type );
 	if( type == VEVO_PLUG_FR ) {
@@ -624,21 +711,37 @@ void	plug_get_parameters( void *instance, int *args, int *n_args)
 	else if (type == VEVO_PLUG_LIVIDO ) {
 		livido_get_default_parameters( instance, args );
 	}
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 void	plug_get_defaults( void *instance, void *fx_values )
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	generic_default_values_f	gdv;
 	int error = vevo_property_get( instance, "HOST_plugin_defaults_f", 0, &gdv );
 	if( error == VEVO_NO_ERROR )
 		(*gdv)( instance, fx_values );
+
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 void	plug_set_defaults( void *instance, void *fx_values )
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	generic_clone_parameter_f	gcp;	
 	if( vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcp ) == VEVO_NO_ERROR )
 		(*gcp)( instance, 0,fx_values );
+
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 void	plug_deactivate( void *instance )
@@ -1047,15 +1150,25 @@ int	plug_get_num_parameters( int fx_id )
 
 int	plug_instance_get_num_parameters(void *instance)
 {
+	int count = 0;
+	if(livido_plug_get_async_parameter_count(instance, &count))
+		return count;
+
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return 0;
+
 	int type = 0;
 	vevo_property_get(instance, "HOST_type", 0, &type );
 	if( type == VEVO_PLUG_FR ) {
-		return frei0r_get_param_count( instance );
+		count = frei0r_get_param_count( instance );
 	}
 	else if (type == VEVO_PLUG_LIVIDO ) {
-		return livido_get_num_input_parameters(instance);
+		count = livido_get_num_input_parameters(instance);
 	}
-	return 0;
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
+	return count;
 }
 
 void	plug_sys_set_palette( int pref_palette )
@@ -1067,20 +1180,101 @@ void	plug_sys_set_palette( int pref_palette )
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 {
 	VJFrame *frame = (VJFrame*) frame_info;
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
 	
 	generic_push_channel_f	gpu;
 	int error = vevo_property_get( instance, "HOST_plugin_push_f", 0, &gpu );
 	
 	if( error == VEVO_NO_ERROR )
 		(*gpu)( instance, seq_num,out, frame );
+
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
 }
 
 void	plug_process( void *instance, double timecode )
 {
+	int locked = livido_plug_call_lock(instance);
+	if(locked < 0)
+		return;
+
 	generic_process_f	gpf;
 	int error = vevo_property_get( instance, "HOST_plugin_process_f", 0, &gpf );
 	if( error == VEVO_NO_ERROR )
 		(*gpf)( instance, timecode );
+
+	if(locked > 0)
+		livido_plug_call_unlock(instance);
+}
+
+int plug_process_frame(void *instance, VJFrame **inputs, int num_inputs,
+					   VJFrame *output, const int *args, int num_params,
+					   double timecode)
+{
+	if(!instance || num_inputs < 0 || num_params < 0 ||
+	   (num_inputs > 0 && !inputs) || (num_params > 0 && !args))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid plugin frame submission");
+		return 0;
+	}
+
+	plug_capabilities_t capabilities;
+	if(!plug_get_capabilities(instance, &capabilities)) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "Unable to determine plugin capabilities for frame submission");
+		return 0;
+	}
+
+	if(capabilities.kind == PLUG_KIND_LIVIDO &&
+	   (capabilities.flags & PLUG_CAPABILITY_NON_REALTIME))
+	{
+		if(!livido_plug_is_async(instance)) {
+			veejay_msg(VEEJAY_MSG_ERROR,
+					   "Non-real-time Livido plugin has no asynchronous host state");
+			return 0;
+		}
+		return livido_plug_process_frame(instance, inputs, num_inputs, output,
+										args, num_params, timecode);
+	}
+
+	if(capabilities.kind == PLUG_KIND_FREI0R) {
+		plug_set_parameters(instance, num_params, (void*)args);
+	}
+	else if(capabilities.kind == PLUG_KIND_LIVIDO) {
+		for(int i = 0; i < num_params; i++)
+			plug_set_parameter(instance, i, 1, (void*)&args[i]);
+	}
+	else {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unsupported plugin type for frame submission");
+		return 0;
+	}
+
+	for(int i = 0; i < num_inputs; i++) {
+		if(!inputs[i]) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Missing plugin input frame %d", i);
+			return 0;
+		}
+		plug_push_frame(instance, 0, i, inputs[i]);
+	}
+
+	if(output)
+		plug_push_frame(instance, 1, 0, output);
+
+	plug_process(instance, timecode);
+	return 1;
+}
+
+void plug_reset(void *instance)
+{
+	plug_capabilities_t capabilities;
+	if(plug_get_capabilities(instance, &capabilities) &&
+	   capabilities.kind == PLUG_KIND_LIVIDO &&
+	   (capabilities.flags & PLUG_CAPABILITY_NON_REALTIME))
+	{
+		livido_plug_reset(instance);
+	}
 }
 
 

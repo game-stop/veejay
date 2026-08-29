@@ -4207,7 +4207,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
         if(args[1] == VJ_PLAYBACK_MODE_PLAIN) 
         {
             if( vj_has_video(v,v->edit_list) )
-                veejay_change_playback_mode(v, args[1], 0);
+                veejay_change_playback_mode_transition(v, args[1], 0);
             else
                 veejay_msg(VEEJAY_MSG_ERROR,
                 "There are no video files in the editlist");
@@ -4219,7 +4219,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
             SAMPLE_DEFAULTS(args[0]);
             if(sample_exists(args[0]))
             {
-                veejay_change_playback_mode(v,args[1] ,args[0]);
+                veejay_change_playback_mode_transition(v,args[1] ,args[0]);
             }
             else
             {   
@@ -4232,7 +4232,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
             STREAM_DEFAULTS(args[0]);
             if(vj_tag_exists(args[0]))
             {
-                veejay_change_playback_mode(v,args[1],args[0]);
+                veejay_change_playback_mode_transition(v,args[1],args[0]);
             }
             else
             {
@@ -4484,7 +4484,7 @@ void vj_event_sample_select(void *ptr, const char format[], va_list ap)
     SAMPLE_DEFAULTS(args[0]);
     if(sample_exists(args[0]))
     {
-        veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,args[0] );
+        veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_SAMPLE,args[0] );
     }
     else
     {
@@ -4500,7 +4500,7 @@ void vj_event_tag_select(void *ptr, const char format[], va_list ap)
     STREAM_DEFAULTS(args[0]);
     if(vj_tag_exists(args[0]))
     {
-        veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG,args[0]);
+        veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_TAG,args[0]);
     }
     else
     {
@@ -4525,19 +4525,19 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
     {
         if(sample_exists(v->last_sample_id)) 
         {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
             return;
         }
         if(vj_tag_exists(v->last_tag_id))
         {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
             return;
         }
         if(sample_size() <= 0)
         {
             if(vj_tag_exists( last_tag ))
             {
-                veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, last_tag);
+                veejay_change_playback_mode_transition( v, VJ_PLAYBACK_MODE_TAG, last_tag);
                 return;
             }
         }   
@@ -4547,20 +4547,20 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
     {
         if(vj_tag_exists(v->last_tag_id))
         {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
         }
         else if ( vj_tag_exists(last_tag)) 
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, last_tag);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_TAG, last_tag);
     }
     else if(STREAM_PLAYING(v))
     {
         if(sample_exists(v->last_sample_id) )
         {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
         }
         else if( sample_exists( last_sample ))
         {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,last_sample);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_SAMPLE,last_sample);
         }
     }
 }
@@ -4668,42 +4668,42 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
         if(mode == VJ_PLAYBACK_MODE_SAMPLE)
         {
             int last_id = sample_highest_valid_id();
+            int target_id = v->last_sample_id;
             if(last_id == 0)
             {
                 veejay_msg(VEEJAY_MSG_ERROR, "There are no samples. Cannot switch to sample mode");
                 return;
             }
-            if(!sample_exists(v->last_sample_id))
+            if(!sample_exists(target_id))
+                target_id = last_id;
+            if(sample_exists(target_id))
             {
-                v->uc->sample_id = last_id;
-            }
-            if(sample_exists(v->uc->sample_id))
-            {
-                veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, v->uc->sample_id );
+                veejay_change_playback_mode_transition(
+                    v, VJ_PLAYBACK_MODE_SAMPLE, target_id);
             }
         }
         if(mode == VJ_PLAYBACK_MODE_TAG)
         {
             int last_id = vj_tag_highest_valid_id();
+            int target_id = v->last_tag_id;
             if(last_id == 0)
             {
                 veejay_msg(VEEJAY_MSG_ERROR, "There are no streams. Cannot switch to stream mode");
                 return;
             }
             
-            if(!vj_tag_exists(v->last_tag_id)) /* jump to last used Tag if ok */
+            if(!vj_tag_exists(target_id))
+                target_id = last_id;
+            if(vj_tag_exists(target_id))
             {
-                v->uc->sample_id = last_id;
-            }
-            if(vj_tag_exists(v->uc->sample_id))
-            {
-                veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->uc->sample_id);
+                veejay_change_playback_mode_transition(
+                    v, VJ_PLAYBACK_MODE_TAG, target_id);
             }
         }
         if(mode == VJ_PLAYBACK_MODE_PLAIN)
         {
             if(vj_has_video(v,v->edit_list) )
-                veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0);
+                veejay_change_playback_mode_transition( v, VJ_PLAYBACK_MODE_PLAIN, 0);
             else
                 veejay_msg(VEEJAY_MSG_ERROR,
                  "There are no video files in the editlist");
@@ -7756,6 +7756,19 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 }
 
 
+static void vj_event_cancel_transition_target(veejay_t *v,
+                                               int target_type,
+                                               int target_id)
+{
+    if(v && v->settings &&
+       atomic_load_int(&v->settings->transition.active) &&
+       v->settings->transition.next_type == target_type &&
+       v->settings->transition.next_id == target_id)
+    {
+        vj_perform_reset_transition(v);
+    }
+}
+
 void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
@@ -7768,6 +7781,10 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
         veejay_msg(VEEJAY_MSG_INFO,"Cannot delete sample while playing");
         return;
     }
+
+    vj_event_cancel_transition_target(v,
+                                      VJ_PLAYBACK_MODE_SAMPLE,
+                                      args[0]);
 
     if(sample_del(args[0]))
     {
@@ -7861,6 +7878,13 @@ void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 
     sample_del_all(v->edit_list);
     vj_font_set_dict( v->font, NULL );
+
+    if(v->settings && v->settings->transition.next_type == VJ_PLAYBACK_MODE_SAMPLE &&
+       v->settings->transition.next_id > 0 &&
+       atomic_load_int(&v->settings->transition.active))
+    {
+        vj_perform_reset_transition(v);
+    }
 
     if(v->seq) {
         if(!vj_sequence_bank_valid(v->seq->active_bank))
@@ -10229,6 +10253,9 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
     {
         if(vj_tag_exists(args[0]))  
         {
+            vj_event_cancel_transition_target(v,
+                                              VJ_PLAYBACK_MODE_TAG,
+                                              args[0]);
             int i;
             for( i = 0; i < MAX_SEQUENCES ; i ++ ) {
                 if( v->seq->samples[i].sample_id == args[0] && v->seq->samples[i].type != 0 ) {
@@ -11010,6 +11037,9 @@ void    vj_event_toggle_transitions( void *ptr, const char format[], va_list ap 
 
     if(args[0] != cur_state) {
         atomic_store_int(&settings->transition.global_state, args[0]);
+        if(args[0] == 0 &&
+           atomic_load_int(&settings->transition.active))
+            vj_perform_reset_transition(v);
     }
 
     veejay_msg(VEEJAY_MSG_INFO, "Shape transitions between sample switches are %s", (args[0] == 0 ? "disabled" : "enabled" ));
@@ -13200,16 +13230,23 @@ void vj_event_resume_id(void *ptr, const char format[], va_list ap)
     else if(SAMPLE_PLAYING(v)) {
         int sample_id = (v->uc->sample_key*12)-12 + args[0];
         if(sample_exists(sample_id)) {
-            veejay_set_sample(v, sample_id);
-            long pos = sample_get_resume(sample_id);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_SAMPLE, sample_id);
+            
+            int transition_armed = v->uc && atomic_load_int(&v->settings->transition.active) &&
+                                   v->settings->transition.next_type == VJ_PLAYBACK_MODE_SAMPLE &&
+                                   v->settings->transition.next_id == sample_id;
+            
+            if(!transition_armed) {
+                long pos = sample_get_resume(sample_id);
 #ifdef HAVE_JACK
-            vj_event_sample_audio_sync_seek_rearm_current(v, pos, "sample-restart-pre");
+                vj_event_sample_audio_sync_seek_rearm_current(v, pos, "sample-restart-pre");
 #endif
-            veejay_set_frame(v, pos );
+                veejay_set_frame(v, pos );
 #ifdef HAVE_JACK
-            vj_event_sample_audio_sync_seek_rearm_current(v, pos, "sample-restart");
+                vj_event_sample_audio_sync_seek_rearm_current(v, pos, "sample-restart");
 #endif
-            veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", sample_id, pos );
+                veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d continues with frame %d", sample_id, pos );
+            }
         }
     }   
 
@@ -13226,7 +13263,7 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
         int sample_id = (v->uc->sample_key*12)-12 + args[0];
         if(sample_exists(sample_id))
         {
-            veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, sample_id);
+            veejay_change_playback_mode_transition( v, VJ_PLAYBACK_MODE_SAMPLE, sample_id);
             vj_event_print_sample_info(v,sample_id);
         }
         else
@@ -13239,7 +13276,7 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
         int sample_id = (v->uc->sample_key*12)-12 + args[0];
         if(vj_tag_exists(sample_id ))
         {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,sample_id);
+            veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_TAG ,sample_id);
         }
         else
         {
@@ -16173,12 +16210,18 @@ void vj_event_input_route_select(void *ptr, const char format[], va_list ap)
         return;
     }
 
-    veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, id);
+    veejay_change_playback_mode_transition(v, VJ_PLAYBACK_MODE_TAG, id);
+    int transition_armed = v->uc && atomic_load_int(&v->settings->transition.active) &&
+                           v->settings->transition.next_type == VJ_PLAYBACK_MODE_TAG &&
+                           v->settings->transition.next_id == id;
+    
     if(!v->uc || v->uc->playback_mode != VJ_PLAYBACK_MODE_TAG ||
        v->uc->sample_id != id) {
-        veejay_msg(VEEJAY_MSG_ERROR,
-                   "Unable to activate input route stream %d", id);
-        return;
+        if(!transition_armed) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Unable to activate input route stream %d", id);
+            return;
+        }
     }
 
     veejay_msg(VEEJAY_MSG_INFO, "Selected input route stream %d", id);
@@ -16250,6 +16293,8 @@ void vj_event_input_route_remove(void *ptr, const char format[], va_list ap)
             v->seq->samples[i].type = 0;
         }
     }
+
+    vj_event_cancel_transition_target(v, VJ_PLAYBACK_MODE_TAG, id);
 
     if(vj_tag_del(id, 0)) {
         if(v->nstreams > 0)
@@ -16912,7 +16957,8 @@ static void vj_event_sample_next1( veejay_t *v )
         int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
         int n = v->uc->sample_id + s;
         if( sample_exists(n) ) {
-            veejay_set_sample(v,n );
+            veejay_change_playback_mode_transition(
+                v, VJ_PLAYBACK_MODE_SAMPLE, n);
         } else {
             n = v->uc->sample_id;
             int stop = sample_highest_valid_id();
@@ -16922,13 +16968,15 @@ static void vj_event_sample_next1( veejay_t *v )
                     return;
                 }
             }
-            veejay_set_sample(v, n );
+            veejay_change_playback_mode_transition(
+                v, VJ_PLAYBACK_MODE_SAMPLE, n);
         }
     }
     else if ( STREAM_PLAYING(v)) {
         int n = v->uc->sample_id + 1;
         if( vj_tag_exists(n) ) {
-            veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, n );
+            veejay_change_playback_mode_transition(
+                v, VJ_PLAYBACK_MODE_TAG, n );
         }
         else {
             n = 1;
@@ -16939,7 +16987,8 @@ static void vj_event_sample_next1( veejay_t *v )
                     return;
                 }
             }
-            veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, n );  
+            veejay_change_playback_mode_transition(
+                v, VJ_PLAYBACK_MODE_TAG, n );
         }
     }
 }

@@ -107,7 +107,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value( port, "description", "Apply water effect on image");
 		livido_set_string_value( port, "author", "GREYC's Magic for Image Computing"); 
 		
-		livido_set_int_value( port, "flags", 0);
+		livido_set_int_value( port, "flags", LIVIDO_FILTER_NON_REALTIME);
 		livido_set_string_value( port, "license", "GPL2");
 		livido_set_int_value( port, "version", 1);
 	
