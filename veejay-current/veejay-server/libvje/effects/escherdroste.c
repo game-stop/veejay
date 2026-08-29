@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
@@ -18,11 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include "common.h"
-#include <math.h>
-#include <stdint.h>
-#include <veejaycore/vjmem.h>
+#include <omp.h>
 
 #define GAMMA_LUT_SIZE 1024
+
 #define FP_SHIFT 16
 #define FP_ONE (1 << FP_SHIFT)
 #define TO_FP(x) ((int32_t)((x) * FP_ONE))
@@ -49,17 +48,20 @@ static inline uint8_t clamp_u8(float v) {
 static void generate_geometry(box_escherdroste_t *t) {
     float cx = t->width * 0.5f;
     float cy = t->height * 0.5f;
-    
-    /* Removed #pragma omp for to prevent nested work-sharing deadlock during allocation */
+
     for (int y = 0; y < t->height; y++) {
         for (int x = 0; x < t->width; x++) {
             int i = y * t->width + x;
+
             float dx = (x - cx) / cx;
             float dy = (y - cy) / cy;
+
             float r = fmaxf(sqrtf(dx * dx + dy * dy), 1e-6f);
             float theta = atan2f(dy, dx);
+
             t->v_lut[i] = (int)(logf(r) * FP_ONE);
             t->u_lut[i] = (int)(theta * FP_ONE);
+
             float dist_rect = fmaxf(fabsf(dx), fabsf(dy));
             t->v_lut_rect[i] = (int)(dist_rect * FP_ONE);
             t->u_lut_rect[i] = (int)(theta * FP_ONE);
@@ -68,16 +70,22 @@ static void generate_geometry(box_escherdroste_t *t) {
 }
 
 vj_effect *escherdroste_init(int width, int height) {
-    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if (!ve) return NULL;
-    
+    vj_effect *ve = (vj_effect*) vj_calloc(sizeof(vj_effect));
     ve->num_params = 9;
-    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    
-    ve->defaults[0] = 1; ve->defaults[1] = 256; ve->defaults[2] = 1; ve->defaults[3] = 0;
-    ve->defaults[4] = 1; ve->defaults[5] = 60; ve->defaults[6] = 100; ve->defaults[7] = 1; ve->defaults[8] = 1;
+    ve->defaults = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
+
+    ve->defaults[0] = 1;
+    ve->defaults[1] = 256;
+    ve->defaults[2] = 1;
+    ve->defaults[3] = 0;
+    ve->defaults[4] = 1;
+    ve->defaults[5] = 60;
+    ve->defaults[6] = 100;
+    ve->defaults[7] = 1;
+    ve->defaults[8] = 1;
+
     ve->limits[0][0] = -100; ve->limits[1][0] = 100;
     ve->limits[0][1] = 2;    ve->limits[1][1] = 500;
     ve->limits[0][2] = 1;    ve->limits[1][2] = 20;
@@ -87,9 +95,22 @@ vj_effect *escherdroste_init(int width, int height) {
     ve->limits[0][6] = -300; ve->limits[1][6] = 300;
     ve->limits[0][7] = 0;    ve->limits[1][7] = 1;
     ve->limits[0][8] = 0;    ve->limits[1][8] = 2;
+
     ve->description = "Escher Droste";
     ve->sub_format = 1;
-    ve->param_description = vje_build_param_list(ve->num_params, "Speed", "Scale Factor", "Branches", "Swirl", "Rot Speed", "Feedback", "Pitch", "High Quality", "Mode");
+    ve->param_description = vje_build_param_list(
+        ve->num_params,
+        "Speed",
+        "Scale Factor",
+        "Branches",
+        "Swirl",
+        "Rot Speed",
+        "Feedback",
+        "Pitch",
+        "High Quality",
+        "Mode"
+    );
+
     {
         const vj_beat_param_hint_t beat_hints[] = {
             VJ_BEAT_HINT_V2(VJ_BEAT_SIGNED_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_SIGN_LOCK | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_EASE_OUT, -72, 72, 82, 100, 8, 420, 0, 1, 0, VJ_BEAT_COST_CHEAP, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
@@ -104,95 +125,136 @@ vj_effect *escherdroste_init(int width, int height) {
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
+
     return ve;
 }
 
 void *escherdroste_malloc(int width, int height) {
-    box_escherdroste_t *t = (box_escherdroste_t *) vj_calloc(sizeof(box_escherdroste_t));
+    box_escherdroste_t *t = (box_escherdroste_t*) vj_calloc(sizeof(box_escherdroste_t));
     if (!t) return NULL;
-    t->width = width; t->height = height;
+
+    t->width = width;
+    t->height = height;
+
     int size = width * height;
+
     t->u_lut = (int*) vj_malloc(sizeof(int) * size * 4);
-    if (!t->u_lut) { free(t); return NULL; }
+    if (!t->u_lut) {
+        free(t);
+        return NULL;
+    }
+
     t->v_lut = t->u_lut + size;
     t->u_lut_rect = t->v_lut + size;
     t->v_lut_rect = t->u_lut_rect + size;
+
     t->histY = (int*) vj_calloc(sizeof(int) * size * 3);
-    if (!t->histY) { free(t->u_lut); free(t); return NULL; }
-    t->histU = t->histY + size; t->histV = t->histU + size;
+    if (!t->histY) {
+        free(t->u_lut);
+        free(t);
+        return NULL;
+    }
+
+    t->histU = t->histY + size;
+    t->histV = t->histU + size;
+
     t->dstY = (uint8_t*) vj_malloc(size * 3);
-    if (!t->dstY) { free(t->histY); free(t->u_lut); free(t); return NULL; }
-    t->dstU = t->dstY + size; t->dstV = t->dstU + size;
+    if (!t->dstY) {
+        free(t->histY);
+        free(t->u_lut);
+        free(t);
+        return NULL;
+    }
+
+    t->dstU = t->dstY + size;
+    t->dstV = t->dstU + size;
+
     for (int i = 0; i < GAMMA_LUT_SIZE; i++) {
         float val = (float)i / (float)(GAMMA_LUT_SIZE - 1);
         t->gamma_lut[i] = clamp_u8(powf(val, 0.85f) * 255.0f);
     }
     generate_geometry(t);
+
     return t;
 }
 
 static inline int32_t sample_bilinear(const uint8_t *buf, int32_t u_fp, int32_t v_fp, int w, int h) {
-    int32_t u = u_fp & (FP_ONE - 1); int32_t v = v_fp & (FP_ONE - 1);
+    int32_t u = u_fp & (FP_ONE - 1);
+    int32_t v = v_fp & (FP_ONE - 1);
+
     int32_t xf = (int32_t)(((int64_t)u * (w - 1)) >> FP_SHIFT);
     int32_t yf = (int32_t)(((int64_t)v * (h - 1)) >> FP_SHIFT);
+
     int32_t fx = (int32_t)(((int64_t)u * (w - 1)) & (FP_ONE - 1));
     int32_t fy = (int32_t)(((int64_t)v * (h - 1)) & (FP_ONE - 1));
-    int x1 = (xf + 1 >= w) ? 0 : xf + 1; int y1 = (yf + 1 >= h) ? 0 : yf + 1;
-    int p00 = buf[yf * w + xf]; int p10 = buf[yf * w + x1];
-    int p01 = buf[y1 * w + xf]; int p11 = buf[y1 * w + x1];
+
+    int x1 = (xf + 1 >= w) ? 0 : xf + 1;
+    int y1 = (yf + 1 >= h) ? 0 : yf + 1;
+
+    int p00 = buf[yf * w + xf];
+    int p10 = buf[yf * w + x1];
+    int p01 = buf[y1 * w + xf];
+    int p11 = buf[y1 * w + x1];
+
     int64_t w00 = (int64_t)(FP_ONE - fx) * (FP_ONE - fy);
     int64_t w10 = (int64_t)fx * (FP_ONE - fy);
     int64_t w01 = (int64_t)(FP_ONE - fx) * fy;
     int64_t w11 = (int64_t)fx * fy;
+
     return (int32_t)((w00 * p00 + w10 * p10 + w01 * p01 + w11 * p11) >> (FP_SHIFT * 2));
 }
 
 static inline int32_t sample_bilinear_uv(const uint8_t *buf, int32_t u_fp, int32_t v_fp, int w, int h) {
-    int32_t u = u_fp & (FP_ONE - 1); int32_t v = v_fp & (FP_ONE - 1);
+    int32_t u = u_fp & (FP_ONE - 1);
+    int32_t v = v_fp & (FP_ONE - 1);
+
     int32_t xf = (int32_t)(((int64_t)u * (w - 1)) >> FP_SHIFT);
     int32_t yf = (int32_t)(((int64_t)v * (h - 1)) >> FP_SHIFT);
+
     int32_t fx = (int32_t)(((int64_t)u * (w - 1)) & (FP_ONE - 1));
     int32_t fy = (int32_t)(((int64_t)v * (h - 1)) & (FP_ONE - 1));
-    int x1 = (xf + 1 >= w) ? 0 : xf + 1; int y1 = (yf + 1 >= h) ? 0 : yf + 1;
-    int p00 = buf[yf * w + xf] - 128; int p10 = buf[yf * w + x1] - 128;
-    int p01 = buf[y1 * w + xf] - 128; int p11 = buf[y1 * w + x1] - 128;
+
+    int x1 = (xf + 1 >= w) ? 0 : xf + 1;
+    int y1 = (yf + 1 >= h) ? 0 : yf + 1;
+
+    int p00 = buf[yf * w + xf] - 128;
+    int p10 = buf[yf * w + x1] - 128;
+    int p01 = buf[y1 * w + xf] - 128;
+    int p11 = buf[y1 * w + x1] - 128;
+
     int64_t w00 = (int64_t)(FP_ONE - fx) * (FP_ONE - fy);
     int64_t w10 = (int64_t)fx * (FP_ONE - fy);
     int64_t w01 = (int64_t)(FP_ONE - fx) * fy;
     int64_t w11 = (int64_t)fx * fy;
+
     return (int32_t)((w00 * p00 + w10 * p10 + w01 * p01 + w11 * p11) >> (FP_SHIFT * 2));
 }
 
 void escherdroste_free(void *ptr) {
-    box_escherdroste_t *t = (box_escherdroste_t *) ptr;
-    if (!t) return;
-    if (t->u_lut) free(t->u_lut);
-    if (t->histY) free(t->histY);
-    if (t->dstY) free(t->dstY);
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+
+    free(t->u_lut);
+    free(t->histY);
+    free(t->dstY);
     free(t);
 }
 
-static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args, int mode) {
-    int w = t->width; int h = t->height; int size = w * h;
-    
-    double dt_time = 0.0;
-    double dt_phase = 0.0;
-    
-    if(mode == 0) {
-        dt_time = (double)args[0] * 0.0025;
-        dt_phase = (double)args[4] * 0.00125;
-    } else {
-        dt_time = (double)args[0] * 0.000725;
-        dt_phase = (double)args[4] * 0.000725;
-    }
+static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args, int mode)
+{
+    int w = t->width;
+    int h = t->height;
+    int size = w * h;
 
-    double new_time = t->time + dt_time;
-    double new_phase = t->phase + dt_phase;
-
-    #pragma omp single
+#pragma omp single
     {
-        t->time = new_time;
-        t->phase = new_phase;
+        if(mode == 0) {
+            t->time += args[0] * 0.0025f;
+            t->phase += args[4] * 0.00125f;
+        }
+        else {
+            t->time += args[0] * 0.000725f;
+            t->phase += args[4] * 0.000725f;
+        }
     }
 
     const float branches = (float)(args[2] < 1 ? 1 : (args[2] > 20 ? 20 : args[2]));
@@ -206,66 +268,104 @@ static void escherdroste_render(box_escherdroste_t *t, VJFrame *frame, int *args
     const int32_t current_inv_fb = FP_ONE - fb_fp;
     const int32_t chroma_fb_fp = (fb_fp * 3) >> 2;
     const int32_t current_inv_chroma_fb = FP_ONE - chroma_fb_fp;
+    const int *restrict u_lut = mode == 2 ? t->u_lut_rect : t->u_lut;
+    const int *restrict v_lut = mode == 2 ? t->v_lut_rect : t->v_lut;
+    const float mode_v_term = mode == 1 ? 1.0f : 0.0f;
 
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
 
-    #pragma omp for schedule(static)
-    for (int i = 0; i < size; i++) {
-        float a = mode == 2 ? FROM_FP(t->v_lut_rect[i]) : FROM_FP(t->v_lut[i]);
-        float theta = mode == 2 ? FROM_FP(t->u_lut_rect[i]) : FROM_FP(t->u_lut[i]);
-        float base_v, base_u;
-        if(mode == 1) {
-            base_v = (a * factor) + (theta * inv_2pi * branches);
-            base_u = (theta * inv_2pi * branches) - (a * factor * pitch);
-        } else {
-            base_v = a * factor;
-            base_u = (theta * inv_2pi * branches) - (a * factor * pitch);
+    if(use_high_quality)
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < size; i++) {
+            const float a = FROM_FP(v_lut[i]);
+            const float theta = FROM_FP(u_lut[i]);
+            const float theta_term = theta * inv_2pi * branches;
+            const float base_v = (a * factor) + (theta_term * mode_v_term);
+            const float base_u = theta_term - (a * factor * pitch);
+
+            float v_val_f = base_v + t->time;
+            float u_val_f = base_u + t->phase + (swirl * a);
+            int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
+            int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
+            const int64_t accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
+            const int64_t accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
+            const int64_t accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
+
+            t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+            t->histU[i] = ((accU * current_inv_chroma_fb) + ((int64_t)t->histU[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+            t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+
+            const int y_val = t->histY[i] >> FP_SHIFT;
+            const int u_px = t->histU[i] >> FP_SHIFT;
+            const int v_px = t->histV[i] >> FP_SHIFT;
+            const int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
+
+            t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
+            t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
+            t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
         }
-        float v_val_f = base_v + (float)t->time;
-        float u_val_f = base_u + (float)t->phase + (swirl * a);
-        int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
-        int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
-        int64_t accY, accU, accV;
-        if (use_high_quality) {
-            accY = (int64_t) sample_bilinear(srcY, u_fp, v_fp, w, h) << FP_SHIFT;
-            accU = (int64_t) sample_bilinear_uv(srcU, u_fp, v_fp, w, h) << FP_SHIFT;
-            accV = (int64_t) sample_bilinear_uv(srcV, u_fp, v_fp, w, h) << FP_SHIFT;
-        } else {
-            int32_t um = u_fp & 0xffff; int32_t vm = v_fp & 0xffff;
-            int tx = ((um >> 8) * (w - 1)) >> 8; int ty = ((vm >> 8) * (h - 1)) >> 8;
+    }
+    else
+    {
+#pragma omp for schedule(static)
+        for (int i = 0; i < size; i++) {
+            const float a = FROM_FP(v_lut[i]);
+            const float theta = FROM_FP(u_lut[i]);
+            const float theta_term = theta * inv_2pi * branches;
+            const float base_v = (a * factor) + (theta_term * mode_v_term);
+            const float base_u = theta_term - (a * factor * pitch);
+
+            float v_val_f = base_v + t->time;
+            float u_val_f = base_u + t->phase + (swirl * a);
+            int32_t u_fp = (int32_t)(u_val_f * 65536.0f);
+            int32_t v_fp = (int32_t)(v_val_f * 65536.0f);
+            int32_t um = u_fp & 0xffff;
+            int32_t vm = v_fp & 0xffff;
+            int tx = ((um >> 8) * (w - 1)) >> 8;
+            int ty = ((vm >> 8) * (h - 1)) >> 8;
             int p = ty * w + tx;
-            accY = (int64_t) srcY[p] << FP_SHIFT;
-            accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
-            accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
+            const int64_t accY = (int64_t) srcY[p] << FP_SHIFT;
+            const int64_t accU = (int64_t)(srcU[p] - 128) << FP_SHIFT;
+            const int64_t accV = (int64_t)(srcV[p] - 128) << FP_SHIFT;
+
+            t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+            t->histU[i] = ((accU * current_inv_chroma_fb) + ((int64_t)t->histU[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+            t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
+
+            const int y_val = t->histY[i] >> FP_SHIFT;
+            const int u_px = t->histU[i] >> FP_SHIFT;
+            const int v_px = t->histV[i] >> FP_SHIFT;
+            const int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
+
+            t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
+            t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
+            t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
         }
-        t->histY[i] = ((accY * current_inv_fb) + ((int64_t)t->histY[i] * fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        t->histU[i] = ((accU * current_inv_chroma_fb) + ((int64_t)t->histU[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        t->histV[i] = ((accV * current_inv_chroma_fb) + ((int64_t)t->histV[i] * chroma_fb_fp) + (1LL << (FP_SHIFT - 1))) >> FP_SHIFT;
-        int y_val = t->histY[i] >> FP_SHIFT;
-        int u_px = t->histU[i] >> FP_SHIFT;
-        int v_px = t->histV[i] >> FP_SHIFT;
-        int y_idx = y_val < 0 ? 0 : (y_val > 255 ? 255 : y_val);
-        t->dstY[i] = t->gamma_lut[y_idx * (GAMMA_LUT_SIZE - 1) / 255];
-        t->dstU[i] = clamp_u8(((u_px * 1056) >> 10) + 128);
-        t->dstV[i] = clamp_u8(((v_px * 1056) >> 10) + 128);
     }
 
-    #pragma omp single
+#pragma omp sections
     {
-        veejay_memcpy(srcY, t->dstY, size);
-        veejay_memcpy(srcU, t->dstU, size);
-        veejay_memcpy(srcV, t->dstV, size);
+#pragma omp section
+        { veejay_memcpy(srcY, t->dstY, size); }
+#pragma omp section
+        { veejay_memcpy(srcU, t->dstU, size); }
+#pragma omp section
+        { veejay_memcpy(srcV, t->dstV, size); }
     }
 }
 
-void escherdroste_apply(void *ptr, VJFrame *frame, int *args) {
-    box_escherdroste_t *t = (box_escherdroste_t *) ptr;
-    
+void escherdroste_apply(void *ptr, VJFrame *frame, int *args)
+{
+    box_escherdroste_t *t = (box_escherdroste_t*) ptr;
+
     int mode = args[8];
-    if (mode < 0) mode = 0;
-    else if (mode > 2) mode = 2;
-    
+    if (mode < 0)
+        mode = 0;
+    else if (mode > 2)
+        mode = 2;
+
     escherdroste_render(t, frame, args, mode);
 }

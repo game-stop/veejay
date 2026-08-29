@@ -1,23 +1,29 @@
-/*
-Linux VeeJay
-Copyright(C)2002 Niels Elburg [nwelburg@gmail.com]
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-as published by the Free Software Foundation; either version 2
-of the License , or (at your option) any later version.
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-You should have received a copy of the GNU General Public License
-along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
-*/
+/* 
+ * Linux VeeJay
+ *
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License , or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
+ */
+
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "solarize.h"
 
 #define SOLARIZE_PARAMS 7
+
 #define P_THRESHOLD   0
 #define P_MODE        1
 #define P_SOFTNESS    2
@@ -57,12 +63,14 @@ static inline int solarize_abs_i(int v)
     return (v ^ m) - m;
 }
 
+
 static inline int solarize_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
     const float diff = (float)target - cur;
     const float step = (diff > 0.0f) ? attack : release;
     const float out = cur + diff * step;
+
     *state = out;
     return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
@@ -78,6 +86,30 @@ static inline int solarize_contrast(int y, int contrast)
     return solarize_clampi(out, 0, 255);
 }
 
+static inline int solarize_luma_pixel(int y,
+                                      int threshold,
+                                      int inv_softness,
+                                      int contrast_q8,
+                                      int *d_out,
+                                      int *blend_out)
+{
+    const int d = y - threshold;
+    int t = d * inv_softness;
+
+    if(t < -256)
+        t = -256;
+    else if(t > 256)
+        t = 256;
+
+    const int blend = (t + 256) >> 1;
+    const int inv = 255 - y;
+    int out = ((256 - blend) * y + blend * inv) >> 8;
+
+    *d_out = d;
+    *blend_out = blend;
+    return solarize_contrast(out, contrast_q8);
+}
+
 vj_effect *solarize_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -85,11 +117,18 @@ vj_effect *solarize_init(int w, int h)
         return NULL;
 
     ve->num_params = SOLARIZE_PARAMS;
+
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_THRESHOLD]   = 16;
     ve->defaults[P_MODE]        = 0;
@@ -123,6 +162,7 @@ vj_effect *solarize_init(int w, int h)
     );
 
     ve->hints = vje_init_value_hint_list(ve->num_params);
+
     vje_build_value_hint_list(
         ve->hints,
         ve->limits[1][P_MODE],
@@ -147,12 +187,13 @@ vj_effect *solarize_init(int w, int h)
 
     (void) w;
     (void) h;
+
     return ve;
 }
 
 void *solarize_malloc(int w, int h)
 {
-    solarize_t *s = (solarize_t *) vj_calloc(sizeof(solarize_t));
+    solarize_t *s = (solarize_t*) vj_calloc(sizeof(solarize_t));
     if(!s)
         return NULL;
 
@@ -166,6 +207,7 @@ void *solarize_malloc(int w, int h)
 
     (void) w;
     (void) h;
+
     return (void*) s;
 }
 
@@ -176,7 +218,8 @@ void solarize_free(void *ptr)
 
 static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mode)
 {
-    solarize_t *s = (solarize_t *) ptr;
+    solarize_t *s = (solarize_t*) ptr;
+
     const int len = frame->len;
 
     int threshold = solarize_clampi(args[P_THRESHOLD], 1, 255);
@@ -189,7 +232,7 @@ static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mod
     const float param_attack = 0.30f;
     const float param_release = 0.085f;
 
-    #pragma omp single
+#pragma omp single
     {
         if(!s->initialized) {
             s->threshold = (float)threshold;
@@ -200,33 +243,40 @@ static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mod
             s->color_drive = (float)color_drive;
             s->initialized = 1;
         } else {
-            threshold = solarize_smooth_i(&s->threshold, threshold, param_attack, param_release);
-            softness = solarize_smooth_i(&s->softness, softness, param_attack, param_release);
-            contrast_arg = solarize_smooth_i(&s->contrast, contrast_arg, param_attack, param_release);
-            chroma_arg = solarize_smooth_i(&s->chroma, chroma_arg, param_attack, param_release);
-            depth_drive = solarize_smooth_i(&s->depth_drive, depth_drive, param_attack, param_release);
-            color_drive = solarize_smooth_i(&s->color_drive, color_drive, param_attack, param_release);
+            solarize_smooth_i(&s->threshold, threshold, param_attack, param_release);
+            solarize_smooth_i(&s->softness, softness, param_attack, param_release);
+            solarize_smooth_i(&s->contrast, contrast_arg, param_attack, param_release);
+            solarize_smooth_i(&s->chroma, chroma_arg, param_attack, param_release);
+            solarize_smooth_i(&s->depth_drive, depth_drive, param_attack, param_release);
+            solarize_smooth_i(&s->color_drive, color_drive, param_attack, param_release);
         }
-
-        threshold = solarize_clampi(threshold, 1, 255);
-        softness = solarize_clampi(softness, 1, 128);
-        contrast_arg = solarize_clampi(contrast_arg, 0, 1000);
-        chroma_arg = solarize_clampi(chroma_arg, 0, 1000);
-        depth_drive = solarize_clampi(depth_drive, 0, 1000);
-        color_drive = solarize_clampi(color_drive, 0, 1000);
-
-        threshold += (depth_drive * 96 + 500) / 1000;
-        threshold = solarize_clampi(threshold, 1, 255);
-
-        softness += (depth_drive * 48 + 500) / 1000;
-        softness = solarize_clampi(softness, 1, 128);
-
-        contrast_arg += (depth_drive * 320 + 500) / 1000;
-        contrast_arg = solarize_clampi(contrast_arg, 0, 1000);
-
-        chroma_arg += ((1000 - chroma_arg) * color_drive + 500) / 1000;
-        chroma_arg = solarize_clampi(chroma_arg, 0, 1000);
     }
+
+    threshold = (int)(s->threshold + 0.5f);
+    softness = (int)(s->softness + 0.5f);
+    contrast_arg = (int)(s->contrast + 0.5f);
+    chroma_arg = (int)(s->chroma + 0.5f);
+    depth_drive = (int)(s->depth_drive + 0.5f);
+    color_drive = (int)(s->color_drive + 0.5f);
+
+    threshold = solarize_clampi(threshold, 1, 255);
+    softness = solarize_clampi(softness, 1, 128);
+    contrast_arg = solarize_clampi(contrast_arg, 0, 1000);
+    chroma_arg = solarize_clampi(chroma_arg, 0, 1000);
+    depth_drive = solarize_clampi(depth_drive, 0, 1000);
+    color_drive = solarize_clampi(color_drive, 0, 1000);
+
+    threshold += (depth_drive * 96 + 500) / 1000;
+    threshold = solarize_clampi(threshold, 1, 255);
+
+    softness += (depth_drive * 48 + 500) / 1000;
+    softness = solarize_clampi(softness, 1, 128);
+
+    contrast_arg += (depth_drive * 320 + 500) / 1000;
+    contrast_arg = solarize_clampi(contrast_arg, 0, 1000);
+
+    chroma_arg += ((1000 - chroma_arg) * color_drive + 500) / 1000;
+    chroma_arg = solarize_clampi(chroma_arg, 0, 1000);
 
     const int contrast_q8 = 256 + ((contrast_arg * 256 + 500) / 1000);
     const int color_q8 = solarize_clampi((color_drive * 224 + 500) / 1000, 0, 256);
@@ -238,55 +288,114 @@ static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mod
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        const int y = Y[i];
-        const int d = y - threshold;
-        int t = d * inv_softness;
+    if(mode == 0)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int d;
+            int blend;
+            const int y_out = solarize_luma_pixel(Y[i], threshold, inv_softness,
+                                                  contrast_q8, &d, &blend);
+            int cb = Cb[i];
+            int cr = Cr[i];
 
-        if(t < -256)
-            t = -256;
-        else if(t > 256)
-            t = 256;
+            Y[i] = solarize_u8(y_out);
 
-        const int blend = (t + 256) >> 1;
-        const int inv = 255 - y;
-        int out = ((256 - blend) * y + blend * inv) >> 8;
-        out = solarize_contrast(out, contrast_q8);
-        Y[i] = solarize_u8(out);
-
-        if(mode == 1 && color_q8 <= 0)
-            continue;
-
-        int cb = Cb[i];
-        int cr = Cr[i];
-
-        if(mode == 2) {
-            int chroma_blend = (blend * chroma_q + 2000) / 4000;
-            chroma_blend += (blend * color_q8 + 32768) >> 16;
-            chroma_blend = solarize_clampi(chroma_blend, 0, 256);
-            cb = solarize_mix_q8(cb, 255 - cb, chroma_blend);
-            cr = solarize_mix_q8(cr, 255 - cr, chroma_blend);
-        } else if(mode == 0) {
             const int dist = solarize_abs_i(d);
             int sat = 256 - (((dist > softness) ? softness : dist) * inv_softness);
             sat = (sat * chroma_q + 500) / 1000;
             sat = solarize_clampi(sat, 0, 256);
+
             cb = 128 + ((((int)cb - 128) * sat) >> 8);
             cr = 128 + ((((int)cr - 128) * sat) >> 8);
-        }
 
-        if(color_q8 > 0) {
             const int cb0 = cb;
             const int cr0 = cr;
             const int phase_q8 = (blend * color_q8 + 128) >> 8;
             const int twist_q8 = color_q8 >> 1;
+
             cb = solarize_mix_q8(cb0, 255 - cr0, phase_q8);
             cr = solarize_mix_q8(cr0, cb0, twist_q8);
-        }
 
-        Cb[i] = solarize_uv(cb);
-        Cr[i] = solarize_uv(cr);
+            Cb[i] = solarize_uv(cb);
+            Cr[i] = solarize_uv(cr);
+        }
+    }
+    else if(mode == 1)
+    {
+        if(color_q8 <= 0)
+        {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                int d;
+                int blend;
+                const int y_out = solarize_luma_pixel(Y[i], threshold, inv_softness,
+                                                      contrast_q8, &d, &blend);
+
+                (void)d;
+                (void)blend;
+                Y[i] = solarize_u8(y_out);
+            }
+        }
+        else
+        {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                int d;
+                int blend;
+                const int y_out = solarize_luma_pixel(Y[i], threshold, inv_softness,
+                                                      contrast_q8, &d, &blend);
+                int cb = Cb[i];
+                int cr = Cr[i];
+
+                (void)d;
+                Y[i] = solarize_u8(y_out);
+
+                const int cb0 = cb;
+                const int cr0 = cr;
+                const int phase_q8 = (blend * color_q8 + 128) >> 8;
+                const int twist_q8 = color_q8 >> 1;
+
+                cb = solarize_mix_q8(cb0, 255 - cr0, phase_q8);
+                cr = solarize_mix_q8(cr0, cb0, twist_q8);
+
+                Cb[i] = solarize_uv(cb);
+                Cr[i] = solarize_uv(cr);
+            }
+        }
+    }
+    else
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int d;
+            int blend;
+            const int y_out = solarize_luma_pixel(Y[i], threshold, inv_softness,
+                                                  contrast_q8, &d, &blend);
+            int cb = Cb[i];
+            int cr = Cr[i];
+
+            (void)d;
+            Y[i] = solarize_u8(y_out);
+
+            int chroma_blend = (blend * chroma_q + 2000) / 4000;
+            chroma_blend += (blend * color_q8 + 32768) >> 16;
+            chroma_blend = solarize_clampi(chroma_blend, 0, 256);
+
+            cb = solarize_mix_q8(cb, 255 - cb, chroma_blend);
+            cr = solarize_mix_q8(cr, 255 - cr, chroma_blend);
+
+            const int cb0 = cb;
+            const int cr0 = cr;
+            const int phase_q8 = (blend * color_q8 + 128) >> 8;
+            const int twist_q8 = color_q8 >> 1;
+
+            cb = solarize_mix_q8(cb0, 255 - cr0, phase_q8);
+            cr = solarize_mix_q8(cr0, cb0, twist_q8);
+
+            Cb[i] = solarize_uv(cb);
+            Cr[i] = solarize_uv(cr);
+        }
     }
 }
 
@@ -308,6 +417,7 @@ void solarize_apply_color(void *ptr, VJFrame *frame, int *args)
 void solarize_apply(void *ptr, VJFrame *frame, int *args)
 {
     const int mode = args[P_MODE];
+
     switch(mode) {
         case 1:
             solarize_apply_luma(ptr, frame, args);

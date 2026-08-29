@@ -37,7 +37,6 @@ typedef struct {
     int *hist;
     uint32_t *cdf;
     uint8_t *lut;
-    int n_threads;
 } histomatch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -64,6 +63,16 @@ vj_effect *histomatch_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
@@ -72,6 +81,7 @@ vj_effect *histomatch_init(int w, int h)
     ve->description = "Histogram Matching";
     ve->sub_format = -1;
     ve->extra_frame = 1;
+    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Opacity");
 
@@ -100,6 +110,7 @@ void *histomatch_malloc(int w, int h)
         histomatch_free(s);
         return NULL;
     }
+
 
     return (void*) s;
 }
@@ -190,7 +201,7 @@ void histomatch_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         return;
 
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     int *restrict hist = s->hist;
     uint32_t *restrict cdf = s->cdf;
@@ -222,32 +233,30 @@ void histomatch_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
-    #pragma omp single
-    {
-        histomatch_calc_histogram(Y, len, hist_y1);
-        histomatch_calc_histogram(Y2, len, hist_y2);
-        histomatch_calc_histogram(U, uv_len, hist_u1);
-        histomatch_calc_histogram(U2, uv_len, hist_u2);
-        histomatch_calc_histogram(V, uv_len, hist_v1);
-        histomatch_calc_histogram(V2, uv_len, hist_v2);
-
-        histomatch_calc_cdf(hist_y1, cdf_y1);
-        histomatch_calc_cdf(hist_y2, cdf_y2);
-        histomatch_calc_cdf(hist_u1, cdf_u1);
-        histomatch_calc_cdf(hist_u2, cdf_u2);
-        histomatch_calc_cdf(hist_v1, cdf_v1);
-        histomatch_calc_cdf(hist_v2, cdf_v2);
-
-        histomatch_map_and_blend(cdf_y1, cdf_y2, lut_y, opacity);
-        histomatch_map_and_blend(cdf_u1, cdf_u2, lut_u, opacity);
-        histomatch_map_and_blend(cdf_v1, cdf_v2, lut_v, opacity);
+#pragma omp for schedule(static)
+    for (int plane = 0; plane < HIST_PLANES; plane++) {
+        const uint8_t *data[HIST_PLANES] = { Y, Y2, U, U2, V, V2 };
+        const int lengths[HIST_PLANES] = { len, len, uv_len, uv_len, uv_len, uv_len };
+        histomatch_calc_histogram(data[plane], lengths[plane],
+                                  hist + plane * HIST_SIZE);
     }
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
+    for (int channel = 0; channel < 3; channel++) {
+        histomatch_calc_cdf(hist + (channel * 2) * HIST_SIZE,
+                            cdf + (channel * 2) * HIST_SIZE);
+        histomatch_calc_cdf(hist + (channel * 2 + 1) * HIST_SIZE,
+                            cdf + (channel * 2 + 1) * HIST_SIZE);
+        histomatch_map_and_blend(cdf + (channel * 2) * HIST_SIZE,
+                                 cdf + (channel * 2 + 1) * HIST_SIZE,
+                                 lut + channel * HIST_SIZE, opacity);
+    }
+
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         Y[i] = lut_y[Y[i]];
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < uv_len; i++) {
         U[i] = lut_u[U[i]];
         V[i] = lut_v[V[i]];

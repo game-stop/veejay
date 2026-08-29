@@ -16,8 +16,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
-*/
-#include <config.h>
+ */
+
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "strobo.h"
@@ -37,7 +37,7 @@ typedef struct {
     int timestamp;
     int pulse_count;
     int strobe_countdown;
-    int n_threads;
+    int update_now;
 
     float eff_threshold;
     float eff_color_hold;
@@ -46,14 +46,6 @@ typedef struct {
     float eff_interval;
     float eff_color_offset;
     int eff_ready;
-    int threshold;
-    int mode;
-    int persist_q8;
-    int deposit_q8;
-    int out_q8;
-    int cy;
-    int cu;
-    int cv;
 } strobo_t;
 
 static const struct {
@@ -123,6 +115,17 @@ vj_effect *strobo_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_THRESHOLD]    = 96;
     ve->defaults[P_COLOR_HOLD]   = 12;
@@ -251,30 +254,23 @@ static inline int strobo_clock_tick(strobo_t *s, int interval)
 void strobo_apply(void *ptr, VJFrame *frame, int *args)
 {
     strobo_t *s = (strobo_t*) ptr;
+
     const int len = frame->len;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
+    const float fast_a = 0.30f;
+    const float fast_r = 0.12f;
+    const float slow_a = 0.13f;
+    const float slow_r = 0.060f;
 
-    uint8_t *restrict bY = s->buf[0];
-    uint8_t *restrict bU = s->buf[1];
-    uint8_t *restrict bV = s->buf[2];
+    const int threshold_arg = args[P_THRESHOLD];
+    const int color_hold_arg = args[P_COLOR_HOLD];
+    const int opacity_arg = args[P_OPACITY];
+    const int trail_arg = args[P_TRAIL];
+    const int interval_arg = args[P_INTERVAL];
+    const int color_offset_arg = args[P_COLOR_OFFSET];
 
-    #pragma omp single
+#pragma omp single
     {
-        const float fast_a = 0.30f;
-        const float fast_r = 0.12f;
-        const float slow_a = 0.13f;
-        const float slow_r = 0.060f;
-
-        const int threshold_arg = args[P_THRESHOLD];
-        const int color_hold_arg = args[P_COLOR_HOLD];
-        const int opacity_arg = args[P_OPACITY];
-        const int trail_arg = args[P_TRAIL];
-        const int interval_arg = args[P_INTERVAL];
-        const int color_offset_arg = args[P_COLOR_OFFSET];
-
         if(!s->eff_ready) {
             s->eff_threshold = (float)threshold_arg;
             s->eff_color_hold = (float)color_hold_arg;
@@ -285,109 +281,119 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
             s->eff_ready = 1;
         }
 
-        int threshold_bias = strobo_smooth_i(&s->eff_threshold, threshold_arg, fast_a, fast_r);
-        int color_hold = strobo_smooth_i(&s->eff_color_hold, color_hold_arg, slow_a, slow_r);
-        int opacity = strobo_smooth_i(&s->eff_opacity, opacity_arg, fast_a, fast_r);
-        int trail = strobo_smooth_i(&s->eff_trail, trail_arg, slow_a, slow_r);
-        int interval = strobo_smooth_i(&s->eff_interval, interval_arg, slow_a, slow_r);
-        int color_offset = strobo_smooth_i(&s->eff_color_offset, color_offset_arg, slow_a, slow_r);
-
-        threshold_bias = clampi(threshold_bias, 0, 255);
-        color_hold = clampi(color_hold, 1, 1500);
-        opacity = clampi(opacity, 0, 255);
-        trail = clampi(trail, 0, 100);
-        interval = clampi(interval, 1, 1500);
-        color_offset = clampi(color_offset, 0, 13);
-
-        s->mode = args[P_MODE] ? 1 : 0;
-
-        uint32_t histogram[256];
-        veejay_memset(histogram, 0, sizeof(histogram));
-
-        for(int i = 0; i < len; i++)
-            histogram[Y[i]]++;
-
-        int base_threshold = (int)otsu_method(histogram);
-        s->threshold = clampi(base_threshold + ((threshold_bias - 128) >> 1), 0, 255);
-        int color_total = (int)(sizeof(strobo_rainbow) / sizeof(strobo_rainbow[0]));
-        int base_color_index = (s->timestamp / color_hold) % color_total;
-        int color_index = (base_color_index + color_offset) % color_total;
-        int update_now = strobo_clock_tick(s, interval);
-
-        int cy = 0;
-        int cu = 128;
-        int cv = 128;
-
-        _rgb2yuv(
-            strobo_rainbow[color_index].r,
-            strobo_rainbow[color_index].g,
-            strobo_rainbow[color_index].b,
-            cy,
-            cu,
-            cv
-        );
-
-        s->cy = CLAMP_Y(cy);
-        s->cu = CLAMP_UV(cu);
-        s->cv = CLAMP_UV(cv);
-
-        s->persist_q8 = 16 + ((trail * 234 + 50) / 100);
-        s->persist_q8 = clampi(s->persist_q8, 16, 250);
-
-        s->deposit_q8 = update_now ? opacity : 0;
-        s->out_q8 = opacity;
-
-        s->timestamp++;
+        strobo_smooth_i(&s->eff_threshold, threshold_arg, fast_a, fast_r);
+        strobo_smooth_i(&s->eff_color_hold, color_hold_arg, slow_a, slow_r);
+        strobo_smooth_i(&s->eff_opacity, opacity_arg, fast_a, fast_r);
+        strobo_smooth_i(&s->eff_trail, trail_arg, slow_a, slow_r);
+        strobo_smooth_i(&s->eff_interval, interval_arg, slow_a, slow_r);
+        strobo_smooth_i(&s->eff_color_offset, color_offset_arg, slow_a, slow_r);
     }
-    
-    const int threshold = s->threshold;
-    const int mode = s->mode;
-    const int persist_q8 = s->persist_q8;
-    const int deposit_q8 = s->deposit_q8;
-    const int out_q8 = s->out_q8;
-    const int cy = s->cy;
-    const int cu = s->cu;
-    const int cv = s->cv;
-   
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        int ty = ((int)bY[i] * persist_q8) >> 8;
-        int tu = 128 + ((((int)bU[i] - 128) * persist_q8) >> 8);
-        int tv = 128 + ((((int)bV[i] - 128) * persist_q8) >> 8);
 
-        if(deposit_q8 > 0 && Y[i] <= threshold) {
-            ty = blend_y((uint8_t)clampi(ty, 0, 255), (uint8_t)cy, deposit_q8);
-            tu = blend_uv((uint8_t)CLAMP_UV(tu), (uint8_t)cu, deposit_q8);
-            tv = blend_uv((uint8_t)CLAMP_UV(tv), (uint8_t)cv, deposit_q8);
+    int threshold_bias = (int)(s->eff_threshold + 0.5f);
+    int color_hold = (int)(s->eff_color_hold + 0.5f);
+    int opacity = (int)(s->eff_opacity + 0.5f);
+    int trail = (int)(s->eff_trail + 0.5f);
+    int interval = (int)(s->eff_interval + 0.5f);
+    int color_offset = (int)(s->eff_color_offset + 0.5f);
+
+    threshold_bias = clampi(threshold_bias, 0, 255);
+    color_hold = clampi(color_hold, 1, 1500);
+    opacity = clampi(opacity, 0, 255);
+    trail = clampi(trail, 0, 100);
+    interval = clampi(interval, 1, 1500);
+    color_offset = clampi(color_offset, 0, 13);
+
+    const int mode = args[P_MODE] ? 1 : 0;
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
+
+    uint8_t *restrict bY = s->buf[0];
+    uint8_t *restrict bU = s->buf[1];
+    uint8_t *restrict bV = s->buf[2];
+
+    uint32_t histogram[256];
+
+    veejay_memset(histogram, 0, sizeof(histogram));
+
+    for(int i = 0; i < len; i++)
+        histogram[Y[i]]++;
+
+    const int base_threshold = (int)otsu_method(histogram);
+    const int threshold = clampi(base_threshold + ((threshold_bias - 128) >> 1), 0, 255);
+    const int color_total = (int)(sizeof(strobo_rainbow) / sizeof(strobo_rainbow[0]));
+    const int base_color_index = (s->timestamp / color_hold) % color_total;
+    const int color_index = (base_color_index + color_offset) % color_total;
+#pragma omp single
+    s->update_now = strobo_clock_tick(s, interval);
+    const int update_now = s->update_now;
+
+    int cy = 0;
+    int cu = 128;
+    int cv = 128;
+
+    _rgb2yuv(
+        strobo_rainbow[color_index].r,
+        strobo_rainbow[color_index].g,
+        strobo_rainbow[color_index].b,
+        cy,
+        cu,
+        cv
+    );
+
+    cy = CLAMP_Y(cy);
+    cu = CLAMP_UV(cu);
+    cv = CLAMP_UV(cv);
+
+    int persist_q8 = 16 + ((trail * 234 + 50) / 100);
+    persist_q8 = clampi(persist_q8, 16, 250);
+
+    const int deposit_q8 = update_now ? opacity : 0;
+    const int out_q8 = opacity;
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int ty = ((int)bY[i] * persist_q8) >> 8;
+            int tu = 128 + ((((int)bU[i] - 128) * persist_q8) >> 8);
+            int tv = 128 + ((((int)bV[i] - 128) * persist_q8) >> 8);
+
+            if(deposit_q8 > 0 && Y[i] <= threshold) {
+                ty = blend_y((uint8_t)clampi(ty, 0, 255), (uint8_t)cy, deposit_q8);
+                tu = blend_uv((uint8_t)CLAMP_UV(tu), (uint8_t)cu, deposit_q8);
+                tv = blend_uv((uint8_t)CLAMP_UV(tv), (uint8_t)cv, deposit_q8);
+            }
+
+            bY[i] = (uint8_t)clampi(ty, 0, 255);
+            bU[i] = (uint8_t)CLAMP_UV(tu);
+            bV[i] = (uint8_t)CLAMP_UV(tv);
         }
-
-        bY[i] = (uint8_t)clampi(ty, 0, 255);
-        bU[i] = (uint8_t)CLAMP_UV(tu);
-        bV[i] = (uint8_t)CLAMP_UV(tv);
-    }
 
     if(mode == 0) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            if(bY[i] > 1) {
-                Y[i] = (uint8_t)CLAMP_Y(bY[i]);
-                U[i] = bU[i];
-                V[i] = bV[i];
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                if(bY[i] > 1) {
+                    Y[i] = (uint8_t)CLAMP_Y(bY[i]);
+                    U[i] = bU[i];
+                    V[i] = bV[i];
+                }
+                else {
+                    Y[i] = pixel_Y_lo_;
+                    U[i] = 128;
+                    V[i] = 128;
+                }
             }
-            else {
-                Y[i] = pixel_Y_lo_;
-                U[i] = 128;
-                V[i] = 128;
-            }
-        }
     } else {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            if(bY[i] > 1) {
-                Y[i] = blend_y(Y[i], (uint8_t)CLAMP_Y(bY[i]), out_q8);
-                U[i] = blend_uv(U[i], bU[i], out_q8);
-                V[i] = blend_uv(V[i], bV[i], out_q8);
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                if(bY[i] > 1) {
+                    Y[i] = blend_y(Y[i], (uint8_t)CLAMP_Y(bY[i]), out_q8);
+                    U[i] = blend_uv(U[i], bU[i], out_q8);
+                    V[i] = blend_uv(V[i], bV[i], out_q8);
             }
         }
     }
+
+#pragma omp single
+    s->timestamp++;
 }

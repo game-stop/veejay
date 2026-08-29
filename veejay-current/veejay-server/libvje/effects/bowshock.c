@@ -71,7 +71,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
 
     uint8_t *src_y;
     uint8_t *src_u;
@@ -209,10 +208,22 @@ vj_effect *bowshock_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * BS_NUM_PARAMS);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * BS_NUM_PARAMS);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->description = "Bow Shock";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    
+    ve->parallel = 0;
+
     ve->defaults[BS_MODE]         = 0;
     ve->defaults[BS_DISPLACE]     = 76;
     ve->defaults[BS_IMPACT]       = 0;
@@ -295,6 +306,9 @@ vj_effect *bowshock_init(int w, int h)
 
 void *bowshock_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0)
+        return NULL;
+
     const int len = w * h;
     const size_t plane = (size_t)len;
     const size_t map_bytes = plane * sizeof(int16_t);
@@ -531,19 +545,19 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
 {
     bowshock_t *s = (bowshock_t *)ptr;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
+    uint8_t * restrict Y = frame->data[0];
+    uint8_t * restrict U = frame->data[1];
+    uint8_t * restrict V = frame->data[2];
 
-    uint8_t *restrict src_y = s->src_y;
-    uint8_t *restrict src_u = s->src_u;
-    uint8_t *restrict src_v = s->src_v;
+    uint8_t * restrict src_y = s->src_y;
+    uint8_t * restrict src_u = s->src_u;
+    uint8_t * restrict src_v = s->src_v;
 
-    int16_t *restrict map_dx = s->map_dx;
-    int16_t *restrict map_dy = s->map_dy;
-    int16_t *restrict map_wave = s->map_wave;
-    int16_t *restrict map_glow = s->map_glow;
-    int16_t *restrict map_pull = s->map_pull;
+    int16_t * restrict map_dx = s->map_dx;
+    int16_t * restrict map_dy = s->map_dy;
+    int16_t * restrict map_wave = s->map_wave;
+    int16_t * restrict map_glow = s->map_glow;
+    int16_t * restrict map_pull = s->map_pull;
 
     const int w = s->w;
     const int h = s->h;
@@ -594,74 +608,71 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
             snare_delta > 0.12f
         );
 
-    #pragma omp single
-    {
-        s->impact_env = bs_env(s->impact_env, impact_target, 0.82f, 0.095f);
-        s->shock_env = bs_env(s->shock_env, shock_target, 0.78f, 0.075f);
-        s->snare_env = bs_env(s->snare_env, snare_target, 0.86f, 0.190f);
-        s->hat_env = bs_env(s->hat_env, hat_target, 0.70f, 0.360f);
+    s->impact_env = bs_env(s->impact_env, impact_target, 0.82f, 0.095f);
+    s->shock_env = bs_env(s->shock_env, shock_target, 0.78f, 0.075f);
+    s->snare_env = bs_env(s->snare_env, snare_target, 0.86f, 0.190f);
+    s->hat_env = bs_env(s->hat_env, hat_target, 0.70f, 0.360f);
 
-        if(impact_rise) {
-            bs_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg, geometry_arg, mode_arg);
-            s->impact_cooldown = 3;
-        }
-
-        if(shock_rise && !impact_rise) {
-            bs_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg, geometry_arg, mode_arg);
-            s->shock_cooldown = 4;
-        }
-
-        if(snare_rise) {
-            bs_spawn_wave(s,
-                          impact_target * 0.35f,
-                          shock_target * 0.42f + snare_target * 0.58f,
-                          width_arg >> 1,
-                          speed_arg + 12,
-                          center_arg,
-                          geometry_arg + 17,
-                          mode_arg);
-            s->snare_cooldown = 3;
-        }
-
-        if(s->impact_cooldown > 0)
-            s->impact_cooldown--;
-        if(s->shock_cooldown > 0)
-            s->shock_cooldown--;
-        if(s->snare_cooldown > 0)
-            s->snare_cooldown--;
-
-        const float decay = 0.9475f;
-        const float max_dist = (float)(w > h ? w : h) * (mode_arg == BS_MODE_BOW ? 2.25f : 1.55f);
-
-        for(int i = 0; i < BS_MAX_WAVES; i++) {
-            bowshock_wave_t *wv = &s->waves[i];
-
-            if(!wv->active)
-                continue;
-
-            wv->pos += wv->speed;
-            wv->amp *= decay;
-
-            if(wv->amp < 0.012f || wv->pos > max_dist)
-                wv->active = 0;
-        }
-
-        s->swing_phase +=
-            0.010f +
-            ((float)speed_arg * 0.0011f) +
-            ((float)geometry_arg * 0.0007f) +
-            s->impact_env * 0.050f +
-            s->snare_env * 0.030f +
-            s->hat_env * 0.012f;
-
-        if(s->swing_phase > (float)(M_PI * 2.0))
-            s->swing_phase -= (float)(M_PI * 2.0);
-
-        s->last_impact = impact_target;
-        s->last_shock = shock_target;
-        s->last_snare = snare_target;
-        s->frame_count++;
+    if(impact_rise) {
+        bs_spawn_wave(s, impact_target, shock_target, width_arg, speed_arg, center_arg, geometry_arg, mode_arg);
+        s->impact_cooldown = 3;
     }
+
+    if(shock_rise && !impact_rise) {
+        bs_spawn_wave(s, impact_target * 0.65f, shock_target, width_arg, speed_arg + 8, center_arg, geometry_arg, mode_arg);
+        s->shock_cooldown = 4;
+    }
+
+    if(snare_rise) {
+        bs_spawn_wave(s,
+                      impact_target * 0.35f,
+                      shock_target * 0.42f + snare_target * 0.58f,
+                      width_arg >> 1,
+                      speed_arg + 12,
+                      center_arg,
+                      geometry_arg + 17,
+                      mode_arg);
+        s->snare_cooldown = 3;
+    }
+
+    if(s->impact_cooldown > 0)
+        s->impact_cooldown--;
+    if(s->shock_cooldown > 0)
+        s->shock_cooldown--;
+    if(s->snare_cooldown > 0)
+        s->snare_cooldown--;
+
+    const float decay = 0.9475f;
+    const float max_dist = (float)(w > h ? w : h) * (mode_arg == BS_MODE_BOW ? 2.25f : 1.55f);
+
+    for(int i = 0; i < BS_MAX_WAVES; i++) {
+        bowshock_wave_t *wv = &s->waves[i];
+
+        if(!wv->active)
+            continue;
+
+        wv->pos += wv->speed;
+        wv->amp *= decay;
+
+        if(wv->amp < 0.012f || wv->pos > max_dist)
+            wv->active = 0;
+    }
+
+    s->swing_phase +=
+        0.010f +
+        ((float)speed_arg * 0.0011f) +
+        ((float)geometry_arg * 0.0007f) +
+        s->impact_env * 0.050f +
+        s->snare_env * 0.030f +
+        s->hat_env * 0.012f;
+
+    if(s->swing_phase > (float)(M_PI * 2.0))
+        s->swing_phase -= (float)(M_PI * 2.0);
+
+    s->last_impact = impact_target;
+    s->last_shock = shock_target;
+    s->last_snare = snare_target;
+    s->frame_count++;
 
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int shock_i = (int)(s->shock_env * 256.0f);
@@ -720,35 +731,27 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
         nactive++;
     }
 
-    int skip_processing = 0;
+    if(nactive <= 0 && swing_x == 0 && swing_y == 0)
+        return;
 
-    if(nactive <= 0 && swing_x == 0 && swing_y == 0) {
-        skip_processing = 1;
-    }
-
-    if (skip_processing) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
             src_y[i] = Y[i];
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
             src_u[i] = U[i];
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
             src_v[i] = V[i];
-        }
-    } else {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            src_y[i] = Y[i];
-            src_u[i] = U[i];
-            src_v[i] = V[i];
-        }
 
         if(nactive <= 0) {
-            #pragma omp for schedule(static)
+#pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
                 const int row = y * w;
                 const int row_up = (y > 0 ? y - 1 : y) * w;
                 const int row_dn = (y < h - 1 ? y + 1 : y) * w;
 
-                #pragma omp simd
+#pragma omp simd
                 for(int x = 0; x < w; x++) {
                     const int i = row + x;
                     const int xm = x > 0 ? x - 1 : x;
@@ -772,38 +775,38 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
                     Y[i] = src_y[pi];
                     U[i] = src_u[pi];
                     V[i] = src_v[pi];
-                }
             }
+        }
         }
         else {
             if(mode_arg == BS_MODE_BOW) {
-                #pragma omp for schedule(static)
+#pragma omp for schedule(static)
                 for(int y = 0; y < h; y++) {
                     const int row = y * w;
                     BS_ROW_SWITCH(BS_ACCUM_BOW);
                 }
             }
             else if(mode_arg == BS_MODE_TORSION) {
-                #pragma omp for schedule(static)
+#pragma omp for schedule(static)
                 for(int y = 0; y < h; y++) {
                     const int row = y * w;
                     BS_ROW_SWITCH(BS_ACCUM_TORSION);
                 }
             }
             else {
-                #pragma omp for schedule(static)
+#pragma omp for schedule(static)
                 for(int y = 0; y < h; y++) {
                     const int row = y * w;
                     BS_ROW_SWITCH(BS_ACCUM_HYBRID);
                 }
             }
 
-            #pragma omp for schedule(static)
+#pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
                 const int row = y * w;
                 const int row_up = (y > 0 ? y - 1 : y) * w;
                 const int row_dn = (y < h - 1 ? y + 1 : y) * w;
-                #pragma omp simd
+#pragma omp simd
                 for(int x = 0; x < w; x++) {
                     const int i = row + x;
                     const int xm = x > 0 ? x - 1 : x;
@@ -850,6 +853,13 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
                     V[i] = bs_u8(vv);
                 }
             }
-        }
     }
 }
+
+
+#undef BS_ACCUM_BOW
+#undef BS_ACCUM_TORSION
+#undef BS_ACCUM_HYBRID
+#undef BS_STORE_MAP
+#undef BS_OMP_SIMD
+#undef BS_ROW_SWITCH

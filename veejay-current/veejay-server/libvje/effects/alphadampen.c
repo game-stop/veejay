@@ -38,6 +38,7 @@ vj_effect *alphadampen_init(int w, int h)
     ve->sub_format        = -1;
     ve->extra_frame       = 0;
     ve->has_user          = 0;
+    ve->parallel          = 1;
     ve->param_description = vje_build_param_list(ve->num_params, "Quantization Step");
     ve->alpha             = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT;
 
@@ -50,10 +51,9 @@ void alphadampen_apply(void *ptr, VJFrame *frame, int *args)
 
     uint8_t *A = frame->data[3];
     const int len = frame->len;
-        
+
     if((base & (base - 1)) == 0) {
         const int mask = ~(base - 1);
-
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             A[i] = (uint8_t)(A[i] & mask);
@@ -63,5 +63,4 @@ void alphadampen_apply(void *ptr, VJFrame *frame, int *args)
         for(int i = 0; i < len; i++)
             A[i] = (uint8_t)((A[i] / base) * base);
     }
-    
 }

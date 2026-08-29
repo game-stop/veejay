@@ -33,6 +33,16 @@ vj_effect *flip_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[0] = 0;
     ve->defaults[1] = 0;
@@ -141,13 +151,12 @@ static void flip_both_yuv444(VJFrame *frame)
 
 void flip_apply(void *ptr, VJFrame *frame, int *args)
 {
+    (void) ptr;
+
     const int horizontal = args[0];
     const int vertical = args[1];
-
     if(horizontal == 0 && vertical == 0)
         return;
-    
-
 
     if(horizontal && vertical)
         flip_both_yuv444(frame);
@@ -155,5 +164,4 @@ void flip_apply(void *ptr, VJFrame *frame, int *args)
         flip_horizontal_yuv444(frame);
     else
         flip_vertical_yuv444(frame);
-    
 }

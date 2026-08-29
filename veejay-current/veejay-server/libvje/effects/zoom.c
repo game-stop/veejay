@@ -50,6 +50,8 @@ static inline int zoom_clampi(int v, int lo, int hi)
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
+
+
 static inline int zoom_lerp_i(int a, int b, int q)
 {
     q = zoom_clampi(q, 0, 1000);
@@ -67,6 +69,14 @@ vj_effect *zoom_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     const int max_x = width - 1;
     const int max_y = height - 1;
@@ -194,80 +204,68 @@ void zoom_apply(void *ptr, VJFrame *frame, int *args)
     const int use_alpha = alpha && frame->data[3];
     const int punch = args[P_ZOOM_PUNCH];
 
-    int target_factor;
-    int x, y, factor;
-    int strides[4];
-    int init_failed = 0;
-
-    #pragma omp single
-    {
-        if(!z->env_ready) {
-            z->center_x_env = (float)target_x;
-            z->center_y_env = (float)target_y;
-            z->factor_env = (float)factor_base;
-            z->env_ready = 1;
-        }
-
-        target_factor = factor_base;
-        if(punch > 0) {
-            const int headroom = 100 - factor_base;
-            const int lift = (headroom > 0)
-                ? (int)(((int64_t)headroom * (int64_t)punch + 500LL) / 1000LL)
-                : 0;
-            target_factor = factor_base + lift;
-        }
-
-        z->center_x_env += ((float)target_x - z->center_x_env) * 0.092f;
-        z->center_y_env += ((float)target_y - z->center_y_env) * 0.092f;
-        z->factor_env += ((float)target_factor - z->factor_env) * 0.285f;
-
-        x = zoom_clampi((int)(z->center_x_env + 0.5f), 0, width - 1);
-        y = zoom_clampi((int)(z->center_y_env + 0.5f), 0, height - 1);
-        factor = zoom_clampi((int)(z->factor_env + 0.5f), 10, 100);
-
-        if(z->zoom_[0] != x ||
-           z->zoom_[1] != y ||
-           z->zoom_[2] != factor ||
-           z->zoom_[3] != dir ||
-           !z->zoom_vp_)
-        {
-            if(z->zoom_vp_) {
-                viewport_destroy(z->zoom_vp_);
-                z->zoom_vp_ = NULL;
-            }
-
-            z->zoom_vp_ = viewport_fx_zoom_init(
-                VP_QUADZOOM,
-                width,
-                height,
-                x,
-                y,
-                factor,
-                dir
-            );
-
-            if(!z->zoom_vp_) {
-                init_failed = 1;
-            } else {
-                z->zoom_[0] = x;
-                z->zoom_[1] = y;
-                z->zoom_[2] = factor;
-                z->zoom_[3] = dir;
-            }
-        }
-
-        if(!init_failed && z->zoom_vp_) {
-            strides[0] = len;
-            strides[1] = len;
-            strides[2] = len;
-            strides[3] = use_alpha ? len : 0;
-
-            vj_frame_copy(frame->data, z->zoom_private_, strides);
-
-            if(use_alpha)
-                viewport_process_dynamic_alpha(z->zoom_vp_, z->zoom_private_, frame->data);
-            else
-                viewport_process_dynamic(z->zoom_vp_, z->zoom_private_, frame->data);
-        }
+    if(!z->env_ready) {
+        z->center_x_env = (float)target_x;
+        z->center_y_env = (float)target_y;
+        z->factor_env = (float)factor_base;
+        z->env_ready = 1;
     }
+
+    int target_factor = factor_base;
+    if(punch > 0) {
+        const int headroom = 100 - factor_base;
+        const int lift = (headroom > 0)
+            ? (int)(((int64_t)headroom * (int64_t)punch + 500LL) / 1000LL)
+            : 0;
+        target_factor = factor_base + lift;
+    }
+
+    z->center_x_env += ((float)target_x - z->center_x_env) * 0.092f;
+    z->center_y_env += ((float)target_y - z->center_y_env) * 0.092f;
+    z->factor_env += ((float)target_factor - z->factor_env) * 0.285f;
+
+    const int x = zoom_clampi((int)(z->center_x_env + 0.5f), 0, width - 1);
+    const int y = zoom_clampi((int)(z->center_y_env + 0.5f), 0, height - 1);
+    int factor = zoom_clampi((int)(z->factor_env + 0.5f), 10, 100);
+
+    if(z->zoom_[0] != x ||
+       z->zoom_[1] != y ||
+       z->zoom_[2] != factor ||
+       z->zoom_[3] != dir ||
+       !z->zoom_vp_)
+    {
+        if(z->zoom_vp_) {
+            viewport_destroy(z->zoom_vp_);
+            z->zoom_vp_ = NULL;
+        }
+
+        z->zoom_vp_ = viewport_fx_zoom_init(
+            VP_QUADZOOM,
+            width,
+            height,
+            x,
+            y,
+            factor,
+            dir
+        );
+
+        if(!z->zoom_vp_)
+            return;
+
+        z->zoom_[0] = x;
+        z->zoom_[1] = y;
+        z->zoom_[2] = factor;
+        z->zoom_[3] = dir;
+    }
+
+    veejay_memcpy(z->zoom_private_[0], frame->data[0], len);
+    veejay_memcpy(z->zoom_private_[1], frame->data[1], len);
+    veejay_memcpy(z->zoom_private_[2], frame->data[2], len);
+    if(use_alpha)
+        veejay_memcpy(z->zoom_private_[3], frame->data[3], len);
+
+    if(use_alpha)
+        viewport_process_dynamic_alpha(z->zoom_vp_, z->zoom_private_, frame->data);
+    else
+        viewport_process_dynamic(z->zoom_vp_, z->zoom_private_, frame->data);
 }

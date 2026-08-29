@@ -45,6 +45,8 @@
 #include "common.h"
 #include "colortap.h"
 
+
+
 /*
  * Tables were produced roughly this way:
  *  - take a sample image
@@ -163,18 +165,18 @@ static const uint8_t old_photo_table[768] =
   "\251{\246\251|\247\253|\250\253}\250\254~\251\256~\252\257\177\252\260\200"
   "\253\260\200\253\262\201\254\263\201\255\263\203\255\265\203\256\265\204"
   "\257\267\205\257\267\205\260\271\206\260\272\206\261\273\207\262\273\210"
-  "\262\275\211\264\277\212\264\277\213\265\300\214\265\301\215\266\303\216"
-  "\266\303\216\267\304\216\267\305\217\270\306\220\271\307\221\271\311\222"
-  "\272\311\223\272\312\223\273\313\224\274\314\225\274\315\226\275\316\226"
-  "\275\317\227\276\320\230\277\321\230\277\322\231\300\323\232\301\324\233"
-  "\301\325\234\302\326\234\302\327\236\303\331\236\304\331\237\304\332\240"
-  "\305\333\240\305\334\241\306\335\242\307\336\243\307\337\244\310\340\244"
-  "\310\341\245\311\341\246\311\343\247\312\344\250\313\345\251\313\346\251"
-  "\314\347\252\315\347\253\315\351\254\316\352\255\316\353\256\316\353\256"
-  "\320\354\257\320\356\260\321\356\261\321\360\262\322\360\262\323\362\263"
-  "\323\362\264\324\363\265\324\365\265\325\366\267\326\367\267\326\370\270"
-  "\327\371\271\327\371\272\330\372\272\330\374\273\331\374\275\331\375\275"
-  "\332\377\276";
+  "\262\275\211\262\276\212\264\277\212\264\277\213\265\300\214\265\301\215"
+  "\266\303\216\266\303\216\267\304\216\267\305\217\270\306\220\271\307\221"
+  "\271\311\222\272\311\223\272\312\223\273\313\224\274\314\225\274\315\226"
+  "\275\316\226\275\317\227\276\320\230\277\321\230\277\322\231\300\323\232"
+  "\301\324\233\301\325\234\302\326\234\302\327\236\303\331\236\304\331\237"
+  "\304\332\240\305\333\240\305\334\241\306\335\242\307\336\243\307\337\244"
+  "\310\340\244\310\341\245\311\341\246\311\343\247\312\344\250\313\345\251"
+  "\313\346\251\314\347\252\315\347\253\315\351\254\316\352\255\316\353\256"
+  "\316\353\256\320\354\257\320\356\260\321\356\261\321\360\262\322\360\262"
+  "\323\362\263\323\362\264\324\363\265\324\365\265\325\366\267\326\367\267"
+  "\326\370\270\327\371\271\327\371\272\330\372\272\330\374\273\331\374\275"
+  "\331\375\275\332\377\276";
 
 static const uint8_t xray_table[768] =
     "\377\377\377\377\377\377\376\376\376\375\375\376\374\375\375\373\374\375"
@@ -336,12 +338,13 @@ vj_effect *colortap_init(int w, int h)
     vje_build_value_hint_list( ve->hints, ve->limits[1][0], 0,
 		"Sepia", "Heat", "Red-Green", "Old Photo", "XRay", "Esses", "Yellow-Blue", "XPro");
     
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
+    
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
     return ve;
 }
 
@@ -415,7 +418,7 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tU = s->lut[1];
     uint8_t *restrict tV = s->lut[2];
 
-    #pragma omp single
+#pragma omp single
     {
         if(s->last_mode != mode)
         {
@@ -439,14 +442,16 @@ void colortap_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++)
-        Y[i] = tY[Y[i]];
-
-    #pragma omp for schedule(static)
-    for(int i = 0; i < uv_len; i++)
     {
-        U[i] = tU[U[i]];
-        V[i] = tV[V[i]];
+        #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+            Y[i] = tY[Y[i]];
+
+        #pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++)
+        {
+            U[i] = tU[U[i]];
+            V[i] = tV[V[i]];
+        }
     }
 }

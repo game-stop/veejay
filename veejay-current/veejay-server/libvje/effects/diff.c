@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,14 +21,12 @@
 #include "common.h"
 #include "softblur.h"
 #include "diff.h"
-#include <veejaycore/vjmem.h>
 
 typedef struct {
     uint8_t *static_bg;
     uint32_t *dt_map;
     uint8_t *data;
     uint8_t *current;
-    int n_threads;
 } diff_t;
 
 static inline int diff_clampi(int v, int lo, int hi)
@@ -39,8 +37,6 @@ static inline int diff_clampi(int v, int lo, int hi)
 vj_effect *diff_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -72,9 +68,6 @@ vj_effect *diff_init(int width, int height)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)width;
-    (void)height;
-
     return ve;
 }
 
@@ -92,14 +85,9 @@ void *diff_malloc(int width, int height)
         return NULL;
     }
 
-    d->data = (uint8_t*) vj_calloc(sizeof(uint8_t) * ((size_t)len + (size_t)width));
-    d->static_bg = (uint8_t*) vj_calloc(sizeof(uint8_t) * ((size_t)len + (size_t)(width * 2)));
-    d->dt_map = (uint32_t*) vj_calloc(sizeof(uint32_t) * ((size_t)len + (size_t)(width * 2)));
-    d->n_threads = vje_advise_num_threads(len);
-
-    if(d->n_threads < 1)
-        d->n_threads = 1;
-
+    d->data = (uint8_t*) vj_calloc(sizeof(uint8_t) * (len + width));
+    d->static_bg = (uint8_t*) vj_calloc(sizeof(uint8_t) * (len + (width * 2)));
+    d->dt_map = (uint32_t*) vj_calloc(sizeof(uint32_t) * (len + (width * 2)));
     if(!d->data || !d->static_bg || !d->dt_map) {
         diff_free(d);
         return NULL;
@@ -134,7 +122,7 @@ int diff_prepare(void *ptr, VJFrame *frame)
     if(!d || !frame || !frame->data[0] || !d->static_bg)
         return 0;
 
-    veejay_memcpy(d->static_bg, frame->data[0], (size_t)frame->len);
+    veejay_memcpy(d->static_bg, frame->data[0], frame->len);
 
     VJFrame tmp;
     veejay_memset(&tmp, 0, sizeof(VJFrame));
@@ -180,7 +168,6 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int mode = args[2];
     const int feather = args[3];
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -193,63 +180,63 @@ void diff_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict data = d->data;
     uint32_t *restrict dt_map = d->dt_map;
 
-    #pragma omp single
-    {
-        veejay_memset(dt_map, 0, sizeof(uint32_t) * ((size_t)len + (size_t)(frame->width * 2)));
-    }
+#pragma omp single
+    veejay_memset(dt_map, 0, len * sizeof(uint32_t));
 
     diff_binarify_mask(data, Y, Y2, threshold, reverse, len);
 
-    #pragma omp single
-    {
+#pragma omp single
         veejay_distance_transform8(data, frame->width, frame->height, dt_map);
-    }
 
-    if(mode == 1)
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = data[i];
-
-        #pragma omp single
+        if(mode == 1)
         {
-            veejay_memset(Cb, 128, (size_t)uv_len);
-            veejay_memset(Cr, 128, (size_t)uv_len);
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                Y[i] = data[i];
+
+#pragma omp sections
+            {
+#pragma omp section
+                { veejay_memset(Cb, 128, len); }
+#pragma omp section
+                { veejay_memset(Cr, 128, len); }
+            }
         }
-    }
-    else if(mode == 2)
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
+        else if(mode == 2)
         {
-            const uint32_t dt = dt_map[i];
-            uint8_t val = 0;
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                const uint32_t dt = dt_map[i];
+                uint8_t val = 0;
 
-            if(dt > (uint32_t)feather)
-                val = (uint8_t)(128 + (dt & 127u));
+                if(dt > (uint32_t)feather)
+                    val = (uint8_t)(128 + (dt & 127u));
 
-            if(dt == (uint32_t)feather || dt == 1u)
-                val = 0xff;
+                if(dt == (uint32_t)feather || dt == 1u)
+                    val = 0xff;
 
-            Y[i] = val;
+                Y[i] = val;
+            }
+
+#pragma omp sections
+            {
+#pragma omp section
+                { veejay_memset(Cb, 128, len); }
+#pragma omp section
+                { veejay_memset(Cr, 128, len); }
+            }
         }
-
-        #pragma omp single
+        else
         {
-            veejay_memset(Cb, 128, (size_t)uv_len);
-            veejay_memset(Cr, 128, (size_t)uv_len);
-        }
-    }
-    else
-    {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-        {
-            const uint32_t mask = -(dt_map[i] >= (uint32_t)feather);
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+            {
+                const uint32_t mask = -(dt_map[i] >= (uint32_t)feather);
 
-            Y[i] = (uint8_t)((Y2[i] & mask) | (pixel_Y_lo_ & ~mask));
-            Cb[i] = (uint8_t)((Cb2[i] & mask) | (128 & ~mask));
-            Cr[i] = (uint8_t)((Cr2[i] & mask) | (128 & ~mask));
-        }
+                Y[i] = (uint8_t)((Y2[i] & mask) | (pixel_Y_lo_ & ~mask));
+                Cb[i] = (uint8_t)((Cb2[i] & mask) | (128 & ~mask));
+                Cr[i] = (uint8_t)((Cr2[i] & mask) | (128 & ~mask));
+            }
     }
 }

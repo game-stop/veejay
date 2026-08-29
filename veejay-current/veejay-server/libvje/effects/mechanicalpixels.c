@@ -448,6 +448,16 @@ vj_effect *mechanicalpixels_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_AMOUNT] = 0;       ve->limits[1][P_AMOUNT] = 100;       ve->defaults[P_AMOUNT] = 100;
     ve->limits[0][P_CELL_SIZE] = 6;    ve->limits[1][P_CELL_SIZE] = 80;     ve->defaults[P_CELL_SIZE] = 28;
@@ -507,6 +517,7 @@ void *mechanicalpixels_malloc(int w, int h)
     k->w = w;
     k->h = h;
     k->len = w * h;
+    k->n_threads = vje_advise_num_threads(k->len);
     k->max_cols = (w + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_rows = (h + KD_CELL_MIN - 1) / KD_CELL_MIN;
     k->max_cells = k->max_cols * k->max_rows;
@@ -982,46 +993,46 @@ void mechanicalpixels_apply(void *ptr, VJFrame *frame, int *args)
 {
     kinetic_t *k = (kinetic_t *) ptr;
 
-    int amount = args[P_AMOUNT];
-    int cell_size = clampi(args[P_CELL_SIZE], KD_CELL_MIN, KD_CELL_MAX);
-    int depth = args[P_DEPTH];
-    int motor_speed = args[P_MOTOR];
-    int trigger = args[P_TRIGGER];
-    int wave = clampi(args[P_WAVE], 0, KD_WAVES - 1);
-    int inertia = args[P_INERTIA];
-    int palette = clampi(args[P_PALETTE], 0, KD_PALETTES - 1);
-    int reset = args[P_RESET];
+    uint8_t *Y = frame->data[0];
+    uint8_t *U = frame->data[1];
+    uint8_t *V = frame->data[2];
 
-    int do_reconfigure = (cell_size != k->last_cell_size);
-    int rebuild_wave = (k->last_wave != wave) || do_reconfigure;
-    int need_seed = (!k->seeded || (reset && !k->last_reset)) || do_reconfigure;
+    const int amount = args[P_AMOUNT];
+    const int cell_size = clampi(args[P_CELL_SIZE], KD_CELL_MIN, KD_CELL_MAX);
+    const int depth = args[P_DEPTH];
+    const int motor_speed = args[P_MOTOR];
+    const int trigger = args[P_TRIGGER];
+    const int wave = clampi(args[P_WAVE], 0, KD_WAVES - 1);
+    const int inertia = args[P_INERTIA];
+    const int palette = clampi(args[P_PALETTE], 0, KD_PALETTES - 1);
+    const int reset = args[P_RESET];
 
-    #pragma omp single
-    {
-        if(do_reconfigure) {
-            kd_configure_grid(k, cell_size);
-            kd_clear_cells(k);
-            k->seeded = 0;
-            k->motor_q8 = 0;
-        }
+#pragma omp single
+    if(cell_size != k->last_cell_size) {
+        kd_configure_grid(k, cell_size);
+        kd_clear_cells(k);
+        k->seeded = 0;
+        k->motor_q8 = 0;
     }
-    
+
+    const int rebuild_wave = k->last_wave != wave;
+    const int need_seed = !k->seeded || (reset && !k->last_reset);
+
     if(rebuild_wave)
         kd_rebuild_wave_lut(k, wave);
 
     if(need_seed)
-        kd_seed_cells(k, frame->data[0], frame->data[1], frame->data[2], cell_size);
+        kd_seed_cells(k, Y, U, V, cell_size);
 
     if(amount > 0) {
-        kd_update_cells(k, frame->data[0], frame->data[1], frame->data[2], cell_size, motor_speed, trigger, inertia);
+        kd_update_cells(k, Y, U, V, cell_size, motor_speed, trigger, inertia);
         kd_render_wall(k, frame, cell_size, amount, depth, palette);
     } else {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < k->len; i++)
-            k->prev_y[i] = frame->data[0][i];
+#pragma omp single
+        veejay_memcpy(k->prev_y, Y, k->len);
     }
 
-    #pragma omp single
+#pragma omp single
     {
         if(need_seed) {
             k->seeded = 1;

@@ -81,13 +81,13 @@ void cartonize_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         Y[i] = (uint8_t)((Y[i] / b1) * b1);
 
     if(ubase > 0)
     {
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int i = 0; i < uv_len; i++)
         {
             const int p = (int)Cb[i] - 128;
@@ -97,7 +97,7 @@ void cartonize_apply(void *ptr, VJFrame *frame, int *args)
 
     if(vbase > 0)
     {
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int i = 0; i < uv_len; i++)
         {
             const int p = (int)Cr[i] - 128;

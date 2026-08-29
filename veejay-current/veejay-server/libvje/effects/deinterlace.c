@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,25 +20,15 @@
 
 #include "common.h"
 #include "deinterlace.h"
-#include <veejaycore/vjmem.h>
-
-typedef struct {
-    uint8_t *block;
-    uint8_t *buf[3];
-} deinterlace_t;
 
 vj_effect *deinterlace_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 1;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 64;
@@ -57,60 +47,17 @@ vj_effect *deinterlace_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
-void *deinterlace_malloc(int w, int h)
-{
-    deinterlace_t *d = (deinterlace_t *) vj_calloc(sizeof(deinterlace_t));
-    if(!d)
-        return NULL;
-
-    const int len = w * h;
-    const size_t total = (size_t)len * 3u;
-
-    d->block = (uint8_t *) vj_malloc(total);
-    if(!d->block) {
-        free(d);
-        return NULL;
-    }
-
-    d->buf[0] = d->block;
-    d->buf[1] = d->block + len;
-    d->buf[2] = d->block + (len * 2);
-
-    return (void *)d;
-}
-
-void deinterlace_free(void *ptr)
-{
-    deinterlace_t *d = (deinterlace_t *) ptr;
-    if(!d)
-        return;
-
-    free(d->block);
-    free(d);
-}
-
-static void deinterlace_plane(uint8_t *restrict dst, const uint8_t *restrict src, int w, int h, int threshold)
+static void deinterlace_plane(uint8_t *restrict src, int w, int h, int threshold)
 {
 #pragma omp for schedule(static)
-    for(int y = 0; y < h; y++)
+    for(int y = 1; y < h - 1; y++)
     {
-        uint8_t *restrict out = dst + y * w;
-
-        if(y == 0 || y == h - 1)
-        {
-            memcpy(out, src + y * w, w);
-            continue;
-        }
-
-        const uint8_t *restrict prev = src + (y - 1) * w;
-        const uint8_t *restrict curr = src + y * w;
-        const uint8_t *restrict next = src + (y + 1) * w;
+        uint8_t *restrict prev = src + (y - 1) * w;
+        uint8_t *restrict curr = src + y * w;
+        uint8_t *restrict next = src + (y + 1) * w;
 
         for(int x = 0; x < w; x++)
         {
@@ -119,28 +66,18 @@ static void deinterlace_plane(uint8_t *restrict dst, const uint8_t *restrict src
             const unsigned diff = (p > n) ? (p - n) : (n - p);
 
             if(diff >= (unsigned)threshold)
-                out[x] = (uint8_t)((p + n) >> 1);
-            else
-                out[x] = curr[x];
+                curr[x] = (uint8_t)((p + n) >> 1);
         }
     }
 }
 
 void deinterlace_apply(void *ptr, VJFrame *frame, int *args)
 {
-    deinterlace_t *d = (deinterlace_t *) ptr;
+    (void) ptr;
+
     const int threshold = args[0];
 
-    const int y_len = frame->len;
-    const int uv_len = frame->uv_len;
-
-    #pragma omp for schedule(static)
-    for(int plane = 0; plane < 3; plane++) {
-        const int copy_len = (plane == 0) ? y_len : uv_len;
-        veejay_memcpy(d->buf[plane], frame->data[plane], copy_len);
-    }
-
-    deinterlace_plane(frame->data[0], d->buf[0], frame->width, frame->height, threshold);
-    deinterlace_plane(frame->data[1], d->buf[1], frame->uv_width, frame->uv_height, threshold);
-    deinterlace_plane(frame->data[2], d->buf[2], frame->uv_width, frame->uv_height, threshold);
+    deinterlace_plane(frame->data[0], frame->width, frame->height, threshold);
+    deinterlace_plane(frame->data[1], frame->uv_width, frame->uv_height, threshold);
+    deinterlace_plane(frame->data[2], frame->uv_width, frame->uv_height, threshold);
 }

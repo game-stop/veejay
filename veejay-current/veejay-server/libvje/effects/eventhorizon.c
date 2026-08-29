@@ -56,7 +56,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
     void *region;
     uint8_t *src_y;
     uint8_t *paint_y;
@@ -321,7 +320,7 @@ static inline size_t eh_align_size(size_t off, size_t align)
 static inline void eh_store4_u8(uint8_t *restrict p, uint8_t v)
 {
     uint32_t q = 0x01010101U * (uint32_t) v;
-    memcpy(p, &q, sizeof(q));
+    veejay_memcpy(p, &q, sizeof(q));
 }
 
 static inline __attribute__((always_inline)) void eh_store2_u8(uint8_t *restrict p, uint8_t v)
@@ -1032,6 +1031,14 @@ vj_effect *eventhorizon_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if (ve->defaults) free(ve->defaults);
+        if (ve->limits[0]) free(ve->limits[0]);
+        if (ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_BUILD] = 0; ve->limits[1][P_BUILD] = 100; ve->defaults[P_BUILD] = 72;
     ve->limits[0][P_SOURCE] = 0; ve->limits[1][P_SOURCE] = 100; ve->defaults[P_SOURCE] = 100;
     ve->limits[0][P_FLOW] = 0; ve->limits[1][P_FLOW] = 100; ve->defaults[P_FLOW] = 19;
@@ -1049,6 +1056,7 @@ vj_effect *eventhorizon_init(int w, int h)
     ve->description = "Event Horizon Ink";
     ve->sub_format = 1;
     ve->extra_frame = 0;
+    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -1110,7 +1118,6 @@ void *eventhorizon_malloc(int w, int h)
     e->len = (int) len;
     e->seeded = 0;
     e->frame = 0;
-    e->n_threads = vje_advise_num_threads((int) len);
 
     gridcap = (size_t) (((w + 7) / 8) + 2) * (size_t) (((h + 7) / 8) + 2);
     total = len * 15 + sizeof(float) * ((size_t) w + gridcap * 9 + ((size_t) w + (size_t) h) * 4) + sizeof(uint16_t) * ((size_t) w + (size_t) h) * 4 + 128;
@@ -1976,92 +1983,143 @@ static inline __attribute__((always_inline)) void eh_render_area_sampled(eventho
     if (escape_thresh < 8)
         escape_thresh = 8;
 
-    uint8_t cu = next_u[pos00];
-    uint8_t cv = next_v[pos00];
-    int adv_q = eh_q10_from_float(adv_coeff);
-    int src_q = eh_q10_from_float(src_coeff);
-    int paint_add_q = eh_q10_from_float(paint_add);
-    int floor_src_q = eh_q10_from_float(floor_src_coeff);
-    int floor_adv_q = eh_q10_from_float(floor_adv_coeff);
-    int floor_const_q = eh_q10_from_float(floor_const);
-    int floor_blend_q = eh_q10_from_float(floor_blend);
-    int display_add_q = eh_q10_from_float(display_add);
-    int display_floor_q = eh_q10_from_float(display_floor);
+    {
+        uint8_t cu = next_u[pos00];
+        uint8_t cv = next_v[pos00];
+        int adv_q = eh_q10_from_float(adv_coeff);
+        int src_q = eh_q10_from_float(src_coeff);
+        int paint_add_q = eh_q10_from_float(paint_add);
+        int floor_src_q = eh_q10_from_float(floor_src_coeff);
+        int floor_adv_q = eh_q10_from_float(floor_adv_coeff);
+        int floor_const_q = eh_q10_from_float(floor_const);
+        int floor_blend_q = eh_q10_from_float(floor_blend);
+        int display_add_q = eh_q10_from_float(display_add);
+        int display_floor_q = eh_q10_from_float(display_floor);
 
-    if (uv_tension_q > 0) {
-        cu = eh_blend_u8_q8(cu, old_u[pos00], uv_tension_q);
-        cv = eh_blend_u8_q8(cv, old_v[pos00], uv_tension_q);
-        next_u[pos00] = cu;
-        next_v[pos00] = cv;
-        U[pos00] = cu;
-        V[pos00] = cv;
-    }
+        if (uv_tension_q > 0) {
+            cu = eh_blend_u8_q8(cu, old_u[pos00], uv_tension_q);
+            cv = eh_blend_u8_q8(cv, old_v[pos00], uv_tension_q);
+            next_u[pos00] = cu;
+            next_v[pos00] = cv;
+            U[pos00] = cu;
+            V[pos00] = cv;
+        }
 
-    if (use_bilinear) {
-        float fx0__ = (float) x + 0.5f - vel_x;
-        float fy0__ = (float) y + 0.5f - vel_y;
-        int sx0__ = (int) fx0__;
-        int sy0__ = (int) fy0__;
-        if (fx0__ < (float) sx0__) sx0__--;
-        if (fy0__ < (float) sy0__) sy0__--;
+        if (use_bilinear) {
+            float fx0__ = (float) x + 0.5f - vel_x;
+            float fy0__ = (float) y + 0.5f - vel_y;
+            int sx0__ = (int) fx0__;
+            int sy0__ = (int) fy0__;
+            if (fx0__ < (float) sx0__)
+                sx0__--;
+            if (fy0__ < (float) sy0__)
+                sy0__--;
+            if (sx0__ >= 0 && sy0__ >= 0 && sx0__ + bw < w && sy0__ + bh < h) {
+                int wx__ = (int) ((fx0__ - (float) sx0__) * 256.0f);
+                int wy__ = (int) ((fy0__ - (float) sy0__) * 256.0f);
+                {
+                    uint8_t advrow__[16];
+                    if (tension_q == 0 && escape_q == 0) {
+                        for (yy = 0; yy < bh; yy++) {
+                            int row = pos00 + yy * w;
+                            int srow = (sy0__ + yy) * w + sx0__;
+                            eh_bilinear_y_row_kernel(old_y, srow, w, bw, wx__, wy__, advrow__);
+                            for (xx = 0; xx < bw; xx++) {
+                                int pos = row + xx;
+                                int adv_y = advrow__[xx];
+                                int src_yy = e->tone_lut[src_y[pos]];
+                                int paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
+                                int floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
+                                int display_q;
+                                if (paint_q < floor_q)
+                                    paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
+                                display_q = paint_q + display_add_q;
+                                if (display_q < display_floor_q)
+                                    display_q += ((display_floor_q - display_q) * 389) >> 10;
+                                next_y[pos] = eh_u8i((paint_q + 512) >> 10);
+                                Y[pos] = eh_u8i((display_q + 512) >> 10);
+                                if (pos != pos00) {
+                                    uint8_t cyv = src_y[pos];
+                                    uint8_t rf = ref_y[pos];
+                                    int d = eh_absi((int) cyv - (int) prev_y[pos]);
+                                    int a = e->slave_blend_lut[d];
+                                    nx_on[pos] = (uint8_t) master_on;
+                                    nx_off[pos] = (uint8_t) master_off;
+                                    nx_veil[pos] = (uint8_t) master_veil;
+                                    ref_y[pos] = eh_blend_u8(rf, cyv, a);
+                                    prev_y[pos] = cyv;
+                                    next_u[pos] = cu;
+                                    next_v[pos] = cv;
+                                    U[pos] = cu;
+                                    V[pos] = cv;
+                                }
+                            }
+                        }
+                        return;
+                    }
+                    for (yy = 0; yy < bh; yy++) {
+                        int row = pos00 + yy * w;
+                        int srow = (sy0__ + yy) * w + sx0__;
+                        eh_bilinear_y_row_kernel(old_y, srow, w, bw, wx__, wy__, advrow__);
+                        for (xx = 0; xx < bw; xx++) {
+                            int pos = row + xx;
+                            int adv_y = advrow__[xx];
+                            int src_yy;
+                            int paint_q;
+                            int floor_q;
+                            int display_q;
 
-        if (sx0__ >= 0 && sy0__ >= 0 && sx0__ + bw < w && sy0__ + bh < h) {
-            int wx__ = (int) ((fx0__ - (float) sx0__) * 256.0f);
-            int wy__ = (int) ((fy0__ - (float) sy0__) * 256.0f);
-            uint8_t advrow__[16];
-            
-            if (tension_q == 0 && escape_q == 0) {
-                for (yy = 0; yy < bh; yy++) {
-                    int row = pos00 + yy * w;
-                    int srow = (sy0__ + yy) * w + sx0__;
-                    eh_bilinear_y_row_kernel(old_y, srow, w, bw, wx__, wy__, advrow__);
-                    for (xx = 0; xx < bw; xx++) {
-                        int pos = row + xx;
-                        int adv_y = advrow__[xx];
-                        int src_yy = e->tone_lut[src_y[pos]];
-                        int paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
-                        int floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
-                        int display_q;
-                        if (paint_q < floor_q)
-                            paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
-                        display_q = paint_q + display_add_q;
-                        if (display_q < display_floor_q)
-                            display_q += ((display_floor_q - display_q) * 389) >> 10;
-                        next_y[pos] = eh_u8i((paint_q + 512) >> 10);
-                        Y[pos] = eh_u8i((display_q + 512) >> 10);
-                        
-                        if (pos != pos00) {
-                            uint8_t cyv = src_y[pos];
-                            uint8_t rf = ref_y[pos];
-                            int d = eh_absi((int) cyv - (int) prev_y[pos]);
-                            int a = e->slave_blend_lut[d];
-                            nx_on[pos] = (uint8_t) master_on;
-                            nx_off[pos] = (uint8_t) master_off;
-                            nx_veil[pos] = (uint8_t) master_veil;
-                            ref_y[pos] = eh_blend_u8(rf, cyv, a);
-                            prev_y[pos] = cyv;
-                            next_u[pos] = cu;
-                            next_v[pos] = cv;
-                            U[pos] = cu;
-                            V[pos] = cv;
+                            if (tension_q > 0) {
+                                int coh_y = tension_safe ? eh_cross5_y(old_y, pos, w) : (int) old_y[pos];
+                                adv_y = (adv_y * inv_tension_q + coh_y * tension_q + 512) >> 10;
+                            }
+                            adv_y = eh_escape_smooth_y(adv_y, escape_ref_y, escape_thresh, escape_q);
+                            src_yy = e->tone_lut[src_y[pos]];
+                            paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
+                            floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
+                            if (paint_q < floor_q)
+                                paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
+                            display_q = paint_q + display_add_q;
+                            if (display_q < display_floor_q)
+                                display_q += ((display_floor_q - display_q) * 389) >> 10;
+
+                            next_y[pos] = eh_u8i((paint_q + 512) >> 10);
+                            Y[pos] = eh_u8i((display_q + 512) >> 10);
+
+                            if (pos != pos00) {
+                                uint8_t cyv = src_y[pos];
+                                uint8_t rf = ref_y[pos];
+                                int d = eh_absi((int) cyv - (int) prev_y[pos]);
+                                int a = e->slave_blend_lut[d];
+                                nx_on[pos] = (uint8_t) master_on;
+                                nx_off[pos] = (uint8_t) master_off;
+                                nx_veil[pos] = (uint8_t) master_veil;
+                                ref_y[pos] = eh_blend_u8(rf, cyv, a);
+                                prev_y[pos] = cyv;
+                                next_u[pos] = cu;
+                                next_v[pos] = cv;
+                                U[pos] = cu;
+                                V[pos] = cv;
+                            }
                         }
                     }
                 }
                 return;
             }
-
             for (yy = 0; yy < bh; yy++) {
                 int row = pos00 + yy * w;
-                int srow = (sy0__ + yy) * w + sx0__;
-                eh_bilinear_y_row_kernel(old_y, srow, w, bw, wx__, wy__, advrow__);
+                float py = (float) (y + yy);
                 for (xx = 0; xx < bw; xx++) {
                     int pos = row + xx;
-                    int adv_y = advrow__[xx];
+                    int adv_y;
                     int src_yy;
+                    float advx = (float) (x + xx) + 0.5f - vel_x;
+                    float advy = py + 0.5f - vel_y;
                     int paint_q;
                     int floor_q;
                     int display_q;
 
+                    adv_y = eh_sample_y_bilinear(old_y, advx, advy, w, h);
                     if (tension_q > 0) {
                         int coh_y = tension_safe ? eh_cross5_y(old_y, pos, w) : (int) old_y[pos];
                         adv_y = (adv_y * inv_tension_q + coh_y * tension_q + 512) >> 10;
@@ -2096,251 +2154,326 @@ static inline __attribute__((always_inline)) void eh_render_area_sampled(eventho
                     }
                 }
             }
-            return;
         }
-    }
+        else {
+            int sx0 = (int) ((float) x + 1.0f - vel_x);
+            int sy0 = (int) ((float) y + 1.0f - vel_y);
+            int x_inside = (sx0 >= 0 && sx0 + bw <= w);
 
-    /* NEAREST NEIGHBOR / OUT-OF-BOUNDS FALLBACK */
-    int sx0 = (int) ((float) x + 1.0f - vel_x);
-    int sy0 = (int) ((float) y + 1.0f - vel_y);
-    int x_inside = (sx0 >= 0 && sx0 + bw <= w);
-
-    if (tension_q == 0 && uv_tension_q == 0 && x_inside && sy0 >= 0 && sy0 + bh <= h) {
-        if (bw == 4 && bh == 4 && sy0 + 4 <= h) {
-            int sample0 = sy0 * w + sx0;
-#define EH_FAST_PIXEL(POS, SAMPLE, SLAVE) do { \
-            int adv_y__ = old_y[(SAMPLE)]; \
-            if (tension_q > 0) { int coh_y__ = tension_safe ? eh_cross5_y(old_y, (POS), w) : (int) old_y[(POS)]; adv_y__ = (adv_y__ * inv_tension_q + coh_y__ * tension_q + 512) >> 10; } \
-            adv_y__ = eh_escape_smooth_y(adv_y__, escape_ref_y, escape_thresh, escape_q); \
-            int src_yy__ = e->tone_lut[src_y[(POS)]]; \
-            int paint_q__ = adv_y__ * adv_q + src_yy__ * src_q + paint_add_q; \
-            int floor_q__ = floor_const_q + src_yy__ * floor_src_q + adv_y__ * floor_adv_q; \
-            int display_q__; \
-            if (paint_q__ < floor_q__) paint_q__ += ((floor_q__ - paint_q__) * floor_blend_q) >> 10; \
-            display_q__ = paint_q__ + display_add_q; \
-            if (display_q__ < display_floor_q) display_q__ += ((display_floor_q - display_q__) * 389) >> 10; \
-            next_y[(POS)] = eh_u8i((paint_q__ + 512) >> 10); \
-            Y[(POS)] = eh_u8i((display_q__ + 512) >> 10); \
-            if (SLAVE) { \
-                uint8_t cyv__ = src_y[(POS)]; \
-                uint8_t rf__ = ref_y[(POS)]; \
-                int d__ = eh_absi((int) cyv__ - (int) prev_y[(POS)]); \
-                int a__ = e->slave_blend_lut[d__]; \
-                ref_y[(POS)] = eh_blend_u8(rf__, cyv__, a__); \
-                prev_y[(POS)] = cyv__; \
-            } \
-        } while (0)
-            EH_FAST_PIXEL(pos00, sample0, 0);
-            EH_FAST_PIXEL(pos00 + 1, sample0 + 1, 1);
-            EH_FAST_PIXEL(pos00 + 2, sample0 + 2, 1);
-            EH_FAST_PIXEL(pos00 + 3, sample0 + 3, 1);
-            EH_FAST_PIXEL(pos00 + w, sample0 + w, 1);
-            EH_FAST_PIXEL(pos00 + w + 1, sample0 + w + 1, 1);
-            EH_FAST_PIXEL(pos00 + w + 2, sample0 + w + 2, 1);
-            EH_FAST_PIXEL(pos00 + w + 3, sample0 + w + 3, 1);
-            EH_FAST_PIXEL(pos00 + w + w, sample0 + w + w, 1);
-            EH_FAST_PIXEL(pos00 + w + w + 1, sample0 + w + w + 1, 1);
-            EH_FAST_PIXEL(pos00 + w + w + 2, sample0 + w + w + 2, 1);
-            EH_FAST_PIXEL(pos00 + w + w + 3, sample0 + w + w + 3, 1);
-            EH_FAST_PIXEL(pos00 + w + w + w, sample0 + w + w + w, 1);
-            EH_FAST_PIXEL(pos00 + w + w + w + 1, sample0 + w + w + w + 1, 1);
-            EH_FAST_PIXEL(pos00 + w + w + w + 2, sample0 + w + w + w + 2, 1);
-            EH_FAST_PIXEL(pos00 + w + w + w + 3, sample0 + w + w + w + 3, 1);
-#undef EH_FAST_PIXEL
-
-#define EH_STORE4_ROWS(PLANE, VAL) do { \
-            uint8_t v__ = (uint8_t) (VAL); \
-            eh_store4_u8((PLANE) + pos00, v__); \
-            eh_store4_u8((PLANE) + pos00 + w, v__); \
-            eh_store4_u8((PLANE) + pos00 + w + w, v__); \
-            eh_store4_u8((PLANE) + pos00 + w + w + w, v__); \
-        } while (0)
-
-            EH_STORE4_ROWS(next_u, cu);
-            EH_STORE4_ROWS(next_v, cv);
-            EH_STORE4_ROWS(U, cu);
-            EH_STORE4_ROWS(V, cv);
-            EH_STORE4_ROWS(nx_on, master_on);
-            EH_STORE4_ROWS(nx_off, master_off);
-            EH_STORE4_ROWS(nx_veil, master_veil);
-#undef EH_STORE4_ROWS
-            return;
-        }
-
-        if (bw == 2 && bh == 2 && sy0 + 2 <= h) {
-            int sample0 = sy0 * w + sx0;
-#define EH_FAST_PIXEL2(POS, SAMPLE, SLAVE) do { \
-            int adv_y__ = old_y[(SAMPLE)]; \
-            if (tension_q > 0) { int coh_y__ = tension_safe ? eh_cross5_y(old_y, (POS), w) : (int) old_y[(POS)]; adv_y__ = (adv_y__ * inv_tension_q + coh_y__ * tension_q + 512) >> 10; } \
-            adv_y__ = eh_escape_smooth_y(adv_y__, escape_ref_y, escape_thresh, escape_q); \
-            int src_yy__ = e->tone_lut[src_y[(POS)]]; \
-            int paint_q__ = adv_y__ * adv_q + src_yy__ * src_q + paint_add_q; \
-            int floor_q__ = floor_const_q + src_yy__ * floor_src_q + adv_y__ * floor_adv_q; \
-            int display_q__; \
-            if (paint_q__ < floor_q__) paint_q__ += ((floor_q__ - paint_q__) * floor_blend_q) >> 10; \
-            display_q__ = paint_q__ + display_add_q; \
-            if (display_q__ < display_floor_q) display_q__ += ((display_floor_q - display_q__) * 389) >> 10; \
-            next_y[(POS)] = eh_u8i((paint_q__ + 512) >> 10); \
-            Y[(POS)] = eh_u8i((display_q__ + 512) >> 10); \
-            if (SLAVE) { \
-                uint8_t cyv__ = src_y[(POS)]; \
-                uint8_t rf__ = ref_y[(POS)]; \
-                int d__ = eh_absi((int) cyv__ - (int) prev_y[(POS)]); \
-                int a__ = e->slave_blend_lut[d__]; \
-                ref_y[(POS)] = eh_blend_u8(rf__, cyv__, a__); \
-                prev_y[(POS)] = cyv__; \
-            } \
-        } while (0)
-            EH_FAST_PIXEL2(pos00, sample0, 0);
-            EH_FAST_PIXEL2(pos00 + 1, sample0 + 1, 1);
-            EH_FAST_PIXEL2(pos00 + w, sample0 + w, 1);
-            EH_FAST_PIXEL2(pos00 + w + 1, sample0 + w + 1, 1);
-#undef EH_FAST_PIXEL2
-
-#define EH_STORE2_ROWS(PLANE, VAL) do { \
-            uint8_t v__ = (uint8_t) (VAL); \
-            eh_store2_u8((PLANE) + pos00, v__); \
-            eh_store2_u8((PLANE) + pos00 + w, v__); \
-        } while (0)
-
-            EH_STORE2_ROWS(next_u, cu);
-            EH_STORE2_ROWS(next_v, cv);
-            EH_STORE2_ROWS(U, cu);
-            EH_STORE2_ROWS(V, cv);
-            EH_STORE2_ROWS(nx_on, master_on);
-            EH_STORE2_ROWS(nx_off, master_off);
-            EH_STORE2_ROWS(nx_veil, master_veil);
-#undef EH_STORE2_ROWS
-            return;
-        }
-    }
-
-    for (yy = 0; yy < bh; yy++) {
-        int row = pos00 + yy * w;
-        int iy = sy0 + yy;
-        int src_row;
-
-        if (iy < 0) iy = 0;
-        else if (iy >= h) iy = h - 1;
-
-        src_row = iy * w;
-
-        if (x_inside) {
-            int sample = src_row + sx0;
-            for (xx = 0; xx < bw; xx++) {
-                int pos = row + xx;
-                int adv_y = old_y[sample + xx];
-                int src_yy;
-                int paint_q;
-                int floor_q;
-                int display_q;
-
-                if (tension_q > 0) {
-                    int coh_y = tension_safe ? eh_cross5_y(old_y, pos, w) : (int) old_y[pos];
-                    adv_y = (adv_y * inv_tension_q + coh_y * tension_q + 512) >> 10;
+            if (tension_q == 0 && uv_tension_q == 0 && x_inside && sy0 >= 0 && sy0 + bh <= h) {
+                for (yy = 0; yy < bh; yy++) {
+                    int row = pos00 + yy * w;
+                    int sample = (sy0 + yy) * w + sx0;
+                    for (xx = 0; xx < bw; xx++) {
+                        int pos = row + xx;
+                        int adv_y__ = old_y[sample + xx];
+                        int src_yy__ = e->tone_lut[src_y[pos]];
+                        int paint_q__;
+                        int floor_q__;
+                        int display_q__;
+                        adv_y__ = eh_escape_smooth_y(adv_y__, escape_ref_y, escape_thresh, escape_q);
+                        paint_q__ = adv_y__ * adv_q + src_yy__ * src_q + paint_add_q;
+                        floor_q__ = floor_const_q + src_yy__ * floor_src_q + adv_y__ * floor_adv_q;
+                        if (paint_q__ < floor_q__)
+                            paint_q__ += ((floor_q__ - paint_q__) * floor_blend_q) >> 10;
+                        display_q__ = paint_q__ + display_add_q;
+                        if (display_q__ < display_floor_q)
+                            display_q__ += ((display_floor_q - display_q__) * 389) >> 10;
+                        next_y[pos] = eh_u8i((paint_q__ + 512) >> 10);
+                        Y[pos] = eh_u8i((display_q__ + 512) >> 10);
+                        if (pos != pos00) {
+                            uint8_t cyv__ = src_y[pos];
+                            uint8_t rf__ = ref_y[pos];
+                            int d__ = eh_absi((int) cyv__ - (int) prev_y[pos]);
+                            int a__ = e->slave_blend_lut[d__];
+                            ref_y[pos] = eh_blend_u8(rf__, cyv__, a__);
+                            prev_y[pos] = cyv__;
+                        }
+                    }
+                    veejay_memset(next_u + row, cu, (size_t) bw);
+                    veejay_memset(next_v + row, cv, (size_t) bw);
+                    veejay_memset(U + row, cu, (size_t) bw);
+                    veejay_memset(V + row, cv, (size_t) bw);
+                    veejay_memset(nx_on + row, master_on, (size_t) bw);
+                    veejay_memset(nx_off + row, master_off, (size_t) bw);
+                    veejay_memset(nx_veil + row, master_veil, (size_t) bw);
                 }
-                adv_y = eh_escape_smooth_y(adv_y, escape_ref_y, escape_thresh, escape_q);
-                src_yy = e->tone_lut[src_y[pos]];
-                paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
-                floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
+                return;
+            }
 
-                if (paint_q < floor_q)
-                    paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
+            if (bw == 4 && bh == 4 && x_inside && sy0 >= 0 && sy0 + 4 <= h) {
+                int sample0 = sy0 * w + sx0;
+#define EH_FAST_PIXEL(POS, SAMPLE, SLAVE) do { \
+                    int adv_y__ = old_y[(SAMPLE)]; \
+                    if (tension_q > 0) { int coh_y__ = tension_safe ? eh_cross5_y(old_y, (POS), w) : (int) old_y[(POS)]; adv_y__ = (adv_y__ * inv_tension_q + coh_y__ * tension_q + 512) >> 10; } \
+                    adv_y__ = eh_escape_smooth_y(adv_y__, escape_ref_y, escape_thresh, escape_q); \
+                    int src_yy__ = e->tone_lut[src_y[(POS)]]; \
+                    int paint_q__ = adv_y__ * adv_q + src_yy__ * src_q + paint_add_q; \
+                    int floor_q__ = floor_const_q + src_yy__ * floor_src_q + adv_y__ * floor_adv_q; \
+                    int display_q__; \
+                    if (paint_q__ < floor_q__) paint_q__ += ((floor_q__ - paint_q__) * floor_blend_q) >> 10; \
+                    display_q__ = paint_q__ + display_add_q; \
+                    if (display_q__ < display_floor_q) display_q__ += ((display_floor_q - display_q__) * 389) >> 10; \
+                    next_y[(POS)] = eh_u8i((paint_q__ + 512) >> 10); \
+                    Y[(POS)] = eh_u8i((display_q__ + 512) >> 10); \
+                    if (SLAVE) { \
+                        uint8_t cyv__ = src_y[(POS)]; \
+                        uint8_t rf__ = ref_y[(POS)]; \
+                        int d__ = eh_absi((int) cyv__ - (int) prev_y[(POS)]); \
+                        int a__ = e->slave_blend_lut[d__]; \
+                        ref_y[(POS)] = eh_blend_u8(rf__, cyv__, a__); \
+                        prev_y[(POS)] = cyv__; \
+                    } \
+                } while (0)
+                EH_FAST_PIXEL(pos00, sample0, 0);
+                EH_FAST_PIXEL(pos00 + 1, sample0 + 1, 1);
+                EH_FAST_PIXEL(pos00 + 2, sample0 + 2, 1);
+                EH_FAST_PIXEL(pos00 + 3, sample0 + 3, 1);
+                EH_FAST_PIXEL(pos00 + w, sample0 + w, 1);
+                EH_FAST_PIXEL(pos00 + w + 1, sample0 + w + 1, 1);
+                EH_FAST_PIXEL(pos00 + w + 2, sample0 + w + 2, 1);
+                EH_FAST_PIXEL(pos00 + w + 3, sample0 + w + 3, 1);
+                EH_FAST_PIXEL(pos00 + w + w, sample0 + w + w, 1);
+                EH_FAST_PIXEL(pos00 + w + w + 1, sample0 + w + w + 1, 1);
+                EH_FAST_PIXEL(pos00 + w + w + 2, sample0 + w + w + 2, 1);
+                EH_FAST_PIXEL(pos00 + w + w + 3, sample0 + w + w + 3, 1);
+                EH_FAST_PIXEL(pos00 + w + w + w, sample0 + w + w + w, 1);
+                EH_FAST_PIXEL(pos00 + w + w + w + 1, sample0 + w + w + w + 1, 1);
+                EH_FAST_PIXEL(pos00 + w + w + w + 2, sample0 + w + w + w + 2, 1);
+                EH_FAST_PIXEL(pos00 + w + w + w + 3, sample0 + w + w + w + 3, 1);
+#undef EH_FAST_PIXEL
+#define EH_STORE4_ROWS(PLANE, VAL) do { \
+                    uint8_t v__ = (uint8_t) (VAL); \
+                    eh_store4_u8((PLANE) + pos00, v__); \
+                    eh_store4_u8((PLANE) + pos00 + w, v__); \
+                    eh_store4_u8((PLANE) + pos00 + w + w, v__); \
+                    eh_store4_u8((PLANE) + pos00 + w + w + w, v__); \
+                } while (0)
+                if (uv_tension_q == 0) {
+                    EH_STORE4_ROWS(next_u, cu);
+                    EH_STORE4_ROWS(next_v, cv);
+                    EH_STORE4_ROWS(U, cu);
+                    EH_STORE4_ROWS(V, cv);
+                }
+                else {
+#define EH_STORE_UV_BLEND4(POS) do { \
+                    uint8_t tu__ = eh_blend_u8_q8(cu, old_u[(POS)], uv_tension_q); \
+                    uint8_t tv__ = eh_blend_u8_q8(cv, old_v[(POS)], uv_tension_q); \
+                    next_u[(POS)] = tu__; next_v[(POS)] = tv__; U[(POS)] = tu__; V[(POS)] = tv__; \
+                } while (0)
+                    EH_STORE_UV_BLEND4(pos00);
+                    EH_STORE_UV_BLEND4(pos00 + 1);
+                    EH_STORE_UV_BLEND4(pos00 + 2);
+                    EH_STORE_UV_BLEND4(pos00 + 3);
+                    EH_STORE_UV_BLEND4(pos00 + w);
+                    EH_STORE_UV_BLEND4(pos00 + w + 1);
+                    EH_STORE_UV_BLEND4(pos00 + w + 2);
+                    EH_STORE_UV_BLEND4(pos00 + w + 3);
+                    EH_STORE_UV_BLEND4(pos00 + w + w);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + 1);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + 2);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + 3);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + w);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + w + 1);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + w + 2);
+                    EH_STORE_UV_BLEND4(pos00 + w + w + w + 3);
+#undef EH_STORE_UV_BLEND4
+                }
+                EH_STORE4_ROWS(nx_on, master_on);
+                EH_STORE4_ROWS(nx_off, master_off);
+                EH_STORE4_ROWS(nx_veil, master_veil);
+#undef EH_STORE4_ROWS
+                return;
+            }
 
-                display_q = paint_q + display_add_q;
-                if (display_q < display_floor_q)
-                    display_q += ((display_floor_q - display_q) * 389) >> 10;
+            if (bw == 2 && bh == 2 && x_inside && sy0 >= 0 && sy0 + 2 <= h) {
+                int sample0 = sy0 * w + sx0;
+#define EH_FAST_PIXEL2(POS, SAMPLE, SLAVE) do { \
+                    int adv_y__ = old_y[(SAMPLE)]; \
+                    if (tension_q > 0) { int coh_y__ = tension_safe ? eh_cross5_y(old_y, (POS), w) : (int) old_y[(POS)]; adv_y__ = (adv_y__ * inv_tension_q + coh_y__ * tension_q + 512) >> 10; } \
+                    adv_y__ = eh_escape_smooth_y(adv_y__, escape_ref_y, escape_thresh, escape_q); \
+                    int src_yy__ = e->tone_lut[src_y[(POS)]]; \
+                    int paint_q__ = adv_y__ * adv_q + src_yy__ * src_q + paint_add_q; \
+                    int floor_q__ = floor_const_q + src_yy__ * floor_src_q + adv_y__ * floor_adv_q; \
+                    int display_q__; \
+                    if (paint_q__ < floor_q__) paint_q__ += ((floor_q__ - paint_q__) * floor_blend_q) >> 10; \
+                    display_q__ = paint_q__ + display_add_q; \
+                    if (display_q__ < display_floor_q) display_q__ += ((display_floor_q - display_q__) * 389) >> 10; \
+                    next_y[(POS)] = eh_u8i((paint_q__ + 512) >> 10); \
+                    Y[(POS)] = eh_u8i((display_q__ + 512) >> 10); \
+                    if (SLAVE) { \
+                        uint8_t cyv__ = src_y[(POS)]; \
+                        uint8_t rf__ = ref_y[(POS)]; \
+                        int d__ = eh_absi((int) cyv__ - (int) prev_y[(POS)]); \
+                        int a__ = e->slave_blend_lut[d__]; \
+                        ref_y[(POS)] = eh_blend_u8(rf__, cyv__, a__); \
+                        prev_y[(POS)] = cyv__; \
+                    } \
+                } while (0)
+                EH_FAST_PIXEL2(pos00, sample0, 0);
+                EH_FAST_PIXEL2(pos00 + 1, sample0 + 1, 1);
+                EH_FAST_PIXEL2(pos00 + w, sample0 + w, 1);
+                EH_FAST_PIXEL2(pos00 + w + 1, sample0 + w + 1, 1);
+#undef EH_FAST_PIXEL2
+#define EH_STORE2_ROWS(PLANE, VAL) do { \
+                    uint8_t v__ = (uint8_t) (VAL); \
+                    eh_store2_u8((PLANE) + pos00, v__); \
+                    eh_store2_u8((PLANE) + pos00 + w, v__); \
+                } while (0)
+                if (uv_tension_q == 0) {
+                    EH_STORE2_ROWS(next_u, cu);
+                    EH_STORE2_ROWS(next_v, cv);
+                    EH_STORE2_ROWS(U, cu);
+                    EH_STORE2_ROWS(V, cv);
+                }
+                else {
+#define EH_STORE_UV_BLEND2(POS) do { \
+                    uint8_t tu__ = eh_blend_u8_q8(cu, old_u[(POS)], uv_tension_q); \
+                    uint8_t tv__ = eh_blend_u8_q8(cv, old_v[(POS)], uv_tension_q); \
+                    next_u[(POS)] = tu__; next_v[(POS)] = tv__; U[(POS)] = tu__; V[(POS)] = tv__; \
+                } while (0)
+                    EH_STORE_UV_BLEND2(pos00);
+                    EH_STORE_UV_BLEND2(pos00 + 1);
+                    EH_STORE_UV_BLEND2(pos00 + w);
+                    EH_STORE_UV_BLEND2(pos00 + w + 1);
+#undef EH_STORE_UV_BLEND2
+                }
+                EH_STORE2_ROWS(nx_on, master_on);
+                EH_STORE2_ROWS(nx_off, master_off);
+                EH_STORE2_ROWS(nx_veil, master_veil);
+#undef EH_STORE2_ROWS
+                return;
+            }
 
-                next_y[pos] = eh_u8i((paint_q + 512) >> 10);
-                Y[pos] = eh_u8i((display_q + 512) >> 10);
+            for (yy = 0; yy < bh; yy++) {
+                int row = pos00 + yy * w;
+                int iy = sy0 + yy;
+                int src_row;
 
-                if (pos != pos00) {
-                    uint8_t cyv = src_y[pos];
-                    uint8_t rf = ref_y[pos];
-                    int d = eh_absi((int) cyv - (int) prev_y[pos]);
-                    int a = e->slave_blend_lut[d];
-                    nx_on[pos] = (uint8_t) master_on;
-                    nx_off[pos] = (uint8_t) master_off;
-                    nx_veil[pos] = (uint8_t) master_veil;
-                    ref_y[pos] = eh_blend_u8(rf, cyv, a);
-                    prev_y[pos] = cyv;
-                    if (uv_tension_q > 0) {
-                        uint8_t tu = eh_blend_u8_q8(cu, old_u[pos], uv_tension_q);
-                        uint8_t tv = eh_blend_u8_q8(cv, old_v[pos], uv_tension_q);
-                        next_u[pos] = tu;
-                        next_v[pos] = tv;
-                        U[pos] = tu;
-                        V[pos] = tv;
-                    } else {
-                        next_u[pos] = cu;
-                        next_v[pos] = cv;
-                        U[pos] = cu;
-                        V[pos] = cv;
+                if (iy < 0)
+                    iy = 0;
+                else if (iy >= h)
+                    iy = h - 1;
+
+                src_row = iy * w;
+
+                if (x_inside) {
+                    int sample = src_row + sx0;
+                    for (xx = 0; xx < bw; xx++) {
+                        int pos = row + xx;
+                        int adv_y = old_y[sample + xx];
+                        if (tension_q > 0) {
+                            int coh_y = tension_safe ? eh_cross5_y(old_y, pos, w) : (int) old_y[pos];
+                            adv_y = (adv_y * inv_tension_q + coh_y * tension_q + 512) >> 10;
+                        }
+                        adv_y = eh_escape_smooth_y(adv_y, escape_ref_y, escape_thresh, escape_q);
+                        int src_yy = e->tone_lut[src_y[pos]];
+                        int paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
+                        int floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
+                        int display_q;
+
+                        if (paint_q < floor_q)
+                            paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
+
+                        display_q = paint_q + display_add_q;
+                        if (display_q < display_floor_q)
+                            display_q += ((display_floor_q - display_q) * 389) >> 10;
+
+                        next_y[pos] = eh_u8i((paint_q + 512) >> 10);
+                        Y[pos] = eh_u8i((display_q + 512) >> 10);
+
+                        if (pos != pos00) {
+                            uint8_t cyv = src_y[pos];
+                            uint8_t rf = ref_y[pos];
+                            int d = eh_absi((int) cyv - (int) prev_y[pos]);
+                            int a = e->slave_blend_lut[d];
+                            nx_on[pos] = (uint8_t) master_on;
+                            nx_off[pos] = (uint8_t) master_off;
+                            nx_veil[pos] = (uint8_t) master_veil;
+                            ref_y[pos] = eh_blend_u8(rf, cyv, a);
+                            prev_y[pos] = cyv;
+                            if (uv_tension_q > 0) {
+                                uint8_t tu = eh_blend_u8_q8(cu, old_u[pos], uv_tension_q);
+                                uint8_t tv = eh_blend_u8_q8(cv, old_v[pos], uv_tension_q);
+                                next_u[pos] = tu;
+                                next_v[pos] = tv;
+                                U[pos] = tu;
+                                V[pos] = tv;
+                            }
+                            else {
+                                next_u[pos] = cu;
+                                next_v[pos] = cv;
+                                U[pos] = cu;
+                                V[pos] = cv;
+                            }
+                        }
                     }
                 }
-            }
-        } else {
-            for (xx = 0; xx < bw; xx++) {
-                int pos = row + xx;
-                int ix = sx0 + xx;
-                int adv_y;
-                int src_yy;
-                int paint_q;
-                int floor_q;
-                int display_q;
+                else {
+                    for (xx = 0; xx < bw; xx++) {
+                        int pos = row + xx;
+                        int ix = sx0 + xx;
+                        int adv_y;
+                        int src_yy;
+                        int paint_q;
+                        int floor_q;
+                        int display_q;
 
-                if (ix < 0) ix = 0;
-                else if (ix >= w) ix = w - 1;
+                        if (ix < 0)
+                            ix = 0;
+                        else if (ix >= w)
+                            ix = w - 1;
 
-                adv_y = old_y[src_row + ix];
-                if (tension_q > 0) {
-                    int coh_y = tension_safe ? eh_cross5_y(old_y, pos, w) : (int) old_y[pos];
-                    adv_y = (adv_y * inv_tension_q + coh_y * tension_q + 512) >> 10;
-                }
-                adv_y = eh_escape_smooth_y(adv_y, escape_ref_y, escape_thresh, escape_q);
-                src_yy = e->tone_lut[src_y[pos]];
-                paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
-                floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
+                        adv_y = old_y[src_row + ix];
+                        if (tension_q > 0) {
+                            int coh_y = tension_safe ? eh_cross5_y(old_y, pos, w) : (int) old_y[pos];
+                            adv_y = (adv_y * inv_tension_q + coh_y * tension_q + 512) >> 10;
+                        }
+                        src_yy = e->tone_lut[src_y[pos]];
+                        paint_q = adv_y * adv_q + src_yy * src_q + paint_add_q;
+                        floor_q = floor_const_q + src_yy * floor_src_q + adv_y * floor_adv_q;
 
-                if (paint_q < floor_q)
-                    paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
+                        if (paint_q < floor_q)
+                            paint_q += ((floor_q - paint_q) * floor_blend_q) >> 10;
 
-                display_q = paint_q + display_add_q;
-                if (display_q < display_floor_q)
-                    display_q += ((display_floor_q - display_q) * 389) >> 10;
+                        display_q = paint_q + display_add_q;
+                        if (display_q < display_floor_q)
+                            display_q += ((display_floor_q - display_q) * 389) >> 10;
 
-                next_y[pos] = eh_u8i((paint_q + 512) >> 10);
-                Y[pos] = eh_u8i((display_q + 512) >> 10);
+                        next_y[pos] = eh_u8i((paint_q + 512) >> 10);
+                        Y[pos] = eh_u8i((display_q + 512) >> 10);
 
-                if (pos != pos00) {
-                    uint8_t cyv = src_y[pos];
-                    uint8_t rf = ref_y[pos];
-                    int d = eh_absi((int) cyv - (int) prev_y[pos]);
-                    int a = e->slave_blend_lut[d];
-                    nx_on[pos] = (uint8_t) master_on;
-                    nx_off[pos] = (uint8_t) master_off;
-                    nx_veil[pos] = (uint8_t) master_veil;
-                    ref_y[pos] = eh_blend_u8(rf, cyv, a);
-                    prev_y[pos] = cyv;
-                    if (uv_tension_q > 0) {
-                        uint8_t tu = eh_blend_u8_q8(cu, old_u[pos], uv_tension_q);
-                        uint8_t tv = eh_blend_u8_q8(cv, old_v[pos], uv_tension_q);
-                        next_u[pos] = tu;
-                        next_v[pos] = tv;
-                        U[pos] = tu;
-                        V[pos] = tv;
-                    } else {
-                        next_u[pos] = cu;
-                        next_v[pos] = cv;
-                        U[pos] = cu;
-                        V[pos] = cv;
+                        if (pos != pos00) {
+                            uint8_t cyv = src_y[pos];
+                            uint8_t rf = ref_y[pos];
+                            int d = eh_absi((int) cyv - (int) prev_y[pos]);
+                            int a = e->slave_blend_lut[d];
+                            nx_on[pos] = (uint8_t) master_on;
+                            nx_off[pos] = (uint8_t) master_off;
+                            nx_veil[pos] = (uint8_t) master_veil;
+                            ref_y[pos] = eh_blend_u8(rf, cyv, a);
+                            prev_y[pos] = cyv;
+                            if (uv_tension_q > 0) {
+                                uint8_t tu = eh_blend_u8_q8(cu, old_u[pos], uv_tension_q);
+                                uint8_t tv = eh_blend_u8_q8(cv, old_v[pos], uv_tension_q);
+                                next_u[pos] = tu;
+                                next_v[pos] = tv;
+                                U[pos] = tu;
+                                V[pos] = tv;
+                            }
+                            else {
+                                next_u[pos] = cu;
+                                next_v[pos] = cv;
+                                U[pos] = cu;
+                                V[pos] = cv;
+                            }
+                        }
                     }
                 }
             }
         }
     }
 }
-
 
 static inline __attribute__((always_inline)) void eh_process_light_tile(eventhorizon_t *e,
                                          uint8_t *restrict Y,
@@ -2521,166 +2654,259 @@ static inline __attribute__((always_inline)) void eh_process_light_tile(eventhor
                            nx_veil[pos00], nx_on[pos00], nx_off[pos00], nx_veil[pos00], drop_cohesion, use_bilinear);
 }
 
-
 void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
 {
     eventhorizon_t *e = (eventhorizon_t *) ptr;
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
-    
-    int w = e->w;
-    int h = e->h;
-    int len = e->len;
+    uint8_t *restrict Y;
+    uint8_t *restrict U;
+    uint8_t *restrict V;
+    uint8_t *restrict src_y;
+    uint8_t *restrict old_y;
+    uint8_t *restrict old_u;
+    uint8_t *restrict old_v;
+    uint8_t *restrict next_y;
+    uint8_t *restrict next_u;
+    uint8_t *restrict next_v;
+    uint8_t *restrict prev_y;
+    uint8_t *restrict ref_y;
+    uint8_t *restrict on_y;
+    uint8_t *restrict off_y;
+    uint8_t *restrict veil;
+    uint8_t *restrict nx_on;
+    uint8_t *restrict nx_off;
+    uint8_t *restrict nx_veil;
+    int w;
+    int h;
+    int len;
+    int build_i;
+    int source_i;
+    int flow_i;
+    int swirl_i;
+    int smoke_i;
+    int decay_i;
+    int density_i;
+    int lens_i;
+    int folds_i;
+    int spin_i;
+    int trail_i;
+    int chroma_i;
+    int speed_i;
+    float build_t;
+    float source_t;
+    float flow_t;
+    float swirl_t;
+    float smoke_t;
+    float density_t;
+    float lens_t;
+    float fold_t;
+    float trail_t;
+    float chroma_t;
+    float speed_signed;
+    float speed_mag;
+    float motion_scale;
+    float mature_rate;
+    float src_mix;
+    float chroma_src_mix;
+    float chroma_gain;
+    float flow_pixels;
+    float fluid_pixels;
+    float fluid_persistence;
+    float lens_curve;
+    float gravity_gain;
+    float vortex_gain;
+    float ring_scale;
+    float shadow_scale;
+    float redshift_scale;
+    float wave_s;
+    float wave_c;
+    float spin_f;
+    float spin_abs;
+    float spin_drive;
+    float cy;
+    float inv_cy;
+    float half_x_step;
+    float half_y_step;
+    int tone_mix;
+    int rise_step;
+    int flow_cell;
+    int force_cell;
+    int qrows;
+    int qcols;
+    int qy;
+    int i;
 
-    /* 1. ALL THREADS READ ARGUMENTS UNIFORMLY */
-    int build_i = args[P_BUILD];
-    int source_i = args[P_SOURCE];
-    int flow_i = args[P_FLOW];
-    int swirl_i = args[P_SWIRL];
-    int smoke_i = args[P_SMOKE];
-    int decay_i = args[P_DECAY];
-    int density_i = args[P_DENSITY];
-    int lens_i = args[P_LENS];
-    int folds_i = args[P_FOLDS];
-    int spin_i = args[P_SPIN];
-    int trail_i = args[P_TRAIL];
-    int chroma_i = args[P_CHROMA];
-    int speed_i = args[P_SPEED];
+    w = frame->width;
+    h = frame->height;
+    len = w * h;
 
-    /* 2. ALL THREADS COMPUTE LOCAL MATH TO AVOID FPU DIVERGENCE */
-    float build_t = (float) build_i * 0.01f;
-    float source_t = (float) source_i * 0.01f;
-    float flow_t = (float) flow_i * 0.01f;
-    float swirl_t = (float) swirl_i * 0.01f;
-    float smoke_t = (float) smoke_i * 0.01f;
-    float density_t = (float) density_i * 0.01f;
-    float lens_t = (float) lens_i * 0.01f;
-    float fold_t = (float) folds_i * 0.01f;
-    float trail_t = (float) trail_i * 0.01f;
-    float chroma_t = (float) chroma_i * 0.01f;
-    float speed_signed = (float) speed_i * 0.01f;
-    float speed_mag = eh_absf(speed_signed);
-    float motion_scale = 0.006f + speed_mag * 0.18f + speed_mag * speed_mag * 1.85f;
-    if (speed_i == 0)
-        motion_scale = 0.0f;
+    Y = frame->data[0];
+    U = frame->data[1];
+    V = frame->data[2];
 
-    float mature_rate = 0.0005f + build_t * build_t * 0.0500f;
-    
-    /* Peek at the current maturity safely */
-    float current_maturity = e->maturity + (1.0f - e->maturity) * mature_rate;
-    if (current_maturity > 1.0f) current_maturity = 1.0f;
-
-    float src_mix = eh_lerpf(0.0008f + source_t * 0.035f + source_t * source_t * 0.185f,
-                             0.0006f + source_t * 0.018f + source_t * source_t * 0.092f,
-                             current_maturity);
-    src_mix *= 1.0f - trail_t * 0.68f;
-    src_mix = eh_clampf(src_mix, 0.0007f, 0.28f);
-
-    float chroma_src_mix = src_mix + 0.0020f + source_t * 0.045f + (1.0f - trail_t) * 0.006f;
-    chroma_src_mix = eh_clampf(chroma_src_mix, 0.0020f, 0.30f);
-    float chroma_gain = 0.982f + chroma_t * 0.022f + chroma_t * chroma_t * 0.118f;
-    
-    float flow_pixels = (0.35f + current_maturity * 1.18f) * (0.55f + flow_t * 3.50f + flow_t * flow_t * 14.5f) * (0.60f + speed_mag * 0.82f);
-    float fluid_pixels = (1.10f + current_maturity * 1.28f) * (0.70f + flow_t * 3.20f + flow_t * flow_t * 18.0f) * (0.66f + speed_mag * 1.02f);
-    float fluid_persistence = 0.78f + trail_t * 0.16f - flow_t * 0.050f;
-    fluid_persistence = eh_clampf(fluid_persistence, 0.64f, 0.970f);
-
-    float lens_curve = eh_smooth01(lens_t);
-    float spin_f = (float) spin_i * 0.01f;
-    float spin_abs = eh_absf(spin_f);
-    float gravity_gain = lens_curve * (12.0f + lens_curve * 88.0f + flow_t * 20.0f);
-    float vortex_gain = lens_curve * (2.0f + swirl_t * 32.0f + fold_t * 16.0f) * (0.22f + spin_abs * 1.80f);
-    if (spin_i < 0) vortex_gain = -vortex_gain;
-
-    float spin_drive = spin_f * lens_curve * (0.34f + spin_abs * 1.05f) * (0.70f + swirl_t * 1.85f + flow_t * 0.72f) * (0.70f + motion_scale * 0.30f);
-    float ring_scale = (3.0f + density_t * 7.0f + fold_t * 18.0f + e->pal_gain * 5.5f) * lens_curve;
-    float shadow_scale = (12.0f + lens_curve * 26.0f + density_t * 9.0f) * lens_curve;
-    float redshift_scale = (12.0f + lens_curve * 24.0f + density_t * 10.0f) * lens_curve;
-
-    float cy = (float) h * 0.5f;
-    float inv_cy = 1.0f / cy;
-    float half_x_step = 1.0f / (float) w;
-    float half_y_step = 1.0f / (float) h;
-
-    int tone_mix = (int) (lens_curve * 168.0f + chroma_t * 6.0f + 0.5f);
-    tone_mix = clampi(tone_mix, 0, 255);
-
-    int rise_step = 1 + (flow_i * 3 + 50) / 100;
-    int flow_cell = 52 - (flow_i * 24 + 50) / 100 - (swirl_i * 10 + 50) / 100;
-    if (flow_cell < 12) flow_cell = 12;
-    else if (flow_cell > 72) flow_cell = 72;
-    
-    int force_cell = 22 + ((100 - lens_i) * 18 + 50) / 100 - (flow_i * 8 + 50) / 100 - (swirl_i * 4 + 50) / 100;
-    if (force_cell < 10) force_cell = 10;
-    else if (force_cell > 42) force_cell = 42;
-
-    uint8_t *restrict src_y = e->src_y;
-    uint8_t *restrict old_y = e->paint_y;
-    uint8_t *restrict old_u = e->paint_u;
-    uint8_t *restrict old_v = e->paint_v;
-    uint8_t *restrict next_y = e->next_y;
-    uint8_t *restrict next_u = e->next_u;
-    uint8_t *restrict next_v = e->next_v;
-    uint8_t *restrict prev_y = e->prev_y;
-    uint8_t *restrict ref_y = e->ref_y;
-    uint8_t *restrict on_y = e->on_y;
-    uint8_t *restrict off_y = e->off_y;
-    uint8_t *restrict veil = e->veil;
-    uint8_t *restrict nx_on = e->nx_on_y;
-    uint8_t *restrict nx_off = e->nx_off_y;
-    uint8_t *restrict nx_veil = e->nx_veil;
-
-    #pragma omp for schedule(static)
-    for (int i = 0; i < len; i++) {
-        src_y[i] = Y[i];
-    }
-
-    #pragma omp single
+ #pragma omp single
     {
         if (!e->seeded)
             eh_seed(e, frame);
+    }
 
-        eh_build_luts(e, smoke_i, decay_i, density_i, flow_i, lens_i);
+    build_i = args[P_BUILD];
+    source_i = args[P_SOURCE];
+    flow_i = args[P_FLOW];
+    swirl_i = args[P_SWIRL];
+    smoke_i = args[P_SMOKE];
+    decay_i = args[P_DECAY];
+    density_i = args[P_DENSITY];
+    lens_i = args[P_LENS];
+    folds_i = args[P_FOLDS];
+    spin_i = args[P_SPIN];
+    trail_i = args[P_TRAIL];
+    chroma_i = args[P_CHROMA];
+    speed_i = args[P_SPEED];
 
-        e->maturity = current_maturity;
-        eh_update_palette(e, chroma_t);
+    build_t = (float) build_i * 0.01f;
+    source_t = (float) source_i * 0.01f;
+    flow_t = (float) flow_i * 0.01f;
+    swirl_t = (float) swirl_i * 0.01f;
+    smoke_t = (float) smoke_i * 0.01f;
+    density_t = (float) density_i * 0.01f;
+    lens_t = (float) lens_i * 0.01f;
+    fold_t = (float) folds_i * 0.01f;
+    trail_t = (float) trail_i * 0.01f;
+    chroma_t = (float) chroma_i * 0.01f;
+    speed_signed = (float) speed_i * 0.01f;
+    speed_mag = eh_absf(speed_signed);
+    motion_scale = 0.006f + speed_mag * 0.18f + speed_mag * speed_mag * 1.85f;
+    if (speed_i == 0)
+        motion_scale = 0.0f;
 
+ #pragma omp single
+     {
+         eh_build_luts(e, smoke_i, decay_i, density_i, flow_i, lens_i);
+     }
+
+    mature_rate = 0.0005f + build_t * build_t * 0.0500f;
+ #pragma omp single
+    {
+        e->maturity += (1.0f - e->maturity) * mature_rate;
+        if (e->maturity > 1.0f)
+            e->maturity = 1.0f;
+    }
+
+    src_mix = eh_lerpf(0.0008f + source_t * 0.035f + source_t * source_t * 0.185f,
+                       0.0006f + source_t * 0.018f + source_t * source_t * 0.092f,
+                       e->maturity);
+    src_mix *= 1.0f - trail_t * 0.68f;
+    src_mix = eh_clampf(src_mix, 0.0007f, 0.28f);
+
+    chroma_src_mix = src_mix + 0.0020f + source_t * 0.045f + (1.0f - trail_t) * 0.006f;
+    chroma_src_mix = eh_clampf(chroma_src_mix, 0.0020f, 0.30f);
+    chroma_gain = 0.982f + chroma_t * 0.022f + chroma_t * chroma_t * 0.118f;
+ #pragma omp single
+     {
+         eh_update_palette(e, chroma_t);
+     }
+
+    lens_curve = eh_smooth01(lens_t);
+    flow_pixels = (0.35f + e->maturity * 1.18f) * (0.55f + flow_t * 3.50f + flow_t * flow_t * 14.5f) * (0.60f + speed_mag * 0.82f);
+    fluid_pixels = (1.10f + e->maturity * 1.28f) * (0.70f + flow_t * 3.20f + flow_t * flow_t * 18.0f) * (0.66f + speed_mag * 1.02f);
+    fluid_persistence = 0.78f + trail_t * 0.16f - flow_t * 0.050f;
+    fluid_persistence = eh_clampf(fluid_persistence, 0.64f, 0.970f);
+
+    spin_f = (float) spin_i * 0.01f;
+    spin_abs = eh_absf(spin_f);
+    gravity_gain = lens_curve * (12.0f + lens_curve * 88.0f + flow_t * 20.0f);
+    vortex_gain = lens_curve * (2.0f + swirl_t * 32.0f + fold_t * 16.0f) * (0.22f + spin_abs * 1.80f);
+    if (spin_i < 0)
+        vortex_gain = -vortex_gain;
+
+    spin_drive = spin_f * lens_curve * (0.34f + spin_abs * 1.05f) * (0.70f + swirl_t * 1.85f + flow_t * 0.72f) * (0.70f + motion_scale * 0.30f);
+
+    ring_scale = (3.0f + density_t * 7.0f + fold_t * 18.0f + e->pal_gain * 5.5f) * lens_curve;
+    shadow_scale = (12.0f + lens_curve * 26.0f + density_t * 9.0f) * lens_curve;
+    redshift_scale = (12.0f + lens_curve * 24.0f + density_t * 10.0f) * lens_curve;
+
+ #pragma omp single
+    {
         e->time = eh_wrap_2pi(e->time + (0.0011f + flow_t * 0.0110f + spin_abs * 0.0040f) * motion_scale);
         e->orbit = eh_wrap_2pi(e->orbit + (0.0022f + lens_curve * 0.0080f + fold_t * 0.0120f) * motion_scale * (speed_i < 0 ? -1.0f : 1.0f));
         e->spin_phase1 = eh_wrap_2pi(e->spin_phase1 + (0.009f + spin_abs * 0.090f + lens_curve * 0.018f) * motion_scale * (spin_i < 0 ? -1.0f : 1.0f));
         e->spin_phase2 = eh_wrap_2pi(e->spin_phase2 - (0.008f + spin_abs * 0.078f + lens_curve * 0.016f) * motion_scale * (spin_i < 0 ? -1.0f : 1.0f));
         e->pulse = e->pulse * 0.95f + (eh_lut_sin(e, e->time * 0.73f) * 0.5f + 0.5f) * lens_curve * flow_t * 0.010f;
+    }
 
-        if (!e->tone_lut_valid || e->last_tone_mix != tone_mix) {
-            for (int i = 0; i < 256; i++) {
-                int g = e->gamma_lut[i];
-                e->tone_lut[i] = eh_u8i(i + (((g - i) * tone_mix + 127) / 255));
-            }
-            e->last_tone_mix = tone_mix;
-            e->tone_lut_valid = 1;
-        }
+    eh_lut_sincos(e, e->spin_phase1 + e->orbit, &wave_s, &wave_c);
 
-        eh_build_flow_grid(e, flow_cell, fluid_persistence);
+    cy = (float) h * 0.5f;
+    inv_cy = 1.0f / cy;
+    half_x_step = 1.0f / (float) w;
+    half_y_step = 1.0f / (float) h;
+
+    tone_mix = (int) (lens_curve * 168.0f + chroma_t * 6.0f + 0.5f);
+    tone_mix = clampi(tone_mix, 0, 255);
+ #pragma omp single
+     {
+         if (!e->tone_lut_valid || e->last_tone_mix != tone_mix) {
+             for (i = 0; i < 256; i++) {
+                 int g = e->gamma_lut[i];
+                 e->tone_lut[i] = eh_u8i(i + (((g - i) * tone_mix + 127) / 255));
+             }
+             e->last_tone_mix = tone_mix;
+             e->tone_lut_valid = 1;
+         }
+     }
+
+    rise_step = 1 + (flow_i * 3 + 50) / 100;
+    flow_cell = 52 - (flow_i * 24 + 50) / 100 - (swirl_i * 10 + 50) / 100;
+    if (flow_cell < 12)
+        flow_cell = 12;
+    else if (flow_cell > 72)
+        flow_cell = 72;
+ #pragma omp single
+     {
+         eh_build_flow_grid(e, flow_cell, fluid_persistence);
+     }
+
+    force_cell = 22 + ((100 - lens_i) * 18 + 50) / 100 - (flow_i * 8 + 50) / 100 - (swirl_i * 4 + 50) / 100;
+    if (force_cell < 10)
+        force_cell = 10;
+    else if (force_cell > 42)
+        force_cell = 42;
+
+    src_y = e->src_y;
+    old_y = e->paint_y;
+    old_u = e->paint_u;
+    old_v = e->paint_v;
+    next_y = e->next_y;
+    next_u = e->next_u;
+    next_v = e->next_v;
+    prev_y = e->prev_y;
+    ref_y = e->ref_y;
+    on_y = e->on_y;
+    off_y = e->off_y;
+    veil = e->veil;
+    nx_on = e->nx_on_y;
+    nx_off = e->nx_off_y;
+    nx_veil = e->nx_veil;
+
+ #pragma omp single
+     {
+        veejay_memcpy(src_y, Y, len);
         eh_build_light_force_grid(e, src_y, prev_y, force_cell, gravity_gain, vortex_gain,
                                   lens_curve, flow_t, motion_scale,
                                   0.24f + trail_t * 0.34f);
         if ((e->frame & 1) == 0 || e->drop_w != e->force_w || e->drop_h != e->force_h || e->drop_cell != force_cell)
             eh_update_drop_field(e, force_cell, lens_curve, flow_t, smoke_t, density_t, trail_t, motion_scale);
     }
-    
-    float wave_s;
-    float wave_c;
-    eh_lut_sincos(e, e->spin_phase1 + e->orbit, &wave_s, &wave_c);
 
-    int qcols = (w + 7) >> 3;
-    int qrows = (h + 7) >> 3;
+    qcols = (w + 7) >> 3;
+    qrows = (h + 7) >> 3;
 
-    #pragma omp for schedule(static)
-    for (int qy = 0; qy < qrows; qy++) {
+#pragma omp for schedule(static)
+    for (qy = 0; qy < qrows; qy++) {
         int yy = qy << 3;
+        int qx;
 
-        for (int qx = 0; qx < qcols; qx++) {
+        for (qx = 0; qx < qcols; qx++) {
             int xx = qx << 3;
             int bw = (xx + 8 <= w) ? 8 : (w - xx);
             int bh = (yy + 8 <= h) ? 8 : (h - yy);
@@ -2700,9 +2926,11 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
             }
 
             if (tile_detail > 56 || bw < 4 || bh < 4) {
-                for (int sy = 0; sy < bh; sy += 2) {
+                int sy;
+                for (sy = 0; sy < bh; sy += 2) {
+                    int sx;
                     int sh = (sy + 2 <= bh) ? 2 : (bh - sy);
-                    for (int sx = 0; sx < bw; sx += 2) {
+                    for (sx = 0; sx < bw; sx += 2) {
                         int sw = (sx + 2 <= bw) ? 2 : (bw - sx);
                         eh_process_light_tile(e, Y, U, V, src_y, old_y, old_u, old_v,
                                               next_y, next_u, next_v, prev_y, ref_y,
@@ -2719,9 +2947,11 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
             else if (dark_protect && bw >= 4 && bh >= 4) {
-                for (int sy = 0; sy < bh; sy += 4) {
+                int sy;
+                for (sy = 0; sy < bh; sy += 4) {
+                    int sx;
                     int sh = (sy + 4 <= bh) ? 4 : (bh - sy);
-                    for (int sx = 0; sx < bw; sx += 4) {
+                    for (sx = 0; sx < bw; sx += 4) {
                         int sw = (sx + 4 <= bw) ? 4 : (bw - sx);
                         eh_process_light_tile(e, Y, U, V, src_y, old_y, old_u, old_v,
                                               next_y, next_u, next_v, prev_y, ref_y,
@@ -2753,7 +2983,7 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
+ #pragma omp single
     {
         uint8_t *tmp;
         tmp = e->paint_y; e->paint_y = e->next_y; e->next_y = tmp;
@@ -2762,7 +2992,6 @@ void eventhorizon_apply(void *ptr, VJFrame *frame, int *args)
         tmp = e->on_y; e->on_y = e->nx_on_y; e->nx_on_y = tmp;
         tmp = e->off_y; e->off_y = e->nx_off_y; e->nx_off_y = tmp;
         tmp = e->veil; e->veil = e->nx_veil; e->nx_veil = tmp;
-
-        e->frame++;
-    }
+         e->frame++;
+     }
 }

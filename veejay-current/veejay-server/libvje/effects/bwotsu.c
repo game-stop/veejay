@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2016-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,20 +20,15 @@
 
 #include "common.h"
 #include "bwotsu.h"
-#include <veejaycore/vjmem.h>
 
 vj_effect *bwotsu_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    
 
     ve->limits[0][0] = 0; ve->limits[1][0] = 1;    ve->defaults[0] = 0;
     ve->limits[0][1] = 0; ve->limits[1][1] = 0xff; ve->defaults[1] = 0xff;
@@ -53,21 +48,17 @@ vj_effect *bwotsu_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
 void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
 {
     (void) ptr;
-
     int mode = args[0];
     const int skew = args[1];
     const int invert = args[2];
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -77,44 +68,63 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
     if(mode == 1 && !A)
         mode = 0;
 
+    uint32_t histogram[256] = { 0 };
+    uint32_t threshold = 0;
+    const int use_lookup = skew != 0xff;
+    uint8_t lookup[256];
+
+    if(use_lookup)
+        __init_lookup_table(lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew);
+
     const uint8_t low = invert ? 0xff : 0x00;
     const uint8_t high = invert ? 0x00 : 0xff;
 
-    uint32_t threshold = 0;
-
-    #pragma omp single copyprivate(threshold)
-    {
-        uint32_t histogram[256] = { 0 };
-        const int use_lookup = (skew != 0xff);
-        
-        int lookup[256];
-
-        if(use_lookup)
-            __init_lookup_table(lookup, 256, 0.0f, 255.0f, 0.0f, (float)skew);
-
+    if(use_lookup) {
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
-            const uint8_t y = use_lookup ? (uint8_t)lookup[Y[i]] : Y[i];
+            const uint8_t y = lookup[Y[i]];
+#pragma omp atomic update
             histogram[y]++;
         }
-
-        threshold = otsu_method(histogram);
+    }
+    else {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t y = Y[i];
+#pragma omp atomic update
+            histogram[y]++;
+        }
     }
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        const uint8_t cond = Y[i] >= threshold;
+#pragma omp single
+    threshold = otsu_method(histogram);
 
-        if(mode == 0)
+    if(mode == 0) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t cond = Y[i] >= threshold;
             Y[i] = (cond * high) | ((1 - cond) * low);
-        else
+        }
+    }
+    else {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const uint8_t cond = Y[i] >= threshold;
             A[i] = (cond * high) | ((1 - cond) * low);
+        }
     }
 
     if(mode == 0) {
-        #pragma omp single
+#pragma omp sections
         {
-            if(Cb) veejay_memset(Cb, 128, (size_t)uv_len);
-            if(Cr) veejay_memset(Cr, 128, (size_t)uv_len);
+#pragma omp section
+            {
+                veejay_memset(Cb, 128, uv_len);
+            }
+#pragma omp section
+            {
+                veejay_memset(Cr, 128, uv_len);
+            }
         }
     }
 }

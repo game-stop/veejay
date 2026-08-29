@@ -39,6 +39,7 @@ vj_effect *blackreplace_init(int w, int h)
     ve->description = "Replace Black with Color (Darkness Key)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
+    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Softness", "Red", "Green", "Blue");
 
@@ -56,6 +57,28 @@ vj_effect *blackreplace_init(int w, int h)
     return ve;
 }
 
+typedef struct {
+} blackreplace_t;
+
+void *blackreplace_malloc(int w, int h)
+{
+    blackreplace_t *br = (blackreplace_t*) vj_calloc(sizeof(blackreplace_t));
+
+    if(!br)
+        return NULL;
+
+
+    return br;
+}
+
+void blackreplace_free(void *ptr)
+{
+    blackreplace_t *br = (blackreplace_t*) ptr;
+
+    if(br)
+        free(br);
+}
+
 static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 {
     return (uint8_t)((a * (255 - t) + b * t) >> 8);
@@ -63,6 +86,8 @@ static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 
 void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
 {
+    blackreplace_t *br = (blackreplace_t*) ptr;
+
     const int threshold = args[0];
     const int softness = args[1];
     const int red = args[2];
@@ -117,5 +142,4 @@ void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
         Cb[i] = blend_u8((uint8_t)cb, (uint8_t)colorCb, t);
         Cr[i] = blend_u8((uint8_t)cr, (uint8_t)colorCr, t);
     }
-    
 }

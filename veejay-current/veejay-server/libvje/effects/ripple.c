@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -64,18 +64,7 @@ typedef struct {
     float sm_phase_drive;
 
     int have_smooth;
-
-    int cached_width;
-    int cached_height;
-    int cached_len;
-    int cached_uv_len;
-    int cached_mix_q8;
-    int cached_chroma_q8;
-    int cached_rebuild;
-    int cached_effective_waves;
-    int cached_effective_ampli;
-    int cached_effective_attn;
-    int cached_effective_phase;
+    int n_threads;
 } ripple_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -98,6 +87,8 @@ static inline uint8_t ripple_mix_u8(uint8_t a, uint8_t b, int q8)
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
 
+
+
 static inline float ripple_smooth_value(float old_v, float target, float amount)
 {
     return old_v + (target - old_v) * amount;
@@ -119,6 +110,17 @@ vj_effect *ripple_init(int width, int height)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_WAVES] = 1;             ve->limits[1][P_WAVES] = 3600;              ve->defaults[P_WAVES] = 132;
     ve->limits[0][P_AMPLITUDE] = 1;         ve->limits[1][P_AMPLITUDE] = 80;            ve->defaults[P_AMPLITUDE] = 47;
@@ -165,10 +167,6 @@ vj_effect *ripple_init(int width, int height)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)width;
-    (void)height;
-
     return ve;
 }
 
@@ -223,9 +221,9 @@ void *ripple_malloc(int width, int height)
     for(int i = 0; i < len; i++)
         r->ripple_table[i] = i;
 
-    veejay_memset(r->ripple_data[0], pixel_Y_lo_, (size_t)len);
-    veejay_memset(r->ripple_data[1], 128, (size_t)len);
-    veejay_memset(r->ripple_data[2], 128, (size_t)len);
+    veejay_memset(r->ripple_data[0], pixel_Y_lo_, len);
+    veejay_memset(r->ripple_data[1], 128, len);
+    veejay_memset(r->ripple_data[2], 128, len);
 
     r->ripple_waves = -1;
     r->ripple_ampli = -1;
@@ -243,6 +241,7 @@ void *ripple_malloc(int width, int height)
     r->sm_attn_drive = 0.0f;
     r->sm_phase_drive = 0.0f;
     r->have_smooth = 0;
+    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -251,11 +250,7 @@ void ripple_free(void *ptr)
 {
     ripple_t *r = (ripple_t*)ptr;
 
-    if(!r)
-        return;
-
-    if(r->block)
-        free(r->block);
+    free(r->block);
     free(r);
 }
 
@@ -273,8 +268,8 @@ static void ripple_build_table(ripple_t *r,
     const float waves = (float)waves_arg * 0.1f;
     const float ampli = (float)amplitude_arg * 0.1f;
     const float attenuation = (float)attenuation_arg * 0.1f;
-    const float frequency = ((float)RIPPLE_DEGREES * waves) / (maxradius > 0.0f ? maxradius : 1.0f);
-    const float amplitude = maxradius / (ampli > 0.0f ? ampli : 1.0f);
+    const float frequency = ((float)RIPPLE_DEGREES * waves) / maxradius;
+    const float amplitude = maxradius / ampli;
 
     int *restrict table = r->ripple_table;
     float *restrict sin_lut = r->ripple_sin;
@@ -298,11 +293,12 @@ static void ripple_build_table(ripple_t *r,
             const float radius = sqrtf(dist2);
             int angle = (int)((atan2f(dy, dx) * 180.0f) / (float)RIPPLE_PI);
 
-            angle = ripple_wrapi(angle, RIPPLE_DEGREES);
+            if(angle < 0)
+                angle += RIPPLE_DEGREES;
 
             const int wave_index = ripple_wrapi((int)(frequency * radius) + phase_arg, RIPPLE_DEGREES);
             const float denom = powf(radius, attenuation);
-            const float z = (amplitude / (denom != 0.0f ? denom : 1.0f)) * sin_lut[wave_index];
+            const float z = (amplitude / denom) * sin_lut[wave_index];
 
             int sx = (int)((float)x + z * cos_lut[angle]);
             int sy = (int)((float)y + z * sin_lut[angle]);
@@ -323,9 +319,15 @@ static void ripple_build_table(ripple_t *r,
     }
 }
 
+
+
 void ripple_apply(void *ptr, VJFrame *frame, int *args)
 {
     ripple_t *r = (ripple_t*)ptr;
+
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
 
     const int waves_arg = args[P_WAVES];
     const int amplitude_arg = args[P_AMPLITUDE];
@@ -338,123 +340,117 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
     const int attn_drive = args[P_ATTENUATION_DRIVE];
     const int phase_drive = args[P_PHASE_DRIVE];
 
-    #pragma omp single
+    const float slow = 0.22f;
+    const float fast = 0.34f;
+
+#pragma omp single
     {
-        r->cached_width = frame->width;
-        r->cached_height = frame->height;
-        r->cached_len = frame->len;
-        r->cached_uv_len = frame->uv_len;
-
-        const float slow = 0.22f;
-        const float fast = 0.34f;
-
-        if(!r->have_smooth) {
-            r->sm_waves = (float)waves_arg;
-            r->sm_ampli = (float)amplitude_arg;
-            r->sm_attn = (float)atten_arg;
-            r->sm_mix = (float)mix_arg;
-            r->sm_chroma = (float)chroma_arg;
-            r->sm_phase = (float)phase_arg;
-            r->sm_waves_drive = (float)waves_drive;
-            r->sm_ampli_drive = (float)ampli_drive;
-            r->sm_attn_drive = (float)attn_drive;
-            r->sm_phase_drive = (float)phase_drive;
-            r->have_smooth = 1;
-        }
-        else {
-            r->sm_waves = ripple_smooth_value(r->sm_waves, (float)waves_arg, slow);
-            r->sm_ampli = ripple_smooth_value(r->sm_ampli, (float)amplitude_arg, slow);
-            r->sm_attn = ripple_smooth_value(r->sm_attn, (float)atten_arg, slow);
-            r->sm_mix = ripple_smooth_value(r->sm_mix, (float)mix_arg, fast);
-            r->sm_chroma = ripple_smooth_value(r->sm_chroma, (float)chroma_arg, fast);
-            r->sm_phase = ripple_smooth_value(r->sm_phase, (float)phase_arg, fast);
-            r->sm_waves_drive = ripple_smooth_value(r->sm_waves_drive, (float)waves_drive, fast);
-            r->sm_ampli_drive = ripple_smooth_value(r->sm_ampli_drive, (float)ampli_drive, fast);
-            r->sm_attn_drive = ripple_smooth_value(r->sm_attn_drive, (float)attn_drive, fast);
-            r->sm_phase_drive = ripple_smooth_value(r->sm_phase_drive, (float)phase_drive, fast);
-        }
-
-        const int base_waves = clampi(ripple_roundi(r->sm_waves), 1, 3600);
-        const int base_ampli = clampi(ripple_roundi(r->sm_ampli), 1, 80);
-        const int base_attn = clampi(ripple_roundi(r->sm_attn), 1, 360);
-
-        const int bw = clampi(ripple_roundi(r->sm_waves_drive), 0, 1000);
-        const int ba = clampi(ripple_roundi(r->sm_ampli_drive), 0, 1000);
-        const int bt = clampi(ripple_roundi(r->sm_attn_drive), 0, 1000);
-        const int bp = clampi(ripple_roundi(r->sm_phase_drive), 0, 1000);
-
-        r->cached_effective_waves = base_waves + (bw * 2600 + 500) / 1000;
-        r->cached_effective_waves = clampi(r->cached_effective_waves, 1, 3600);
-
-        r->cached_effective_ampli = base_ampli + (ba * 62 + 500) / 1000;
-        r->cached_effective_ampli = clampi(r->cached_effective_ampli, 1, 80);
-
-        r->cached_effective_attn = base_attn;
-        r->cached_effective_attn -= (bt * (base_attn - 1) + 500) / 1000;
-        r->cached_effective_attn = clampi(r->cached_effective_attn, 1, 360);
-
-        r->cached_effective_phase = ((clampi(ripple_roundi(r->sm_phase), 0, 1000) * RIPPLE_DEGREES + 500) / 1000);
-        r->cached_effective_phase += (bp * RIPPLE_DEGREES + 500) / 1000;
-        r->cached_effective_phase = ripple_wrapi(r->cached_effective_phase, RIPPLE_DEGREES);
-
-        r->cached_mix_q8 = (clampi(ripple_roundi(r->sm_mix), 0, 1000) * 256 + 500) / 1000;
-        r->cached_chroma_q8 = (r->cached_mix_q8 * clampi(ripple_roundi(r->sm_chroma), 0, 1000) + 500) / 1000;
-
-        const int drive = clampi(((bw * 260) + (ba * 360) + (bt * 180) + (bp * 200) + 500) / 1000, 0, 1000);
-
-        if(drive > 0) {
-            r->cached_mix_q8 += ((256 - r->cached_mix_q8) * drive + 500) / 1000;
-            r->cached_chroma_q8 += ((256 - r->cached_chroma_q8) * drive + 750) / 1500;
-        }
-
-        r->cached_mix_q8 = clampi(r->cached_mix_q8, 0, 256);
-        r->cached_chroma_q8 = clampi(r->cached_chroma_q8, 0, 256);
-
-        veejay_memcpy(r->ripple_data[0], frame->data[0], (size_t)r->cached_len);
-        veejay_memcpy(r->ripple_data[1], frame->data[1], (size_t)r->cached_len);
-        veejay_memcpy(r->ripple_data[2], frame->data[2], (size_t)r->cached_len);
-
-        r->cached_rebuild =
-            r->ripple_waves != r->cached_effective_waves ||
-            r->ripple_ampli != r->cached_effective_ampli ||
-            r->ripple_attn != r->cached_effective_attn ||
-            r->ripple_phase != r->cached_effective_phase;
+    if(!r->have_smooth) {
+        r->sm_waves = (float)waves_arg;
+        r->sm_ampli = (float)amplitude_arg;
+        r->sm_attn = (float)atten_arg;
+        r->sm_mix = (float)mix_arg;
+        r->sm_chroma = (float)chroma_arg;
+        r->sm_phase = (float)phase_arg;
+        r->sm_waves_drive = (float)waves_drive;
+        r->sm_ampli_drive = (float)ampli_drive;
+        r->sm_attn_drive = (float)attn_drive;
+        r->sm_phase_drive = (float)phase_drive;
+        r->have_smooth = 1;
+    }
+    else {
+        r->sm_waves = ripple_smooth_value(r->sm_waves, (float)waves_arg, slow);
+        r->sm_ampli = ripple_smooth_value(r->sm_ampli, (float)amplitude_arg, slow);
+        r->sm_attn = ripple_smooth_value(r->sm_attn, (float)atten_arg, slow);
+        r->sm_mix = ripple_smooth_value(r->sm_mix, (float)mix_arg, fast);
+        r->sm_chroma = ripple_smooth_value(r->sm_chroma, (float)chroma_arg, fast);
+        r->sm_phase = ripple_smooth_value(r->sm_phase, (float)phase_arg, fast);
+        r->sm_waves_drive = ripple_smooth_value(r->sm_waves_drive, (float)waves_drive, fast);
+        r->sm_ampli_drive = ripple_smooth_value(r->sm_ampli_drive, (float)ampli_drive, fast);
+        r->sm_attn_drive = ripple_smooth_value(r->sm_attn_drive, (float)attn_drive, fast);
+        r->sm_phase_drive = ripple_smooth_value(r->sm_phase_drive, (float)phase_drive, fast);
+    }
     }
 
-    if(r->cached_rebuild) {
-        ripple_build_table(r, r->cached_width, r->cached_height, r->cached_effective_waves, r->cached_effective_ampli, r->cached_effective_attn, r->cached_effective_phase);
+    const int base_waves = clampi(ripple_roundi(r->sm_waves), 1, 3600);
+    const int base_ampli = clampi(ripple_roundi(r->sm_ampli), 1, 80);
+    const int base_attn = clampi(ripple_roundi(r->sm_attn), 1, 360);
+
+    const int bw = clampi(ripple_roundi(r->sm_waves_drive), 0, 1000);
+    const int ba = clampi(ripple_roundi(r->sm_ampli_drive), 0, 1000);
+    const int bt = clampi(ripple_roundi(r->sm_attn_drive), 0, 1000);
+    const int bp = clampi(ripple_roundi(r->sm_phase_drive), 0, 1000);
+
+    int effective_waves = base_waves + (bw * 2600 + 500) / 1000;
+    effective_waves = clampi(effective_waves, 1, 3600);
+
+    int effective_ampli = base_ampli + (ba * 62 + 500) / 1000;
+    effective_ampli = clampi(effective_ampli, 1, 80);
+
+    int effective_attn = base_attn;
+    effective_attn -= (bt * (base_attn - 1) + 500) / 1000;
+    effective_attn = clampi(effective_attn, 1, 360);
+
+    int effective_phase = ((clampi(ripple_roundi(r->sm_phase), 0, 1000) * RIPPLE_DEGREES + 500) / 1000);
+    effective_phase += (bp * RIPPLE_DEGREES + 500) / 1000;
+    effective_phase = ripple_wrapi(effective_phase, RIPPLE_DEGREES);
+
+    int mix_q8 = (clampi(ripple_roundi(r->sm_mix), 0, 1000) * 256 + 500) / 1000;
+    int chroma_q8 = (mix_q8 * clampi(ripple_roundi(r->sm_chroma), 0, 1000) + 500) / 1000;
+
+    const int drive = clampi(((bw * 260) + (ba * 360) + (bt * 180) + (bp * 200) + 500) / 1000, 0, 1000);
+
+    if(drive > 0) {
+        mix_q8 += ((256 - mix_q8) * drive + 500) / 1000;
+        chroma_q8 += ((256 - chroma_q8) * drive + 750) / 1500;
     }
 
-    const int len = r->cached_len;
-    const int mix_q8 = r->cached_mix_q8;
-    const int chroma_q8 = r->cached_chroma_q8;
-    const int *restrict table = r->ripple_table;
-    const uint8_t *restrict srcY = r->ripple_data[0];
-    const uint8_t *restrict srcCb = r->ripple_data[1];
-    const uint8_t *restrict srcCr = r->ripple_data[2];
+    mix_q8 = clampi(mix_q8, 0, 256);
+    chroma_q8 = clampi(chroma_q8, 0, 256);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    if(mix_q8 >= 256 && chroma_q8 >= 256) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            const int src = table[i];
-
-            Y[i] = srcY[src];
-            Cb[i] = srcCb[src];
-            Cr[i] = srcCr[src];
-        }
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        r->ripple_data[0][i] = Y[i];
+        r->ripple_data[1][i] = Cb[i];
+        r->ripple_data[2][i] = Cr[i];
     }
-    else {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            const int src = table[i];
 
-            Y[i] = ripple_mix_u8(srcY[i], srcY[src], mix_q8);
-            Cb[i] = ripple_mix_u8(srcCb[i], srcCb[src], chroma_q8);
-            Cr[i] = ripple_mix_u8(srcCr[i], srcCr[src], chroma_q8);
+    const int rebuild =
+        r->ripple_waves != effective_waves ||
+        r->ripple_ampli != effective_ampli ||
+        r->ripple_attn != effective_attn ||
+        r->ripple_phase != effective_phase;
+
+    int *restrict table = r->ripple_table;
+    uint8_t *restrict srcY = r->ripple_data[0];
+    uint8_t *restrict srcCb = r->ripple_data[1];
+    uint8_t *restrict srcCr = r->ripple_data[2];
+
+    if(rebuild)
+        ripple_build_table(r, width, height, effective_waves, effective_ampli, effective_attn, effective_phase);
+
+        if(mix_q8 >= 256 && chroma_q8 >= 256) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int src = table[i];
+
+                Y[i] = srcY[src];
+                Cb[i] = srcCb[src];
+                Cr[i] = srcCr[src];
+            }
         }
+        else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int src = table[i];
+
+                Y[i] = ripple_mix_u8(srcY[i], srcY[src], mix_q8);
+                Cb[i] = ripple_mix_u8(srcCb[i], srcCb[src], chroma_q8);
+                Cr[i] = ripple_mix_u8(srcCr[i], srcCr[src], chroma_q8);
+            }
     }
 }

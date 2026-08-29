@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -86,6 +86,95 @@ static inline uint8_t mirror_mix_uv_u8(uint8_t a, uint8_t b, int q8)
     return mirror_uv(v);
 }
 
+typedef void (*mirror_reflect_fn)(uint8_t *, uint8_t *, uint8_t *,
+                                  const uint8_t *, const uint8_t *, const uint8_t *,
+                                  int, int, int);
+
+static void mirror_reflect_none(uint8_t *dstY,
+                                uint8_t *dstU,
+                                uint8_t *dstV,
+                                const uint8_t *srcY,
+                                const uint8_t *srcU,
+                                const uint8_t *srcV,
+                                int idx,
+                                int s_idx,
+                                int mix_q8)
+{
+    (void) dstY;
+    (void) dstU;
+    (void) dstV;
+    (void) srcY;
+    (void) srcU;
+    (void) srcV;
+    (void) idx;
+    (void) s_idx;
+    (void) mix_q8;
+}
+
+static void mirror_reflect_copy(uint8_t *dstY,
+                                uint8_t *dstU,
+                                uint8_t *dstV,
+                                const uint8_t *srcY,
+                                const uint8_t *srcU,
+                                const uint8_t *srcV,
+                                int idx,
+                                int s_idx,
+                                int mix_q8)
+{
+    (void) mix_q8;
+
+    dstY[idx] = srcY[s_idx];
+    dstU[idx] = srcU[s_idx];
+    dstV[idx] = srcV[s_idx];
+}
+
+static void mirror_reflect_blend(uint8_t *dstY,
+                                 uint8_t *dstU,
+                                 uint8_t *dstV,
+                                 const uint8_t *srcY,
+                                 const uint8_t *srcU,
+                                 const uint8_t *srcV,
+                                 int idx,
+                                 int s_idx,
+                                 int mix_q8)
+{
+    dstY[idx] = mirror_mix_y_u8(srcY[idx], srcY[s_idx], mix_q8);
+    dstU[idx] = mirror_mix_uv_u8(srcU[idx], srcU[s_idx], mix_q8);
+    dstV[idx] = mirror_mix_uv_u8(srcV[idx], srcV[s_idx], mix_q8);
+}
+
+typedef void (*mirror_glow_fn)(uint8_t *, int, float, float, float, int);
+
+static void mirror_no_glow(uint8_t *dstY,
+                           int idx,
+                           float abs_dot,
+                           float axis_width,
+                           float inv_axis_width,
+                           int glow_max)
+{
+    (void) dstY;
+    (void) idx;
+    (void) abs_dot;
+    (void) axis_width;
+    (void) inv_axis_width;
+    (void) glow_max;
+}
+
+static void mirror_apply_glow(uint8_t *dstY,
+                              int idx,
+                              float abs_dot,
+                              float axis_width,
+                              float inv_axis_width,
+                              int glow_max)
+{
+    if(abs_dot < axis_width) {
+        const float falloff = 1.0f - abs_dot * inv_axis_width;
+        const int glow = (int)(falloff * falloff * (float)glow_max + 0.5f);
+
+        dstY[idx] = mirror_y((int)dstY[idx] + glow);
+    }
+}
+
 vj_effect *mirror_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -98,6 +187,16 @@ vj_effect *mirror_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_CENTER_X] = 0;      ve->limits[1][P_CENTER_X] = w;       ve->defaults[P_CENTER_X] = w / 2;
     ve->limits[0][P_CENTER_Y] = 0;      ve->limits[1][P_CENTER_Y] = h;       ve->defaults[P_CENTER_Y] = h / 2;
@@ -159,6 +258,7 @@ void *mirror_malloc(int w, int h)
     m->buf[2] = m->buf[1] + len;
     m->w = w;
     m->h = h;
+    m->n_threads = vje_advise_num_threads(len);
     m->spin_phase = 0.0f;
 
     return (void*) m;
@@ -188,48 +288,56 @@ void mirror_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = m->buf[1];
     uint8_t *restrict srcV = m->buf[2];
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        srcY[i] = dstY[i];
-        srcU[i] = dstU[i];
-        srcV[i] = dstV[i];
+#pragma omp sections
+    {
+#pragma omp section
+        { veejay_memcpy(m->buf[0], frame->data[0], len); }
+#pragma omp section
+        { veejay_memcpy(m->buf[1], frame->data[1], len); }
+#pragma omp section
+        { veejay_memcpy(m->buf[2], frame->data[2], len); }
     }
 
-    int center_x_i = args[P_CENTER_X];
-    int center_y_i = args[P_CENTER_Y];
-    int angle_i = args[P_ANGLE];
-    int spin_i = args[P_SPIN_SPEED];
-    int mix_i = args[P_REFLECT_MIX];
-    int axis_width_i = args[P_AXIS_WIDTH];
-    int axis_glow_i = args[P_AXIS_GLOW];
+    const int center_x_i = args[P_CENTER_X];
+    const int center_y_i = args[P_CENTER_Y];
+    const int angle_i = args[P_ANGLE];
+    const int spin_i = args[P_SPIN_SPEED];
+    const int mix_i = args[P_REFLECT_MIX];
+    const int axis_width_i = args[P_AXIS_WIDTH];
+    const int axis_glow_i = args[P_AXIS_GLOW];
 
-    #pragma omp single
+#pragma omp single
     {
         m->spin_phase += (float)spin_i * 0.00275f;
+
         if(m->spin_phase >= 360.0f)
             m->spin_phase -= 360.0f;
         else if(m->spin_phase <= -360.0f)
             m->spin_phase += 360.0f;
     }
 
-    float cx = (float)center_x_i;
-    float cy = (float)center_y_i;
-    float angle_deg = (float)angle_i + m->spin_phase;
-    float rad = angle_deg * MIRROR_DEG_TO_RAD;
-    float nx = cosf(rad);
-    float ny = sinf(rad);
+    const float cx = (float)center_x_i;
+    const float cy = (float)center_y_i;
+    const float angle_deg = (float)angle_i + m->spin_phase;
+    const float rad = angle_deg * MIRROR_DEG_TO_RAD;
+    const float nx = cosf(rad);
+    const float ny = sinf(rad);
 
-    int mix_q8 = (mix_i * 256 + 500) / 1000;
-    float axis_width = (float)axis_width_i;
-    int glow_amount = axis_glow_i;
-    int glow_enabled = glow_amount > 0 && axis_width > 0.1f;
-    float inv_axis_width = glow_enabled ? 1.0f / axis_width : 0.0f;
-    int glow_max = (glow_amount * 70 + 500) / 1000;
+    const int mix_q8 = (mix_i * 256 + 500) / 1000;
+    const float axis_width = (float)axis_width_i;
+    const int glow_amount = axis_glow_i;
+    const int glow_enabled = glow_amount > 0 && axis_width > 0.1f;
+    const float inv_axis_width = glow_enabled ? 1.0f / axis_width : 0.0f;
+    const int glow_max = (glow_amount * 70 + 500) / 1000;
+    const mirror_reflect_fn reflect_fn = mix_q8 >= 256
+        ? mirror_reflect_copy
+        : (mix_q8 > 0 ? mirror_reflect_blend : mirror_reflect_none);
+    const mirror_glow_fn glow_fn = glow_enabled ? mirror_apply_glow : mirror_no_glow;
 
-    float rx_step = 1.0f - 2.0f * nx * nx;
-    float ry_step = -2.0f * nx * ny;
+    const float rx_step = 1.0f - 2.0f * nx * nx;
+    const float ry_step = -2.0f * nx * ny;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
         const float dy = (float)y - cy;
@@ -250,24 +358,10 @@ void mirror_apply(void *ptr, VJFrame *frame, int *args)
 
                 const int s_idx = my * width + mx;
 
-                if(mix_q8 >= 256) {
-                    dstY[idx] = srcY[s_idx];
-                    dstU[idx] = srcU[s_idx];
-                    dstV[idx] = srcV[s_idx];
-                }
-                else if(mix_q8 > 0) {
-                    dstY[idx] = mirror_mix_y_u8(srcY[idx], srcY[s_idx], mix_q8);
-                    dstU[idx] = mirror_mix_uv_u8(srcU[idx], srcU[s_idx], mix_q8);
-                    dstV[idx] = mirror_mix_uv_u8(srcV[idx], srcV[s_idx], mix_q8);
-                }
+                reflect_fn(dstY, dstU, dstV, srcY, srcU, srcV, idx, s_idx, mix_q8);
             }
 
-            if(glow_enabled && abs_dot < axis_width) {
-                const float falloff = 1.0f - abs_dot * inv_axis_width;
-                const int glow = (int)(falloff * falloff * (float)glow_max + 0.5f);
-
-                dstY[idx] = mirror_y((int)dstY[idx] + glow);
-            }
+            glow_fn(dstY, idx, abs_dot, axis_width, inv_axis_width, glow_max);
 
             dot += nx;
             rx += rx_step;

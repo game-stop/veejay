@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,10 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <float.h>
 #include "common.h"
-#include "isolate.h"
-#include <libsubsample/subsample.h>
+#include <veejaycore/vjmem.h>
+#include <math.h>
 
 #define ISOLATE_PARAMS 7
 
@@ -62,7 +61,7 @@ static inline int isolate_absi(int v)
 static inline uint8_t isolate_blend255(uint8_t a, uint8_t b, int opacity)
 {
     const int inv = 255 - opacity;
-    const int x = (int)a * inv + (int)b * opacity;
+    const int x = (int)a * opacity + (int)b * inv;
     return (uint8_t)(((x + 1) + (x >> 8)) >> 8);
 }
 
@@ -78,6 +77,16 @@ vj_effect *isolate_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 0;
@@ -109,6 +118,7 @@ vj_effect *isolate_init(int w, int h)
 
     ve->has_user = 0;
     ve->extra_frame = 0;
+    ve->parallel = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
 
@@ -209,10 +219,8 @@ void isolate_apply(void *ptr, VJFrame *frame, int *args)
 {
     isolate_t *s = (isolate_t*) ptr;
 
-    #pragma omp single
-    {
-        isolate_update_cache(s, args);
-    }
+#pragma omp single
+    isolate_update_cache(s, args);
 
     const int mag_fp = s->mag_fp;
     const int cos_q_fp = s->cos_q_fp;
@@ -227,7 +235,7 @@ void isolate_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

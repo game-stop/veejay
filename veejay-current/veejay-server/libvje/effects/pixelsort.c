@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2019-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2019 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,7 +21,6 @@
 #include "common.h"
 #include "pixelsort.h"
 #include <stdint.h>
-#include <veejaycore/vjmem.h>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -78,15 +77,6 @@ typedef struct {
     int n_threads;
     pixelsort_worker_t *workers;
     uint32_t *scratch;
-
-    unsigned int width;
-    unsigned int height;
-    int mode;
-    int pass;
-    int threshold;
-    int descending;
-    int reverse_x;
-    int reverse_y;
 } pixelsort_t;
 
 vj_effect *pixelsort_init(int w, int h)
@@ -100,6 +90,17 @@ vj_effect *pixelsort_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_MODE] = 0;             ve->limits[1][P_MODE] = 3;             ve->defaults[P_MODE] = PS_MODE_BRIGHT;
     ve->limits[0][P_PASS] = 0;             ve->limits[1][P_PASS] = 3;             ve->defaults[P_PASS] = PS_PASS_COLUMNS_ROWS;
@@ -157,7 +158,12 @@ void *pixelsort_malloc(int w, int h)
         return NULL;
 
     p->line_cap = w > h ? w : h;
+
+#ifdef _OPENMP
     p->n_threads = vje_advise_num_threads(w * h);
+#else
+    p->n_threads = 1;
+#endif
 
     p->workers = (pixelsort_worker_t *) vj_calloc(sizeof(pixelsort_worker_t) * (size_t)p->n_threads);
 
@@ -679,33 +685,30 @@ void pixelsort_apply(void *ptr, VJFrame *frame, int *args)
         frame->data[2]
     };
 
-    #pragma omp single
-    {
-        p->width = (unsigned int)frame->width;
-        p->height = (unsigned int)frame->height;
-        p->mode = args[P_MODE];
-        p->pass = args[P_PASS];
-        p->threshold = args[P_THRESHOLD];
-        p->descending = args[P_ORDER] == PS_ORDER_DESCENDING;
-        p->reverse_x = args[P_ROW_DIRECTION] == PS_ROW_RIGHT_LEFT;
-        p->reverse_y = args[P_COLUMN_DIRECTION] == PS_COLUMN_BOTTOM_TOP;
-    }
+    const unsigned int width = (unsigned int)frame->width;
+    const unsigned int height = (unsigned int)frame->height;
+    const int mode = args[P_MODE];
+    const int pass = args[P_PASS];
+    const int threshold = args[P_THRESHOLD];
+    const int descending = args[P_ORDER] == PS_ORDER_DESCENDING;
+    const int reverse_x = args[P_ROW_DIRECTION] == PS_ROW_RIGHT_LEFT;
+    const int reverse_y = args[P_COLUMN_DIRECTION] == PS_COLUMN_BOTTOM_TOP;
 
-    switch(p->pass) {
+    switch(pass) {
         case PS_PASS_ROWS_COLUMNS:
-            pixelsort_rows(p, P, p->width, p->height, p->mode, p->threshold, p->descending, p->reverse_x);
-            pixelsort_columns(p, P, p->width, p->height, p->mode, p->threshold, p->descending, p->reverse_y);
+            pixelsort_rows(p, P, width, height, mode, threshold, descending, reverse_x);
+            pixelsort_columns(p, P, width, height, mode, threshold, descending, reverse_y);
             break;
         case PS_PASS_COLUMNS_ONLY:
-            pixelsort_columns(p, P, p->width, p->height, p->mode, p->threshold, p->descending, p->reverse_y);
+            pixelsort_columns(p, P, width, height, mode, threshold, descending, reverse_y);
             break;
         case PS_PASS_ROWS_ONLY:
-            pixelsort_rows(p, P, p->width, p->height, p->mode, p->threshold, p->descending, p->reverse_x);
+            pixelsort_rows(p, P, width, height, mode, threshold, descending, reverse_x);
             break;
         case PS_PASS_COLUMNS_ROWS:
         default:
-            pixelsort_columns(p, P, p->width, p->height, p->mode, p->threshold, p->descending, p->reverse_y);
-            pixelsort_rows(p, P, p->width, p->height, p->mode, p->threshold, p->descending, p->reverse_x);
+            pixelsort_columns(p, P, width, height, mode, threshold, descending, reverse_y);
+            pixelsort_rows(p, P, width, height, mode, threshold, descending, reverse_x);
             break;
     }
 }

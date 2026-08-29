@@ -24,7 +24,6 @@
 typedef struct {
     int w;
     int h;
-    int n_threads;
     uint8_t *tmpY;
     uint8_t *tmpU;
     uint8_t *tmpV;
@@ -70,6 +69,17 @@ vj_effect *chromawarp_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 0; ve->limits[1][0] = 64;  ve->defaults[0] = 12;
     ve->limits[0][1] = 0; ve->limits[1][1] = 360; ve->defaults[1] = 0;
     ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 255;
@@ -105,7 +115,6 @@ void *chromawarp_malloc(int w, int h)
 
     c->w = w;
     c->h = h;
-
     c->tmpY = (uint8_t *) vj_malloc(sz * 3);
 
     if(!c->tmpY) {
@@ -189,67 +198,69 @@ void chromawarp_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tmpU = c->tmpU;
     uint8_t *restrict tmpV = c->tmpV;
 
+    {
 #pragma omp for schedule(static)
-    for(int y = 0; y < h; y++)
-    {
-        const int yw = y * w;
-        const float cy = ((float)y - half_h) * inv_h;
-        const float cx_start = -half_w * inv_w;
-
-        for(int x = 0; x < w; x++)
+        for(int y = 0; y < h; y++)
         {
-            const int i = yw + x;
-            const float u_raw = (float)U[i] - 128.0f;
-            const float v_raw = (float)V[i] - 128.0f;
-            float fx = u_raw * cos_a - v_raw * sin_a;
-            float fy = u_raw * sin_a + v_raw * cos_a;
+            const int yw = y * w;
+            const float cy = ((float)y - half_h) * inv_h;
+            const float cx_start = -half_w * inv_w;
 
-            if(bias > 0)
+            for(int x = 0; x < w; x++)
             {
-                const float cx = cx_start + (float)x * inv_w;
-                const float dot = fx * cx + fy * cy;
+                const int i = yw + x;
+                const float u_raw = (float)U[i] - 128.0f;
+                const float v_raw = (float)V[i] - 128.0f;
+                float fx = u_raw * cos_a - v_raw * sin_a;
+                float fy = u_raw * sin_a + v_raw * cos_a;
 
-                fx += dot * b;
-                fy += dot * b;
+                if(bias > 0)
+                {
+                    const float cx = cx_start + (float)x * inv_w;
+                    const float dot = fx * cx + fy * cy;
+
+                    fx += dot * b;
+                    fy += dot * b;
+                }
+
+                const float vx_new = vx[i] * t + fx * inv_t;
+                const float vy_new = vy[i] * t + fy * inv_t;
+
+                vx[i] = vx_new;
+                vy[i] = vy_new;
+
+                const float sx_f = clampf((float)x + vx_new * scale, 0.0f, max_sx);
+                const float sy_f = clampf((float)y + vy_new * scale, 0.0f, max_sy);
+                const int sx_fixed = (int)(sx_f * 65536.0f);
+                const int sy_fixed = (int)(sy_f * 65536.0f);
+
+                tmpY[i] = fast_bilinear(Y, w, sx_fixed, sy_fixed);
+                tmpU[i] = fast_bilinear(U, w, sx_fixed, sy_fixed);
+                tmpV[i] = fast_bilinear(V, w, sx_fixed, sy_fixed);
             }
+        }
 
-            const float vx_new = vx[i] * t + fx * inv_t;
-            const float vy_new = vy[i] * t + fy * inv_t;
+        if(mix > 0 && mix < 255)
+        {
+            const int inv_mix = 255 - mix;
 
-            vx[i] = vx_new;
-            vy[i] = vy_new;
-
-            const float sx_f = clampf((float)x + vx_new * scale, 0.0f, max_sx);
-            const float sy_f = clampf((float)y + vy_new * scale, 0.0f, max_sy);
-            const int sx_fixed = (int)(sx_f * 65536.0f);
-            const int sy_fixed = (int)(sy_f * 65536.0f);
-
-            tmpY[i] = fast_bilinear(Y, w, sx_fixed, sy_fixed);
-            tmpU[i] = fast_bilinear(U, w, sx_fixed, sy_fixed);
-            tmpV[i] = fast_bilinear(V, w, sx_fixed, sy_fixed);
+#pragma omp for schedule(static)
+            for(int i = 0; i < sz; i++)
+            {
+                Y[i] = (uint8_t)(((int)Y[i] * inv_mix + (int)tmpY[i] * mix) >> 8);
+                U[i] = (uint8_t)(((int)U[i] * inv_mix + (int)tmpU[i] * mix) >> 8);
+                V[i] = (uint8_t)(((int)V[i] * inv_mix + (int)tmpV[i] * mix) >> 8);
+            }
         }
     }
 
-    if(mix > 0 && mix < 255)
+    if(mix >= 255)
     {
-        const int inv_mix = 255 - mix;
+        uint8_t *dst[3] = { Y, U, V };
+        uint8_t *src[3] = { tmpY, tmpU, tmpV };
 
-#pragma omp for simd schedule(static)
-        for(int i = 0; i < sz; i++)
-        {
-            Y[i] = (uint8_t)(((int)Y[i] * inv_mix + (int)tmpY[i] * mix) >> 8);
-            U[i] = (uint8_t)(((int)U[i] * inv_mix + (int)tmpU[i] * mix) >> 8);
-            V[i] = (uint8_t)(((int)V[i] * inv_mix + (int)tmpV[i] * mix) >> 8);
-        }
-    }
-
-#pragma omp single
-    {
-        if(mix >= 255)
-        {
-            veejay_memcpy(Y, tmpY, sz);
-            veejay_memcpy(U, tmpU, sz);
-            veejay_memcpy(V, tmpV, sz);
-        }
+#pragma omp for schedule(static)
+        for(int plane = 0; plane < 3; plane++)
+            veejay_memcpy(dst[plane], src[plane], (size_t) sz);
     }
 }

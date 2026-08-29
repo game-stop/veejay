@@ -129,6 +129,16 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_MODE] = 0;  ve->limits[1][P_MODE] = 8;   ve->defaults[P_MODE] = 0;
     ve->limits[0][P_MIN_T] = 0; ve->limits[1][P_MIN_T] = 255; ve->defaults[P_MIN_T] = pixel_Y_lo_;
@@ -200,7 +210,7 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cr = frame->data[2];
 
     if(mask_mode) {
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             const uint8_t y = Y[i];
 
@@ -212,7 +222,7 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
     else {
         const int range = threshold_max > threshold_min ? threshold_max - threshold_min : 1;
 
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             const uint8_t y = Y[i];
 
@@ -221,24 +231,24 @@ void pencilsketch_apply(void *ptr, VJFrame *frame, int *args)
 
                 Y[i] = ps_eval(type, yn, y, threshold_max);
             }
-            else {
+            else
                 Y[i] = (uint8_t)pixel_Y_hi_;
-            }
         }
     }
 
     if(type == 7) {
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int i = 0; i < uv_len; i++) {
             Cb[i] = ps_chroma_color(128, Cb[i]);
             Cr[i] = ps_chroma_color(128, Cr[i]);
         }
     }
     else {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            Cb[i] = 128;
-            Cr[i] = 128;
+        uint8_t *planes[2] = { Cb, Cr };
+
+#pragma omp for schedule(static)
+        for(int plane = 0; plane < 2; plane++) {
+            veejay_memset(planes[plane], 128, (size_t) uv_len);
         }
     }
 }

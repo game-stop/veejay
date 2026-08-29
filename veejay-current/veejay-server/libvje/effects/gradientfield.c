@@ -27,7 +27,6 @@
 #define P_OPACITY 1
 
 typedef struct {
-    int n_threads;
     int width;
     int height;
     int len;
@@ -74,6 +73,16 @@ vj_effect *gradientfield_init(int w, int h)
     ve->limits[0] = (int*) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int*) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_WINDOW] = 2;  ve->limits[1][P_WINDOW] = 30;  ve->defaults[P_WINDOW] = 6;
     ve->limits[0][P_OPACITY] = 0; ve->limits[1][P_OPACITY] = 255; ve->defaults[P_OPACITY] = 0;
@@ -81,6 +90,7 @@ vj_effect *gradientfield_init(int w, int h)
     ve->description = "Kuwahara Painting";
     ve->sub_format = 1;
     ve->extra_frame = 0;
+    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Window Size", "Opacity");
 
@@ -397,18 +407,18 @@ void gradientfield_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    #pragma omp single
-    {
-        veejay_memcpy(s->copyY, Y, len);
-        veejay_memcpy(s->copyU, U, len);
-        veejay_memcpy(s->copyV, V, len);
+#pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++) {
+        uint8_t *dst[3] = { s->copyY, s->copyU, s->copyV };
+        const uint8_t *src[3] = { Y, U, V };
+        veejay_memcpy(dst[plane], src[plane], len);
     }
 
     gradientfield_integral_y(s->copyY, s->intY_sum, s->intY_sq, w, h);
     gradientfield_integral_sum(s->copyU, s->intU_sum, w, h);
     gradientfield_integral_sum(s->copyV, s->intV_sum, w, h);
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < h - 1; y += 2)
         gradientfield_apply_rowpair(s, Y, U, V, a, opacity, y);
 }

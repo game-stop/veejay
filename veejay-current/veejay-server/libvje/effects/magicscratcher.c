@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -21,7 +21,6 @@
 #include "common.h"
 #include "internal.h"
 #include "magicscratcher.h"
-#include <veejaycore/vjmem.h>
 
 #define MAGICSCRATCHER_PARAMS 4
 
@@ -37,11 +36,6 @@ typedef struct {
     int reverse;
     int seeded;
     int n_threads;
-
-    uint8_t *history;
-    uint8_t *write_ptr;
-    pix_func_Y func_y;
-    int uv_len_val;
 } magicscratcher_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -61,7 +55,16 @@ vj_effect *magicscratcher_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     const int scratch_soft_hi = (MAX_SCRATCH_FRAMES - 1) < 28 ? (MAX_SCRATCH_FRAMES - 1) : 28;
 
@@ -104,7 +107,6 @@ void *magicscratcher_malloc(int w, int h)
     if(!m)
         return NULL;
 
-    const int len = w * h;
     m->mframe = (uint8_t*) vj_malloc((size_t)w * (size_t)h * (size_t)MAX_SCRATCH_FRAMES);
 
     if(!m->mframe) {
@@ -112,7 +114,7 @@ void *magicscratcher_malloc(int w, int h)
         return NULL;
     }
 
-    m->n_threads = vje_advise_num_threads(len);
+    m->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) m;
 }
@@ -120,8 +122,6 @@ void *magicscratcher_malloc(int w, int h)
 void magicscratcher_free(void *ptr)
 {
     magicscratcher_t *m = (magicscratcher_t*) ptr;
-    if(!m)
-        return;
 
     free(m->mframe);
     free(m);
@@ -129,13 +129,20 @@ void magicscratcher_free(void *ptr)
 
 static void magicscratcher_seed(magicscratcher_t *m, const uint8_t *restrict Y, int len)
 {
-    for(int i = 0; i < MAX_SCRATCH_FRAMES; i++)
-        veejay_memcpy(m->mframe + (size_t)len * (size_t)i, Y, len);
+    const int do_seed = !m->seeded;
 
-    m->write_pos = 0;
-    m->read_pos = 0;
-    m->reverse = 0;
-    m->seeded = 1;
+#pragma omp for schedule(static)
+    for(int i = 0; i < MAX_SCRATCH_FRAMES; i++)
+        if(do_seed)
+            veejay_memcpy(m->mframe + (size_t)len * (size_t)i, Y, len);
+
+#pragma omp single
+    if(do_seed) {
+        m->write_pos = 0;
+        m->read_pos = 0;
+        m->reverse = 0;
+        m->seeded = 1;
+    }
 }
 
 static void magicscratcher_advance_depth(magicscratcher_t *m, int n, int pingpong)
@@ -187,47 +194,53 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp single
-    {
-        if(!m->seeded)
-            magicscratcher_seed(m, Y, len);
+    magicscratcher_seed(m, Y, len);
 
-        if(m->read_pos >= n)
-            m->read_pos = n - 1;
+#pragma omp single
+    if(m->read_pos >= n)
+        m->read_pos = n - 1;
 
-        int read_slot = m->write_pos - 1 - m->read_pos;
-        while(read_slot < 0)
-            read_slot += MAX_SCRATCH_FRAMES;
+    int read_slot = m->write_pos - 1 - m->read_pos;
 
-        m->history = m->mframe + (size_t)len * (size_t)read_slot;
-        m->write_ptr = m->mframe + (size_t)len * (size_t)m->write_pos;
-        m->func_y = get_pix_func_Y(mode);
-        m->uv_len_val = frame->ssm ? len : frame->uv_len;
-    }
+    while(read_slot < 0)
+        read_slot += MAX_SCRATCH_FRAMES;
 
-    const uint8_t *restrict history = m->history;
-    uint8_t *restrict write = m->write_ptr;
-    pix_func_Y func_y = m->func_y;
-    const int uv_len = m->uv_len_val;
+    uint8_t *restrict history = m->mframe + (size_t)len * (size_t)read_slot;
+    uint8_t *restrict write = m->mframe + (size_t)len * (size_t)m->write_pos;
+    pix_func_Y func_y = get_pix_func_Y(mode);
 
 #pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const uint8_t src = Y[i];
+
         Y[i] = func_y(history[i], src);
         write[i] = src;
     }
 
-    #pragma omp single
+#pragma omp single
     {
         m->write_pos++;
+
         if(m->write_pos >= MAX_SCRATCH_FRAMES)
             m->write_pos = 0;
-
-        if(grayscale) {
-            veejay_memset(Cb, 128, uv_len);
-            veejay_memset(Cr, 128, uv_len);
-        }
-
-        magicscratcher_advance_depth(m, n, pingpong);
     }
+
+    if(grayscale) {
+        const int uv_len = frame->ssm ? len : frame->uv_len;
+
+#pragma omp sections
+        {
+#pragma omp section
+            {
+                veejay_memset(Cb, 128, uv_len);
+            }
+#pragma omp section
+            {
+                veejay_memset(Cr, 128, uv_len);
+            }
+        }
+    }
+
+#pragma omp single
+    magicscratcher_advance_depth(m, n, pingpong);
 }

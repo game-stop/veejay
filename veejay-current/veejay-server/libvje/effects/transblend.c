@@ -18,7 +18,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include "common.h"
+#include <libvje/effects/common.h>
 #include <veejaycore/vjmem.h>
 #include "transblend.h"
 #include <libvje/internal.h>
@@ -40,20 +40,18 @@ typedef struct {
     uint16_t *angle_lut;
     int progress_q16;
     int direction;
+    int n_threads;
     int w;
     int h;
 
     float speed_env;
     float expand_env;
     float glow_env;
-    uint16_t progress;
-    int glow_width;
-    int glow_strength;
 } wipe_t;
 
 static inline int transblend_clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : ((v > hi) ? hi : v);
+    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t transblend_u8(int v)
@@ -67,10 +65,14 @@ static inline uint8_t transblend_blend_u8(uint8_t a, uint8_t b, int q8)
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
 
+
+
 static inline float transblend_smooth(float oldv, float target, float amount)
 {
     return oldv + (target - oldv) * amount;
 }
+
+
 
 vj_effect *transblend_init(int width, int height)
 {
@@ -83,6 +85,14 @@ vj_effect *transblend_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     int max_speed = (width > height) ? width : height;
 
@@ -182,6 +192,8 @@ void *transblend_malloc(int w, int h)
     wipe->expand_env = 0.0f;
     wipe->glow_env = 0.0f;
 
+    wipe->n_threads = vje_advise_num_threads(len);
+
     transblend_build_angle_lut(wipe, w, h);
 
     return wipe;
@@ -190,11 +202,8 @@ void *transblend_malloc(int w, int h)
 void transblend_free(void *ptr)
 {
     wipe_t *wipe = (wipe_t*) ptr;
-    if(!wipe)
-        return;
 
-    if(wipe->angle_lut)
-        free(wipe->angle_lut);
+    free(wipe->angle_lut);
     free(wipe);
 }
 
@@ -240,57 +249,50 @@ void transblend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int expand_drive_arg = args[P_EXPAND_DRIVE];
     const int edge_glow_arg = args[P_EDGE_GLOW];
 
-    #pragma omp single
-    {
-        const float fast = 0.24f;
+    const float fast = 0.24f;
 
-        wipe->speed_env = transblend_smooth(wipe->speed_env, (float)speed_arg, fast);
-        wipe->expand_env = transblend_smooth(wipe->expand_env, (float)expand_drive_arg, fast * 0.82f);
-        wipe->glow_env = transblend_smooth(wipe->glow_env, (float)edge_glow_arg, fast * 0.88f);
+    wipe->speed_env = transblend_smooth(wipe->speed_env, (float)speed_arg, fast);
+    wipe->expand_env = transblend_smooth(wipe->expand_env, (float)expand_drive_arg, fast * 0.82f);
+    wipe->glow_env = transblend_smooth(wipe->glow_env, (float)edge_glow_arg, fast * 0.88f);
 
-        const float expand_t = wipe->expand_env * 0.001f;
+    const float expand_t = wipe->expand_env * 0.001f;
 
-        int s_eff = (int)(wipe->speed_env + 0.5f);
-        s_eff += (int)((float)max_speed * expand_t * 0.045f + 0.5f);
-        int speed_eff = transblend_clampi(s_eff, 0, max_speed);
+    int speed_eff = (int)(wipe->speed_env + 0.5f);
+    speed_eff += (int)((float)max_speed * expand_t * 0.045f + 0.5f);
+    speed_eff = transblend_clampi(speed_eff, 0, max_speed);
 
-        transblend_step(wipe, speed_eff, bounce, width, height);
+    transblend_step(wipe, speed_eff, bounce, width, height);
 
-        const int expand_q16 = transblend_clampi((int)(wipe->expand_env * 42.0f + 0.5f), 0, 32768);
+    int expand_q16 = (int)(wipe->expand_env * 42.0f + 0.5f);
+    expand_q16 = transblend_clampi(expand_q16, 0, 32768);
 
-        int p_eff = wipe->progress_q16 + expand_q16;
-        if(p_eff > 65535)
-            p_eff = 65535;
+    int progress_eff = wipe->progress_q16 + expand_q16;
+    if(progress_eff > 65535)
+        progress_eff = 65535;
 
-        wipe->progress = (uint16_t)p_eff;
+    int glow_width = 0;
+    int glow_strength = 0;
 
-        wipe->glow_width = 0;
-        wipe->glow_strength = 0;
+    if(wipe->glow_env > 0.5f) {
+        glow_width = 96 + (int)(wipe->glow_env * 9.0f + expand_t * 1800.0f + 0.5f);
+        glow_width = transblend_clampi(glow_width, 1, 8192);
 
-        if(wipe->glow_env > 0.5f) {
-            int gw = 96 + (int)(wipe->glow_env * 9.0f + expand_t * 1800.0f + 0.5f);
-            wipe->glow_width = transblend_clampi(gw, 1, 8192);
-
-            int gs = (int)(wipe->glow_env * 0.135f + expand_t * 36.0f + 0.5f);
-            wipe->glow_strength = transblend_clampi(gs, 0, 180);
-        }
+        glow_strength = (int)(wipe->glow_env * 0.135f + expand_t * 36.0f + 0.5f);
+        glow_strength = transblend_clampi(glow_strength, 0, 180);
     }
- 
-    const uint16_t progress = wipe->progress;
-    const int glow_width = wipe->glow_width;
-    const int glow_strength = wipe->glow_strength;
 
-    uint8_t *Y  = frame->data[0];
-    uint8_t *U  = frame->data[1];
-    uint8_t *V  = frame->data[2];
+    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict U  = frame->data[1];
+    uint8_t *restrict V  = frame->data[2];
 
-    const uint8_t *Y2 = frame2->data[0];
-    const uint8_t *U2 = frame2->data[1];
-    const uint8_t *V2 = frame2->data[2];
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict U2 = frame2->data[1];
+    const uint8_t *restrict V2 = frame2->data[2];
 
-    const uint16_t *angle = wipe->angle_lut;
+    const uint16_t *restrict angle = wipe->angle_lut;
+    const uint16_t progress = (uint16_t)progress_eff;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int a = (int)angle[i];
 

@@ -44,14 +44,15 @@ vj_effect *coloradjust_init(int w, int h)
     ve->sub_format = -1;
     ve->has_user = 0;
 
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_RATE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_EASE_OUT, 0, 360, 82, 100, 0, 180, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 20, 180, 80, 100, 30, 620, 0, 1, 0, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 192, 480, 64, 96, 80, 900, 0, 4, 0, VJ_BEAT_COST_CHEAP, 84, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
+    
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_RATE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_EASE_OUT, 0, 360, 82, 100, 0, 180, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 20, 180, 80, 100, 30, 620, 0, 1, 0, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 192, 480, 64, 96, 80, 900, 0, 4, 0, VJ_BEAT_COST_CHEAP, 84, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }
@@ -63,7 +64,7 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
     const int intensity = args[1];
     const int exposureValue = args[2];
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -76,9 +77,9 @@ void coloradjust_apply(void *ptr, VJFrame *frame, int *args)
     const int do_exp = exposureValue != 256;
     const float powValue = exposureValue > 0 ? ((float)exposureValue / 256.0f) : 1.0f;
 
-    if(do_exp) {
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
+    for(int i = 0; i < len; i++) {
+        if(do_exp) {
             int y = (int)((float)Y[i] * powValue);
 
             Y[i] = (uint8_t)clampi(y, 0, 255);

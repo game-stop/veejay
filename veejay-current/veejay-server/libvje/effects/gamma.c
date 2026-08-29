@@ -26,7 +26,6 @@
 typedef struct {
     int gamma_key;
     uint8_t table[256];
-    int n_threads;
 } gamma_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -46,6 +45,16 @@ vj_effect *gamma_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[0] = 124;
     ve->limits[0][0] = 0;
@@ -104,7 +113,7 @@ void gamma_apply(void *ptr, VJFrame *frame, int *args)
     const int gamma_value = args[0];
     const int len = frame->len;
 
-    #pragma omp critical
+#pragma omp single
     {
         if(gamma_value != g->gamma_key)
             gamma_setup(g, gamma_value);
@@ -113,7 +122,7 @@ void gamma_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Y = frame->data[0];
     const uint8_t *restrict table = g->table;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         Y[i] = table[Y[i]];
 }

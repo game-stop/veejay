@@ -24,7 +24,6 @@
 
 typedef struct {
     uint8_t *binary_img;
-    int n_threads;
 } diffmap_t;
 
 vj_effect *differencemap_init(int w, int h)
@@ -105,7 +104,6 @@ void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -118,54 +116,59 @@ void differencemap_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict binary_img = d->binary_img;
     uint8_t *restrict previous_img = binary_img + len;
 
-    int skip_processing = 0;
-
     #pragma omp single
     {
-        if(height < 3 || width < 3) {
-            skip_processing = 1;
-        } else {
-            vj_frame_copy1(Y, previous_img, len);
+        veejay_memcpy(previous_img, Y, len);
 
-            VJFrame tmp;
-            veejay_memcpy(&tmp, frame, sizeof(VJFrame));
-            tmp.data[0] = previous_img;
+        VJFrame tmp;
+        veejay_memcpy(&tmp, frame, sizeof(VJFrame));
+        tmp.data[0] = previous_img;
 
-            softblur_apply_internal(&tmp);
-            binarify_1src(binary_img, previous_img, threshold, reverse, width, height);
-
-            if(show)
-            {
-                vj_frame_copy1(binary_img, Y, len);
-                vj_frame_clear1(Cb, 128, uv_len);
-                vj_frame_clear1(Cr, 128, uv_len);
-            }
-            else
-            {
-                veejay_memset(Y, pixel_Y_lo_, len);
-                veejay_memset(Cb, 128, uv_len);
-                veejay_memset(Cr, 128, uv_len);
-            }
-        }
+        softblur_apply_internal(&tmp);
+        binarify_1src(binary_img, previous_img, threshold, reverse, width, height);
     }
 
-    if(!skip_processing && !show)
+    if(show)
     {
-        #pragma omp for schedule(static)
-        for(int y = 1; y < height - 1; y++)
+        #pragma omp sections
         {
-            const int row = y * width;
+            #pragma omp section
+            { veejay_memcpy(Y, binary_img, len); }
+            #pragma omp section
+            { veejay_memset(Cb, 128, len); }
+            #pragma omp section
+            { veejay_memset(Cr, 128, len); }
+        }
+        return;
+    }
 
-            for(int x = 1; x < width - 1; x++)
+    #pragma omp sections
+    {
+        #pragma omp section
+        { veejay_memset(Y, pixel_Y_lo_, len); }
+        #pragma omp section
+        { veejay_memset(Cb, 128, len); }
+        #pragma omp section
+        { veejay_memset(Cr, 128, len); }
+    }
+
+    if(height < 3 || width < 3)
+        return;
+
+    #pragma omp for schedule(static)
+    for(int y = 1; y < height - 1; y++)
+    {
+        const int row = y * width;
+
+        for(int x = 1; x < width - 1; x++)
+        {
+            const int i = row + x;
+
+            if(binary_img[i])
             {
-                const int i = row + x;
-
-                if(binary_img[i])
-                {
-                    Y[i] = Y2[i];
-                    Cb[i] = Cb2[i];
-                    Cr[i] = Cr2[i];
-                }
+                Y[i] = Y2[i];
+                Cb[i] = Cb2[i];
+                Cr[i] = Cr2[i];
             }
         }
     }

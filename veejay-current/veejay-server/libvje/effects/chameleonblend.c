@@ -10,7 +10,13 @@
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
- * as published by.
+ * as published by the Free Software Foundation; either version 2
+ * of the License , or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
@@ -35,7 +41,6 @@ typedef struct {
     uint8_t *timebuffer;
     int plane;
     uint8_t *bgimage[4];
-    int n_threads;
 } chameleonblend_t;
 
 static inline int chameleonblend_clampi(int v, int lo, int hi)
@@ -96,8 +101,9 @@ int chameleonblend_prepare(void *ptr, VJFrame *frame)
     if(!c || !frame || !frame->data[0] || !frame->data[1] || !frame->data[2])
         return 0;
 
-    int strides[4] = { frame->len, frame->len, frame->len, 0 };
-    vj_frame_copy(frame->data, c->bgimage, strides);
+    veejay_memcpy(c->bgimage[0], frame->data[0], frame->len);
+    veejay_memcpy(c->bgimage[1], frame->data[1], frame->len);
+    veejay_memcpy(c->bgimage[2], frame->data[2], frame->len);
 
     VJFrame tmp;
     veejay_memset(&tmp, 0, sizeof(VJFrame));
@@ -153,12 +159,10 @@ void *chameleonblend_malloc(int w, int h)
     c->bgimage[1] = c->bgimage[0] + len + safe_zone;
     c->bgimage[2] = c->bgimage[1] + len + safe_zone;
 
-    vj_frame_clear1(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
+    veejay_memset(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
 
     for(int i = 1; i < 3; i++)
-        vj_frame_clear1(c->bgimage[i], 128, len + safe_zone);
-
-    c->n_threads = vje_advise_num_threads(len);
+        veejay_memset(c->bgimage[i], 128, len + safe_zone);
     c->last_mode_ = -1;
 
     return c;
@@ -229,57 +233,58 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
         }
     }
 
-#pragma omp single
-    {
-        cb->plane = (cb->plane + 1) & (PLANES - 1);
-    }
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
+
 
 void chameleonblend_apply(void *ptr, VJFrame *frame, VJFrame *source, int *args)
 {
     chameleonblend_t *c = (chameleonblend_t*) ptr;
+
     const int mode = args[0];
-    int appearing = 0;
 
-#pragma omp single
-    {
-        if(!c->has_bg) {
-            chameleonblend_prepare(c, frame);
-        }
+    if(!c->has_bg)
+        chameleonblend_prepare(c, frame);
 
-        if(c->last_mode_ != mode) {
-            chameleonblend_reset_history(c, source->len);
-            c->last_mode_ = mode;
-        }
-
-        uint32_t activity = 0;
-        int auto_switch = 0;
-        int tmp1 = 0;
-        int tmp2 = 0;
-
-        if(c->motionmap && motionmap_active(c->motionmap)) {
-            motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
-            auto_switch = 1;
-            activity = motionmap_activity(c->motionmap);
-        }
-        else {
-            c->N__ = 0;
-            c->n__ = 0;
-        }
-
-        if(c->n__ == c->N__ || c->n__ == 0) {
-            auto_switch = 0;
-        }
-
-        if(auto_switch) {
-            appearing = (activity > 40) ? 1 : 0;
-        }
-        else {
-            appearing = (mode == 0) ? 0 : 1;
-        }
+    if(c->last_mode_ != mode) {
+        chameleonblend_reset_history(c, source->len);
+        c->last_mode_ = mode;
     }
 
-    drawChameleonBlend(c, source, frame, appearing);
+    uint32_t activity = 0;
+    int auto_switch = 0;
+    int tmp1 = 0;
+    int tmp2 = 0;
+
+    if(c->motionmap && motionmap_active(c->motionmap))
+    {
+        motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
+        auto_switch = 1;
+        activity = motionmap_activity(c->motionmap);
+    }
+    else
+    {
+        c->N__ = 0;
+        c->n__ = 0;
+    }
+
+    if(c->n__ == c->N__ || c->n__ == 0)
+        auto_switch = 0;
+
+    if(auto_switch)
+    {
+        if(activity <= 40)
+            drawChameleonBlend(c, source, frame, 0);
+        else
+            drawChameleonBlend(c, source, frame, 1);
+    }
+    else
+    {
+        if(mode == 0)
+            drawChameleonBlend(c, source, frame, 0);
+        else
+            drawChameleonBlend(c, source, frame, 1);
+    }
 }
 
 int chameleonblend_request_fx(void)

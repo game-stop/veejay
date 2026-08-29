@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -41,17 +41,6 @@ typedef struct {
 
     int frame;
     int state_ready;
-
-    int cached_w;
-    int cached_h;
-    int cached_mode;
-    int cached_fit_source;
-    int cached_split_x;
-    int cached_split_y;
-    int cached_glow;
-    int cached_mix_q8;
-    int cached_use_x_glow;
-    int cached_use_y_glow;
 } split_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -69,6 +58,7 @@ static inline uint8_t split_mix_u8(uint8_t a, uint8_t b, int q8)
     q8 = clampi(q8, 0, 256);
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
+
 
 static inline int split_smooth_i(float *state, int target, float attack, float release)
 {
@@ -100,6 +90,14 @@ vj_effect *split_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_MODE]        = 8;
     ve->defaults[P_SWITCH]      = 1;
@@ -203,22 +201,45 @@ void *split_malloc(int width, int height)
 void split_free(void *ptr)
 {
     split_t *s = (split_t*) ptr;
-    if(!s)
-        return;
 
-    if(s->tmp[0])
-        free(s->tmp[0]);
+    free(s->tmp[0]);
     free(s);
 }
 
 static void split_snapshot(split_t *s, VJFrame *frame)
 {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
-    veejay_memcpy(s->tmp[0], frame->data[0], (size_t)len);
-    veejay_memcpy(s->tmp[1], frame->data[1], (size_t)uv_len);
-    veejay_memcpy(s->tmp[2], frame->data[2], (size_t)uv_len);
+    veejay_memcpy(s->tmp[0], frame->data[0], len);
+    veejay_memcpy(s->tmp[1], frame->data[1], len);
+    veejay_memcpy(s->tmp[2], frame->data[2], len);
+}
+
+typedef int (*split_coord_fn)(int value, int origin, int extent, int source_extent);
+
+static inline int split_coord_direct(int value, int origin, int extent, int source_extent)
+{
+    (void)origin;
+    (void)extent;
+    (void)source_extent;
+    return value;
+}
+
+static inline int split_coord_direct_mirror(int value, int origin, int extent, int source_extent)
+{
+    (void)origin;
+    (void)extent;
+    return (source_extent - 1) - value;
+}
+
+static inline int split_coord_fit(int value, int origin, int extent, int source_extent)
+{
+    return ((value - origin) * source_extent) / extent;
+}
+
+static inline int split_coord_fit_mirror(int value, int origin, int extent, int source_extent)
+{
+    return (source_extent - 1) - (((value - origin) * source_extent) / extent);
 }
 
 static void split_copy_region_plane(uint8_t *restrict dst,
@@ -243,6 +264,12 @@ static void split_copy_region_plane(uint8_t *restrict dst,
     const int rw = x1 - x0;
     const int rh = y1 - y0;
 
+    const split_coord_fn x_fn =
+        fit_source
+            ? (mirror_x ? split_coord_fit_mirror : split_coord_fit)
+            : (mirror_x ? split_coord_direct_mirror : split_coord_direct);
+    const split_coord_fn y_fn = fit_source ? split_coord_fit : split_coord_direct;
+
 #pragma omp for schedule(static)
     for(int y = y0; y < y1; y++) {
         const int dst_row = y * w;
@@ -251,16 +278,8 @@ static void split_copy_region_plane(uint8_t *restrict dst,
             int sx;
             int sy;
 
-            if(fit_source) {
-                sx = ((x - x0) * w) / rw;
-                sy = ((y - y0) * h) / rh;
-            } else {
-                sx = x;
-                sy = y;
-            }
-
-            if(mirror_x)
-                sx = (w - 1) - sx;
+            sx = x_fn(x, x0, rw, w);
+            sy = y_fn(y, y0, rh, h);
 
             sx = clampi(sx, 0, w - 1);
             sy = clampi(sy, 0, h - 1);
@@ -356,6 +375,8 @@ static void split_squeeze_plane(uint8_t *restrict dst,
     }
 }
 
+
+
 static void split_mix_frame2(VJFrame *frame, VJFrame *frame2, int q8)
 {
     if(q8 <= 0)
@@ -364,17 +385,54 @@ static void split_mix_frame2(VJFrame *frame, VJFrame *frame2, int q8)
     q8 = clampi(q8, 0, 256);
 
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
 
 #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++)
+    for(int i = 0; i < len; i++) {
         frame->data[0][i] = split_mix_u8(frame->data[0][i], frame2->data[0][i], q8);
-
-#pragma omp for schedule(static)
-    for(int i = 0; i < uv_len; i++) {
         frame->data[1][i] = split_mix_u8(frame->data[1][i], frame2->data[1][i], q8);
         frame->data[2][i] = split_mix_u8(frame->data[2][i], frame2->data[2][i], q8);
     }
+}
+
+typedef int (*split_distance_fn)(int x, int y, int split_x, int split_y);
+
+static inline int split_distance_x(int x, int y, int split_x, int split_y)
+{
+    int d = x - split_x;
+
+    (void)y;
+    (void)split_y;
+
+    if(d < 0)
+        d = -d;
+
+    return d;
+}
+
+static inline int split_distance_y(int x, int y, int split_x, int split_y)
+{
+    int d = y - split_y;
+
+    (void)x;
+    (void)split_x;
+
+    if(d < 0)
+        d = -d;
+
+    return d;
+}
+
+static inline int split_distance_xy(int x, int y, int split_x, int split_y)
+{
+    int dx = x - split_x;
+    int dy = y - split_y;
+
+    if(dx < 0)
+        dx = -dx;
+    if(dy < 0)
+        dy = -dy;
+
+    return dx < dy ? dx : dy;
 }
 
 static void split_apply_edge_glow(VJFrame *frame,
@@ -391,6 +449,8 @@ static void split_apply_edge_glow(VJFrame *frame,
     const int h = frame->height;
     const int radius = 1 + ((glow * 31 + 500) / 1000);
     const int lift = (glow * 110 + 500) / 1000;
+    const split_distance_fn distance_fn =
+        use_x ? (use_y ? split_distance_xy : split_distance_x) : split_distance_y;
 
     uint8_t *restrict Y = frame->data[0];
 
@@ -399,23 +459,7 @@ static void split_apply_edge_glow(VJFrame *frame,
         const int row = y * w;
 
         for(int x = 0; x < w; x++) {
-            int dist = 999999;
-
-            if(use_x) {
-                int d = x - split_x;
-                if(d < 0)
-                    d = -d;
-                if(d < dist)
-                    dist = d;
-            }
-
-            if(use_y) {
-                int d = y - split_y;
-                if(d < 0)
-                    d = -d;
-                if(d < dist)
-                    dist = d;
-            }
+            const int dist = distance_fn(x, y, split_x, split_y);
 
             if(dist < radius) {
                 const int add = (lift * (radius - dist) + (radius >> 1)) / radius;
@@ -431,141 +475,132 @@ void split_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     split_t *s = (split_t*) ptr;
 
+    const int w = frame->width;
+    const int h = frame->height;
+
+    const int mode = args[P_MODE];
+    const int fit_source = args[P_SWITCH] ? 1 : 0;
     const int split_pos_arg = args[P_SPLIT_POS];
     const int edge_glow_arg = args[P_EDGE_GLOW];
     const int slide_drive_arg = args[P_SLIDE_DRIVE];
     const int mix_drive_arg = args[P_MIX_DRIVE];
-    const int mode_arg = args[P_MODE];
-    const int switch_arg = args[P_SWITCH];
 
-    #pragma omp single
+#pragma omp single
     {
-        s->cached_w = frame->width;
-        s->cached_h = frame->height;
-
-        s->cached_mode = mode_arg;
-        s->cached_fit_source = switch_arg ? 1 : 0;
-
         if(!s->state_ready) {
             s->pos_state = (float)split_pos_arg;
             s->glow_state = (float)edge_glow_arg;
             s->slide_state = (float)slide_drive_arg;
             s->mix_state = (float)mix_drive_arg;
             s->state_ready = 1;
+        } else {
+            split_smooth_i(&s->slide_state, slide_drive_arg, 0.18f, 0.070f);
+            split_smooth_i(&s->mix_state, mix_drive_arg, 0.16f, 0.065f);
+            split_smooth_i(&s->glow_state, edge_glow_arg, 0.15f, 0.060f);
         }
-
-        const int slide_drive = split_smooth_i(&s->slide_state, slide_drive_arg, 0.18f, 0.070f);
-        const int mix_drive = split_smooth_i(&s->mix_state, mix_drive_arg, 0.16f, 0.065f);
-        const int base_glow = split_smooth_i(&s->glow_state, edge_glow_arg, 0.15f, 0.060f);
-
-        const int tri = split_tri_centered(s->frame * 7);
-        const int slide_offset = (tri * slide_drive) / 1024;
-
-        int target_pos = split_pos_arg + slide_offset;
-        target_pos = clampi(target_pos, 0, 1000);
-
-        const int pos_q = clampi(split_smooth_i(&s->pos_state, target_pos, 0.16f, 0.080f), 0, 1000);
-        s->cached_split_x = clampi((s->cached_w * pos_q + 500) / 1000, 1, s->cached_w - 1);
-        s->cached_split_y = clampi((s->cached_h * pos_q + 500) / 1000, 1, s->cached_h - 1);
-
-        s->cached_glow = clampi(base_glow + ((slide_drive * 180 + 500) / 1000), 0, 1000);
-        s->cached_mix_q8 = clampi((mix_drive * 220 + 500) / 1000, 0, 256);
-
-        s->cached_use_x_glow = 0;
-        s->cached_use_y_glow = 0;
-
-        switch(s->cached_mode) {
-            case 0:
-            case 1:
-            case 2:
-            case 7:
-                s->cached_use_x_glow = 1;
-                break;
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-                s->cached_use_x_glow = 1;
-                s->cached_use_y_glow = 1;
-                break;
-            case 8:
-                s->cached_use_y_glow = 1;
-                break;
-            default:
-                break;
-        }
-
-        if(s->cached_mode == 7)
-            split_snapshot(s, frame);
     }
 
-    const int w = s->cached_w;
-    const int h = s->cached_h;
-    const int mode = s->cached_mode;
-    const int fit_source = s->cached_fit_source;
-    const int split_x = s->cached_split_x;
-    const int split_y = s->cached_split_y;
-    const int glow = s->cached_glow;
-    const int mix_q8 = s->cached_mix_q8;
-    const int use_x_glow = s->cached_use_x_glow;
-    const int use_y_glow = s->cached_use_y_glow;
+    const int slide_drive = clampi((int)(s->slide_state + 0.5f), 0, 1000);
+    const int mix_drive = clampi((int)(s->mix_state + 0.5f), 0, 1000);
+    const int base_glow = clampi((int)(s->glow_state + 0.5f), 0, 1000);
+
+    const int tri = split_tri_centered(s->frame * 7);
+    const int slide_offset = (tri * slide_drive) / 1024;
+
+    int target_pos = split_pos_arg + slide_offset;
+    target_pos = clampi(target_pos, 0, 1000);
+
+    int use_x_glow = 0;
+    int use_y_glow = 0;
 
     switch(mode) {
         case 0:
-            split_copy_region_xy(frame, frame2, split_x, 0, w, h, 0, fit_source);
-            break;
-
         case 1:
-            split_copy_region_xy(frame, frame2, split_x, 0, w, h, 1, fit_source);
-            break;
-
         case 2:
-            split_copy_region_xy(frame, frame2, 0, 0, split_x, h, 1, fit_source);
+        case 7:
+            use_x_glow = 1;
             break;
-
         case 3:
-            split_copy_region_xy(frame, frame2, 0, 0, split_x, split_y, 0, fit_source);
-            break;
-
         case 4:
-            split_copy_region_xy(frame, frame2, split_x, 0, w, split_y, 0, fit_source);
-            break;
-
         case 5:
-            split_copy_region_xy(frame, frame2, split_x, split_y, w, h, 0, fit_source);
-            break;
-
         case 6:
-            split_copy_region_xy(frame, frame2, 0, split_y, split_x, h, 0, fit_source);
+            use_x_glow = 1;
+            use_y_glow = 1;
             break;
-
-        case 7: {
-            const int uw = frame->ssm ? w : frame->uv_width;
-            const int uh = frame->ssm ? h : frame->uv_height;
-            const int usplit = (split_x * uw + (w >> 1)) / w;
-
-            split_squeeze_plane(frame->data[0], frame2->data[0], w, h, 0, split_x);
-            split_squeeze_plane(frame->data[0], s->tmp[0],       w, h, split_x, w);
-            split_squeeze_plane(frame->data[1], frame2->data[1], uw, uh, 0, usplit);
-            split_squeeze_plane(frame->data[2], frame2->data[2], uw, uh, 0, usplit);
-            split_squeeze_plane(frame->data[1], s->tmp[1], uw, uh, usplit, uw);
-            split_squeeze_plane(frame->data[2], s->tmp[2], uw, uh, usplit, uw);
-            break;
-        }
-
         case 8:
-            split_copy_region_xy(frame, frame2, 0, 0, w, split_y, 0, fit_source);
+            use_y_glow = 1;
             break;
-
         default:
             break;
+    }
+
+#pragma omp single
+    {
+        split_smooth_i(&s->pos_state, target_pos, 0.16f, 0.080f);
+        if(mode == 7)
+            split_snapshot(s, frame);
+    }
+
+    const int pos_q = clampi((int)(s->pos_state + 0.5f), 0, 1000);
+    const int split_x = clampi((w * pos_q + 500) / 1000, 1, w - 1);
+    const int split_y = clampi((h * pos_q + 500) / 1000, 1, h - 1);
+    const int glow = clampi(base_glow + ((slide_drive * 180 + 500) / 1000), 0, 1000);
+    const int mix_q8 = clampi((mix_drive * 220 + 500) / 1000, 0, 256);
+
+    switch(mode) {
+            case 0:
+                split_copy_region_xy(frame, frame2, split_x, 0, w, h, 0, fit_source);
+                break;
+
+            case 1:
+                split_copy_region_xy(frame, frame2, split_x, 0, w, h, 1, fit_source);
+                break;
+
+            case 2:
+                split_copy_region_xy(frame, frame2, 0, 0, split_x, h, 1, fit_source);
+                break;
+
+            case 3:
+                split_copy_region_xy(frame, frame2, 0, 0, split_x, split_y, 0, fit_source);
+                break;
+
+            case 4:
+                split_copy_region_xy(frame, frame2, split_x, 0, w, split_y, 0, fit_source);
+                break;
+
+            case 5:
+                split_copy_region_xy(frame, frame2, split_x, split_y, w, h, 0, fit_source);
+                break;
+
+            case 6:
+                split_copy_region_xy(frame, frame2, 0, split_y, split_x, h, 0, fit_source);
+                break;
+
+            case 7: {
+                const int uw = frame->ssm ? w : frame->uv_width;
+                const int uh = frame->ssm ? h : frame->uv_height;
+                const int usplit = (split_x * uw + (w >> 1)) / w;
+
+                split_squeeze_plane(frame->data[0], frame2->data[0], w, h, 0, split_x);
+                split_squeeze_plane(frame->data[0], s->tmp[0],       w, h, split_x, w);
+                split_squeeze_plane(frame->data[1], frame2->data[1], uw, uh, 0, usplit);
+                split_squeeze_plane(frame->data[2], frame2->data[2], uw, uh, 0, usplit);
+                split_squeeze_plane(frame->data[1], s->tmp[1], uw, uh, usplit, uw);
+                split_squeeze_plane(frame->data[2], s->tmp[2], uw, uh, usplit, uw);
+                break;
+            }
+
+            case 8:
+                split_copy_region_xy(frame, frame2, 0, 0, w, split_y, 0, fit_source);
+                break;
+
+            default:
+                break;
     }
 
     split_mix_frame2(frame, frame2, mix_q8);
     split_apply_edge_glow(frame, split_x, split_y, use_x_glow, use_y_glow, glow);
 
-    #pragma omp single
-    {
-        s->frame++;
-    }
+#pragma omp single
+    s->frame++;
 }

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,19 +17,14 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
 #include "chromapalette.h"
-#include <veejaycore/vjmem.h>
-#include <math.h>
 
 typedef struct {
     int softness;
     int tolerance;
     float *lut;
-    uint8_t lut_cb[256];
-    uint8_t lut_cr[256];
-    int target_u;
-    int target_v;
 } chromapalette_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -49,7 +44,16 @@ vj_effect *chromapalette_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][0] = 1; ve->limits[1][0] = 255; ve->defaults[0] = 60;
 
@@ -84,9 +88,6 @@ vj_effect *chromapalette_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
@@ -105,9 +106,6 @@ void *chromapalette_malloc(int w, int h)
         free(c);
         return NULL;
     }
-
-    (void)w;
-    (void)h;
 
     return c;
 }
@@ -159,53 +157,58 @@ static void calc_lut(chromapalette_t *c, int tolerance, int softness)
 void chromapalette_apply(void *ptr, VJFrame *frame, int *args)
 {
     chromapalette_t *c = (chromapalette_t*) ptr;
+
+    uint8_t lut_cb[256];
+    uint8_t lut_cr[256];
+
+    const int tolerance = args[0];
+    const int r = args[1];
+    const int g = args[2];
+    const int b = args[3];
+    const int color_cb = args[4];
+    const int color_cr = args[5];
+    const int softness = args[6];
+    const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
-    const int len = frame->len;
 
-    #pragma omp single
+    int target_y = 0;
+    int target_u = 128;
+    int target_v = 128;
+
+    _rgb2yuv(r, g, b, target_y, target_u, target_v);
+
+    target_u = clampi(target_u, 0, 255);
+    target_v = clampi(target_v, 0, 255);
+
+#pragma omp single
     {
-        const int tolerance = args[0];
-        const int r = args[1];
-        const int g = args[2];
-        const int b = args[3];
-        const int color_cb = args[4];
-        const int color_cr = args[5];
-        const int softness = args[6];
-
-        int target_y = 0;
-        int target_u = 128;
-        int target_v = 128;
-
-        _rgb2yuv(r, g, b, target_y, target_u, target_v);
-
-        c->target_u = clampi(target_u, 0, 255);
-        c->target_v = clampi(target_v, 0, 255);
-
         if(softness != c->softness || tolerance != c->tolerance) {
             calc_lut(c, tolerance, softness);
             c->softness = softness;
             c->tolerance = tolerance;
         }
-
-        for(int i = 0; i < 256; i++) {
-            c->lut_cb[i] = CLAMP_UV(128 + (int)(((float)(color_cb - i) * 0.492f) + 0.5f));
-            c->lut_cr[i] = CLAMP_UV(128 + (int)(((float)(color_cr - i) * 0.877f) + 0.5f));
-        }
     }
 
-#pragma omp for schedule(static)
+    const float *restrict lut = c->lut;
+
+    for(int i = 0; i < 256; i++) {
+        lut_cb[i] = CLAMP_UV(128 + (int)(((float)(color_cb - i) * 0.492f) + 0.5f));
+        lut_cr[i] = CLAMP_UV(128 + (int)(((float)(color_cr - i) * 0.877f) + 0.5f));
+    }
+
+    #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
-        const int du_idx = (int)Cb[i] - c->target_u + 255;
-        const int dv_idx = (int)Cr[i] - c->target_v + 255;
-        const float blend = c->lut[dv_idx * 512 + du_idx];
+        const int du_idx = (int)Cb[i] - target_u + 255;
+        const int dv_idx = (int)Cr[i] - target_v + 255;
+        const float blend = lut[dv_idx * 512 + du_idx];
 
         if(blend > 0.0f)
         {
-            const int target_cb = c->lut_cb[Y[i]];
-            const int target_cr = c->lut_cr[Y[i]];
+            const int target_cb = lut_cb[Y[i]];
+            const int target_cr = lut_cr[Y[i]];
 
             Cb[i] = CLAMP_UV((int)Cb[i] + (int)(blend * ((float)target_cb - (float)Cb[i])));
             Cr[i] = CLAMP_UV((int)Cr[i] + (int)(blend * ((float)target_cr - (float)Cr[i])));

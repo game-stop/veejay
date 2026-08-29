@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -35,7 +35,6 @@
 #define GREYSELECT_SCALE 4096
 
 typedef struct {
-    int n_threads;
     int last[GREYSELECT_PARAMS];
     int mag_fp;
     int cos_q_fp;
@@ -70,6 +69,18 @@ static inline int greyselect_mul255_signed(int v, int a)
     }
 }
 
+typedef int (*greyselect_alpha_fn)(int alpha);
+
+static inline int greyselect_alpha_identity(int alpha)
+{
+    return alpha;
+}
+
+static inline int greyselect_alpha_invert(int alpha)
+{
+    return 255 - alpha;
+}
+
 vj_effect *greyselect_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -82,7 +93,16 @@ vj_effect *greyselect_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 255;
@@ -150,15 +170,12 @@ void *greyselect_malloc(int w, int h)
     g->inv_range_fp = 255 << 8;
     g->black_clip_fp = 0;
     g->swap = 0;
-    g->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) g;
 }
 
 void greyselect_free(void *ptr)
 {
-    if(!ptr)
-        return;
     free(ptr);
 }
 
@@ -216,15 +233,8 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
 {
     greyselect_t *g = (greyselect_t*) ptr;
 
-    const int len = frame->len;
-
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    #pragma omp single
-    {
-        greyselect_update_cache(g, args);
-    }
+#pragma omp single
+    greyselect_update_cache(g, args);
 
     const int mag_fp = g->mag_fp;
     const int cos_q_fp = g->cos_q_fp;
@@ -233,6 +243,12 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
     const int inv_range_fp = g->inv_range_fp;
     const int black_clip_fp = g->black_clip_fp;
     const int swap = g->swap;
+    const greyselect_alpha_fn alpha_fn =
+        swap ? greyselect_alpha_identity : greyselect_alpha_invert;
+    const int len = frame->len;
+
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
 #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
@@ -246,8 +262,7 @@ void greyselect_apply(void *ptr, VJFrame *frame, int *args)
         const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
         int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-        if(!swap)
-            alpha = 255 - alpha;
+        alpha = alpha_fn(alpha);
 
         if(alpha == 0) {
             Cb[pos] = 128;

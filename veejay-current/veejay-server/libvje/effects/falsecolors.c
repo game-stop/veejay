@@ -38,7 +38,9 @@ typedef struct {
     uint8_t rainbow[256][3];
     uint8_t gamma_lut[256];
     int timestamp;
-    int n_threads;
+    int global_min;
+    int global_max;
+    int scale_fp;
     float phase;
     float gamma;
 } thermal_t;
@@ -107,7 +109,6 @@ static void falsecolors_build_beat_hints(vj_effect *ve)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 }
-
 vj_effect *falsecolors_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -120,7 +121,13 @@ vj_effect *falsecolors_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_MOTION_SENS] = 128;
     ve->defaults[P_CYCLE_SPEED] = 1;
@@ -184,8 +191,8 @@ void *falsecolors_malloc(int w, int h)
     thermal_build_palette(s->rainbow, 0.8f);
 
     const int max_dim = (w > h) ? w : h;
-    s->n_threads = omp_get_max_threads();
-    s->blur = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)s->n_threads * (size_t)max_dim * 2u);
+    const int thread_slots = omp_get_max_threads();
+    s->blur = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)thread_slots * (size_t)max_dim * 2u);
     if(!s->blur) {
         free(s->buf[0]);
         free(s);
@@ -202,9 +209,6 @@ void *falsecolors_malloc(int w, int h)
 void falsecolors_free(void *ptr)
 {
     thermal_t *s = (thermal_t*) ptr;
-
-    if(!s)
-        return;
 
     free(s->buf[0]);
     free(s->blur);
@@ -225,11 +229,17 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
     const int trail_user   = args[P_TRAIL_DECAY];
     const int gain_user    = args[P_MOTION_GAIN];
 
-    const int sensitivity = clampi(sens_user, 0, 255);
-    const int motion_gain = clampi(gain_user, 0, 1024);
-    const int cycle_speed = clampi(cycle_user, 0, 64);
-    const int opacity = clampi(opacity_user, 0, 255);
-    const int trail_decay = clampi(trail_user, 1, 128);
+    int sensitivity = sens_user;
+    int motion_gain = gain_user;
+    int cycle_speed = cycle_user;
+    int opacity = opacity_user;
+    int trail_decay = trail_user;
+
+    sensitivity = clampi(sensitivity, 0, 255);
+    motion_gain = clampi(motion_gain, 0, 1024);
+    cycle_speed = clampi(cycle_speed, 0, 64);
+    opacity = clampi(opacity, 0, 255);
+    trail_decay = clampi(trail_decay, 1, 128);
 
     const int inv_opacity = 256 - opacity;
     const int decay_step = clampi((256 + (trail_decay >> 1)) / trail_decay, 2, 256);
@@ -244,9 +254,8 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict blur_buf  = s->buf[2];
 
     const int max_dim = (w > h) ? w : h;
-    int lut_offset = 0;
 
-    #pragma omp single copyprivate(lut_offset)
+ #pragma omp single
     {
         if(fabsf(s->gamma - gamma) > 0.01f) {
             build_gamma_lut(s->gamma_lut, gamma);
@@ -256,25 +265,24 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
         s->phase += (float)cycle_speed;
         if(s->phase >= 4096.0f)
             s->phase -= 4096.0f;
-
-        lut_offset = ((int)s->phase) & 0xFF;
     }
 
-    #pragma omp for schedule(static)
+    const int lut_offset = ((int)s->phase) & 0xFF;
+
+    const int tid = omp_get_thread_num();
+
+    uint8_t *tmp = s->blur + (size_t)tid * (size_t)max_dim * 2u;
+    uint8_t *col_tmp = tmp;
+    uint8_t *col_out = tmp + max_dim;
+
+#pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
-        const int tid = omp_get_thread_num();
-        uint8_t *tmp = s->blur + (size_t)tid * (size_t)max_dim * 2u;
         veejay_blur2(tmp, Y + (y * w), w, 2, 2, 1, 1);
-        memcpy(blur_buf + (y * w), tmp, (size_t)w);
+        veejay_memcpy(blur_buf + (y * w), tmp, (size_t)w);
     }
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int x = 0; x < w; x++) {
-        const int tid = omp_get_thread_num();
-        uint8_t *tmp = s->blur + (size_t)tid * (size_t)max_dim * 2u;
-        uint8_t *col_tmp = tmp;
-        uint8_t *col_out = tmp + max_dim;
-
         for(int y = 0; y < h; y++)
             col_tmp[y] = blur_buf[y * w + x];
 
@@ -284,60 +292,84 @@ void falsecolors_apply(void *ptr, VJFrame *frame, int *args)
             blur_buf[y * w + x] = col_out[y];
     }
 
-    int global_min = 255;
-    int global_max = 0;
-    for(int i = 0; i < len; i++) {
-        if(blur_buf[i] < global_min) global_min = blur_buf[i];
-        if(blur_buf[i] > global_max) global_max = blur_buf[i];
+#pragma omp single
+    {
+        s->global_min = 255;
+        s->global_max = 0;
     }
 
-    int range = global_max - global_min;
-    if(range < 64)
-        range = 64;
+    int local_min = 255;
+    int local_max = 0;
 
-    int scale_fp = (255 << 16) / range;
-
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
-        const int lum = blur_buf[i];
+        int v = blur_buf[i];
 
-        int motion = fc_absi(lum - prev_luma[i]) - sensitivity;
-        motion &= ~(motion >> 31);
-
-        int heat = (((lum - global_min) * scale_fp) >> 16) + ((motion * motion_gain) >> 7);
-
-        if(heat > 255)
-            heat = 255;
-        else if(heat < 0)
-            heat = 0;
-
-        int mixed = (heat * opacity + heat_buf[i] * inv_opacity) >> 8;
-        int released = (int)heat_buf[i] - decay_step;
-
-        if(released < 0)
-            released = 0;
-
-        int val = (mixed < released) ? released : mixed;
-
-        heat_buf[i] = (uint8_t)val;
-        prev_luma[i] = (uint8_t)lum;
-
-        const int mapped = s->gamma_lut[val];
-        int lut_idx = (mapped + lut_offset) & 0xFF;
-
-        if(motion > 0) {
-            int jump = (motion > 48) ? 64 : (motion << 6) / 48;
-            lut_idx = (lut_idx + jump) & 0xFF;
-        }
-
-        const uint8_t *restrict col = s->rainbow[lut_idx];
-
-        Y[i] = col[0];
-        U[i] = col[1];
-        V[i] = col[2];
+        if(v < local_min)
+            local_min = v;
+        if(v > local_max)
+            local_max = v;
     }
 
-    #pragma omp single
+#pragma omp critical
+    {
+        if(local_min < s->global_min)
+            s->global_min = local_min;
+        if(local_max > s->global_max)
+            s->global_max = local_max;
+    }
+
+#pragma omp single
+    {
+        int range = s->global_max - s->global_min;
+        if(range < 64)
+            range = 64;
+
+        s->scale_fp = (255 << 16) / range;
+    }
+
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+            const int lum = blur_buf[i];
+
+            int motion = fc_absi(lum - prev_luma[i]) - sensitivity;
+            motion &= ~(motion >> 31);
+
+            int heat = (((lum - s->global_min) * s->scale_fp) >> 16) + ((motion * motion_gain) >> 7);
+
+            if(heat > 255)
+                heat = 255;
+            else if(heat < 0)
+                heat = 0;
+
+            int mixed = (heat * opacity + heat_buf[i] * inv_opacity) >> 8;
+            int released = (int)heat_buf[i] - decay_step;
+
+            if(released < 0)
+                released = 0;
+
+            int val = (mixed < released) ? released : mixed;
+
+            heat_buf[i] = (uint8_t)val;
+            prev_luma[i] = (uint8_t)lum;
+
+            const int mapped = s->gamma_lut[val];
+            int lut_idx = (mapped + lut_offset) & 0xFF;
+
+            if(motion > 0) {
+                int jump = (motion > 48) ? 64 : (motion << 6) / 48;
+
+                lut_idx = (lut_idx + jump) & 0xFF;
+            }
+
+            const uint8_t *restrict col = s->rainbow[lut_idx];
+
+            Y[i] = col[0];
+            U[i] = col[1];
+            V[i] = col[2];
+    }
+
+ #pragma omp single
     {
         s->timestamp++;
     }

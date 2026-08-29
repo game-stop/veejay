@@ -29,13 +29,7 @@
 typedef struct {
     int currentFrame;
     int last_exposure;
-    int n_threads;
     uint16_t explut[TABLE_SIZE];
-    
-    int rising;
-    int fp_multiplier;
-    int lerp;
-    int opacity;
 } flash_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -86,6 +80,17 @@ vj_effect *flashopacity_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 1; ve->limits[1][0] = 100; ve->defaults[0] = 5;
     ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 100;
     ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 255;
@@ -95,6 +100,8 @@ vj_effect *flashopacity_init(int w, int h)
     ve->description = "Flash Opacity";
     ve->sub_format = -1;
     ve->extra_frame = 1;
+    ve->parallel = 0;
+    ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Exposure", "Start Opacity", "End Opacity", "Interval", "Mode");
 
     {
@@ -120,10 +127,6 @@ void *flashopacity_malloc(int w, int h)
 
     f->currentFrame = 0;
     f->last_exposure = -1;
-    f->rising = 0;
-    f->fp_multiplier = 256;
-    f->lerp = 0;
-    f->opacity = 255;
 
     return f;
 }
@@ -138,55 +141,50 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     flash_t *f = (flash_t*) ptr;
 
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
     const int exposure = args[0];
     const int opacityStart = args[1];
     const int opacityEnd = args[2];
     const int interval = args[3];
     const int mode = args[4];
 
-    #pragma omp single
+#pragma omp single
     {
         if(f->last_exposure != exposure)
             flashopacity_build_lut(f, exposure);
-
-        int cf = f->currentFrame;
-
-        if(cf < 0 || cf >= interval)
-            cf %= interval;
-        if(cf < 0)
-            cf = 0;
-
-        const int hInterval = interval >> 1;
-        f->rising = (hInterval > 0 && cf < hInterval);
-
-        if(f->rising) {
-            const int index = (cf * (TABLE_SIZE - 1) + (hInterval >> 1)) / hInterval;
-            f->fp_multiplier = f->explut[index];
-            if(mode == 1)
-                f->lerp = (cf * 255 + (hInterval >> 1)) / hInterval;
-            else
-                f->lerp = 0;
-        }
-        else {
-            const int denom = interval - hInterval;
-            const int t = cf - hInterval;
-
-            if(denom <= 1)
-                f->opacity = opacityEnd;
-            else
-                f->opacity = opacityStart + (t * (opacityEnd - opacityStart) + ((opacityEnd >= opacityStart) ? (denom >> 1) : -(denom >> 1))) / (denom - 1);
-
-            f->opacity = clampi(f->opacity, 0, 255);
-            f->fp_multiplier = 256;
-            f->lerp = 0;
-        }
-
-        f->currentFrame = cf + 1;
-        if(f->currentFrame >= interval)
-            f->currentFrame = 0;
     }
-    
+
+    int currentFrame = f->currentFrame;
+
+    if(currentFrame < 0 || currentFrame >= interval)
+        currentFrame %= interval;
+    if(currentFrame < 0)
+        currentFrame = 0;
+
+    const int hInterval = interval >> 1;
+    const int rising = hInterval > 0 && currentFrame < hInterval;
+    int fp_multiplier = 256;
+    int lerp = 0;
+    int opacity = opacityEnd;
+
+    if(rising) {
+        const int index = (currentFrame * (TABLE_SIZE - 1) + (hInterval >> 1)) / hInterval;
+        fp_multiplier = f->explut[index];
+        if(mode == 1)
+            lerp = (currentFrame * 255 + (hInterval >> 1)) / hInterval;
+    }
+    else {
+        const int denom = interval - hInterval;
+        const int t = currentFrame - hInterval;
+
+        if(denom <= 1)
+            opacity = opacityEnd;
+        else
+            opacity = opacityStart + (t * (opacityEnd - opacityStart) + ((opacityEnd >= opacityStart) ? (denom >> 1) : -(denom >> 1))) / (denom - 1);
+
+        opacity = clampi(opacity, 0, 255);
+    }
+
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
@@ -195,35 +193,37 @@ void flashopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict U2 = frame2->data[1];
     const uint8_t *restrict V2 = frame2->data[2];
 
-    if(f->rising) {
-        const int fp_mult = f->fp_multiplier;
-        const int l_val = f->lerp;
-
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            int v = ((int)Y[i] * fp_mult) >> 8;
-            Y[i] = flashopacity_u8(v);
-        }
+    if(rising) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                int v = ((int)Y[i] * fp_multiplier) >> 8;
+                Y[i] = flashopacity_u8(v);
+            }
 
         if(mode == 1) {
-            #pragma omp for schedule(static)
-            for(int i = 0; i < uv_len; i++) {
-                U[i] = flashopacity_blend255(U[i], U2[i], l_val);
-                V[i] = flashopacity_blend255(V[i], V2[i], l_val);
-            }
+#pragma omp for schedule(static)
+                for(int i = 0; i < uv_len; i++) {
+                    U[i] = flashopacity_blend255(U[i], U2[i], lerp);
+                    V[i] = flashopacity_blend255(V[i], V2[i], lerp);
+                }
         }
     }
     else {
-        const int opac = f->opacity;
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++)
+                Y[i] = flashopacity_blend255(Y[i], Y2[i], opacity);
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = flashopacity_blend255(Y[i], Y2[i], opac);
-
-        #pragma omp for schedule(static)
-        for(int i = 0; i < uv_len; i++) {
-            U[i] = flashopacity_blend255(U[i], U2[i], opac);
-            V[i] = flashopacity_blend255(V[i], V2[i], opac);
+#pragma omp for schedule(static)
+            for(int i = 0; i < uv_len; i++) {
+                U[i] = flashopacity_blend255(U[i], U2[i], opacity);
+                V[i] = flashopacity_blend255(V[i], V2[i], opacity);
         }
+    }
+
+#pragma omp single
+    {
+        f->currentFrame = currentFrame + 1;
+        if(f->currentFrame >= interval)
+            f->currentFrame = 0;
     }
 }

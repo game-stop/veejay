@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2005-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2005 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,7 +20,6 @@
 
 #include "common.h"
 #include "photoplay.h"
-#include <veejaycore/vjmem.h>
 
 #define PHOTOPLAY_PARAMS 3
 
@@ -36,14 +35,6 @@ typedef struct {
     int frame_delay;
     int *rt;
     int last_mode;
-
-    int cached_width;
-    int cached_height;
-    int cached_len;
-    int cached_uv_len;
-    int cached_size;
-    int skip_processing;
-    matrix_f cached_matrix_placement;
 } photoplay_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -69,6 +60,17 @@ vj_effect *photoplay_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     const int max_grid_w = max_power(w);
     const int max_grid_h = max_power(h);
@@ -124,25 +126,16 @@ vj_effect *photoplay_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
 static void destroy_filmstrip(photoplay_t *p)
 {
-    if(!p)
-        return;
-
     if(p->photo_list) {
         for(int i = 0; i < p->num_photos; i++) {
             if(p->photo_list[i]) {
-                for(int j = 0; j < 3; j++) {
-                    if(p->photo_list[i]->data[j])
-                        free(p->photo_list[i]->data[j]);
-                }
+                for(int j = 0; j < 3; j++)
+                    free(p->photo_list[i]->data[j]);
 
                 free(p->photo_list[i]);
             }
@@ -152,10 +145,8 @@ static void destroy_filmstrip(photoplay_t *p)
         p->photo_list = NULL;
     }
 
-    if(p->rt) {
-        free(p->rt);
-        p->rt = NULL;
-    }
+    free(p->rt);
+    p->rt = NULL;
 
     p->num_photos = 0;
     p->grid_size = 0;
@@ -173,12 +164,12 @@ static int prepare_filmstrip(photoplay_t *p, int grid_size, int w, int h)
 
     destroy_filmstrip(p);
 
-    p->photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (size_t)(film_length + 1));
+    p->photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1));
 
     if(!p->photo_list)
         goto fail;
 
-    p->rt = (int*) vj_calloc(sizeof(int) * (size_t)film_length);
+    p->rt = (int*) vj_calloc(sizeof(int) * film_length);
 
     if(!p->rt)
         goto fail;
@@ -201,7 +192,7 @@ static int prepare_filmstrip(photoplay_t *p, int grid_size, int w, int h)
             if(!p->photo_list[i]->data[j])
                 goto fail;
 
-            veejay_memset(p->photo_list[i]->data[j], j == 0 ? pixel_Y_lo_ : 128, (size_t)picture_len);
+            veejay_memset(p->photo_list[i]->data[j], j == 0 ? pixel_Y_lo_ : 128, picture_len);
         }
     }
 
@@ -234,8 +225,6 @@ void *photoplay_malloc(int w, int h)
 void photoplay_free(void *ptr)
 {
     photoplay_t *p = (photoplay_t*) ptr;
-    if(!p)
-        return;
 
     destroy_filmstrip(p);
     free(p);
@@ -298,7 +287,7 @@ static void put_photo(photoplay_t *p,
     const uint8_t *restrict src_ptr = photo;
 
     for(int y = 0; y < copy_h; y++) {
-        veejay_memcpy(dst_ptr, src_ptr, (size_t)copy_w);
+        veejay_memcpy(dst_ptr, src_ptr, copy_w);
         dst_ptr += dst_w;
         src_ptr += box_w;
     }
@@ -306,92 +295,71 @@ static void put_photo(photoplay_t *p,
 
 void photoplay_apply(void *ptr, VJFrame *frame, int *args)
 {
+#pragma omp single
+    {
     photoplay_t *p = (photoplay_t*) ptr;
 
-    #pragma omp single
-    {
-        const int width = frame->width;
-        const int height = frame->height;
-        const int len = frame->len;
-        const int uv_len = frame->ssm ? len : frame->uv_len;
-        const int max_grid_w = max_power(width);
-        const int max_grid_h = max_power(height);
-        const int max_grid = max_grid_w < max_grid_h ? max_grid_w : max_grid_h;
-        const int size = clampi(args[P_GRID_SIZE], 2, max_grid);
-        const int delay = args[P_FRAME_DELAY];
-        const int mode = clampi(args[P_MODE], 0, pp_mode_max());
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+    const int max_grid_w = max_power(width);
+    const int max_grid_h = max_power(height);
+    const int max_grid = max_grid_w < max_grid_h ? max_grid_w : max_grid_h;
+    const int size = clampi(args[P_GRID_SIZE], 2, max_grid);
+    const int delay = args[P_FRAME_DELAY];
+    const int mode = clampi(args[P_MODE], 0, pp_mode_max());
 
-        p->skip_processing = 0;
-
-        if((size * size) != p->num_photos || p->grid_size != size) {
-            if(!prepare_filmstrip(p, size, width, height)) {
-                p->skip_processing = 1;
-            } else {
-                photoplay_reset_order(p, mode);
-            }
-        }
-        else if(p->last_mode != mode) {
+    if((size * size) != p->num_photos || p->grid_size != size) {
+        if(prepare_filmstrip(p, size, width, height))
             photoplay_reset_order(p, mode);
-        }
-
-        if(!p->skip_processing) {
-            if(p->frame_delay > 0)
-                p->frame_delay--;
-
-            if(p->frame_delay == 0) {
-                const int photo_index = p->frame_counter % p->num_photos;
-
-                for(int i = 0; i < 3; i++) {
-                    take_photo(
-                        p,
-                        frame->data[i],
-                        p->photo_list[photo_index]->data[i],
-                        width,
-                        height,
-                        photo_index
-                    );
-                }
-
-                p->frame_delay = delay;
-                p->frame_counter++;
-            }
-
-            p->cached_matrix_placement = mode == 0 ? get_matrix_func(0) : get_matrix_func(mode - 1);
-        }
-
-        p->cached_width = width;
-        p->cached_height = height;
-        p->cached_len = len;
-        p->cached_uv_len = uv_len;
-        p->cached_size = size;
+    }
+    else if(p->last_mode != mode) {
+        photoplay_reset_order(p, mode);
     }
 
-    if(!p->skip_processing) {
-        uint8_t *restrict dstY = frame->data[0];
-        uint8_t *restrict dstU = frame->data[1];
-        uint8_t *restrict dstV = frame->data[2];
-        const int width = p->cached_width;
-        const int height = p->cached_height;
-        const int len = p->cached_len;
-        const int uv_len = p->cached_uv_len;
-        const int size = p->cached_size;
-        matrix_f matrix_placement = p->cached_matrix_placement;
+    if(p->num_photos <= 0)
+        goto done;
 
-        #pragma omp single
-        {
-            veejay_memset(dstY, pixel_Y_lo_, (size_t)len);
-            veejay_memset(dstU, 128, (size_t)uv_len);
-            veejay_memset(dstV, 128, (size_t)uv_len);
+    if(p->frame_delay > 0)
+        p->frame_delay--;
+
+    if(p->frame_delay == 0) {
+        const int photo_index = p->frame_counter % p->num_photos;
+
+        for(int i = 0; i < 3; i++) {
+            take_photo(
+                p,
+                frame->data[i],
+                p->photo_list[photo_index]->data[i],
+                width,
+                height,
+                photo_index
+            );
         }
 
-#pragma omp for schedule(static)
-        for(int i = 0; i < p->num_photos; i++) {
-            const int photo_index = p->rt[i];
-            matrix_t m = matrix_placement(i, size, width, height);
+        p->frame_delay = delay;
+        p->frame_counter++;
+    }
 
-            put_photo(p, dstY, p->photo_list[photo_index]->data[0], width, height, photo_index, m);
-            put_photo(p, dstU, p->photo_list[photo_index]->data[1], width, height, photo_index, m);
-            put_photo(p, dstV, p->photo_list[photo_index]->data[2], width, height, photo_index, m);
+    matrix_f matrix_placement = mode == 0 ? get_matrix_func(0) : get_matrix_func(mode - 1);
+
+    uint8_t *restrict dstY = frame->data[0];
+    uint8_t *restrict dstU = frame->data[1];
+    uint8_t *restrict dstV = frame->data[2];
+
+    veejay_memset(dstY, pixel_Y_lo_, len);
+    veejay_memset(dstU, 128, len);
+    veejay_memset(dstV, 128, len);
+
+    for(int i = 0; i < p->num_photos; i++) {
+        const int photo_index = p->rt[i];
+        matrix_t m = matrix_placement(i, size, width, height);
+
+        put_photo(p, dstY, p->photo_list[photo_index]->data[0], width, height, photo_index, m);
+        put_photo(p, dstU, p->photo_list[photo_index]->data[1], width, height, photo_index, m);
+        put_photo(p, dstV, p->photo_list[photo_index]->data[2], width, height, photo_index, m);
+    done:
+        ;
         }
     }
 }

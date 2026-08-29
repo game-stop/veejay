@@ -27,7 +27,6 @@ typedef struct {
     int last_size;
     int last_mode;
     uint32_t seed;
-    int n_threads;
 } dither_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -145,6 +144,7 @@ void dither_apply(void *ptr, VJFrame *frame, int *args)
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
+
 
     const int size = clampi(args[0], 2, dh->w);
     const int random_on = args[1];

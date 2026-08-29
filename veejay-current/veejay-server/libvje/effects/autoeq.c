@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2007-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2007 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -17,17 +17,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
-#include "hist.h"
 #include "autoeq.h"
-#include <veejaycore/vjmem.h>
 
 vj_effect *autoeq_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-
-    if(!ve)
-        return NULL;
 
     ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -56,9 +52,6 @@ vj_effect *autoeq_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
@@ -74,7 +67,7 @@ void *autoeq_malloc(int w, int h)
     if(!a)
         return NULL;
 
-    a->tmp = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t)(w * h));
+    a->tmp = (uint8_t *) vj_calloc(sizeof(uint8_t) * (w * h));
 
     if(!a->tmp)
     {
@@ -118,8 +111,7 @@ void autoeq_apply(void *ptr, VJFrame *frame, int *args)
     const int intensity = args[1];
     const int strength = args[2];
     const int len = frame->len;
-    
-    const int actual_uv_len = frame->ssm ? frame->len : frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     if(val == 0)
     {
@@ -128,17 +120,20 @@ void autoeq_apply(void *ptr, VJFrame *frame, int *args)
         veejay_memcpy(&tmp, frame, sizeof(VJFrame));
         tmp.data[0] = a->tmp;
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            tmp.data[0][i] = frame->data[0][i];
-        }
+#pragma omp single
+        veejay_memcpy(tmp.data[0], frame->data[0], len);
 
         veejay_histogram_draw(a->histogram_, &tmp, frame, intensity, strength);
-
-        #pragma omp for schedule(static)
-        for(int i = 0; i < actual_uv_len; i++) {
-            frame->data[1][i] = 128;
-            frame->data[2][i] = 128;
+#pragma omp sections
+        {
+#pragma omp section
+            {
+                veejay_memset(frame->data[1], 128, uv_len);
+            }
+#pragma omp section
+            {
+                veejay_memset(frame->data[2], 128, uv_len);
+            }
         }
     }
     else

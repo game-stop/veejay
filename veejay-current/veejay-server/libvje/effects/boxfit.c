@@ -1,5 +1,4 @@
-/* 
- * Linux VeeJay
+/* * Linux VeeJay
  *
  * Copyright(C)2023 Niels Elburg <nwelburg@gmail.com>
  *
@@ -27,7 +26,6 @@ typedef struct
     uint32_t *integralY;
     uint32_t *integralU;
     uint32_t *integralV;
-    int n_threads;
 } boxfit_t;
 
 static inline int boxfit_clampi(int v, int lo, int hi)

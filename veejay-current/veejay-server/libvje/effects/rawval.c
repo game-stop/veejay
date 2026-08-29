@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -45,6 +45,17 @@ vj_effect *rawval_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_OLD_CB] = 232;
     ve->defaults[P_OLD_CR] = 16;
@@ -92,13 +103,14 @@ void rawval_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t new_cr = (uint8_t)args[P_NEW_CR];
 
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
-
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
 #pragma omp for schedule(static)
     for(int i = 0; i < uv_len; i++) {
-        if(Cb[i] == old_cb && Cr[i] == old_cr) {
+        const int match = (Cb[i] == old_cb) & (Cr[i] == old_cr);
+
+        if(match) {
             Cb[i] = new_cb;
             Cr[i] = new_cr;
         }

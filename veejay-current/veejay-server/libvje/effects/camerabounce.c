@@ -20,6 +20,7 @@
 #include "common.h"
 #include "camerabounce.h"
 
+
 #define CB_PARAMS 8
 
 #define P_TEMPO      0
@@ -127,17 +128,11 @@ typedef struct {
     uint16_t *ywmap;
     float inv_area[CB_INV_AREA_SIZE];
     int frameNumber;
-    int n_threads;
     int last_blur_arg;
     int last_center_x_arg;
     int last_center_y_arg;
     int last_blur_energy_q;
     int w, h;
-
-    int skip_processing;
-    int no_blur;
-    int blur_mix;
-    int blur_energy_q;
 } camera_t;
 
 static inline float cb_center_pos(int size, int arg)
@@ -320,6 +315,61 @@ static inline uint8_t cb_bilerp(const uint8_t *row0, const uint8_t *row1, int x0
     return (uint8_t)(v >> (CB_FP_SHIFT * 2));
 }
 
+typedef void (*cb_blur_store_fn)(uint8_t *frameY,
+                                 uint8_t *frameU,
+                                 uint8_t *frameV,
+                                 const uint8_t *bufY,
+                                 const uint8_t *bufU,
+                                 const uint8_t *bufV,
+                                 int idx,
+                                 int by,
+                                 int bu,
+                                 int bv,
+                                 int blur_mix);
+
+static inline void cb_store_blur_full(uint8_t *frameY,
+                                      uint8_t *frameU,
+                                      uint8_t *frameV,
+                                      const uint8_t *bufY,
+                                      const uint8_t *bufU,
+                                      const uint8_t *bufV,
+                                      int idx,
+                                      int by,
+                                      int bu,
+                                      int bv,
+                                      int blur_mix)
+{
+    (void) bufY;
+    (void) bufU;
+    (void) bufV;
+    (void) blur_mix;
+
+    frameY[idx] = (uint8_t) by;
+    frameU[idx] = (uint8_t) bu;
+    frameV[idx] = (uint8_t) bv;
+}
+
+static inline void cb_store_blur_mix(uint8_t *frameY,
+                                     uint8_t *frameU,
+                                     uint8_t *frameV,
+                                     const uint8_t *bufY,
+                                     const uint8_t *bufU,
+                                     const uint8_t *bufV,
+                                     int idx,
+                                     int by,
+                                     int bu,
+                                     int bv,
+                                     int blur_mix)
+{
+    const int sy = bufY[idx];
+    const int su = bufU[idx];
+    const int sv = bufV[idx];
+
+    frameY[idx] = (uint8_t)(sy + (((by - sy) * blur_mix + 128) >> 8));
+    frameU[idx] = (uint8_t)(su + (((bu - su) * blur_mix + 128) >> 8));
+    frameV[idx] = (uint8_t)(sv + (((bv - sv) * blur_mix + 128) >> 8));
+}
+
 static void camerabounce_build_sat(camera_t *c, int w, int h)
 {
     const uint8_t *srcY = c->buf[0];
@@ -426,58 +476,54 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
     const int zoomDuration = (args[P_IMPACT] * zoomInterval) / 100;
     const float depthDelta = args[P_DEPTH] / 50.0f;
     const int phaseFrames = (args[P_PHASE] * zoomInterval) / 100;
+    int frameWithPhase;
+    int currentFrame;
+    int pulseIndex;
 
-    #pragma omp single
+#pragma omp single
+    c->frameNumber++;
+    frameWithPhase = c->frameNumber + phaseFrames;
+    currentFrame = frameWithPhase % zoomInterval;
+    pulseIndex = frameWithPhase / zoomInterval;
+
+    if (currentFrame > zoomDuration || zoomDuration <= 0)
+        return;
+
+    int mode = args[P_DIRECTION];
+    if (mode < CB_MODE_PUSH)
+        mode = CB_MODE_PUSH;
+    else if (mode > CB_MODE_ALTERNATE)
+        mode = CB_MODE_ALTERNATE;
+
+    float bounceEnergy = 0.0f;
+    const float zoomFactor = cb_zoom_for_mode(mode, pulseIndex, currentFrame, zoomDuration, depthDelta, &bounceEnergy);
+    const int blur_mix = (args[P_BLUR] <= 0) ? 0 : (int)(bounceEnergy * 256.0f + 0.5f);
+    const int blur_energy_q = (args[P_BLUR] <= 0) ? 0 : (int)(bounceEnergy * 1024.0f + 0.5f);
+    const int no_blur = (blur_mix <= 0 || blur_energy_q <= 0);
+
+    if (no_blur && zoomFactor == 1.0f)
+        return;
+
+    const float invZoom = 1.0f / zoomFactor;
+    const float centerX = cb_center_pos(w, args[P_CENTER_X]);
+    const float centerY = cb_center_pos(h, args[P_CENTER_Y]);
+
+#pragma omp single
     {
-        int current_frame_num = c->frameNumber;
-        c->frameNumber++;
+        camerabounce_build_maps(c, w, h, centerX, centerY, invZoom);
 
-        const int frameWithPhase = current_frame_num + phaseFrames;
-        const int currentFrame = frameWithPhase % zoomInterval;
-        const int pulseIndex = frameWithPhase / zoomInterval;
-
-        if (currentFrame > zoomDuration || zoomDuration <= 0) {
-            c->skip_processing = 1;
-        } else {
-            c->skip_processing = 0;
-            int mode = args[P_DIRECTION];
-            if (mode < CB_MODE_PUSH)
-                mode = CB_MODE_PUSH;
-            else if (mode > CB_MODE_ALTERNATE)
-                mode = CB_MODE_ALTERNATE;
-
-            float bounceEnergy = 0.0f;
-            float zoomFactor = cb_zoom_for_mode(mode, pulseIndex, currentFrame, zoomDuration, depthDelta, &bounceEnergy);
-            
-            c->blur_mix = (args[P_BLUR] <= 0) ? 0 : (int)(bounceEnergy * 256.0f + 0.5f);
-            c->blur_energy_q = (args[P_BLUR] <= 0) ? 0 : (int)(bounceEnergy * 1024.0f + 0.5f);
-            c->no_blur = (c->blur_mix <= 0 || c->blur_energy_q <= 0);
-
-            if (c->no_blur && zoomFactor == 1.0f) {
-                c->skip_processing = 1;
-            } else {
-                float invZoom = 1.0f / zoomFactor;
-                float centerX = cb_center_pos(w, args[P_CENTER_X]);
-                float centerY = cb_center_pos(h, args[P_CENTER_Y]);
-
-                camerabounce_build_maps(c, w, h, centerX, centerY, invZoom);
-
-                if (!c->no_blur &&
-                    (c->last_blur_arg != args[P_BLUR] ||
-                     c->last_center_x_arg != args[P_CENTER_X] ||
-                     c->last_center_y_arg != args[P_CENTER_Y] ||
-                     c->last_blur_energy_q != c->blur_energy_q)) {
-                    camerabounce_build_radius_map(c, args[P_BLUR], bounceEnergy, centerX, centerY);
-                    c->last_center_x_arg = args[P_CENTER_X];
-                    c->last_center_y_arg = args[P_CENTER_Y];
-                    c->last_blur_energy_q = c->blur_energy_q;
-                }
-            }
+        if (!no_blur &&
+            (c->last_blur_arg != args[P_BLUR] ||
+             c->last_center_x_arg != args[P_CENTER_X] ||
+             c->last_center_y_arg != args[P_CENTER_Y] ||
+             c->last_blur_energy_q != blur_energy_q)) {
+            camerabounce_build_radius_map(c, args[P_BLUR], bounceEnergy, centerX, centerY);
+            c->last_blur_arg = args[P_BLUR];
+            c->last_center_x_arg = args[P_CENTER_X];
+            c->last_center_y_arg = args[P_CENTER_Y];
+            c->last_blur_energy_q = blur_energy_q;
         }
     }
-
-    if (c->skip_processing)
-        return;
 
     uint8_t *frameY = frame->data[0];
     uint8_t *frameU = frame->data[1];
@@ -486,100 +532,90 @@ void camerabounce_apply(void *ptr, VJFrame* frame, int *args)
     uint8_t *bufU = c->buf[1];
     uint8_t *bufV = c->buf[2];
 
-    #pragma omp for schedule(static)
-    for (int y = 0; y < h; y++) {
-        const int y0 = c->y0map[y];
-        const int y1 = c->y1map[y];
-        const int wy = c->ywmap[y];
-        const uint8_t *row0Y = frameY + y0 * w;
-        const uint8_t *row1Y = frameY + y1 * w;
-        const uint8_t *row0U = frameU + y0 * w;
-        const uint8_t *row1U = frameU + y1 * w;
-        const uint8_t *row0V = frameV + y0 * w;
-        const uint8_t *row1V = frameV + y1 * w;
-        const int row_idx = y * w;
-
-        for (int x = 0; x < w; x++) {
-            const int x0 = c->x0map[x];
-            const int x1 = c->x1map[x];
-            const int wx = c->xwmap[x];
-            const int idx = row_idx + x;
-
-            bufY[idx] = cb_bilerp(row0Y, row1Y, x0, x1, wx, wy);
-            bufU[idx] = cb_bilerp(row0U, row1U, x0, x1, wx, wy);
-            bufV[idx] = cb_bilerp(row0V, row1V, x0, x1, wx, wy);
-        }
-    }
-
-    if (c->no_blur) {
-        #pragma omp for schedule(static)
-        for (int i = 0; i < plane_size; i++) {
-            frameY[i] = bufY[i];
-            frameU[i] = bufU[i];
-            frameV[i] = bufV[i];
-        }
-    } else {
-        #pragma omp single
-        {
-            camerabounce_build_sat(c, w, h);
-        }
-
-        const uint32_t *satY = c->sat[0];
-        const uint32_t *satU = c->sat[1];
-        const uint32_t *satV = c->sat[2];
-        const uint8_t *radius_map = c->radius_map;
-        const float *inv_area = c->inv_area;
-        const int bm = (c->blur_mix > 256) ? 256 : c->blur_mix;
-
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for (int y = 0; y < h; y++) {
-            const int row_off = y * w;
+            const int y0 = c->y0map[y];
+            const int y1 = c->y1map[y];
+            const int wy = c->ywmap[y];
+            const uint8_t *row0Y = frameY + y0 * w;
+            const uint8_t *row1Y = frameY + y1 * w;
+            const uint8_t *row0U = frameU + y0 * w;
+            const uint8_t *row1U = frameU + y1 * w;
+            const uint8_t *row0V = frameV + y0 * w;
+            const uint8_t *row1V = frameV + y1 * w;
+            const int row_idx = y * w;
 
             for (int x = 0; x < w; x++) {
-                const int idx = row_off + x;
-                const uint8_t r_u8 = radius_map[idx];
+                const int x0 = c->x0map[x];
+                const int x1 = c->x1map[x];
+                const int wx = c->xwmap[x];
+                const int idx = row_idx + x;
 
-                if (r_u8 == CB_COPY_RADIUS) {
-                    frameY[idx] = bufY[idx];
-                    frameU[idx] = bufU[idx];
-                    frameV[idx] = bufV[idx];
-                    continue;
-                }
+                bufY[idx] = cb_bilerp(row0Y, row1Y, x0, x1, wx, wy);
+                bufU[idx] = cb_bilerp(row0U, row1U, x0, x1, wx, wy);
+                bufV[idx] = cb_bilerp(row0V, row1V, x0, x1, wx, wy);
+            }
+        }
 
-                const int r = (int) r_u8;
-                const int x1 = (x - r < 1) ? 0 : x - r - 1;
-                const int y1 = (y - r < 1) ? 0 : y - r - 1;
-                const int x2 = (x + r >= w) ? w - 1 : x + r;
-                const int y2 = (y + r >= h) ? h - 1 : y + r;
-                const int area = (x2 - x1) * (y2 - y1);
-                const float areaInv = inv_area[area];
-                const int y2w = y2 * w;
-                const int y1w = y1 * w;
-                const int a = y2w + x2;
-                const int b = y1w + x2;
-                const int d = y1w + x1;
-                const int e = y2w + x1;
+        if (no_blur) {
+            uint8_t *planes[3] = { frameY, frameU, frameV };
+            const uint8_t *buffers[3] = { bufY, bufU, bufV };
 
-                const uint32_t sumY = satY[a] - satY[b] - satY[e] + satY[d];
-                const uint32_t sumU = satU[a] - satU[b] - satU[e] + satU[d];
-                const uint32_t sumV = satV[a] - satV[b] - satV[e] + satV[d];
+#pragma omp for schedule(static)
+            for (int plane = 0; plane < 3; plane++)
+                veejay_memcpy(planes[plane], buffers[plane], (size_t) plane_size);
+        } else {
+#pragma omp single
+            camerabounce_build_sat(c, w, h);
 
-                const int by = (int)(sumY * areaInv + 0.5f);
-                const int bu = (int)(sumU * areaInv + 0.5f);
-                const int bv = (int)(sumV * areaInv + 0.5f);
+            const uint32_t *satY = c->sat[0];
+            const uint32_t *satU = c->sat[1];
+            const uint32_t *satV = c->sat[2];
+            const uint8_t *radius_map = c->radius_map;
+            const float *inv_area = c->inv_area;
+            const int bm = (blur_mix > 256) ? 256 : blur_mix;
+            const cb_blur_store_fn store_blur =
+                (bm >= 256) ? cb_store_blur_full : cb_store_blur_mix;
 
-                if (bm >= 256) {
-                    frameY[idx] = (uint8_t)by;
-                    frameU[idx] = (uint8_t)bu;
-                    frameV[idx] = (uint8_t)bv;
-                } else {
-                    const int sy = bufY[idx];
-                    const int su = bufU[idx];
-                    const int sv = bufV[idx];
-                    frameY[idx] = (uint8_t)(sy + (((by - sy) * bm + 128) >> 8));
-                    frameU[idx] = (uint8_t)(su + (((bu - su) * bm + 128) >> 8));
-                    frameV[idx] = (uint8_t)(sv + (((bv - sv) * bm + 128) >> 8));
-                }
+#pragma omp for schedule(static)
+            for (int y = 0; y < h; y++) {
+                const int row_off = y * w;
+
+                for (int x = 0; x < w; x++) {
+                    const int idx = row_off + x;
+                    const uint8_t r_u8 = radius_map[idx];
+
+                    if (r_u8 == CB_COPY_RADIUS) {
+                        frameY[idx] = bufY[idx];
+                        frameU[idx] = bufU[idx];
+                        frameV[idx] = bufV[idx];
+                        continue;
+                    }
+
+                    const int r = (int) r_u8;
+                    const int x1 = (x - r < 1) ? 0 : x - r - 1;
+                    const int y1 = (y - r < 1) ? 0 : y - r - 1;
+                    const int x2 = (x + r >= w) ? w - 1 : x + r;
+                    const int y2 = (y + r >= h) ? h - 1 : y + r;
+                    const int area = (x2 - x1) * (y2 - y1);
+                    const float areaInv = inv_area[area];
+                    const int y2w = y2 * w;
+                    const int y1w = y1 * w;
+                    const int a = y2w + x2;
+                    const int b = y1w + x2;
+                    const int d = y1w + x1;
+                    const int e = y2w + x1;
+
+                    const uint32_t sumY = satY[a] - satY[b] - satY[e] + satY[d];
+                    const uint32_t sumU = satU[a] - satU[b] - satU[e] + satU[d];
+                    const uint32_t sumV = satV[a] - satV[b] - satV[e] + satV[d];
+
+                    const int by = (int)(sumY * areaInv + 0.5f);
+                    const int bu = (int)(sumU * areaInv + 0.5f);
+                    const int bv = (int)(sumV * areaInv + 0.5f);
+
+                    store_blur(frameY, frameU, frameV,
+                               bufY, bufU, bufV, idx, by, bu, bv, bm);
             }
         }
     }

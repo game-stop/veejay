@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2006-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2006 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@
 
 #include "common.h"
 #include "colmorphology.h"
-#include <veejaycore/vjmem.h>
 
 static const uint8_t kernels[8][9] = {
     { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },
@@ -41,9 +40,6 @@ vj_effect *colmorphology_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-    if(!ve)
-        return NULL;
-
     ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -59,17 +55,15 @@ vj_effect *colmorphology_init(int w, int h)
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Kernel", "Dilate or Erode");
 
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_EASE_OUT, 48, 224, 82, 100, 0, 520, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
-
-    (void)w;
-    (void)h;
+    
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_EASE_OUT, 48, 224, 82, 100, 0, 520, 0, 1, 80, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }
@@ -81,7 +75,7 @@ void *colmorphology_malloc(int w, int h)
     if(!c)
         return NULL;
 
-    c->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)w * (size_t)h);
+    c->binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w * h));
 
     if(!c->binary_img) {
         free(c);
@@ -137,53 +131,57 @@ void colmorphology_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t *restrict k = kernels[type];
 
     if(width < 3 || height < 3) {
-        veejay_memset(Y, pixel_Y_lo_, len);
-        return;
-    }
-
-#pragma omp for simd schedule(static)
-    for(int i = 0; i < len; i++)
-        binary_img[i] = Y[i] < threshold ? 0x00 : 0xff;
-
-#pragma omp for simd schedule(static)
-    for(int x = 0; x < width; x++)
-    {
-        Y[x] = pixel_Y_lo_;
-        Y[len - width + x] = pixel_Y_lo_;
-    }
-
-    if(!erode)
-    {
-#pragma omp for schedule(static)
-        for(int y = 1; y < height - 1; y++)
+#pragma omp single
         {
-            const uint8_t *restrict r0 = binary_img + (y - 1) * width;
-            const uint8_t *restrict r1 = binary_img + y * width;
-            const uint8_t *restrict r2 = binary_img + (y + 1) * width;
-            uint8_t *restrict dst_row = Y + y * width;
-
-            dst_row[0] = pixel_Y_lo_;
-            dst_row[width - 1] = pixel_Y_lo_;
-
-            for(int x = 1; x < width - 1; x++)
-                dst_row[x] = r1[x] == 0xff ? pixel_Y_hi_ : do_dilate(k, r0, r1, r2, x);
+            veejay_memset(Y, pixel_Y_lo_, len);
         }
     }
     else
     {
 #pragma omp for schedule(static)
-        for(int y = 1; y < height - 1; y++)
+        for(int i = 0; i < len; i++)
+            binary_img[i] = Y[i] < threshold ? 0x00 : 0xff;
+
+#pragma omp for schedule(static)
+        for(int x = 0; x < width; x++)
         {
-            const uint8_t *restrict r0 = binary_img + (y - 1) * width;
-            const uint8_t *restrict r1 = binary_img + y * width;
-            const uint8_t *restrict r2 = binary_img + (y + 1) * width;
-            uint8_t *restrict dst_row = Y + y * width;
+            Y[x] = pixel_Y_lo_;
+            Y[len - width + x] = pixel_Y_lo_;
+        }
 
-            dst_row[0] = pixel_Y_lo_;
-            dst_row[width - 1] = pixel_Y_lo_;
+        if(!erode)
+        {
+#pragma omp for schedule(static)
+            for(int y = 1; y < height - 1; y++)
+            {
+                const uint8_t *restrict r0 = binary_img + (y - 1) * width;
+                const uint8_t *restrict r1 = binary_img + y * width;
+                const uint8_t *restrict r2 = binary_img + (y + 1) * width;
+                uint8_t *restrict dst_row = Y + y * width;
 
-            for(int x = 1; x < width - 1; x++)
-                dst_row[x] = r1[x] == 0x00 ? pixel_Y_lo_ : do_erode(k, r0, r1, r2, x);
+                dst_row[0] = pixel_Y_lo_;
+                dst_row[width - 1] = pixel_Y_lo_;
+
+                for(int x = 1; x < width - 1; x++)
+                    dst_row[x] = r1[x] == 0xff ? pixel_Y_hi_ : do_dilate(k, r0, r1, r2, x);
+            }
+        }
+        else
+        {
+#pragma omp for schedule(static)
+            for(int y = 1; y < height - 1; y++)
+            {
+                const uint8_t *restrict r0 = binary_img + (y - 1) * width;
+                const uint8_t *restrict r1 = binary_img + y * width;
+                const uint8_t *restrict r2 = binary_img + (y + 1) * width;
+                uint8_t *restrict dst_row = Y + y * width;
+
+                dst_row[0] = pixel_Y_lo_;
+                dst_row[width - 1] = pixel_Y_lo_;
+
+                for(int x = 1; x < width - 1; x++)
+                    dst_row[x] = r1[x] == 0x00 ? pixel_Y_lo_ : do_erode(k, r0, r1, r2, x);
+            }
         }
     }
 }

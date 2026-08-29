@@ -1,7 +1,7 @@
-/* 
- * Linux VeeJay
+/*
+ * VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2005 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,35 +20,24 @@
 
 #include "common.h"
 #include "flare.h"
-#include <veejaycore/vjmem.h>
 
 #include <math.h>
 #include <stdint.h>
-#include <omp.h>
 
 #define FLARE_LEVELS 6
-#define VJ_MAX_THREADS 64
 
 typedef struct {
     uint8_t *flare_buf[3];
     uint8_t *pyrY[FLARE_LEVELS];
     int pyrW[FLARE_LEVELS];
     int pyrH[FLARE_LEVELS];
-    int n_threads;
     uint16_t lin_lut[256];
     uint8_t inv_lut[1024];
-    
-    int t_minX[VJ_MAX_THREADS];
-    int t_minY[VJ_MAX_THREADS];
-    int t_maxX[VJ_MAX_THREADS];
-    int t_maxY[VJ_MAX_THREADS];
-    int t_hasGlow[VJ_MAX_THREADS];
-
-    int cached_minX;
-    int cached_minY;
-    int cached_maxX;
-    int cached_maxY;
-    int cached_skip;
+    int minX;
+    int minY;
+    int maxX;
+    int maxY;
+    int hasGlow;
 } flare_t;
 
 static const uint8_t bloom_weights[FLARE_LEVELS] = {
@@ -97,6 +86,17 @@ vj_effect *flare_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->defaults[0] = 0;
     ve->defaults[1] = 25;
     ve->defaults[2] = 15;
@@ -136,14 +136,12 @@ vj_effect *flare_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
 void *flare_malloc(int w, int h)
 {
+
     flare_t *f = (flare_t*) vj_calloc(sizeof(flare_t));
 
     if(!f)
@@ -182,9 +180,6 @@ void *flare_malloc(int w, int h)
         }
     }
 
-    f->n_threads = vje_advise_num_threads(len);
-    if(f->n_threads < 1)
-        f->n_threads = 1;
 
     flare_init_lut(f);
 
@@ -194,16 +189,11 @@ void *flare_malloc(int w, int h)
 void flare_free(void *ptr)
 {
     flare_t *f = (flare_t*) ptr;
-    if(!f)
-        return;
 
-    if(f->flare_buf[0])
-        free(f->flare_buf[0]);
+    free(f->flare_buf[0]);
 
-    for(int i = 0; i < FLARE_LEVELS; i++) {
-        if(f->pyrY[i])
-            free(f->pyrY[i]);
-    }
+    for(int i = 0; i < FLARE_LEVELS; i++)
+        free(f->pyrY[i]);
 
     free(f);
 }
@@ -213,11 +203,8 @@ static void flare_downsample2(const uint8_t *restrict src,
                               int sh,
                               uint8_t *restrict dst,
                               int dw,
-                              int dh,
-                              int n_threads)
+                              int dh)
 {
-    (void)n_threads;
-
 #pragma omp for schedule(static)
     for(int y = 0; y < dh; y++) {
         int sy0 = y << 1;
@@ -251,11 +238,8 @@ static void flare_box_blur_u8(uint8_t *restrict buf,
                               uint8_t *restrict tmp,
                               int w,
                               int h,
-                              int radius,
-                              int n_threads)
+                              int radius)
 {
-    (void)n_threads;
-
     const int diameter = radius * 2 + 1;
     const uint32_t inv = (uint32_t)(((1ULL << 24) + (diameter >> 1)) / (uint32_t)diameter);
 
@@ -314,11 +298,8 @@ static void flare_upsample_add(uint8_t *restrict dst,
                                const uint8_t *restrict src,
                                int sw,
                                int sh,
-                               int weight,
-                               int n_threads)
+                               int weight)
 {
-    (void)n_threads;
-
     const int scale_x = dw > 1 ? ((sw - 1) << 8) / (dw - 1) : 0;
     const int scale_y = dh > 1 ? ((sh - 1) << 8) / (dh - 1) : 0;
 
@@ -413,22 +394,6 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict tmp = f->flare_buf[2];
     const uint16_t *restrict lin = f->lin_lut;
 
-    int tid = omp_get_thread_num();
-    if(tid >= VJ_MAX_THREADS)
-        tid = VJ_MAX_THREADS - 1;
-
-    f->t_minX[tid] = W;
-    f->t_minY[tid] = H;
-    f->t_maxX[tid] = 0;
-    f->t_maxY[tid] = 0;
-    f->t_hasGlow[tid] = 0;
-
-    int l_minX = W;
-    int l_minY = H;
-    int l_maxX = 0;
-    int l_maxY = 0;
-    int l_hasGlow = 0;
-
     const int t = (threshold << 2) + 16;
 
 #pragma omp for schedule(static)
@@ -465,247 +430,252 @@ void flare_apply(void *ptr, VJFrame *frame, int *args)
                 x = 255;
 
             out = x;
-            l_hasGlow = 1;
-
-            int py = i / W;
-            int px = i - py * W;
-
-            if(px < l_minX)
-                l_minX = px;
-            if(px > l_maxX)
-                l_maxX = px;
-            if(py < l_minY)
-                l_minY = py;
-            if(py > l_maxY)
-                l_maxY = py;
         }
 
         maskY[i] = (uint8_t)out;
     }
 
-    f->t_minX[tid] = l_minX;
-    f->t_minY[tid] = l_minY;
-    f->t_maxX[tid] = l_maxX;
-    f->t_maxY[tid] = l_maxY;
-    f->t_hasGlow[tid] = l_hasGlow;
+#pragma omp single
+        {
+            f->minX = W;
+            f->minY = H;
+            f->maxX = 0;
+            f->maxY = 0;
+            f->hasGlow = 0;
+        }
 
-#pragma omp barrier
+        int local_minX = W;
+        int local_minY = H;
+        int local_maxX = 0;
+        int local_maxY = 0;
+        int local_hasGlow = 0;
 
-    #pragma omp single
-    {
-        int minX = W;
-        int minY = H;
-        int maxX = 0;
-        int maxY = 0;
-        int hasGlow = 0;
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            if(maskY[i] == 0)
+                continue;
 
-        for(int i = 0; i < VJ_MAX_THREADS; i++) {
-            if(f->t_hasGlow[i]) {
-                hasGlow = 1;
-                if(f->t_minX[i] < minX) minX = f->t_minX[i];
-                if(f->t_minY[i] < minY) minY = f->t_minY[i];
-                if(f->t_maxX[i] > maxX) maxX = f->t_maxX[i];
-                if(f->t_maxY[i] > maxY) maxY = f->t_maxY[i];
+            local_hasGlow = 1;
+            int py = i / W;
+            int px = i - py * W;
+
+            if(px < local_minX)
+                local_minX = px;
+            if(px > local_maxX)
+                local_maxX = px;
+            if(py < local_minY)
+                local_minY = py;
+            if(py > local_maxY)
+                local_maxY = py;
+        }
+
+#pragma omp critical
+        {
+            if(local_minX < f->minX)
+                f->minX = local_minX;
+            if(local_minY < f->minY)
+                f->minY = local_minY;
+            if(local_maxX > f->maxX)
+                f->maxX = local_maxX;
+            if(local_maxY > f->maxY)
+                f->maxY = local_maxY;
+            if(local_hasGlow)
+                f->hasGlow = 1;
+        }
+
+#pragma omp single
+        {
+            if(f->hasGlow) {
+                int padding = spread * 4 + (1 << FLARE_LEVELS);
+
+                f->minX = f->minX - padding < 0 ? 0 : f->minX - padding;
+                f->minY = f->minY - padding < 0 ? 0 : f->minY - padding;
+                f->maxX = f->maxX + padding >= W ? W - 1 : f->maxX + padding;
+                f->maxY = f->maxY + padding >= H ? H - 1 : f->maxY + padding;
             }
         }
 
-        if(!hasGlow) {
-            f->cached_skip = 1;
-        }
-        else {
-            int padding = spread * 4 + (1 << FLARE_LEVELS);
+#pragma omp barrier
 
-            f->cached_minX = minX - padding < 0 ? 0 : minX - padding;
-            f->cached_minY = minY - padding < 0 ? 0 : minY - padding;
-            f->cached_maxX = maxX + padding >= W ? W - 1 : maxX + padding;
-            f->cached_maxY = maxY + padding >= H ? H - 1 : maxY + padding;
-            f->cached_skip = 0;
-        }
+        if(f->hasGlow) {
+            flare_downsample2(maskY, W, H, f->pyrY[0], f->pyrW[0], f->pyrH[0]);
+
+    for(int l = 1; l < FLARE_LEVELS; l++)
+        flare_downsample2(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l]);
+
+    for(int l = 0; l < FLARE_LEVELS; l++) {
+        int r = spread >> (l + 1);
+
+        if(r < 1 && spread > 0)
+            r = 1;
+
+        if(r > 0)
+            flare_box_blur_u8(f->pyrY[l], tmp, f->pyrW[l], f->pyrH[l], r);
     }
 
-    if(!f->cached_skip) {
-        flare_downsample2(maskY, W, H, f->pyrY[0], f->pyrW[0], f->pyrH[0], f->n_threads);
+    for(int l = FLARE_LEVELS - 1; l > 0; l--)
+        flare_upsample_add(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], bloom_weights[l]);
 
-        for(int l = 1; l < FLARE_LEVELS; l++)
-            flare_downsample2(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], f->n_threads);
+    const uint8_t *restrict base_bloom = f->pyrY[0];
+    const int bw = f->pyrW[0];
+    const int bh = f->pyrH[0];
+    const int scale_x = W > 1 ? ((bw - 1) << 8) / (W - 1) : 0;
+    const int scale_y = H > 1 ? ((bh - 1) << 8) / (H - 1) : 0;
 
-        for(int l = 0; l < FLARE_LEVELS; l++) {
-            int r = spread >> (l + 1);
-
-            if(r < 1 && spread > 0)
-                r = 1;
-
-            if(r > 0)
-                flare_box_blur_u8(f->pyrY[l], tmp, f->pyrW[l], f->pyrH[l], r, f->n_threads);
-        }
-
-        for(int l = FLARE_LEVELS - 1; l > 0; l--)
-            flare_upsample_add(f->pyrY[l - 1], f->pyrW[l - 1], f->pyrH[l - 1], f->pyrY[l], f->pyrW[l], f->pyrH[l], bloom_weights[l], f->n_threads);
-
-        const uint8_t *restrict base_bloom = f->pyrY[0];
-        const int bw = f->pyrW[0];
-        const int bh = f->pyrH[0];
-        const int scale_x = W > 1 ? ((bw - 1) << 8) / (W - 1) : 0;
-        const int scale_y = H > 1 ? ((bh - 1) << 8) / (H - 1) : 0;
-        const int minX = f->cached_minX;
-        const int minY = f->cached_minY;
-        const int maxX = f->cached_maxX;
-        const int maxY = f->cached_maxY;
-
-        switch(type) {
-            case 0:
+    switch(type) {
+        case 0:
 #pragma omp for schedule(static)
-                for(int y = minY; y <= maxY; y++) {
-                    int row = y * W;
-                    for(int x = minX; x <= maxX; x++) {
-                        int i = row + x;
-                        int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
+            for(int y = f->minY; y <= f->maxY; y++) {
+                int row = y * W;
+                for(int x = f->minX; x <= f->maxX; x++) {
+                    int i = row + x;
+                    int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
 
-                        if(glow > 255)
-                            glow = 255;
+                    if(glow > 255)
+                        glow = 255;
 
-                        glow = (glow * opacity) >> 8;
+                    glow = (glow * opacity) >> 8;
 
-                        if(glow <= 0)
-                            continue;
+                    if(glow <= 0)
+                        continue;
 
-                        int sum = (int)lin[dstY[i]] + (int)lin[glow];
+                    int sum = (int)lin[dstY[i]] + (int)lin[glow];
 
-                        if(sum > 1023)
-                            sum = 1023;
+                    if(sum > 1023)
+                        sum = 1023;
 
-                        dstY[i] = f->inv_lut[sum];
-                        FLARE_PUSH_CHROMA(i, glow);
-                    }
+                    dstY[i] = f->inv_lut[sum];
+                    FLARE_PUSH_CHROMA(i, glow);
                 }
-                break;
+            }
+            break;
 
-            case 1:
+        case 1:
 #pragma omp for schedule(static)
-                for(int y = minY; y <= maxY; y++) {
-                    int row = y * W;
-                    for(int x = minX; x <= maxX; x++) {
-                        int i = row + x;
-                        int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
+            for(int y = f->minY; y <= f->maxY; y++) {
+                int row = y * W;
+                for(int x = f->minX; x <= f->maxX; x++) {
+                    int i = row + x;
+                    int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
 
-                        if(glow > 255)
-                            glow = 255;
+                    if(glow > 255)
+                        glow = 255;
 
-                        glow = (glow * opacity) >> 8;
+                    glow = (glow * opacity) >> 8;
 
-                        if(glow <= 0)
-                            continue;
+                    if(glow <= 0)
+                        continue;
 
-                        int a = lin[dstY[i]];
-                        int b = lin[glow];
-                        int inv = ((1023 - a) * (1023 - b)) >> 10;
-                        int res = 1023 - inv;
+                    int a = lin[dstY[i]];
+                    int b = lin[glow];
+                    int inv = ((1023 - a) * (1023 - b)) >> 10;
+                    int res = 1023 - inv;
 
-                        dstY[i] = f->inv_lut[clampi(res, 0, 1023)];
-                        FLARE_PUSH_CHROMA(i, glow);
-                    }
+                    dstY[i] = f->inv_lut[clampi(res, 0, 1023)];
+                    FLARE_PUSH_CHROMA(i, glow);
                 }
-                break;
+            }
+            break;
 
-            case 2:
+        case 2:
 #pragma omp for schedule(static)
-                for(int y = minY; y <= maxY; y++) {
-                    int row = y * W;
-                    for(int x = minX; x <= maxX; x++) {
-                        int i = row + x;
-                        int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
+            for(int y = f->minY; y <= f->maxY; y++) {
+                int row = y * W;
+                for(int x = f->minX; x <= f->maxX; x++) {
+                    int i = row + x;
+                    int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
 
-                        if(glow > 255)
-                            glow = 255;
+                    if(glow > 255)
+                        glow = 255;
 
-                        glow = (glow * opacity) >> 8;
+                    glow = (glow * opacity) >> 8;
 
-                        if(glow <= 0)
-                            continue;
+                    if(glow <= 0)
+                        continue;
 
-                        dstY[i] = flare_u8((int)dstY[i] + glow + (((int)dstY[i] * glow) >> 8));
-                        FLARE_PUSH_CHROMA(i, glow);
-                    }
+                    dstY[i] = flare_u8((int)dstY[i] + glow + (((int)dstY[i] * glow) >> 8));
+                    FLARE_PUSH_CHROMA(i, glow);
                 }
-                break;
+            }
+            break;
 
-            case 3:
+        case 3:
 #pragma omp for schedule(static)
-                for(int y = minY; y <= maxY; y++) {
-                    int row = y * W;
-                    for(int x = minX; x <= maxX; x++) {
-                        int i = row + x;
-                        int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
+            for(int y = f->minY; y <= f->maxY; y++) {
+                int row = y * W;
+                for(int x = f->minX; x <= f->maxX; x++) {
+                    int i = row + x;
+                    int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
 
-                        if(glow > 255)
-                            glow = 255;
+                    if(glow > 255)
+                        glow = 255;
 
-                        glow = (glow * opacity) >> 8;
+                    glow = (glow * opacity) >> 8;
 
-                        if(glow <= 0)
-                            continue;
+                    if(glow <= 0)
+                        continue;
 
-                        int sum = (int)lin[dstY[i]] + (int)lin[glow];
-                        int mapped = (sum << 10) / (sum + 1023);
+                    int sum = (int)lin[dstY[i]] + (int)lin[glow];
+                    int mapped = (sum << 10) / (sum + 1023);
 
-                        dstY[i] = f->inv_lut[clampi(mapped, 0, 1023)];
-                        FLARE_PUSH_CHROMA(i, glow);
-                    }
+                    dstY[i] = f->inv_lut[clampi(mapped, 0, 1023)];
+                    FLARE_PUSH_CHROMA(i, glow);
                 }
-                break;
+            }
+            break;
 
-            case 4:
+        case 4:
 #pragma omp for schedule(static)
-                for(int y = minY; y <= maxY; y++) {
-                    int row = y * W;
-                    for(int x = minX; x <= maxX; x++) {
-                        int i = row + x;
-                        int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
+            for(int y = f->minY; y <= f->maxY; y++) {
+                int row = y * W;
+                for(int x = f->minX; x <= f->maxX; x++) {
+                    int i = row + x;
+                    int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
 
-                        if(glow > 255)
-                            glow = 255;
+                    if(glow > 255)
+                        glow = 255;
 
-                        glow = (glow * opacity) >> 8;
+                    glow = (glow * opacity) >> 8;
 
-                        if(glow <= 0)
-                            continue;
+                    if(glow <= 0)
+                        continue;
 
-                        int combined = (int)lin[dstY[i]] + (int)lin[glow];
-                        int compressed = combined - ((combined * combined) >> 11);
+                    int combined = (int)lin[dstY[i]] + (int)lin[glow];
+                    int compressed = combined - ((combined * combined) >> 11);
 
-                        dstY[i] = f->inv_lut[clampi(compressed, 0, 1023)];
-                        FLARE_PUSH_CHROMA(i, glow);
-                    }
+                    dstY[i] = f->inv_lut[clampi(compressed, 0, 1023)];
+                    FLARE_PUSH_CHROMA(i, glow);
                 }
-                break;
+            }
+            break;
 
-            case 5:
-            default:
+        case 5:
+        default:
 #pragma omp for schedule(static)
-                for(int y = minY; y <= maxY; y++) {
-                    int row = y * W;
-                    for(int x = minX; x <= maxX; x++) {
-                        int i = row + x;
-                        int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
+            for(int y = f->minY; y <= f->maxY; y++) {
+                int row = y * W;
+                for(int x = f->minX; x <= f->maxX; x++) {
+                    int i = row + x;
+                    int glow = maskY[i] + flare_sample_bilinear(base_bloom, bw, bh, x, y, scale_x, scale_y);
 
-                        if(glow > 255)
-                            glow = 255;
+                    if(glow > 255)
+                        glow = 255;
 
-                        glow = (glow * opacity) >> 8;
+                    glow = (glow * opacity) >> 8;
 
-                        if(glow <= 0)
-                            continue;
+                    if(glow <= 0)
+                        continue;
 
-                        int lin_base = lin[dstY[i]];
-                        int lin_glow = lin[glow];
-                        int res = lin_base + ((lin_glow * (1023 - lin_base)) >> 10);
+                    int lin_base = lin[dstY[i]];
+                    int lin_glow = lin[glow];
+                    int res = lin_base + ((lin_glow * (1023 - lin_base)) >> 10);
 
-                        dstY[i] = f->inv_lut[clampi(res, 0, 1023)];
-                        FLARE_PUSH_CHROMA(i, glow);
-                    }
+                    dstY[i] = f->inv_lut[clampi(res, 0, 1023)];
+                    FLARE_PUSH_CHROMA(i, glow);
                 }
-                break;
-        }
+            }
+            break;
+    }
     }
 }
 

@@ -68,7 +68,6 @@ void cosmichue_apply(void *ptr, VJFrame *frame, int *args)
     const int opacity = args[2];
     const int hue_arg = args[3];
     const int len = frame->len;
-
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];

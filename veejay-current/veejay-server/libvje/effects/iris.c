@@ -1,4 +1,4 @@
-/*
+/* 
  * Linux VeeJay
  *
  * Copyright(C)2009 Niels Elburg <nwelburg@gmail.com>
@@ -16,38 +16,78 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
-*/
+ */
+
+/*  "weed"-plugin partially ported from LiVES (C) G. Finch (Salsaman) 2009
+ *
+ *  weed-plugins/multi_transitions.c?revision=286
+ *
+ */
+
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "iris.h"
 
 #define IRIS_PARAMS 2
+
 #define P_VALUE 0
 #define P_SHAPE 1
 
-static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
+static inline int clampi(int v, int lo, int hi)
+{
+    return v < lo ? lo : (v > hi ? hi : v);
+}
 
-vj_effect *iris_init(int w, int h) {
+vj_effect *iris_init(int w, int h)
+{
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve) return NULL;
+
+    if(!ve)
+        return NULL;
+
     ve->num_params = IRIS_PARAMS;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_VALUE] = 0; ve->limits[1][P_VALUE] = 100; ve->defaults[P_VALUE] = 1;
     ve->limits[0][P_SHAPE] = 0; ve->limits[1][P_SHAPE] = 1;   ve->defaults[P_SHAPE] = 0;
+
     ve->description = "Iris Transition (Circle,Rect)";
     ve->sub_format = 1;
     ve->extra_frame = 1;
+    ve->parallel = 0;
     ve->has_user = 0;
+
     ve->param_description = vje_build_param_list(ve->num_params, "Value", "Shape");
+
     ve->hints = vje_init_value_hint_list(ve->num_params);
     vje_build_value_hint_list(ve->hints, ve->limits[1][P_SHAPE], P_SHAPE, "Circle", "Rectangle");
+
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_INTENSITY, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 0, 100, 92, 100, 8, 420, 0, 1, 0, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
+
     return ve;
 }
 
-static void iris_copy_frame(VJFrame *frame, VJFrame *frame2) {
+static void iris_copy_frame(VJFrame *frame, VJFrame *frame2)
+{
     const int len = frame->len;
     uint8_t *restrict Y0 = frame->data[0];
     uint8_t *restrict Cb0 = frame->data[1];
@@ -56,34 +96,42 @@ static void iris_copy_frame(VJFrame *frame, VJFrame *frame2) {
     const uint8_t *restrict Cb1 = frame2->data[1];
     const uint8_t *restrict Cr1 = frame2->data[2];
 
-    #pragma omp single
-    {
-        veejay_memcpy( Y0, Y1, len );
-        veejay_memcpy( Cb0, Cb1, len );
-        veejay_memcpy( Cr0, Cr1, len );
+#pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++) {
+        if(plane == 0)
+            veejay_memcpy(Y0, Y1, len);
+        else if(plane == 1)
+            veejay_memcpy(Cb0, Cb1, len);
+        else
+            veejay_memcpy(Cr0, Cr1, len);
     }
 }
 
-void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
+void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
+{
     (void) ptr;
+
     const int val = args[P_VALUE];
     const int shape = args[P_SHAPE];
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
-    
     if(val <= 0) {
         iris_copy_frame(frame, frame2);
         return;
     }
-    if(val >= 100) return;
+
+    if(val >= 100)
+        return;
 
     uint8_t *restrict Y0 = frame->data[0];
     uint8_t *restrict Cb0 = frame->data[1];
     uint8_t *restrict Cr0 = frame->data[2];
+
     const uint8_t *restrict Y1 = frame2->data[0];
     const uint8_t *restrict Cb1 = frame2->data[1];
     const uint8_t *restrict Cr1 = frame2->data[2];
+
     const int half_w = width >> 1;
     const int half_h = height >> 1;
 
@@ -92,35 +140,42 @@ void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args) {
         const long long vv = (long long)val * (long long)val;
         const long long threshold_sq = (max_dist_sq * vv) / 10000LL;
 
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
             const int dy = y - half_h;
             const long long dy_sq = (long long)dy * (long long)dy;
             const int row = y * width;
+
+#pragma omp simd
             for(int x = 0; x < width; x++) {
                 const int dx = x - half_w;
                 const long long dist_sq = dy_sq + (long long)dx * (long long)dx;
                 const int mask = -(dist_sq > threshold_sq);
                 const int idx = row + x;
+
                 Y0[idx]  = (uint8_t)((Y1[idx]  & mask) | (Y0[idx]  & ~mask));
                 Cb0[idx] = (uint8_t)((Cb1[idx] & mask) | (Cb0[idx] & ~mask));
                 Cr0[idx] = (uint8_t)((Cr1[idx] & mask) | (Cr0[idx] & ~mask));
             }
         }
-    } else {
+    }
+    else {
         const int inv = 100 - val;
         const int x_bound = (half_w * inv) / 100;
         const int y_bound = (half_h * inv) / 100;
         const int x_hi = width - x_bound;
         const int y_hi = height - y_bound;
 
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int y = 0; y < height; y++) {
             const int row = y * width;
             const int row_mask = (y < y_bound) | (y >= y_hi);
+
+#pragma omp simd
             for(int x = 0; x < width; x++) {
                 const int mask = -((x < x_bound) | (x >= x_hi) | row_mask);
                 const int idx = row + x;
+
                 Y0[idx]  = (uint8_t)((Y1[idx]  & mask) | (Y0[idx]  & ~mask));
                 Cb0[idx] = (uint8_t)((Cb1[idx] & mask) | (Cb0[idx] & ~mask));
                 Cr0[idx] = (uint8_t)((Cr1[idx] & mask) | (Cr0[idx] & ~mask));

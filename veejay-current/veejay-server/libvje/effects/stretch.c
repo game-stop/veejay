@@ -1,7 +1,7 @@
-/* 
+/*
  * Linux VeeJay
  *
- * Copyright(C)2019-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2019 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -38,12 +38,6 @@ typedef struct {
     float eff_chroma_drive;
     int initialized;
     int n_threads;
-
-    int upper;
-    int lower;
-    int effective_gain;
-    int beat_twist_q8;
-    int use_soft_guard;
 } stretch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -73,6 +67,8 @@ static inline uint8_t stretch_soft_chroma_u8(int v)
     return stretch_u8(128 + c);
 }
 
+
+
 static inline int stretch_smooth_i(float *state, int target, float attack, float release)
 {
     const float cur = *state;
@@ -83,6 +79,8 @@ static inline int stretch_smooth_i(float *state, int target, float attack, float
     *state = out;
     return (int)(out + (out >= 0.0f ? 0.5f : -0.5f));
 }
+
+
 
 vj_effect *stretch_init(int w, int h)
 {
@@ -96,7 +94,13 @@ vj_effect *stretch_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_UPPER_BOUND] = 0;
     ve->limits[1][P_UPPER_BOUND] = 255;
@@ -160,6 +164,8 @@ void *stretch_malloc(int w, int h)
     s->eff_chroma_drive = 0.0f;
     s->initialized = 0;
 
+    s->n_threads = vje_advise_num_threads(w * h);
+
     return (void*) s;
 }
 
@@ -171,6 +177,7 @@ void stretch_free(void *ptr)
 void stretch_apply(void *ptr, VJFrame *frame, int *args)
 {
     stretch_t *s = (stretch_t*) ptr;
+
     const int len = frame->len;
 
     int upper_target = args[P_UPPER_BOUND];
@@ -179,83 +186,73 @@ void stretch_apply(void *ptr, VJFrame *frame, int *args)
     const int sat_target = args[P_SAT_AMP];
     const int chroma_drive_target = args[P_CHROMA_DRIVE];
 
+    if(lower_target > upper_target) {
+        const int t = lower_target;
+        lower_target = upper_target;
+        upper_target = t;
+    }
+
+    if(!s->initialized) {
+        s->eff_upper = (float)upper_target;
+        s->eff_lower = (float)lower_target;
+        s->eff_gain = (float)gain_target;
+        s->eff_sat = (float)sat_target;
+        s->eff_chroma_drive = (float)chroma_drive_target;
+        s->initialized = 1;
+    }
+
+    const float fast = 0.165f;
+    const float slow = 0.072f;
+
+    int upper = stretch_smooth_i(&s->eff_upper, upper_target, fast, slow);
+    int lower = stretch_smooth_i(&s->eff_lower, lower_target, fast, slow);
+    int gain = stretch_smooth_i(&s->eff_gain, gain_target, fast, slow);
+    int gain_saturation = stretch_smooth_i(&s->eff_sat, sat_target, fast, slow);
+    int chroma_drive = stretch_smooth_i(&s->eff_chroma_drive, chroma_drive_target, fast, slow);
+
+    upper = clampi(upper, 0, 255);
+    lower = clampi(lower, 0, 255);
+    gain = clampi(gain, 0, 1000);
+    gain_saturation = clampi(gain_saturation, 0, 1000);
+    chroma_drive = clampi(chroma_drive, 0, 1000);
+
+    if(lower > upper) {
+        const int t = lower;
+        lower = upper;
+        upper = t;
+    }
+
+    if(chroma_drive > 0) {
+        const int spread = ((chroma_drive * (12 + ((chroma_drive * 20) / 1000))) + 500) / 1000;
+        lower = clampi(lower - spread, 0, 255);
+        upper = clampi(upper + spread, 0, 255);
+    }
+
+    if(lower >= upper) {
+        if(upper < 255)
+            upper++;
+        else if(lower > 0)
+            lower--;
+    }
+
+    int fixed_gain = gain_saturation > 0
+        ? (gain * gain_saturation * 256) / 10000
+        : (gain * 256) / 100;
+
+    fixed_gain = clampi(fixed_gain, 0, 32768);
+
+    const int direct_extra_gain = (chroma_drive * 896 + 500) / 1000;
+    const int effective_gain = clampi(fixed_gain + direct_extra_gain, 0, 32768);
+
+    const int beat_twist_q8 = clampi((chroma_drive * 62 + 500) / 1000, 0, 192);
+
+    const int use_soft_guard = (chroma_drive > 0 || gain_saturation > 0);
+
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp single
-    {
-        if(lower_target > upper_target) {
-            const int t = lower_target;
-            lower_target = upper_target;
-            upper_target = t;
-        }
-
-        if(!s->initialized) {
-            s->eff_upper = (float)upper_target;
-            s->eff_lower = (float)lower_target;
-            s->eff_gain = (float)gain_target;
-            s->eff_sat = (float)sat_target;
-            s->eff_chroma_drive = (float)chroma_drive_target;
-            s->initialized = 1;
-        }
-
-        const float fast = 0.165f;
-        const float slow = 0.072f;
-
-        int upper = stretch_smooth_i(&s->eff_upper, upper_target, fast, slow);
-        int lower = stretch_smooth_i(&s->eff_lower, lower_target, fast, slow);
-        int gain = stretch_smooth_i(&s->eff_gain, gain_target, fast, slow);
-        int gain_saturation = stretch_smooth_i(&s->eff_sat, sat_target, fast, slow);
-        int chroma_drive = stretch_smooth_i(&s->eff_chroma_drive, chroma_drive_target, fast, slow);
-
-        upper = clampi(upper, 0, 255);
-        lower = clampi(lower, 0, 255);
-        gain = clampi(gain, 0, 1000);
-        gain_saturation = clampi(gain_saturation, 0, 1000);
-        chroma_drive = clampi(chroma_drive, 0, 1000);
-
-        if(lower > upper) {
-            const int t = lower;
-            lower = upper;
-            upper = t;
-        }
-
-        if(chroma_drive > 0) {
-            const int spread = ((chroma_drive * (12 + ((chroma_drive * 20) / 1000))) + 500) / 1000;
-            lower = clampi(lower - spread, 0, 255);
-            upper = clampi(upper + spread, 0, 255);
-        }
-
-        if(lower >= upper) {
-            if(upper < 255)
-                upper++;
-            else if(lower > 0)
-                lower--;
-        }
-
-        int fixed_gain = gain_saturation > 0
-            ? (gain * gain_saturation * 256) / 10000
-            : (gain * 256) / 100;
-
-        fixed_gain = clampi(fixed_gain, 0, 32768);
-
-        int direct_extra_gain = (chroma_drive * 896 + 500) / 1000;
-        
-        s->upper = upper;
-        s->lower = lower;
-        s->effective_gain = clampi(fixed_gain + direct_extra_gain, 0, 32768);
-        s->beat_twist_q8 = clampi((chroma_drive * 62 + 500) / 1000, 0, 192);
-        s->use_soft_guard = (chroma_drive > 0 || gain_saturation > 0);
-    }
-
-    const int upper = s->upper;
-    const int lower = s->lower;
-    const int effective_gain = s->effective_gain;
-    const int beat_twist_q8 = s->beat_twist_q8;
-    const int use_soft_guard = s->use_soft_guard;
-
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
         const int y = Y[i];
 

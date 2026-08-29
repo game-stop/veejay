@@ -47,7 +47,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -112,7 +111,6 @@ static inline int cs_u8_to_param1000(int v)
     v = cs_clampi(v, 0, 255);
     return (v * 1000 + 127) / 255;
 }
-
 static inline uint8_t cs_u8(int v)
 {
     return (uint8_t) cs_clampi(v, 0, 255);
@@ -194,6 +192,17 @@ vj_effect *chronomirror_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_TRIGGER_GATE] = 0;
     ve->limits[1][P_TRIGGER_GATE] = 1000;
     ve->defaults[P_TRIGGER_GATE] = cs_u8_to_param1000(16);
@@ -254,30 +263,34 @@ vj_effect *chronomirror_init(int w, int h)
         "Color Energy"
     );
     
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 200, 80, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 180, 1000, 82, 100, 0, 500, 0, 2, 200, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_DRIFT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 60, 1000, 82, 100, 0, 460, 0, 2, 180, VJ_BEAT_COST_MODERATE, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 480, 980, 62, 96, 80, 900, 0, 2, 240, VJ_BEAT_COST_MODERATE, 80, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_DENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 180, 1000, 80, 100, 0, 520, 0, 2, 200, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 300, 34, 74, 180, 1400, 0, 2, 320, VJ_BEAT_COST_MODERATE, 44, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 80, 1000, 86, 100, 0, 480, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 86, 100, 0, 430, 80, 2, 120, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 220, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 200, 80, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 180, 1000, 82, 100, 0, 500, 0, 2, 200, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_DRIFT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 60, 1000, 82, 100, 0, 460, 0, 2, 180, VJ_BEAT_COST_MODERATE, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 480, 980, 62, 96, 80, 900, 0, 2, 240, VJ_BEAT_COST_MODERATE, 80, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_DENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 180, 1000, 80, 100, 0, 520, 0, 2, 200, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 300, 34, 74, 180, 1400, 0, 2, 320, VJ_BEAT_COST_MODERATE, 44, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 80, 1000, 86, 100, 0, 480, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 86, 100, 0, 430, 80, 2, 120, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 220, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }
 
 void *chronomirror_malloc(int w, int h)
 {
-    chronomirror_t *c = (chronomirror_t *) vj_calloc(sizeof(chronomirror_t));
+    chronomirror_t *c;
     int i;
 
+    if(w <= 0 || h <= 0)
+        return NULL;
+
+    c = (chronomirror_t *) vj_calloc(sizeof(chronomirror_t));
     if(!c)
         return NULL;
 
@@ -867,6 +880,7 @@ static void cs_compute_border(chronomirror_t *c,
     int y;
 
     if(ymin > 0) {
+#pragma omp for schedule(static)
         for(y = 0; y < ymin; y++) {
             int x;
             int pos = y * w;
@@ -888,6 +902,7 @@ static void cs_compute_border(chronomirror_t *c,
     }
 
     if(ymax + 1 < h) {
+#pragma omp for schedule(static)
         for(y = ymax + 1; y < h; y++) {
             int x;
             int pos = y * w;
@@ -909,6 +924,7 @@ static void cs_compute_border(chronomirror_t *c,
     }
 
     if(xmin > 0 && ymin <= ymax) {
+#pragma omp for schedule(static)
         for(y = ymin; y <= ymax; y++) {
             int x;
             int pos = y * w;
@@ -930,6 +946,7 @@ static void cs_compute_border(chronomirror_t *c,
     }
 
     if(xmax + 1 < w && ymin <= ymax) {
+#pragma omp for schedule(static)
         for(y = ymin; y <= ymax; y++) {
             int x;
             int pos = y * w + xmax + 1;
@@ -1135,21 +1152,18 @@ static void cs_compute_smoke_plain(chronomirror_t *c,
         }
     }
 
-#pragma omp single
-    {
-        cs_compute_border(
-            c,
-            Y,
-            rise,
-            0,
-            0,
-            frame_eddy,
-            xmin,
-            xmax,
-            ymin,
-            ymax
-        );
-    }
+    cs_compute_border(
+        c,
+        Y,
+        rise,
+        0,
+        0,
+        frame_eddy,
+        xmin,
+        xmax,
+        ymin,
+        ymax
+    );
 }
 
 static void cs_compute_smoke_curl(chronomirror_t *c,
@@ -1374,21 +1388,18 @@ static void cs_compute_smoke_curl(chronomirror_t *c,
         }
     }
 
-#pragma omp single
-    {
-        cs_compute_border(
-            c,
-            Y,
-            rise,
-            curl,
-            0,
-            frame_eddy,
-            xmin,
-            xmax,
-            ymin,
-            ymax
-        );
-    }
+    cs_compute_border(
+        c,
+        Y,
+        rise,
+        curl,
+        0,
+        frame_eddy,
+        xmin,
+        xmax,
+        ymin,
+        ymax
+    );
 }
 
 static void cs_compute_smoke_turbulent(chronomirror_t *c,
@@ -1625,21 +1636,18 @@ static void cs_compute_smoke_turbulent(chronomirror_t *c,
         }
     }
 
-#pragma omp single
-    {
-        cs_compute_border(
-            c,
-            Y,
-            rise,
-            curl,
-            turbulence,
-            frame_eddy,
-            xmin,
-            xmax,
-            ymin,
-            ymax
-        );
-    }
+    cs_compute_border(
+        c,
+        Y,
+        rise,
+        curl,
+        turbulence,
+        frame_eddy,
+        xmin,
+        xmax,
+        ymin,
+        ymax
+    );
 }
 
 static void cs_compute_smoke(chronomirror_t *c,
@@ -2178,22 +2186,36 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronomirror_t *c = (chronomirror_t *) ptr;
 
-    int trigger_gate = cs_param1000_to_u8(args[P_TRIGGER_GATE]);
-    int rise         = cs_param1000_to_u8(args[P_RISE]);
-    int curl         = cs_param1000_to_u8(args[P_CURL]);
-    int decay        = cs_param1000_to_u8(args[P_DECAY]);
-    int density      = cs_param1000_to_u8(args[P_DENSITY]);
-    int source_bleed = cs_param1000_to_u8(args[P_SOURCE_BLEED]);
-    int color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
-    int turbulence   = cs_param1000_to_u8(args[P_TURBULENCE]);
-    int plume_gain   = cs_clampi(args[P_PLUME_GAIN], 0, 1000);
-    int color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, 1000);
+    int trigger_gate;
+    int rise;
+    int curl;
+    int decay;
+    int density;
+    int source_bleed;
+    int color_mode;
+    int turbulence;
+    int plume_gain;
+    int color_energy;
 
-    #pragma omp single
+#pragma omp single
     {
         if(!c->seeded)
             cs_seed(c, frame);
+    }
 
+    trigger_gate = cs_param1000_to_u8(args[P_TRIGGER_GATE]);
+    rise         = cs_param1000_to_u8(args[P_RISE]);
+    curl         = cs_param1000_to_u8(args[P_CURL]);
+    decay        = cs_param1000_to_u8(args[P_DECAY]);
+    density      = cs_param1000_to_u8(args[P_DENSITY]);
+    source_bleed = cs_param1000_to_u8(args[P_SOURCE_BLEED]);
+    color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
+    turbulence   = cs_param1000_to_u8(args[P_TURBULENCE]);
+    plume_gain   = cs_clampi(args[P_PLUME_GAIN], 0, 1000);
+    color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+#pragma omp single
+    {
         cs_build_luts_if_needed(
             c,
             trigger_gate,
@@ -2207,7 +2229,7 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
             color_energy
         );
     }
-    
+
     cs_compute_smoke(
         c,
         frame,
@@ -2216,7 +2238,7 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
         turbulence
     );
 
-    #pragma omp single
+#pragma omp single
     {
         cs_swap_fields(c);
     }
@@ -2228,7 +2250,7 @@ void chronomirror_apply(void *ptr, VJFrame *frame, int *args)
         color_mode
     );
 
-    #pragma omp single
+#pragma omp single
     {
         c->frame++;
     }

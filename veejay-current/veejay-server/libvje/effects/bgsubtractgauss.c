@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2016-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -23,6 +23,9 @@
 #include "bgsubtractgauss.h"
 #include <libsubsample/subsample.h>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 typedef struct {
     uint8_t *static_bg__;
@@ -31,10 +34,6 @@ typedef struct {
     double *pVar;
     uint32_t bg_n;
     int auto_hist;
-    int n_threads;
-
-    int do_update;
-    int effective_mode;
 } bgsubtract_t;
 
 vj_effect *bgsubtractgauss_init(int width, int height)
@@ -112,7 +111,6 @@ void *bgsubtractgauss_malloc(int width, int height)
     veejay_memset(b->static_bg_frame__[3], 0, plane_size);
 
     b->bg_n = 0;
-    b->n_threads = vje_advise_num_threads(plane_size);
     return b;
 }
 
@@ -143,8 +141,6 @@ int bgsubtractgauss_prepare(void *ptr, VJFrame *frame)
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
 
-    b->bg_n = 0;
-
     for(int i = 0; i < len; i++) {
         b->pMu[i] = (double)Y[i];
         b->pVar[i] = 100.0;
@@ -161,6 +157,8 @@ int bgsubtractgauss_prepare(void *ptr, VJFrame *frame)
         chroma_supersample(SSM_422_444, frame, b->static_bg_frame__);
     }
 
+    b->bg_n = 0;
+
     return 1;
 }
 
@@ -174,6 +172,52 @@ uint8_t* bgsubtractgauss_get_bg_frame(void *ptr, unsigned int plane)
     return b->static_bg_frame__[plane];
 }
 
+static inline int bgsubtractgauss_process_model(int i,
+                                                const uint8_t *Y,
+                                                const uint8_t *U,
+                                                const uint8_t *V,
+                                                uint8_t *BG_Y,
+                                                uint8_t *BG_U,
+                                                uint8_t *BG_V,
+                                                double *mu,
+                                                double *var,
+                                                double alpha,
+                                                double threshold,
+                                                double min_noise,
+                                                int do_update)
+{
+    double m = mu[i];
+    double v = var[i];
+
+    if(v < min_noise)
+        v = min_noise;
+
+    const double diff = (double)Y[i] - m;
+    const double dist_sq = (diff * diff) / v;
+    const int is_fg = dist_sq > threshold;
+
+    if(!is_fg && do_update)
+    {
+        m += alpha * diff;
+        v += alpha * (diff * diff - v);
+
+        if(v < min_noise)
+            v = min_noise;
+
+        mu[i] = m;
+        var[i] = v;
+        BG_Y[i] = (uint8_t)(m < 0.0 ? 0.0 : (m > 255.0 ? 255.0 : m));
+        BG_U[i] = U[i];
+        BG_V[i] = V[i];
+    }
+    else if(v != var[i])
+    {
+        var[i] = v;
+    }
+
+    return is_fg;
+}
+
 void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
 {
     bgsubtract_t *b = (bgsubtract_t*) ptr;
@@ -181,7 +225,7 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     const int alpha_arg = args[0];
     const int threshold_arg = args[1];
     const int min_noise_arg = args[2];
-    const int mode = args[3];
+    int mode = args[3];
     const int period = args[4];
 
     const double alpha = (double)alpha_arg / 10000.0;
@@ -201,73 +245,65 @@ void bgsubtractgauss_apply(void *ptr, VJFrame *frame, int *args)
     double *restrict mu = b->pMu;
     double *restrict var = b->pVar;
 
-    #pragma omp single
-    {
-        b->effective_mode = mode;
-        if(b->effective_mode == 2 && !A)
-            b->effective_mode = 3;
+    if(mode == 2 && !A)
+        mode = 3;
 
+#pragma omp single
+    {
         b->bg_n++;
-        b->do_update = (b->bg_n % (uint32_t)(period > 0 ? period : 1)) == 0 ? 1 : 0;
     }
 
-    const int do_update = b->do_update;
-    const int eff_mode = b->effective_mode;
+    const int do_update = (b->bg_n % (uint32_t)period) == 0;
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++)
+    if(mode == 0)
     {
-        double m = mu[i];
-        double v = var[i];
-
-        if(v < min_noise)
-            v = min_noise;
-
-        const double diff = (double)Y[i] - m;
-        const double dist_sq = (diff * diff) / v;
-        const int is_fg = dist_sq > threshold;
-
-        if(!is_fg && do_update)
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
         {
-            m += alpha * diff;
-            v += alpha * (diff * diff - v);
-
-            if(v < min_noise)
-                v = min_noise;
-
-            mu[i] = m;
-            var[i] = v;
-            BG_Y[i] = (uint8_t)(m < 0.0 ? 0.0 : (m > 255.0 ? 255.0 : m));
-            BG_U[i] = U[i];
-            BG_V[i] = V[i];
-        }
-        else
-        {
-            var[i] = v;
-        }
-
-        if(eff_mode == 0)
-        {
+            bgsubtractgauss_process_model(i, Y, U, V, BG_Y, BG_U, BG_V,
+                                          mu, var, alpha, threshold, min_noise, do_update);
             Y[i] = BG_Y[i];
             U[i] = BG_U[i];
             V[i] = BG_V[i];
         }
-        else if(eff_mode == 1)
+    }
+    else if(mode == 1)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
         {
+            const int is_fg = bgsubtractgauss_process_model(i, Y, U, V, BG_Y, BG_U, BG_V,
+                                                             mu, var, alpha, threshold, min_noise, do_update);
             if(!is_fg)
                 Y[i] = 16;
-            U[i] = 128;
-            V[i] = 128;
         }
-        else if(eff_mode == 2)
+
+#pragma omp for schedule(static)
+        for(int plane = 1; plane < 3; plane++)
+            veejay_memset(frame->data[plane], 128, len);
+    }
+    else if(mode == 2)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
         {
+            const int is_fg = bgsubtractgauss_process_model(i, Y, U, V, BG_Y, BG_U, BG_V,
+                                                             mu, var, alpha, threshold, min_noise, do_update);
             A[i] = is_fg ? 255 : 0;
         }
-        else
+    }
+    else
+    {
+ #pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
         {
+            const int is_fg = bgsubtractgauss_process_model(i, Y, U, V, BG_Y, BG_U, BG_V,
+                                                             mu, var, alpha, threshold, min_noise, do_update);
             Y[i] = is_fg ? 255 : 0;
-            U[i] = 128;
-            V[i] = 128;
         }
+
+#pragma omp for schedule(static)
+        for(int plane = 1; plane < 3; plane++)
+            veejay_memset(frame->data[plane], 128, len);
     }
 }

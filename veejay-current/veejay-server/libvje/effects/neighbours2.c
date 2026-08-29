@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2005-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2005 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -44,13 +44,6 @@ typedef struct {
     uint8_t *bin;
     int *scratch;
     int n_threads;
-
-    int cached_width;
-    int cached_height;
-    int cached_brush_size;
-    int cached_smoothness;
-    int cached_active_bins;
-    int cached_mode;
 } nb2_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -164,6 +157,17 @@ vj_effect *neighbours2_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_BRUSH] = 2;      ve->limits[1][P_BRUSH] = 16;      ve->defaults[P_BRUSH] = 4;
     ve->limits[0][P_SMOOTHNESS] = 1; ve->limits[1][P_SMOOTHNESS] = 255; ve->defaults[P_SMOOTHNESS] = 4;
     ve->limits[0][P_MODE] = 0;       ve->limits[1][P_MODE] = 1;         ve->defaults[P_MODE] = 0;
@@ -186,22 +190,15 @@ vj_effect *neighbours2_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
 void neighbours2_free(void *ptr)
 {
     nb2_t *n = (nb2_t*) ptr;
-    if(!n)
-        return;
 
-    if(n->src[0])
-        free(n->src[0]);
-    if(n->scratch)
-        free(n->scratch);
+    free(n->src[0]);
+    free(n->scratch);
     free(n);
 }
 
@@ -214,6 +211,8 @@ void *neighbours2_malloc(int w, int h)
 
     const int len = w * h;
 
+    n->n_threads = vje_advise_num_threads(len);
+
     n->src[0] = (uint8_t*) vj_malloc((size_t)len * 4u);
 
     if(!n->src[0]) {
@@ -224,11 +223,6 @@ void *neighbours2_malloc(int w, int h)
     n->src[1] = n->src[0] + len;
     n->src[2] = n->src[1] + len;
     n->bin = n->src[2] + len;
-
-    n->n_threads = vje_advise_num_threads(len);
-    if(n->n_threads < 1)
-        n->n_threads = 1;
-
     n->scratch = (int*) vj_calloc(sizeof(int) * NB2_SCRATCH_STRIDE * n->n_threads);
 
     if(!n->scratch) {
@@ -356,52 +350,36 @@ void neighbours2_apply(void *ptr, VJFrame *frame, int *args)
 {
     nb2_t *n = (nb2_t*) ptr;
 
+    const int width = frame->width;
+    const int height = frame->height;
     const int len = frame->len;
-
-    #pragma omp single
-    {
-        n->cached_width = frame->width;
-        n->cached_height = frame->height;
-        n->cached_brush_size = args[P_BRUSH];
-        n->cached_smoothness = args[P_SMOOTHNESS];
-        n->cached_active_bins = args[P_SMOOTHNESS] + 1;
-        n->cached_mode = args[P_MODE];
-
-        uint8_t *dst_y = frame->data[0];
-        uint8_t *dst_u = frame->data[1];
-        uint8_t *dst_v = frame->data[2];
-
-        uint8_t *src_y = n->src[0];
-        uint8_t *src_u = n->src[1];
-        uint8_t *src_v = n->src[2];
-
-        veejay_memcpy(src_y, dst_y, len);
-
-        if(n->cached_mode) {
-            veejay_memcpy(src_u, dst_u, len);
-            veejay_memcpy(src_v, dst_v, len);
-        }
-    }
-
-    const int width = n->cached_width;
-    const int height = n->cached_height;
-    const int brush_size = n->cached_brush_size;
-    const int smoothness = n->cached_smoothness;
-    const int active_bins = n->cached_active_bins;
-    const int mode = n->cached_mode;
+    const int brush_size = args[P_BRUSH];
+    const int smoothness = args[P_SMOOTHNESS];
+    const int mode = args[P_MODE];
+    const int active_bins = smoothness + 1;
 
     uint8_t *restrict dst_y = frame->data[0];
     uint8_t *restrict dst_u = frame->data[1];
     uint8_t *restrict dst_v = frame->data[2];
+
     uint8_t *restrict src_y = n->src[0];
     uint8_t *restrict src_u = n->src[1];
     uint8_t *restrict src_v = n->src[2];
     uint8_t *restrict bin = n->bin;
 
+    #pragma omp sections
+        {
+    #pragma omp section
+            { veejay_memcpy(src_y, dst_y, len); }
+    #pragma omp section
+            { if(mode) veejay_memcpy(src_u, dst_u, len); }
+    #pragma omp section
+            { if(mode) veejay_memcpy(src_v, dst_v, len); }
+        }
+
 #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
+    for(int i = 0; i < len; i++)
         bin[i] = nb2_quant_luma(src_y[i], smoothness);
-    }
 
     if(mode)
         nb2_apply_color(n, dst_y, dst_u, dst_v, src_y, src_u, src_v, bin, width, height, brush_size, active_bins);

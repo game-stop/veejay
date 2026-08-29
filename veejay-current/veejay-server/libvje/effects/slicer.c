@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -20,7 +20,6 @@
 
 #include "common.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <veejaycore/vjmem.h>
 #include "slicer.h"
 
@@ -52,7 +51,6 @@ typedef struct {
     int have_shift;
 
     uint32_t seed;
-    int n_threads;
 
     int smooth_ready;
     float sm_width;
@@ -65,15 +63,6 @@ typedef struct {
     float sm_slice_drive;
     float sm_shatter_drive;
     float sm_mix_drive;
-
-    int val1;
-    int val2;
-    int shatter;
-    int smoothness;
-    int dominance;
-    int block_shift;
-    int extra_mix_q8;
-    int mode;
 } slicer_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -104,6 +93,7 @@ static inline int slicer_rand_range(uint32_t *state, int lo, int hi)
     return lo + (int)(slicer_rand(state) % (uint32_t)(hi - lo + 1));
 }
 
+
 static inline float slicer_smooth_value(float current, float target, float speed)
 {
     return current + ((target - current) * speed);
@@ -120,6 +110,17 @@ vj_effect *slicer_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     int min_dim = w < h ? w : h;
     int max_block_size = min_dim / 2;
@@ -141,8 +142,8 @@ vj_effect *slicer_init(int w, int h)
     if(max_shift < 2)
         max_shift = 2;
 
-    ve->limits[0][P_WIDTH] = 1;        ve->limits[1][P_WIDTH] = w > 0 ? w : 1;              ve->defaults[P_WIDTH] = w >= 16 ? 16 : (w > 0 ? w : 1);
-    ve->limits[0][P_HEIGHT] = 1;       ve->limits[1][P_HEIGHT] = h > 0 ? h : 1;             ve->defaults[P_HEIGHT] = h >= 16 ? 16 : (h > 0 ? h : 1);
+    ve->limits[0][P_WIDTH] = 1;        ve->limits[1][P_WIDTH] = w;              ve->defaults[P_WIDTH] = w >= 16 ? 16 : w;
+    ve->limits[0][P_HEIGHT] = 1;       ve->limits[1][P_HEIGHT] = h;             ve->defaults[P_HEIGHT] = h >= 16 ? 16 : h;
     ve->limits[0][P_SHATTER] = 0;      ve->limits[1][P_SHATTER] = 128;          ve->defaults[P_SHATTER] = 8;
     ve->limits[0][P_PERIOD] = 0;       ve->limits[1][P_PERIOD] = 500;           ve->defaults[P_PERIOD] = 0;
     ve->limits[0][P_MODE] = 0;         ve->limits[1][P_MODE] = 1;               ve->defaults[P_MODE] = 0;
@@ -340,11 +341,8 @@ void *slicer_malloc(int width, int height)
 void slicer_free(void *ptr)
 {
     slicer_t *s = (slicer_t*)ptr;
-    if(!s)
-        return;
 
-    if(s->block)
-        free(s->block);
+    free(s->block);
     free(s);
 }
 
@@ -356,6 +354,138 @@ static inline int slicer_wrapi(int v, int max)
         v += max;
 
     return v;
+}
+
+typedef void (*slicer_store_fn)(uint8_t *dY, uint8_t *dCb, uint8_t *dCr,
+                                const uint8_t *s2Y, const uint8_t *s2Cb,
+                                const uint8_t *s2Cr, int dst, uint8_t out_y,
+                                uint8_t out_cb, uint8_t out_cr, int q8);
+
+static void slicer_store_direct(uint8_t *dY, uint8_t *dCb, uint8_t *dCr,
+                                const uint8_t *s2Y, const uint8_t *s2Cb,
+                                const uint8_t *s2Cr, int dst, uint8_t out_y,
+                                uint8_t out_cb, uint8_t out_cr, int q8)
+{
+    (void)s2Y;
+    (void)s2Cb;
+    (void)s2Cr;
+    (void)q8;
+
+    dY[dst] = out_y;
+    dCb[dst] = out_cb;
+    dCr[dst] = out_cr;
+}
+
+static void slicer_store_mixed(uint8_t *dY, uint8_t *dCb, uint8_t *dCr,
+                               const uint8_t *s2Y, const uint8_t *s2Cb,
+                               const uint8_t *s2Cr, int dst, uint8_t out_y,
+                               uint8_t out_cb, uint8_t out_cr, int q8)
+{
+    dY[dst] = slicer_blend_u8(out_y, s2Y[dst], q8);
+    dCb[dst] = slicer_blend_u8(out_cb, s2Cb[dst], q8);
+    dCr[dst] = slicer_blend_u8(out_cr, s2Cr[dst], q8);
+}
+
+typedef void (*slicer_render_fn)(uint8_t *dY, uint8_t *dCb, uint8_t *dCr,
+                                 const uint8_t *s1Y, const uint8_t *s1Cb,
+                                 const uint8_t *s1Cr, const uint8_t *s2Y,
+                                 const uint8_t *s2Cb, const uint8_t *s2Cr,
+                                 const int *sx_row, const int *sy_col,
+                                 int width, int height, int block_shift,
+                                 int dominance, int extra_mix_q8,
+                                 slicer_store_fn store);
+
+static void slicer_render_clip(uint8_t *dY, uint8_t *dCb, uint8_t *dCr,
+                               const uint8_t *s1Y, const uint8_t *s1Cb,
+                               const uint8_t *s1Cr, const uint8_t *s2Y,
+                               const uint8_t *s2Cb, const uint8_t *s2Cr,
+                               const int *sx_row, const int *sy_col,
+                               int width, int height, int block_shift,
+                               int dominance, int extra_mix_q8,
+                               slicer_store_fn store)
+{
+#pragma omp for schedule(static)
+    for(int y = 0; y < height; y++) {
+        const int row = y * width;
+        const int shift_x = sx_row[y];
+
+        for(int x = 0; x < width; x++) {
+            const int ix = x + shift_x;
+            const int iy = y + sy_col[x];
+            const int dst = row + x;
+            uint8_t out_y = s1Y[dst];
+            uint8_t out_cb = s1Cb[dst];
+            uint8_t out_cr = s1Cr[dst];
+
+            if((unsigned)ix < (unsigned)width && (unsigned)iy < (unsigned)height) {
+                const int src = iy * width + ix;
+                const int chunk_x = ix >> block_shift;
+                const int chunk_y = iy >> block_shift;
+                const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^
+                                      ((uint32_t)chunk_y * 131071u);
+                const int use_s2 = (int)(hash % 100u) < dominance;
+
+                if(use_s2) {
+                    out_y = s2Y[src];
+                    out_cb = s2Cb[src];
+                    out_cr = s2Cr[src];
+                }
+                else {
+                    out_y = s1Y[src];
+                    out_cb = s1Cb[src];
+                    out_cr = s1Cr[src];
+                }
+            }
+
+            store(dY, dCb, dCr, s2Y, s2Cb, s2Cr, dst,
+                  out_y, out_cb, out_cr, extra_mix_q8);
+        }
+    }
+}
+
+static void slicer_render_wrap(uint8_t *dY, uint8_t *dCb, uint8_t *dCr,
+                               const uint8_t *s1Y, const uint8_t *s1Cb,
+                               const uint8_t *s1Cr, const uint8_t *s2Y,
+                               const uint8_t *s2Cb, const uint8_t *s2Cr,
+                               const int *sx_row, const int *sy_col,
+                               int width, int height, int block_shift,
+                               int dominance, int extra_mix_q8,
+                               slicer_store_fn store)
+{
+#pragma omp for schedule(static)
+    for(int y = 0; y < height; y++) {
+        const int row = y * width;
+        const int shift_x = sx_row[y];
+
+        for(int x = 0; x < width; x++) {
+            const int ix = slicer_wrapi(x + shift_x, width);
+            const int iy = slicer_wrapi(y + sy_col[x], height);
+            const int dst = row + x;
+            const int src = iy * width + ix;
+            const int chunk_x = ix >> block_shift;
+            const int chunk_y = iy >> block_shift;
+            const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^
+                                  ((uint32_t)chunk_y * 131071u);
+            const int use_s2 = (int)(hash % 100u) < dominance;
+            uint8_t out_y;
+            uint8_t out_cb;
+            uint8_t out_cr;
+
+            if(use_s2) {
+                out_y = s2Y[src];
+                out_cb = s2Cb[src];
+                out_cr = s2Cr[src];
+            }
+            else {
+                out_y = s1Y[src];
+                out_cb = s1Cb[src];
+                out_cr = s1Cr[src];
+            }
+
+            store(dY, dCb, dCr, s2Y, s2Cb, s2Cr, dst,
+                  out_y, out_cb, out_cr, extra_mix_q8);
+        }
+    }
 }
 
 void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
@@ -379,22 +509,7 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_step = 0.24f;
 
-    const uint8_t *srcY = frame->data[0];
-    const uint8_t *srcCb = frame->data[1];
-    const uint8_t *srcCr = frame->data[2];
-
-    uint8_t *restrict tmpY = s->tmp[0];
-    uint8_t *restrict tmpCb = s->tmp[1];
-    uint8_t *restrict tmpCr = s->tmp[2];
-
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        tmpY[i] = srcY[i];
-        tmpCb[i] = srcCb[i];
-        tmpCr[i] = srcCr[i];
-    }
-
-    #pragma omp single
+#pragma omp single
     {
         if(!s->smooth_ready) {
             s->sm_width = (float)base_w;
@@ -421,128 +536,88 @@ void slicer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             s->sm_shatter_drive = slicer_smooth_value(s->sm_shatter_drive, (float)shatter_drive_arg, param_step);
             s->sm_mix_drive = slicer_smooth_value(s->sm_mix_drive, (float)mix_drive_arg, param_step);
         }
+    }
 
-        int slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
-        int shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
-        int mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
+    const int slice_drive = clampi((int)(s->sm_slice_drive + 0.5f), 0, 1000);
+    const int shatter_drive = clampi((int)(s->sm_shatter_drive + 0.5f), 0, 1000);
+    const int mix_drive = clampi((int)(s->sm_mix_drive + 0.5f), 0, 1000);
 
-        s->val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
-        s->val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
-        s->shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
-        int period = clampi((int)(s->sm_period + 0.5f), 0, 500);
-        s->smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
-        s->dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
-        s->block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
+    int val1 = clampi((int)(s->sm_width + 0.5f), 1, width);
+    int val2 = clampi((int)(s->sm_height + 0.5f), 1, height);
+    int shatter = clampi((int)(s->sm_shatter + 0.5f), 0, 128);
+    int period = clampi((int)(s->sm_period + 0.5f), 0, 500);
+    int smoothness = clampi((int)(s->sm_smoothness + 0.5f), 0, 100);
+    int dominance = clampi((int)(s->sm_dominance + 0.5f), 0, 100);
+    int block_shift = clampi((int)(s->sm_block + 0.5f), 2, 9);
 
-        s->val1 = clampi(s->val1 + (((width - s->val1) * slice_drive + 500) / 1000), 1, width);
-        s->val2 = clampi(s->val2 + (((height - s->val2) * slice_drive + 500) / 1000), 1, height);
-        s->shatter = clampi(s->shatter + (((128 - s->shatter) * shatter_drive + 500) / 1000), 0, 128);
+    val1 = clampi(val1 + (((width - val1) * slice_drive + 500) / 1000), 1, width);
+    val2 = clampi(val2 + (((height - val2) * slice_drive + 500) / 1000), 1, height);
+    shatter = clampi(shatter + (((128 - shatter) * shatter_drive + 500) / 1000), 0, 128);
 
-        s->dominance = clampi(s->dominance + (((100 - s->dominance) * mix_drive + 500) / 1000), 0, 100);
-        s->block_shift = clampi(s->block_shift - ((mix_drive + 333) / 500), 2, 9);
 
-        s->extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
-        s->mode = mode;
+    dominance = clampi(dominance + (((100 - dominance) * mix_drive + 500) / 1000), 0, 100);
+    block_shift = clampi(block_shift - ((mix_drive + 333) / 500), 2, 9);
 
+    const int extra_mix_q8 = clampi((mix_drive * 88 + 500) / 1000, 0, 96);
+
+#pragma omp single
+    {
         if(s->last_period != period) {
             s->last_period = period;
             s->current_period = 0;
         }
 
+
         if(s->current_period <= 0 || !s->have_shift) {
             s->seed ^= (uint32_t)(frame->timecode * 1000003.0);
-            s->seed ^= (uint32_t)(s->val1 * 0x45d9f3bu);
-            s->seed ^= (uint32_t)(s->val2 * 0x119de1f3u);
-            s->seed ^= (uint32_t)(s->shatter * 0x27d4eb2du);
+            s->seed ^= (uint32_t)(val1 * 0x45d9f3bu);
+            s->seed ^= (uint32_t)(val2 * 0x119de1f3u);
+            s->seed ^= (uint32_t)(shatter * 0x27d4eb2du);
             s->seed ^= (uint32_t)((slice_drive + (shatter_drive << 1) + (mix_drive << 2)) * 0x9e3779b9u);
 
-            recalc(s, width, height, tmpY, s->val1, s->val2, s->shatter, s->seed, s->smoothness);
+            recalc(s, width, height, frame->data[0], val1, val2, shatter, s->seed, smoothness);
 
             s->current_period = period > 0 ? period : 1;
         }
 
         s->current_period--;
     }
- 
-    const int block_shift = s->block_shift;
-    const int dominance = s->dominance;
-    const int extra_mix_q8 = s->extra_mix_q8;
-    const int mode_val = s->mode;
 
-    uint8_t *restrict dY  = frame->data[0];
+    uint8_t *restrict dY = frame->data[0];
     uint8_t *restrict dCb = frame->data[1];
     uint8_t *restrict dCr = frame->data[2];
 
-    const uint8_t *restrict s1Y  = s->tmp[0];
+#pragma omp sections
+    {
+#pragma omp section
+        {
+            veejay_memcpy(s->tmp[0], dY, len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(s->tmp[1], dCb, len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(s->tmp[2], dCr, len);
+        }
+    }
+
+    const uint8_t *restrict s1Y = s->tmp[0];
     const uint8_t *restrict s1Cb = s->tmp[1];
     const uint8_t *restrict s1Cr = s->tmp[2];
 
-    const uint8_t *restrict s2Y  = frame2->data[0];
+    const uint8_t *restrict s2Y = frame2->data[0];
     const uint8_t *restrict s2Cb = frame2->data[1];
     const uint8_t *restrict s2Cr = frame2->data[2];
 
-    const int *restrict sx_row = s->slice_xshift;
-    const int *restrict sy_col = s->slice_yshift;
+    int *restrict sx_row = s->slice_xshift;
+    int *restrict sy_col = s->slice_yshift;
+    const slicer_store_fn store =
+        extra_mix_q8 > 0 ? slicer_store_mixed : slicer_store_direct;
+    const slicer_render_fn render = mode == 0 ? slicer_render_clip : slicer_render_wrap;
 
-#pragma omp for schedule(static)
-    for(int y = 0; y < height; y++) {
-        const int row = y * width;
-        const int shift_x = sx_row[y];
-
-        for(int x = 0; x < width; x++) {
-            int ix = x + shift_x;
-            int iy = y + sy_col[x];
-
-            const int dst = row + x;
-            uint8_t out_y = s1Y[dst];
-            uint8_t out_cb = s1Cb[dst];
-            uint8_t out_cr = s1Cr[dst];
-
-            if(mode_val == 0) {
-                if((unsigned)ix < (unsigned)width && (unsigned)iy < (unsigned)height) {
-                    const int src = iy * width + ix;
-                    const int chunk_x = ix >> block_shift;
-                    const int chunk_y = iy >> block_shift;
-                    const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^ ((uint32_t)chunk_y * 131071u);
-                    const int use_s2 = (int)(hash % 100u) < dominance;
-
-                    const uint8_t *restrict srcY = use_s2 ? s2Y : s1Y;
-                    const uint8_t *restrict srcCb = use_s2 ? s2Cb : s1Cb;
-                    const uint8_t *restrict srcCr = use_s2 ? s2Cr : s1Cr;
-
-                    out_y = srcY[src];
-                    out_cb = srcCb[src];
-                    out_cr = srcCr[src];
-                }
-            }
-            else {
-                ix = slicer_wrapi(ix, width);
-                iy = slicer_wrapi(iy, height);
-
-                const int src = iy * width + ix;
-                const int chunk_x = ix >> block_shift;
-                const int chunk_y = iy >> block_shift;
-                const uint32_t hash = ((uint32_t)chunk_x * 104729u) ^ ((uint32_t)chunk_y * 131071u);
-                const int use_s2 = (int)(hash % 100u) < dominance;
-
-                const uint8_t *restrict srcY = use_s2 ? s2Y : s1Y;
-                const uint8_t *restrict srcCb = use_s2 ? s2Cb : s1Cb;
-                const uint8_t *restrict srcCr = use_s2 ? s2Cr : s1Cr;
-
-                out_y = srcY[src];
-                out_cb = srcCb[src];
-                out_cr = srcCr[src];
-            }
-
-            if(extra_mix_q8 > 0) {
-                out_y = slicer_blend_u8(out_y, s2Y[dst], extra_mix_q8);
-                out_cb = slicer_blend_u8(out_cb, s2Cb[dst], extra_mix_q8);
-                out_cr = slicer_blend_u8(out_cr, s2Cr[dst], extra_mix_q8);
-            }
-
-            dY[dst] = out_y;
-            dCb[dst] = out_cb;
-            dCr[dst] = out_cr;
-        }
-    }
+    render(dY, dCb, dCr, s1Y, s1Cb, s1Cr, s2Y, s2Cb, s2Cr,
+           sx_row, sy_col, width, height, block_shift, dominance,
+           extra_mix_q8, store);
 }

@@ -67,11 +67,16 @@ vj_effect *contrast_init(int w, int h)
 
 void contrast_apply(void *ptr, VJFrame *frame, int *s)
 {
+    (void) ptr;
+
+    if(!frame || !s)
+        return;
+
     const int mode = clampi(s[0], 0, 2);
     const int luma = clampi(s[1], 0, 255);
     const int chroma = clampi(s[2], 0, 255);
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -79,7 +84,6 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
 
     const int scale_y = (luma << 8) / 100;
     const int scale_uv = (chroma << 8) / 100;
-
     if(mode == 0 || mode == 2)
     {
 #pragma omp for schedule(static)

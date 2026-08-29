@@ -38,7 +38,7 @@ typedef struct {
     buffer_slot_t *slots;
     int write_pos;
     int filled;
-    int n_threads;
+    int apply_write_slot;
 } buffer_t;
 
 static void buffer_release(buffer_t *b)
@@ -85,6 +85,7 @@ vj_effect *buffer_init(int w, int h)
     ve->sub_format = -1;
     ve->extra_frame = 0;
     ve->has_user = 0;
+    ve->parallel = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Memory Tap", "Opacity", "Feedback");
 
     {
@@ -169,19 +170,38 @@ static int buffer_store_slot(buffer_slot_t *slot, VJFrame *frame)
     slot->frame.data[2] = slot->frame.data[1] + uv_len;
     slot->frame.data[3] = has_alpha ? (slot->frame.data[2] + uv_len) : NULL;
 
-    veejay_memcpy(slot->frame.data[0], frame->data[0], frame->len);
-    veejay_memcpy(slot->frame.data[1], frame->data[1], frame->uv_len);
-    veejay_memcpy(slot->frame.data[2], frame->data[2], frame->uv_len);
-
-    if(has_alpha)
-        veejay_memcpy(slot->frame.data[3], frame->data[3], frame->len);
-
     slot->frame.len = frame->len;
     slot->frame.uv_len = frame->uv_len;
     slot->frame.ssm = frame->ssm;
     slot->valid = 1;
 
     return 1;
+}
+
+static void buffer_store_slot_data(buffer_slot_t *slot, VJFrame *frame)
+{
+    const int has_alpha = frame->data[3] != NULL;
+
+#pragma omp sections
+    {
+#pragma omp section
+        {
+        veejay_memcpy(slot->frame.data[0], frame->data[0], frame->len);
+        }
+#pragma omp section
+        {
+        veejay_memcpy(slot->frame.data[1], frame->data[1], frame->uv_len);
+        }
+#pragma omp section
+        {
+        veejay_memcpy(slot->frame.data[2], frame->data[2], frame->uv_len);
+        }
+#pragma omp section
+        {
+            if(has_alpha)
+            veejay_memcpy(slot->frame.data[3], frame->data[3], frame->len);
+        }
+    }
 }
 
 static int buffer_put_frame(buffer_t *b, VJFrame *frame)
@@ -227,25 +247,43 @@ static inline uint8_t buffer_blend_u8(uint8_t a, uint8_t b, int opacity)
 static void buffer_copy_slot(buffer_slot_t *slot, VJFrame *dst)
 {
     VJFrame *src = &slot->frame;
+    const int uv_len = src->ssm ? src->len : src->uv_len;
 
-    veejay_memcpy(dst->data[0], src->data[0], src->len);
-    veejay_memcpy(dst->data[1], src->data[1], src->uv_len);
-    veejay_memcpy(dst->data[2], src->data[2], src->uv_len);
+#pragma omp single
+    {
+        dst->len = src->len;
+        dst->uv_len = src->uv_len;
+        dst->stride[3] = src->stride[3];
+        dst->ssm = src->ssm;
+    }
 
-    if(dst->data[3] && src->data[3])
-        veejay_memcpy(dst->data[3], src->data[3], src->len);
-
-    dst->len = src->len;
-    dst->uv_len = src->uv_len;
-    dst->stride[3] = src->stride[3];
-    dst->ssm = src->ssm;
+#pragma omp sections
+    {
+#pragma omp section
+        {
+        veejay_memcpy(dst->data[0], src->data[0], src->len);
+        }
+#pragma omp section
+        {
+        veejay_memcpy(dst->data[1], src->data[1], uv_len);
+        }
+#pragma omp section
+        {
+        veejay_memcpy(dst->data[2], src->data[2], uv_len);
+        }
+#pragma omp section
+        {
+            if(dst->data[3] && src->data[3])
+            veejay_memcpy(dst->data[3], src->data[3], src->len);
+        }
+    }
 }
 
 static void buffer_mix_slot(buffer_slot_t *slot, VJFrame *dst, int opacity)
 {
     VJFrame *src = &slot->frame;
     const int len = dst->len;
-    const int uv_len = dst->uv_len;
+    const int uv_len = dst->ssm ? dst->len : dst->uv_len;
     uint8_t *restrict dstY = dst->data[0];
     uint8_t *restrict dstU = dst->data[1];
     uint8_t *restrict dstV = dst->data[2];
@@ -277,7 +315,7 @@ static void buffer_feedback_slot(buffer_slot_t *slot, VJFrame *frame, int feedba
 {
     VJFrame *dst = &slot->frame;
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
     uint8_t *restrict dstY = dst->data[0];
     uint8_t *restrict dstU = dst->data[1];
     uint8_t *restrict dstV = dst->data[2];
@@ -307,12 +345,28 @@ static void buffer_feedback_slot(buffer_slot_t *slot, VJFrame *frame, int feedba
 
 static void buffer_black(VJFrame *frame)
 {
-    veejay_memset(frame->data[0], pixel_Y_lo_, frame->len);
-    veejay_memset(frame->data[1], 128, frame->uv_len);
-    veejay_memset(frame->data[2], 128, frame->uv_len);
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    if(frame->data[3])
-        veejay_memset(frame->data[3], 0, frame->len);
+#pragma omp sections
+        {
+#pragma omp section
+            {
+            veejay_memset(frame->data[0], pixel_Y_lo_, frame->len);
+            }
+#pragma omp section
+            {
+            veejay_memset(frame->data[1], 128, uv_len);
+            }
+#pragma omp section
+            {
+            veejay_memset(frame->data[2], 128, uv_len);
+            }
+#pragma omp section
+            {
+                if(frame->data[3])
+                veejay_memset(frame->data[3], 0, frame->len);
+            }
+        }
 }
 
 void buffer_apply(void *ptr, VJFrame *frame, int *args)
@@ -327,37 +381,38 @@ void buffer_apply(void *ptr, VJFrame *frame, int *args)
     else if(delay > MAX_FRAMES)
         delay = MAX_FRAMES;
 
-    #pragma omp single
-    {
-        int write_slot = buffer_put_frame(b, frame);
-        
-        if(write_slot >= 0 && delay > 0) {
-            buffer_slot_t *tap = buffer_get_tap(b, delay);
-            
-            if(!tap) {
-                if(opacity >= 255) {
-                    buffer_black(frame);
-                }
-            } else {
-                if(opacity >= 255) {
-                    buffer_copy_slot(tap, frame);
-                }
-                
-                int do_mix = (opacity > 0 && opacity < 255);
-                int do_feedback_mix = (feedback > 0 && feedback < 255);
-                
-                if(do_mix) {
-                    buffer_mix_slot(tap, frame, opacity);
-                }
-                
-                if(do_feedback_mix) {
-                    buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
-                }
-                
-                if(feedback >= 255) {
-                    buffer_store_slot(&b->slots[write_slot], frame);
-                }
-            }
-        }
+    int write_slot;
+#pragma omp single
+    b->apply_write_slot = buffer_put_frame(b, frame);
+    write_slot = b->apply_write_slot;
+    if(write_slot < 0)
+        return;
+
+    buffer_store_slot_data(&b->slots[write_slot], frame);
+
+    if(delay == 0)
+        return;
+
+    buffer_slot_t *tap = buffer_get_tap(b, delay);
+
+    if(!tap) {
+        if(opacity >= 255)
+            buffer_black(frame);
+        return;
     }
+
+    if(opacity >= 255)
+        buffer_copy_slot(tap, frame);
+
+    const int do_mix = opacity > 0 && opacity < 255;
+    const int do_feedback_mix = feedback > 0 && feedback < 255;
+
+    if(do_mix)
+        buffer_mix_slot(tap, frame, opacity);
+
+    if(do_feedback_mix)
+        buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
+
+    if(feedback >= 255)
+        buffer_store_slot_data(&b->slots[write_slot], frame);
 }

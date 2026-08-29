@@ -94,8 +94,8 @@ void *complexsync_malloc(int width, int height)
     c->c_outofsync_buffer[2] = c->c_outofsync_buffer[1] + len;
     c->c_outofsync_buffer[3] = NULL;
 
-    vj_frame_clear1(c->c_outofsync_buffer[0], pixel_Y_lo_, len);
-    vj_frame_clear1(c->c_outofsync_buffer[1], 128, len * 2);
+    veejay_memset(c->c_outofsync_buffer[0], pixel_Y_lo_, len);
+    veejay_memset(c->c_outofsync_buffer[1], 128, len * 2);
 
     return c;
 }
@@ -115,23 +115,21 @@ void complexsync_free(void *ptr)
 
 void complexsync_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    #pragma omp single
+    complexsync_t *c = (complexsync_t*) ptr;
+
+    const int width = frame->width;
+    const int height = frame->height;
+    const int len = frame->len;
+    const int val = clampi(args[0], 1, height - 1);
+    const int auto_inc = clampi(args[1], 0, 1);
+    int duration = clampi(args[2], 1, 25 * 10);
+
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
+
+#pragma omp single
     {
-        complexsync_t *c = (complexsync_t*) ptr;
-
-        const int width = frame->width;
-        const int height = frame->height;
-        const int len = frame->len;
-        const int val = clampi(args[0], 1, height - 1);
-        const int auto_inc = clampi(args[1], 0, 1);
-        int duration = clampi(args[2], 1, 25 * 10);
-
-        uint8_t *restrict Y = frame->data[0];
-        uint8_t *restrict Cb = frame->data[1];
-        uint8_t *restrict Cr = frame->data[2];
-
-        int planes[4] = { len, len, len, 0 };
-
         if(auto_inc == 1)
         {
             c->position += (val / duration) + 1;
@@ -145,20 +143,64 @@ void complexsync_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         }
 
         c->position = clampi(c->position, 1, height - 1);
+    }
 
-        const int region = width * c->position;
+    const int region = width * c->position;
 
-        vj_frame_copy(frame->data, c->c_outofsync_buffer, planes);
-        vj_frame_copy(frame2->data, frame->data, planes);
-
-        c->complex_not_completed = (len - region) > 0;
-
-        if(c->complex_not_completed)
+#pragma omp sections
+    {
+#pragma omp section
         {
-            uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
-            int dst_strides[4] = { len - region, len - region, len - region, 0 };
+            veejay_memcpy(c->c_outofsync_buffer[0], frame->data[0], len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(c->c_outofsync_buffer[1], frame->data[1], len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(c->c_outofsync_buffer[2], frame->data[2], len);
+        }
+    }
 
-            vj_frame_copy(c->c_outofsync_buffer, dest, dst_strides);
+#pragma omp sections
+    {
+#pragma omp section
+        {
+            veejay_memcpy(frame->data[0], frame2->data[0], len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(frame->data[1], frame2->data[1], len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(frame->data[2], frame2->data[2], len);
+        }
+    }
+
+    const int incomplete = (len - region) > 0;
+
+#pragma omp single
+    c->complex_not_completed = incomplete;
+
+    if(incomplete)
+    {
+        uint8_t *dest[4] = { Y + region, Cb + region, Cr + region, NULL };
+#pragma omp sections
+        {
+#pragma omp section
+        {
+            veejay_memcpy(dest[0], c->c_outofsync_buffer[0], len - region);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(dest[1], c->c_outofsync_buffer[1], len - region);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(dest[2], c->c_outofsync_buffer[2], len - region);
+        }
         }
     }
 }

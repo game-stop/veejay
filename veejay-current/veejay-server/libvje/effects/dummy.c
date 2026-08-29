@@ -43,10 +43,8 @@ vj_effect *dummy_init(int w, int h)
 }
 void dummy_apply( VJFrame *frame, int color)
 {
-    #pragma omp single
-    {
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
     char colorCb, colorCr, colorY;
 
     uint8_t *Y = frame->data[0];
@@ -59,15 +57,12 @@ void dummy_apply( VJFrame *frame, int color)
     veejay_memset( Y, colorY, len);
     veejay_memset( Cb,colorCb,uv_len);
     veejay_memset( Cr,colorCr,uv_len);
-    }
 }
 
 void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
 {
-	#pragma omp single
-	{
 	const int len = frame->len;
-	const int uv_len = frame->uv_len;
+	const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 	int colorCb=128, colorCr=128, colorY=pixel_Y_lo_;
 
  	uint8_t *Y = frame->data[0];
@@ -79,7 +74,5 @@ void dummy_rgb_apply( VJFrame *frame, int r,int g, int b)
  	veejay_memset( Y, colorY, len);
    	veejay_memset( Cb,colorCb,uv_len);
    	veejay_memset( Cr,colorCr,uv_len);
-	}
 }
-
 

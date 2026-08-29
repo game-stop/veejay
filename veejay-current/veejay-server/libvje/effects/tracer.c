@@ -41,12 +41,7 @@ typedef struct {
     float chroma_trail_s;
     int state_ready;
 
-    int wet_q8;
-    int feed;
-    int decay;
-    int chroma_wet_q8;
-    int chroma_feed;
-    int chroma_decay;
+    int n_threads;
 } tracer_t;
 
 static inline int tracer_clampi(int v, int lo, int hi)
@@ -58,6 +53,8 @@ static inline float tracer_clampf(float v, float lo, float hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
+
+
 
 static inline uint8_t tracer_mix_y(uint8_t a, uint8_t b, int q8)
 {
@@ -98,6 +95,14 @@ vj_effect *tracer_init(int w, int h)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_OPACITY] = 0;
     ve->limits[1][P_OPACITY] = 255;
@@ -144,9 +149,6 @@ vj_effect *tracer_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
@@ -178,19 +180,20 @@ void *tracer_malloc(int w, int h)
     t->chroma_trail_s = 1000.0f;
     t->state_ready = 0;
 
+    t->n_threads = vje_advise_num_threads(len);
+
     return (void*) t;
 }
 
 void tracer_free(void *ptr)
 {
     tracer_t *t = (tracer_t*) ptr;
-    if(!t)
-        return;
 
-    if(t->trace_buffer[0])
-        free(t->trace_buffer[0]);
+    free(t->trace_buffer[0]);
     free(t);
 }
+
+
 
 void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
@@ -207,58 +210,48 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_coeff = 0.185f;
 
-    #pragma omp single
-    {
-        if(!t->state_ready) {
-            t->opacity_s = (float)opacity_arg;
-            t->buffer_s = (float)buffer_arg;
-            t->mix_drive_s = (float)mix_drive_arg;
-            t->feed_drive_s = (float)feed_drive_arg;
-            t->chroma_trail_s = (float)chroma_trail_arg;
-            t->state_ready = 1;
-        } else {
-            t->opacity_s = tracer_smoothf(t->opacity_s, (float)opacity_arg, param_coeff);
-            t->buffer_s = tracer_smoothf(t->buffer_s, (float)buffer_arg, param_coeff * 0.80f);
-            t->mix_drive_s = tracer_smoothf(t->mix_drive_s, (float)mix_drive_arg, param_coeff);
-            t->feed_drive_s = tracer_smoothf(t->feed_drive_s, (float)feed_drive_arg, param_coeff * 0.90f);
-            t->chroma_trail_s = tracer_smoothf(t->chroma_trail_s, (float)chroma_trail_arg, param_coeff * 0.76f);
-        }
-
-        const float mix_t = tracer_clampf(t->mix_drive_s * 0.001f, 0.0f, 1.0f);
-        const float feed_t = tracer_clampf(t->feed_drive_s * 0.001f, 0.0f, 1.0f);
-        const float chroma_t = tracer_clampf(t->chroma_trail_s * 0.001f, 0.0f, 1.0f);
-
-        const int opacity_i = tracer_clampi((int)(t->opacity_s + 0.5f), 0, 255);
-        const int buffer_i = tracer_clampi((int)(t->buffer_s + 0.5f), 1, MAX_OLD_FRAMES);
-
-        int wet = tracer_to_q8(opacity_i);
-        {
-            const int headroom = 256 - wet;
-            const float lift = mix_t * 0.68f;
-            wet += (int)((float)headroom * lift + 0.5f);
-            t->wet_q8 = tracer_clampi(wet, 0, 256);
-        }
-
-        int f_val = 256 / buffer_i;
-        f_val += (int)(feed_t * 132.0f + 0.5f);
-        t->feed = tracer_clampi(f_val, 1, 224);
-
-        t->decay = 256 - t->feed;
-
-        int c_wet = (int)((float)t->wet_q8 * (0.56f + chroma_t * 0.44f) + chroma_t * 18.0f + 0.5f);
-        t->chroma_wet_q8 = tracer_clampi(c_wet, 0, 256);
-
-        int c_feed = (int)((float)t->feed * (0.50f + chroma_t * 0.50f) + chroma_t * 18.0f + 0.5f);
-        t->chroma_feed = tracer_clampi(c_feed, 1, 224);
-        t->chroma_decay = 256 - t->chroma_feed;
+    if(!t->state_ready) {
+        t->opacity_s = (float)opacity_arg;
+        t->buffer_s = (float)buffer_arg;
+        t->mix_drive_s = (float)mix_drive_arg;
+        t->feed_drive_s = (float)feed_drive_arg;
+        t->chroma_trail_s = (float)chroma_trail_arg;
+        t->state_ready = 1;
+    } else {
+        t->opacity_s = tracer_smoothf(t->opacity_s, (float)opacity_arg, param_coeff);
+        t->buffer_s = tracer_smoothf(t->buffer_s, (float)buffer_arg, param_coeff * 0.80f);
+        t->mix_drive_s = tracer_smoothf(t->mix_drive_s, (float)mix_drive_arg, param_coeff);
+        t->feed_drive_s = tracer_smoothf(t->feed_drive_s, (float)feed_drive_arg, param_coeff * 0.90f);
+        t->chroma_trail_s = tracer_smoothf(t->chroma_trail_s, (float)chroma_trail_arg, param_coeff * 0.76f);
     }
-    
-    const int wet_q8 = t->wet_q8;
-    const int feed = t->feed;
-    const int decay = t->decay;
-    const int chroma_wet_q8 = t->chroma_wet_q8;
-    const int chroma_feed = t->chroma_feed;
-    const int chroma_decay = t->chroma_decay;
+
+    const float mix_t = tracer_clampf(t->mix_drive_s * 0.001f, 0.0f, 1.0f);
+    const float feed_t = tracer_clampf(t->feed_drive_s * 0.001f, 0.0f, 1.0f);
+    const float chroma_t = tracer_clampf(t->chroma_trail_s * 0.001f, 0.0f, 1.0f);
+
+    const int opacity_i = tracer_clampi((int)(t->opacity_s + 0.5f), 0, 255);
+    const int buffer_i = tracer_clampi((int)(t->buffer_s + 0.5f), 1, MAX_OLD_FRAMES);
+
+    int wet_q8 = tracer_to_q8(opacity_i);
+    {
+        const int headroom = 256 - wet_q8;
+        const float lift = mix_t * 0.68f;
+        wet_q8 += (int)((float)headroom * lift + 0.5f);
+        wet_q8 = tracer_clampi(wet_q8, 0, 256);
+    }
+
+    int feed = 256 / buffer_i;
+    feed += (int)(feed_t * 132.0f + 0.5f);
+    feed = tracer_clampi(feed, 1, 224);
+
+    const int decay = 256 - feed;
+
+    int chroma_wet_q8 = (int)((float)wet_q8 * (0.56f + chroma_t * 0.44f) + chroma_t * 18.0f + 0.5f);
+    chroma_wet_q8 = tracer_clampi(chroma_wet_q8, 0, 256);
+
+    int chroma_feed = (int)((float)feed * (0.50f + chroma_t * 0.50f) + chroma_t * 18.0f + 0.5f);
+    chroma_feed = tracer_clampi(chroma_feed, 1, 224);
+    const int chroma_decay = 256 - chroma_feed;
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -272,30 +265,30 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *restrict tU = t->trace_buffer[1];
     uint8_t *restrict tV = t->trace_buffer[2];
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        const int mixed = ((int)Y[i] + (int)Y2[i] + 1) >> 1;
-        const int accum = (((int)tY[i] * decay) + (mixed * feed) + 128) >> 8;
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            const int mixed = ((int)Y[i] + (int)Y2[i] + 1) >> 1;
+            const int accum = (((int)tY[i] * decay) + (mixed * feed) + 128) >> 8;
 
-        tY[i] = (uint8_t)CLAMP_Y(accum);
-        Y[i] = tracer_mix_y(Y[i], tY[i], wet_q8);
-    }
+            tY[i] = (uint8_t)CLAMP_Y(accum);
+            Y[i] = tracer_mix_y(Y[i], tY[i], wet_q8);
+        }
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < uv_len; i++) {
-        const int mixed_u = (((int)Cb[i] - 128) + ((int)Cb2[i] - 128)) >> 1;
-        const int mixed_v = (((int)Cr[i] - 128) + ((int)Cr2[i] - 128)) >> 1;
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            const int mixed_u = (((int)Cb[i] - 128) + ((int)Cb2[i] - 128)) >> 1;
+            const int mixed_v = (((int)Cr[i] - 128) + ((int)Cr2[i] - 128)) >> 1;
 
-        int acc_u = (int)tU[i] - 128;
-        int acc_v = (int)tV[i] - 128;
+            int acc_u = (int)tU[i] - 128;
+            int acc_v = (int)tV[i] - 128;
 
-        acc_u = ((acc_u * chroma_decay) + (mixed_u * chroma_feed) + 128) >> 8;
-        acc_v = ((acc_v * chroma_decay) + (mixed_v * chroma_feed) + 128) >> 8;
+            acc_u = ((acc_u * chroma_decay) + (mixed_u * chroma_feed) + 128) >> 8;
+            acc_v = ((acc_v * chroma_decay) + (mixed_v * chroma_feed) + 128) >> 8;
 
-        tU[i] = (uint8_t)CLAMP_UV(acc_u + 128);
-        tV[i] = (uint8_t)CLAMP_UV(acc_v + 128);
+            tU[i] = (uint8_t)CLAMP_UV(acc_u + 128);
+            tV[i] = (uint8_t)CLAMP_UV(acc_v + 128);
 
-        Cb[i] = tracer_mix_uv(Cb[i], tU[i], chroma_wet_q8);
-        Cr[i] = tracer_mix_uv(Cr[i], tV[i], chroma_wet_q8);
+            Cb[i] = tracer_mix_uv(Cb[i], tU[i], chroma_wet_q8);
+            Cr[i] = tracer_mix_uv(Cr[i], tV[i], chroma_wet_q8);
     }
 }

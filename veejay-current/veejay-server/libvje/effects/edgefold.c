@@ -43,7 +43,6 @@ typedef struct {
     float *nextX, *nextY;
 
     double time;
-    int n_threads;
     int w;
     int h;
 } liquid_fold_t;
@@ -78,6 +77,18 @@ static inline int edgefold_percent_to_param1000(int v)
     return (v * 1000 + 50) / 100;
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
 static inline int32_t edgefold_mirror_fp(float v)
 {
     int64_t fp = (int64_t)(v * (float)FP_ONE);
@@ -106,7 +117,13 @@ vj_effect *edgefold_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults) free(ve->defaults);
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_EDGE_GATE] = 0;
     ve->limits[1][P_EDGE_GATE] = 1000;
@@ -209,7 +226,6 @@ void *edgefold_malloc(int w, int h)
     s->time = 0.0;
     s->w = w;
     s->h = h;
-
 
     return (void*) s;
 }
@@ -317,14 +333,20 @@ void edgefold_apply(void *ptr, VJFrame *frame, int *args)
     float *restrict NX = s->nextX;
     float *restrict NY = s->nextY;
 
-    #pragma omp single
+    uint8_t *restrict dst[3] = { s->srcY, s->srcU, s->srcV };
+    const uint8_t *restrict src[3] = { srcY, srcU, srcV };
+
+#pragma omp sections
     {
-        veejay_memcpy(s->srcY, srcY, plane_size);
-        veejay_memcpy(s->srcU, srcU, plane_size);
-        veejay_memcpy(s->srcV, srcV, plane_size);
+#pragma omp section
+        { veejay_memcpy(dst[0], src[0], plane_size); }
+#pragma omp section
+        { veejay_memcpy(dst[1], src[1], plane_size); }
+#pragma omp section
+        { veejay_memcpy(dst[2], src[2], plane_size); }
     }
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int y = 1; y < h - 1; y++) {
         for(int x = 1; x < w - 1; x++) {
             const int idx = y * w + x;
@@ -414,7 +436,7 @@ void edgefold_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
+#pragma omp single
     {
         float *tmp;
         tmp = s->vecX; s->vecX = s->nextX; s->nextX = tmp;

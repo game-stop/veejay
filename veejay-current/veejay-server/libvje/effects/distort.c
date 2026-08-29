@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -11,7 +11,7 @@
 
 #include "common.h"
 #include "distort.h"
-#include <veejaycore/vjmem.h>
+
 #include <math.h>
 
 #define DISTORT_TABLE_SIZE 512
@@ -22,7 +22,6 @@ typedef struct {
     int plasma_pos1;
     int plasma_pos2;
     uint8_t *plasma_buf[4];
-    int n_threads;
 } distortion_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -63,15 +62,11 @@ static inline int distortion_reflect_coord(int v, int limit)
 vj_effect *distortion_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-
 
     ve->defaults[0] = 5;
     ve->defaults[1] = 3;
@@ -106,14 +101,14 @@ vj_effect *distortion_init(int width, int height)
     return ve;
 }
 
-void *distortion_malloc(int width, int height)
+void *distortion_malloc(int w, int h)
 {
     distortion_t *d = (distortion_t*) vj_calloc(sizeof(distortion_t));
 
     if(!d)
         return NULL;
 
-    const int len = width * height;
+    const int len = w * h;
 
     if(len <= 0)
     {
@@ -132,7 +127,6 @@ void *distortion_malloc(int width, int height)
     d->plasma_buf[1] = d->plasma_buf[0] + len;
     d->plasma_buf[2] = d->plasma_buf[1] + len;
     d->plasma_buf[3] = NULL;
-    d->n_threads = vje_advise_num_threads(len);
 
     for(int i = 0; i < DISTORT_TABLE_SIZE; i++)
     {
@@ -174,13 +168,14 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
     const int h = frame->height;
     const int len = frame->len;
 
-    int strides[4] = { len, len, len, 0 };
-
-    #pragma omp single
+    #pragma omp sections
     {
-        vj_frame_copy(frame->data, d->plasma_buf, strides);
-        d->plasma_pos1 = d->plasma_pos1 & DISTORT_TABLE_MASK;
-        d->plasma_pos2 = d->plasma_pos2 & DISTORT_TABLE_MASK;
+        #pragma omp section
+        { veejay_memcpy(d->plasma_buf[0], frame->data[0], len); }
+        #pragma omp section
+        { veejay_memcpy(d->plasma_buf[1], frame->data[1], len); }
+        #pragma omp section
+        { veejay_memcpy(d->plasma_buf[2], frame->data[2], len); }
     }
 
     const uint8_t *restrict srcY = d->plasma_buf[0];
@@ -194,10 +189,10 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
     amp_x = clampi(amp_x, 2, 96);
     amp_y = clampi(amp_y, 2, 96);
 
-    const int plasma_pos1 = d->plasma_pos1;
-    const int plasma_pos2 = d->plasma_pos2;
+    const int plasma_pos1 = d->plasma_pos1 & DISTORT_TABLE_MASK;
+    const int plasma_pos2 = d->plasma_pos2 & DISTORT_TABLE_MASK;
 
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int y = 0; y < h; y++)
     {
         int tpos1 = (plasma_pos1 + y * inc_val3) & DISTORT_TABLE_MASK;
@@ -230,7 +225,7 @@ void distortion_apply(void *ptr, VJFrame *frame, int *args)
 
     #pragma omp single
     {
-        d->plasma_pos1 = (d->plasma_pos1 + inc_val5) & DISTORT_TABLE_MASK;
-        d->plasma_pos2 = (d->plasma_pos2 + inc_val6) & DISTORT_TABLE_MASK;
+        d->plasma_pos1 = (plasma_pos1 + inc_val5) & DISTORT_TABLE_MASK;
+        d->plasma_pos2 = (plasma_pos2 + inc_val6) & DISTORT_TABLE_MASK;
     }
 }

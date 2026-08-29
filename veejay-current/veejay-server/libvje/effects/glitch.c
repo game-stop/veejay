@@ -1,3 +1,14 @@
+/* 
+ * Linux VeeJay
+ *
+ * Copyright(C)2023 Niels Elburg <nwelburg@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License , or (at your option) any later version.
+ */
+
 #include "common.h"
 #include <veejaycore/vjmem.h>
 #include "glitch.h"
@@ -18,15 +29,7 @@ typedef struct {
     int *rand_lut;
     int *lsfr_lut;
     int frame_count;
-    int n_threads;
-
-    int noise_qty;
-    int half_qty;
-    int noise_mul;
-    int distortion_x;
-    int distortion_y;
-    int chroma_alpha_scale;
-    int skip_work;
+    int phase;
 } glitch_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -66,6 +69,16 @@ vj_effect *glitch_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_AMPLITUDE] = 1;    ve->limits[1][P_AMPLITUDE] = 360;   ve->defaults[P_AMPLITUDE] = 20;
     ve->limits[0][P_NOISE_GAIN] = 1;   ve->limits[1][P_NOISE_GAIN] = 10;   ve->defaults[P_NOISE_GAIN] = 2;
@@ -79,6 +92,7 @@ vj_effect *glitch_init(int w, int h)
     ve->description = "Glitch";
     ve->sub_format = 1;
     ve->extra_frame = 0;
+    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(
@@ -159,12 +173,33 @@ void glitch_free(void *ptr)
 
 void glitch_apply(void *ptr, VJFrame *frame, int *args)
 {
-    glitch_t *g = (glitch_t*) ptr;
-    
+    glitch_t *g = (glitch_t *) ptr;
+
     const int len = frame->len;
     const int width = frame->width;
     const int height = frame->height;
-    
+    const int amplitude = args[P_AMPLITUDE];
+    const int noise_gain = args[P_NOISE_GAIN];
+    const int noise_qty = args[P_NOISE_QTY];
+    const int noise_scale = args[P_NOISE_SCALE];
+    const int interval = args[P_INTERVAL];
+    const int distortion_x_arg = args[P_DISTORT_X];
+    const int distortion_y_arg = args[P_DISTORT_Y];
+    const int duration = args[P_DURATION];
+
+#pragma omp single
+    {
+        g->phase = g->frame_count;
+        g->frame_count++;
+        if(g->frame_count >= interval)
+            g->frame_count = 0;
+    }
+
+    const int phase = g->phase;
+
+    if(duration > 0 && phase >= duration)
+        return;
+
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
@@ -173,100 +208,65 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bU = g->buf[1];
     uint8_t *restrict bV = g->buf[2];
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        bU[i] = U[i];
-        bV[i] = V[i];
-    }
-
-    #pragma omp single
-    {
-        const int amplitude = args[P_AMPLITUDE];
-        const int noise_gain = args[P_NOISE_GAIN];
-        g->noise_qty = args[P_NOISE_QTY];
-        const int noise_scale = args[P_NOISE_SCALE];
-        const int interval = args[P_INTERVAL];
-        const int distortion_x_arg = args[P_DISTORT_X];
-        const int distortion_y_arg = args[P_DISTORT_Y];
-        const int duration = args[P_DURATION];
-
-        int phase = g->frame_count;
-        g->frame_count = phase + 1;
-
-        if(g->frame_count >= interval)
-            g->frame_count = 0;
-
-        if(phase >= interval)
-            phase = 0;
-
-        g->skip_work = 0;
-        if(duration > 0 && phase >= duration) {
-            g->skip_work = 1;
-        }
-
-        g->half_qty = g->noise_qty >> 1;
-        g->noise_mul = amplitude * noise_gain * noise_scale;
-
-        g->distortion_x = (distortion_x_arg * width) / 100;
-        g->distortion_y = (distortion_y_arg * height) / 100;
-
-        if(g->distortion_x <= -width || g->distortion_x >= width)
-            g->distortion_x %= width;
-
-        if(g->distortion_y <= -height || g->distortion_y >= height)
-            g->distortion_y %= height;
-
-        const int chroma_alpha_base = clampi(glitch_absi(distortion_x_arg) + glitch_absi(distortion_y_arg), 0, 200);
-        g->chroma_alpha_scale = 96 + ((chroma_alpha_base * 159) / 200);
-    }
-    
-    const int skip_work = g->skip_work;
-    const int noise_qty = g->noise_qty;
-    const int half_qty = g->half_qty;
-    const int noise_mul = g->noise_mul;
-    const int distortion_x = g->distortion_x;
-    const int distortion_y = g->distortion_y;
-    const int chroma_alpha_scale = g->chroma_alpha_scale;
-
     int *restrict rand_lut = g->rand_lut;
     int *restrict lsfr_lut = g->lsfr_lut;
-    
-    if (!skip_work) {
-        if (g->frame_count == 1) {
-            #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                rand_lut[i] = fastrand(rand_lut[i]);
-                lsfr_lut[i] = rand_lut[i];
-            }
-        }
 
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
+    for(int plane = 0; plane < 2; plane++) {
+        uint8_t *dst[2] = { bU, bV };
+        const uint8_t *src[2] = { U, V };
+        veejay_memcpy(dst[plane], src[plane], len);
+    }
+
+    const int half_qty = noise_qty >> 1;
+    const int noise_mul = amplitude * noise_gain * noise_scale;
+
+    int distortion_x = (distortion_x_arg * width) / 100;
+    int distortion_y = (distortion_y_arg * height) / 100;
+
+    if(distortion_x <= -width || distortion_x >= width)
+        distortion_x %= width;
+
+    if(distortion_y <= -height || distortion_y >= height)
+        distortion_y %= height;
+
+    const int chroma_alpha_base = clampi(glitch_absi(distortion_x_arg) + glitch_absi(distortion_y_arg), 0, 200);
+    const int chroma_alpha_scale = 96 + ((chroma_alpha_base * 159) / 200);
+
+    if(phase == 0) {
+#pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
-            const int q = lsfr_lut[i] % noise_qty;
-            const int centered = q - half_qty;
-            const int noise = (centered * noise_mul) / 100;
-
-            bY[i] = CLAMP_Y((int)Y[i] + noise);
-            lsfr_lut[i] = fastrand(lsfr_lut[i]);
+            rand_lut[i] = fastrand(rand_lut[i]);
+            lsfr_lut[i] = rand_lut[i];
         }
+    }
 
-        #pragma omp for schedule(static)
-        for(int y = 0; y < height; y++) {
-            const int ny = glitch_wrap_once(y + distortion_y, height);
-            const int row = y * width;
-            const int drow = ny * width;
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        const int q = lsfr_lut[i] % noise_qty;
+        const int centered = q - half_qty;
+        const int noise = (centered * noise_mul) / 100;
 
-            #pragma omp simd
-            for(int x = 0; x < width; x++) {
-                const int nx = glitch_wrap_once(x + distortion_x, width);
-                const int src = row + x;
-                const int dst = drow + nx;
-                const int alpha = ((int)Y[dst] * chroma_alpha_scale) >> 8;
+        bY[i] = CLAMP_Y((int)Y[i] + noise);
+        lsfr_lut[i] = fastrand(lsfr_lut[i]);
+    }
 
-                U[src] = glitch_blend255(U[src], bU[dst], 255 - alpha);
-                V[src] = glitch_blend255(V[src], bV[dst], 255 - alpha);
-                Y[src] = (uint8_t)(((int)Y[src] + (int)bY[dst] + 1) >> 1);
-            }
+#pragma omp for schedule(static)
+    for(int y = 0; y < height; y++) {
+        const int ny = glitch_wrap_once(y + distortion_y, height);
+        const int row = y * width;
+        const int drow = ny * width;
+
+#pragma omp simd
+        for(int x = 0; x < width; x++) {
+            const int nx = glitch_wrap_once(x + distortion_x, width);
+            const int src = row + x;
+            const int dst = drow + nx;
+            const int alpha = ((int)Y[dst] * chroma_alpha_scale) >> 8;
+
+            U[src] = glitch_blend255(U[src], bU[dst], 255 - alpha);
+            V[src] = glitch_blend255(V[src], bV[dst], 255 - alpha);
+            Y[src] = (uint8_t)(((int)Y[src] + (int)bY[dst] + 1) >> 1);
         }
     }
 }

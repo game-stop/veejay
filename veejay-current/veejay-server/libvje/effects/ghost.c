@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,10 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "ghost.h"
-
-#define RADIALBLUR_PARAMS 3 // (Note: keep original defines/structure)
 
 typedef struct {
     uint8_t *ghost_buf[4];
@@ -54,6 +51,17 @@ vj_effect *ghost_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 16; 
     ve->limits[1][0] = 255;
     ve->defaults[0] = 134;
@@ -70,9 +78,6 @@ vj_effect *ghost_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -104,11 +109,8 @@ void *ghost_malloc(int w, int h)
 void ghost_free(void *ptr)
 {
     ghost_t *g = (ghost_t*) ptr;
-    if(!g)
-        return;
 
-    if(g->ghost_buf[0])
-        free(g->ghost_buf[0]);
+    free(g->ghost_buf[0]);
     free(g);
 }
 
@@ -130,13 +132,16 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dV = g->ghost_buf[2];
     uint8_t *restrict bm = g->diff_map;
 
-    #pragma omp single
-    {
-        if(g->diff_period == 0) {
-            int strides[4] = { len, len, len, 0 };
-            vj_frame_copy(frame->data, g->ghost_buf, strides);
-            g->diff_period = 1;
+    if(g->diff_period == 0) {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            dY[i] = srcY[i];
+            dU[i] = srcU[i];
+            dV[i] = srcV[i];
         }
+#pragma omp single
+        g->diff_period = 1;
+        return;
     }
 
 #pragma omp for schedule(static)
@@ -151,7 +156,7 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args)
     for(int y = 1; y < height - 1; y++) {
         const int row = y * width;
 
-        #pragma omp simd
+#pragma omp simd
         for(int x = 1; x < width - 1; x++) {
             const int i = row + x;
             const int active =
@@ -169,5 +174,5 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args)
                 srcV[i] = dV[i];
             }
         }
-    }
 }
+    }

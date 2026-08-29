@@ -84,6 +84,14 @@ vj_effect *wave_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_FACTOR] = 1;
     ve->limits[1][P_FACTOR] = 100;
     ve->defaults[P_FACTOR] = 18;
@@ -176,6 +184,8 @@ void *wave_malloc(int w, int h)
     data->speed_env = 8.0f;
     data->env_init = 0;
 
+    data->n_threads = vje_advise_num_threads(len);
+
     return data;
 }
 
@@ -237,27 +247,24 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     if(!deform_x && !deform_y)
         return;
 
-    #pragma omp single
-    {
-        if(!data->env_init) {
-            data->factor_env = (float)base_factor;
-            data->speed_env = (float)base_speed;
-            data->env_init = 1;
-        }
-
-        data->factor_env = wave_follow_f(data->factor_env, (float)base_factor, 0.115f, 0.060f);
-        data->speed_env  = wave_follow_f(data->speed_env,  (float)base_speed,  0.105f, 0.055f);
-
-        const int factor = wave_clampi((int)(data->factor_env + 0.5f), 1, 100);
-        const int speed = wave_clampi((int)(data->speed_env + 0.5f), 1, 100);
-
-        data->phase += (float)speed * 0.0065f;
-
-        if(data->phase > 4096.0f)
-            data->phase -= 4096.0f;
-
-        wave_build_maps(data, width, height, factor, deform_x, deform_y);
+    if(!data->env_init) {
+        data->factor_env = (float)base_factor;
+        data->speed_env = (float)base_speed;
+        data->env_init = 1;
     }
+
+    data->factor_env = wave_follow_f(data->factor_env, (float)base_factor, 0.115f, 0.060f);
+    data->speed_env  = wave_follow_f(data->speed_env,  (float)base_speed,  0.105f, 0.055f);
+
+    const int factor = wave_clampi((int)(data->factor_env + 0.5f), 1, 100);
+    const int speed = wave_clampi((int)(data->speed_env + 0.5f), 1, 100);
+
+    data->phase += (float)speed * 0.0065f;
+
+    if(data->phase > 4096.0f)
+        data->phase -= 4096.0f;
+
+    wave_build_maps(data, width, height, factor, deform_x, deform_y);
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
@@ -270,7 +277,7 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
     const int *restrict map_x = data->map_x;
     const int *restrict map_y = data->map_y;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int src_row = map_y[y] * width;
         const int dst_row = y * width;
@@ -285,10 +292,10 @@ void wave_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
-    {
-        veejay_memcpy(Y, dstY, len);
-        veejay_memcpy(U, dstU, len);
-        veejay_memcpy(V, dstV, len);
+#pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++) {
+        uint8_t *dst[] = { Y, U, V };
+        uint8_t *src[] = { dstY, dstU, dstV };
+        veejay_memcpy(dst[plane], src[plane], len);
     }
 }

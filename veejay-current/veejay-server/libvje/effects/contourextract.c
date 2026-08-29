@@ -68,6 +68,18 @@ vj_effect *contourextract_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1])
+    {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;
@@ -273,7 +285,7 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
     if(!static_bg || !map || !map[0] || width <= 0 || height <= 0)
         return 0;
 
-    vj_frame_copy1(map[0], static_bg, width * height);
+    veejay_memcpy(static_bg, map[0], width * height);
 
     VJFrame tmp;
     veejay_memset(&tmp, 0, sizeof(VJFrame));
@@ -293,15 +305,13 @@ int contourextract_prepare(uint8_t *map[4], int width, int height)
 void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
                           int mode, int take_bg, int feather, int min_blob_weight)
 {
-        #pragma omp single
-    {
     (void) take_bg;
     (void) feather;
 
     const unsigned int width = frame->width;
     const unsigned int height = frame->height;
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -332,10 +342,11 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
 
     if(mode == 1)
     {
-        vj_frame_copy1(ud->bitmap, Y, len);
-        vj_frame_clear1(Cb, 128, uv_len);
-        vj_frame_clear1(Cr, 128, uv_len);
-         skip_processing = 1; }
+        veejay_memcpy(Y, ud->bitmap, len);
+        veejay_memset(Cb, 128, uv_len);
+        veejay_memset(Cr, 128, uv_len);
+        return;
+    }
 
     veejay_distance_transform8(ud->bitmap, width, height, dt_map);
 
@@ -362,5 +373,4 @@ void contourextract_apply(void *ed, VJFrame *frame, int threshold, int reverse,
     }
 
     (void) num_objects;
-    }
 }

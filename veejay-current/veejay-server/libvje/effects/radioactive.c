@@ -16,7 +16,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -90,6 +90,17 @@ vj_effect *radioactivetv_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_MODE] = 0;      ve->limits[1][P_MODE] = 6;      ve->defaults[P_MODE] = 0;
     ve->limits[0][P_ZOOM] = 50;     ve->limits[1][P_ZOOM] = 100;    ve->defaults[P_ZOOM] = 95;
@@ -199,6 +210,8 @@ void *radioactivetv_malloc(int w, int h)
 
     r->zoom_y = (int*)p;
 
+    r->n_threads = vje_advise_num_threads(w * h);
+
     radioactive_set_table(r);
 
     return (void*)r;
@@ -207,11 +220,8 @@ void *radioactivetv_malloc(int w, int h)
 void radioactivetv_free(void *ptr)
 {
     radioactive_t *r = (radioactive_t*)ptr;
-    if(!r)
-        return;
 
-    if(r->block)
-        free(r->block);
+    free(r->block);
     free(r);
 }
 
@@ -349,6 +359,7 @@ static inline void radioactive_inject_core(radioactive_t *r,
     }
 }
 
+
 void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
 {
     radioactive_t *r = (radioactive_t*)ptr;
@@ -364,18 +375,17 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
     uint8_t *restrict lum = frame->data[0];
     uint8_t *restrict prev = r->diffbuf;
 
-    #pragma omp single
-    {
-        const float snap_ratio = (float)zoom_ratio * 0.01f;
+    const float snap_ratio = (float)zoom_ratio * 0.01f;
 
+ #pragma omp single
+    {
         if(r->ratio_ != snap_ratio) {
             r->ratio_ = snap_ratio;
             radioactive_set_table(r);
         }
 
         if(r->first_frame) {
-            for(int i = 0; i < len; i++)
-                prev[i] = lum[i];
+            veejay_memcpy(prev, lum, len);
             r->first_frame = 0;
         }
 
@@ -384,26 +394,28 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
             r->last_mode = mode;
         }
     }
-    
+
     if(strength > 0)
         radioactive_inject_core(r, lum, prev, width, threshold, strength, mode);
 
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        prev[i] = lum[i];
+#pragma omp single
+    {
+        veejay_memcpy(prev, lum, len);
     }
 
     radioactive_blur(r);
     radioactive_zoom(r);
 
     if(mode >= 3) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            frame->data[1][i] = 128;
-            frame->data[2][i] = 128;
+#pragma omp sections
+        {
+#pragma omp section
+            { veejay_memset(frame->data[1], 128, len); }
+#pragma omp section
+            { veejay_memset(frame->data[2], 128, len); }
         }
 
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int y = 0; y < r->buf_height; y++) {
             uint8_t *restrict src_row = r->blurzoombuf + y * r->buf_width;
             uint8_t *restrict dst_row = lum + y * width + r->buf_margin_left;
@@ -413,7 +425,7 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
         }
     }
     else {
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int y = 0; y < r->buf_height; y++) {
             const int frame_offset = y * width + r->buf_margin_left;
 
@@ -423,9 +435,9 @@ void radioactivetv_apply(void *ptr, VJFrame *frame, VJFrame *blue, int *args)
             uint8_t *restrict u_plane = frame->data[1] + frame_offset;
             uint8_t *restrict v_plane = frame->data[2] + frame_offset;
 
-            uint8_t *restrict src_y = blue && blue->data[0] ? blue->data[0] + frame_offset : y_plane;
-            uint8_t *restrict src_u = blue && blue->data[1] ? blue->data[1] + frame_offset : u_plane;
-            uint8_t *restrict src_v = blue && blue->data[2] ? blue->data[2] + frame_offset : v_plane;
+            uint8_t *restrict src_y = blue->data[0] + frame_offset;
+            uint8_t *restrict src_u = blue->data[1] + frame_offset;
+            uint8_t *restrict src_v = blue->data[2] + frame_offset;
 
             for(int x = 0; x < r->buf_width; x++) {
                 const uint8_t a = mask_row[x];

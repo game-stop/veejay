@@ -1,21 +1,7 @@
-/* 
- * Linux VeeJay
+/* veejay - Linux VeeJay
+ *       (C) 2002-2004 Niels Elburg <nwelburg@gmail.com>
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
+ * Beat-ready transition wipe variant.
  */
 
 #include "common.h"
@@ -39,15 +25,11 @@ typedef struct {
     float speed_env;
     float edge_env;
     float glow_env;
-    
-    int copy_w;
-    int effective_edge;
-    int effective_glow;
 } wipe_t;
 
 static inline int wipe_clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : ((v > hi) ? hi : v);
+    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t wipe_clamp_u8(int v)
@@ -80,6 +62,14 @@ vj_effect *wipe_init(int w, int h)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     int max_speed = w;
     int max_edge = w / 3;
@@ -133,9 +123,6 @@ vj_effect *wipe_init(int w, int h)
 
 int wipe_ready(void *ptr, int width, int height)
 {
-    if(!ptr)
-        return TRANSITION_RUNNING;
-
     wipe_t *w = (wipe_t*) ptr;
 
     (void) height;
@@ -158,6 +145,8 @@ void *wipe_malloc(int w, int h)
     prv->edge_env = 0.0f;
     prv->glow_env = 0.0f;
 
+    prv->n_threads = vje_advise_num_threads(w * h);
+
     return prv;
 }
 
@@ -178,55 +167,48 @@ void wipe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int edge_arg = args[P_EDGE_WIDTH];
     const int glow_arg = args[P_EDGE_GLOW];
 
-    #pragma omp single
-    {
-        if(!wipe->initialized) {
-            wipe->speed_env = (float)speed_arg;
-            wipe->edge_env = (float)edge_arg;
-            wipe->glow_env = (float)glow_arg;
-            wipe->initialized = 1;
-        }
-
-        if(restart && !wipe->last_restart)
-            wipe->wipe_position = 0;
-
-        wipe->last_restart = restart;
-
-        wipe->speed_env = wipe_follow(wipe->speed_env, (float)speed_arg, 0.34f, 0.115f);
-        wipe->edge_env = wipe_follow(wipe->edge_env, (float)edge_arg, 0.30f, 0.105f);
-        wipe->glow_env = wipe_follow(wipe->glow_env, (float)glow_arg, 0.38f, 0.130f);
-
-        int effective_speed = (int)(wipe->speed_env + 0.5f);
-        if(effective_speed < 0)
-            effective_speed = 0;
-        if(effective_speed > width)
-            effective_speed = width;
-
-        wipe->wipe_position += effective_speed;
-
-        if(wipe->wipe_position > width)
-            wipe->wipe_position = width;
-
-        wipe->copy_w = wipe_clampi(wipe->wipe_position, 0, width);
-
-        wipe->effective_edge = (int)(wipe->edge_env + 0.5f);
-        if(wipe->effective_edge < 0)
-            wipe->effective_edge = 0;
-        if(wipe->effective_edge > width)
-            wipe->effective_edge = width;
-
-        wipe->effective_glow = (int)(wipe->glow_env + 0.5f);
-        if(wipe->effective_glow < 0)
-            wipe->effective_glow = 0;
-        if(wipe->effective_glow > 255)
-            wipe->effective_glow = 255;
+    if(!wipe->initialized) {
+        wipe->speed_env = (float)speed_arg;
+        wipe->edge_env = (float)edge_arg;
+        wipe->glow_env = (float)glow_arg;
+        wipe->initialized = 1;
     }
-    
-    const int copy_w = wipe->copy_w;
-    const int effective_edge = wipe->effective_edge;
-    const int effective_glow = wipe->effective_glow;
 
-    #pragma omp for schedule(static)
+    if(restart && !wipe->last_restart)
+        wipe->wipe_position = 0;
+
+    wipe->last_restart = restart;
+
+    wipe->speed_env = wipe_follow(wipe->speed_env, (float)speed_arg, 0.34f, 0.115f);
+    wipe->edge_env = wipe_follow(wipe->edge_env, (float)edge_arg, 0.30f, 0.105f);
+    wipe->glow_env = wipe_follow(wipe->glow_env, (float)glow_arg, 0.38f, 0.130f);
+
+    int effective_speed = (int)(wipe->speed_env + 0.5f);
+    if(effective_speed < 0)
+        effective_speed = 0;
+    if(effective_speed > width)
+        effective_speed = width;
+
+    wipe->wipe_position += effective_speed;
+
+    if(wipe->wipe_position > width)
+        wipe->wipe_position = width;
+
+    const int copy_w = wipe_clampi(wipe->wipe_position, 0, width);
+
+    int effective_edge = (int)(wipe->edge_env + 0.5f);
+    if(effective_edge < 0)
+        effective_edge = 0;
+    if(effective_edge > width)
+        effective_edge = width;
+
+    int effective_glow = (int)(wipe->glow_env + 0.5f);
+    if(effective_glow < 0)
+        effective_glow = 0;
+    if(effective_glow > 255)
+        effective_glow = 255;
+
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 

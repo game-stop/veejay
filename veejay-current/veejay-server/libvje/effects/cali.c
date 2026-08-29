@@ -153,119 +153,110 @@ void cali_free(void *ptr)
     free(ptr);
 }
 
-
 void cali_apply(void *ptr, VJFrame *frame, int *args)
 {
     calidata_t *c = (calidata_t*) ptr;
     if(!c || !frame || !args)
         return;
 
-    int should_return = 0;
-    int mode = 0;
-    int use_flat = 0;
-    int len = 0;
-    int uv_len = 0;
-
-    #pragma omp single
-    {
-        len = frame->len;
-        uv_len = frame->uv_len;
-
-        if(!c->b[0] || !c->l[0] || !c->m[0] || c->mean[0] <= 0.0) {
-            if(c->flood == 0) {
-                veejay_msg(VEEJAY_MSG_ERROR,
-                           "Please select a calibration source for the Image calibration FX");
-            }
-            c->flood = (c->flood + 1) % 25;
-            should_return = 1;
-        } else if(c->len > 0 && c->uv_len > 0 && (c->len != len || c->uv_len != uv_len)) {
-            if(c->flood == 0) {
-                veejay_msg(VEEJAY_MSG_ERROR,
-                           "Calibration frame geometry does not match the current video frame");
-            }
-            c->flood = (c->flood + 1) % 25;
-            should_return = 1;
-        } else {
-            mode = args[0];
-            use_flat = args[1];
+    if(!c->b[0] || !c->l[0] || !c->m[0] || c->mean[0] <= 0.0) {
+        if(c->flood == 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Please select a calibration source for the Image calibration FX");
         }
+        c->flood = (c->flood + 1) % 25;
+        return;
     }
 
-    if(!should_return) {
-        uint8_t *Y = frame->data[0];
-        uint8_t *U = frame->data[1];
-        uint8_t *V = frame->data[2];
+    const int len = frame->len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
+    if(c->len > 0 && c->uv_len > 0 && (c->len != len || c->uv_len != uv_len)) {
+        if(c->flood == 0) {
+            veejay_msg(VEEJAY_MSG_ERROR,
+                       "Calibration frame geometry does not match the current video frame");
+        }
+        c->flood = (c->flood + 1) % 25;
+        return;
+    }
 
-        if(mode == CALI_MODE_DARK) {
-            #pragma omp single
+    uint8_t *Y = frame->data[0];
+    uint8_t *U = frame->data[1];
+    uint8_t *V = frame->data[2];
+
+    const int mode = args[0];
+    const int use_flat = args[1];
+
+    const uint8_t *copy_y = NULL;
+    const uint8_t *copy_u = NULL;
+    const uint8_t *copy_v = NULL;
+    if(mode == CALI_MODE_DARK) {
+        copy_y = c->b[0]; copy_u = c->b[1]; copy_v = c->b[2];
+    } else if(mode == CALI_MODE_LIGHT) {
+        copy_y = c->l[0]; copy_u = c->l[1]; copy_v = c->l[2];
+    } else if(mode == CALI_MODE_FLAT) {
+        copy_y = c->m[0]; copy_u = c->m[1]; copy_v = c->m[2];
+    }
+    if(copy_y) {
+#pragma omp sections
+        {
+#pragma omp section
             {
-                veejay_memcpy(Y, c->b[0], len);
-                veejay_memcpy(U, c->b[1], uv_len);
-                veejay_memcpy(V, c->b[2], uv_len);
+                veejay_memcpy(Y, copy_y, len);
+            }
+#pragma omp section
+            {
+                veejay_memcpy(U, copy_u, uv_len);
+            }
+#pragma omp section
+            {
+                veejay_memcpy(V, copy_v, uv_len);
             }
         }
-        else if(mode == CALI_MODE_LIGHT) {
-            #pragma omp single
-            {
-                veejay_memcpy(Y, c->l[0], len);
-                veejay_memcpy(U, c->l[1], uv_len);
-                veejay_memcpy(V, c->l[2], uv_len);
-            }
+        return;
+    }
+
+    uint8_t *by = c->b[0];
+    uint8_t *bu = c->b[1];
+    uint8_t *bv = c->b[2];
+    uint8_t *fy = c->m[0];
+    uint8_t *fu = c->m[1];
+    uint8_t *fv = c->m[2];
+
+    if(use_flat) {
+        const double cy = c->mean[0] > 0.0 ? c->mean[0] : 1.0;
+        const double cu = c->mean[1] > 0.0 ? c->mean[1] : CALI_CHROMA;
+        const double cv = c->mean[2] > 0.0 ? c->mean[2] : CALI_CHROMA;
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int signal = (int) Y[i] - (int) by[i];
+            if(signal < 0)
+                signal = 0;
+            Y[i] = cali_clip_u8_double((double) signal * cali_gain_from_flat(fy[i], cy));
         }
-        else if(mode == CALI_MODE_FLAT) {
-            #pragma omp single
-            {
-                veejay_memcpy(Y, c->m[0], len);
-                veejay_memcpy(U, c->m[1], uv_len);
-                veejay_memcpy(V, c->m[2], uv_len);
-            }
+
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            double bias_u = cali_clip_double((double) fu[i] - cu, -CALI_MAX_CHROMA_BIAS, CALI_MAX_CHROMA_BIAS);
+            double bias_v = cali_clip_double((double) fv[i] - cv, -CALI_MAX_CHROMA_BIAS, CALI_MAX_CHROMA_BIAS);
+            int du = ((int) U[i] - CALI_CHROMA) - ((int) bu[i] - CALI_CHROMA);
+            int dv = ((int) V[i] - CALI_CHROMA) - ((int) bv[i] - CALI_CHROMA);
+            U[i] = cali_clip_u8_double((double) CALI_CHROMA + (double) du - bias_u);
+            V[i] = cali_clip_u8_double((double) CALI_CHROMA + (double) dv - bias_v);
         }
-        else {
-            uint8_t *by = c->b[0];
-            uint8_t *bu = c->b[1];
-            uint8_t *bv = c->b[2];
-            uint8_t *fy = c->m[0];
-            uint8_t *fu = c->m[1];
-            uint8_t *fv = c->m[2];
-
-            if(use_flat) {
-                const double cy = c->mean[0] > 0.0 ? c->mean[0] : 1.0;
-                const double cu = c->mean[1] > 0.0 ? c->mean[1] : CALI_CHROMA;
-                const double cv = c->mean[2] > 0.0 ? c->mean[2] : CALI_CHROMA;
-
-                #pragma omp for schedule(static)
-                for(int i = 0; i < len; i++) {
-                    int signal = (int) Y[i] - (int) by[i];
-                    if(signal < 0)
-                        signal = 0;
-                    Y[i] = cali_clip_u8_double((double) signal * cali_gain_from_flat(fy[i], cy));
-                }
-
-                #pragma omp for schedule(static)
-                for(int i = 0; i < uv_len; i++) {
-                    double bias_u = cali_clip_double((double) fu[i] - cu, -CALI_MAX_CHROMA_BIAS, CALI_MAX_CHROMA_BIAS);
-                    double bias_v = cali_clip_double((double) fv[i] - cv, -CALI_MAX_CHROMA_BIAS, CALI_MAX_CHROMA_BIAS);
-                    int du = ((int) U[i] - CALI_CHROMA) - ((int) bu[i] - CALI_CHROMA);
-                    int dv = ((int) V[i] - CALI_CHROMA) - ((int) bv[i] - CALI_CHROMA);
-                    U[i] = cali_clip_u8_double((double) CALI_CHROMA + (double) du - bias_u);
-                    V[i] = cali_clip_u8_double((double) CALI_CHROMA + (double) dv - bias_v);
-                }
-            }
-            else {
-                #pragma omp for schedule(static)
-                for(int i = 0; i < len; i++) {
-                    int p = (int) Y[i] - (int) by[i];
-                    Y[i] = cali_clip_u8_int(p < 0 ? pixel_Y_lo_ : p);
-                }
-
-                #pragma omp for schedule(static)
-                for(int i = 0; i < uv_len; i++) {
-                    int du = CALI_CHROMA + ((int) U[i] - CALI_CHROMA) - ((int) bu[i] - CALI_CHROMA);
-                    int dv = CALI_CHROMA + ((int) V[i] - CALI_CHROMA) - ((int) bv[i] - CALI_CHROMA);
-                    U[i] = cali_clip_u8_int(du);
-                    V[i] = cali_clip_u8_int(dv);
-                }
-            }
+    }
+    else {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++) {
+            int p = (int) Y[i] - (int) by[i];
+            Y[i] = cali_clip_u8_int(p < 0 ? pixel_Y_lo_ : p);
+        }
+#pragma omp for schedule(static)
+        for(int i = 0; i < uv_len; i++) {
+            int du = CALI_CHROMA + ((int) U[i] - CALI_CHROMA) - ((int) bu[i] - CALI_CHROMA);
+            int dv = CALI_CHROMA + ((int) V[i] - CALI_CHROMA) - ((int) bv[i] - CALI_CHROMA);
+            U[i] = cali_clip_u8_int(du);
+            V[i] = cali_clip_u8_int(dv);
         }
     }
 }

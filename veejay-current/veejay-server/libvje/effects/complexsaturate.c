@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,22 +19,7 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "complexsaturate.h"
-#include <math.h>
-
-typedef struct {
-    int n_threads;
-    int last_args[9];
-    int mag_fp;
-    int cos_q_fp;
-    int sin_q_fp;
-    int inv_wedge_slope_fp;
-    int inv_range_fp;
-    int black_clip_fp;
-    int s;
-    int c;
-} complexsaturate_t;
 
 static inline int clampi(int v, int lo, int hi)
 {
@@ -46,18 +31,24 @@ static inline int complexsaturation_blend255(int a, int b, int q)
     return ((a * q) + (b * (255 - q))) / 255;
 }
 
+static inline int complexsaturation_alpha(int alpha)
+{
+    return alpha;
+}
+
+static inline int complexsaturation_alpha_swap(int alpha)
+{
+    return 255 - alpha;
+}
+
 vj_effect *complexsaturation_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 9;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-
 
     ve->defaults[0] = 4500;
     ve->defaults[1] = 0;
@@ -104,38 +95,9 @@ vj_effect *complexsaturation_init(int w, int h)
     return ve;
 }
 
-void *complexsaturation_malloc(int w, int h)
+void complexsaturation_apply(void *ptr, VJFrame *frame, int *args)
 {
-    complexsaturate_t *cs = (complexsaturate_t*) vj_calloc(sizeof(complexsaturate_t));
-    if(!cs)
-        return NULL;
-
-    for(int i = 0; i < 9; i++)
-        cs->last_args[i] = -999999;
-
-    cs->n_threads = vje_advise_num_threads(w * h);
-    return (void*) cs;
-}
-
-void complexsaturation_free(void *ptr)
-{
-    if(!ptr)
-        return;
-    free(ptr);
-}
-
-static void complexsaturation_update_cache(complexsaturate_t *cs, const int *args)
-{
-    int changed = 0;
-    for(int i = 0; i < 9; i++) {
-        if(args[i] != cs->last_args[i]) {
-            changed = 1;
-            break;
-        }
-    }
-
-    if(!changed)
-        return;
+    (void) ptr;
 
     const int angle = args[0];
     const int r = args[1];
@@ -145,6 +107,8 @@ static void complexsaturation_update_cache(complexsaturate_t *cs, const int *arg
     const int solidity = args[5];
     const int saturation = args[6];
     const int hue_shift = args[7];
+    const int swap = args[8];
+    const int len = frame->len;
 
     int iy = 0;
     int iu = 128;
@@ -160,59 +124,32 @@ static void complexsaturation_update_cache(complexsaturate_t *cs, const int *arg
     if(mag_f < 1.0f)
         mag_f = 1.0f;
 
-    cs->mag_fp = (int)(mag_f * (float)scale);
-    cs->cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
-    cs->sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
-
+    const int mag_fp = (int)(mag_f * (float)scale);
+    const int cos_q_fp = (int)((ut_f / mag_f) * (float)scale);
+    const int sin_q_fp = (int)((vt_f / mag_f) * (float)scale);
     const float angle_rad = ((float)angle / 100.0f) * (float)(M_PI / 180.0f);
     float tan_v = tanf(angle_rad);
 
     if(tan_v > -0.0001f && tan_v < 0.0001f)
         tan_v = tan_v < 0.0f ? -0.0001f : 0.0001f;
 
-    cs->inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
+    const int inv_wedge_slope_fp = (int)((1.0f / tan_v) * (float)scale);
     float diff = (float)solidity - (float)threshold;
 
     if(diff < 1.0f)
         diff = 1.0f;
 
-    cs->inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
-    cs->black_clip_fp = threshold * scale;
-
+    const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
+    const int black_clip_fp = threshold * scale;
     const float hue_rot = ((float)hue_shift / 180.0f) * (float)M_PI;
     const float sat_scale = (float)saturation * 0.01f;
-    cs->s = (int)(sinf(hue_rot) * 65536.0f * sat_scale);
-    cs->c = (int)(cosf(hue_rot) * 65536.0f * sat_scale);
-
-    for(int i = 0; i < 9; i++)
-        cs->last_args[i] = args[i];
-}
-
-void complexsaturation_apply(void *ptr, VJFrame *frame, int *args)
-{
-    complexsaturate_t *cs = (complexsaturate_t*) ptr;
-
-    const int swap = args[8];
-    const int len = frame->ssm ? frame->len : frame->uv_len;
-
+    const int s = (int)(sinf(hue_rot) * 65536.0f * sat_scale);
+    const int c = (int)(cosf(hue_rot) * 65536.0f * sat_scale);
+    int (*alpha_fn)(int) = swap ? complexsaturation_alpha_swap : complexsaturation_alpha;
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp single
-    {
-        complexsaturation_update_cache(cs, args);
-    }
-
-    const int mag_fp = cs->mag_fp;
-    const int cos_q_fp = cs->cos_q_fp;
-    const int sin_q_fp = cs->sin_q_fp;
-    const int inv_wedge_slope_fp = cs->inv_wedge_slope_fp;
-    const int inv_range_fp = cs->inv_range_fp;
-    const int black_clip_fp = cs->black_clip_fp;
-    const int s = cs->s;
-    const int c = cs->c;
-
-#pragma omp for schedule(static)
+    #pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;
@@ -225,8 +162,7 @@ void complexsaturation_apply(void *ptr, VJFrame *frame, int *args)
 
         alpha = clampi(alpha, 0, 255);
 
-        if(swap)
-            alpha = 255 - alpha;
+        alpha = alpha_fn(alpha);
 
         if(alpha > 0)
         {

@@ -1,7 +1,7 @@
-/* 
+/*
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,10 +19,8 @@
  */
 
 #include "common.h"
-#include <stdint.h>
-#include <stdlib.h>
 #include <veejaycore/vjmem.h>
-#include "keyselect.h"
+#include <math.h>
 
 #define KEYSELECT_PARAMS 8
 
@@ -70,7 +68,7 @@ static inline uint8_t keyselect_u8(int v)
 static inline uint8_t keyselect_blend255(uint8_t a, uint8_t b, int opacity)
 {
     const int inv = 255 - opacity;
-    const int x = (int)a * inv + (int)b * opacity;
+    const int x = (int)a * opacity + (int)b * inv;
     return (uint8_t)(((x + 1) + (x >> 8)) >> 8);
 }
 
@@ -116,7 +114,16 @@ vj_effect *keyselect_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 0;
@@ -204,6 +211,7 @@ void *keyselect_malloc(int w, int h)
     s->black_clip_fp = 0;
     s->blend_mode = 3;
     s->swap = 0;
+    s->n_threads = vje_advise_num_threads(w * h);
 
     return (void*) s;
 }
@@ -268,12 +276,8 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
     keyselect_t *s = (keyselect_t*) ptr;
 
-    const int len = frame->len;
-
-    #pragma omp single
-    {
-        keyselect_update_cache(s, args);
-    }
+#pragma omp single
+    keyselect_update_cache(s, args);
 
     const int mag_fp = s->mag_fp;
     const int cos_q_fp = s->cos_q_fp;
@@ -283,12 +287,13 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int black_clip_fp = s->black_clip_fp;
     const int blend_mode = s->blend_mode;
     const int swap = s->swap;
+    const int len = frame->len;
 
-    uint8_t *restrict Y  = frame->data[0];
+    uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const uint8_t *restrict src_Y  = swap ? frame2->data[0] : frame->data[0];
+    const uint8_t *restrict src_Y = swap ? frame2->data[0] : frame->data[0];
     const uint8_t *restrict src_Cb = swap ? frame2->data[1] : frame->data[1];
     const uint8_t *restrict src_Cr = swap ? frame2->data[2] : frame->data[2];
 
@@ -296,7 +301,7 @@ void keyselect_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict bg_U = swap ? frame->data[1] : frame2->data[1];
     const uint8_t *restrict bg_V = swap ? frame->data[2] : frame2->data[2];
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++) {
         const int uc = (int)Cb[pos] - 128;
         const int vc = (int)Cr[pos] - 128;

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@
 
 #include "common.h"
 #include "feathermask.h"
-#include <veejaycore/vjmem.h>
 
 typedef struct {
     uint8_t  *mask;
@@ -28,7 +27,6 @@ typedef struct {
     uint32_t *integral;
     int width;
     int height;
-    int n_threads;
 } feathermask_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -48,6 +46,17 @@ vj_effect *feathermask_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 1; ve->limits[1][0] = 32; ve->defaults[0] = 3;
     ve->limits[0][1] = 1; ve->limits[1][1] = 4;  ve->defaults[1] = 1;
 
@@ -64,9 +73,6 @@ vj_effect *feathermask_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -88,16 +94,12 @@ void *feathermask_malloc(int width, int height)
     f->integral = (uint32_t*) vj_malloc(sizeof(uint32_t) * ilen);
 
     if(!f->mask || !f->tmp || !f->integral) {
-        if(f->mask) free(f->mask);
-        if(f->tmp) free(f->tmp);
-        if(f->integral) free(f->integral);
+        free(f->mask);
+        free(f->tmp);
+        free(f->integral);
         free(f);
         return NULL;
     }
-
-    f->n_threads = vje_advise_num_threads(width * height);
-    if(f->n_threads < 1)
-        f->n_threads = 1;
 
     return f;
 }
@@ -105,12 +107,10 @@ void *feathermask_malloc(int width, int height)
 void feathermask_free(void *ptr)
 {
     feathermask_t *f = (feathermask_t*) ptr;
-    if(!f)
-        return;
 
-    if(f->mask) free(f->mask);
-    if(f->tmp) free(f->tmp);
-    if(f->integral) free(f->integral);
+    free(f->mask);
+    free(f->tmp);
+    free(f->integral);
     free(f);
 }
 
@@ -159,11 +159,11 @@ static void feathermask_box_blur(feathermask_t *f,
     const int stride = w + 1;
     const uint32_t *restrict I = f->integral;
 
-    #pragma omp single
+#pragma omp single
     {
         feathermask_build_integral(f, src);
     }
-    
+
 #pragma omp for schedule(static)
     for(int y = 0; y < h; y++) {
         int y0 = y - radius;
@@ -201,16 +201,14 @@ static void feathermask_box_blur(feathermask_t *f,
 void feathermask_apply(void *ptr, VJFrame *frame, int *args)
 {
     feathermask_t *f = (feathermask_t*) ptr;
-    if(!frame->data[3])
-        return;
 
     const int len = frame->len;
     const int radius = args[0];
     const int iter = args[1];
 
-    #pragma omp single
+#pragma omp single
     {
-        veejay_memcpy(f->mask, frame->data[3], (size_t)len);
+        veejay_memcpy(f->mask, frame->data[3], len);
     }
 
     uint8_t *restrict src = f->mask;
@@ -224,8 +222,8 @@ void feathermask_apply(void *ptr, VJFrame *frame, int *args)
         dst = swap;
     }
 
-    #pragma omp single
+#pragma omp single
     {
-        veejay_memcpy(frame->data[3], src, (size_t)len);
+        veejay_memcpy(frame->data[3], src, len);
     }
 }

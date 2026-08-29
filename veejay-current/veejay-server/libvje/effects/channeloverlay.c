@@ -74,8 +74,8 @@ void channeloverlay_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     (void) ptr;
 
     const int len = frame->len;
-    const int mode = args[0];
 
+    const int mode = args[0];
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];

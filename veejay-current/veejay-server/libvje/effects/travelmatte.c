@@ -38,13 +38,16 @@ typedef struct {
 
     int state_ready;
     int n_threads;
-    uint8_t alpha_lut[256];
 } travelmatte_t;
 
 static inline int travelmatte_clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
+
+
+
+
 
 static inline int travelmatte_alpha_xform(int a,
                                           int gain,
@@ -84,6 +87,8 @@ static inline uint8_t travelmatte_blend_u8(uint8_t a, uint8_t b, int alpha)
     return ALPHA_BLEND(alpha, a, b);
 }
 
+
+
 vj_effect *travelmatte_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -98,6 +103,14 @@ vj_effect *travelmatte_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_MATTE_SOURCE] = 0;    ve->limits[1][P_MATTE_SOURCE] = 1;    ve->defaults[P_MATTE_SOURCE] = 1;
     ve->limits[0][P_MATTE_GAIN]   = 0;    ve->limits[1][P_MATTE_GAIN]   = 2000; ve->defaults[P_MATTE_GAIN]   = 1000;
@@ -135,17 +148,11 @@ vj_effect *travelmatte_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
 void *travelmatte_malloc(int w, int h)
 {
-    (void)w;
-    (void)h;
-
     travelmatte_t *tm = (travelmatte_t*) vj_calloc(sizeof(travelmatte_t));
     if(!tm)
         return NULL;
@@ -156,16 +163,14 @@ void *travelmatte_malloc(int w, int h)
     tm->mix_drive_state = 0.0f;
     tm->state_ready = 0;
 
-    for(int i = 0; i < 256; i++)
-        tm->alpha_lut[i] = (uint8_t)i;
+    tm->n_threads = vje_advise_num_threads(w * h);
 
     return tm;
 }
 
 void travelmatte_free(void *ptr)
 {
-    if(ptr)
-        free(ptr);
+    free(ptr);
 }
 
 void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
@@ -178,49 +183,45 @@ void travelmatte_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint8_t *a1 = frame->data[1];
     uint8_t *a2 = frame->data[2];
 
-    const uint8_t *b0 = frame2->data[0];
-    const uint8_t *b1 = frame2->data[1];
-    const uint8_t *b2 = frame2->data[2];
+    uint8_t *b0 = frame2->data[0];
+    uint8_t *b1 = frame2->data[1];
+    uint8_t *b2 = frame2->data[2];
 
-    const uint8_t *aA = frame->data[3];
-    const uint8_t *aB = frame2->data[3];
+    uint8_t *aA = frame->data[3];
+    uint8_t *aB = frame2->data[3];
 
     const int source = args[P_MATTE_SOURCE] ? 1 : 0;
-    
-    const uint8_t *matte = source == 0 ? (aA ? aA : a0) : (aB ? aB : b0);
-    const uint8_t *lut = tm->alpha_lut;
+    uint8_t *matte = source == 0 ? aA : aB;
 
-    #pragma omp single
-    {
-        const float fast = 0.24f;
-        const float slow = 0.085f;
+    int gain = args[P_MATTE_GAIN];
+    int bias = args[P_MATTE_BIAS];
+    int soften = args[P_MATTE_SOFTEN];
+    int mix_drive = args[P_MIX_DRIVE];
 
-        if(!tm->state_ready) {
-            tm->gain_state = (float)args[P_MATTE_GAIN];
-            tm->bias_state = (float)args[P_MATTE_BIAS];
-            tm->soften_state = (float)args[P_MATTE_SOFTEN];
-            tm->mix_drive_state = (float)args[P_MIX_DRIVE];
-            tm->state_ready = 1;
-        } else {
-            tm->gain_state += ((float)args[P_MATTE_GAIN] - tm->gain_state) * fast;
-            tm->bias_state += ((float)args[P_MATTE_BIAS] - tm->bias_state) * (fast * 0.92f);
-            tm->soften_state += ((float)args[P_MATTE_SOFTEN] - tm->soften_state) * slow;
-            tm->mix_drive_state += ((float)args[P_MIX_DRIVE] - tm->mix_drive_state) * (fast * 1.18f);
-        }
+    const float fast = 0.24f;
+    const float slow = 0.085f;
 
-        const int gain = travelmatte_clampi((int)(tm->gain_state + 0.5f), 0, 2000);
-        const int bias = travelmatte_clampi((int)(tm->bias_state + (tm->bias_state >= 0.0f ? 0.5f : -0.5f)), -255, 255);
-        const int soften = travelmatte_clampi((int)(tm->soften_state + 0.5f), 0, 255);
-        const int mix_drive = travelmatte_clampi((int)(tm->mix_drive_state + 0.5f), 0, 1000);
-
-        for(int i = 0; i < 256; i++) {
-            tm->alpha_lut[i] = (uint8_t)travelmatte_alpha_xform(i, gain, bias, soften, mix_drive);
-        }
+    if(!tm->state_ready) {
+        tm->gain_state = (float)gain;
+        tm->bias_state = (float)bias;
+        tm->soften_state = (float)soften;
+        tm->mix_drive_state = (float)mix_drive;
+        tm->state_ready = 1;
+    } else {
+        tm->gain_state += ((float)gain - tm->gain_state) * fast;
+        tm->bias_state += ((float)bias - tm->bias_state) * (fast * 0.92f);
+        tm->soften_state += ((float)soften - tm->soften_state) * slow;
+        tm->mix_drive_state += ((float)mix_drive - tm->mix_drive_state) * (fast * 1.18f);
     }
-   
-    #pragma omp for schedule(static)
+
+    gain = travelmatte_clampi((int)(tm->gain_state + 0.5f), 0, 2000);
+    bias = travelmatte_clampi((int)(tm->bias_state + (tm->bias_state >= 0.0f ? 0.5f : -0.5f)), -255, 255);
+    soften = travelmatte_clampi((int)(tm->soften_state + 0.5f), 0, 255);
+    mix_drive = travelmatte_clampi((int)(tm->mix_drive_state + 0.5f), 0, 1000);
+
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++) {
-        const int a = (int)lut[matte[i]];
+        const int a = travelmatte_alpha_xform((int)matte[i], gain, bias, soften, mix_drive);
 
         if(a <= 0)
             continue;

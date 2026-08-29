@@ -1,7 +1,7 @@
 /*
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -36,7 +36,6 @@ typedef struct {
     uint8_t *src[3];
     uint8_t *tmp[3];
     int max_len;
-    int n_threads;
 
     float eff_kernel;
     float eff_mix;
@@ -44,18 +43,14 @@ typedef struct {
     float eff_blur_drive;
     float eff_mix_drive;
     int eff_initialized;
-
-    int type;
-    int y_mix_q8;
-    int c_mix_q8;
-    int uv_width;
-    int uv_height;
 } softblur_t;
 
 static inline int clampi(int v, int lo, int hi)
 {
     return (v < lo) ? lo : (v > hi ? hi : v);
 }
+
+
 
 static inline int softblur_smooth_i(float *state, int target, float attack, float release)
 {
@@ -85,6 +80,17 @@ vj_effect *softblur_init(int w, int h)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_KERNEL]     = 0;
     ve->defaults[P_MIX]        = 1000;
@@ -165,32 +171,22 @@ void *softblur_malloc(int w, int h)
     sb->eff_mix_drive = 0.0f;
     sb->eff_initialized = 0;
 
-    sb->n_threads = vje_advise_num_threads(len);
-
     return (void*) sb;
 }
 
 void softblur_free(void *ptr)
 {
     softblur_t *sb = (softblur_t*) ptr;
-    if(!sb)
-        return;
 
     free(sb->src[0]);
     free(sb);
 }
 
-/* =========================================================================
- * PARALLEL ROUTINES (Used by softblur_apply inside OpenMP worker teams)
- * ========================================================================= */
-
 static inline void softblur_copy_plane(const uint8_t *restrict src,
                                           uint8_t *restrict dst,
                                           int len)
 {
-#pragma omp for schedule(static)
-    for(int i = 0; i < len; i++)
-        dst[i] = src[i];
+    veejay_memcpy(dst, src, len);
 }
 
 static inline void softblur1_core(const uint8_t *restrict src,
@@ -291,8 +287,6 @@ static inline void softblur_plane(uint8_t *restrict src,
 {
     const int len = w * h;
 
-    softblur_copy_plane(plane, src, len);
-
     switch(type) {
         case 0:
             softblur1_core(src, plane, w, h);
@@ -314,133 +308,57 @@ static inline void softblur_plane(uint8_t *restrict src,
     softblur_blend_plane(src, plane, len, mix_q8);
 }
 
-/* =========================================================================
- * SERIAL ROUTINES (Used exclusively by softblur_apply_internal)
- * ========================================================================= */
-
-static inline void softblur_copy_plane_serial(const uint8_t *restrict src,
-                                                uint8_t *restrict dst,
-                                                int len)
-{
-    for(int i = 0; i < len; i++)
-        dst[i] = src[i];
-}
-
-static inline void softblur1_core_serial(const uint8_t *restrict src,
-                                        uint8_t *restrict dst,
-                                        int w,
-                                        int h)
-{
-    for(int y = 0; y < h; y++) {
-        const uint8_t *restrict row = src + y * w;
-        uint8_t *restrict out = dst + y * w;
-
-        out[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
-
-        for(int x = 1; x < w - 1; x++)
-            out[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
-
-        out[w - 1] = (uint8_t)(((int)row[w - 2] + (int)row[w - 1] * 2 + 1) / 3);
-    }
-}
-
-static inline void softblur3_h_serial(const uint8_t *restrict src,
-                                      uint8_t *restrict tmp,
-                                      int w,
-                                      int h)
-{
-    for(int y = 0; y < h; y++) {
-        const uint8_t *restrict row = src + y * w;
-        uint8_t *restrict trow = tmp + y * w;
-
-        trow[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
-
-        for(int x = 1; x < w - 1; x++)
-            trow[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
-
-        trow[w - 1] = (uint8_t)(((int)row[w - 2] + (int)row[w - 1] * 2 + 1) / 3);
-    }
-}
-
-static inline void softblur3_v_serial(const uint8_t *restrict tmp,
-                                      uint8_t *restrict dst,
-                                      int w,
-                                      int h)
-{
-    for(int y = 0; y < h; y++) {
-        const int ym = (y > 0) ? y - 1 : y;
-        const int yp = (y < h - 1) ? y + 1 : y;
-
-        const uint8_t *restrict r0 = tmp + ym * w;
-        const uint8_t *restrict r1 = tmp + y * w;
-        const uint8_t *restrict r2 = tmp + yp * w;
-        uint8_t *restrict out = dst + y * w;
-
-        for(int x = 0; x < w; x++)
-            out[x] = (uint8_t)(((int)r0[x] + (int)r1[x] + (int)r2[x] + 1) / 3);
-    }
-}
-
-static inline void softblur3_core_serial(const uint8_t *restrict src,
-                                        uint8_t *restrict tmp,
-                                        uint8_t *dst,
-                                        int w,
-                                        int h)
-{
-    softblur3_h_serial(src, tmp, w, h);
-    softblur3_v_serial(tmp, dst, w, h);
-}
-
-static inline void softblur_blend_plane_serial(const uint8_t *restrict src,
-                                              uint8_t *restrict dst,
-                                              int len,
-                                              int mix_q8)
-{
-    mix_q8 = clampi(mix_q8, 0, 256);
-
-    if(mix_q8 >= 256)
-        return;
-
-    if(mix_q8 <= 0) {
-        softblur_copy_plane_serial(src, dst, len);
-        return;
-    }
-
-    for(int i = 0; i < len; i++)
-        dst[i] = softblur_mix_u8(src[i], dst[i], mix_q8);
-}
-
-static inline void softblur_plane_serial(uint8_t *restrict src,
-                                         uint8_t *restrict tmp,
-                                         uint8_t *restrict plane,
-                                         int w,
-                                         int h,
-                                         int type,
-                                         int mix_q8)
+static void softblur_plane_serial(const uint8_t *restrict input,
+                                  uint8_t *restrict src,
+                                  uint8_t *restrict tmp,
+                                  uint8_t *restrict plane,
+                                  int w,
+                                  int h,
+                                  int type,
+                                  int mix_q8)
 {
     const int len = w * h;
+    veejay_memcpy(src, input, len);
 
-    softblur_copy_plane_serial(plane, src, len);
-
-    switch(type) {
-        case 0:
-            softblur1_core_serial(src, plane, w, h);
-            break;
-
-        case 1:
-            softblur3_core_serial(src, tmp, plane, w, h);
-            break;
-
-        case 2:
-            softblur3_core_serial(src, tmp, plane, w, h);
-            softblur3_core_serial(plane, tmp, plane, w, h);
-            break;
-
-        default:
-            break;
+    if(type == 0) {
+        for(int y = 0; y < h; y++) {
+            const uint8_t *row = src + y * w;
+            uint8_t *out = plane + y * w;
+            out[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
+            for(int x = 1; x < w - 1; x++)
+                out[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
+            out[w - 1] = (uint8_t)(((int)row[w - 2] + (int)row[w - 1] * 2 + 1) / 3);
+        }
+    } else {
+        for(int pass = 0; pass < (type == 2 ? 2 : 1); pass++) {
+            const uint8_t *hsrc = pass == 0 ? src : plane;
+            for(int y = 0; y < h; y++) {
+                const uint8_t *row = hsrc + y * w;
+                uint8_t *out = tmp + y * w;
+                out[0] = (uint8_t)(((int)row[0] * 2 + (int)row[1] + 1) / 3);
+                for(int x = 1; x < w - 1; x++)
+                    out[x] = (uint8_t)(((int)row[x - 1] + (int)row[x] + (int)row[x + 1] + 1) / 3);
+                out[w - 1] = (uint8_t)(((int)row[w - 2] + (int)row[w - 1] * 2 + 1) / 3);
+            }
+            for(int y = 0; y < h; y++) {
+                const int ym = y > 0 ? y - 1 : y;
+                const int yp = y < h - 1 ? y + 1 : y;
+                const uint8_t *r0 = tmp + ym * w;
+                const uint8_t *r1 = tmp + y * w;
+                const uint8_t *r2 = tmp + yp * w;
+                uint8_t *out = plane + y * w;
+                for(int x = 0; x < w; x++)
+                    out[x] = (uint8_t)(((int)r0[x] + (int)r1[x] + (int)r2[x] + 1) / 3);
+            }
+        }
     }
 
-    softblur_blend_plane_serial(src, plane, len, mix_q8);
+    mix_q8 = clampi(mix_q8, 0, 256);
+    if(mix_q8 <= 0)
+        veejay_memcpy(plane, src, len);
+    else if(mix_q8 < 256)
+        for(int i = 0; i < len; i++)
+            plane[i] = softblur_mix_u8(src[i], plane[i], mix_q8);
 }
 
 void softblur_apply_internal(VJFrame *frame)
@@ -454,7 +372,8 @@ void softblur_apply_internal(VJFrame *frame)
 
     uint8_t *tmp = src + len;
 
-    softblur_plane_serial(src, tmp, frame->data[0], frame->width, frame->height, type, 256);
+    softblur_plane_serial(frame->data[0], src, tmp, frame->data[0],
+                          frame->width, frame->height, type, 256);
 
     free(src);
 }
@@ -472,7 +391,7 @@ void softblur_apply(void *ptr, VJFrame *frame, int *args)
     const int blur_drive_arg = args[P_BLUR_DRIVE];
     const int mix_drive_arg = args[P_MIX_DRIVE];
 
-    #pragma omp single
+#pragma omp single
     {
         if(!blur->eff_initialized) {
             blur->eff_kernel = (float)kernel_arg;
@@ -491,35 +410,45 @@ void softblur_apply(void *ptr, VJFrame *frame, int *args)
             softblur_smooth_i(&blur->eff_blur_drive, blur_drive_arg, param_fast, param_slow);
             softblur_smooth_i(&blur->eff_mix_drive,  mix_drive_arg,  param_fast, param_slow);
         }
-
-        int eff_kernel = clampi((int)(blur->eff_kernel + 0.5f), 0, 2);
-        int eff_mix = clampi((int)(blur->eff_mix + 0.5f), 0, 1000);
-        int eff_chroma = clampi((int)(blur->eff_chroma + 0.5f), 0, 1000);
-        int blur_drive = clampi((int)(blur->eff_blur_drive + 0.5f), 0, 1000);
-        int mix_drive = clampi((int)(blur->eff_mix_drive + 0.5f), 0, 1000);
-
-        blur->type = eff_kernel;
-        if(blur->type < 1 && blur_drive >= 280)
-            blur->type = 1;
-        if(blur->type < 2 && blur_drive >= 660)
-            blur->type = 2;
-
-        const int base_mix_q8 = (eff_mix * 256 + 500) / 1000;
-        const int clarity_q8 = (mix_drive * 112 + 500) / 1000;
-        blur->y_mix_q8 = clampi(base_mix_q8 - clarity_q8, 0, 256);
-        blur->c_mix_q8 = clampi((blur->y_mix_q8 * eff_chroma + 500) / 1000, 0, 256);
-
-        blur->uv_width  = frame->ssm ? width  : frame->uv_width;
-        blur->uv_height = frame->ssm ? height : frame->uv_height;
     }
 
-    const int type = blur->type;
-    const int y_mix_q8 = blur->y_mix_q8;
-    const int c_mix_q8 = blur->c_mix_q8;
-    const int uv_w = blur->uv_width;
-    const int uv_h = blur->uv_height;
+    const int eff_kernel = clampi((int)(blur->eff_kernel + 0.5f), 0, 2);
+    const int eff_mix = clampi((int)(blur->eff_mix + 0.5f), 0, 1000);
+    const int eff_chroma = clampi((int)(blur->eff_chroma + 0.5f), 0, 1000);
+    const int blur_drive = clampi((int)(blur->eff_blur_drive + 0.5f), 0, 1000);
+    const int mix_drive = clampi((int)(blur->eff_mix_drive + 0.5f), 0, 1000);
+
+    int type = eff_kernel;
+    if(type < 1 && blur_drive >= 280)
+        type = 1;
+    if(type < 2 && blur_drive >= 660)
+        type = 2;
+
+    const int base_mix_q8 = (eff_mix * 256 + 500) / 1000;
+    const int clarity_q8 = (mix_drive * 112 + 500) / 1000;
+    const int y_mix_q8 = clampi(base_mix_q8 - clarity_q8, 0, 256);
+    const int c_mix_q8 = clampi((y_mix_q8 * eff_chroma + 500) / 1000, 0, 256);
+
+    const int uv_width  = frame->ssm ? width  : frame->uv_width;
+    const int uv_height = frame->ssm ? height : frame->uv_height;
+
+#pragma omp sections
+    {
+#pragma omp section
+        {
+            softblur_copy_plane(frame->data[0], blur->src[0], frame->len);
+        }
+#pragma omp section
+        {
+            softblur_copy_plane(frame->data[1], blur->src[1], uv_width * uv_height);
+        }
+#pragma omp section
+        {
+            softblur_copy_plane(frame->data[2], blur->src[2], uv_width * uv_height);
+        }
+    }
 
     softblur_plane(blur->src[0], blur->tmp[0], frame->data[0], width, height, type, y_mix_q8);
-    softblur_plane(blur->src[1], blur->tmp[1], frame->data[1], uv_w, uv_h, type, c_mix_q8);
-    softblur_plane(blur->src[2], blur->tmp[2], frame->data[2], uv_w, uv_h, type, c_mix_q8);
+    softblur_plane(blur->src[1], blur->tmp[1], frame->data[1], uv_width, uv_height, type, c_mix_q8);
+    softblur_plane(blur->src[2], blur->tmp[2], frame->data[2], uv_width, uv_height, type, c_mix_q8);
 }

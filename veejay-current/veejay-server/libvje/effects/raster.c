@@ -188,6 +188,16 @@ vj_effect *raster_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     int grid_max = h >> 2;
 
@@ -263,7 +273,6 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
     const int v_lines = clampi(args[P_V_LINES], 0, 100);
     const int blend = clampi(args[P_LINE_BLEND], 0, 255);
     const uint8_t pixel_color = args[P_MODE] ? pixel_Y_hi_ : pixel_Y_lo_;
-
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -272,28 +281,29 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
     const int v_count = (width + grid - 1) / grid;
 
     if(h_lines >= 100 && v_lines >= 100 && blend >= 255) {
-        #pragma omp for schedule(static)
-        for(int line_no = 0; line_no < v_count; line_no++) {
-            const int x0 = line_no * grid;
+#pragma omp for schedule(static)
+            for(int line_no = 0; line_no < v_count; line_no++) {
+                const int x0 = line_no * grid;
 
-            raster_draw_vertical_column(Y, Cb, Cr, x0, width, height, pixel_color);
+                raster_draw_vertical_column(Y, Cb, Cr, x0, width, height, pixel_color);
 
-            if(x0 + 1 < width)
-                raster_draw_vertical_column(Y, Cb, Cr, x0 + 1, width, height, pixel_color);
-        }
+                if(x0 + 1 < width)
+                    raster_draw_vertical_column(Y, Cb, Cr, x0 + 1, width, height, pixel_color);
+            }
 
-        #pragma omp for schedule(static)
-        for(int line_no = 0; line_no < h_count; line_no++) {
-            const int y0 = line_no * grid;
+#pragma omp for schedule(static)
+            for(int line_no = 0; line_no < h_count; line_no++) {
+                const int y0 = line_no * grid;
 
-            raster_draw_horizontal(Y, Cb, Cr, y0 * width, width, pixel_color);
+                raster_draw_horizontal(Y, Cb, Cr, y0 * width, width, pixel_color);
 
-            if(y0 + 1 < height)
-                raster_draw_horizontal(Y, Cb, Cr, (y0 + 1) * width, width, pixel_color);
-        }
+                if(y0 + 1 < height)
+                    raster_draw_horizontal(Y, Cb, Cr, (y0 + 1) * width, width, pixel_color);
+            }
+        return;
     }
-    else {
-        #pragma omp for schedule(static)
+
+#pragma omp for schedule(static)
         for(int line_no = 0; line_no < h_count; line_no++) {
             const int y0 = line_no * grid;
             const int h_state = raster_line_state(y0, line_no, grid, h_lines, blend, 17u);
@@ -311,7 +321,7 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
                 raster_draw_horizontal(Y, Cb, Cr, (y0 + 1) * width, width, raster_blend_luma(pixel_color, level1));
         }
 
-        #pragma omp for schedule(static)
+#pragma omp for schedule(static)
         for(int line_no = 0; line_no < v_count; line_no++) {
             const int x0 = line_no * grid;
             const int state = raster_line_state(x0, line_no, grid, v_lines, blend, 29u);
@@ -327,6 +337,5 @@ void raster_apply(void *ptr, VJFrame *frame, int *args)
 
             if(x0 + 1 < width && level1)
                 raster_draw_vertical_column(Y, Cb, Cr, x0 + 1, width, height, raster_blend_luma(pixel_color, level1));
-        }
     }
 }

@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,29 +19,21 @@
  */
 
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "bwselect.h"
-#include <math.h>
 
 typedef struct {
     int last_gamma;
     uint8_t table[256];
-    int n_threads;
-    int use_gamma;
 } bwselect_t;
 
 vj_effect *bwselect_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-
 
     ve->limits[0][0] = 0; ve->limits[1][0] = 255;  ve->defaults[0] = 16;
     ve->limits[0][1] = 0; ve->limits[1][1] = 255;  ve->defaults[1] = 235;
@@ -62,9 +54,6 @@ vj_effect *bwselect_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -95,8 +84,6 @@ void *bwselect_malloc(int w, int h)
 
     gamma_setup(b, 4.0);
     b->last_gamma = 400;
-    b->use_gamma = 1;
-    b->n_threads = vje_advise_num_threads(w * h);
 
     return b;
 }
@@ -118,7 +105,7 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
     const int gamma = args[2];
     int mode = args[3];
     const int len = frame->len;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     if(min_threshold > max_threshold)
     {
@@ -131,43 +118,48 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
     uint8_t *restrict A = frame->data[3];
+    uint8_t *restrict table = b->table;
 
     if(mode == 1 && !A)
         mode = 0;
 
-    uint8_t *restrict table = b->table;
-    const int hi = pixel_Y_hi_;
-    const int lo = pixel_Y_lo_;
-
-    #pragma omp single
+#pragma omp single
     {
         if(gamma != 0 && gamma != b->last_gamma)
         {
             gamma_setup(b, (double)gamma / 100.0);
             b->last_gamma = gamma;
         }
-        b->use_gamma = (gamma != 0);
     }
 
-    const int use_gamma = b->use_gamma;
+    const int use_gamma = gamma != 0;
+    const int hi = pixel_Y_hi_;
+    const int lo = pixel_Y_lo_;
+
+    if(mode == 0)
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+        {
+            const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
+            const int cond = (p > min_threshold) & (p < max_threshold);
+            Y[i] = (uint8_t)((-cond & hi) | (~(-cond) & lo));
+        }
 
 #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++)
-    {
-        const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
-        const int cond = (p > min_threshold) & (p < max_threshold);
-
-        if(mode == 0)
-            Y[i] = (uint8_t)((-cond & hi) | (~(-cond) & lo));
-        else
-            A[i] = (uint8_t)(-cond);
-    }
-
-    if(mode == 0) {
-        #pragma omp single
+        for(int plane = 1; plane < 3; plane++)
         {
-            veejay_memset(Cb, 128, uv_len);
-            veejay_memset(Cr, 128, uv_len);
+            veejay_memset(frame->data[plane], 128, uv_len);
+        }
+    }
+    else
+    {
+#pragma omp for schedule(static)
+        for(int i = 0; i < len; i++)
+        {
+            const uint8_t p = use_gamma ? table[Y[i]] : Y[i];
+            const int cond = (p > min_threshold) & (p < max_threshold);
+            A[i] = (uint8_t)(-cond);
         }
     }
 }

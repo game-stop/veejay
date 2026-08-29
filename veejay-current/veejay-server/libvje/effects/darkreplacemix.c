@@ -22,7 +22,6 @@
 #include "opacity.h"
 
 typedef struct {
-    int n_threads;
 } darkreplace_t;
 
 static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
@@ -45,6 +44,7 @@ vj_effect *darkreplace_init(int w, int h)
     ve->description = "Replace Dark";
     ve->sub_format = 1;
     ve->extra_frame = 1;
+    ve->parallel = 0;
     ve->has_user = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Threshold", "Softness");
 
@@ -78,7 +78,7 @@ void darkreplace_free(void *ptr)
 
 void darkreplace_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    darkreplace_t *dr = (darkreplace_t*) ptr;
+    (void) ptr;
 
     const int threshold = args[0];
     const int softness = args[1];

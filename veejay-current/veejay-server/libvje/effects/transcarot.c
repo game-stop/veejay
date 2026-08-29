@@ -44,7 +44,7 @@ typedef struct {
 
 static inline int transcarot_clampi(int v, int lo, int hi)
 {
-    return (v < lo) ? lo : ((v > hi) ? hi : v);
+    return (v < lo) ? lo : (v > hi ? hi : v);
 }
 
 static inline uint8_t transcarot_u8_add(uint8_t v, int add)
@@ -53,10 +53,14 @@ static inline uint8_t transcarot_u8_add(uint8_t v, int add)
     return (uint8_t)((r < 0) ? 0 : (r > 255 ? 255 : r));
 }
 
+
+
 static inline float transcarot_smoothf(float oldv, float target, float coef)
 {
     return oldv + (target - oldv) * coef;
 }
+
+
 
 vj_effect *transcarot_init(int width, int height)
 {
@@ -69,6 +73,14 @@ vj_effect *transcarot_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_SPEED]        = 2;
     ve->defaults[P_MODE]         = 0;
@@ -143,6 +155,56 @@ void transcarot_free(void *ptr)
     free(ptr);
 }
 
+typedef void (*transcarot_diagonal_glow_fn)(uint8_t *Y,
+                                            int row,
+                                            int width,
+                                            int edge_x,
+                                            int glow_width,
+                                            int glow_strength);
+
+static inline void transcarot_diagonal_glow_none(uint8_t *Y,
+                                                 int row,
+                                                 int width,
+                                                 int edge_x,
+                                                 int glow_width,
+                                                 int glow_strength)
+{
+    (void)Y;
+    (void)row;
+    (void)width;
+    (void)edge_x;
+    (void)glow_width;
+    (void)glow_strength;
+}
+
+static inline void transcarot_diagonal_glow_apply(uint8_t *Y,
+                                                  int row,
+                                                  int width,
+                                                  int edge_x,
+                                                  int glow_width,
+                                                  int glow_strength)
+{
+    int x0 = edge_x - glow_width;
+    int x1 = edge_x + glow_width + 1;
+
+    x0 = transcarot_clampi(x0, 0, width);
+    x1 = transcarot_clampi(x1, 0, width);
+
+    if(x1 > x0) {
+        for(int x = x0; x < x1; x++) {
+            int d = x - edge_x;
+            if(d < 0)
+                d = -d;
+
+            int q = glow_width + 1 - d;
+            if(q > 0) {
+                const int add = (glow_strength * q) / (glow_width + 1);
+                Y[row + x] = transcarot_u8_add(Y[row + x], add);
+            }
+        }
+    }
+}
+
 static void transcarot_apply_diagonal(wipe_t *wipe,
                                       VJFrame *frame,
                                       VJFrame *frame2,
@@ -155,7 +217,13 @@ static void transcarot_apply_diagonal(wipe_t *wipe,
 
     const int width = frame->width;
     const int height = frame->height;
+    const transcarot_diagonal_glow_fn glow_fn =
+        glow_width > 0 && glow_strength > 0
+            ? transcarot_diagonal_glow_apply
+            : transcarot_diagonal_glow_none;
+    uint8_t *Y = frame->data[0];
 
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         int limit = progress + expand_px - y;
 
@@ -170,30 +238,154 @@ static void transcarot_apply_diagonal(wipe_t *wipe,
             veejay_memcpy(frame->data[2] + off, frame2->data[2] + off, limit);
         }
 
-        if(glow_width > 0 && glow_strength > 0) {
-            const int edge_x = progress + expand_px - y;
-            int x0 = edge_x - glow_width;
-            int x1 = edge_x + glow_width + 1;
+        glow_fn(Y, y * width, width, progress + expand_px - y, glow_width, glow_strength);
+    }
+}
 
-            x0 = transcarot_clampi(x0, 0, width);
-            x1 = transcarot_clampi(x1, 0, width);
+typedef void (*transcarot_bouncy_glow_fn)(uint8_t *Y,
+                                          int row,
+                                          int y,
+                                          int width,
+                                          int cur_x,
+                                          int cur_y,
+                                          int glow_width,
+                                          int glow_strength);
 
-            if(x1 > x0) {
-                const int row = y * width;
+static inline void transcarot_bouncy_glow_none(uint8_t *Y,
+                                               int row,
+                                               int y,
+                                               int width,
+                                               int cur_x,
+                                               int cur_y,
+                                               int glow_width,
+                                               int glow_strength)
+{
+    (void)Y;
+    (void)row;
+    (void)y;
+    (void)width;
+    (void)cur_x;
+    (void)cur_y;
+    (void)glow_width;
+    (void)glow_strength;
+}
 
-                for(int x = x0; x < x1; x++) {
-                    int d = x - edge_x;
-                    if(d < 0)
-                        d = -d;
+static inline void transcarot_bouncy_glow_apply(uint8_t *Y,
+                                                int row,
+                                                int y,
+                                                int width,
+                                                int cur_x,
+                                                int cur_y,
+                                                int glow_width,
+                                                int glow_strength)
+{
+    if(y < cur_y) {
+        int x0 = transcarot_clampi(cur_x - glow_width, 0, width);
+        int x1 = transcarot_clampi(cur_x + glow_width + 1, 0, width);
 
-                    int q = glow_width + 1 - d;
-                    if(q > 0) {
-                        const int add = (glow_strength * q) / (glow_width + 1);
-                        frame->data[0][row + x] = transcarot_u8_add(frame->data[0][row + x], add);
-                    }
-                }
+        for(int x = x0; x < x1; x++) {
+            int d = x - cur_x;
+            if(d < 0)
+                d = -d;
+
+            int q = glow_width + 1 - d;
+            if(q > 0) {
+                const int add = (glow_strength * q) / (glow_width + 1);
+                Y[row + x] = transcarot_u8_add(Y[row + x], add);
             }
         }
+    }
+
+    int d = y - cur_y;
+    if(d < 0)
+        d = -d;
+
+    if(d <= glow_width) {
+        const int q = glow_width + 1 - d;
+        const int add = (glow_strength * q) / (glow_width + 1);
+        const int x1 = transcarot_clampi(cur_x, 0, width);
+
+        for(int x = 0; x < x1; x++)
+            Y[row + x] = transcarot_u8_add(Y[row + x], add);
+    }
+}
+
+static inline void transcarot_bouncy_glow_apply_edge(uint8_t *Y,
+                                                     int row,
+                                                     int y,
+                                                     int width,
+                                                     int cur_x,
+                                                     int cur_y,
+                                                     int glow_width,
+                                                     int glow_strength)
+{
+    if(y < cur_y) {
+        int x0 = transcarot_clampi(cur_x - glow_width, 0, width);
+        int x1 = transcarot_clampi(cur_x + glow_width + 1, 0, width);
+
+        for(int x = x0; x < x1; x++) {
+            int d = x - cur_x;
+            if(d < 0)
+                d = -d;
+
+            int q = glow_width + 1 - d;
+            if(q > 0) {
+                const int add = (glow_strength * q) / (glow_width + 1);
+                Y[row + x] = transcarot_u8_add(Y[row + x], add);
+            }
+        }
+    }
+}
+
+typedef void (*transcarot_bouncy_copy_fn)(uint8_t *dst_y,
+                                          uint8_t *dst_u,
+                                          uint8_t *dst_v,
+                                          const uint8_t *src_y,
+                                          const uint8_t *src_u,
+                                          const uint8_t *src_v,
+                                          int row,
+                                          int y,
+                                          int cur_x,
+                                          int cur_y);
+
+static inline void transcarot_bouncy_copy_none(uint8_t *dst_y,
+                                               uint8_t *dst_u,
+                                               uint8_t *dst_v,
+                                               const uint8_t *src_y,
+                                               const uint8_t *src_u,
+                                               const uint8_t *src_v,
+                                               int row,
+                                               int y,
+                                               int cur_x,
+                                               int cur_y)
+{
+    (void)dst_y;
+    (void)dst_u;
+    (void)dst_v;
+    (void)src_y;
+    (void)src_u;
+    (void)src_v;
+    (void)row;
+    (void)y;
+    (void)cur_x;
+    (void)cur_y;
+}
+
+static inline void transcarot_bouncy_copy_apply(uint8_t *dst_y,
+                                                uint8_t *dst_u,
+                                                uint8_t *dst_v,
+                                                const uint8_t *src_y,
+                                                const uint8_t *src_u,
+                                                const uint8_t *src_v,
+                                                int row,
+                                                int y,
+                                                int cur_x,
+                                                int cur_y)
+{
+    if(y < cur_y) {
+        veejay_memcpy(dst_y + row, src_y + row, cur_x);
+        veejay_memcpy(dst_u + row, src_u + row, cur_x);
+        veejay_memcpy(dst_v + row, src_v + row, cur_x);
     }
 }
 
@@ -209,51 +401,25 @@ static void transcarot_apply_bouncybox(wipe_t *wipe,
 
     const int width = frame->width;
     const int height = frame->height;
+    const transcarot_bouncy_glow_fn glow_fn =
+        glow_width > 0 && glow_strength > 0
+            ? (cur_x > 0 ? transcarot_bouncy_glow_apply : transcarot_bouncy_glow_apply_edge)
+            : transcarot_bouncy_glow_none;
+    const transcarot_bouncy_copy_fn copy_fn =
+        cur_x > 0 ? transcarot_bouncy_copy_apply : transcarot_bouncy_copy_none;
+    uint8_t *Y = frame->data[0];
+    uint8_t *U = frame->data[1];
+    uint8_t *V = frame->data[2];
+    const uint8_t *src_y = frame2->data[0];
+    const uint8_t *src_u = frame2->data[1];
+    const uint8_t *src_v = frame2->data[2];
 
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
-        if(y < cur_y && cur_x > 0) {
-            const int off = y * width;
+        const int row = y * width;
 
-            veejay_memcpy(frame->data[0] + off, frame2->data[0] + off, cur_x);
-            veejay_memcpy(frame->data[1] + off, frame2->data[1] + off, cur_x);
-            veejay_memcpy(frame->data[2] + off, frame2->data[2] + off, cur_x);
-        }
-
-        if(glow_width > 0 && glow_strength > 0) {
-            const int row = y * width;
-
-            if(y < cur_y) {
-                int x0 = transcarot_clampi(cur_x - glow_width, 0, width);
-                int x1 = transcarot_clampi(cur_x + glow_width + 1, 0, width);
-
-                for(int x = x0; x < x1; x++) {
-                    int d = x - cur_x;
-                    if(d < 0)
-                        d = -d;
-
-                    int q = glow_width + 1 - d;
-                    if(q > 0) {
-                        const int add = (glow_strength * q) / (glow_width + 1);
-                        frame->data[0][row + x] = transcarot_u8_add(frame->data[0][row + x], add);
-                    }
-                }
-            }
-
-            if(cur_x > 0) {
-                int d = y - cur_y;
-                if(d < 0)
-                    d = -d;
-
-                if(d <= glow_width) {
-                    int q = glow_width + 1 - d;
-                    int add = (glow_strength * q) / (glow_width + 1);
-                    int x1 = transcarot_clampi(cur_x, 0, width);
-
-                    for(int x = 0; x < x1; x++)
-                        frame->data[0][row + x] = transcarot_u8_add(frame->data[0][row + x], add);
-                }
-            }
-        }
+        copy_fn(Y, U, V, src_y, src_u, src_v, row, y, cur_x, cur_y);
+        glow_fn(Y, row, y, width, cur_x, cur_y, glow_width, glow_strength);
     }
 }
 
@@ -271,9 +437,12 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float fast = 0.28f;
 
-    wipe->speed_env = transcarot_smoothf(wipe->speed_env, (float)speed_arg, fast);
-    wipe->expand_env = transcarot_smoothf(wipe->expand_env, (float)expand_drive, fast * 0.66f);
-    wipe->glow_env = transcarot_smoothf(wipe->glow_env, (float)edge_glow, fast * 0.74f);
+#pragma omp single
+    {
+        wipe->speed_env = transcarot_smoothf(wipe->speed_env, (float)speed_arg, fast);
+        wipe->expand_env = transcarot_smoothf(wipe->expand_env, (float)expand_drive, fast * 0.66f);
+        wipe->glow_env = transcarot_smoothf(wipe->glow_env, (float)edge_glow, fast * 0.74f);
+    }
 
     const int max_dim = width > height ? width : height;
     const float expand_t = wipe->expand_env * 0.001f;
@@ -282,7 +451,8 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     effective_speed += (int)(expand_t * (float)(1 + max_dim / 32) + 0.5f);
     effective_speed = transcarot_clampi(effective_speed, 0, max_dim);
 
-    const int expand_px = (int)(((float)max_dim * 0.42f) * expand_t + 0.5f);
+    int expand_px = (int)(((float)max_dim * 0.42f) * expand_t + 0.5f);
+    expand_px = transcarot_clampi(expand_px, 0, max_dim);
 
     int glow_width = 0;
     int glow_strength = 0;
@@ -295,40 +465,45 @@ void transcarot_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         glow_strength = transcarot_clampi(glow_strength, 0, 220);
     }
 
+#pragma omp single
+    {
+        if(mode == 1) {
+            wipe->box_x += effective_speed * wipe->box_dir_x;
+            wipe->box_y += effective_speed * wipe->box_dir_y;
+
+            if(wipe->box_x >= width) {
+                wipe->box_x = width;
+                wipe->box_dir_x = -1;
+            } else if(wipe->box_x <= 0) {
+                wipe->box_x = 0;
+                wipe->box_dir_x = 1;
+            }
+
+            if(wipe->box_y >= height) {
+                wipe->box_y = height;
+                wipe->box_dir_y = -1;
+            } else if(wipe->box_y <= 0) {
+                wipe->box_y = 0;
+                wipe->box_dir_y = 1;
+            }
+        } else {
+            const int total_span = width + height;
+
+            wipe->diagonal_pos += effective_speed;
+
+            while(wipe->diagonal_pos >= total_span)
+                wipe->diagonal_pos -= total_span;
+        }
+    }
+
     int cur_x = 0;
     int cur_y = 0;
     int progress = wipe->diagonal_pos;
 
     if(mode == 1) {
-        wipe->box_x += effective_speed * wipe->box_dir_x;
-        wipe->box_y += effective_speed * wipe->box_dir_y;
-
-        if(wipe->box_x >= width) {
-            wipe->box_x = width;
-            wipe->box_dir_x = -1;
-        } else if(wipe->box_x <= 0) {
-            wipe->box_x = 0;
-            wipe->box_dir_x = 1;
-        }
-
-        if(wipe->box_y >= height) {
-            wipe->box_y = height;
-            wipe->box_dir_y = -1;
-        } else if(wipe->box_y <= 0) {
-            wipe->box_y = 0;
-            wipe->box_dir_y = 1;
-        }
-
         cur_x = transcarot_clampi(wipe->box_x + expand_px, 0, width);
         cur_y = transcarot_clampi(wipe->box_y + expand_px, 0, height);
     } else {
-        const int total_span = width + height;
-
-        wipe->diagonal_pos += effective_speed;
-
-        while(wipe->diagonal_pos >= total_span)
-            wipe->diagonal_pos -= total_span;
-
         progress = wipe->diagonal_pos;
     }
 

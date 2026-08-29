@@ -74,6 +74,16 @@ vj_effect *radialblur_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[P_RADIUS] = 15;
     ve->defaults[P_POWER] = 0;
@@ -128,6 +138,7 @@ void *radialblur_malloc(int w, int h)
 
     r->radial_src[1] = r->radial_src[0] + len;
     r->radial_src[2] = r->radial_src[1] + len;
+    r->n_threads = vje_advise_num_threads(len);
 
     return (void*)r;
 }
@@ -156,6 +167,7 @@ static void radialblur_v(uint8_t *restrict dst, uint8_t *restrict src, int w, in
         veejay_blur2(dst + x, src + x, h, radius, power, w, w);
 }
 
+
 void radialblur_apply(void *ptr, VJFrame *frame, int *args)
 {
     radialblur_t *r = (radialblur_t*)ptr;
@@ -172,7 +184,7 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
     const int uv_width = frame->uv_width;
     const int uv_height = frame->uv_height;
-    const int uv_len = frame->uv_len;
+    const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
@@ -182,41 +194,47 @@ void radialblur_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcU = r->radial_src[1];
     uint8_t *restrict srcV = r->radial_src[2];
 
-    #pragma omp single
-    {
-        veejay_memcpy(srcY, Y, len);
-        veejay_memcpy(srcU, Cb, uv_len);
-        veejay_memcpy(srcV, Cr, uv_len);
+
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+        srcY[i] = Y[i];
+#pragma omp for schedule(static)
+    for(int i = 0; i < uv_len; i++) {
+        srcU[i] = Cb[i];
+        srcV[i] = Cr[i];
     }
 
     switch(direction) {
-        case 0:
-            radialblur_h(Y,  srcY, width, height, radius, power);
-            radialblur_h(Cb, srcU, uv_width, uv_height, radius, power);
-            radialblur_h(Cr, srcV, uv_width, uv_height, radius, power);
-            break;
+            case 0:
+                radialblur_h(Y,  srcY, width, height, radius, power);
+                radialblur_h(Cb, srcU, uv_width, uv_height, radius, power);
+                radialblur_h(Cr, srcV, uv_width, uv_height, radius, power);
+                break;
 
-        case 1:
-            radialblur_v(Y,  srcY, width, height, radius, power);
-            radialblur_v(Cb, srcU, uv_width, uv_height, radius, power);
-            radialblur_v(Cr, srcV, uv_width, uv_height, radius, power);
-            break;
+            case 1:
+                radialblur_v(Y,  srcY, width, height, radius, power);
+                radialblur_v(Cb, srcU, uv_width, uv_height, radius, power);
+                radialblur_v(Cr, srcV, uv_width, uv_height, radius, power);
+                break;
 
-        case 2:
-            radialblur_v(Y,  srcY, width, height, radius, power);
-            radialblur_v(Cb, srcU, uv_width, uv_height, radius, power);
-            radialblur_v(Cr, srcV, uv_width, uv_height, radius, power);
+            case 2:
+                radialblur_v(Y,  srcY, width, height, radius, power);
+                radialblur_v(Cb, srcU, uv_width, uv_height, radius, power);
+                radialblur_v(Cr, srcV, uv_width, uv_height, radius, power);
 
-            #pragma omp single
-            {
-                veejay_memcpy(srcY, Y, len);
-                veejay_memcpy(srcU, Cb, uv_len);
-                veejay_memcpy(srcV, Cr, uv_len);
-            }
+#pragma omp for schedule(static)
+                for(int plane = 0; plane < 3; plane++) {
+                    if(plane == 0)
+                        veejay_memcpy(srcY, Y, len);
+                    else if(plane == 1)
+                        veejay_memcpy(srcU, Cb, uv_len);
+                    else
+                        veejay_memcpy(srcV, Cr, uv_len);
+                }
 
-            radialblur_h(Y,  srcY, width, height, radius, power);
-            radialblur_h(Cb, srcU, uv_width, uv_height, radius, power);
-            radialblur_h(Cr, srcV, uv_width, uv_height, radius, power);
-            break;
+                radialblur_h(Y,  srcY, width, height, radius, power);
+                radialblur_h(Cb, srcU, uv_width, uv_height, radius, power);
+                radialblur_h(Cr, srcV, uv_width, uv_height, radius, power);
+                break;
     }
 }

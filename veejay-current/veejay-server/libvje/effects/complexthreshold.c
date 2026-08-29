@@ -29,7 +29,6 @@
 #define DIV3(x) (((x) * 21846) >> 16)
 
 typedef struct {
-    int n_threads;
     uint8_t *alpha_map;
     uint8_t *alpha_temp;
     uint8_t gamma_lut[256];
@@ -48,21 +47,11 @@ static inline uint8_t complexthreshold_u8(int v)
 vj_effect *complexthreshold_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 12;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-
-    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
-        free(ve->defaults);
-        free(ve->limits[0]);
-        free(ve->limits[1]);
-        free(ve);
-        return NULL;
-    }
 
     ve->defaults[0]  = 1200;
     ve->defaults[1]  = 120;
@@ -179,15 +168,6 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
     const int h = frame->height;
     const int len = w * h;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    const uint8_t *restrict Y2 = frame2->data[0];
-    const uint8_t *restrict Cb2 = frame2->data[1];
-    const uint8_t *restrict Cr2 = frame2->data[2];
-
-    // Every thread independently computes these lightweight constants
     const float angle_rad = ((float)key_color / 10.0f) * (float)(M_PI / 180.0f);
     const float target_u = cosf(angle_rad) * 127.0f;
     const float target_v = sinf(angle_rad) * 127.0f;
@@ -201,12 +181,21 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
     const int cos_q_fp = (int)((target_u / mag_target) * (float)scale);
     const int sin_q_fp = (int)((target_v / mag_target) * (float)scale);
 
+    const float g_val = fmaxf((float)matte_gamma / 128.0f, 0.1f);
+
+    #pragma omp single
+    {
+        for(int i = 0; i < 256; i++)
+            mk->gamma_lut[i] = complexthreshold_u8((int)(powf((float)i / 255.0f, 1.0f / g_val) * 255.0f));
+    }
+
     const int sat_gate_sq = sat_gate * sat_gate;
     const int matte_range = clampi(clip_white - clip_black, 1, 255);
     const int m_range_inv_fp = (255 << 12) / matte_range;
     const int inv_c_thresh_fp = (1 << 24) / (key_reach * scale);
 
     int spill_final_fp = 0;
+
     if(spill_balance >= 128)
     {
         float spill_softness = 1.0f - ((float)(spill_balance - 128) / 160.0f);
@@ -217,14 +206,13 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
         spill_final_fp = (int)(((float)spill_amt / 255.0f) * spill_softness * 4096.0f);
     }
 
-    // Only the shared gamma lookup table needs thread-safe single execution
-    #pragma omp single
-    {
-        const float g_val = fmaxf((float)matte_gamma / 128.0f, 0.1f);
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-        for(int i = 0; i < 256; i++)
-            mk->gamma_lut[i] = complexthreshold_u8((int)(powf((float)i / 255.0f, 1.0f / g_val) * 255.0f));
-    }
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
@@ -240,7 +228,7 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
             const int abs_yy = yy < 0 ? -yy : yy;
             const int dist_fp = mag_target_fp - (xx << 12) + (abs_yy * 16);
 
-            if(dist_fp < (key_reach * 4096))
+            if(dist_fp < (key_reach * scale))
                 a = 255 - ((dist_fp * inv_c_thresh_fp) >> 16);
         }
 
@@ -255,102 +243,101 @@ void complexthreshold_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *arg
         mk->alpha_map[i] = complexthreshold_u8(a);
     }
 
-    if(soft > 0 && w > 2 && h > 2)
+    const int do_soft = soft > 0 && w > 2 && h > 2;
+
+    #pragma omp for schedule(static)
+    for(int y = 0; y < (do_soft ? h : 0); y++)
     {
-        #pragma omp for schedule(static)
-        for(int y = 0; y < h; y++)
-        {
-            uint8_t *restrict in = mk->alpha_map + y * w;
-            uint8_t *restrict out = mk->alpha_temp + y * w;
+        uint8_t *restrict in = mk->alpha_map + y * w;
+        uint8_t *restrict out = mk->alpha_temp + y * w;
 
-            out[0] = in[0];
-            out[w - 1] = in[w - 1];
+        out[0] = in[0];
+        out[w - 1] = in[w - 1];
 
-            for(int x = 1; x < w - 1; x++)
-                out[x] = (uint8_t)DIV3(in[x - 1] + in[x] + in[x + 1]);
-        }
+        for(int x = 1; x < w - 1; x++)
+            out[x] = (uint8_t)DIV3(in[x - 1] + in[x] + in[x + 1]);
+    }
 
-        #pragma omp for schedule(static)
-        for(int y = 1; y < h - 1; y++)
-        {
-            uint8_t *restrict m = mk->alpha_temp + y * w;
-            uint8_t *restrict t = mk->alpha_temp + (y - 1) * w;
-            uint8_t *restrict b = mk->alpha_temp + (y + 1) * w;
-            uint8_t *restrict dest = mk->alpha_map + y * w;
+    #pragma omp for schedule(static)
+    for(int y = 1; y < (do_soft ? h - 1 : 1); y++)
+    {
+        uint8_t *restrict m = mk->alpha_temp + y * w;
+        uint8_t *restrict t = mk->alpha_temp + (y - 1) * w;
+        uint8_t *restrict b = mk->alpha_temp + (y + 1) * w;
+        uint8_t *restrict dest = mk->alpha_map + y * w;
 
-            for(int x = 0; x < w; x++)
-                dest[x] = (uint8_t)DIV3(t[x] + m[x] + b[x]);
-        }
+        for(int x = 0; x < w; x++)
+            dest[x] = (uint8_t)DIV3(t[x] + m[x] + b[x]);
     }
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
     {
-        const int raw_a = mk->alpha_map[i];
-        const int alpha_f_fp = (raw_a - clip_black) * m_range_inv_fp;
-        const uint8_t snapped_a = complexthreshold_u8(alpha_f_fp >> 12);
-        int a = mk->gamma_lut[snapped_a];
+            const int raw_a = mk->alpha_map[i];
+            const int alpha_f_fp = (raw_a - clip_black) * m_range_inv_fp;
+            const uint8_t snapped_a = complexthreshold_u8(alpha_f_fp >> 12);
+            int a = mk->gamma_lut[snapped_a];
 
-        if(invert_matte)
-            a = 255 - a;
+            if(invert_matte)
+                a = 255 - a;
 
-        if(output_view == 1)
-        {
-            Y[i] = (uint8_t)a;
-            Cb[i] = 128;
-            Cr[i] = 128;
-            continue;
-        }
-
-        const int uc = (int)Cb2[i] - 128;
-        const int vc = (int)Cr2[i] - 128;
-        const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-
-        int sY = Y2[i];
-        int sCb = Cb2[i];
-        int sCr = Cr2[i];
-
-        if(xx > 2)
-        {
-            if(spill_balance >= 128)
+            if(output_view == 1)
             {
-                sCb = clampi((int)Cb2[i] - ((uc * spill_final_fp) >> 12), 0, 255);
-                sCr = clampi((int)Cr2[i] - ((vc * spill_final_fp) >> 12), 0, 255);
-                sY = clampi((int)Y2[i] + ((spill_balance - 128) >> 3), 0, 255);
+                Y[i] = (uint8_t)a;
+                Cb[i] = 128;
+                Cr[i] = 128;
+                continue;
             }
-            else
+
+            const int uc = (int)Cb2[i] - 128;
+            const int vc = (int)Cr2[i] - 128;
+            const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+
+            int sY = Y2[i];
+            int sCb = Cb2[i];
+            int sCr = Cr2[i];
+
+            if(xx > 2)
             {
-                const int spill_f = (xx * spill_amt) >> 8;
+                if(spill_balance >= 128)
+                {
+                    sCb = clampi((int)Cb2[i] - ((uc * spill_final_fp) >> 12), 0, 255);
+                    sCr = clampi((int)Cr2[i] - ((vc * spill_final_fp) >> 12), 0, 255);
+                    sY = clampi((int)Y2[i] + ((spill_balance - 128) >> 3), 0, 255);
+                }
+                else
+                {
+                    const int spill_f = (xx * spill_amt) >> 8;
 
-                sY = clampi((int)Y2[i] + ((spill_f * spill_balance) >> 6), 0, 255);
-                sCb = clampi((int)Cb2[i] - ((spill_f * cos_q_fp) >> 12), 0, 255);
-                sCr = clampi((int)Cr2[i] - ((spill_f * sin_q_fp) >> 12), 0, 255);
+                    sY = clampi((int)Y2[i] + ((spill_f * spill_balance) >> 6), 0, 255);
+                    sCb = clampi((int)Cb2[i] - ((spill_f * cos_q_fp) >> 12), 0, 255);
+                    sCr = clampi((int)Cr2[i] - ((spill_f * sin_q_fp) >> 12), 0, 255);
+                }
             }
+
+            if(output_view == 2)
+            {
+                Y[i] = (uint8_t)sY;
+                Cb[i] = (uint8_t)sCb;
+                Cr[i] = (uint8_t)sCr;
+                continue;
+            }
+
+            if(a >= 254)
+                continue;
+
+            if(a <= 1)
+            {
+                Y[i] = (uint8_t)sY;
+                Cb[i] = (uint8_t)sCb;
+                Cr[i] = (uint8_t)sCr;
+                continue;
+            }
+
+            const int ia = 255 - a;
+
+            Y[i] = (uint8_t)DIV255((int)Y[i] * a + sY * ia);
+            Cb[i] = (uint8_t)DIV255((int)Cb[i] * a + sCb * ia);
+            Cr[i] = (uint8_t)DIV255((int)Cr[i] * a + sCr * ia);
         }
-
-        if(output_view == 2)
-        {
-            Y[i] = (uint8_t)sY;
-            Cb[i] = (uint8_t)sCb;
-            Cr[i] = (uint8_t)sCr;
-            continue;
-        }
-
-        if(a >= 254)
-            continue;
-
-        if(a <= 1)
-        {
-            Y[i] = (uint8_t)sY;
-            Cb[i] = (uint8_t)sCb;
-            Cr[i] = (uint8_t)sCr;
-            continue;
-        }
-
-        const int ia = 255 - a;
-
-        Y[i] = (uint8_t)DIV255((int)Y[i] * a + sY * ia);
-        Cb[i] = (uint8_t)DIV255((int)Cb[i] * a + sCb * ia);
-        Cr[i] = (uint8_t)DIV255((int)Cr[i] * a + sCr * ia);
-    }
 }

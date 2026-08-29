@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -37,8 +37,6 @@
 
 #include "common.h"
 #include "boids.h"
-#include <veejaycore/vjmem.h>
-#include <math.h>
 
 typedef struct {
     short x;
@@ -65,8 +63,6 @@ typedef struct {
     int blob_num_;
     int blob_type_;
     int blob_home_radius_;
-
-    int init_failed;
 } boids_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -82,8 +78,6 @@ static void boid_rule4_(boids_t *b, int boid_id, int velocity_limit);
 vj_effect *boids_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 8;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -119,9 +113,6 @@ vj_effect *boids_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
@@ -130,12 +121,11 @@ static void blob_home_position(boids_t *b, int blob_id, int w, int h, double v[2
     const double theta = 360.0 / (double)b->blob_num_ * (double)blob_id;
     const double rad = (theta / 180.0) * M_PI;
     const double ratio = h > 0 ? ((double)w / (double)h) : 1.0;
-    
     const double cx = (double)(w >> 1);
-    const double cy = (double)(h >> 1);
+    const double cy = (double)(h >> 1) * ratio;
 
-    v[0] = cx + cos(rad) * (double)b->blob_home_radius_;
-    v[1] = cy + sin(rad) * ((double)b->blob_home_radius_ / ratio); 
+    v[0] = cx + a_cos(rad) * (double)b->blob_home_radius_;
+    v[1] = cy + a_sin(rad) * (double)b->blob_home_radius_;
 }
 
 static void blob_init_(boids_t *g, blob_t *b, int blob_id, int w, int h)
@@ -229,6 +219,7 @@ void *boids_malloc(int w, int h)
         return NULL;
     }
 
+    veejay_memset(b->blob_image_, 0, w * h);
     b->blob_ready_ = 1;
 
     return b;
@@ -369,14 +360,14 @@ void boids_apply(void *ptr, VJFrame *frame, int *args)
     const unsigned int height = frame->height;
     const int len = frame->len;
 
-    const int radius = args[0];
-    const int num = args[1];
-    const int shape = args[2];
-    const int m1 = args[3];
-    const int m2 = args[4];
-    const int m3 = args[5];
-    const int speed = args[6];
-    const int home_radius = args[7];
+    int radius = args[0];
+    int num = args[1];
+    int shape = args[2];
+    int m1 = args[3];
+    int m2 = args[4];
+    int m3 = args[5];
+    int speed = args[6];
+    int home_radius = args[7];
 
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcCb = frame->data[1];
@@ -386,72 +377,71 @@ void boids_apply(void *ptr, VJFrame *frame, int *args)
     const double M2 = m2 == 0 ? 0.0 : (double)m2 / 100.0;
     const double M3 = m3 == 0 ? 0.0 : (double)m3 / 1000.0;
 
-    #pragma omp single
+#pragma omp single
     {
-        b->blob_type_ = shape;
+    b->blob_type_ = shape;
 
-        if(radius != b->blob_radius_ || num != b->blob_num_) {
-            if(!boids_reinit(b, radius, num, frame->width, frame->height)) {
-                b->init_failed = 1;
-            } else {
-                b->init_failed = 0;
-            }
-        } else {
-            b->init_failed = 0;
-        }
-
-        if(!b->init_failed) {
-            if(home_radius != b->blob_home_radius_) {
-                b->blob_home_radius_ = home_radius;
-
-                for(int i = 0; i < b->blob_num_; i++)
-                    blob_init_(b, b->blobs_ + i, i, width, height);
-            }
-
-            for(int i = 0; i < b->blob_num_; i++) {
-                double v1[2];
-                double v2[2];
-                double v3[2];
-
-                boid_rule1_(b, i, v1);
-                boid_rule2_(b, i, v2);
-                boid_rule3_(b, i, v3);
-
-                b->blobs_[i].vx += v1[0] * M1 + v2[0] * M2 + v3[0] * M3;
-                b->blobs_[i].vy += v1[1] * M1 + v2[1] * M2 + v3[1] * M3;
-
-                boid_rule4_(b, i, speed);
-
-                b->blobs_[i].x = (short)((double)b->blobs_[i].x + b->blobs_[i].vx);
-                b->blobs_[i].y = (short)((double)b->blobs_[i].y + b->blobs_[i].vy);
-            }
-
-            blob_func f = blob_render(b);
-
-            for(int k = 0; k < b->blob_num_; k++) {
-                if((b->blobs_[k].x > 0) &&
-                   (b->blobs_[k].x < (int)(width - b->blob_dradius_)) &&
-                   (b->blobs_[k].y > 0) &&
-                   (b->blobs_[k].y < (int)(height - b->blob_dradius_))) {
-                    const int s = b->blobs_[k].x + b->blobs_[k].y * (int)width;
-                    f(b, s, (int)width);
-                } else {
-                    blob_init_(b, b->blobs_ + k, k, width, height);
-                }
-            }
-        }
+    if(radius != b->blob_radius_ || num != b->blob_num_) {
+        if(!boids_reinit(b, radius, num, frame->width, frame->height))
+            b->blob_num_ = 0;
     }
 
-    if (!b->init_failed) {
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            if(b->blob_image_[i] == 0x0) {
-                srcY[i] = pixel_Y_lo_;
-                srcCb[i] = 128;
-                srcCr[i] = 128;
-            }
+    if(home_radius != b->blob_home_radius_)
+    {
+        b->blob_home_radius_ = home_radius;
 
-            b->blob_image_[i] = 0x0;
+        for(int i = 0; i < b->blob_num_; i++)
+            blob_init_(b, b->blobs_ + i, i, width, height);
+    }
+
+    for(int i = 0; i < b->blob_num_; i++)
+    {
+        double v1[2];
+        double v2[2];
+        double v3[2];
+
+        boid_rule1_(b, i, v1);
+        boid_rule2_(b, i, v2);
+        boid_rule3_(b, i, v3);
+
+        b->blobs_[i].vx += v1[0] * M1 + v2[0] * M2 + v3[0] * M3;
+        b->blobs_[i].vy += v1[1] * M1 + v2[1] * M2 + v3[1] * M3;
+
+        boid_rule4_(b, i, speed);
+
+        b->blobs_[i].x = (short)((double)b->blobs_[i].x + b->blobs_[i].vx);
+        b->blobs_[i].y = (short)((double)b->blobs_[i].y + b->blobs_[i].vy);
+    }
+
+    blob_func f = blob_render(b);
+
+    for(int k = 0; k < b->blob_num_; k++)
+    {
+        if((b->blobs_[k].x > 0) &&
+           (b->blobs_[k].x < (int)(width - b->blob_dradius_)) &&
+           (b->blobs_[k].y > 0) &&
+           (b->blobs_[k].y < (int)(height - b->blob_dradius_)))
+        {
+            const int s = b->blobs_[k].x + b->blobs_[k].y * (int)width;
+            f(b, s, (int)width);
         }
+        else
+        {
+            blob_init_(b, b->blobs_ + k, k, width, height);
+        }
+    }
+    }
+
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++)
+    {
+        if(b->blob_image_[i] == 0x0)
+        {
+            srcY[i] = pixel_Y_lo_;
+            srcCb[i] = 128;
+            srcCr[i] = 128;
+        }
+
+        b->blob_image_[i] = 0x0;
     }
 }

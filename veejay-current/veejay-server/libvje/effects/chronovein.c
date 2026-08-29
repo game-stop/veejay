@@ -46,7 +46,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -89,6 +88,49 @@ static inline uint8_t cv_blend_fast_u8(uint8_t a, uint8_t b, int amount)
     return (uint8_t) (((int) a * (256 - amount) + (int) b * amount) >> 8);
 }
 
+typedef void (*cv_render_base_fn)(const uint8_t *bleed_y,
+                                  const uint8_t *bleed_uv,
+                                  uint8_t src_y,
+                                  uint8_t src_u,
+                                  uint8_t src_v,
+                                  int *base_y,
+                                  uint8_t *base_u,
+                                  uint8_t *base_v);
+
+static inline void cv_render_base_pure(const uint8_t *bleed_y,
+                                       const uint8_t *bleed_uv,
+                                       uint8_t src_y,
+                                       uint8_t src_u,
+                                       uint8_t src_v,
+                                       int *base_y,
+                                       uint8_t *base_u,
+                                       uint8_t *base_v)
+{
+    (void) bleed_y;
+    (void) bleed_uv;
+    (void) src_y;
+    (void) src_u;
+    (void) src_v;
+
+    *base_y = 0;
+    *base_u = 128;
+    *base_v = 128;
+}
+
+static inline void cv_render_base_bleed(const uint8_t *bleed_y,
+                                        const uint8_t *bleed_uv,
+                                        uint8_t src_y,
+                                        uint8_t src_u,
+                                        uint8_t src_v,
+                                        int *base_y,
+                                        uint8_t *base_u,
+                                        uint8_t *base_v)
+{
+    *base_y = bleed_y[src_y];
+    *base_u = bleed_uv[src_u];
+    *base_v = bleed_uv[src_v];
+}
+
 static inline int cv_param1000_to_u8(int v)
 {
     v = cv_clampi(v, 0, 1000);
@@ -100,6 +142,8 @@ static inline int cv_gain1000_to_q8(int v)
     v = cv_clampi(v, 0, 1000);
     return 64 + ((v * 384 + 500) / 1000);
 }
+
+
 
 vj_effect *chronovein_init(int w, int h)
 {
@@ -113,6 +157,16 @@ vj_effect *chronovein_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_THRESHOLD] = 0;
     ve->limits[1][P_THRESHOLD] = 1000;
@@ -146,6 +200,7 @@ vj_effect *chronovein_init(int w, int h)
     ve->limits[1][P_PULSE] = 1000;
     ve->defaults[P_PULSE] = 250;
 
+
     ve->limits[0][P_VEIN_GAIN] = 0;
     ve->limits[1][P_VEIN_GAIN] = 1000;
     ve->defaults[P_VEIN_GAIN] = 500;
@@ -173,28 +228,34 @@ vj_effect *chronovein_init(int w, int h)
         "Color Energy"
     );
     
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 190, 80, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 200, 1000, 86, 100, 0, 440, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 100, 940, 78, 100, 0, 500, 0, 2, 180, VJ_BEAT_COST_MODERATE, 92, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 420, 960, 62, 96, 80, 900, 0, 2, 240, VJ_BEAT_COST_MODERATE, 78, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 80, 1000, 84, 100, 0, 520, 0, 2, 180, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 300, 34, 74, 180, 1400, 0, 2, 320, VJ_BEAT_COST_MODERATE, 44, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 0, 820, 74, 100, 0, 700, 0, 4, 160, VJ_BEAT_COST_CHEAP, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 86, 100, 0, 430, 80, 2, 120, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 220, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
+    
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 190, 80, 100, 0, 340, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 200, 1000, 86, 100, 0, 440, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_MID_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 100, 940, 78, 100, 0, 500, 0, 2, 180, VJ_BEAT_COST_MODERATE, 92, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 420, 960, 62, 96, 80, 900, 0, 2, 240, VJ_BEAT_COST_MODERATE, 78, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 80, 1000, 84, 100, 0, 520, 0, 2, 180, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 300, 34, 74, 180, 1400, 0, 2, 320, VJ_BEAT_COST_MODERATE, 44, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SPEED, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 0, 820, 74, 100, 0, 700, 0, 4, 160, VJ_BEAT_COST_CHEAP, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 240, 1000, 86, 100, 0, 430, 80, 2, 120, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 220, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }
 
 void *chronovein_malloc(int w, int h)
 {
-    chronovein_t *c = (chronovein_t *) vj_calloc(sizeof(chronovein_t));
+    chronovein_t *c;
+
+    if(w <= 0 || h <= 0)
+        return NULL;
+
+    c = (chronovein_t *) vj_calloc(sizeof(chronovein_t));
     if(!c)
         return NULL;
 
@@ -309,7 +370,7 @@ static void cv_build_luts_if_needed(chronovein_t *c,
     if(denom < 1)
         denom = 1;
 
-    growth_scale = (growth * 320 + 127) / 255;
+    growth_scale = (growth * 320 + 127) / 255; /* 0..320 */
 
     conduct_power = (conductivity * decay + 127) / 255;
     branch_power  = (branch * decay + 127) / 255;
@@ -389,13 +450,316 @@ static inline int cv_source_edge_safe(uint8_t *restrict Y,
     return gx > gy ? gx : gy;
 }
 
+typedef void (*cv_safe_prop_fn)(chronovein_t *c,
+                                int x,
+                                int y,
+                                int pos,
+                                int *base,
+                                int *out_pol);
+
+typedef void (*cv_direct_prop_fn)(chronovein_t *c,
+                                  int x,
+                                  int y,
+                                  int pos,
+                                  int gx,
+                                  int gy,
+                                  int *base,
+                                  int *out_pol);
+
+static inline void cv_safe_apply_conduct(chronovein_t *c,
+                                         int x,
+                                         int y,
+                                         int pos,
+                                         int *base,
+                                         int *out_pol)
+{
+    const int w = c->w;
+    const int h = c->h;
+    uint8_t *restrict F = c->field;
+    uint8_t *restrict P = c->polarity;
+    int best_src = pos;
+    int best_v = F[pos];
+    int v;
+
+    if(x > 0) {
+        v = F[pos - 1];
+        if(v > best_v) {
+            best_v = v;
+            best_src = pos - 1;
+        }
+    }
+
+    if(x + 1 < w) {
+        v = F[pos + 1];
+        if(v > best_v) {
+            best_v = v;
+            best_src = pos + 1;
+        }
+    }
+
+    if(y > 0) {
+        v = F[pos - w];
+        if(v > best_v) {
+            best_v = v;
+            best_src = pos - w;
+        }
+    }
+
+    if(y + 1 < h) {
+        v = F[pos + w];
+        if(v > best_v) {
+            best_v = v;
+            best_src = pos + w;
+        }
+    }
+
+    v = c->conduct_lut[best_v];
+    if(v > *base) {
+        *base = v;
+        *out_pol = P[best_src];
+    }
+}
+
+static inline void cv_safe_apply_branch(chronovein_t *c,
+                                        int x,
+                                        int y,
+                                        int pos,
+                                        int *base,
+                                        int *out_pol)
+{
+    const int w = c->w;
+    const int h = c->h;
+    uint8_t *restrict F = c->field;
+    uint8_t *restrict P = c->polarity;
+    int best_src = pos;
+    int best_v = 0;
+    int flip = (x ^ y ^ (c->frame >> 1)) & 1;
+    int v;
+
+    if(flip) {
+        if(x > 0 && y > 0) {
+            v = F[pos - w - 1];
+            if(v > best_v) {
+                best_v = v;
+                best_src = pos - w - 1;
+            }
+        }
+
+        if(x + 1 < w && y + 1 < h) {
+            v = F[pos + w + 1];
+            if(v > best_v) {
+                best_v = v;
+                best_src = pos + w + 1;
+            }
+        }
+    }
+    else {
+        if(x + 1 < w && y > 0) {
+            v = F[pos - w + 1];
+            if(v > best_v) {
+                best_v = v;
+                best_src = pos - w + 1;
+            }
+        }
+
+        if(x > 0 && y + 1 < h) {
+            v = F[pos + w - 1];
+            if(v > best_v) {
+                best_v = v;
+                best_src = pos + w - 1;
+            }
+        }
+    }
+
+    v = c->branch_lut[best_v];
+    if(v > *base) {
+        *base = v;
+        *out_pol = P[best_src];
+    }
+}
+
+static inline void cv_safe_prop_none(chronovein_t *c,
+                                     int x,
+                                     int y,
+                                     int pos,
+                                     int *base,
+                                     int *out_pol)
+{
+    (void) c;
+    (void) x;
+    (void) y;
+    (void) pos;
+    (void) base;
+    (void) out_pol;
+}
+
+static inline void cv_safe_prop_conduct(chronovein_t *c,
+                                        int x,
+                                        int y,
+                                        int pos,
+                                        int *base,
+                                        int *out_pol)
+{
+    cv_safe_apply_conduct(c, x, y, pos, base, out_pol);
+}
+
+static inline void cv_safe_prop_branch(chronovein_t *c,
+                                       int x,
+                                       int y,
+                                       int pos,
+                                       int *base,
+                                       int *out_pol)
+{
+    cv_safe_apply_branch(c, x, y, pos, base, out_pol);
+}
+
+static inline void cv_safe_prop_both(chronovein_t *c,
+                                     int x,
+                                     int y,
+                                     int pos,
+                                     int *base,
+                                     int *out_pol)
+{
+    cv_safe_apply_conduct(c, x, y, pos, base, out_pol);
+    cv_safe_apply_branch(c, x, y, pos, base, out_pol);
+}
+
+static inline cv_safe_prop_fn cv_safe_prop_for_flags(int use_conduct, int use_branch)
+{
+    if(use_conduct)
+        return use_branch ? cv_safe_prop_both : cv_safe_prop_conduct;
+
+    return use_branch ? cv_safe_prop_branch : cv_safe_prop_none;
+}
+
+static inline void cv_direct_apply_conduct(chronovein_t *c,
+                                           int pos,
+                                           int gx,
+                                           int gy,
+                                           int *base,
+                                           int *out_pol)
+{
+    uint8_t *restrict F = c->field;
+    uint8_t *restrict P = c->polarity;
+    int src_a;
+    int src_b;
+    int src;
+    int v;
+
+    if(gx > gy) {
+        src_a = pos - c->w;
+        src_b = pos + c->w;
+    }
+    else {
+        src_a = pos - 1;
+        src_b = pos + 1;
+    }
+
+    src = F[src_a] > F[src_b] ? src_a : src_b;
+    v = c->conduct_lut[F[src]];
+
+    if(v > *base) {
+        *base = v;
+        *out_pol = P[src];
+    }
+}
+
+static inline void cv_direct_apply_branch(chronovein_t *c,
+                                          int x,
+                                          int y,
+                                          int pos,
+                                          int *base,
+                                          int *out_pol)
+{
+    uint8_t *restrict F = c->field;
+    uint8_t *restrict P = c->polarity;
+    const int frame_phase = c->frame >> 1;
+    const int flip = (x ^ y ^ frame_phase) & 1;
+    const int src_a = flip ? (pos - c->w - 1) : (pos - c->w + 1);
+    const int src_b = flip ? (pos + c->w + 1) : (pos + c->w - 1);
+    const int src = F[src_a] > F[src_b] ? src_a : src_b;
+    const int v = c->branch_lut[F[src]];
+
+    if(v > *base) {
+        *base = v;
+        *out_pol = P[src];
+    }
+}
+
+static inline void cv_direct_prop_none(chronovein_t *c,
+                                       int x,
+                                       int y,
+                                       int pos,
+                                       int gx,
+                                       int gy,
+                                       int *base,
+                                       int *out_pol)
+{
+    (void) c;
+    (void) x;
+    (void) y;
+    (void) pos;
+    (void) gx;
+    (void) gy;
+    (void) base;
+    (void) out_pol;
+}
+
+static inline void cv_direct_prop_conduct(chronovein_t *c,
+                                          int x,
+                                          int y,
+                                          int pos,
+                                          int gx,
+                                          int gy,
+                                          int *base,
+                                          int *out_pol)
+{
+    (void) x;
+    (void) y;
+    cv_direct_apply_conduct(c, pos, gx, gy, base, out_pol);
+}
+
+static inline void cv_direct_prop_branch(chronovein_t *c,
+                                         int x,
+                                         int y,
+                                         int pos,
+                                         int gx,
+                                         int gy,
+                                         int *base,
+                                         int *out_pol)
+{
+    (void) gx;
+    (void) gy;
+    cv_direct_apply_branch(c, x, y, pos, base, out_pol);
+}
+
+static inline void cv_direct_prop_both(chronovein_t *c,
+                                       int x,
+                                       int y,
+                                       int pos,
+                                       int gx,
+                                       int gy,
+                                       int *base,
+                                       int *out_pol)
+{
+    cv_direct_apply_conduct(c, pos, gx, gy, base, out_pol);
+    cv_direct_apply_branch(c, x, y, pos, base, out_pol);
+}
+
+static inline cv_direct_prop_fn cv_direct_prop_for_flags(int use_conduct, int use_branch)
+{
+    if(use_conduct)
+        return use_branch ? cv_direct_prop_both : cv_direct_prop_conduct;
+
+    return use_branch ? cv_direct_prop_branch : cv_direct_prop_none;
+}
+
 static inline void cv_compute_one_safe(chronovein_t *c,
                                        uint8_t *restrict Y,
                                        int x,
                                        int y,
                                        int pos,
-                                       int use_conduct,
-                                       int use_branch)
+                                       cv_safe_prop_fn prop_fn)
 {
     int w = c->w;
     int h = c->h;
@@ -418,97 +782,7 @@ static inline void cv_compute_one_safe(chronovein_t *c,
     int base = c->decay_lut[F[pos]];
     int out_pol = P[pos];
 
-    if(use_conduct) {
-        int best_src = pos;
-        int best_v = F[pos];
-        int v;
-
-        if(x > 0) {
-            v = F[pos - 1];
-            if(v > best_v) {
-                best_v = v;
-                best_src = pos - 1;
-            }
-        }
-
-        if(x + 1 < w) {
-            v = F[pos + 1];
-            if(v > best_v) {
-                best_v = v;
-                best_src = pos + 1;
-            }
-        }
-
-        if(y > 0) {
-            v = F[pos - w];
-            if(v > best_v) {
-                best_v = v;
-                best_src = pos - w;
-            }
-        }
-
-        if(y + 1 < h) {
-            v = F[pos + w];
-            if(v > best_v) {
-                best_v = v;
-                best_src = pos + w;
-            }
-        }
-
-        v = c->conduct_lut[best_v];
-        if(v > base) {
-            base = v;
-            out_pol = P[best_src];
-        }
-    }
-
-    if(use_branch) {
-        int best_src = pos;
-        int best_v = 0;
-        int flip = (x ^ y ^ (c->frame >> 1)) & 1;
-        int v;
-
-        if(flip) {
-            if(x > 0 && y > 0) {
-                v = F[pos - w - 1];
-                if(v > best_v) {
-                    best_v = v;
-                    best_src = pos - w - 1;
-                }
-            }
-
-            if(x + 1 < w && y + 1 < h) {
-                v = F[pos + w + 1];
-                if(v > best_v) {
-                    best_v = v;
-                    best_src = pos + w + 1;
-                }
-            }
-        }
-        else {
-            if(x + 1 < w && y > 0) {
-                v = F[pos - w + 1];
-                if(v > best_v) {
-                    best_v = v;
-                    best_src = pos - w + 1;
-                }
-            }
-
-            if(x > 0 && y + 1 < h) {
-                v = F[pos + w - 1];
-                if(v > best_v) {
-                    best_v = v;
-                    best_src = pos + w - 1;
-                }
-            }
-        }
-
-        v = c->branch_lut[best_v];
-        if(v > base) {
-            base = v;
-            out_pol = P[best_src];
-        }
-    }
+    prop_fn(c, x, y, pos, &base, &out_pol);
 
     if(event_strength > 0) {
         int edge = cv_source_edge_safe(Y, w, h, x, y, pos);
@@ -536,25 +810,27 @@ static inline void cv_compute_one_safe(chronovein_t *c,
 
 static void cv_compute_safe_border(chronovein_t *c,
                                    uint8_t *restrict Y,
-                                   int use_conduct,
-                                   int use_branch)
+                                   cv_safe_prop_fn prop_fn)
 {
     int w = c->w;
     int h = c->h;
     int y;
 
     if(h <= 2 || w <= 2) {
+#pragma omp for schedule(static)
         for(y = 0; y < h; y++) {
             int x;
             int pos = y * w;
 
             for(x = 0; x < w; x++, pos++) {
-                cv_compute_one_safe(c, Y, x, y, pos, use_conduct, use_branch);
+                cv_compute_one_safe(c, Y, x, y, pos, prop_fn);
             }
         }
+
         return;
     }
 
+#pragma omp for schedule(static)
     for(y = 0; y < h; y++) {
         int x;
 
@@ -562,15 +838,15 @@ static void cv_compute_safe_border(chronovein_t *c,
             int pos = y * w;
 
             for(x = 0; x < w; x++, pos++) {
-                cv_compute_one_safe(c, Y, x, y, pos, use_conduct, use_branch);
+                cv_compute_one_safe(c, Y, x, y, pos, prop_fn);
             }
         }
         else {
             int pos_l = y * w;
             int pos_r = y * w + (w - 1);
 
-            cv_compute_one_safe(c, Y, 0, y, pos_l, use_conduct, use_branch);
-            cv_compute_one_safe(c, Y, w - 1, y, pos_r, use_conduct, use_branch);
+            cv_compute_one_safe(c, Y, 0, y, pos_l, prop_fn);
+            cv_compute_one_safe(c, Y, w - 1, y, pos_r, prop_fn);
         }
     }
 }
@@ -590,21 +866,19 @@ static void cv_compute(chronovein_t *c,
 
     uint8_t *restrict EVENT = c->event_lut;
     uint8_t *restrict DECAY = c->decay_lut;
-    uint8_t *restrict CONDUCT = c->conduct_lut;
-    uint8_t *restrict BRANCH = c->branch_lut;
     uint8_t *restrict ADAPT = c->adapt_lut;
 
     int w = c->w;
     int h = c->h;
-    int frame_phase = c->frame >> 1;
+    const cv_safe_prop_fn safe_prop =
+        cv_safe_prop_for_flags(use_conduct, use_branch);
+    const cv_direct_prop_fn direct_prop =
+        cv_direct_prop_for_flags(use_conduct, use_branch);
 
     int y;
 
     if(w <= 2 || h <= 2) {
-        #pragma omp single
-        {
-            cv_compute_safe_border(c, Y, use_conduct, use_branch);
-        }
+        cv_compute_safe_border(c, Y, safe_prop);
         return;
     }
 
@@ -629,42 +903,7 @@ static void cv_compute(chronovein_t *c,
             int base = DECAY[F[pos]];
             int out_pol = P[pos];
 
-            if(use_conduct) {
-                int src_a;
-                int src_b;
-                int src;
-                int v;
-
-                if(gx > gy) {
-                    src_a = pos - w;
-                    src_b = pos + w;
-                }
-                else {
-                    src_a = pos - 1;
-                    src_b = pos + 1;
-                }
-
-                src = F[src_a] > F[src_b] ? src_a : src_b;
-                v = CONDUCT[F[src]];
-
-                if(v > base) {
-                    base = v;
-                    out_pol = P[src];
-                }
-            }
-
-            if(use_branch) {
-                int flip = (x ^ y ^ frame_phase) & 1;
-                int src_a = flip ? (pos - w - 1) : (pos - w + 1);
-                int src_b = flip ? (pos + w + 1) : (pos + w - 1);
-                int src = F[src_a] > F[src_b] ? src_a : src_b;
-                int v = BRANCH[F[src]];
-
-                if(v > base) {
-                    base = v;
-                    out_pol = P[src];
-                }
-            }
+            direct_prop(c, x, y, pos, gx, gy, &base, &out_pol);
 
             if(event_strength > 0) {
                 int edge = gx > gy ? gx : gy;
@@ -689,10 +928,7 @@ static void cv_compute(chronovein_t *c,
         }
     }
 
-    #pragma omp single
-    {
-        cv_compute_safe_border(c, Y, use_conduct, use_branch);
-    }
+    cv_compute_safe_border(c, Y, safe_prop);
 }
 
 static inline int cv_pulse_gain(chronovein_t *c, int pulse)
@@ -732,6 +968,8 @@ static void cv_render_const(chronovein_t *c,
 
     int len = c->len;
     int i;
+    const cv_render_base_fn base_fn =
+        (source_bleed > 0) ? cv_render_base_bleed : cv_render_base_pure;
 
 #pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
@@ -751,16 +989,8 @@ static void cv_render_const(chronovein_t *c,
 
         PREV[i] = src_y;
 
-        if(source_bleed > 0) {
-            base_y = BLEEDY[src_y];
-            base_u = BLEEDUV[U[i]];
-            base_v = BLEEDUV[V[i]];
-        }
-        else {
-            base_y = 0;
-            base_u = 128;
-            base_v = 128;
-        }
+        base_fn(BLEEDY, BLEEDUV, src_y, U[i], V[i],
+                &base_y, &base_u, &base_v);
 
         if(ev <= 0) {
             Y[i] = (uint8_t) base_y;
@@ -804,6 +1034,8 @@ static void cv_render_source(chronovein_t *c,
 
     int len = c->len;
     int i;
+    const cv_render_base_fn base_fn =
+        (source_bleed > 0) ? cv_render_base_bleed : cv_render_base_pure;
 
 #pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
@@ -825,16 +1057,8 @@ static void cv_render_source(chronovein_t *c,
 
         PREV[i] = src_y;
 
-        if(source_bleed > 0) {
-            base_y = BLEEDY[src_y];
-            base_u = BLEEDUV[src_u];
-            base_v = BLEEDUV[src_v];
-        }
-        else {
-            base_y = 0;
-            base_u = 128;
-            base_v = 128;
-        }
+        base_fn(BLEEDY, BLEEDUV, src_y, src_u, src_v,
+                &base_y, &base_u, &base_v);
 
         if(ev <= 0) {
             Y[i] = (uint8_t) base_y;
@@ -876,6 +1100,8 @@ static void cv_render_white(chronovein_t *c,
 
     int len = c->len;
     int i;
+    const cv_render_base_fn base_fn =
+        (source_bleed > 0) ? cv_render_base_bleed : cv_render_base_pure;
 
 #pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
@@ -890,16 +1116,8 @@ static void cv_render_white(chronovein_t *c,
 
         PREV[i] = src_y;
 
-        if(source_bleed > 0) {
-            base_y = BLEEDY[src_y];
-            base_u = BLEEDUV[U[i]];
-            base_v = BLEEDUV[V[i]];
-        }
-        else {
-            base_y = 0;
-            base_u = 128;
-            base_v = 128;
-        }
+        base_fn(BLEEDY, BLEEDUV, src_y, U[i], V[i],
+                &base_y, &base_u, &base_v);
 
         ev = (ev * pulse_gain + 128) >> 8;
         ev = ev > 255 ? 255 : ev;
@@ -969,32 +1187,39 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronovein_t *c = (chronovein_t *) ptr;
 
-    int threshold    = cv_param1000_to_u8(args[P_THRESHOLD]);
-    int growth       = cv_param1000_to_u8(args[P_GROWTH]);
-    int conductivity = cv_param1000_to_u8(args[P_CONDUCTIVITY]);
-    int decay        = cv_param1000_to_u8(args[P_DECAY]);
-    int branch       = cv_param1000_to_u8(args[P_BRANCH]);
-    int source_bleed = cv_param1000_to_u8(args[P_SOURCE_BLEED]);
-    int color_mode   = cv_clampi(args[P_COLOR_MODE], 0, 4);
-    int pulse        = cv_param1000_to_u8(args[P_PULSE]);
-    int vein_gain    = cv_clampi(args[P_VEIN_GAIN], 0, 1000);
-    int color_energy = cv_clampi(args[P_COLOR_ENERGY], 0, 1000);
+    int threshold;
+    int growth;
+    int conductivity;
+    int decay;
+    int branch;
+    int source_bleed;
+    int color_mode;
+    int pulse;
+    int vein_gain;
+    int color_energy;
 
-    int growth_scale = (growth * 320 + 127) / 255;
-    int conduct_power = (conductivity * decay + 127) / 255;
-    int branch_power  = (branch * decay + 127) / 255;
-
-    conduct_power = (conduct_power * growth_scale + 128) >> 8;
-    branch_power  = (branch_power  * growth_scale + 128) >> 8;
-
-    int use_conduct = (conduct_power > 0);
-    int use_branch  = (branch_power > 0);
+    int use_conduct;
+    int use_branch;
 
     #pragma omp single
     {
         if(!c->seeded)
             cv_seed(c, frame);
+    }
 
+    threshold    = cv_param1000_to_u8(args[P_THRESHOLD]);
+    growth       = cv_param1000_to_u8(args[P_GROWTH]);
+    conductivity = cv_param1000_to_u8(args[P_CONDUCTIVITY]);
+    decay        = cv_param1000_to_u8(args[P_DECAY]);
+    branch       = cv_param1000_to_u8(args[P_BRANCH]);
+    source_bleed = cv_param1000_to_u8(args[P_SOURCE_BLEED]);
+    color_mode   = cv_clampi(args[P_COLOR_MODE], 0, 4);
+    pulse        = cv_param1000_to_u8(args[P_PULSE]);
+    vein_gain    = cv_clampi(args[P_VEIN_GAIN], 0, 1000);
+    color_energy = cv_clampi(args[P_COLOR_ENERGY], 0, 1000);
+
+    #pragma omp single
+    {
         cv_build_luts_if_needed(
             c,
             threshold,
@@ -1005,10 +1230,22 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
             source_bleed
         );
     }
-    
+
+    {
+        int growth_scale = (growth * 320 + 127) / 255;
+        int conduct_power = (conductivity * decay + 127) / 255;
+        int branch_power  = (branch * decay + 127) / 255;
+
+        conduct_power = (conduct_power * growth_scale + 128) >> 8;
+        branch_power  = (branch_power  * growth_scale + 128) >> 8;
+
+        use_conduct = (conduct_power > 0);
+        use_branch  = (branch_power > 0);
+    }
+
     cv_compute(c, frame, use_conduct, use_branch);
 
-    #pragma omp single
+#pragma omp single
     {
         cv_swap_fields(c);
     }
@@ -1023,7 +1260,7 @@ void chronovein_apply(void *ptr, VJFrame *frame, int *args)
         color_energy
     );
 
-    #pragma omp single
+#pragma omp single
     {
         c->frame++;
     }

@@ -32,6 +32,7 @@
 typedef struct {
     int wipe_pos;
     int direction;
+    int n_threads;
 
     float speed_state;
     float expand_state;
@@ -56,6 +57,10 @@ static inline uint8_t transline_u8_add(uint8_t v, int add)
     return (uint8_t)((r < 0) ? 0 : (r > 255 ? 255 : r));
 }
 
+
+
+
+
 vj_effect *transline_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -67,6 +72,14 @@ vj_effect *transline_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     int max_speed = (width > height) ? width : height;
 
@@ -129,6 +142,8 @@ void *transline_malloc(int w, int h)
     wipe->glow_state = 0.0f;
     wipe->state_ready = 0;
 
+    wipe->n_threads = vje_advise_num_threads(w * h);
+
     return wipe;
 }
 
@@ -165,13 +180,15 @@ static void transline_apply_cross_glow(VJFrame *frame,
                                        int y0,
                                        int y1,
                                        int glow_width,
-                                       int glow_strength)
+                                       int glow_strength,
+                                       int n_threads)
 {
     const int width = frame->width;
     const int height = frame->height;
 
     uint8_t *restrict Y = frame->data[0];
 
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -230,6 +247,7 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int width = frame->width;
     const int height = frame->height;
+
     const int max_speed = (width > height) ? width : height;
     const int speed_arg = transline_clampi(args[P_SPEED], 0, max_speed);
     const int bounce = args[P_BOUNCE] ? 1 : 0;
@@ -237,7 +255,12 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int edge_glow = args[P_EDGE_GLOW];
 
     const float fast = 0.28f;
+    float expand_t;
+    int speed;
+    const int max_pos = width;
 
+#pragma omp single
+    {
     if(!wipe->state_ready) {
         wipe->speed_state = (float)speed_arg;
         wipe->expand_state = (float)expand_drive;
@@ -249,12 +272,14 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         wipe->glow_state += ((float)edge_glow - wipe->glow_state) * (fast * 0.72f);
     }
 
-    const float expand_t = wipe->expand_state * 0.001f;
+    expand_t = wipe->expand_state * 0.001f;
 
-    const int speed = transline_clampi((int)(wipe->speed_state + 0.5f) + (int)(expand_t * (float)(max_speed / 8) + 0.5f), 0, max_speed);
+    speed = transline_clampi((int)(wipe->speed_state + 0.5f) + (int)(expand_t * (float)(max_speed / 8) + 0.5f), 0, max_speed);
 
-    int max_pos = width;
     transline_step(wipe, speed, bounce, max_pos);
+    }
+
+    expand_t = wipe->expand_state * 0.001f;
 
     const int center_x = width >> 1;
     const int center_y = height >> 1;
@@ -281,15 +306,7 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     y0 = transline_clampi(y0, 0, height - 1);
     y1 = transline_clampi(y1, 0, height - 1);
 
-    int glow_width = 0;
-    int glow_strength = 0;
-
-    if(wipe->glow_state > 0.5f || expand_drive > 0) {
-        glow_width = 1 + (int)(wipe->glow_state * 0.012f + expand_t * 7.0f + 0.5f);
-        glow_strength = (int)(wipe->glow_state * 0.150f + expand_t * 42.0f + 0.5f);
-        glow_strength = transline_clampi(glow_strength, 0, 210);
-    }
-
+#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int row = y * width;
 
@@ -307,7 +324,11 @@ void transline_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         }
     }
 
-    if(glow_width > 0) {
-        transline_apply_cross_glow(frame, x0, x1, y0, y1, glow_width, glow_strength);
+    if(wipe->glow_state > 0.5f || expand_drive > 0) {
+        const int glow_width = 1 + (int)(wipe->glow_state * 0.012f + expand_t * 7.0f + 0.5f);
+        int glow_strength = (int)(wipe->glow_state * 0.150f + expand_t * 42.0f + 0.5f);
+
+        glow_strength = transline_clampi(glow_strength, 0, 210);
+        transline_apply_cross_glow(frame, x0, x1, y0, y1, glow_width, glow_strength, wipe->n_threads);
     }
 }

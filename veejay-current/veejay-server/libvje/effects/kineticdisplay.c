@@ -58,7 +58,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int frame;
     int seeded;
     int last_reset;
@@ -153,6 +152,16 @@ vj_effect *kineticdisplay_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_AMOUNT] = 0;      ve->limits[1][P_AMOUNT] = 100;       ve->defaults[P_AMOUNT] = 100;
     ve->limits[0][P_CELL_SIZE] = 4;   ve->limits[1][P_CELL_SIZE] = 64;     ve->defaults[P_CELL_SIZE] = 12;
@@ -339,6 +348,66 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
     }
 }
 
+typedef int (*kd_target_fn)(int cyy, int dthr, int motion);
+typedef int (*kd_delay_fn)(int cx, int cy, int frame, int lag, int motion, uint8_t rnd);
+
+static int kd_target_threshold(int cyy, int dthr, int motion)
+{
+    (void)motion;
+    return cyy > dthr ? cyy : 0;
+}
+
+static int kd_target_punch_card(int cyy, int dthr, int motion)
+{
+    (void)motion;
+    return cyy > dthr ? 255 : 0;
+}
+
+static int kd_target_dot_matrix(int cyy, int dthr, int motion)
+{
+    (void)dthr;
+    (void)motion;
+    return cyy;
+}
+
+static int kd_target_relay_lamps(int cyy, int dthr, int motion)
+{
+    return cyy > dthr ? kd_clampi(cyy + motion / 2, 0, 255) : 0;
+}
+
+static int kd_delay_none(int cx, int cy, int frame, int lag, int motion, uint8_t rnd)
+{
+    (void)cx;
+    (void)cy;
+    (void)frame;
+    (void)lag;
+    (void)motion;
+    (void)rnd;
+    return 0;
+}
+
+static int kd_delay_wave(int cx, int cy, int frame, int lag, int motion, uint8_t rnd)
+{
+    (void)motion;
+    (void)rnd;
+    return ((cx * 5 + cy * 3 + frame) & 31) * lag / 150;
+}
+
+static int kd_delay_random(int cx, int cy, int frame, int lag, int motion, uint8_t rnd)
+{
+    (void)motion;
+    (void)rnd;
+    return (kd_hash_cell(cx, cy, frame >> 2) * lag) / 180;
+}
+
+static int kd_delay_airport(int cx, int cy, int frame, int lag, int motion, uint8_t rnd)
+{
+    (void)frame;
+    (void)motion;
+    (void)rnd;
+    return ((cy * 7 + cx) & 15) * lag / 180;
+}
+
 static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, const uint8_t *V,
                             int cell_size, int threshold, int dither, int speed, int lag,
                             int persistence, int contrast, int motion_react, int mode)
@@ -349,6 +418,38 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
     const int rows = k->rows;
     const int max_cols = k->max_cols;
     const int frame = k->frame;
+    kd_target_fn target_fn;
+    kd_delay_fn delay_fn;
+
+    switch(mode) {
+        case KD_MODE_PUNCH_CARD:
+            target_fn = kd_target_punch_card;
+            break;
+        case KD_MODE_DOT_MATRIX:
+            target_fn = kd_target_dot_matrix;
+            break;
+        case KD_MODE_RELAY_LAMPS:
+            target_fn = kd_target_relay_lamps;
+            break;
+        default:
+            target_fn = kd_target_threshold;
+            break;
+    }
+
+    switch(mode) {
+        case KD_MODE_WAVE_FLIP:
+            delay_fn = kd_delay_wave;
+            break;
+        case KD_MODE_RANDOM_CASCADE:
+            delay_fn = kd_delay_random;
+            break;
+        case KD_MODE_AIRPORT_BOARD:
+            delay_fn = kd_delay_airport;
+            break;
+        default:
+            delay_fn = kd_delay_none;
+            break;
+    }
 
 #pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
@@ -400,14 +501,7 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
 
             const int rnd = (int)k->cell_rand[idx] - 128;
             const int dthr = threshold + ((rnd * dither) / 100);
-            int target = (cyy > dthr) ? cyy : 0;
-
-            if(mode == KD_MODE_PUNCH_CARD)
-                target = (cyy > dthr) ? 255 : 0;
-            else if(mode == KD_MODE_DOT_MATRIX)
-                target = cyy;
-            else if(mode == KD_MODE_RELAY_LAMPS)
-                target = (cyy > dthr) ? kd_clampi(cyy + motion / 2, 0, 255) : 0;
+            int target = target_fn(cyy, dthr, motion);
 
             const int old_target = k->cell_target[idx];
 
@@ -417,13 +511,8 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
                 if(k->cell_delay[idx] == 0) {
                     int delay = (lag * (int)k->cell_rand[idx]) / 255;
                     delay += (lag * (255 - motion)) / 512;
-
-                    if(mode == KD_MODE_WAVE_FLIP)
-                        delay += ((cx * 5 + cy * 3 + frame) & 31) * lag / 150;
-                    else if(mode == KD_MODE_RANDOM_CASCADE)
-                        delay += (kd_hash_cell(cx, cy, frame >> 2) * lag) / 180;
-                    else if(mode == KD_MODE_AIRPORT_BOARD)
-                        delay += ((cy * 7 + cx) & 15) * lag / 180;
+                    delay += delay_fn(cx, cy, frame, lag, motion,
+                                      k->cell_rand[idx]);
 
                     if(delay > 255)
                         delay = 255;
@@ -470,20 +559,74 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
     }
 }
 
-static inline void kd_write_pixel(uint8_t *Y, uint8_t *U, uint8_t *V, int p,
+typedef void (*kd_write_pixel_fn)(uint8_t *Y, uint8_t *U, uint8_t *V, int p,
                                   int src_y, int src_u, int src_v,
-                                  int fx_y, int fx_u, int fx_v, int amount_q)
-{
-    if(amount_q >= 256) {
-        Y[p] = kd_clip_u8(fx_y);
-        U[p] = kd_clip_u8(fx_u);
-        V[p] = kd_clip_u8(fx_v);
-        return;
-    }
+                                  int fx_y, int fx_u, int fx_v, int amount_q);
 
+static void kd_write_pixel_full(uint8_t *Y, uint8_t *U, uint8_t *V, int p,
+                                int src_y, int src_u, int src_v,
+                                int fx_y, int fx_u, int fx_v, int amount_q)
+{
+    (void)src_y;
+    (void)src_u;
+    (void)src_v;
+    (void)amount_q;
+
+    Y[p] = kd_clip_u8(fx_y);
+    U[p] = kd_clip_u8(fx_u);
+    V[p] = kd_clip_u8(fx_v);
+}
+
+static void kd_write_pixel_blend(uint8_t *Y, uint8_t *U, uint8_t *V, int p,
+                                 int src_y, int src_u, int src_v,
+                                 int fx_y, int fx_u, int fx_v, int amount_q)
+{
     Y[p] = kd_clip_u8(kd_blend_q8(src_y, fx_y, amount_q));
     U[p] = kd_clip_u8(kd_blend_q8(src_u, fx_u, amount_q));
     V[p] = kd_clip_u8(kd_blend_q8(src_v, fx_v, amount_q));
+}
+
+typedef void (*kd_lit_adjust_fn)(int *lit, int *fx_u, int *fx_v, int phase,
+                                 int cx, int cy, int frame_no, int rnd, int dead);
+
+static void kd_lit_adjust_none(int *lit, int *fx_u, int *fx_v, int phase,
+                               int cx, int cy, int frame_no, int rnd, int dead)
+{
+    (void)lit;
+    (void)fx_u;
+    (void)fx_v;
+    (void)phase;
+    (void)cx;
+    (void)cy;
+    (void)frame_no;
+    (void)rnd;
+    (void)dead;
+}
+
+static void kd_lit_adjust_random(int *lit, int *fx_u, int *fx_v, int phase,
+                                 int cx, int cy, int frame_no, int rnd, int dead)
+{
+    (void)fx_u;
+    (void)fx_v;
+    (void)rnd;
+    (void)dead;
+    *lit += ((kd_hash_cell(cx, cy, frame_no) & 31) * phase) >> 8;
+}
+
+static void kd_lit_adjust_broken(int *lit, int *fx_u, int *fx_v, int phase,
+                                 int cx, int cy, int frame_no, int rnd, int dead)
+{
+    (void)phase;
+    (void)cx;
+    (void)cy;
+    (void)frame_no;
+    (void)rnd;
+
+    if(dead > 230) {
+        *lit = (*lit * 18) >> 8;
+        *fx_u = 128;
+        *fx_v = 128;
+    }
 }
 
 static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amount, int brightness, int mode)
@@ -499,6 +642,12 @@ static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amo
     const int max_cols = k->max_cols;
     const int amount_q = (amount * 256 + 50) / 100;
     const int frame_no = k->frame;
+    const kd_write_pixel_fn write_pixel =
+        amount_q >= 256 ? kd_write_pixel_full : kd_write_pixel_blend;
+    const kd_lit_adjust_fn lit_adjust =
+        mode == KD_MODE_RANDOM_CASCADE ? kd_lit_adjust_random : kd_lit_adjust_none;
+    const kd_lit_adjust_fn broken_adjust =
+        mode == KD_MODE_BROKEN_SIGN ? kd_lit_adjust_broken : kd_lit_adjust_none;
 
 #pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
@@ -520,21 +669,13 @@ static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amo
             const int motion = k->cell_motion[idx];
 
             int lit = (value * brightness) / 100;
-
-            if(mode == KD_MODE_RANDOM_CASCADE)
-                lit += ((kd_hash_cell(cx, cy, frame_no) & 31) * phase) >> 8;
-
-            lit = kd_clampi(lit, 0, 255);
-
             int fx_u_lit = 128 + ((value * (avg_u - 128)) >> 8);
             int fx_v_lit = 128 + ((value * (avg_v - 128)) >> 8);
             const int dark = 4 + ((rnd & 15) * 3) / 2;
 
-            if(mode == KD_MODE_BROKEN_SIGN && dead > 230) {
-                lit = (lit * 18) >> 8;
-                fx_u_lit = 128;
-                fx_v_lit = 128;
-            }
+            lit_adjust(&lit, &fx_u_lit, &fx_v_lit, phase, cx, cy, frame_no, rnd, dead);
+            lit = kd_clampi(lit, 0, 255);
+            broken_adjust(&lit, &fx_u_lit, &fx_v_lit, phase, cx, cy, frame_no, rnd, dead);
 
             const int cx2 = cw - 1;
             const int cy2 = ch - 1;
@@ -772,7 +913,7 @@ static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amo
                         }
                     }
 
-                    kd_write_pixel(Y, U, V, p, sy, su, sv, fy, fu, fv, amount_q);
+                    write_pixel(Y, U, V, p, sy, su, sv, fy, fu, fv, amount_q);
                 }
             }
         }
@@ -787,60 +928,56 @@ void kineticdisplay_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *U = frame->data[1];
     uint8_t *V = frame->data[2];
 
-    int amount = args[P_AMOUNT];
-    int cell_size = args[P_CELL_SIZE];
-    int threshold = args[P_THRESHOLD];
-    int dither = args[P_DITHER];
-    int speed = args[P_FLIP_SPEED];
-    int lag = args[P_LAG];
-    int persistence = args[P_PERSIST];
-    int brightness = args[P_BRIGHTNESS];
-    int contrast = args[P_CONTRAST];
-    int mode = args[P_MODE];
-    int motion_react = args[P_MOTION];
-    int reset = args[P_RESET];
+    const int amount = args[P_AMOUNT];
+    const int cell_size = args[P_CELL_SIZE];
+    const int threshold = args[P_THRESHOLD];
+    const int dither = args[P_DITHER];
+    const int speed = args[P_FLIP_SPEED];
+    const int lag = args[P_LAG];
+    const int persistence = args[P_PERSIST];
+    const int brightness = args[P_BRIGHTNESS];
+    const int contrast = args[P_CONTRAST];
+    const int mode = args[P_MODE];
+    const int motion_react = args[P_MOTION];
+    const int reset = args[P_RESET];
 
-    int do_reconfigure = (cell_size != k->last_cell_size);
-    int do_seed = (!k->seeded || (reset && !k->last_reset)) || do_reconfigure;
-
-    #pragma omp single
+#pragma omp single
     {
-        if(do_reconfigure) {
+        if(cell_size != k->last_cell_size) {
             kd_configure_grid(k, cell_size);
             kd_clear_cells(k);
             k->seeded = 0;
         }
-        k->last_reset = reset;
     }
-    
+
+    const int do_seed = !k->seeded || (reset && !k->last_reset);
+#pragma omp single
+    k->last_reset = reset;
+
     if(do_seed) {
         kd_seed_cells(k, Y, U, V, cell_size);
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < k->len; i++)
-            k->prev_y[i] = Y[i];
+#pragma omp single
+        veejay_memcpy(k->prev_y, Y, k->len);
     }
 
     if(amount > 0) {
         kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode);
 
-        #pragma omp for schedule(static)
-        for(int i = 0; i < k->len; i++)
-            k->prev_y[i] = Y[i];
+#pragma omp single
+        veejay_memcpy(k->prev_y, Y, k->len);
 
         kd_render_cells(k, frame, cell_size, amount, brightness, mode);
     }
     else {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < k->len; i++)
-            k->prev_y[i] = Y[i];
+#pragma omp single
+        veejay_memcpy(k->prev_y, Y, k->len);
     }
 
-    #pragma omp single
+#pragma omp single
     {
         if(do_seed)
             k->seeded = 1;
-
         k->frame++;
     }
 }

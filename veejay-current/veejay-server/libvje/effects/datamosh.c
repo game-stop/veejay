@@ -48,7 +48,6 @@ typedef struct {
     int w;
     int h;
     int len;
-    int n_threads;
     int frame;
     int initialized;
     int hist_head;
@@ -242,6 +241,178 @@ static inline int dm_block_sad(const uint8_t * restrict cur,
         : dm_block_sad_clamped(cur, prev, w, h, x0, y0, x1, y1, dx, dy, step, samples);
 }
 
+typedef struct {
+    int flow_q;
+    int flow_norm_q;
+    int half_w;
+    int half_h;
+} dm_flow_params_t;
+
+typedef void (*dm_flow_fn)(const dm_flow_params_t *params,
+                           int x0,
+                           int y0,
+                           int x1,
+                           int y1,
+                           int *target_x,
+                           int *target_y);
+
+static inline void dm_flow_none(const dm_flow_params_t *params,
+                                int x0,
+                                int y0,
+                                int x1,
+                                int y1,
+                                int *target_x,
+                                int *target_y)
+{
+    (void) params;
+    (void) x0;
+    (void) y0;
+    (void) x1;
+    (void) y1;
+    (void) target_x;
+    (void) target_y;
+}
+
+static inline void dm_flow_left(const dm_flow_params_t *params,
+                                int x0,
+                                int y0,
+                                int x1,
+                                int y1,
+                                int *target_x,
+                                int *target_y)
+{
+    (void) x0;
+    (void) y0;
+    (void) x1;
+    (void) y1;
+    (void) target_y;
+    *target_x -= params->flow_q;
+}
+
+static inline void dm_flow_right(const dm_flow_params_t *params,
+                                 int x0,
+                                 int y0,
+                                 int x1,
+                                 int y1,
+                                 int *target_x,
+                                 int *target_y)
+{
+    (void) x0;
+    (void) y0;
+    (void) x1;
+    (void) y1;
+    (void) target_y;
+    *target_x += params->flow_q;
+}
+
+static inline void dm_flow_up(const dm_flow_params_t *params,
+                              int x0,
+                              int y0,
+                              int x1,
+                              int y1,
+                              int *target_x,
+                              int *target_y)
+{
+    (void) x0;
+    (void) y0;
+    (void) x1;
+    (void) y1;
+    (void) target_x;
+    *target_y -= params->flow_q;
+}
+
+static inline void dm_flow_down(const dm_flow_params_t *params,
+                                int x0,
+                                int y0,
+                                int x1,
+                                int y1,
+                                int *target_x,
+                                int *target_y)
+{
+    (void) x0;
+    (void) y0;
+    (void) x1;
+    (void) y1;
+    (void) target_x;
+    *target_y += params->flow_q;
+}
+
+static inline void dm_flow_radial_out(const dm_flow_params_t *params,
+                                      int x0,
+                                      int y0,
+                                      int x1,
+                                      int y1,
+                                      int *target_x,
+                                      int *target_y)
+{
+    const int cx = x0 + ((x1 - x0) >> 1);
+    const int cy = y0 + ((y1 - y0) >> 1);
+    const int rx = cx - params->half_w;
+    const int ry = cy - params->half_h;
+
+    *target_x += (rx * params->flow_norm_q) >> 8;
+    *target_y += (ry * params->flow_norm_q) >> 8;
+}
+
+static inline void dm_flow_radial_in(const dm_flow_params_t *params,
+                                     int x0,
+                                     int y0,
+                                     int x1,
+                                     int y1,
+                                     int *target_x,
+                                     int *target_y)
+{
+    const int cx = x0 + ((x1 - x0) >> 1);
+    const int cy = y0 + ((y1 - y0) >> 1);
+    const int rx = cx - params->half_w;
+    const int ry = cy - params->half_h;
+
+    *target_x -= (rx * params->flow_norm_q) >> 8;
+    *target_y -= (ry * params->flow_norm_q) >> 8;
+}
+
+static inline void dm_flow_rotate(const dm_flow_params_t *params,
+                                  int x0,
+                                  int y0,
+                                  int x1,
+                                  int y1,
+                                  int *target_x,
+                                  int *target_y)
+{
+    const int cx = x0 + ((x1 - x0) >> 1);
+    const int cy = y0 + ((y1 - y0) >> 1);
+    const int rx = cx - params->half_w;
+    const int ry = cy - params->half_h;
+
+    *target_x += (-ry * params->flow_norm_q) >> 8;
+    *target_y += (rx * params->flow_norm_q) >> 8;
+}
+
+static inline dm_flow_fn dm_flow_for_mode(int flow_mode, int flow_active)
+{
+    if (!flow_active)
+        return dm_flow_none;
+
+    switch (flow_mode) {
+        case 1:
+            return dm_flow_left;
+        case 2:
+            return dm_flow_right;
+        case 3:
+            return dm_flow_up;
+        case 4:
+            return dm_flow_down;
+        case 5:
+            return dm_flow_radial_out;
+        case 6:
+            return dm_flow_radial_in;
+        case 7:
+            return dm_flow_rotate;
+        default:
+            return dm_flow_none;
+    }
+}
+
 static void dm_clear_fields(datamosh_t *d)
 {
     veejay_memset(d->field_x, 0, (size_t) d->max_blocks * sizeof(int16_t));
@@ -253,23 +424,31 @@ static void dm_fill_history(datamosh_t *d, const uint8_t *src_y, const uint8_t *
 {
     const size_t len = (size_t) d->len;
 
+    const uint8_t *restrict src[3] = { src_y, src_u, src_v };
     for (int i = 0; i < DM_HISTORY_MAX; i++) {
-        veejay_memcpy(d->hist[0] + (size_t) i * len, src_y, len);
-        veejay_memcpy(d->hist[1] + (size_t) i * len, src_u, len);
-        veejay_memcpy(d->hist[2] + (size_t) i * len, src_v, len);
+#pragma omp for schedule(static)
+        for (int plane = 0; plane < 3; plane++) {
+            uint8_t *dst[3] = {
+                d->hist[0] + (size_t) i * len,
+                d->hist[1] + (size_t) i * len,
+                d->hist[2] + (size_t) i * len
+            };
+            veejay_memcpy(dst[plane], src[plane], len);
+        }
     }
 
-    for (int p = 0; p < 2; p++) {
-        veejay_memcpy(d->canvas[p][0], src_y, len);
-        veejay_memcpy(d->canvas[p][1], src_u, len);
-        veejay_memcpy(d->canvas[p][2], src_v, len);
-    }
+#pragma omp for schedule(static)
+    for (int copy = 0; copy < 6; copy++)
+        veejay_memcpy(d->canvas[copy / 3][copy % 3], src[copy % 3], len);
 
+#pragma omp single
+    {
     dm_clear_fields(d);
 
     d->hist_head = 0;
     d->canvas_ping = 0;
     d->initialized = 1;
+    }
 }
 
 static void dm_push_history(datamosh_t *d,
@@ -282,17 +461,22 @@ static void dm_push_history(datamosh_t *d,
 {
     const size_t len = (size_t) d->len;
 
-    d->hist_head++;
-    if (d->hist_head >= DM_HISTORY_MAX)
-        d->hist_head = 0;
+ #pragma omp single
+    {
+        d->hist_head++;
+        if (d->hist_head >= DM_HISTORY_MAX)
+            d->hist_head = 0;
+    }
 
     *cur_y = d->hist[0] + (size_t) d->hist_head * len;
     *cur_u = d->hist[1] + (size_t) d->hist_head * len;
     *cur_v = d->hist[2] + (size_t) d->hist_head * len;
 
-    veejay_memcpy(*cur_y, src_y, len);
-    veejay_memcpy(*cur_u, src_u, len);
-    veejay_memcpy(*cur_v, src_v, len);
+    uint8_t *restrict dst[3] = { *cur_y, *cur_u, *cur_v };
+    const uint8_t *restrict src[3] = { src_y, src_u, src_v };
+#pragma omp for schedule(static)
+    for (int plane = 0; plane < 3; plane++)
+        veejay_memcpy(dst[plane], src[plane], len);
 }
 
 vj_effect *datamosh_init(int w, int h)
@@ -480,7 +664,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
 
     const int w = frame->width;
     const int h = frame->height;
-    const int len = w * h;
+    const int len = w * h;;
 
     uint8_t * restrict frame_y = frame->data[0];
     uint8_t * restrict frame_u = frame->data[1];
@@ -488,6 +672,23 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const size_t llen = (size_t) len;
 
     const int reset = args[P_RESET] > 0;
+
+    if (!d->initialized) {
+        dm_fill_history(d, frame_y, frame_u, frame_v);
+#pragma omp single
+        {
+        d->last_reset = reset;
+        d->frame++;
+        }
+        return;
+    }
+
+    if (reset && !d->last_reset)
+        dm_fill_history(d, frame_y, frame_u, frame_v);
+
+#pragma omp single
+    d->last_reset = reset;
+
     const int strength = args[P_MOSH];
     const int history_depth = args[P_HISTORY];
     const int block = args[P_BLOCK];
@@ -499,55 +700,37 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int flow_strength = args[P_FLOW_AMT];
     const int source_opacity = args[P_SRC_OPAC];
 
-    #pragma omp single
-    {
-        if (!d->initialized) {
-            dm_fill_history(d, frame_y, frame_u, frame_v);
-            d->last_reset = reset;
-        } else if (reset && !d->last_reset) {
-            dm_fill_history(d, frame_y, frame_u, frame_v);
-        }
-        d->last_reset = reset;
-
-        if (block != d->last_block || flow_mode != d->last_flow) {
-            dm_clear_fields(d);
-            d->last_block = block;
-            d->last_flow = flow_mode;
-        }
-
-        uint8_t *dummy_y, *dummy_u, *dummy_v;
-        dm_push_history(d, frame_y, frame_u, frame_v, &dummy_y, &dummy_u, &dummy_v);
-    }
-    
-    if(strength <= 0) {
-        const uint8_t *cur[3] = {
-            d->hist[0] + (size_t)d->hist_head * llen,
-            d->hist[1] + (size_t)d->hist_head * llen,
-            d->hist[2] + (size_t)d->hist_head * llen
-        };
-
-        #pragma omp for schedule(static)
-        for(int plane = 0; plane < 3; plane++) {
-            veejay_memcpy(d->canvas[0][plane], cur[plane], llen);
-            veejay_memcpy(d->canvas[1][plane], cur[plane], llen);
-        }
-
-        #pragma omp single
+    if (block != d->last_block || flow_mode != d->last_flow) {
+#pragma omp single
         {
-            dm_clear_fields(d);
-            d->canvas_ping = 0;
-            d->frame++;
+        dm_clear_fields(d);
+        d->last_block = block;
+        d->last_flow = flow_mode;
         }
-
-        return;
     }
 
-    uint8_t * restrict cur_y = d->hist[0] + (size_t) d->hist_head * llen;
-    uint8_t * restrict cur_u = d->hist[1] + (size_t) d->hist_head * llen;
-    uint8_t * restrict cur_v = d->hist[2] + (size_t) d->hist_head * llen;
+    uint8_t *cur_y;
+    uint8_t *cur_u;
+    uint8_t *cur_v;
+    dm_push_history(d, frame_y, frame_u, frame_v, &cur_y, &cur_u, &cur_v);
 
     const int prev_slot = (d->hist_head > 0) ? (d->hist_head - 1) : (DM_HISTORY_MAX - 1);
     const uint8_t * restrict prev_y = d->hist[0] + (size_t) prev_slot * llen;
+
+    if (strength <= 0) {
+#pragma omp for schedule(static)
+        for (int copy = 0; copy < 6; copy++) {
+            const uint8_t *src[3] = { cur_y, cur_u, cur_v };
+            veejay_memcpy(d->canvas[copy / 3][copy % 3], src[copy % 3], llen);
+        }
+#pragma omp single
+        {
+        dm_clear_fields(d);
+        d->canvas_ping = 0;
+        d->frame++;
+        }
+        return;
+    }
 
     const int bw = (w + block - 1) / block;
     const int bh = (h + block - 1) / block;
@@ -562,7 +745,6 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int half_w = w >> 1;
     const int half_h = h >> 1;
     const int max_dim = (w > h) ? w : h;
-    
     const int cand_x[DM_CANDIDATES] = {
         0,
         -half_shift, half_shift, 0, 0, -half_shift, half_shift, -half_shift, half_shift,
@@ -577,6 +759,13 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int persist_q = dm_percent_to_q8(persist);
     const int source_opacity_q = dm_percent_to_q8(source_opacity);
     const int flow_norm_q = (max_dim > 0) ? ((flow_q * 2 * 256 + (max_dim >> 1)) / max_dim) : 0;
+    const dm_flow_params_t flow_params = {
+        flow_q,
+        flow_norm_q,
+        half_w,
+        half_h
+    };
+    const dm_flow_fn flow_fn = dm_flow_for_mode(flow_mode, flow_active);
 
     uint8_t back_lut[256];
     uint16_t hist_mix_q_lut[256];
@@ -611,7 +800,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int max_xfp_inner = ((w - 2) << DM_FP_SHIFT);
     const int max_yfp_inner = ((h - 2) << DM_FP_SHIFT);
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for (int bi = 0; bi < bw * bh; bi++) {
         const int by = bi / bw;
         const int bx = bi - by * bw;
@@ -678,33 +867,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         int target_x = best_dx * amp_q;
         int target_y = best_dy * amp_q;
 
-        if (flow_active) {
-            const int cx = x0 + ((x1 - x0) >> 1);
-            const int cy = y0 + ((y1 - y0) >> 1);
-            const int rx = cx - half_w;
-            const int ry = cy - half_h;
-
-            switch (flow_mode) {
-                case 1: target_x -= flow_q; break;
-                case 2: target_x += flow_q; break;
-                case 3: target_y -= flow_q; break;
-                case 4: target_y += flow_q; break;
-                case 5:
-                    target_x += (rx * flow_norm_q) >> 8;
-                    target_y += (ry * flow_norm_q) >> 8;
-                    break;
-                case 6:
-                    target_x -= (rx * flow_norm_q) >> 8;
-                    target_y -= (ry * flow_norm_q) >> 8;
-                    break;
-                case 7:
-                    target_x += (-ry * flow_norm_q) >> 8;
-                    target_y += ( rx * flow_norm_q) >> 8;
-                    break;
-                default:
-                    break;
-            }
-        }
+        flow_fn(&flow_params, x0, y0, x1, y1, &target_x, &target_y);
 
         int drive = act;
         drive = (flow_active && drive < flow_strength) ? flow_strength : drive;
@@ -856,7 +1019,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
+#pragma omp single
     {
         d->canvas_ping = write_ping;
         d->frame++;

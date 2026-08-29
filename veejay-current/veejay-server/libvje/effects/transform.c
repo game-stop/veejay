@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -61,6 +61,10 @@ static inline int transform_wrapi(int v, int max)
     return v;
 }
 
+
+
+
+
 vj_effect *transform_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -72,6 +76,14 @@ vj_effect *transform_init(int width, int height)
     ve->defaults  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     int max_size = height / 16;
     if(max_size < 1)
@@ -151,6 +163,7 @@ void *transform_malloc(int w, int h)
     t->phase_state = 0.0f;
     t->size_drive_state = 0.0f;
     t->drift_phase = 0.0f;
+
     t->n_threads = vje_advise_num_threads(len);
 
     return (void*) t;
@@ -159,8 +172,6 @@ void *transform_malloc(int w, int h)
 void transform_free(void *ptr)
 {
     transform_t *t = (transform_t*) ptr;
-    if(!t)
-        return;
 
     free(t->region);
     free(t);
@@ -207,63 +218,60 @@ void transform_apply(void *ptr, VJFrame *frame, int *args)
     const int drift_arg = args[P_DRIFT_SPEED];
     const int size_drive_arg = args[P_SIZE_DRIVE];
 
-    #pragma omp single
-    {
-        int base_size = transform_clampi(base_size_arg, 1, t->max_size);
+    const int base_size = transform_clampi(base_size_arg, 1, t->max_size);
 
-        if(t->size_state < 1.0f)
-            t->size_state = (float)base_size;
+    if(t->size_state < 1.0f)
+        t->size_state = (float)base_size;
 
-        const float size_coef = 0.142f;
-        const float phase_coef = 0.170f;
+    const float size_coef = 0.142f;
+    const float phase_coef = 0.170f;
 
-        t->size_drive_state += ((float)size_drive_arg - t->size_drive_state) * size_coef;
-        t->phase_state += ((float)phase_arg - t->phase_state) * phase_coef;
+    t->size_drive_state += ((float)size_drive_arg - t->size_drive_state) * size_coef;
+    t->phase_state += ((float)phase_arg - t->phase_state) * phase_coef;
 
-        float size_lane = transform_clampi((int)(t->size_drive_state + 0.5f), 0, 1000) * 0.001f;
-        float headroom = (float)(t->max_size - base_size);
+    const float size_lane = transform_clampi((int)(t->size_drive_state + 0.5f), 0, 1000) * 0.001f;
+    const float headroom = (float)(t->max_size - base_size);
 
-        float size_target = (float)base_size;
-        size_target += headroom * size_lane;
+    float size_target = (float)base_size;
+    size_target += headroom * size_lane;
 
-        if(size_target < 1.0f)
-            size_target = 1.0f;
-        else if(size_target > (float)t->max_size)
-            size_target = (float)t->max_size;
+    if(size_target < 1.0f)
+        size_target = 1.0f;
+    else if(size_target > (float)t->max_size)
+        size_target = (float)t->max_size;
 
-        t->size_state += (size_target - t->size_state) * size_coef;
+    t->size_state += (size_target - t->size_state) * size_coef;
 
-        int size = transform_clampi((int)(t->size_state + 0.5f), 1, t->max_size);
+    int size = transform_clampi((int)(t->size_state + 0.5f), 1, t->max_size);
 
-        float drift_step = (float)drift_arg * 0.020f;
+    const float drift_step = (float)drift_arg * 0.020f;
 
-        t->drift_phase += drift_step;
+    t->drift_phase += drift_step;
 
-        if(t->drift_phase > 1048576.0f)
-            t->drift_phase -= 1048576.0f;
-        else if(t->drift_phase < -1048576.0f)
-            t->drift_phase += 1048576.0f;
+    if(t->drift_phase > 1048576.0f)
+        t->drift_phase -= 1048576.0f;
+    else if(t->drift_phase < -1048576.0f)
+        t->drift_phase += 1048576.0f;
 
-        int manual_phase = (int)((t->phase_state * (float)(size * 2)) * 0.001f + 0.5f);
-        int drift_phase = (int)t->drift_phase;
-        int phase_x = manual_phase + drift_phase;
-        int phase_y = ((manual_phase * 3) >> 1) - ((drift_phase * 5) >> 2);
-
-        veejay_memcpy(t->buf[0], frame->data[0], len);
-        veejay_memcpy(t->buf[1], frame->data[1], len);
-        veejay_memcpy(t->buf[2], frame->data[2], len);
-
-        transform_build_map(t->xmap, width, size, phase_x);
-        transform_build_map(t->ymap, height, size, phase_y);
-    }
+    const int manual_phase = (int)((t->phase_state * (float)(size * 2)) * 0.001f + 0.5f);
+    const int drift_phase = (int)t->drift_phase;
+    const int phase_x = manual_phase + drift_phase;
+    const int phase_y = ((manual_phase * 3) >> 1) - ((drift_phase * 5) >> 2);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const uint8_t *restrict srcY  = t->buf[0];
-    const uint8_t *restrict srcCb = t->buf[1];
-    const uint8_t *restrict srcCr = t->buf[2];
+    uint8_t *restrict srcY  = t->buf[0];
+    uint8_t *restrict srcCb = t->buf[1];
+    uint8_t *restrict srcCr = t->buf[2];
+
+    veejay_memcpy(srcY,  Y,  len);
+    veejay_memcpy(srcCb, Cb, len);
+    veejay_memcpy(srcCr, Cr, len);
+
+    transform_build_map(t->xmap, width, size, phase_x);
+    transform_build_map(t->ymap, height, size, phase_y);
 
 #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {

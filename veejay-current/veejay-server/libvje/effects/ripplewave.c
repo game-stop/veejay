@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -52,13 +52,6 @@ typedef struct {
     float sm_phase;
     int have_smooth;
     int n_threads;
-    
-    float frequency_x;
-    float frequency_y;
-    float amplitude;
-    float render_phase;
-    int mix_q8;
-    int chroma_q8;
 } ripplewave_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -97,6 +90,17 @@ vj_effect *ripplewave_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_FREQ_X] = 0;   ve->limits[1][P_FREQ_X] = 100;  ve->defaults[P_FREQ_X] = 10;
     ve->limits[0][P_FREQ_Y] = 1;   ve->limits[1][P_FREQ_Y] = 100;  ve->defaults[P_FREQ_Y] = 15;
@@ -178,6 +182,7 @@ void *ripplewave_malloc(int w, int h)
     data->height = h;
     data->phase = 0.0f;
     data->have_smooth = 0;
+    data->n_threads = vje_advise_num_threads(len);
 
     return (void*)data;
 }
@@ -198,122 +203,116 @@ void ripplewave_apply(void *ptr, VJFrame *frame, int *args)
     const int height = frame->height;
     const int len = frame->len;
 
-    #pragma omp single
+    const int freq_x_arg = args[P_FREQ_X];
+    const int freq_y_arg = args[P_FREQ_Y];
+    const int amp_arg = args[P_AMP];
+    const int speed_arg = args[P_SPEED];
+    const int mix_arg = args[P_MIX];
+    const int chroma_arg = args[P_CHROMA];
+    const int phase_arg = args[P_PHASE];
+
+    const float param_k = 0.34f;
+
+#pragma omp single
     {
-        const int freq_x_arg = args[P_FREQ_X];
-        const int freq_y_arg = args[P_FREQ_Y];
-        const int amp_arg = args[P_AMP];
-        const int speed_arg = args[P_SPEED];
-        const int mix_arg = args[P_MIX];
-        const int chroma_arg = args[P_CHROMA];
-        const int phase_arg = args[P_PHASE];
-
-        const float param_k = 0.34f;
-
-        if(!data->have_smooth) {
-            data->sm_freq_x = (float)freq_x_arg;
-            data->sm_freq_y = (float)freq_y_arg;
-            data->sm_amp = (float)amp_arg;
-            data->sm_speed = (float)speed_arg;
-            data->sm_mix = (float)mix_arg;
-            data->sm_chroma = (float)chroma_arg;
-            data->sm_phase = (float)phase_arg;
-            data->have_smooth = 1;
-        }
-        else {
-            data->sm_freq_x = ripplewave_smooth_to(data->sm_freq_x, (float)freq_x_arg, param_k);
-            data->sm_freq_y = ripplewave_smooth_to(data->sm_freq_y, (float)freq_y_arg, param_k);
-            data->sm_amp = ripplewave_smooth_to(data->sm_amp, (float)amp_arg, param_k);
-            data->sm_speed = ripplewave_smooth_to(data->sm_speed, (float)speed_arg, param_k);
-            data->sm_mix = ripplewave_smooth_to(data->sm_mix, (float)mix_arg, param_k);
-            data->sm_chroma = ripplewave_smooth_to(data->sm_chroma, (float)chroma_arg, param_k);
-            data->sm_phase = ripplewave_smooth_to(data->sm_phase, (float)phase_arg, param_k);
-        }
-
-        data->frequency_x = data->sm_freq_x * 0.01f;
-        data->frequency_y = data->sm_freq_y * 0.01f;
-        data->amplitude = clampf(data->sm_amp, 0.0f, 45.0f);
-        const float speed = clampf(data->sm_speed, 0.0f, 100.0f);
-
-        if(speed > 0.0001f) {
-            data->phase += speed * 0.01f;
-
-            if(data->phase > 628.3185f)
-                data->phase -= 628.3185f;
-        }
-
-        const float phase_offset = data->sm_phase * 0.001f * RIPPLE_PI2;
-        data->render_phase = data->phase + phase_offset;
-
-        const int mix_q8 = ripplewave_q8_from_1000((int)(data->sm_mix + 0.5f));
-        const int chroma_amount = clampi((int)(data->sm_chroma + 0.5f), 0, 1000);
-        data->mix_q8 = mix_q8;
-        data->chroma_q8 = (mix_q8 * chroma_amount + 500) / 1000;
+    if(!data->have_smooth) {
+        data->sm_freq_x = (float)freq_x_arg;
+        data->sm_freq_y = (float)freq_y_arg;
+        data->sm_amp = (float)amp_arg;
+        data->sm_speed = (float)speed_arg;
+        data->sm_mix = (float)mix_arg;
+        data->sm_chroma = (float)chroma_arg;
+        data->sm_phase = (float)phase_arg;
+        data->have_smooth = 1;
+    }
+    else {
+        data->sm_freq_x = ripplewave_smooth_to(data->sm_freq_x, (float)freq_x_arg, param_k);
+        data->sm_freq_y = ripplewave_smooth_to(data->sm_freq_y, (float)freq_y_arg, param_k);
+        data->sm_amp = ripplewave_smooth_to(data->sm_amp, (float)amp_arg, param_k);
+        data->sm_speed = ripplewave_smooth_to(data->sm_speed, (float)speed_arg, param_k);
+        data->sm_mix = ripplewave_smooth_to(data->sm_mix, (float)mix_arg, param_k);
+        data->sm_chroma = ripplewave_smooth_to(data->sm_chroma, (float)chroma_arg, param_k);
+        data->sm_phase = ripplewave_smooth_to(data->sm_phase, (float)phase_arg, param_k);
     }
 
-    const float frequency_x = data->frequency_x;
-    const float frequency_y = data->frequency_y;
-    const float amplitude = data->amplitude;
-    const float render_phase = data->render_phase;
-    const int mix_q8 = data->mix_q8;
-    const int chroma_q8 = data->chroma_q8;
+    const float speed = clampf(data->sm_speed, 0.0f, 100.0f);
+    if(speed > 0.0001f) {
+        data->phase += speed * 0.01f;
+
+        if(data->phase > 628.3185f)
+            data->phase -= 628.3185f;
+    }
+    }
+
+    const float frequency_x = data->sm_freq_x * 0.01f;
+    const float frequency_y = data->sm_freq_y * 0.01f;
+    const float amplitude = clampf(data->sm_amp, 0.0f, 45.0f);
+    const float phase_offset = data->sm_phase * 0.001f * RIPPLE_PI2;
+    const float render_phase = data->phase + phase_offset;
+
+    const int mix_q8 = ripplewave_q8_from_1000((int)(data->sm_mix + 0.5f));
+    const int chroma_amount = clampi((int)(data->sm_chroma + 0.5f), 0, 1000);
+    const int chroma_q8 = (mix_q8 * chroma_amount + 500) / 1000;
 
     uint8_t *restrict Y = frame->data[0];
-    uint8_t *U = frame->data[1];
-    uint8_t *V = frame->data[2];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
 
-    uint8_t *dstY = data->buf[0];
-    uint8_t *dstU = data->buf[1];
-    uint8_t *dstV = data->buf[2];
+    uint8_t *restrict dstY = data->buf[0];
+    uint8_t *restrict dstU = data->buf[1];
+    uint8_t *restrict dstV = data->buf[2];
 
     float *restrict lut_x = data->lut_x;
-    float *lut_y = data->lut_y;
+    float *restrict lut_y = data->lut_y;
 
-    #pragma omp for schedule(static)
-    for(int y = 0; y < height; y++)
-        lut_y[y] = a_sin(frequency_y * (float)y + render_phase);
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++)
+            lut_y[y] = a_sin(frequency_y * (float)y + render_phase);
 
-    #pragma omp for schedule(static)
-    for(int x = 0; x < width; x++)
-        lut_x[x] = a_cos(frequency_x * (float)x + render_phase * 0.93f);
+#pragma omp for schedule(static)
+        for(int x = 0; x < width; x++)
+            lut_x[x] = a_cos(frequency_x * (float)x + render_phase * 0.93f);
 
-    #pragma omp for schedule(static)
-    for(int y = 0; y < height; y++) {
-        const int row = y * width;
-        const int offset_y = (int)(amplitude * lut_y[y]);
+#pragma omp for schedule(static)
+        for(int y = 0; y < height; y++) {
+            const int row = y * width;
+            const int offset_y = (int)(amplitude * lut_y[y]);
 
-        for(int x = 0; x < width; x++) {
-            const int offset_x = (int)(amplitude * lut_x[x]);
+            for(int x = 0; x < width; x++) {
+                const int offset_x = (int)(amplitude * lut_x[x]);
 
-            int sx = x + offset_x;
-            int sy = y + offset_y;
+                int sx = x + offset_x;
+                int sy = y + offset_y;
 
-            sx = clampi(sx, 0, width - 1);
-            sy = clampi(sy, 0, height - 1);
+                sx = clampi(sx, 0, width - 1);
+                sy = clampi(sy, 0, height - 1);
 
-            const int src = sy * width + sx;
-            const int dst = row + x;
+                const int src = sy * width + sx;
+                const int dst = row + x;
 
-            dstY[dst] = Y[src];
-            dstU[dst] = U[src];
-            dstV[dst] = V[src];
+                dstY[dst] = Y[src];
+                dstU[dst] = U[src];
+                dstV[dst] = V[src];
         }
-    }
+        }
 
-    if(mix_q8 >= 256 && chroma_q8 >= 256) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            Y[i] = dstY[i];
-            U[i] = dstU[i];
-            V[i] = dstV[i];
+        if(mix_q8 >= 256 && chroma_q8 >= 256) {
+#pragma omp for schedule(static)
+            for(int plane = 0; plane < 3; plane++) {
+                if(plane == 0)
+                    veejay_memcpy(Y, dstY, len);
+                else if(plane == 1)
+                    veejay_memcpy(U, dstU, len);
+                else
+                    veejay_memcpy(V, dstV, len);
+            }
         }
-    }
-    else if(mix_q8 > 0 || chroma_q8 > 0) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            Y[i] = ripplewave_mix_u8(Y[i], dstY[i], mix_q8);
-            U[i] = ripplewave_mix_u8(U[i], dstU[i], chroma_q8);
-            V[i] = ripplewave_mix_u8(V[i], dstV[i], chroma_q8);
-        }
+        else if(mix_q8 > 0 || chroma_q8 > 0) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                Y[i] = ripplewave_mix_u8(Y[i], dstY[i], mix_q8);
+                U[i] = ripplewave_mix_u8(U[i], dstU[i], chroma_q8);
+                V[i] = ripplewave_mix_u8(V[i], dstV[i], chroma_q8);
+            }
     }
 }

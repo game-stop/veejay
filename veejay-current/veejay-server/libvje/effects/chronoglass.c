@@ -17,7 +17,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
 #include "common.h"
 #include "chronoglass.h"
 
@@ -49,7 +48,6 @@ typedef struct {
     int len;
     int seeded;
     int frame;
-    int n_threads;
 
     uint8_t *prev_y;
     uint8_t *ref_y;
@@ -109,6 +107,78 @@ static inline uint8_t cs_blend_fast_u8(uint8_t a, uint8_t b, int amount)
     return (uint8_t) (((int) a * (256 - amount) + (int) b * amount) >> 8);
 }
 
+typedef void (*cs_render_base_fn)(const uint8_t *bleed_y,
+                                  const uint8_t *bleed_uv,
+                                  uint8_t src_y,
+                                  uint8_t src_u,
+                                  uint8_t src_v,
+                                  int *base_y,
+                                  uint8_t *base_u,
+                                  uint8_t *base_v);
+
+static inline void cs_render_base_pure(const uint8_t *bleed_y,
+                                       const uint8_t *bleed_uv,
+                                       uint8_t src_y,
+                                       uint8_t src_u,
+                                       uint8_t src_v,
+                                       int *base_y,
+                                       uint8_t *base_u,
+                                       uint8_t *base_v)
+{
+    (void) bleed_y;
+    (void) bleed_uv;
+    (void) src_y;
+    (void) src_u;
+    (void) src_v;
+
+    *base_y = 0;
+    *base_u = 128;
+    *base_v = 128;
+}
+
+static inline void cs_render_base_bleed(const uint8_t *bleed_y,
+                                        const uint8_t *bleed_uv,
+                                        uint8_t src_y,
+                                        uint8_t src_u,
+                                        uint8_t src_v,
+                                        int *base_y,
+                                        uint8_t *base_u,
+                                        uint8_t *base_v)
+{
+    *base_y = bleed_y[src_y];
+    *base_u = bleed_uv[src_u];
+    *base_v = bleed_uv[src_v];
+}
+
+typedef int (*cs_render_y_fn)(int base_y, int mass, int bed, int ev);
+
+static inline int cs_render_y_normal(int base_y, int mass, int bed, int ev)
+{
+    int yy = base_y + mass - (bed >> 2);
+
+    (void) ev;
+
+    if(yy < 0)
+        yy = 0;
+    else if(yy > 255)
+        yy = 255;
+
+    return yy;
+}
+
+static inline int cs_render_y_white(int base_y, int mass, int bed, int ev)
+{
+    int yy = base_y + ev;
+
+    (void) mass;
+    (void) bed;
+
+    if(yy > 255)
+        yy = 255;
+
+    return yy;
+}
+
 static inline int cs_index_clamped(int w, int h, int x, int y)
 {
     if(x < 0)
@@ -135,6 +205,17 @@ vj_effect *chronoglass_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_THRESHOLD] = 0;
     ve->limits[1][P_THRESHOLD] = CS_UI_MAX;
@@ -194,28 +275,34 @@ vj_effect *chronoglass_init(int w, int h)
         "Color Energy"
     );
 
-    {
-        const vj_beat_param_hint_t beat_hints[] = {
-            VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 190, 78, 100, 0, 360, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 160, 1000, 86, 100, 0, 460, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 80, 900, 82, 100, 0, 520, 0, 2, 200, VJ_BEAT_COST_MODERATE, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 520, 980, 56, 94, 80, 900, 0, 2, 240, VJ_BEAT_COST_MODERATE, 72, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_DENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 180, 1000, 80, 100, 0, 520, 0, 2, 200, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 320, 36, 76, 180, 1300, 0, 2, 320, VJ_BEAT_COST_MODERATE, 46, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_FLUX, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SQUARE, 0, 880, 76, 100, 0, 500, 0, 2, 180, VJ_BEAT_COST_MODERATE, 92, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 260, 1000, 86, 100, 0, 430, 80, 2, 120, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
-            VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 220, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
-        };
-        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
-    }
+    
+{
+    const vj_beat_param_hint_t beat_hints[] = {
+        VJ_BEAT_HINT_V2(VJ_BEAT_DETAIL, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_NEGATIVE, VJ_BEAT_CURVE_SQUARE, 18, 190, 78, 100, 0, 360, 0, 1, 180, VJ_BEAT_COST_MODERATE, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_FLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_VELOCITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 160, 1000, 86, 100, 0, 460, 0, 2, 180, VJ_BEAT_COST_MODERATE, 98, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_MOTION_REACT, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 80, 900, 82, 100, 0, 520, 0, 2, 200, VJ_BEAT_COST_MODERATE, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_MEMORY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_ENVELOPE, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LOG, 520, 980, 56, 94, 80, 900, 0, 2, 240, VJ_BEAT_COST_MODERATE, 72, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_DENSITY, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_EASE_OUT, 180, 1000, 80, 100, 0, 520, 0, 2, 200, VJ_BEAT_COST_MODERATE, 96, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SOURCE_MIX, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_ACTIVITY, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SMOOTHSTEP, 0, 320, 36, 76, 180, 1300, 0, 2, 320, VJ_BEAT_COST_MODERATE, 46, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_TURBULENCE, VJ_BEAT_F_CONTINUOUS, VJ_BEAT_SRC_FLUX, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_SQUARE, 0, 880, 76, 100, 0, 500, 0, 2, 180, VJ_BEAT_COST_MODERATE, 92, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_GLOW, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_LOW_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 260, 1000, 86, 100, 0, 430, 80, 2, 120, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+        VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_AMOUNT, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_HIGH_ONSET, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 220, 1000, 82, 100, 0, 480, 0, 2, 160, VJ_BEAT_COST_CHEAP, 94, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+    };
+    ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+}
 
     return ve;
 }
 
 void *chronoglass_malloc(int w, int h)
 {
-    chronoglass_t *c = (chronoglass_t *) vj_calloc(sizeof(chronoglass_t));
+    chronoglass_t *c;
+
+    if(w <= 0 || h <= 0)
+        return NULL;
+
+    c = (chronoglass_t *) vj_calloc(sizeof(chronoglass_t));
     if(!c)
         return NULL;
 
@@ -301,7 +388,7 @@ static void cs_seed(chronoglass_t *c, VJFrame *frame)
     int len = c->len;
     int i;
 
-    for(i = 0; i < len; i++) {
+for(i = 0; i < len; i++) {
         c->prev_y[i] = Y[i];
         c->ref_y[i] = Y[i];
 
@@ -1023,6 +1110,10 @@ static void cs_render_const(chronoglass_t *c,
 
     int len = c->len;
     int i;
+    const cs_render_base_fn base_fn =
+        (source_bleed > 0) ? cs_render_base_bleed : cs_render_base_pure;
+    const cs_render_y_fn y_fn =
+        (color_mode == CS_COLOR_WHITE) ? cs_render_y_white : cs_render_y_normal;
 
     int low_u = 108;
     int low_v = 146;
@@ -1086,42 +1177,24 @@ static void cs_render_const(chronoglass_t *c,
         {
             int color_ev = CLUT[ev];
 
-            if(source_bleed > 0) {
-                base_y = BY[src_y];
-                base_u = BUV[U[i]];
-                base_v = BUV[V[i]];
-            }
-            else {
-                base_y = 0;
-                base_u = 128;
-                base_v = 128;
-            }
+        base_fn(BY, BUV, src_y, U[i], V[i],
+                &base_y, &base_u, &base_v);
 
-            if(ev <= 0) {
-                Y[i] = (uint8_t) base_y;
-                U[i] = base_u;
-                V[i] = base_v;
-                continue;
-            }
+        if(ev <= 0) {
+            Y[i] = (uint8_t) base_y;
+            U[i] = base_u;
+            V[i] = base_v;
+            continue;
+        }
 
-            ev_u = cs_blend_fast_u8((uint8_t) low_u, (uint8_t) high_u, pol);
-            ev_v = cs_blend_fast_u8((uint8_t) low_v, (uint8_t) high_v, pol);
+        ev_u = cs_blend_fast_u8((uint8_t) low_u, (uint8_t) high_u, pol);
+        ev_v = cs_blend_fast_u8((uint8_t) low_v, (uint8_t) high_v, pol);
 
-            yy = base_y + mass - (bed >> 2);
-            if(yy < 0)
-                yy = 0;
-            else if(yy > 255)
-                yy = 255;
+        yy = y_fn(base_y, mass, bed, ev);
 
-            if(color_mode == CS_COLOR_WHITE)
-                yy = base_y + ev;
-
-            if(yy > 255)
-                yy = 255;
-
-            Y[i] = (uint8_t) yy;
-            U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, color_ev);
-            V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, color_ev);
+        Y[i] = (uint8_t) yy;
+        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, color_ev);
+        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, color_ev);
         }
     }
 }
@@ -1146,6 +1219,8 @@ static void cs_render_source(chronoglass_t *c,
 
     int len = c->len;
     int i;
+    const cs_render_base_fn base_fn =
+        (source_bleed > 0) ? cs_render_base_bleed : cs_render_base_pure;
 
 #pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
@@ -1175,36 +1250,28 @@ static void cs_render_source(chronoglass_t *c,
         {
             int color_ev = CLUT[ev];
 
-            if(source_bleed > 0) {
-                base_y = BY[src_y];
-                base_u = BUV[src_u];
-                base_v = BUV[src_v];
-            }
-            else {
-                base_y = 0;
-                base_u = 128;
-                base_v = 128;
-            }
+        base_fn(BY, BUV, src_y, src_u, src_v,
+                &base_y, &base_u, &base_v);
 
-            if(ev <= 0) {
-                Y[i] = (uint8_t) base_y;
-                U[i] = base_u;
-                V[i] = base_v;
-                continue;
-            }
+        if(ev <= 0) {
+            Y[i] = (uint8_t) base_y;
+            U[i] = base_u;
+            V[i] = base_v;
+            continue;
+        }
 
-            ev_u = cs_blend_fast_u8((uint8_t) (255 - src_u), src_u, pol);
-            ev_v = cs_blend_fast_u8((uint8_t) (255 - src_v), src_v, pol);
+        ev_u = cs_blend_fast_u8((uint8_t) (255 - src_u), src_u, pol);
+        ev_v = cs_blend_fast_u8((uint8_t) (255 - src_v), src_v, pol);
 
-            yy = base_y + mass - (bed >> 2);
-            if(yy < 0)
-                yy = 0;
-            else if(yy > 255)
-                yy = 255;
+        yy = base_y + mass - (bed >> 2);
+        if(yy < 0)
+            yy = 0;
+        else if(yy > 255)
+            yy = 255;
 
-            Y[i] = (uint8_t) yy;
-            U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, color_ev);
-            V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, color_ev);
+        Y[i] = (uint8_t) yy;
+        U[i] = cs_blend_fast_u8(base_u, (uint8_t) ev_u, color_ev);
+        V[i] = cs_blend_fast_u8(base_v, (uint8_t) ev_v, color_ev);
         }
     }
 }
@@ -1224,22 +1291,36 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronoglass_t *c = (chronoglass_t *) ptr;
 
-    int threshold    = cs_ui_to_u8(args[P_THRESHOLD]);
-    int flow         = cs_ui_to_u8(args[P_FLOW]);
-    int erosion      = cs_ui_to_u8(args[P_EROSION]);
-    int decay        = cs_ui_to_u8(args[P_DECAY]);
-    int sediment     = cs_ui_to_u8(args[P_SEDIMENT]);
-    int source_bleed = cs_ui_to_u8(args[P_SOURCE_BLEED]);
-    int color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
-    int turbulence   = cs_ui_to_u8(args[P_TURBULENCE]);
-    int silt_gain    = cs_clampi(args[P_SILT_GAIN], 0, CS_UI_MAX);
-    int color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, CS_UI_MAX);
+    int threshold;
+    int flow;
+    int erosion;
+    int decay;
+    int sediment;
+    int source_bleed;
+    int color_mode;
+    int turbulence;
+    int silt_gain;
+    int color_energy;
 
-    #pragma omp single
+#pragma omp single
     {
         if(!c->seeded)
             cs_seed(c, frame);
+    }
 
+    threshold    = cs_ui_to_u8(args[P_THRESHOLD]);
+    flow         = cs_ui_to_u8(args[P_FLOW]);
+    erosion      = cs_ui_to_u8(args[P_EROSION]);
+    decay        = cs_ui_to_u8(args[P_DECAY]);
+    sediment     = cs_ui_to_u8(args[P_SEDIMENT]);
+    source_bleed = cs_ui_to_u8(args[P_SOURCE_BLEED]);
+    color_mode   = cs_clampi(args[P_COLOR_MODE], 0, 4);
+    turbulence   = cs_ui_to_u8(args[P_TURBULENCE]);
+    silt_gain    = cs_clampi(args[P_SILT_GAIN], 0, CS_UI_MAX);
+    color_energy = cs_clampi(args[P_COLOR_ENERGY], 0, CS_UI_MAX);
+
+#pragma omp single
+    {
         cs_build_luts_if_needed(
             c,
             threshold,
@@ -1253,7 +1334,7 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
             color_energy
         );
     }
-    
+
     cs_compute_silt(
         c,
         frame,
@@ -1263,7 +1344,7 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
         turbulence
     );
 
-    #pragma omp single
+#pragma omp single
     {
         cs_swap_fields(c);
     }
@@ -1275,7 +1356,7 @@ void chronoglass_apply(void *ptr, VJFrame *frame, int *args)
         color_mode
     );
 
-    #pragma omp single
+#pragma omp single
     {
         c->frame++;
     }

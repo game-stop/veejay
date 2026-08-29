@@ -96,7 +96,6 @@ void *aquatex_malloc(int w, int h)
     for(int i = 0; i < RAND_LUT_SIZE; i++)
         s->noise_lut[i] = ((float)rand() / (float)RAND_MAX) - 0.5f;
 
-
     return s;
 }
 
@@ -134,9 +133,20 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
     const float cross = frequency * spread;
     const float phase_b = phase_shift * 0.73f;
 
-    #pragma omp for schedule(static)
-    for( int plane = 0 ; plane < 3; plane ++ ) {
-        veejay_memcpy(s->temp_buf + (plane_size * plane),frame->data[plane], plane_size);
+#pragma omp sections
+    {
+#pragma omp section
+        {
+        veejay_memcpy(s->temp_buf,                  frame->data[0], plane_size);
+        }
+#pragma omp section
+        {
+        veejay_memcpy(s->temp_buf + plane_size,     frame->data[1], plane_size);
+        }
+#pragma omp section
+        {
+        veejay_memcpy(s->temp_buf + plane_size * 2, frame->data[2], plane_size);
+        }
     }
 
     uint8_t *restrict srcY = s->temp_buf;
@@ -146,7 +156,6 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dstY = frame->data[0];
     uint8_t *restrict dstU = frame->data[1];
     uint8_t *restrict dstV = frame->data[2];
-
 
     #pragma omp for schedule(static)
     for(int y = 0; y < h; y++)
@@ -178,5 +187,4 @@ void aquatex_apply(void *ptr, VJFrame *frame, int *args)
             h_phase += x_frequency;
         }
     }
-    
 }

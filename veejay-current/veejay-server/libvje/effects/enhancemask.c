@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -20,7 +20,6 @@
 
 #include "common.h"
 #include "enhancemask.h"
-#include <veejaycore/vjmem.h>
 
 typedef struct {
     uint8_t *buf;
@@ -43,6 +42,15 @@ vj_effect *enhancemask_init(int width, int height)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->limits[0] || !ve->limits[1] || !ve->defaults)
+    {
+        if(ve->limits[0]) free(ve->limits[0]);
+        if(ve->limits[1]) free(ve->limits[1]);
+        if(ve->defaults) free(ve->defaults);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][0] = 0; ve->limits[1][0] = 4096; ve->defaults[0] = 120;
     ve->limits[0][1] = 0; ve->limits[1][1] = 64;   ve->defaults[1] = 8;
     ve->limits[0][2] = 0; ve->limits[1][2] = 128;  ve->defaults[2] = 50;
@@ -61,9 +69,6 @@ vj_effect *enhancemask_init(int width, int height)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)width;
-    (void)height;
 
     return ve;
 }
@@ -91,12 +96,7 @@ void enhancemask_free(void *ptr)
 {
     enhancemask_t *e = (enhancemask_t*) ptr;
 
-    if(!e)
-        return;
-
-    if(e->buf)
-        free(e->buf);
-        
+    free(e->buf);
     free(e);
 }
 
@@ -118,12 +118,10 @@ void enhancemask_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dst = frame->data[0];
     uint8_t *restrict src = e->buf;
 
-    #pragma omp single
-    {
-        veejay_memcpy(src, dst, len);
-    }
+#pragma omp single
+    veejay_memcpy(src, dst, len);
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int y = 1; y < height - 1; y++)
     {
         const uint8_t *restrict p_prev = src + (y - 1) * width;
@@ -131,6 +129,7 @@ void enhancemask_apply(void *ptr, VJFrame *frame, int *args)
         const uint8_t *restrict p_next = src + (y + 1) * width;
         uint8_t *restrict p_out = dst + y * width;
 
+#pragma omp simd
         for(int x = 1; x < width - 1; x++)
         {
             const int blur =

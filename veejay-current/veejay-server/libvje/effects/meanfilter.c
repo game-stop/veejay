@@ -24,6 +24,7 @@
 
 typedef struct {
     uint8_t *mean;
+    int n_threads;
 } mean_t;
 
 vj_effect *meanfilter_init(int w, int h)
@@ -52,6 +53,8 @@ void *meanfilter_malloc(int w, int h)
         return NULL;
     }
 
+    m->n_threads = vje_advise_num_threads(w * h);
+
     return (void*) m;
 }
 
@@ -63,21 +66,13 @@ void meanfilter_free(void *ptr)
     free(m);
 }
 
-void meanfilter_apply(void *ptr, VJFrame *frame, int *args)
+static void vje_mean_filter(const uint8_t *restrict src,
+                            uint8_t *restrict dst,
+                            int w,
+                            int h,
+                            int n_threads)
 {
-    mean_t *m = (mean_t*) ptr;
-    (void) args;
-
-    const int w = frame->width;
-    const int h = frame->height;
-    const int len = frame->len;
-
-    #pragma omp single
-    {
-        veejay_memcpy(m->mean, frame->data[0], len);
-    }
-
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for(int y = 1; y < h - 1; y++) {
         const int row = y * w;
         const int prev = row - w;
@@ -86,18 +81,29 @@ void meanfilter_apply(void *ptr, VJFrame *frame, int *args)
 
         for(int x = 1; x < w - 1; x++) {
             if(x == 1) {
-                sum = m->mean[prev] + m->mean[prev + 1] + m->mean[prev + 2] +
-                      m->mean[row]  + m->mean[row  + 1] + m->mean[row  + 2] +
-                      m->mean[next] + m->mean[next + 1] + m->mean[next + 2];
+                sum = src[prev] + src[prev + 1] + src[prev + 2] +
+                      src[row]  + src[row  + 1] + src[row  + 2] +
+                      src[next] + src[next + 1] + src[next + 2];
             }
             else {
-                const int lcol = m->mean[prev + x - 2] + m->mean[row + x - 2] + m->mean[next + x - 2];
-                const int rcol = m->mean[prev + x + 1] + m->mean[row + x + 1] + m->mean[next + x + 1];
+                const int lcol = src[prev + x - 2] + src[row + x - 2] + src[next + x - 2];
+                const int rcol = src[prev + x + 1] + src[row + x + 1] + src[next + x + 1];
 
                 sum += rcol - lcol;
             }
 
-            frame->data[0][row + x] = (uint8_t)(sum / 9);
+            dst[row + x] = (uint8_t)(sum / 9);
         }
     }
+}
+
+void meanfilter_apply(void *ptr, VJFrame *frame, int *args)
+{
+    (void) args;
+
+    mean_t *m = (mean_t*) ptr;
+
+#pragma omp single
+    veejay_memcpy(m->mean, frame->data[0], frame->len);
+    vje_mean_filter(m->mean, frame->data[0], frame->width, frame->height, m->n_threads);
 }

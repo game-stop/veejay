@@ -31,7 +31,6 @@
 typedef struct {
     int gamma_key;
     uint8_t table[256];
-    int n_threads;
 } gammacompr_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -51,6 +50,16 @@ vj_effect *gammacompr_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[0] = 3000;
     ve->defaults[1] = 240;
@@ -118,24 +127,24 @@ void gammacompr_apply(void *ptr, VJFrame *frame, int *args)
     const int black_threshold = args[2];
     const int len = frame->len;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
-    const uint8_t *restrict table = g->table;
-
-    #pragma omp single
+#pragma omp single
     {
         if(value != g->gamma_key)
             gammacompr_setup(g, value);
     }
 
-    #pragma omp for schedule(static)
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict U = frame->data[1];
+    uint8_t *restrict V = frame->data[2];
+    const uint8_t *restrict table = g->table;
+
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
         Y[i] = table[Y[i]];
 
-    if(white_threshold > 0 || black_threshold > 0) {
-        #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
+        if(white_threshold > 0 || black_threshold > 0) {
             const int y = Y[i];
             const int white_mask = -(y > white_threshold);
             const int black_mask = -(y < black_threshold);

@@ -27,7 +27,6 @@
 #include "softblur.h"
 #include "chameleon.h"
 #include "motionmap.h"
-#include <veejaycore/vjmem.h>
 
 #define PLANES_DEPTH 6
 #define PLANES (1 << PLANES_DEPTH)
@@ -61,9 +60,6 @@ vj_effect *chameleon_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 
-    if(!ve)
-        return NULL;
-
     ve->num_params = 2;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -94,11 +90,10 @@ vj_effect *chameleon_init(int w, int h)
 int chameleon_prepare(void *ptr, VJFrame *frame)
 {
     chameleon_t *c = (chameleon_t*) ptr;
-    if(!c || !frame)
-        return 0;
 
-    int strides[4] = { frame->len, frame->len, frame->len, 0 };
-    vj_frame_copy(frame->data, c->bgimage, strides);
+    veejay_memcpy(c->bgimage[0], frame->data[0], frame->len);
+    veejay_memcpy(c->bgimage[1], frame->data[1], frame->len);
+    veejay_memcpy(c->bgimage[2], frame->data[2], frame->len);
 
     VJFrame tmp;
     veejay_memset(&tmp, 0, sizeof(VJFrame));
@@ -127,7 +122,7 @@ void *chameleon_malloc(int w, int h)
     const int len = w * h;
     const int safe_zone = w * 2;
 
-    c->bgimage[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ((size_t)len + (size_t)safe_zone) * 3u);
+    c->bgimage[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)(len + safe_zone) * 3u);
 
     if(!c->bgimage[0]) {
         free(c);
@@ -161,17 +156,17 @@ void *chameleon_malloc(int w, int h)
         return NULL;
     }
 
-    c->bgimage[1] = c->bgimage[0] + (size_t)len + (size_t)safe_zone;
-    c->bgimage[2] = c->bgimage[1] + (size_t)len + (size_t)safe_zone;
+    c->bgimage[1] = c->bgimage[0] + len + safe_zone;
+    c->bgimage[2] = c->bgimage[1] + len + safe_zone;
     c->tmpimage[1] = c->tmpimage[0] + len;
     c->tmpimage[2] = c->tmpimage[1] + len;
 
-    vj_frame_clear1(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
-    vj_frame_clear1(c->tmpimage[0], pixel_Y_lo_, len);
+    veejay_memset(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
+    veejay_memset(c->tmpimage[0], pixel_Y_lo_, len);
 
     for(int i = 1; i < 3; i++) {
-        vj_frame_clear1(c->bgimage[i], 128, len + safe_zone);
-        vj_frame_clear1(c->tmpimage[i], 128, len);
+        veejay_memset(c->bgimage[i], 128, len + safe_zone);
+        veejay_memset(c->tmpimage[i], 128, len);
     }
 
     c->last_mode_ = -1;
@@ -183,17 +178,10 @@ void chameleon_free(void *ptr)
 {
     chameleon_t *c = (chameleon_t*) ptr;
 
-    if(!c)
-        return;
-
-    if(c->bgimage[0])
-        free(c->bgimage[0]);
-    if(c->tmpimage[0])
-        free(c->tmpimage[0]);
-    if(c->timebuffer)
-        free(c->timebuffer);
-    if(c->sum)
-        free(c->sum);
+    free(c->bgimage[0]);
+    free(c->tmpimage[0]);
+    free(c->timebuffer);
+    free(c->sum);
     free(c);
 }
 
@@ -241,12 +229,8 @@ static void drawChameleon(chameleon_t *cb, VJFrame *src, VJFrame *dest, int sens
         }
     }
 
-#pragma omp barrier
-
 #pragma omp single
-    {
-        cb->plane = (cb->plane + 1) & (PLANES - 1);
-    }
+    cb->plane = (cb->plane + 1) & (PLANES - 1);
 }
 
 void chameleon_apply(void *ptr, VJFrame *frame, int *args)
@@ -255,16 +239,6 @@ void chameleon_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[0];
     const int sensitivity = chameleon_clampi(args[1], 1, 32);
     const int len = frame->len;
-
-    VJFrame source;
-    veejay_memset(&source, 0, sizeof(VJFrame));
-
-    int strides[4] = { len, len, len, 0 };
-    uint32_t activity = 0;
-    int auto_switch = 0;
-    int tmp1 = 0;
-    int tmp2 = 0;
-    int appearing = mode ? 1 : 0;
 
 #pragma omp single
     {
@@ -275,31 +249,56 @@ void chameleon_apply(void *ptr, VJFrame *frame, int *args)
             chameleon_reset_history(c, len);
             c->last_mode_ = mode;
         }
-
-        vj_frame_copy(frame->data, c->tmpimage, strides);
-
-        if(c->motionmap && motionmap_active(c->motionmap)) {
-            motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
-            auto_switch = 1;
-            activity = motionmap_activity(c->motionmap);
-        } else {
-            c->N__ = 0;
-            c->n__ = 0;
-        }
-
-        if(c->n__ == c->N__ || c->n__ == 0)
-            auto_switch = 0;
-
-        if(auto_switch)
-            appearing = activity > 40 ? 1 : 0;
     }
 
+    VJFrame source;
+#pragma omp sections
+    {
+#pragma omp section
+        {
+            veejay_memcpy(c->tmpimage[0], frame->data[0], (size_t) len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(c->tmpimage[1], frame->data[1], (size_t) len);
+        }
+#pragma omp section
+        {
+            veejay_memcpy(c->tmpimage[2], frame->data[2], (size_t) len);
+        }
+    }
+
+    veejay_memset(&source, 0, sizeof(VJFrame));
     source.data[0] = c->tmpimage[0];
     source.data[1] = c->tmpimage[1];
     source.data[2] = c->tmpimage[2];
-    source.width = frame->width;
-    source.height = frame->height;
     source.len = len;
+
+    uint32_t activity = 0;
+    int auto_switch = 0;
+    int tmp1 = 0;
+    int tmp2 = 0;
+
+    if(c->motionmap && motionmap_active(c->motionmap)) {
+#pragma omp single
+        motionmap_scale_to(c->motionmap, 32, 32, 1, 1, &tmp1, &tmp2, &(c->n__), &(c->N__));
+        auto_switch = 1;
+        activity = motionmap_activity(c->motionmap);
+    } else {
+#pragma omp single
+        {
+        c->N__ = 0;
+        c->n__ = 0;
+        }
+    }
+
+    if(c->n__ == c->N__ || c->n__ == 0)
+        auto_switch = 0;
+
+    int appearing = mode ? 1 : 0;
+
+    if(auto_switch)
+        appearing = activity > 40 ? 1 : 0;
 
     drawChameleon(c, &source, frame, sensitivity, appearing);
 }
@@ -312,8 +311,6 @@ int chameleon_request_fx(void)
 void chameleon_set_motionmap(void *ptr, void *priv)
 {
     chameleon_t *c = (chameleon_t*) ptr;
-    if(!c)
-        return;
 
     c->motionmap = priv;
 }

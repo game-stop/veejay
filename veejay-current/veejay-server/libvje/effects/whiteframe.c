@@ -38,12 +38,6 @@ typedef struct {
     float softness_env;
     float glow_env;
     float chroma_env;
-    
-    int full;
-    int edge;
-    int denom;
-    int edge_glow;
-    int chroma_edge;
 } whiteframe_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -86,6 +80,14 @@ vj_effect *whiteframe_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        free(ve->defaults);
+        free(ve->limits[0]);
+        free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_THRESHOLD]   = 0;    ve->limits[1][P_THRESHOLD]   = 255; ve->defaults[P_THRESHOLD]   = 220;
     ve->limits[0][P_SOFTNESS]    = 1;    ve->limits[1][P_SOFTNESS]    = 128; ve->defaults[P_SOFTNESS]    = 24;
     ve->limits[0][P_EDGE_GLOW]   = 0;    ve->limits[1][P_EDGE_GLOW]   = 255; ve->defaults[P_EDGE_GLOW]   = 0;
@@ -113,9 +115,6 @@ vj_effect *whiteframe_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
 
@@ -125,6 +124,8 @@ void *whiteframe_malloc(int w, int h)
 
     if(!wf)
         return NULL;
+
+    wf->n_threads = vje_advise_num_threads(w * h);
 
     wf->env_ready = 0;
     wf->threshold_env = 220.0f;
@@ -138,8 +139,6 @@ void *whiteframe_malloc(int w, int h)
 void whiteframe_free(void *ptr)
 {
     whiteframe_t *wf = (whiteframe_t*) ptr;
-    if(!wf)
-        return;
 
     free(wf);
 }
@@ -155,46 +154,37 @@ void whiteframe_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int glow_arg = args[P_EDGE_GLOW];
     const int chroma_arg = args[P_CHROMA_EDGE];
 
-    #pragma omp single
-    {
-        if(!wf->env_ready) {
-            wf->threshold_env = (float)threshold_arg;
-            wf->softness_env = (float)softness_arg;
-            wf->glow_env = (float)glow_arg;
-            wf->chroma_env = (float)chroma_arg;
-            wf->env_ready = 1;
-        }
-        else {
-            wf->threshold_env = whiteframe_slew(wf->threshold_env, (float)threshold_arg, 0.265f, 0.092f);
-            wf->softness_env = whiteframe_slew(wf->softness_env, (float)softness_arg, 0.245f, 0.088f);
-            wf->glow_env = whiteframe_slew(wf->glow_env, (float)glow_arg, 0.325f, 0.115f);
-            wf->chroma_env = whiteframe_slew(wf->chroma_env, (float)chroma_arg, 0.285f, 0.105f);
-        }
-
-        const int threshold = (int)(wf->threshold_env + 0.5f);
-        const int softness = (int)(wf->softness_env + 0.5f);
-        wf->edge_glow = (int)(wf->glow_env + 0.5f);
-        wf->chroma_edge = (int)(wf->chroma_env + 0.5f);
-
-        wf->full = threshold - softness;
-        wf->edge = threshold + softness;
-
-        if(wf->full < 0)
-            wf->full = 0;
-        if(wf->edge > 255)
-            wf->edge = 255;
-        if(wf->edge <= wf->full)
-            wf->edge = wf->full + 1;
-
-        wf->denom = wf->edge - wf->full;
-        if(wf->denom <= 0)
-            wf->denom = 1;
+    if(!wf->env_ready) {
+        wf->threshold_env = (float)threshold_arg;
+        wf->softness_env = (float)softness_arg;
+        wf->glow_env = (float)glow_arg;
+        wf->chroma_env = (float)chroma_arg;
+        wf->env_ready = 1;
     }
-    
-    const int full = wf->full;
-    const int denom = wf->denom;
-    const int edge_glow = wf->edge_glow;
-    const int chroma_edge = wf->chroma_edge;
+    else {
+        wf->threshold_env = whiteframe_slew(wf->threshold_env, (float)threshold_arg, 0.265f, 0.092f);
+        wf->softness_env = whiteframe_slew(wf->softness_env, (float)softness_arg, 0.245f, 0.088f);
+        wf->glow_env = whiteframe_slew(wf->glow_env, (float)glow_arg, 0.325f, 0.115f);
+        wf->chroma_env = whiteframe_slew(wf->chroma_env, (float)chroma_arg, 0.285f, 0.105f);
+    }
+
+    const int threshold = (int)(wf->threshold_env + 0.5f);
+    const int softness = (int)(wf->softness_env + 0.5f);
+    const int edge_glow = (int)(wf->glow_env + 0.5f);
+    const int chroma_edge = (int)(wf->chroma_env + 0.5f);
+    const int n_threads = wf->n_threads;
+
+    int full = threshold - softness;
+    int edge = threshold + softness;
+
+    if(full < 0)
+        full = 0;
+    if(edge > 255)
+        edge = 255;
+    if(edge <= full)
+        edge = full + 1;
+
+    const int denom = edge - full;
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];

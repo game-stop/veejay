@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
@@ -76,6 +76,7 @@ static inline int percent_to_param(int v)
     return (v * 1000 + 127) / 255;
 }
 
+
 static inline void cd_limit_chroma_i32(int32_t *u, int32_t *v, int limit)
 {
     int au = absi_i32((int)*u);
@@ -127,7 +128,6 @@ typedef struct
     int last_pastel_param;
     int last_bprot_param;
     int last_wprot_param;
-    int n_threads;
 } chromaticdrift_t;
 
 vj_effect *chromaticdrift_init(int w, int h)
@@ -140,6 +140,18 @@ vj_effect *chromaticdrift_init(int w, int h)
     ve->defaults   = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0]  = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1]  = (int *) vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->defaults[P_GLOBAL_HUE]    = percent_to_param(0);
     ve->defaults[P_RAINBOW_WRAP]  = percent_to_param(0);
     ve->defaults[P_VIBRANCE]      = percent_to_param(55);
@@ -248,8 +260,10 @@ void chromaticdrift_free(void *ptr)
 void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
 {
     chromaticdrift_t *n = (chromaticdrift_t *) ptr;
+
     const int w = n->w;
     const int h = n->h;
+
     const int w_sub_1 = w - 1;
     const int h_sub_1 = h - 1;
 
@@ -280,7 +294,13 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict pu = frame->data[1];
     uint8_t *restrict pv = frame->data[2];
 
-    #pragma omp single
+    const int len = w * h;
+#pragma omp for schedule(static)
+    for (int i = 0; i < len; i++)
+        n->srcY_copy[i] = py[i];
+    const uint8_t *restrict srcY = n->srcY_copy;
+
+#pragma omp single
     {
         if (contrast_i != n->last_contrast_param) {
             for (int i = 0; i < 256; i++) {
@@ -290,39 +310,32 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
             n->last_contrast_param = contrast_i;
             n->last_luma_floor = -1;
         }
-
         if (luma_floor != n->last_luma_floor ||
             luma_knee != n->last_luma_knee ||
             luma_guard_q8 != n->last_luma_guard_q8) {
-            for (int i = 0; i < 256; i++) {
+            for (int i = 0; i < 256; i++)
                 n->luma_lut[i] = clamp_u8(cd_guard_luma_black_i(i, n->contrast_lut[i], luma_floor, luma_knee, luma_guard_q8));
-            }
             n->last_luma_floor = luma_floor;
             n->last_luma_knee = luma_knee;
             n->last_luma_guard_q8 = luma_guard_q8;
         }
-
         if (pastel_i != n->last_pastel_param ||
             bprot_i != n->last_bprot_param ||
             wprot_i != n->last_wprot_param) {
             const float b_prot = (float)bprot_i * 0.001f;
             const float w_prot = (float)wprot_i * 0.001f;
-
             const float inv_b = 1.0f / (b_prot + 0.001f);
             const float inv_w = 1.0f / (1.0f - w_prot + 0.001f);
-
             for (int i = 0; i < 256; i++) {
                 const float y_raw = (float)i * INV_255;
                 const float m_b = (y_raw < b_prot) ? (y_raw * inv_b) : 1.0f;
                 const float m_w = (y_raw > w_prot) ? (1.0f - (y_raw - w_prot) * inv_w) : 1.0f;
-                const float mask = m_b * m_b * m_w * m_w;
-                n->tint_lut_fp[i] = (int32_t)(pastel_base * mask * (float)FP_M + 0.5f);
+                n->tint_lut_fp[i] = (int32_t)(pastel_base * m_b * m_b * m_w * m_w * (float)FP_M + 0.5f);
             }
             n->last_pastel_param = pastel_i;
             n->last_bprot_param = bprot_i;
             n->last_wprot_param = wprot_i;
         }
-
         n->time += speed * dir;
     }
 
@@ -338,9 +351,9 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t *restrict luma_lut = n->luma_lut;
     const int32_t *restrict tint_lut = n->tint_lut_fp;
 
-    #pragma omp for schedule(static)
+#pragma omp for schedule(static)
     for (int y = 1; y < h_sub_1; y++) {
-        const uint8_t *row  = py + y * w;
+        const uint8_t *row  = srcY + y * w;
         const uint8_t *up   = row - w;
         const uint8_t *down = row + w;
 
@@ -376,6 +389,9 @@ void chromaticdrift_apply(void *ptr, VJFrame *frame, int *args)
 
             int32_t u_rot = (u * c_fp - v * s_fp + FP_HALF) >> FP_S;
             int32_t v_rot = (u * s_fp + v * c_fp + FP_HALF) >> FP_S;
+
+            u_rot = (u_rot * stab_fp + FP_HALF) >> FP_S;
+            v_rot = (v_rot * stab_fp + FP_HALF) >> FP_S;
 
             {
                 const int32_t tint_fp = tint_lut[y_v];

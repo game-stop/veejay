@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2016 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -37,17 +37,12 @@ typedef struct {
     int direction;
     int last_pingpong;
     int last_n;
-    int initialized;
+    int n_threads;
 
     float sm_opacity;
     float sm_buffer;
     float sm_mix;
     float sm_chroma;
-
-    int cached_n;
-    int slot;
-    int wet_q8;
-    int chroma_q8;
 } scratcher_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -85,6 +80,17 @@ vj_effect *scratcher_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_OPACITY] = 0;       ve->limits[1][P_OPACITY] = 255;                      ve->defaults[P_OPACITY] = 150;
     ve->limits[0][P_BUFFER_LEN] = 1;    ve->limits[1][P_BUFFER_LEN] = MAX_SCRATCH_FRAMES - 1; ve->defaults[P_BUFFER_LEN] = 8;
@@ -145,16 +151,15 @@ void *scratcher_malloc(int w, int h)
     s->frame[1] = s->frame[0] + ((size_t)len * (size_t)MAX_SCRATCH_FRAMES);
     s->frame[2] = s->frame[1] + ((size_t)len * (size_t)MAX_SCRATCH_FRAMES);
 
-    veejay_memset(s->frame[0], pixel_Y_lo_, (size_t)len * (size_t)MAX_SCRATCH_FRAMES);
-    veejay_memset(s->frame[1], 128, (size_t)len * (size_t)MAX_SCRATCH_FRAMES);
-    veejay_memset(s->frame[2], 128, (size_t)len * (size_t)MAX_SCRATCH_FRAMES);
+    veejay_memset(s->frame[0], pixel_Y_lo_, len * MAX_SCRATCH_FRAMES);
+    veejay_memset(s->frame[1], 128, len * MAX_SCRATCH_FRAMES);
+    veejay_memset(s->frame[2], 128, len * MAX_SCRATCH_FRAMES);
 
     s->phase_q8 = 0;
     s->direction = 1;
     s->last_pingpong = 1;
     s->last_n = 8;
-    s->initialized = 0;
-    
+    s->n_threads = vje_advise_num_threads(len);
     s->sm_opacity = 150.0f;
     s->sm_buffer = 8.0f;
     s->sm_mix = 1000.0f;
@@ -166,26 +171,29 @@ void *scratcher_malloc(int w, int h)
 void scratcher_free(void *ptr)
 {
     scratcher_t *s = (scratcher_t*)ptr;
-    if(!s)
-        return;
 
-    if(s->frame[0])
-        free(s->frame[0]);
+    free(s->frame[0]);
     free(s);
 }
 
 static void scratcher_store_current(scratcher_t *s, VJFrame *src, int slot)
 {
     const int len = src->len;
-    const int uv_len = src->uv_len;
+    const int uv_len = src->ssm ? src->len : src->uv_len;
 
     uint8_t *restrict dy = s->frame[0] + ((size_t)len * (size_t)slot);
     uint8_t *restrict du = s->frame[1] + ((size_t)len * (size_t)slot);
     uint8_t *restrict dv = s->frame[2] + ((size_t)len * (size_t)slot);
 
-    veejay_memcpy(dy, src->data[0], (size_t)len);
-    veejay_memcpy(du, src->data[1], (size_t)uv_len);
-    veejay_memcpy(dv, src->data[2], (size_t)uv_len);
+    uint8_t *dst[3] = { dy, du, dv };
+    const uint8_t *src_data[3] = {
+        src->data[0], src->data[1], src->data[2]
+    };
+    const int bytes[3] = { len, uv_len, uv_len };
+
+#pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++)
+        veejay_memcpy(dst[plane], src_data[plane], bytes[plane]);
 }
 
 static void scratcher_advance(scratcher_t *s, int n, int pingpong)
@@ -225,11 +233,11 @@ static void scratcher_advance(scratcher_t *s, int n, int pingpong)
 
 static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, int wet_q8, int chroma_q8)
 {
-    if(slot < 0 || wet_q8 <= 0)
+    if(slot <= 0 || wet_q8 <= 0)
         return;
 
     const int len = src->len;
-    const int uv_len = src->uv_len;
+    const int uv_len = src->ssm ? src->len : src->uv_len;
 
     uint8_t *restrict Y = src->data[0];
     uint8_t *restrict U = src->data[1];
@@ -240,80 +248,68 @@ static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, in
     const uint8_t *restrict hV = s->frame[2] + ((size_t)len * (size_t)slot);
 
 #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++)
-        Y[i] = scratcher_mix_y(Y[i], hY[i], wet_q8);
+        for(int i = 0; i < len; i++)
+            Y[i] = scratcher_mix_y(Y[i], hY[i], wet_q8);
 
 #pragma omp for schedule(static)
-    for(int i = 0; i < uv_len; i++) {
-        U[i] = scratcher_mix_uv(U[i], hU[i], chroma_q8);
-        V[i] = scratcher_mix_uv(V[i], hV[i], chroma_q8);
+        for(int i = 0; i < uv_len; i++) {
+            U[i] = scratcher_mix_uv(U[i], hU[i], chroma_q8);
+            V[i] = scratcher_mix_uv(V[i], hV[i], chroma_q8);
     }
 }
 
 void scratcher_apply(void *ptr, VJFrame *src, int *args)
 {
     scratcher_t *s = (scratcher_t*)ptr;
-    
     const int raw_opacity = args[P_OPACITY];
     const int raw_n = args[P_BUFFER_LEN];
     const int pingpong = args[P_PINGPONG] ? 1 : 0;
     const int raw_mix = args[P_SCRATCH_MIX];
     const int raw_chroma = args[P_CHROMA_AMOUNT];
-    
     const float follow = 0.34f;
     const float slow_follow = 0.16f;
+    int n;
 
-    #pragma omp single
+#pragma omp single
     {
-        scratcher_smooth_to(&s->sm_opacity, (float)raw_opacity, follow);
-        scratcher_smooth_to(&s->sm_buffer,  (float)raw_n, slow_follow);
-        scratcher_smooth_to(&s->sm_mix,     (float)raw_mix, follow);
-        scratcher_smooth_to(&s->sm_chroma,  (float)raw_chroma, follow);
+    scratcher_smooth_to(&s->sm_opacity, (float)raw_opacity, follow);
+    scratcher_smooth_to(&s->sm_buffer,  (float)raw_n, slow_follow);
+    scratcher_smooth_to(&s->sm_mix,     (float)raw_mix, follow);
+    scratcher_smooth_to(&s->sm_chroma,  (float)raw_chroma, follow);
 
-        s->cached_n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
+    const int next_n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
 
-        if(!s->initialized) {
-            for(int i = 0; i < s->cached_n; i++) {
-                scratcher_store_current(s, src, i);
-            }
-            s->initialized = 1;
-        } else if(s->cached_n > s->last_n) {
-            for(int i = s->last_n; i < s->cached_n; i++) {
-                scratcher_store_current(s, src, i);
-            }
-        }
+    if(next_n != s->last_n || pingpong != s->last_pingpong) {
+        s->last_n = next_n;
+        s->last_pingpong = pingpong;
 
-        if(s->cached_n != s->last_n || pingpong != s->last_pingpong) {
-            s->last_n = s->cached_n;
-            s->last_pingpong = pingpong;
+        const int max_q8 = (next_n - 1) << 8;
 
-            const int max_q8 = (s->cached_n - 1) << 8;
+        if(s->phase_q8 > max_q8)
+            s->phase_q8 = max_q8;
+        if(s->phase_q8 < 0)
+            s->phase_q8 = 0;
 
-            if(s->phase_q8 > max_q8)
-                s->phase_q8 = max_q8;
-            if(s->phase_q8 < 0)
-                s->phase_q8 = 0;
-
-            s->direction = 1;
-        }
-
-        s->slot = clampi((s->phase_q8 + 128) >> 8, 0, s->cached_n - 1);
-        s->wet_q8 = ((int)(s->sm_opacity + 0.5f) * 256 + 127) / 255;
-
-        s->wet_q8 = (s->wet_q8 * clampi((int)(s->sm_mix + 0.5f), 0, 1000) + 500) / 1000;
-        s->wet_q8 = clampi(s->wet_q8, 0, 256);
-
-        s->chroma_q8 = (s->wet_q8 * clampi((int)(s->sm_chroma + 0.5f), 0, 1000) + 500) / 1000;
-        s->chroma_q8 = clampi(s->chroma_q8, 0, 256);
+        s->direction = 1;
+    }
     }
 
-    scratcher_blend_from_slot(s, src, s->slot, s->wet_q8, s->chroma_q8);
+    n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
+    const int slot = clampi((s->phase_q8 + 128) >> 8, 0, n - 1);
+    int wet_q8 = ((int)(s->sm_opacity + 0.5f) * 256 + 127) / 255;
+
+    wet_q8 = (wet_q8 * clampi((int)(s->sm_mix + 0.5f), 0, 1000) + 500) / 1000;
+    wet_q8 = clampi(wet_q8, 0, 256);
+
+    int chroma_q8 = (wet_q8 * clampi((int)(s->sm_chroma + 0.5f), 0, 1000) + 500) / 1000;
+
+    chroma_q8 = clampi(chroma_q8, 0, 256);
+
+    scratcher_blend_from_slot(s, src, slot, wet_q8, chroma_q8);
+
+    if(!pingpong || s->direction > 0)
+        scratcher_store_current(s, src, slot);
 
     #pragma omp single
-    {
-        if(!pingpong || s->direction > 0)
-            scratcher_store_current(s, src, s->slot);
-
-        scratcher_advance(s, s->cached_n, pingpong);
-    }
+    scratcher_advance(s, n, pingpong);
 }

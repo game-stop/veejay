@@ -71,7 +71,6 @@ void constantblend_apply(void *ptr, VJFrame *frame, int *args)
 
     const uint8_t y = (uint8_t)valY;
     const int s_fp = (scale * 256) / 100;
-
     pix_func_Y blend_y = get_pix_func_Y(type);
     uint8_t *restrict Y = frame->data[0];
 

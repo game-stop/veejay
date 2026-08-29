@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -29,7 +29,6 @@
 
 #include "common.h"
 #include "dices.h"
-#include <veejaycore/vjmem.h>
 
 #define VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT 4
 
@@ -50,11 +49,6 @@ typedef struct {
     uint8_t *g_dicemap;
     uint8_t *src[3];
     uint8_t g_orientation;
-    int n_threads;
-
-    unsigned int shift_w;
-    unsigned int shift_h;
-    int skip_processing;
 } dices_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -176,8 +170,6 @@ void *dices_malloc(int width, int height)
     d->src[2] = d->src[1] + len;
     d->g_orientation = 255;
     d->g_cube_bits = -1;
-    d->n_threads = vje_advise_num_threads(len);
-
     return d;
 }
 
@@ -294,57 +286,46 @@ void dices_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict sCb = d->src[1];
     uint8_t *restrict sCr = d->src[2];
 
-    uint8_t *dst[3] = { sY, sCb, sCr };
-    uint8_t *src[3] = { Y, Cb, Cr };
-
-    #pragma omp single nowait
+    if((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation))
     {
-        if((cube_bits != d->g_cube_bits) ||
-        (orientation != d->g_orientation))
+#pragma omp single
         {
             d->g_cube_bits = cube_bits;
             d->g_orientation = (uint8_t)orientation;
-
             if(orientation == VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT)
                 dice_create_map(d, width, height);
             else
                 dice_create_map_orientation(d, width, height, orientation);
         }
-
-        d->shift_w =
-            (width - (d->g_cube_size * d->g_map_width)) >> 1;
-
-        d->shift_h =
-            (height - (d->g_cube_size * d->g_map_height)) >> 1;
-
-        d->skip_processing =
-            (d->g_map_width <= 0 ||
-            d->g_map_height <= 0 ||
-            d->g_cube_size <= 0);
     }
 
-    #pragma omp for schedule(static)
-    for(int plane = 0; plane < 3; plane++)
+    const int g_map_width = d->g_map_width;
+    const int g_map_height = d->g_map_height;
+    const int g_cube_bits = d->g_cube_bits;
+    const int g_cube_size = d->g_cube_size;
+
+    if(g_map_width <= 0 || g_map_height <= 0 || g_cube_size <= 0)
+        return;
+
+    uint8_t *restrict dst[3] = { sY, sCb, sCr };
+    const uint8_t *restrict src[3] = { Y, Cb, Cr };
+
+#pragma omp for schedule(static)
+    for (int plane = 0; plane < 3; plane++)
         veejay_memcpy(dst[plane], src[plane], len);
 
-    if(!d->skip_processing)
+    const unsigned int shift_w = (width - (g_cube_size * g_map_width)) >> 1;
+    const unsigned int shift_h = (height - (g_cube_size * g_map_height)) >> 1;
+
+    #pragma omp for collapse(2) schedule(static)
+    for(int map_y = 0; map_y < g_map_height; map_y++)
     {
-        const int map_w = d->g_map_width;
-        const int map_h = d->g_map_height;
-        const int cube_bits_val = d->g_cube_bits;
-        const unsigned int shift_w = d->shift_w;
-        const unsigned int shift_h = d->shift_h;
-
-        #pragma omp for collapse(2) schedule(static)
-        for(int map_y = 0; map_y < map_h; map_y++)
+        for(int map_x = 0; map_x < g_map_width; map_x++)
         {
-            for(int map_x = 0; map_x < map_w; map_x++)
-            {
-                const int map_i = map_y * map_w + map_x;
-                const int base = (shift_h + (map_y << cube_bits_val)) * width + (map_x << cube_bits_val) + shift_w;
+            const int map_i = map_y * g_map_width + map_x;
+            const int base = (shift_h + (map_y << g_cube_bits)) * width + (map_x << g_cube_bits) + shift_w;
 
-                dice_copy_block(d, Y, Cb, Cr, sY, sCb, sCr, width, base, d->g_dicemap[map_i]);
-            }
+            dice_copy_block(d, Y, Cb, Cr, sY, sCb, sCr, width, base, d->g_dicemap[map_i]);
         }
     }
 }

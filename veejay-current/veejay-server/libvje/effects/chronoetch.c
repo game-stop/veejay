@@ -41,7 +41,6 @@ typedef struct {
     int len;
     int frame;
     int filled;
-    int n_threads;
 
     uint8_t *region;
 
@@ -115,6 +114,22 @@ static inline int tas_slot_for_age(int write_slot, int age)
 static inline int tas_scale_1000_to_100(int v)
 {
     return (tas_clampi(v, 0, 1000) * 100 + 500) / 1000;
+}
+
+typedef int (*tas_stable_fn)(int raw, int old_stable);
+
+static inline int tas_stable_seed(int raw, int old_stable)
+{
+    (void) old_stable;
+    return raw;
+}
+
+static inline int tas_stable_follow(int raw, int old_stable)
+{
+    const int delta = tas_absi(raw - old_stable);
+    const int weight = (delta > 56) ? 6 : 3;
+
+    return ((old_stable * (16 - weight)) + raw * weight + 8) >> 4;
 }
 
 
@@ -546,9 +561,9 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronoetch_t *c = (chronoetch_t *) ptr;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict U = frame->data[1];
-    uint8_t *restrict V = frame->data[2];
+    uint8_t *restrict Y;
+    uint8_t *restrict U;
+    uint8_t *restrict V;
 
     uint8_t *restrict curY;
     uint8_t *restrict curU;
@@ -556,24 +571,70 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict edgeY;
     uint8_t *restrict lastEdgeY;
 
-    /* ALL THREADS EVALUATE PARAMETERS OUTSIDE THE SINGLE BLOCK */
-    int opacity       = tas_clampi(args[P_OPACITY],       0, 100);
-    int step          = tas_clampi(args[P_STEP],          3, 14);
-    int time_depth    = tas_clampi(args[P_TIME_DEPTH],    1, TAS_MAX_FRAMES);
-    int rib_length    = tas_clampi(args[P_RIB_LENGTH],    2, 96);
-    int edge_sens     = tas_scale_1000_to_100(args[P_EDGE]);
-    int motion_age    = tas_scale_1000_to_100(args[P_MOTION_AGE]);
-    int bone_density  = tas_scale_1000_to_100(args[P_BONE_DENSITY]);
-    int age_violence  = tas_scale_1000_to_100(args[P_AGE_VIOLENCE]);
-    int chroma_tear   = tas_scale_1000_to_100(args[P_CHROMA_TEAR]);
-    int trail         = tas_scale_1000_to_100(args[P_TRAIL]);
-    int stroke_chroma = tas_scale_1000_to_100(args[P_STROKE_CHROMA]);
-    int color_bias    = 0;
-
-    int opacity_q8 = (opacity * 255 + 50) / 100;
-    int trail_q8 = (trail * 255 + 50) / 100;
-
+    int opacity;
+    int opacity_q8;
+    int step;
+    int time_depth;
+    int rib_length;
+    int edge_sens;
+    int motion_age;
+    int bone_density;
+    int age_violence;
+    int chroma_tear;
+    int trail;
+    int trail_q8;
+    int stroke_chroma;
     int stroke_chroma_q8;
+    int color_bias;
+
+    int chroma_gain_age_q8[TAS_MAX_FRAMES];
+
+    int process_len;
+    int rows;
+    int w;
+    int write_slot;
+    int available;
+    int max_age;
+
+    int edge_threshold_base;
+    int seed_floor;
+    int motion_min;
+    int motion_fracture_keep;
+    int current_keep_base;
+
+    int a;
+    int y;
+
+    Y = frame->data[0];
+    U = frame->data[1];
+    V = frame->data[2];
+
+
+    w = c->w;
+
+    process_len = c->len;
+    if (frame->len > 0 && frame->len < process_len)
+        process_len = frame->len;
+
+    rows = process_len / w;
+
+    opacity       = tas_clampi(args[P_OPACITY],       0, 100);
+    step          = tas_clampi(args[P_STEP],          3, 14);
+    time_depth    = tas_clampi(args[P_TIME_DEPTH],    1, TAS_MAX_FRAMES);
+    rib_length    = tas_clampi(args[P_RIB_LENGTH],    2, 96);
+    edge_sens     = tas_scale_1000_to_100(args[P_EDGE]);
+    motion_age    = tas_scale_1000_to_100(args[P_MOTION_AGE]);
+    bone_density  = tas_scale_1000_to_100(args[P_BONE_DENSITY]);
+    age_violence  = tas_scale_1000_to_100(args[P_AGE_VIOLENCE]);
+    chroma_tear   = tas_scale_1000_to_100(args[P_CHROMA_TEAR]);
+    trail         = tas_scale_1000_to_100(args[P_TRAIL]);
+    stroke_chroma = tas_scale_1000_to_100(args[P_STROKE_CHROMA]);
+    color_bias    = 0;
+
+    opacity_q8 = (opacity * 255 + 50) / 100;
+
+    trail_q8 = (trail * 255 + 50) / 100;
+
     if (stroke_chroma <= 50)
         stroke_chroma_q8 = (stroke_chroma * 256 + 25) / 50;
     else
@@ -581,8 +642,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
 
     stroke_chroma_q8 = tas_clampi(stroke_chroma_q8, 0, 2048);
 
-    int chroma_gain_age_q8[TAS_MAX_FRAMES];
-    for (int a = 0; a < TAS_MAX_FRAMES; a++) {
+    for (a = 0; a < TAS_MAX_FRAMES; a++) {
         int base = 100 + chroma_tear * 2 + a * 8;
         int gain_q8 = (base * 256 + 50) / 100;
 
@@ -590,13 +650,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
         chroma_gain_age_q8[a] = tas_clampi(gain_q8, 0, 2048);
     }
 
-    int w = c->w;
-    int process_len = c->len;
-    if (frame->len > 0 && frame->len < process_len)
-        process_len = frame->len;
-
-    int rows = process_len / w;
-    int write_slot = c->frame % TAS_MAX_FRAMES;
+    write_slot = c->frame % TAS_MAX_FRAMES;
 
     curY = c->ring_y[write_slot];
     curU = c->ring_u[write_slot];
@@ -605,30 +659,32 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     edgeY = c->stable_y;
     lastEdgeY = c->last_stable_y;
 
-    int available = c->filled + 1;
+    available = c->filled + 1;
     if (available > TAS_MAX_FRAMES)
         available = TAS_MAX_FRAMES;
 
-    int max_age = time_depth - 1;
+    max_age = time_depth - 1;
     if (max_age > available - 1)
         max_age = available - 1;
 
-    int edge_threshold_base = 250 - edge_sens * 2;
-    int seed_floor = 32 - (edge_sens / 7);
+    edge_threshold_base = 250 - edge_sens * 2;
+
+    seed_floor = 32 - (edge_sens / 7);
     seed_floor = tas_clampi(seed_floor, 8, 32);
 
-    int motion_min = 18 + ((100 - motion_age) / 4);
+    motion_min = 18 + ((100 - motion_age) / 4);
     motion_min = tas_clampi(motion_min, 6, 42);
-    int motion_fracture_keep = 3 + (bone_density / 7) + (motion_age / 10);
-    int current_keep_base = 18 + (bone_density / 2);
+    motion_fracture_keep = 3 + (bone_density / 7) + (motion_age / 10);
+    current_keep_base = 18 + (bone_density / 2);
+
+    const tas_stable_fn stable_fn =
+        (c->filled <= 0) ? tas_stable_seed : tas_stable_follow;
 
 #pragma omp for schedule(static)
     for (int i = 0; i < process_len; i++) {
         int raw_y = Y[i];
         int old_stable = c->stable_y[i];
         int new_stable;
-        int delta;
-        int w_new;
 
         int yy;
         int uu;
@@ -640,13 +696,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
 
         c->last_stable_y[i] = (uint8_t) old_stable;
 
-        if (c->filled <= 0) {
-            new_stable = raw_y;
-        } else {
-            delta = tas_absi(raw_y - old_stable);
-            w_new = (delta > 56) ? 6 : 3;
-            new_stable = ((old_stable * (16 - w_new)) + raw_y * w_new + 8) >> 4;
-        }
+        new_stable = stable_fn(raw_y, old_stable);
 
         c->stable_y[i] = tas_u8(new_stable);
 
@@ -667,8 +717,9 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = (uint8_t) vv;
     }
 
-#pragma omp for schedule(static)
-    for (int y = 1; y < rows - 1; y += step) {
+#pragma omp single
+    {
+    for (y = 1; y < rows - 1; y += step) {
         int x;
         int row = y * w;
         int ycell = y / step;
@@ -871,11 +922,9 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-#pragma omp single
-    {
-        if (c->filled < TAS_MAX_FRAMES)
-            c->filled++;
+    if (c->filled < TAS_MAX_FRAMES)
+        c->filled++;
 
-        c->frame++;
+    c->frame++;
     }
 }

@@ -1,4 +1,4 @@
-/* 
+/*
  * Linux VeeJay
  *
  * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
@@ -28,11 +28,19 @@ static inline int complexopacity_clampi(int v, int lo, int hi)
     return v < lo ? lo : (v > hi ? hi : v);
 }
 
+static inline int complexopacity_alpha(int alpha)
+{
+    return alpha;
+}
+
+static inline int complexopacity_alpha_swap(int alpha)
+{
+    return 255 - alpha;
+}
+
 vj_effect *complexopacity_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
 
     ve->num_params = 7;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
@@ -61,7 +69,7 @@ vj_effect *complexopacity_init(int w, int h)
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
-    
+
     {
         const vj_beat_param_hint_t beat_hints[] = {
             VJ_BEAT_HINT_V2(VJ_BEAT_COLOR_PHASE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_WRAP, VJ_BEAT_SRC_SCRATCH_SIGNED, VJ_BEAT_OP_RATE, VJ_BEAT_POLARITY_SOURCE_SIGN, VJ_BEAT_CURVE_LINEAR, 700, 8300, 60, 90, 0, 260, 0, 25, 0, VJ_BEAT_COST_CHEAP, 82, 0, 0, VJ_BEAT_GROUP_NONE, 0),
@@ -74,9 +82,6 @@ vj_effect *complexopacity_init(int w, int h)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -102,17 +107,10 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int swap = complexopacity_clampi(swap_arg, 0, 1);
     const int len = frame->len;
 
-    uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
-
-    const uint8_t *restrict Y2 = frame2->data[0];
-    const uint8_t *restrict Cb2 = frame2->data[1];
-    const uint8_t *restrict Cr2 = frame2->data[2];
-
     int iy = 0;
     int iu = 128;
     int iv = 128;
+
     _rgb2yuv(r, g, b, iy, iu, iv);
 
     const int scale = 4096;
@@ -140,8 +138,16 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const int inv_range_fp = (int)((255.0f / diff) * (float)(1 << 8));
     const int black_clip_fp = threshold * scale;
+    uint8_t *restrict Y = frame->data[0];
+    uint8_t *restrict Cb = frame->data[1];
+    uint8_t *restrict Cr = frame->data[2];
 
-    #pragma omp for schedule(static)
+    const uint8_t *restrict Y2 = frame2->data[0];
+    const uint8_t *restrict Cb2 = frame2->data[1];
+    const uint8_t *restrict Cr2 = frame2->data[2];
+    int (*alpha_fn)(int) = swap ? complexopacity_alpha_swap : complexopacity_alpha;
+
+#pragma omp for schedule(static)
     for(int pos = 0; pos < len; pos++)
     {
         const int uc = (int)Cb[pos] - 128;
@@ -154,8 +160,7 @@ void complexopacity_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
         alpha = complexopacity_clampi(alpha, 0, 255);
 
-        if(swap)
-            alpha = 255 - alpha;
+        alpha = alpha_fn(alpha);
 
         if(alpha <= 0)
         {

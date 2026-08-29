@@ -36,25 +36,8 @@ typedef struct {
     int w;
     int h;
     int initialized;
-    int n_threads;
     float maturity;
     uint32_t frame_no;
-
-    float src_mix;
-    float hist_mix;
-    float chroma_src_mix;
-    float chroma_hist_mix;
-    float chroma_wet_gain;
-    float detail_gain;
-    float flow_pixels;
-    float swirl_gain;
-    float amp;
-    float motion_scale;
-    float inv_max_dim;
-    float lut[65];
-    int gw;
-    int gh;
-    int cell;
 } fluid_paint_t;
 
 static inline uint8_t clamp_u8f(float v)
@@ -261,7 +244,6 @@ void *dotillism_malloc(int w, int h)
     p->initialized = 0;
     p->maturity = 0.0f;
     p->frame_no = 0;
-
     return (void *)p;
 }
 
@@ -287,107 +269,102 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
 
     const int w = frame->width;
     const int h = frame->height;
+    const int len = w * h;
+
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    #pragma omp single
-    {
-        if (!p->initialized) {
-            veejay_memcpy(p->canvas_y, Y, w * h);
-            veejay_memcpy(p->canvas_u, U, w * h);
-            veejay_memcpy(p->canvas_v, V, w * h);
-            veejay_memcpy(p->prev_src_y, Y, w * h);
+
+    const int need_init = !p->initialized;
+    if (need_init) {
+        #pragma omp sections
+        {
+            #pragma omp section
+            { veejay_memcpy(p->canvas_y, Y, len); }
+            #pragma omp section
+            { veejay_memcpy(p->canvas_u, U, len); }
+            #pragma omp section
+            { veejay_memcpy(p->canvas_v, V, len); }
+        }
+#pragma omp single
+        {
+            veejay_memcpy(p->prev_src_y, Y, len);
             p->initialized = 1;
             p->maturity = 0.0f;
             p->frame_no = 0;
         }
-
-        const float build_param = clampf_local((float)args[0] * 0.01f, 0.0f, 1.0f);
-        const float refresh_param = clampf_local((float)args[1] * 0.01f, 0.0f, 1.0f);
-        const float flow_param = clampf_local((float)args[2] * 0.01f, 0.0f, 1.0f);
-        const float swirl_param = clampf_local((float)args[3] * 0.01f, 0.0f, 1.0f);
-        const float bleed_param = clampf_local((float)args[4] * 0.01f, 0.0f, 1.0f);
-        const float detail_param = clampf_local((float)args[5] * 0.01f, 0.0f, 1.0f);
-        const float trail_param = clampf_local((float)args[6] * 0.01f, 0.0f, 1.0f);
-        const float turbulence_param = clampf_local((float)args[7] * 0.01f, 0.0f, 1.0f);
-        const float scale_param = clampf_local((float)args[8] * 0.01f, 0.0f, 1.0f);
-        const float motion_param = clampf_local((float)args[9] * 0.01f, 0.0f, 1.0f);
-        const float chroma_gain_param = clampf_local((float)args[10] * 0.01f, 0.0f, 1.0f);
-
-        const float build_curve = build_param * build_param;
-        const float refresh_curve = refresh_param * refresh_param;
-        const float flow_curve = flow_param * flow_param;
-        const float swirl_curve = swirl_param * swirl_param;
-        const float bleed_curve = bleed_param * bleed_param;
-        const float detail_curve = detail_param * detail_param;
-        const float trail_curve = trail_param * trail_param;
-        const float turbulence_curve = turbulence_param * turbulence_param;
-        const float scale_curve = scale_param * scale_param;
-        const float motion_curve = motion_param * motion_param;
-        const float chroma_gain_curve = chroma_gain_param * chroma_gain_param;
-
-        const float mature_rate = 0.0005f + build_curve * 0.0500f;
-        p->maturity += (1.0f - p->maturity) * mature_rate;
-        if (p->maturity > 1.0f) p->maturity = 1.0f;
-
-        const float maturity = p->maturity;
-
-        const float early_refresh = 0.008f + refresh_curve * 0.620f;
-        const float mature_refresh = 0.010f + refresh_curve * 0.280f;
-
-        p->src_mix = lerpf_local(early_refresh, mature_refresh, maturity);
-        p->src_mix *= (1.0f - trail_curve * 0.58f);
-        if (p->src_mix < 0.006f) p->src_mix = 0.006f;
-        if (p->src_mix > 0.78f) p->src_mix = 0.78f;
-
-        p->hist_mix = 1.0f - p->src_mix;
-
-        p->chroma_src_mix = p->src_mix + 0.014f + refresh_curve * 0.120f + (1.0f - trail_curve) * 0.020f;
-        if (p->chroma_src_mix < 0.018f) p->chroma_src_mix = 0.018f;
-        if (p->chroma_src_mix > 0.82f) p->chroma_src_mix = 0.82f;
-
-        p->chroma_hist_mix = 1.0f - p->chroma_src_mix;
-        p->chroma_wet_gain = 0.92f + chroma_gain_curve * 0.38f + bleed_curve * 0.18f * (1.0f - p->chroma_src_mix);
-        p->detail_gain = detail_curve * lerpf_local(1.10f, 0.55f, maturity);
-        p->flow_pixels = (0.35f + maturity * 2.10f) * (0.5f + flow_curve * 40.0f);
-        p->swirl_gain = swirl_curve * 7.0f;
-        const float turbulence_gain = turbulence_curve * 18.0f * (0.25f + maturity * 0.75f);
-
-        p->cell = 10 + (int)(scale_curve * 54.0f);
-        p->cell -= (int)(turbulence_curve * 18.0f);
-        if (p->cell < 8) p->cell = 8;
-        if (p->cell > 64) p->cell = 64;
-
-        for (int i = 0; i <= p->cell; i++)
-            p->lut[i] = smoothstepf_local((float)i / (float)p->cell);
-
-        build_flow_grid(p, w, h, p->cell);
-
-        p->gw = (w + p->cell - 1) / p->cell + 2;
-        p->gh = (h + p->cell - 1) / p->cell + 2;
-
-        p->inv_max_dim = 1.0f / ((float)((w > h) ? w : h) * 0.5f + 1.0f);
-        p->amp = 1.0f + turbulence_gain * 0.18f;
-        p->motion_scale = (0.35f + motion_curve * 5.25f) * (1.0f / 255.0f);
     }
 
-    const float src_mix = p->src_mix;
-    const float hist_mix = p->hist_mix;
-    const float chroma_src_mix = p->chroma_src_mix;
-    const float chroma_hist_mix = p->chroma_hist_mix;
-    const float chroma_wet_gain = p->chroma_wet_gain;
-    const float detail_gain = p->detail_gain;
-    const float flow_pixels = p->flow_pixels;
-    const float swirl_gain = p->swirl_gain;
-    const float amp = p->amp;
-    const float motion_scale = p->motion_scale;
-    const float inv_max_dim = p->inv_max_dim;
-    const int cell = p->cell;
-    const int gw = p->gw;
-    const int gh = p->gh;
-    const float *restrict lut = p->lut;
+    const float build_param = clampf_local((float)args[0] * 0.01f, 0.0f, 1.0f);
+    const float refresh_param = clampf_local((float)args[1] * 0.01f, 0.0f, 1.0f);
+    const float flow_param = clampf_local((float)args[2] * 0.01f, 0.0f, 1.0f);
+    const float swirl_param = clampf_local((float)args[3] * 0.01f, 0.0f, 1.0f);
+    const float bleed_param = clampf_local((float)args[4] * 0.01f, 0.0f, 1.0f);
+    const float detail_param = clampf_local((float)args[5] * 0.01f, 0.0f, 1.0f);
+    const float trail_param = clampf_local((float)args[6] * 0.01f, 0.0f, 1.0f);
+    const float turbulence_param = clampf_local((float)args[7] * 0.01f, 0.0f, 1.0f);
+    const float scale_param = clampf_local((float)args[8] * 0.01f, 0.0f, 1.0f);
+    const float motion_param = clampf_local((float)args[9] * 0.01f, 0.0f, 1.0f);
+    const float chroma_gain_param = clampf_local((float)args[10] * 0.01f, 0.0f, 1.0f);
+
+    const float build_curve = build_param * build_param;
+    const float refresh_curve = refresh_param * refresh_param;
+    const float flow_curve = flow_param * flow_param;
+    const float swirl_curve = swirl_param * swirl_param;
+    const float bleed_curve = bleed_param * bleed_param;
+    const float detail_curve = detail_param * detail_param;
+    const float trail_curve = trail_param * trail_param;
+    const float turbulence_curve = turbulence_param * turbulence_param;
+    const float scale_curve = scale_param * scale_param;
+    const float motion_curve = motion_param * motion_param;
+    const float chroma_gain_curve = chroma_gain_param * chroma_gain_param;
+
+    const float mature_rate = 0.0005f + build_curve * 0.0500f;
+    #pragma omp single
+    {
+        p->maturity += (1.0f - p->maturity) * mature_rate;
+        if (p->maturity > 1.0f) p->maturity = 1.0f;
+    }
+
+    const float maturity = p->maturity;
+
+    const float early_refresh = 0.008f + refresh_curve * 0.620f;
+    const float mature_refresh = 0.010f + refresh_curve * 0.280f;
+
+    float src_mix = lerpf_local(early_refresh, mature_refresh, maturity);
+    src_mix *= (1.0f - trail_curve * 0.58f);
+    if (src_mix < 0.006f) src_mix = 0.006f;
+    if (src_mix > 0.78f) src_mix = 0.78f;
+
+    const float hist_mix = 1.0f - src_mix;
+
+    float chroma_src_mix = src_mix + 0.014f + refresh_curve * 0.120f + (1.0f - trail_curve) * 0.020f;
+    if (chroma_src_mix < 0.018f) chroma_src_mix = 0.018f;
+    if (chroma_src_mix > 0.82f) chroma_src_mix = 0.82f;
+
+    const float chroma_hist_mix = 1.0f - chroma_src_mix;
+    const float chroma_wet_gain = 0.92f + chroma_gain_curve * 0.38f + bleed_curve * 0.18f * (1.0f - chroma_src_mix);
+    const float detail_gain = detail_curve * lerpf_local(1.10f, 0.55f, maturity);
+    const float flow_pixels = (0.35f + maturity * 2.10f) * (0.5f + flow_curve * 40.0f);
+    const float swirl_gain = swirl_curve * 7.0f;
+    const float turbulence_gain = turbulence_curve * 18.0f * (0.25f + maturity * 0.75f);
+
+    int cell = 10 + (int)(scale_curve * 54.0f);
+    cell -= (int)(turbulence_curve * 18.0f);
+    if (cell < 8) cell = 8;
+    if (cell > 64) cell = 64;
+
+    float lut[65];
+    for (int i = 0; i <= cell; i++)
+        lut[i] = smoothstepf_local((float)i / (float)cell);
+
+    #pragma omp single
+    build_flow_grid(p, w, h, cell);
+
+    const int gw = (w + cell - 1) / cell + 2;
+    const int gh = (h + cell - 1) / cell + 2;
 
     const uint8_t *restrict old_y = p->canvas_y;
     const uint8_t *restrict old_u = p->canvas_u;
@@ -398,7 +375,11 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict next_v = p->next_v;
     uint8_t *restrict prev_y = p->prev_src_y;
 
-    #pragma omp for collapse(2) schedule(static)
+    const float inv_max_dim = 1.0f / ((float)((w > h) ? w : h) * 0.5f + 1.0f);
+    const float amp = 1.0f + turbulence_gain * 0.18f;
+    const float motion_scale = (0.35f + motion_curve * 5.25f) * (1.0f / 255.0f);
+
+    #pragma omp for schedule(static)
     for (int gy = 0; gy < gh - 1; gy++) {
         for (int gx = 0; gx < gw - 1; gx++) {
             const int y0 = gy * cell;
@@ -512,6 +493,8 @@ void dotillism_apply(void *ptr, VJFrame *frame, int *args)
         tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
         tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
         tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
-        p->frame_no++;
     }
+
+    #pragma omp single
+    p->frame_no++;
 }

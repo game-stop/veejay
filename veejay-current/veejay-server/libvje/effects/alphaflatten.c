@@ -60,7 +60,7 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
     uint8_t *restrict A = frame->data[3];
-    
+
 #pragma omp for schedule(static)
     for (int i = 0; i < len; i++)
     {
@@ -72,11 +72,9 @@ void alphaflatten_apply(void *ptr, VJFrame *frame, int *args)
         V[i] = (uint8_t)alphaflatten_div255(a * V[i] + ia * 128);
     }
 
-#pragma omp single
+    if (mode)
     {
-        if (mode)
-        {
-            veejay_memset(A, 0, len);
-        }
+#pragma omp single
+        veejay_memset(A, 0, len);
     }
 }

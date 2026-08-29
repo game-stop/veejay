@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -49,12 +49,9 @@ typedef struct {
     float eff_swirl_drive;
     int eff_ready;
 
+    int n_threads;
     int w;
     int h;
-
-    int cached_drive_q8;
-    int cached_rebuild_base;
-    int cached_rebuild_drive;
 } swirl_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -66,6 +63,8 @@ static inline uint8_t mix_u8(uint8_t a, uint8_t b, int q8)
 {
     return (uint8_t)((((int)a * (256 - q8)) + ((int)b * q8) + 128) >> 8);
 }
+
+
 
 static inline int swirl_smooth_i(float *state, int target, float attack, float release)
 {
@@ -103,6 +102,17 @@ vj_effect *swirl_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->limits[0][P_DEGREES] = 1;
     ve->limits[1][P_DEGREES] = 360;
     ve->defaults[P_DEGREES] = 250;
@@ -136,6 +146,7 @@ vj_effect *swirl_init(int w, int h)
         "Normal",
         "Mirrored"
     );
+
     
     {
         const vj_beat_param_hint_t beat_hints[] = {
@@ -146,8 +157,6 @@ vj_effect *swirl_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
 
     return ve;
 }
@@ -220,14 +229,14 @@ void *swirl_malloc(int w, int h)
     s->w = w;
     s->h = h;
 
+    s->n_threads = vje_advise_num_threads(len);
+
     return (void*) s;
 }
 
 void swirl_free(void *ptr)
 {
     swirl_t *s = (swirl_t*) ptr;
-    if(!s)
-        return;
 
     free(s->region);
     free(s);
@@ -293,6 +302,8 @@ static void swirl_rebuild_map(swirl_t *s, int width, int height, int degrees, in
     }
 }
 
+
+
 void swirl_apply(void *ptr, VJFrame *frame, int *args)
 {
     swirl_t *s = (swirl_t*) ptr;
@@ -305,11 +316,12 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[P_MODE];
     const int swirl_drive_arg = args[P_SWIRL_DRIVE];
 
-    #pragma omp single
-    {
-        const float param_attack = 0.28f;
-        const float param_release = 0.095f;
 
+    const float param_attack = 0.28f;
+    const float param_release = 0.095f;
+
+#pragma omp single
+    {
         if(!s->eff_ready) {
             s->eff_degrees = (float)degrees_arg;
             s->eff_swirl_drive = (float)swirl_drive_arg;
@@ -318,67 +330,65 @@ void swirl_apply(void *ptr, VJFrame *frame, int *args)
             swirl_smooth_i(&s->eff_degrees, degrees_arg, param_attack, param_release);
             swirl_smooth_i(&s->eff_swirl_drive, swirl_drive_arg, param_attack * 1.16f, param_release);
         }
-
-        const int degrees = clampi((int)(s->eff_degrees + 0.5f), 1, 360);
-        const int swirl_drive = clampi((int)(s->eff_swirl_drive + 0.5f), 0, 1000);
-        const int drive_degrees = swirl_drive_degrees(degrees, swirl_drive);
-
-        s->cached_rebuild_base = (s->v != degrees || s->mode != mode);
-        s->cached_rebuild_drive = (s->drive_v != drive_degrees || s->mode != mode || s->drive_swirl != swirl_drive);
-
-        int drive_q8 = (swirl_drive * 256 + 500) / 1000;
-        s->cached_drive_q8 = clampi(drive_q8, 0, 256);
-
-        veejay_memcpy(s->buf[0], frame->data[0], len);
-        veejay_memcpy(s->buf[1], frame->data[1], len);
-        veejay_memcpy(s->buf[2], frame->data[2], len);
-
-        s->v = degrees;
-        s->mode = mode;
-        s->drive_v = drive_degrees;
-        s->drive_swirl = swirl_drive;
     }
 
-    const int degrees = s->v;
-    const int drive_degrees = s->drive_v;
-    const int drive_q8 = s->cached_drive_q8;
-    const int current_mode = s->mode;
+    const int degrees = clampi((int)(s->eff_degrees + 0.5f), 1, 360);
+    const int swirl_drive = clampi((int)(s->eff_swirl_drive + 0.5f), 0, 1000);
+    const int drive_degrees = swirl_drive_degrees(degrees, swirl_drive);
 
-    if(s->cached_rebuild_base)
-        swirl_rebuild_map(s, width, height, degrees, current_mode, s->cached_coords);
+    const int rebuild_base = (s->v != degrees || s->mode != mode);
+    const int rebuild_drive = (s->drive_v != drive_degrees || s->mode != mode || s->drive_swirl != swirl_drive);
 
-    if(s->cached_rebuild_drive)
-        swirl_rebuild_map(s, width, height, drive_degrees, current_mode, s->drive_coords);
+    int drive_q8 = (swirl_drive * 256 + 500) / 1000;
+    drive_q8 = clampi(drive_q8, 0, 256);
 
     uint8_t *restrict Y  = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const uint8_t *restrict srcY  = s->buf[0];
-    const uint8_t *restrict srcCb = s->buf[1];
-    const uint8_t *restrict srcCr = s->buf[2];
+    uint8_t *restrict srcY  = s->buf[0];
+    uint8_t *restrict srcCb = s->buf[1];
+    uint8_t *restrict srcCr = s->buf[2];
 
-    const int *restrict base_coords = s->cached_coords;
-    const int *restrict drive_coords = s->drive_coords;
+    veejay_memcpy(srcY,  Y,  len);
+    veejay_memcpy(srcCb, Cb, len);
+    veejay_memcpy(srcCr, Cr, len);
 
-    if(drive_q8 <= 0 || drive_degrees == degrees) {
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            const int idx = base_coords[i];
+    int *restrict base_coords = s->cached_coords;
+    int *restrict drive_coords = s->drive_coords;
 
-            Y[i]  = srcY[idx];
-            Cb[i] = srcCb[idx];
-            Cr[i] = srcCr[idx];
+    if(rebuild_base)
+        swirl_rebuild_map(s, width, height, degrees, mode, s->cached_coords);
+
+    if(rebuild_drive)
+        swirl_rebuild_map(s, width, height, drive_degrees, mode, s->drive_coords);
+
+#pragma omp single
+        {
+            s->v = degrees;
+            s->mode = mode;
+            s->drive_v = drive_degrees;
+            s->drive_swirl = swirl_drive;
         }
-    } else {
-#pragma omp for schedule(static)
-        for(int i = 0; i < len; i++) {
-            const int a = base_coords[i];
-            const int b = drive_coords[i];
 
-            Y[i]  = mix_u8(srcY[a],  srcY[b],  drive_q8);
-            Cb[i] = mix_u8(srcCb[a], srcCb[b], drive_q8);
-            Cr[i] = mix_u8(srcCr[a], srcCr[b], drive_q8);
+        if(drive_q8 <= 0 || drive_degrees == degrees) {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int idx = base_coords[i];
+
+                Y[i]  = srcY[idx];
+                Cb[i] = srcCb[idx];
+                Cr[i] = srcCr[idx];
+            }
+        } else {
+#pragma omp for schedule(static)
+            for(int i = 0; i < len; i++) {
+                const int a = base_coords[i];
+                const int b = drive_coords[i];
+
+                Y[i]  = mix_u8(srcY[a],  srcY[b],  drive_q8);
+                Cb[i] = mix_u8(srcCb[a], srcCb[b], drive_q8);
+                Cr[i] = mix_u8(srcCr[a], srcCr[b], drive_q8);
         }
     }
 }

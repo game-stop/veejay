@@ -6,7 +6,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -34,6 +34,8 @@ typedef struct {
     void *motionmap;
     int n__;
     int N__;
+    int x_scale__;
+    int y_scale__;
     int n_threads;
 } lumamask_t;
 
@@ -54,7 +56,16 @@ vj_effect *lumamask_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_X_DISPLACE] = -width;  ve->limits[1][P_X_DISPLACE] = width;  ve->defaults[P_X_DISPLACE] = width / 20;
     ve->limits[0][P_Y_DISPLACE] = -height; ve->limits[1][P_Y_DISPLACE] = height; ve->defaults[P_Y_DISPLACE] = height / 10;
@@ -98,8 +109,7 @@ int lumamask_requests_fx(void)
 void lumamask_set_motionmap(void *ptr, void *priv)
 {
     lumamask_t *l = (lumamask_t*) ptr;
-    if(l)
-        l->motionmap = priv;
+    l->motionmap = priv;
 }
 
 void *lumamask_malloc(int width, int height)
@@ -126,6 +136,8 @@ void *lumamask_malloc(int width, int height)
     veejay_memset(l->buf[1], 128, len);
     veejay_memset(l->buf[2], 128, len);
     veejay_memset(l->buf[3], 0, len);
+
+    l->n_threads = vje_advise_num_threads(len);
 
     return (void*) l;
 }
@@ -292,33 +304,46 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int alpha = args[P_ALPHA];
     int interpolate = 1;
     int motion = 0;
-    int len;
-    int x_mul_q8 = 0, y_mul_q8 = 0;
-    const uint8_t *map = NULL;
 
-    #pragma omp single copyprivate(x_mul_q8, y_mul_q8, map)
+#pragma omp single
     {
         if(motionmap_active(l->motionmap)) {
-            motionmap_scale_to(l->motionmap, frame->width, frame->height, 1, 1, &x_scale, &y_scale, &(l->n__), &(l->N__));
-            motion = 1;
+            motionmap_scale_to(l->motionmap, frame->width, frame->height, 1, 1, &l->x_scale__, &l->y_scale__, &(l->n__), &(l->N__));
         }
         else {
             l->n__ = 0;
             l->N__ = 0;
+            l->x_scale__ = x_scale;
+            l->y_scale__ = y_scale;
         }
-
-        if(l->n__ == l->N__ || l->n__ == 0)
-            interpolate = 0;
-
-        len = frame->len;
-        int strides[4] = { len, len, len, alpha ? len : 0 };
-
-        vj_frame_copy(frame->data, l->buf, strides);
-
-        x_mul_q8 = -(x_scale * 2);
-        y_mul_q8 = -(y_scale * 2);
-        map = frame2->data[0];
     }
+
+    motion = motionmap_active(l->motionmap);
+    x_scale = l->x_scale__;
+    y_scale = l->y_scale__;
+
+    if(l->n__ == l->N__ || l->n__ == 0)
+        interpolate = 0;
+
+    const int len = frame->len;
+#pragma omp sections
+    {
+#pragma omp section
+        { veejay_memcpy(l->buf[0], frame->data[0], len); }
+#pragma omp section
+        { veejay_memcpy(l->buf[1], frame->data[1], len); }
+#pragma omp section
+        { veejay_memcpy(l->buf[2], frame->data[2], len); }
+#pragma omp section
+        {
+            if(alpha)
+                veejay_memcpy(l->buf[3], frame->data[3], len);
+        }
+    }
+
+    const int x_mul_q8 = -(x_scale * 2);
+    const int y_mul_q8 = -(y_scale * 2);
+    const uint8_t *restrict map = frame2->data[0];
 
     if(alpha) {
         if(border)
@@ -333,7 +358,7 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             lumamask_noalpha_clamp(l, frame, map, x_mul_q8, y_mul_q8);
     }
 
-    #pragma omp single
+#pragma omp single
     {
         if(interpolate)
             motionmap_interpolate_frame(l->motionmap, frame, l->N__, l->n__);
@@ -346,10 +371,7 @@ void lumamask_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 void lumamask_free(void *ptr)
 {
     lumamask_t *l = (lumamask_t*) ptr;
-    if(!l)
-        return;
 
-    if(l->buf[0])
-        free(l->buf[0]);
+    free(l->buf[0]);
     free(l);
 }

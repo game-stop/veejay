@@ -51,7 +51,6 @@ typedef struct {
     int len;
     int frame;
     int seeded;
-    int n_threads;
 
     uint8_t *ref_y;
 
@@ -81,7 +80,6 @@ typedef struct {
     int last_source_bleed;
     int last_cortex_gain;
     int last_color_energy;
-    int last_color_mode;
 } chronocortex_t;
 
 static inline int cf_clampi(int v, int lo, int hi)
@@ -131,6 +129,16 @@ vj_effect *chronocortex_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_THRESHOLD] = 0;
     ve->limits[1][P_THRESHOLD] = 1000;
@@ -175,7 +183,9 @@ vj_effect *chronocortex_init(int w, int h)
 
     ve->description = "Chronofold Cortex";
     ve->sub_format = 1;
-    
+    ve->extra_frame = 0;
+    ve->has_user = 0;
+
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Trigger Gate",
@@ -211,7 +221,12 @@ vj_effect *chronocortex_init(int w, int h)
 
 void *chronocortex_malloc(int w, int h)
 {
-    chronocortex_t *c = (chronocortex_t *) vj_calloc(sizeof(chronocortex_t));
+    chronocortex_t *c;
+
+    if(w <= 0 || h <= 0)
+        return NULL;
+
+    c = (chronocortex_t *) vj_calloc(sizeof(chronocortex_t));
     if(!c)
         return NULL;
 
@@ -221,7 +236,6 @@ void *chronocortex_malloc(int w, int h)
     c->frame = 0;
     c->seeded = 0;
     c->lut_valid = 0;
-
 
     c->ref_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
     c->on_y = (uint8_t *) vj_calloc(sizeof(uint8_t) * (size_t) c->len);
@@ -276,7 +290,7 @@ static void cf_seed(chronocortex_t *c, VJFrame *frame)
     int i;
     int len = c->len;
 
-    for(i = 0; i < len; i++) {
+for(i = 0; i < len; i++) {
         c->ref_y[i] = Y[i];
 
         c->on_y[i] = 0;
@@ -423,77 +437,126 @@ static inline int cf_pair_direct_offset(uint8_t *restrict F, int pos, int o1, in
     return a > b ? a : b;
 }
 
-static inline int cf_pair_safe(uint8_t *restrict F,
+typedef int (*cf_pair_safe_fn)(uint8_t *restrict F,
                                int w,
                                int h,
                                int x,
                                int y,
-                               int pos,
-                               int prop_mode)
+                               int pos);
+
+static inline int cf_pair_safe_ud(uint8_t *restrict F,
+                                  int w,
+                                  int h,
+                                  int x,
+                                  int y,
+                                  int pos)
 {
     int best = 0;
     int v;
 
-    switch(prop_mode) {
-        case CF_PROP_UD:
-            if(y > 0) {
-                v = F[pos - w];
-                if(v > best)
-                    best = v;
-            }
+    if(y > 0) {
+        v = F[pos - w];
+        if(v > best)
+            best = v;
+    }
 
-            if(y + 1 < h) {
-                v = F[pos + w];
-                if(v > best)
-                    best = v;
-            }
-            break;
-
-        case CF_PROP_NW_SE:
-            if(x > 0 && y > 0) {
-                v = F[pos - w - 1];
-                if(v > best)
-                    best = v;
-            }
-
-            if(x + 1 < w && y + 1 < h) {
-                v = F[pos + w + 1];
-                if(v > best)
-                    best = v;
-            }
-            break;
-
-        case CF_PROP_NE_SW:
-            if(x + 1 < w && y > 0) {
-                v = F[pos - w + 1];
-                if(v > best)
-                    best = v;
-            }
-
-            if(x > 0 && y + 1 < h) {
-                v = F[pos + w - 1];
-                if(v > best)
-                    best = v;
-            }
-            break;
-
-        case CF_PROP_LR:
-        default:
-            if(x > 0) {
-                v = F[pos - 1];
-                if(v > best)
-                    best = v;
-            }
-
-            if(x + 1 < w) {
-                v = F[pos + 1];
-                if(v > best)
-                    best = v;
-            }
-            break;
+    if(y + 1 < h) {
+        v = F[pos + w];
+        if(v > best)
+            best = v;
     }
 
     return best;
+}
+
+static inline int cf_pair_safe_nw_se(uint8_t *restrict F,
+                                     int w,
+                                     int h,
+                                     int x,
+                                     int y,
+                                     int pos)
+{
+    int best = 0;
+    int v;
+
+    if(x > 0 && y > 0) {
+        v = F[pos - w - 1];
+        if(v > best)
+            best = v;
+    }
+
+    if(x + 1 < w && y + 1 < h) {
+        v = F[pos + w + 1];
+        if(v > best)
+            best = v;
+    }
+
+    return best;
+}
+
+static inline int cf_pair_safe_ne_sw(uint8_t *restrict F,
+                                     int w,
+                                     int h,
+                                     int x,
+                                     int y,
+                                     int pos)
+{
+    int best = 0;
+    int v;
+
+    if(x + 1 < w && y > 0) {
+        v = F[pos - w + 1];
+        if(v > best)
+            best = v;
+    }
+
+    if(x > 0 && y + 1 < h) {
+        v = F[pos + w - 1];
+        if(v > best)
+            best = v;
+    }
+
+    return best;
+}
+
+static inline int cf_pair_safe_lr(uint8_t *restrict F,
+                                  int w,
+                                  int h,
+                                  int x,
+                                  int y,
+                                  int pos)
+{
+    int best = 0;
+    int v;
+
+    if(x > 0) {
+        v = F[pos - 1];
+        if(v > best)
+            best = v;
+    }
+
+    if(x + 1 < w) {
+        v = F[pos + 1];
+        if(v > best)
+            best = v;
+    }
+
+    return best;
+}
+
+static inline cf_pair_safe_fn cf_pair_safe_for_mode(int prop_mode)
+{
+    switch(prop_mode) {
+        case CF_PROP_UD:
+            return cf_pair_safe_ud;
+        case CF_PROP_NW_SE:
+            return cf_pair_safe_nw_se;
+        case CF_PROP_NE_SW:
+            return cf_pair_safe_ne_sw;
+        case CF_PROP_LR:
+        default:
+            return cf_pair_safe_lr;
+    }
 }
 
 static inline int cf_source_edge_direct(uint8_t *restrict Y, int w, int pos)
@@ -566,39 +629,115 @@ static inline void cf_polarity_drift_vector(int frame,
     *dy_off = -*dy_on;
 }
 
-static inline void cf_apply_pair_propagation_fast(chronocortex_t *c,
-                                                  int prop_diag,
-                                                  int excitation,
-                                                  int branching,
-                                                  int pair_on,
-                                                  int pair_off,
-                                                  int *on_base,
-                                                  int *off_base)
+typedef void (*cf_pair_apply_fn)(chronocortex_t *c,
+                                 int pair_on,
+                                 int pair_off,
+                                 int *on_base,
+                                 int *off_base);
+
+static inline void cf_pair_apply_none(chronocortex_t *c,
+                                      int pair_on,
+                                      int pair_off,
+                                      int *on_base,
+                                      int *off_base)
 {
-    int on_ex;
-    int off_ex;
+    (void) c;
+    (void) pair_on;
+    (void) pair_off;
+    (void) on_base;
+    (void) off_base;
+}
 
-    if(excitation > 0) {
-        on_ex = c->excite_lut[pair_on];
-        off_ex = c->excite_lut[pair_off];
+static inline void cf_pair_apply_excitation(chronocortex_t *c,
+                                            int pair_on,
+                                            int pair_off,
+                                            int *on_base,
+                                            int *off_base)
+{
+    const int on_ex = c->excite_lut[pair_on];
+    const int off_ex = c->excite_lut[pair_off];
 
-        if(on_ex > *on_base)
-            *on_base = on_ex;
+    if(on_ex > *on_base)
+        *on_base = on_ex;
 
-        if(off_ex > *off_base)
-            *off_base = off_ex;
-    }
+    if(off_ex > *off_base)
+        *off_base = off_ex;
+}
 
-    if(branching > 0 && prop_diag) {
-        int on_br = c->branch_lut[pair_on];
-        int off_br = c->branch_lut[pair_off];
+static inline void cf_pair_apply_branching(chronocortex_t *c,
+                                           int pair_on,
+                                           int pair_off,
+                                           int *on_base,
+                                           int *off_base)
+{
+    const int on_br = c->branch_lut[pair_on];
+    const int off_br = c->branch_lut[pair_off];
 
-        if(on_br > *on_base)
-            *on_base = on_br;
+    if(on_br > *on_base)
+        *on_base = on_br;
 
-        if(off_br > *off_base)
-            *off_base = off_br;
-    }
+    if(off_br > *off_base)
+        *off_base = off_br;
+}
+
+static inline void cf_pair_apply_both(chronocortex_t *c,
+                                      int pair_on,
+                                      int pair_off,
+                                      int *on_base,
+                                      int *off_base)
+{
+    cf_pair_apply_excitation(c, pair_on, pair_off, on_base, off_base);
+    cf_pair_apply_branching(c, pair_on, pair_off, on_base, off_base);
+}
+
+static inline cf_pair_apply_fn cf_pair_apply_for_flags(int excitation,
+                                                       int branching,
+                                                       int prop_diag)
+{
+    const int use_excitation = excitation > 0;
+    const int use_branching = branching > 0 && prop_diag;
+
+    if(use_excitation)
+        return use_branching ? cf_pair_apply_both : cf_pair_apply_excitation;
+
+    return use_branching ? cf_pair_apply_branching : cf_pair_apply_none;
+}
+
+typedef void (*cf_inhibit_fn)(chronocortex_t *c,
+                              int on_base,
+                              int off_base,
+                              int *on_val,
+                              int *off_val);
+
+static inline void cf_inhibit_none(chronocortex_t *c,
+                                   int on_base,
+                                   int off_base,
+                                   int *on_val,
+                                   int *off_val)
+{
+    (void) c;
+    *on_val = on_base;
+    *off_val = off_base;
+}
+
+static inline void cf_inhibit_apply(chronocortex_t *c,
+                                    int on_base,
+                                    int off_base,
+                                    int *on_val,
+                                    int *off_val)
+{
+    *on_val = on_base - c->inhibit_lut[off_base];
+    *off_val = off_base - c->inhibit_lut[on_base];
+
+    if(*on_val < 0)
+        *on_val = 0;
+    if(*off_val < 0)
+        *off_val = 0;
+}
+
+static inline cf_inhibit_fn cf_inhibit_for_mode(int inhibition)
+{
+    return inhibition > 0 ? cf_inhibit_apply : cf_inhibit_none;
 }
 
 static inline void cf_compute_one_safe(chronocortex_t *c,
@@ -606,11 +745,9 @@ static inline void cf_compute_one_safe(chronocortex_t *c,
                                        int x,
                                        int y,
                                        int pos,
-                                       int excitation,
-                                       int inhibition,
-                                       int branching,
-                                       int prop_mode,
-                                       int prop_diag,
+                                       cf_inhibit_fn inhibit_fn,
+                                       cf_pair_safe_fn pair_safe,
+                                       cf_pair_apply_fn pair_apply,
                                        int dx_on,
                                        int dy_on,
                                        int dx_off,
@@ -637,20 +774,11 @@ static inline void cf_compute_one_safe(chronocortex_t *c,
     int on_val;
     int off_val;
 
-    if(excitation > 0 || branching > 0) {
-        int pair_on = cf_pair_safe(c->on_y, w, h, x, y, pos, prop_mode);
-        int pair_off = cf_pair_safe(c->off_y, w, h, x, y, pos, prop_mode);
+    {
+        int pair_on = pair_safe(c->on_y, w, h, x, y, pos);
+        int pair_off = pair_safe(c->off_y, w, h, x, y, pos);
 
-        cf_apply_pair_propagation_fast(
-            c,
-            prop_diag,
-            excitation,
-            branching,
-            pair_on,
-            pair_off,
-            &on_base,
-            &off_base
-        );
+        pair_apply(c, pair_on, pair_off, &on_base, &off_base);
     }
 
     if(event_strength > 0) {
@@ -671,19 +799,7 @@ static inline void cf_compute_one_safe(chronocortex_t *c,
     if(off_base > 255)
         off_base = 255;
 
-    if(inhibition > 0) {
-        on_val = on_base - c->inhibit_lut[off_base];
-        off_val = off_base - c->inhibit_lut[on_base];
-
-        if(on_val < 0)
-            on_val = 0;
-        if(off_val < 0)
-            off_val = 0;
-    }
-    else {
-        on_val = on_base;
-        off_val = off_base;
-    }
+    inhibit_fn(c, on_base, off_base, &on_val, &off_val);
 
     c->nx_on_y[pos] = (uint8_t) on_val;
     c->nx_off_y[pos] = (uint8_t) off_val;
@@ -702,10 +818,8 @@ static inline void cf_compute_one_direct(chronocortex_t *c,
                                          int off_pos,
                                          int po1,
                                          int po2,
-                                         int prop_diag,
-                                         int excitation,
-                                         int inhibition,
-                                         int branching)
+                                         cf_inhibit_fn inhibit_fn,
+                                         cf_pair_apply_fn pair_apply)
 {
     uint8_t cy = Y[pos];
 
@@ -722,20 +836,11 @@ static inline void cf_compute_one_direct(chronocortex_t *c,
     int on_val;
     int off_val;
 
-    if(excitation > 0 || branching > 0) {
+    {
         int pair_on = cf_pair_direct_offset(c->on_y, pos, po1, po2);
         int pair_off = cf_pair_direct_offset(c->off_y, pos, po1, po2);
 
-        cf_apply_pair_propagation_fast(
-            c,
-            prop_diag,
-            excitation,
-            branching,
-            pair_on,
-            pair_off,
-            &on_base,
-            &off_base
-        );
+        pair_apply(c, pair_on, pair_off, &on_base, &off_base);
     }
 
     if(event_strength > 0) {
@@ -756,19 +861,7 @@ static inline void cf_compute_one_direct(chronocortex_t *c,
     if(off_base > 255)
         off_base = 255;
 
-    if(inhibition > 0) {
-        on_val = on_base - c->inhibit_lut[off_base];
-        off_val = off_base - c->inhibit_lut[on_base];
-
-        if(on_val < 0)
-            on_val = 0;
-        if(off_val < 0)
-            off_val = 0;
-    }
-    else {
-        on_val = on_base;
-        off_val = off_base;
-    }
+    inhibit_fn(c, on_base, off_base, &on_val, &off_val);
 
     c->nx_on_y[pos] = (uint8_t) on_val;
     c->nx_off_y[pos] = (uint8_t) off_val;
@@ -786,23 +879,21 @@ static void cf_compute_safe_region(chronocortex_t *c,
                                    int xmax,
                                    int ymin,
                                    int ymax,
-                                   int excitation,
-                                   int inhibition,
-                                   int branching,
-                                   int prop_mode,
-                                   int prop_diag,
+                                   cf_inhibit_fn inhibit_fn,
+                                   cf_pair_safe_fn pair_safe,
+                                   cf_pair_apply_fn pair_apply,
                                    int dx_on,
                                    int dy_on,
                                    int dx_off,
                                    int dy_off)
 {
     int w = c->w;
-    int h = c->h;
     int y;
 
     if(xmin > xmax || ymin > ymax)
         return;
 
+#pragma omp for schedule(static)
     for(y = ymin; y <= ymax; y++) {
         int x;
         int pos = y * w + xmin;
@@ -814,11 +905,9 @@ static void cf_compute_safe_region(chronocortex_t *c,
                 x,
                 y,
                 pos,
-                excitation,
-                inhibition,
-                branching,
-                prop_mode,
-                prop_diag,
+                inhibit_fn,
+                pair_safe,
+                pair_apply,
                 dx_on,
                 dy_on,
                 dx_off,
@@ -827,15 +916,14 @@ static void cf_compute_safe_region(chronocortex_t *c,
         }
     }
 
-    (void) h;
 }
 
 static void cf_compute_cortex_direct_rect(chronocortex_t *c,
                                           VJFrame *frame,
-                                          int excitation,
-                                          int inhibition,
-                                          int branching,
+                                          cf_inhibit_fn inhibit_fn,
                                           int prop_mode,
+                                          cf_pair_safe_fn pair_safe,
+                                          cf_pair_apply_fn pair_apply,
                                           int dx_on,
                                           int dy_on,
                                           int dx_off,
@@ -852,7 +940,6 @@ static void cf_compute_cortex_direct_rect(chronocortex_t *c,
 
     int po1;
     int po2;
-    int prop_diag = (prop_mode >= CF_PROP_NW_SE);
 
     int on_offset;
     int off_offset;
@@ -880,83 +967,74 @@ static void cf_compute_cortex_direct_rect(chronocortex_t *c,
                 off_pos,
                 po1,
                 po2,
-                prop_diag,
-                excitation,
-                inhibition,
-                branching
+                inhibit_fn,
+                pair_apply
             );
         }
     }
 
-#pragma omp single
-    {
-        if(ymin > 0) {
-            cf_compute_safe_region(
-                c, Y,
-                0, w - 1,
-                0, ymin - 1,
-                excitation,
-                inhibition,
-                branching,
-                prop_mode,
-                prop_diag,
-                dx_on,
-                dy_on,
-                dx_off,
-                dy_off
-            );
-        }
+    /*
+     * Safe outside-rectangle bands.
+     * These are small when drift is small, and only borders when drift is zero.
+     */
+    if(ymin > 0) {
+        cf_compute_safe_region(
+            c, Y,
+            0, w - 1,
+            0, ymin - 1,
+            inhibit_fn,
+            pair_safe,
+            pair_apply,
+            dx_on,
+            dy_on,
+            dx_off,
+            dy_off
+        );
+    }
 
-        if(ymax + 1 < h) {
-            cf_compute_safe_region(
-                c, Y,
-                0, w - 1,
-                ymax + 1, h - 1,
-                excitation,
-                inhibition,
-                branching,
-                prop_mode,
-                prop_diag,
-                dx_on,
-                dy_on,
-                dx_off,
-                dy_off
-            );
-        }
+    if(ymax + 1 < h) {
+        cf_compute_safe_region(
+            c, Y,
+            0, w - 1,
+            ymax + 1, h - 1,
+            inhibit_fn,
+            pair_safe,
+            pair_apply,
+            dx_on,
+            dy_on,
+            dx_off,
+            dy_off
+        );
+    }
 
-        if(xmin > 0) {
-            cf_compute_safe_region(
-                c, Y,
-                0, xmin - 1,
-                ymin, ymax,
-                excitation,
-                inhibition,
-                branching,
-                prop_mode,
-                prop_diag,
-                dx_on,
-                dy_on,
-                dx_off,
-                dy_off
-            );
-        }
+    if(xmin > 0) {
+        cf_compute_safe_region(
+            c, Y,
+            0, xmin - 1,
+            ymin, ymax,
+            inhibit_fn,
+            pair_safe,
+            pair_apply,
+            dx_on,
+            dy_on,
+            dx_off,
+            dy_off
+        );
+    }
 
-        if(xmax + 1 < w) {
-            cf_compute_safe_region(
-                c, Y,
-                xmax + 1, w - 1,
-                ymin, ymax,
-                excitation,
-                inhibition,
-                branching,
-                prop_mode,
-                prop_diag,
-                dx_on,
-                dy_on,
-                dx_off,
-                dy_off
-            );
-        }
+    if(xmax + 1 < w) {
+        cf_compute_safe_region(
+            c, Y,
+            xmax + 1, w - 1,
+            ymin, ymax,
+            inhibit_fn,
+            pair_safe,
+            pair_apply,
+            dx_on,
+            dy_on,
+            dx_off,
+            dy_off
+        );
     }
 }
 
@@ -980,6 +1058,11 @@ static void cf_compute_cortex(chronocortex_t *c,
     int xmax;
     int ymin;
     int ymax;
+    const int prop_diag = (prop_mode >= CF_PROP_NW_SE);
+    const cf_pair_safe_fn pair_safe = cf_pair_safe_for_mode(prop_mode);
+    const cf_pair_apply_fn pair_apply =
+        cf_pair_apply_for_flags(excitation, branching, prop_diag);
+    const cf_inhibit_fn inhibit_fn = cf_inhibit_for_mode(inhibition);
 
     cf_polarity_drift_vector(
         c->frame,
@@ -990,6 +1073,12 @@ static void cf_compute_cortex(chronocortex_t *c,
         &dy_off
     );
 
+    /*
+     * Direct interior constraints:
+     * - source edge needs x/y one pixel away from border
+     * - propagation pair also needs one pixel away from border
+     * - drift source positions must stay inside frame
+     */
     xmin = 1;
     ymin = 1;
     xmax = w - 2;
@@ -1015,10 +1104,10 @@ static void cf_compute_cortex(chronocortex_t *c,
         cf_compute_cortex_direct_rect(
             c,
             frame,
-            excitation,
-            inhibition,
-            branching,
+            inhibit_fn,
             prop_mode,
+            pair_safe,
+            pair_apply,
             dx_on,
             dy_on,
             dx_off,
@@ -1031,7 +1120,6 @@ static void cf_compute_cortex(chronocortex_t *c,
     }
     else {
         uint8_t *restrict Y = frame->data[0];
-        int prop_diag = (prop_mode >= CF_PROP_NW_SE);
         int y;
 
 #pragma omp for schedule(static)
@@ -1046,11 +1134,9 @@ static void cf_compute_cortex(chronocortex_t *c,
                     x,
                     y,
                     pos,
-                    excitation,
-                    inhibition,
-                    branching,
-                    prop_mode,
-                    prop_diag,
+                    inhibit_fn,
+                    pair_safe,
+                    pair_apply,
                     dx_on,
                     dy_on,
                     dx_off,
@@ -1194,6 +1280,49 @@ static void cf_render_cortex_const_bleed(chronocortex_t *c,
     }
 }
 
+typedef void (*cf_source_base_fn)(const uint8_t *bleed_y,
+                                  const uint8_t *bleed_uv,
+                                  uint8_t src_y,
+                                  uint8_t src_u,
+                                  uint8_t src_v,
+                                  int *base_y,
+                                  uint8_t *base_u,
+                                  uint8_t *base_v);
+
+static inline void cf_source_base_pure(const uint8_t *bleed_y,
+                                       const uint8_t *bleed_uv,
+                                       uint8_t src_y,
+                                       uint8_t src_u,
+                                       uint8_t src_v,
+                                       int *base_y,
+                                       uint8_t *base_u,
+                                       uint8_t *base_v)
+{
+    (void) bleed_y;
+    (void) bleed_uv;
+    (void) src_y;
+    (void) src_u;
+    (void) src_v;
+
+    *base_y = 0;
+    *base_u = 128;
+    *base_v = 128;
+}
+
+static inline void cf_source_base_bleed(const uint8_t *bleed_y,
+                                        const uint8_t *bleed_uv,
+                                        uint8_t src_y,
+                                        uint8_t src_u,
+                                        uint8_t src_v,
+                                        int *base_y,
+                                        uint8_t *base_u,
+                                        uint8_t *base_v)
+{
+    *base_y = bleed_y[src_y];
+    *base_u = bleed_uv[src_u];
+    *base_v = bleed_uv[src_v];
+}
+
 static void cf_render_cortex_source(chronocortex_t *c,
                                     VJFrame *frame,
                                     int source_bleed)
@@ -1204,6 +1333,8 @@ static void cf_render_cortex_source(chronocortex_t *c,
 
     int len = c->len;
     int i;
+    const cf_source_base_fn base_fn =
+        (source_bleed > 0) ? cf_source_base_bleed : cf_source_base_pure;
 
 #pragma omp for schedule(static)
     for(i = 0; i < len; i++) {
@@ -1233,16 +1364,8 @@ static void cf_render_cortex_source(chronocortex_t *c,
         color_index = c->gain_lut[ev];
         ev = color_index;
 
-        if(source_bleed > 0) {
-            base_y = c->bleed_y_lut[Y[i]];
-            base_u = c->bleed_uv_lut[src_u];
-            base_v = c->bleed_uv_lut[src_v];
-        }
-        else {
-            base_y = 0;
-            base_u = 128;
-            base_v = 128;
-        }
+        base_fn(c->bleed_y_lut, c->bleed_uv_lut,
+                Y[i], src_u, src_v, &base_y, &base_u, &base_v);
 
         Y[i] = cf_u8(base_y + ev);
 
@@ -1281,6 +1404,7 @@ static void cf_render_cortex_white_pure(chronocortex_t *c,
                                         VJFrame *frame)
 {
     uint8_t *restrict Y = frame->data[0];
+    uint8_t *planes[2] = { frame->data[1], frame->data[2] };
 
     int len = c->len;
     int i;
@@ -1293,11 +1417,9 @@ static void cf_render_cortex_white_pure(chronocortex_t *c,
         Y[i] = c->gain_lut[ev];
     }
 
-#pragma omp single
-    {
-        veejay_memset(frame->data[1], 128, (size_t) len);
-        veejay_memset(frame->data[2], 128, (size_t) len);
-    }
+#pragma omp for schedule(static)
+    for(i = 0; i < 2; i++)
+        veejay_memset(planes[i], 128, (size_t) len);
 }
 
 static void cf_render_cortex_white_bleed(chronocortex_t *c,
@@ -1385,34 +1507,58 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
 {
     chronocortex_t *c = (chronocortex_t *) ptr;
 
-    int threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
-    int excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
-    int inhibition_ui     = cf_clampi(args[P_INHIBITION], 0, 1000);
-    int decay_ui          = cf_clampi(args[P_DECAY], 0, 1000);
-    int branching_ui      = cf_clampi(args[P_BRANCHING], 0, 1000);
-    int polarity_drift_ui = cf_clampi(args[P_POLARITY_DRIFT], 0, 1000);
-    int source_bleed_ui   = cf_clampi(args[P_SOURCE_BLEED], 0, 1000);
-    int cortex_gain_ui    = cf_clampi(args[P_CORTEX_GAIN], 0, 1000);
-    int color_energy_ui   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
-    int color_mode        = cf_clampi(args[P_COLOR_MODE], 0, 4);
+    int threshold;
+    int excitation;
+    int inhibition;
+    int decay;
+    int branching;
+    int polarity_drift;
+    int source_bleed;
+    int color_mode;
+    int cortex_gain;
+    int color_energy;
 
-    int threshold      = cf_ui1000_to_u8(threshold_ui);
-    int excitation     = cf_ui1000_to_u8(excitation_ui);
-    int inhibition     = cf_ui1000_to_u8(inhibition_ui);
-    int decay          = cf_ui1000_to_u8(decay_ui);
-    int branching      = cf_ui1000_to_u8(branching_ui);
-    int polarity_drift = cf_ui1000_to_u8(polarity_drift_ui);
-    int source_bleed   = cf_ui1000_to_u8(source_bleed_ui);
-    int cortex_gain    = cf_ui1000_to_u8(cortex_gain_ui);
-    int color_energy   = cf_ui1000_to_u8(color_energy_ui);
+    int threshold_ui;
+    int excitation_ui;
+    int inhibition_ui;
+    int decay_ui;
+    int branching_ui;
+    int polarity_drift_ui;
+    int source_bleed_ui;
+    int cortex_gain_ui;
+    int color_energy_ui;
 
-    int prop_mode = c->frame & 3;
+    int prop_mode;
 
-    #pragma omp single
+#pragma omp single
     {
         if(!c->seeded)
             cf_seed(c, frame);
+    }
 
+    threshold_ui      = cf_clampi(args[P_THRESHOLD], 0, 1000);
+    excitation_ui     = cf_clampi(args[P_EXCITATION], 0, 1000);
+    inhibition_ui     = cf_clampi(args[P_INHIBITION], 0, 1000);
+    decay_ui          = cf_clampi(args[P_DECAY], 0, 1000);
+    branching_ui      = cf_clampi(args[P_BRANCHING], 0, 1000);
+    polarity_drift_ui = cf_clampi(args[P_POLARITY_DRIFT], 0, 1000);
+    source_bleed_ui   = cf_clampi(args[P_SOURCE_BLEED], 0, 1000);
+    cortex_gain_ui    = cf_clampi(args[P_CORTEX_GAIN], 0, 1000);
+    color_energy_ui   = cf_clampi(args[P_COLOR_ENERGY], 0, 1000);
+    color_mode        = cf_clampi(args[P_COLOR_MODE], 0, 4);
+
+    threshold      = cf_ui1000_to_u8(threshold_ui);
+    excitation     = cf_ui1000_to_u8(excitation_ui);
+    inhibition     = cf_ui1000_to_u8(inhibition_ui);
+    decay          = cf_ui1000_to_u8(decay_ui);
+    branching      = cf_ui1000_to_u8(branching_ui);
+    polarity_drift = cf_ui1000_to_u8(polarity_drift_ui);
+    source_bleed   = cf_ui1000_to_u8(source_bleed_ui);
+    cortex_gain    = cf_ui1000_to_u8(cortex_gain_ui);
+    color_energy   = cf_ui1000_to_u8(color_energy_ui);
+
+#pragma omp single
+    {
         cf_build_luts_if_needed(
             c,
             threshold,
@@ -1425,32 +1571,32 @@ void chronocortex_apply(void *ptr, VJFrame *frame, int *args)
             color_energy
         );
     }
-    
-    cf_compute_cortex(
-        c,
-        frame,
-        excitation,
-        inhibition,
-        branching,
-        polarity_drift,
-        prop_mode
-    );
 
-    #pragma omp single
+    prop_mode = c->frame & 3;
+
+        cf_compute_cortex(
+            c,
+            frame,
+            excitation,
+            inhibition,
+            branching,
+            polarity_drift,
+            prop_mode
+        );
+#pragma omp single
+        {
+            cf_swap_fields(c);
+        }
+
+        cf_render_cortex(
+            c,
+            frame,
+            source_bleed,
+            color_mode
+        );
+
+#pragma omp single
     {
-        cf_swap_fields(c);
-    }
-
-    cf_render_cortex(
-        c,
-        frame,
-        source_bleed,
-        color_mode
-    );
-
-    #pragma omp single
-    {
-        c->last_color_mode = color_mode;
         c->frame++;
     }
 }

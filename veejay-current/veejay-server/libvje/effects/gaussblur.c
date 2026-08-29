@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2015-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,12 +18,9 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include <float.h>
 #include "common.h"
-#include "gaussblur.h"
-#include <libsubsample/subsample.h>
 #include <libswscale/swscale.h>
-#include <libavutil/pixfmt.h>
+#include "gaussblur.h"
 
 extern int yuv_sws_get_cpu_flags();
 
@@ -59,6 +56,16 @@ vj_effect *gaussblur_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->defaults[0] = 100;
     ve->defaults[1] = 100;
@@ -75,6 +82,7 @@ vj_effect *gaussblur_init(int w, int h)
     ve->extra_frame = 0;
     ve->sub_format = -1;
     ve->rgb_conv = 0;
+    ve->parallel = 0;
     ve->alpha = FLAG_ALPHA_OUT | FLAG_ALPHA_SRC_A;
 
     {
@@ -182,19 +190,16 @@ void gaussblur_apply(void *ptr, VJFrame *frame, int *args)
 {
     gaussblur_t *g = (gaussblur_t*) ptr;
 
-    uint8_t *A = frame->data[3];
-    if(!A)
-        return;
-
     const int radius = args[0];
     const int strength = args[1];
     const int quality = args[2];
 
+    uint8_t *A = frame->data[3];
     const int width = frame->width;
     const int height = frame->height;
     const int len = frame->len;
 
-    #pragma omp single
+#pragma omp single
     {
         if(g->last_radius != radius || g->last_strength != strength || g->last_quality != quality) {
             if(g->gaussfilter.filter_context) {
@@ -208,10 +213,14 @@ void gaussblur_apply(void *ptr, VJFrame *frame, int *args)
                 g->last_quality = quality;
             }
         }
+    }
 
-        if(g->gaussfilter.filter_context) {
-            veejay_memcpy(g->temp, A, len);
-            gaussblur_scale(A, width, g->temp, width, width, height, g->gaussfilter.filter_context);
-        }
+    if(!g->gaussfilter.filter_context)
+        return;
+
+#pragma omp single
+    {
+        veejay_memcpy(g->temp, A, len);
+        gaussblur_scale(A, width, g->temp, width, width, height, g->gaussfilter.filter_context);
     }
 }

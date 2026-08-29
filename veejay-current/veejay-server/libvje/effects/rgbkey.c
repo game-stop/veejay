@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2004 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -84,6 +84,17 @@ vj_effect *rgbkey_init(int w, int h)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
+
     ve->defaults[P_HUE_ANGLE] = 4500;
     ve->defaults[P_RED] = 0;
     ve->defaults[P_GREEN] = 255;
@@ -137,11 +148,9 @@ vj_effect *rgbkey_init(int w, int h)
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
 
-    (void)w;
-    (void)h;
-
     return ve;
 }
+
 
 void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
@@ -172,11 +181,7 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int sin_q_fp = (int)((vt_f / mag_f) * RGBKEY_SCALE);
 
     const float angle_rad = ((float)hue_angle_arg / 100.0f) * (3.14159265f / 180.0f);
-    float t = tanf(angle_rad);
-    if(fabsf(t) < 1e-6f)
-        t = 1e-6f;
-
-    const int inv_wedge_slope_fp = (int)((1.0f / t) * RGBKEY_SCALE);
+    const int inv_wedge_slope_fp = (int)((1.0f / tanf(angle_rad)) * RGBKEY_SCALE);
 
     const int threshold = clampi(threshold_arg, 0, 255);
     const int solidity = clampi(solidity_arg, 1, 255);
@@ -191,7 +196,6 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int ut = (int)ut_f;
     const int vt = (int)vt_f;
     const int len = frame->len;
-
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
@@ -200,53 +204,64 @@ void rgbkey_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const uint8_t *restrict Cb2 = frame2->data[1];
     const uint8_t *restrict Cr2 = frame2->data[2];
 
-    #pragma omp for schedule(static)
-    for(int pos = 0; pos < len; pos++) {
-        const int uc = (int)Cb[pos] - 128;
-        const int vc = (int)Cr[pos] - 128;
-        const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
-        const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
-        const int abs_yy = yy < 0 ? -yy : yy;
-        const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
-        int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
+    if(mode != 0) {
+#pragma omp for schedule(static)
+        for(int pos = 0; pos < len; pos++) {
+            const int uc = (int)Cb[pos] - 128;
+            const int vc = (int)Cr[pos] - 128;
+            const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+            const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+            const int abs_yy = yy < 0 ? -yy : yy;
+            const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+            const int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-        if(mode != 0) {
             Y[pos] = (uint8_t)clampi(alpha, 0, 255);
             Cb[pos] = 128;
             Cr[pos] = 128;
-            continue;
         }
+    }
+    else {
+#pragma omp for schedule(static)
+        for(int pos = 0; pos < len; pos++) {
+            const int uc = (int)Cb[pos] - 128;
+            const int vc = (int)Cr[pos] - 128;
+            const int xx = (uc * cos_q_fp + vc * sin_q_fp) >> 12;
+            const int yy = (vc * cos_q_fp - uc * sin_q_fp) >> 12;
+            const int abs_yy = yy < 0 ? -yy : yy;
+            const int dist_fp = (mag_fp - (xx << 12)) + (abs_yy * inv_wedge_slope_fp);
+            int alpha = ((dist_fp - black_clip_fp) * inv_range_fp) >> 20;
 
-        if(LIKELY(alpha <= 0)) {
-            Y[pos] = Y2[pos];
-            Cb[pos] = Cb2[pos];
-            Cr[pos] = Cr2[pos];
-            continue;
+            if(LIKELY(alpha <= 0)) {
+                Y[pos] = Y2[pos];
+                Cb[pos] = Cb2[pos];
+                Cr[pos] = Cr2[pos];
+                continue;
+            }
+
+            if(UNLIKELY(alpha > 255))
+                alpha = 255;
+
+            const int invA = 255 - alpha;
+
+            int cb_c = Cb[pos];
+            int cr_c = Cr[pos];
+
+            if(xx > 0) {
+                int suppress_fp = xx * spill_factor_fp;
+
+                if(suppress_fp > RGBKEY_SCALE)
+                    suppress_fp = RGBKEY_SCALE;
+
+                cb_c -= (suppress_fp * ut) >> 12;
+                cr_c -= (suppress_fp * vt) >> 12;
+
+                cb_c = clampi(cb_c, 0, 255);
+                cr_c = clampi(cr_c, 0, 255);
+            }
+
+            Y[pos] = RGBKEY_DIV255(Y[pos] * alpha + Y2[pos] * invA);
+            Cb[pos] = RGBKEY_DIV255(cb_c * alpha + Cb2[pos] * invA);
+            Cr[pos] = RGBKEY_DIV255(cr_c * alpha + Cr2[pos] * invA);
         }
-
-        if(UNLIKELY(alpha > 255))
-            alpha = 255;
-
-        const int invA = 255 - alpha;
-
-        int cb_c = Cb[pos];
-        int cr_c = Cr[pos];
-
-        if(xx > 0) {
-            int suppress_fp = xx * spill_factor_fp;
-
-            if(suppress_fp > RGBKEY_SCALE)
-                suppress_fp = RGBKEY_SCALE;
-
-            cb_c -= (suppress_fp * ut) >> 12;
-            cr_c -= (suppress_fp * vt) >> 12;
-
-            cb_c = clampi(cb_c, 0, 255);
-            cr_c = clampi(cr_c, 0, 255);
-        }
-
-        Y[pos] = RGBKEY_DIV255(Y[pos] * alpha + Y2[pos] * invA);
-        Cb[pos] = RGBKEY_DIV255(cb_c * alpha + Cb2[pos] * invA);
-        Cr[pos] = RGBKEY_DIV255(cr_c * alpha + Cr2[pos] * invA);
     }
 }

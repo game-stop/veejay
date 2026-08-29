@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -15,106 +15,154 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+
 #include "common.h"
-#include <veejaycore/vjmem.h>
 #include "crosspixel.h"
 
-#define CROSSPIXEL_PARAMS 2
-#define P_MODE      0
-#define P_THRESHOLD 1
-
 typedef struct {
-    int state;
+    uint8_t *cross_pixels[3];
 } crosspixel_t;
-
-static inline int clampi(int v, int lo, int hi)
-{
-    return (v < lo) ? lo : (v > hi ? hi : v);
-}
 
 vj_effect *crosspixel_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    if(!ve)
-        return NULL;
-    
-    ve->num_params = CROSSPIXEL_PARAMS;
+
+    ve->num_params = 2;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
-    
 
-    
-    ve->limits[0][P_MODE] = 0;      ve->limits[1][P_MODE] = 1;      ve->defaults[P_MODE] = 0;
-    ve->limits[0][P_THRESHOLD] = 0; ve->limits[1][P_THRESHOLD] = 255; ve->defaults[P_THRESHOLD] = 128;
-    
-    ve->description = "Cross Pixel";
+    ve->limits[0][0] = 0; ve->limits[1][0] = 1;  ve->defaults[0] = 0;
+    ve->limits[0][1] = 1; ve->limits[1][1] = 40; ve->defaults[1] = 2;
+
+    ve->description = "Pixel Raster";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
-    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Threshold");
-    
-    (void)w;
-    (void)h;
+    ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Size");
+    ve->hints = vje_init_value_hint_list(ve->num_params);
+
+    vje_build_value_hint_list(ve->hints, ve->limits[1][0], 0, "Black", "White");
+
+    {
+        const vj_beat_param_hint_t beat_hints[] = {
+            VJ_BEAT_HINT_V2(VJ_BEAT_SELECTOR, VJ_BEAT_F_REJECT | VJ_BEAT_F_STRUCTURAL, VJ_BEAT_SRC_NONE, VJ_BEAT_OP_NONE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_LINEAR, VJ_BEAT_SOFT_UNSET, VJ_BEAT_SOFT_UNSET, 0, 0, 0, 0, 0, 0, 0, VJ_BEAT_COST_STRUCTURAL, -1000, 0, 0, VJ_BEAT_GROUP_NONE, 0),
+            VJ_BEAT_HINT_V2(VJ_BEAT_GRID_SIZE, VJ_BEAT_F_CONTINUOUS | VJ_BEAT_F_DISCRETE | VJ_BEAT_F_NO_ZERO_CROSS, VJ_BEAT_SRC_SCRATCH_BURST, VJ_BEAT_OP_MAP_RANGE, VJ_BEAT_POLARITY_POSITIVE, VJ_BEAT_CURVE_PUNCH, 1, 24, 82, 100, 0, 520, 0, 1, 100, VJ_BEAT_COST_CHEAP, 100, 0, 0, VJ_BEAT_GROUP_NONE, 0)
+        };
+        ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
+    }
 
     return ve;
 }
 
 void *crosspixel_malloc(int w, int h)
 {
-    crosspixel_t *c = (crosspixel_t *) vj_calloc(sizeof(crosspixel_t));
+    crosspixel_t *c = (crosspixel_t*) vj_calloc(sizeof(crosspixel_t));
+
     if(!c)
         return NULL;
-    
-    c->state = 0;
-    
-    (void)w;
-    (void)h;
 
-    return (void*) c;
+    const int len = w * h;
+
+    if(len <= 0) {
+        free(c);
+        return NULL;
+    }
+
+    c->cross_pixels[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len * 3);
+
+    if(!c->cross_pixels[0]) {
+        free(c);
+        return NULL;
+    }
+
+    c->cross_pixels[1] = c->cross_pixels[0] + len;
+    c->cross_pixels[2] = c->cross_pixels[1] + len;
+    return c;
 }
 
 void crosspixel_free(void *ptr)
 {
-    if(!ptr)
+    crosspixel_t *c = (crosspixel_t*) ptr;
+
+    if(!c)
         return;
-    free(ptr);
+
+    if(c->cross_pixels[0])
+        free(c->cross_pixels[0]);
+
+    free(c);
+}
+
+static void crosspixel_copy_raster_rows(uint8_t *restrict dst_y,
+                                        const uint8_t *restrict src_y,
+                                        uint8_t *restrict dst_u,
+                                        const uint8_t *restrict src_u,
+                                        uint8_t *restrict dst_v,
+                                        const uint8_t *restrict src_v,
+                                        int width,
+                                        int height,
+                                        unsigned int step)
+{
+    if(!dst_y || !src_y || !dst_u || !src_u || !dst_v || !src_v ||
+       width <= 0 || height <= 0 || step == 0)
+        return;
+
+    #pragma omp for schedule(static)
+    for(int y = 0; y < height; y++)
+    {
+        if(((unsigned int)y % step) == 1u)
+        {
+            const size_t offset = (size_t)y * (size_t)width;
+
+            veejay_memcpy(dst_y + offset, src_y + offset, width);
+            veejay_memcpy(dst_u + offset, src_u + offset, width);
+            veejay_memcpy(dst_v + offset, src_v + offset, width);
+        }
+    }
 }
 
 void crosspixel_apply(void *ptr, VJFrame *frame, int *args)
 {
-    crosspixel_t *c = (crosspixel_t *) ptr;
+    crosspixel_t *c = (crosspixel_t*) ptr;
+
+    const int mode = args[0];
+    const int size = args[1];
+    const int width = frame->width;
+    const int height = frame->height;
     const int len = frame->len;
-    const int mode = args[P_MODE];
-    const int threshold = args[P_THRESHOLD];
-    
+
+    const unsigned int step_y = (unsigned int)size * 2u;
+
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
-    
-    #pragma omp single
+
+#pragma omp sections
     {
-        c->state = (c->state + 1) & 1;
-    }
-    
-    #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        int y = Y[i];
-        int cb = Cb[i];
-        int cr = Cr[i];
-        
-        if(mode == 0) {
-            if(y > threshold) {
-                Y[i] = 255 - y;
-            }
-        } else {
-            if(y < threshold) {
-                Y[i] = 255 - y;
-            }
+    #pragma omp section
+        {
+            veejay_memcpy(c->cross_pixels[0], Y, len);
+            veejay_memset(Y, mode == 0 ? pixel_Y_lo_ : pixel_Y_hi_, len);
         }
-        
-        Cb[i] = 128 + ((cb - 128) >> 1);
-        Cr[i] = 128 + ((cr - 128) >> 1);
+    #pragma omp section
+        {
+            veejay_memcpy(c->cross_pixels[1], Cb, len);
+            veejay_memset(Cb, 128, len);
+        }
+    #pragma omp section
+        {
+            veejay_memcpy(c->cross_pixels[2], Cr, len);
+            veejay_memset(Cr, 128, len);
+        }
     }
+
+    crosspixel_copy_raster_rows(
+        Y, c->cross_pixels[0],
+        Cb, c->cross_pixels[1],
+        Cr, c->cross_pixels[2],
+        width, height, step_y
+    );
 }

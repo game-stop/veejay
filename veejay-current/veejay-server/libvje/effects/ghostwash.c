@@ -60,7 +60,7 @@ typedef struct {
     int cw;
     int ch;
     int initialized;
-    int n_threads;
+    int setup_failed;
     float maturity;
     uint32_t frame_no;
 } ghostwash_t;
@@ -95,6 +95,7 @@ static inline float param1000_to_float(int v)
     else if (v > 1000) v = 1000;
     return (float)v * 0.001f;
 }
+
 
 static inline uint8_t avg2_u8(uint8_t a, uint8_t b)
 {
@@ -238,6 +239,7 @@ static void build_flow_grid(ghostwash_t *p, int w, int h, int cell)
     const uint32_t seed1 = seed0 + 1U;
     const float phase = ((float)(p->frame_no & 15U)) * (1.0f / 16.0f);
 
+#pragma omp for schedule(static)
     for (int gy = 0; gy < gh; gy++) {
         for (int gx = 0; gx < gw; gx++) {
             const int gi = gy * gw + gx;
@@ -262,6 +264,14 @@ vj_effect *ghostwash_init(int w, int h)
     ve->defaults = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
+
+    if (!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if (ve->defaults) free(ve->defaults);
+        if (ve->limits[0]) free(ve->limits[0]);
+        if (ve->limits[1]) free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_SOURCE] = 0;
     ve->limits[1][P_SOURCE] = 1000;
@@ -311,6 +321,7 @@ vj_effect *ghostwash_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
+    ve->parallel = 0;
     ve->param_description = vje_build_param_list(
         ve->num_params,
         "Source",
@@ -453,6 +464,7 @@ void *ghostwash_malloc(int w, int h)
     veejay_memset(p->poly_ry_y, 0, sizeof(float) * (size_t)ch);
 
     p->initialized = 0;
+    p->setup_failed = 0;
     p->maturity = 0.0f;
     p->frame_no = 0;
 
@@ -463,10 +475,8 @@ void *ghostwash_malloc(int w, int h)
     do { \
         switch (MODE) { \
             case 0: \
-                if (warp_gain > 0.0f) { \
-                    vx += (-cy * inv_max_dim) * warp_gain; \
-                    vy += ( cx * inv_max_dim) * warp_gain; \
-                } \
+                vx += (-cy * inv_max_dim) * warp_gain; \
+                vy += ( cx * inv_max_dim) * warp_gain; \
                 break; \
             case 1: \
                 vx *= 1.0f + warp_gain * 0.10f; \
@@ -565,7 +575,7 @@ void *ghostwash_malloc(int w, int h)
 
 #define GHOSTWASH_ADVECTION_LOOP(MODE, MONO) \
     do { \
-        _Pragma("omp for collapse(2) schedule(static)") \
+        _Pragma("omp for schedule(static)") \
         for (int gy = 0; gy < gh - 1; gy++) { \
             for (int gx = 0; gx < gw - 1; gx++) { \
                 const int y0 = gy * cell; \
@@ -728,6 +738,79 @@ static inline void ghostwash_dispatch_advection(
     }
 }
 
+typedef void (*ghostwash_chroma_fn)(uint8_t *U, uint8_t *V,
+                                    const uint8_t *gu, const uint8_t *gv,
+                                    int c00, int c10, int c01, int c11,
+                                    int o00, int fx, int fy, int w, int h);
+
+static void ghostwash_render_mono_chroma(uint8_t *U, uint8_t *V,
+                                         const uint8_t *gu, const uint8_t *gv,
+                                         int c00, int c10, int c01, int c11,
+                                         int o00, int fx, int fy, int w, int h)
+{
+    (void)gu;
+    (void)gv;
+    (void)c00;
+    (void)c10;
+    (void)c01;
+    (void)c11;
+
+    U[o00] = 128;
+    V[o00] = 128;
+
+    if(fx + 1 < w) {
+        U[o00 + 1] = 128;
+        V[o00 + 1] = 128;
+    }
+
+    if(fy + 1 < h) {
+        const int o01 = o00 + w;
+
+        U[o01] = 128;
+        V[o01] = 128;
+
+        if(fx + 1 < w) {
+            U[o01 + 1] = 128;
+            V[o01 + 1] = 128;
+        }
+    }
+}
+
+static void ghostwash_render_color_chroma(uint8_t *U, uint8_t *V,
+                                          const uint8_t *gu, const uint8_t *gv,
+                                          int c00, int c10, int c01, int c11,
+                                          int o00, int fx, int fy, int w, int h)
+{
+    const uint8_t u00 = gu[c00];
+    const uint8_t u10 = avg2_u8(gu[c00], gu[c10]);
+    const uint8_t u01 = avg2_u8(gu[c00], gu[c01]);
+    const uint8_t u11 = avg4_u8(gu[c00], gu[c10], gu[c01], gu[c11]);
+    const uint8_t v00 = gv[c00];
+    const uint8_t v10 = avg2_u8(gv[c00], gv[c10]);
+    const uint8_t v01 = avg2_u8(gv[c00], gv[c01]);
+    const uint8_t v11 = avg4_u8(gv[c00], gv[c10], gv[c01], gv[c11]);
+
+    U[o00] = u00;
+    V[o00] = v00;
+
+    if(fx + 1 < w) {
+        U[o00 + 1] = u10;
+        V[o00 + 1] = v10;
+    }
+
+    if(fy + 1 < h) {
+        const int o01 = o00 + w;
+
+        U[o01] = u01;
+        V[o01] = v01;
+
+        if(fx + 1 < w) {
+            U[o01 + 1] = u11;
+            V[o01 + 1] = v11;
+        }
+    }
+}
+
 static void ghostwash_render_fullres(ghostwash_t *p, VJFrame *frame, int mono_mode)
 {
     const int w = p->w;
@@ -740,6 +823,8 @@ static void ghostwash_render_fullres(ghostwash_t *p, VJFrame *frame, int mono_mo
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
+    const ghostwash_chroma_fn chroma =
+        mono_mode ? ghostwash_render_mono_chroma : ghostwash_render_color_chroma;
 
 #pragma omp for schedule(static)
     for (int cy = 0; cy < ch; cy++) {
@@ -775,54 +860,7 @@ static void ghostwash_render_fullres(ghostwash_t *p, VJFrame *frame, int mono_mo
                     Y[o01 + 1] = y11;
             }
 
-            if (mono_mode) {
-                U[o00] = 128;
-                V[o00] = 128;
-
-                if (fx + 1 < w) {
-                    U[o00 + 1] = 128;
-                    V[o00 + 1] = 128;
-                }
-
-                if (fy + 1 < h) {
-                    const int o01 = o00 + w;
-                    U[o01] = 128;
-                    V[o01] = 128;
-
-                    if (fx + 1 < w) {
-                        U[o01 + 1] = 128;
-                        V[o01 + 1] = 128;
-                    }
-                }
-            } else {
-                const uint8_t u00 = gu[c00];
-                const uint8_t u10 = avg2_u8(gu[c00], gu[c10]);
-                const uint8_t u01 = avg2_u8(gu[c00], gu[c01]);
-                const uint8_t u11 = avg4_u8(gu[c00], gu[c10], gu[c01], gu[c11]);
-                const uint8_t v00 = gv[c00];
-                const uint8_t v10 = avg2_u8(gv[c00], gv[c10]);
-                const uint8_t v01 = avg2_u8(gv[c00], gv[c01]);
-                const uint8_t v11 = avg4_u8(gv[c00], gv[c10], gv[c01], gv[c11]);
-
-                U[o00] = u00;
-                V[o00] = v00;
-
-                if (fx + 1 < w) {
-                    U[o00 + 1] = u10;
-                    V[o00 + 1] = v10;
-                }
-
-                if (fy + 1 < h) {
-                    const int o01 = o00 + w;
-                    U[o01] = u01;
-                    V[o01] = v01;
-
-                    if (fx + 1 < w) {
-                        U[o01 + 1] = u11;
-                        V[o01 + 1] = v11;
-                    }
-                }
-            }
+            chroma(U, V, gu, gv, c00, c10, c01, c11, o00, fx, fy, w, h);
         }
     }
 }
@@ -840,10 +878,31 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict U = frame->data[1];
     uint8_t *restrict V = frame->data[2];
 
-    int grid_ok = 1;
-    int skip_processing = 0;
-    int gw = 0, gh = 0;
-    
+    const int needs_init = !p->initialized;
+    if (needs_init) {
+#pragma omp for schedule(static)
+        for (int y = 0; y < ch; y++) {
+            const int row = y * cw;
+            for (int x = 0; x < cw; x++) {
+                const int idx = row + x;
+                p->canvas_y[idx] = downsample_src_plane_2x2(Y, x, y, w, h);
+                p->canvas_u[idx] = downsample_src_plane_2x2(U, x, y, w, h);
+                p->canvas_v[idx] = downsample_src_plane_2x2(V, x, y, w, h);
+                p->next_y[idx] = p->canvas_y[idx];
+                p->next_u[idx] = p->canvas_u[idx];
+                p->next_v[idx] = p->canvas_v[idx];
+                p->prev_src_y[idx] = p->canvas_y[idx];
+            }
+        }
+
+#pragma omp single
+        {
+        p->initialized = 1;
+        p->maturity = 0.0f;
+        p->frame_no = 0;
+        }
+    }
+
     const float fade_param = 0.35f;
     const float source_param = param1000_to_float(args[P_SOURCE]);
     float drift_param = param1000_to_float(args[P_DRIFT]);
@@ -854,8 +913,8 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     const float flow_size_param = param1000_to_float(args[P_FLOW_SIZE]);
     float motion_param = param1000_to_float(args[P_MOTION_PULL]);
     float color_strength_param = param1000_to_float(args[P_COLOR_STRENGTH]);
-    
-    int mono_mode = (args[P_COLOR_MODE] != 0);
+    const int mono_mode = (args[P_COLOR_MODE] != 0);
+
     int geometry_mode = args[P_GEOMETRY];
 
     if (geometry_mode < 0)
@@ -878,15 +937,18 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     const float color_strength_curve = color_strength_param * color_strength_param;
 
     const float mature_rate = 0.0004f + fade_curve * 0.0350f;
-    float current_maturity = p->maturity + (1.0f - p->maturity) * mature_rate;
+#pragma omp single
+    {
+        p->maturity += (1.0f - p->maturity) * mature_rate;
+        if (p->maturity > 1.0f)
+            p->maturity = 1.0f;
+    }
 
-    if (current_maturity > 1.0f)
-        current_maturity = 1.0f;
-
+    const float maturity = p->maturity;
     const float early_source = 0.004f + source_curve * 0.360f;
     const float mature_source = 0.003f + source_curve * 0.150f;
 
-    float src_mix = lerpf_local(early_source, mature_source, current_maturity);
+    float src_mix = lerpf_local(early_source, mature_source, maturity);
     src_mix *= (1.0f - persist_curve * 0.78f);
 
     if (src_mix < 0.0015f) src_mix = 0.0015f;
@@ -903,18 +965,18 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     if (chroma_src_mix < 0.018f) chroma_src_mix = 0.018f;
     if (chroma_src_mix > 0.70f) chroma_src_mix = 0.70f;
 
-    float chroma_hist_mix = 1.0f - chroma_src_mix;
-    float color_gain = 0.90f + color_strength_curve * 0.42f + bleed_curve * 0.16f;
+    const float chroma_hist_mix = 1.0f - chroma_src_mix;
+    const float color_gain = 0.90f + color_strength_curve * 0.42f + bleed_curve * 0.16f;
     const float desat = (1.0f - bleed_curve * 0.55f) * (0.10f + persist_curve * 0.20f) * (1.0f - color_strength_curve * 0.70f);
-    float chroma_keep = clampf_local(1.0f - desat, 0.30f, 1.15f);
-    const float detail_gain = detail_curve * lerpf_local(0.55f, 0.20f, current_maturity);
-    float detail_boost = detail_gain * 0.20f + 0.08f;
-    float flow_pixels = ((0.20f + current_maturity * 1.55f) * (0.3f + drift_curve * 26.0f)) * 0.5f;
-    float warp_gain = warp_curve * 3.0f;
-    float instability_gain = instability_curve * 8.0f * (0.25f + current_maturity * 0.75f);
-    float chroma_slip_gain = bleed_curve * (0.20f + color_strength_curve * 1.40f);
-    float prism_slip_boost = 0.65f + bleed_curve * 1.35f;
-    float motion_scale = (0.20f + motion_curve * 3.20f) * (1.0f / 255.0f);
+    const float chroma_keep = clampf_local(1.0f - desat, 0.30f, 1.15f);
+    const float detail_gain = detail_curve * lerpf_local(0.55f, 0.20f, maturity);
+    const float detail_boost = detail_gain * 0.20f + 0.08f;
+    const float flow_pixels = ((0.20f + maturity * 1.55f) * (0.3f + drift_curve * 26.0f)) * 0.5f;
+    const float warp_gain = warp_curve * 3.0f;
+    const float instability_gain = instability_curve * 8.0f * (0.25f + maturity * 0.75f);
+    const float chroma_slip_gain = bleed_curve * (0.20f + color_strength_curve * 1.40f);
+    const float prism_slip_boost = 0.65f + bleed_curve * 1.35f;
+    const float motion_scale = (0.20f + motion_curve * 3.20f) * (1.0f / 255.0f);
 
     int cell = 9 + (int)(flow_size_curve * 31.0f);
     cell -= (int)(instability_curve * 5.0f);
@@ -922,116 +984,79 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
     if (cell < 7) cell = 7;
     if (cell > 40) cell = 40;
 
-    float lut[41];
-    for (int i = 0; i <= cell; i++) {
-        lut[i] = smoothstepf_local((float)i / (float)cell);
-    }
-
-    #pragma omp single
+#pragma omp single
     {
-        if (!p->initialized) {
-            for (int y = 0; y < ch; y++) {
-                const int row = y * cw;
-                for (int x = 0; x < cw; x++) {
-                    const int idx = row + x;
-                    p->canvas_y[idx] = downsample_src_plane_2x2(Y, x, y, w, h);
-                    p->canvas_u[idx] = downsample_src_plane_2x2(U, x, y, w, h);
-                    p->canvas_v[idx] = downsample_src_plane_2x2(V, x, y, w, h);
-                    p->next_y[idx] = p->canvas_y[idx];
-                    p->next_u[idx] = p->canvas_u[idx];
-                    p->next_v[idx] = p->canvas_v[idx];
-                    p->prev_src_y[idx] = p->canvas_y[idx];
-                }
-            }
-
-            p->initialized = 1;
-            p->maturity = 0.0f;
-            p->frame_no = 0;
-        }
-
-        p->maturity = current_maturity;
-
-        if (!ghostwash_ensure_grid(p, cw, ch, cell)) {
-            grid_ok = 0;
-        } else {
-            build_flow_grid(p, cw, ch, cell);
-
-            if (ghostwash_grid_required(cw, ch, cell) > p->grid_capacity)
-                grid_ok = 0;
-
-            const float time_phase = (float)(p->frame_no & 1023U) * (6.28318530717958647692f / 1024.0f);
-            const float shear_phase = time_phase * (0.40f + instability_param * 1.60f);
-            const float shear_freq = 0.020f + flow_size_param * 0.090f;
-
-            if (geometry_mode == 3) {
-                for (int y = 0; y < ch; y++)
-                    p->shear_y[y] = sinf((float)y * shear_freq + shear_phase);
-
-                for (int x = 0; x < cw; x++)
-                    p->shear_x[x] = sinf((float)x * shear_freq * 0.73f + shear_phase * 1.31f);
-            }
-
-            const float inv_max_dim = 1.0f / ((float)((cw > ch) ? cw : ch) * 0.5f + 1.0f);
-            const float half_cw = (float)cw * 0.5f;
-            const float half_ch = (float)ch * 0.5f;
-
-            if (geometry_mode == 8) {
-                const float tri_angle = time_phase * (0.18f + instability_param * 0.42f);
-                const float tri_ca = cosf(tri_angle);
-                const float tri_sa = sinf(tri_angle);
-
-                for (int x = 0; x < cw; x++) {
-                    const float nx = ((float)x - half_cw) * inv_max_dim;
-                    p->poly_rx_x[x] = nx * tri_ca;
-                    p->poly_ry_x[x] = nx * tri_sa;
-                }
-
-                for (int y = 0; y < ch; y++) {
-                    const float ny = ((float)y - half_ch) * inv_max_dim;
-                    p->poly_rx_y[y] = -ny * tri_sa;
-                    p->poly_ry_y[y] =  ny * tri_ca;
-                }
-            } else if (geometry_mode == 9) {
-                const float rect_angle = -time_phase * (0.14f + instability_param * 0.36f);
-                const float rect_ca = cosf(rect_angle);
-                const float rect_sa = sinf(rect_angle);
-
-                for (int x = 0; x < cw; x++) {
-                    const float nx = ((float)x - half_cw) * inv_max_dim;
-                    p->poly_rx_x[x] = nx * rect_ca;
-                    p->poly_ry_x[x] = nx * rect_sa;
-                }
-
-                for (int y = 0; y < ch; y++) {
-                    const float ny = ((float)y - half_ch) * inv_max_dim;
-                    p->poly_rx_y[y] = -ny * rect_sa;
-                    p->poly_ry_y[y] =  ny * rect_ca;
-                }
-            }
-        }
+        p->setup_failed = !ghostwash_ensure_grid(p, cw, ch, cell);
     }
-    
-    gw = (cw + cell - 1) / cell + 2;
-    gh = (ch + cell - 1) / cell + 2;
+
+    if (p->setup_failed)
+        return;
+
+    float lut[41];
+
+    for (int i = 0; i <= cell; i++)
+        lut[i] = smoothstepf_local((float)i / (float)cell);
+
+    build_flow_grid(p, cw, ch, cell);
+
+    const int gw = (cw + cell - 1) / cell + 2;
+    const int gh = (ch + cell - 1) / cell + 2;
 
     if (gw <= 1 || gh <= 1)
-        grid_ok = 0;
+        return;
 
-    if (!grid_ok) {
-        skip_processing = 1;
+    if (ghostwash_grid_required(cw, ch, cell) > p->grid_capacity)
+        return;
+
+    const float time_phase = (float)(p->frame_no & 1023U) * (6.28318530717958647692f / 1024.0f);
+    const float shear_phase = time_phase * (0.40f + instability_param * 1.60f);
+    const float shear_freq = 0.020f + flow_size_param * 0.090f;
+    const float polygon_angle = geometry_mode == 8
+        ? time_phase * (0.18f + instability_param * 0.42f)
+        : -time_phase * (0.14f + instability_param * 0.36f);
+    const float polygon_ca = cosf(polygon_angle);
+    const float polygon_sa = sinf(polygon_angle);
+
+    if (geometry_mode == 3) {
+#pragma omp for schedule(static)
+        for (int i = 0; i < (cw > ch ? cw : ch); i++) {
+            if (i < ch)
+                p->shear_y[i] = sinf((float)i * shear_freq + shear_phase);
+            if (i < cw)
+                p->shear_x[i] = sinf((float)i * shear_freq * 0.73f + shear_phase * 1.31f);
+        }
     }
 
-    if (!skip_processing) {
-        const uint8_t *restrict old_y = p->canvas_y;
-        const uint8_t *restrict old_u = p->canvas_u;
-        const uint8_t *restrict old_v = p->canvas_v;
+    const float inv_max_dim = 1.0f / ((float)((cw > ch) ? cw : ch) * 0.5f + 1.0f);
+    const float half_cw = (float)cw * 0.5f;
+    const float half_ch = (float)ch * 0.5f;
 
-        uint8_t *restrict next_y = p->next_y;
-        uint8_t *restrict next_u = p->next_u;
-        uint8_t *restrict next_v = p->next_v;
-        uint8_t *restrict prev_y = p->prev_src_y;
+    if (geometry_mode == 8 || geometry_mode == 9) {
+#pragma omp for schedule(static)
+        for (int i = 0; i < (cw > ch ? cw : ch); i++) {
+            if (i < cw) {
+                const float nx = ((float)i - half_cw) * inv_max_dim;
+                p->poly_rx_x[i] = nx * polygon_ca;
+                p->poly_ry_x[i] = nx * polygon_sa;
+            }
+            if (i < ch) {
+                const float ny = ((float)i - half_ch) * inv_max_dim;
+                p->poly_rx_y[i] = -ny * polygon_sa;
+                p->poly_ry_y[i] = ny * polygon_ca;
+            }
+        }
+    }
 
-        ghostwash_dispatch_advection(
+    const uint8_t *restrict old_y = p->canvas_y;
+    const uint8_t *restrict old_u = p->canvas_u;
+    const uint8_t *restrict old_v = p->canvas_v;
+
+    uint8_t *restrict next_y = p->next_y;
+    uint8_t *restrict next_u = p->next_u;
+    uint8_t *restrict next_v = p->next_v;
+    uint8_t *restrict prev_y = p->prev_src_y;
+
+    ghostwash_dispatch_advection(
             p,
             Y,
             U,
@@ -1072,18 +1097,15 @@ void ghostwash_apply(void *ptr, VJFrame *frame, int *args)
             chroma_slip_gain,
             prism_slip_boost,
             motion_scale
-        );
+    );
 
-        ghostwash_render_fullres(p, frame, mono_mode);
-
-        #pragma omp single
-        {
-            uint8_t *tmp;
-            tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
-            tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
-            tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
-
-            p->frame_no++;
-        }
+    ghostwash_render_fullres(p, frame, mono_mode);
+#pragma omp single
+    {
+        uint8_t *tmp;
+        tmp = p->canvas_y; p->canvas_y = p->next_y; p->next_y = tmp;
+        tmp = p->canvas_u; p->canvas_u = p->next_u; p->next_u = tmp;
+        tmp = p->canvas_v; p->canvas_v = p->next_v; p->next_v = tmp;
+        p->frame_no++;
     }
 }

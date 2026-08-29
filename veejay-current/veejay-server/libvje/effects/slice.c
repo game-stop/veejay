@@ -1,12 +1,12 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2026 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2015 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License , or (at your option) any later version.
+ * of the License , or at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -50,6 +50,7 @@ typedef struct {
 
     int n__;
     int N__;
+    int n_threads;
 
     uint32_t seed;
 
@@ -62,11 +63,6 @@ typedef struct {
     int smooth_init;
 
     void *motionmap;
-
-    int cached_mix_q8;
-    int cached_chroma_q8;
-    int cached_interpolate;
-    int cached_motion;
 } slice_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -101,6 +97,8 @@ static inline int slice_rand_range(uint32_t *state, int lo, int hi)
 
     return lo + (int)(*state % (uint32_t)(hi - lo + 1));
 }
+
+
 
 static inline float slice_smooth_value(float oldv, float target, float attack, float release)
 {
@@ -183,7 +181,16 @@ vj_effect *slice_init(int width, int height)
     ve->limits[0] = (int *)vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *)vj_calloc(sizeof(int) * ve->num_params);
 
-
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_SLICES] = 2;       ve->limits[1][P_SLICES] = 128;       ve->defaults[P_SLICES] = 63;
     ve->limits[0][P_PERIOD] = 0;       ve->limits[1][P_PERIOD] = 8 * 30;    ve->defaults[P_PERIOD] = 0;
@@ -219,9 +226,6 @@ vj_effect *slice_init(int width, int height)
         };
         ve->beat_hints = vje_build_beat_hint_list_v2(ve->num_params, beat_hints);
     }
-
-    (void)width;
-    (void)height;
 
     return ve;
 }
@@ -289,6 +293,7 @@ void *slice_malloc(int width, int height)
     s->sm_slice_drive = 0.0f;
     s->sm_recut_drive = 0.0f;
     s->smooth_init = 0;
+    s->n_threads = vje_advise_num_threads(len);
 
     slice_recalc(s, width, height, 63, s->seed, 0);
 
@@ -298,8 +303,6 @@ void *slice_malloc(int width, int height)
 void slice_free(void *ptr)
 {
     slice_t *s = (slice_t*)ptr;
-    if(!s)
-        return;
 
     free(s->block);
     free(s);
@@ -309,9 +312,15 @@ static void slice_snapshot(slice_t *s, VJFrame *frame)
 {
     const int len = frame->len;
 
-    veejay_memcpy(s->slice_frame[0], frame->data[0], len);
-    veejay_memcpy(s->slice_frame[1], frame->data[1], len);
-    veejay_memcpy(s->slice_frame[2], frame->data[2], len);
+#pragma omp for schedule(static)
+    for (int i = 0; i < len; i++)
+        s->slice_frame[0][i] = frame->data[0][i];
+#pragma omp for schedule(static)
+    for (int i = 0; i < len; i++)
+        s->slice_frame[1][i] = frame->data[1][i];
+#pragma omp for schedule(static)
+    for (int i = 0; i < len; i++)
+        s->slice_frame[2][i] = frame->data[2][i];
 }
 
 static void slice_update_smoothing(slice_t *s,
@@ -350,134 +359,118 @@ void slice_apply(void *ptr, VJFrame *frame, int *args)
 
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
-
     int val = args[P_SLICES];
     int re_init = args[P_PERIOD];
-    const int mix = args[P_MIX];
-    const int chroma = args[P_CHROMA];
-    const int slice_drive = args[P_SLICE_DRIVE];
-    const int recut_drive = args[P_RECUT_DRIVE];
+    int mix = args[P_MIX];
+    int chroma = args[P_CHROMA];
+    int slice_drive = args[P_SLICE_DRIVE];
+    int recut_drive = args[P_RECUT_DRIVE];
 
+    int interpolate = 0;
+    int motion = 0;
     int tmp1 = val;
     int tmp2 = re_init;
 
-    #pragma omp single
-    {
-        int interpolate = 0;
-        int motion = 0;
+    if(s->motionmap && motionmap_active(s->motionmap)) {
+        motionmap_scale_to(
+            s->motionmap,
+            128,
+            1,
+            2,
+            0,
+            &tmp1,
+            &tmp2,
+            &(s->n__),
+            &(s->N__)
+        );
 
-        if(s->motionmap && motionmap_active(s->motionmap)) {
-            motionmap_scale_to(
-                s->motionmap,
-                128,
-                1,
-                2,
-                0,
-                &tmp1,
-                &tmp2,
-                &(s->n__),
-                &(s->N__)
-            );
-
-            val = clampi(tmp1, 2, 128);
-            re_init = clampi(tmp2, 0, 8 * 30);
-            motion = 1;
-            interpolate = !(s->n__ == s->N__ || s->n__ == 0);
-        }
-        else {
-            s->n__ = 0;
-            s->N__ = 0;
-        }
-
-        slice_update_smoothing(s, val, re_init, mix, chroma, slice_drive, recut_drive);
-
-        int effective_val = slice_roundf_i(s->sm_slices);
-        const int slice_q = clampi(slice_roundf_i(s->sm_slice_drive), 0, 1000);
-        const int recut_q = clampi(slice_roundf_i(s->sm_recut_drive), 0, 1000);
-
-        effective_val += (slice_q * 92 + 500) / 1000;
-        effective_val = clampi(effective_val, 2, 128);
-
-        int effective_period = clampi(slice_roundf_i(s->sm_period), 0, 8 * 30);
-        const int forced_recut_period = recut_q > 0 ? (1 + (((1000 - recut_q) * 34 + 500) / 1000)) : 0;
-
-        if(forced_recut_period > 0 && (effective_period == 0 || forced_recut_period < effective_period))
-            effective_period = forced_recut_period;
-
-        int force_recalc = 0;
-        const int recut_bucket = recut_q / 80;
-
-        if(recut_bucket != s->recut_bucket) {
-            s->recut_bucket = recut_bucket;
-
-            if(recut_q > 0)
-                force_recalc = 1;
-        }
-
-        if(s->frame_periods != effective_period) {
-            s->frame_periods = effective_period;
-            s->current_period = effective_period;
-        }
-
-        if(motion) {
-            force_recalc = 1;
-        }
-        else if(effective_period > 0) {
-            s->current_period--;
-
-            if(s->current_period <= 0) {
-                force_recalc = 1;
-                s->current_period = s->frame_periods;
-            }
-        }
-        else if(effective_val != s->current_slices) {
-            force_recalc = 1;
-        }
-
-        if(force_recalc || !s->have_shift) {
-            const int table_smooth = 8 + ((1000 - recut_q) * 50 + 500) / 1000;
-
-            s->seed = slice_hash_u32(
-                s->seed ^
-                (uint32_t)(effective_val * 0x45d9f3bu) ^
-                (uint32_t)(recut_q * 0x27d4eb2du) ^
-                (uint32_t)(slice_q * 0x9e3779b9u) ^
-                (uint32_t)(frame->timecode * 1000003.0)
-            );
-
-            slice_recalc(s, width, height, effective_val, s->seed, table_smooth);
-        }
-
-        slice_snapshot(s, frame);
-
-        int mix_q8 = (clampi(slice_roundf_i(s->sm_mix), 0, 1000) * 256 + 500) / 1000;
-        int chroma_q8 = (clampi(slice_roundf_i(s->sm_chroma), 0, 1000) * 256 + 500) / 1000;
-
-        mix_q8 = clampi(mix_q8 + ((slice_q * 34 + recut_q * 18 + 500) / 1000), 0, 256);
-        chroma_q8 = clampi(chroma_q8 + ((slice_q * 24 + recut_q * 18 + 500) / 1000), 0, 256);
-
-        s->cached_mix_q8 = mix_q8;
-        s->cached_chroma_q8 = chroma_q8;
-        s->cached_interpolate = interpolate;
-        s->cached_motion = motion;
+        val = clampi(tmp1, 2, 128);
+        re_init = clampi(tmp2, 0, 8 * 30);
+        motion = 1;
+        interpolate = !(s->n__ == s->N__ || s->n__ == 0);
+    }
+    else {
+        s->n__ = 0;
+        s->N__ = 0;
     }
 
-    const int mix_q8 = s->cached_mix_q8;
-    const int chroma_q8 = s->cached_chroma_q8;
-    const int interpolate = s->cached_interpolate;
-    const int motion = s->cached_motion;
+    slice_update_smoothing(s, val, re_init, mix, chroma, slice_drive, recut_drive);
+
+    int effective_val = slice_roundf_i(s->sm_slices);
+    const int slice_q = clampi(slice_roundf_i(s->sm_slice_drive), 0, 1000);
+    const int recut_q = clampi(slice_roundf_i(s->sm_recut_drive), 0, 1000);
+
+    effective_val += (slice_q * 92 + 500) / 1000;
+    effective_val = clampi(effective_val, 2, 128);
+
+    int effective_period = clampi(slice_roundf_i(s->sm_period), 0, 8 * 30);
+    const int forced_recut_period = recut_q > 0 ? (1 + (((1000 - recut_q) * 34 + 500) / 1000)) : 0;
+
+    if(forced_recut_period > 0 && (effective_period == 0 || forced_recut_period < effective_period))
+        effective_period = forced_recut_period;
+
+    int force_recalc = 0;
+    const int recut_bucket = recut_q / 80;
+
+    if(recut_bucket != s->recut_bucket) {
+        s->recut_bucket = recut_bucket;
+
+        if(recut_q > 0)
+            force_recalc = 1;
+    }
+
+    if(s->frame_periods != effective_period) {
+        s->frame_periods = effective_period;
+        s->current_period = effective_period;
+    }
+
+    if(motion) {
+        force_recalc = 1;
+    }
+    else if(effective_period > 0) {
+        s->current_period--;
+
+        if(s->current_period <= 0) {
+            force_recalc = 1;
+            s->current_period = s->frame_periods;
+        }
+    }
+    else if(effective_val != s->current_slices) {
+        force_recalc = 1;
+    }
+
+    if(force_recalc || !s->have_shift) {
+        const int table_smooth = 8 + ((1000 - recut_q) * 50 + 500) / 1000;
+
+        s->seed = slice_hash_u32(
+            s->seed ^
+            (uint32_t)(effective_val * 0x45d9f3bu) ^
+            (uint32_t)(recut_q * 0x27d4eb2du) ^
+            (uint32_t)(slice_q * 0x9e3779b9u) ^
+            (uint32_t)(frame->timecode * 1000003.0)
+        );
+
+        slice_recalc(s, width, height, effective_val, s->seed, table_smooth);
+    }
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict Cb = frame->data[1];
     uint8_t *restrict Cr = frame->data[2];
 
-    const int *restrict slice_xshift = s->slice_xshift;
-    const int *restrict slice_yshift = s->slice_yshift;
+    slice_snapshot(s, frame);
+
     const uint8_t *restrict sY = s->slice_frame[0];
     const uint8_t *restrict sCb = s->slice_frame[1];
     const uint8_t *restrict sCr = s->slice_frame[2];
-    const int *restrict table = s->slice_xshift; // note: table is derived from shifts during apply
+
+    int *restrict slice_xshift = s->slice_xshift;
+    int *restrict slice_yshift = s->slice_yshift;
+
+    int mix_q8 = (clampi(slice_roundf_i(s->sm_mix), 0, 1000) * 256 + 500) / 1000;
+    int chroma_q8 = (clampi(slice_roundf_i(s->sm_chroma), 0, 1000) * 256 + 500) / 1000;
+
+    mix_q8 = clampi(mix_q8 + ((slice_q * 34 + recut_q * 18 + 500) / 1000), 0, 256);
+    chroma_q8 = clampi(chroma_q8 + ((slice_q * 24 + recut_q * 18 + 500) / 1000), 0, 256);
 
 #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
@@ -502,14 +495,11 @@ void slice_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    #pragma omp single
-    {
-        if(interpolate)
-            motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
+    if(interpolate)
+        motionmap_interpolate_frame(s->motionmap, frame, s->N__, s->n__);
 
-        if(motion)
-            motionmap_store_frame(s->motionmap, frame);
-    }
+    if(motion)
+        motionmap_store_frame(s->motionmap, frame);
 }
 
 int slice_request_fx(void)
@@ -520,8 +510,6 @@ int slice_request_fx(void)
 void slice_set_motionmap(void *ptr, void *priv)
 {
     slice_t *s = (slice_t*)ptr;
-    if(!s)
-        return;
 
     s->motionmap = priv;
 }

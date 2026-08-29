@@ -131,6 +131,16 @@ vj_effect *picinpic_init(int width, int height)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
+    if(!ve->defaults || !ve->limits[0] || !ve->limits[1]) {
+        if(ve->defaults)
+            free(ve->defaults);
+        if(ve->limits[0])
+            free(ve->limits[0]);
+        if(ve->limits[1])
+            free(ve->limits[1]);
+        free(ve);
+        return NULL;
+    }
 
     ve->limits[0][P_WIDTH] = 8;  ve->limits[1][P_WIDTH] = width;  ve->defaults[P_WIDTH] = width / 8;
     ve->limits[0][P_HEIGHT] = 8; ve->limits[1][P_HEIGHT] = height; ve->defaults[P_HEIGHT] = height / 8;
@@ -234,65 +244,59 @@ static int picinpic_rebuild(pic_t *picture, VJFrame *src, int view_width, int vi
 
 void picinpic_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    pic_t *picture = (pic_t*) ptr;
-    int width, height, view_width, view_height, dx, dy, pixfmt;
-    uint8_t *restrict sY = NULL, *restrict sCb = NULL, *restrict sCr = NULL;
-    uint8_t *restrict dY = NULL, *restrict dCb = NULL, *restrict dCr = NULL;
-    int skip_processing = 0;
-
-    #pragma omp single
+#pragma omp single
     {
-        width = frame->width;
-        height = frame->height;
+    pic_t *picture = (pic_t*) ptr;
+    const int width = frame->width;
+    const int height = frame->height;
 
-        view_width = pip_size8(clampi(args[P_WIDTH], 8, width));
-        view_height = pip_size8(clampi(args[P_HEIGHT], 8, height));
-        dx = pip_pos8(clampi(args[P_X], 0, width - 1));
-        dy = pip_pos8(clampi(args[P_Y], 0, height - 1));
+    int view_width = pip_size8(clampi(args[P_WIDTH], 8, width));
+    int view_height = pip_size8(clampi(args[P_HEIGHT], 8, height));
+    int dx = pip_pos8(clampi(args[P_X], 0, width - 1));
+    int dy = pip_pos8(clampi(args[P_Y], 0, height - 1));
 
-        if(view_width > width)
-            view_width = pip_floor8(width);
-        if(view_height > height)
-            view_height = pip_floor8(height);
+    if(view_width > width)
+        view_width = pip_floor8(width);
+    if(view_height > height)
+        view_height = pip_floor8(height);
 
-        if(dx + view_width > width)
-            dx = pip_pos8(width - view_width);
-        if(dy + view_height > height)
-            dy = pip_pos8(height - view_height);
+    if(dx + view_width > width)
+        dx = pip_pos8(width - view_width);
+    if(dy + view_height > height)
+        dy = pip_pos8(height - view_height);
 
-        pixfmt = frame->format == AV_PIX_FMT_YUVJ422P ? AV_PIX_FMT_YUVJ444P : AV_PIX_FMT_YUV444P;
+    const int pixfmt = frame->format == AV_PIX_FMT_YUVJ422P ? AV_PIX_FMT_YUVJ444P : AV_PIX_FMT_YUV444P;
 
-        VJFrame src;
-        veejay_memcpy(&src, frame2, sizeof(VJFrame));
-        src.format = pixfmt;
-        src.stride[1] = src.width;
-        src.stride[2] = src.width;
+    VJFrame src;
+    veejay_memcpy(&src, frame2, sizeof(VJFrame));
+    src.format = pixfmt;
+    src.stride[1] = src.width;
+    src.stride[2] = src.width;
 
-        if(picture->w != view_width || picture->h != view_height || picture->pixfmt != pixfmt || !picture->frame || !picture->scaler) {
-            if(!picinpic_rebuild(picture, &src, view_width, view_height, pixfmt)) {
-                skip_processing = 1;
-            }
-        }
+    if(picture->w != view_width || picture->h != view_height || picture->pixfmt != pixfmt || !picture->frame || !picture->scaler) {
+        if(!picinpic_rebuild(picture, &src, view_width, view_height, pixfmt))
+            goto done;
+    }
 
-        if(!skip_processing) {
-            yuv_convert_and_scale(picture->scaler, &src, picture->frame);
+    yuv_convert_and_scale(picture->scaler, &src, picture->frame);
 
-            sY = picture->frame->data[0];
-            sCb = picture->frame->data[1];
-            sCr = picture->frame->data[2];
+    const uint8_t *restrict sY = picture->frame->data[0];
+    const uint8_t *restrict sCb = picture->frame->data[1];
+    const uint8_t *restrict sCr = picture->frame->data[2];
 
-            dY = frame->data[0];
-            dCb = frame->data[1];
-            dCr = frame->data[2];
+    uint8_t *restrict dY = frame->data[0];
+    uint8_t *restrict dCb = frame->data[1];
+    uint8_t *restrict dCr = frame->data[2];
 
-            for(int y = 0; y < view_height; y++) {
-                const int dst_off = (dy + y) * width + dx;
-                const int src_off = y * view_width;
+    for(int y = 0; y < view_height; y++) {
+        const int dst_off = (dy + y) * width + dx;
+        const int src_off = y * view_width;
 
-                veejay_memcpy(dY + dst_off, sY + src_off, view_width);
-                veejay_memcpy(dCb + dst_off, sCb + src_off, view_width);
-                veejay_memcpy(dCr + dst_off, sCr + src_off, view_width);
-            }
-        }
+        veejay_memcpy(dY + dst_off, sY + src_off, view_width);
+        veejay_memcpy(dCb + dst_off, sCb + src_off, view_width);
+        veejay_memcpy(dCr + dst_off, sCr + src_off, view_width);
+    }
+done:
+    ;
     }
 }
