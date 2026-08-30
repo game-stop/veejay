@@ -258,26 +258,29 @@ void revtv_apply(void *ptr, VJFrame *frame, int *args)
 
     const float lane_a = 0.28f;
 
-    if(!r->initialized) {
-        r->sm_linespace = (float)linespace_arg;
-        r->sm_vscale = (float)vscale_arg;
-        r->sm_luma = (float)color_y_arg;
-        r->sm_mix = (float)mix_arg;
-        r->sm_chroma = (float)chroma_arg;
-        r->sm_lines_drive = (float)lines_drive;
-        r->sm_scale_drive = (float)scale_drive;
-        r->sm_intensity_drive = (float)intensity_drive;
-        r->initialized = 1;
-    }
-    else {
-        revtv_smooth_lane(&r->sm_linespace, (float)linespace_arg, lane_a);
-        revtv_smooth_lane(&r->sm_vscale, (float)vscale_arg, lane_a);
-        revtv_smooth_lane(&r->sm_luma, (float)color_y_arg, lane_a);
-        revtv_smooth_lane(&r->sm_mix, (float)mix_arg, lane_a);
-        revtv_smooth_lane(&r->sm_chroma, (float)chroma_arg, lane_a);
-        revtv_smooth_lane(&r->sm_lines_drive, (float)lines_drive, lane_a);
-        revtv_smooth_lane(&r->sm_scale_drive, (float)scale_drive, lane_a);
-        revtv_smooth_lane(&r->sm_intensity_drive, (float)intensity_drive, lane_a);
+#pragma omp single
+    {
+        if(!r->initialized) {
+            r->sm_linespace = (float)linespace_arg;
+            r->sm_vscale = (float)vscale_arg;
+            r->sm_luma = (float)color_y_arg;
+            r->sm_mix = (float)mix_arg;
+            r->sm_chroma = (float)chroma_arg;
+            r->sm_lines_drive = (float)lines_drive;
+            r->sm_scale_drive = (float)scale_drive;
+            r->sm_intensity_drive = (float)intensity_drive;
+            r->initialized = 1;
+        }
+        else {
+            revtv_smooth_lane(&r->sm_linespace, (float)linespace_arg, lane_a);
+            revtv_smooth_lane(&r->sm_vscale, (float)vscale_arg, lane_a);
+            revtv_smooth_lane(&r->sm_luma, (float)color_y_arg, lane_a);
+            revtv_smooth_lane(&r->sm_mix, (float)mix_arg, lane_a);
+            revtv_smooth_lane(&r->sm_chroma, (float)chroma_arg, lane_a);
+            revtv_smooth_lane(&r->sm_lines_drive, (float)lines_drive, lane_a);
+            revtv_smooth_lane(&r->sm_scale_drive, (float)scale_drive, lane_a);
+            revtv_smooth_lane(&r->sm_intensity_drive, (float)intensity_drive, lane_a);
+        }
     }
 
     const int line_q = revtv_clampi((int)(r->sm_lines_drive + 0.5f), 0, 1000);
@@ -325,19 +328,38 @@ void revtv_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t color_cb = (uint8_t)bl_pix_get_color_cb(color_num);
     const uint8_t color_cr = (uint8_t)bl_pix_get_color_cr(color_num);
 
-    revtv_luma(Y, width, height, linespace, vscale, (uint8_t)color_y);
+#pragma omp sections
+    {
+#pragma omp section
+        { revtv_luma(Y, width, height, linespace, vscale, (uint8_t)color_y); }
+#pragma omp section
+        {
+            if(color_num > 0 && chroma_q > 0) {
+                int uv_linespace = linespace >> frame->shift_v;
+                int uv_vscale = vscale >> frame->shift_v;
 
-    if(color_num > 0 && chroma_q > 0) {
-        int uv_linespace = linespace >> frame->shift_v;
-        int uv_vscale = vscale >> frame->shift_v;
+                if(uv_linespace < 1)
+                    uv_linespace = 1;
+                if(uv_vscale < 1)
+                    uv_vscale = 1;
 
-        if(uv_linespace < 1)
-            uv_linespace = 1;
-        if(uv_vscale < 1)
-            uv_vscale = 1;
+                revtv_chroma(Cb, width, height, uv_linespace, uv_vscale, color_cb);
+            }
+        }
+#pragma omp section
+        {
+            if(color_num > 0 && chroma_q > 0) {
+                int uv_linespace = linespace >> frame->shift_v;
+                int uv_vscale = vscale >> frame->shift_v;
 
-        revtv_chroma(Cb, width, height, uv_linespace, uv_vscale, color_cb);
-        revtv_chroma(Cr, width, height, uv_linespace, uv_vscale, color_cr);
+                if(uv_linespace < 1)
+                    uv_linespace = 1;
+                if(uv_vscale < 1)
+                    uv_vscale = 1;
+
+                revtv_chroma(Cr, width, height, uv_linespace, uv_vscale, color_cr);
+            }
+        }
     }
 
     const int chroma_mix_q = (mix_q * chroma_q + 500) / 1000;
