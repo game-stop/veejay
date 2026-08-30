@@ -102,9 +102,9 @@ AC_ARG_VAR([CUDA_HOME], [CUDA toolkit prefix used for nvJPEG detection])
 AC_ARG_VAR([CUDA_PATH], [CUDA toolkit prefix used for nvJPEG detection])
 AC_ARG_VAR([NVCC], [path to the NVIDIA CUDA compiler])
 
-arch_target="auto"
-AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, auto or user defined],
-					[Build a generic binary, auto-detect current cpu type or user defined -mtune/-march setting)]),
+arch_target="generic"
+AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, native, auto or user defined],
+          [Build a generic binary, target the build host with native/auto, or use a specific -march setting)]),
 					[ arch_target="$withval"])
 
 AC_USE_SYSTEM_EXTENSIONS
@@ -115,6 +115,7 @@ LT_INIT
 dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
+AC_OPENMP
 dnl AM_PROG_CC_STDC
 AC_PROG_YACC
 AC_PROG_CXX
@@ -128,14 +129,11 @@ AC_SYS_LARGEFILE
 dnl configure AS and ASFLAGS...
 AM_PROG_AS
 
-CFLAGS=""
-
 AC_CHECK_HEADERS([stdatomic.h fenv.h stdint.h inttypes.h sys/types.h alloca.h sys/time.h sys/times.h])
 
 AC_MSG_CHECKING([for C11 standard support (mandatory for atomics)])
+_VEEJAY_CFLAGS_SAVE="$CFLAGS"
 AC_CACHE_VAL([ac_cv_c_c11], [
-  _VEEJAY_CFLAGS_SAVE="$CFLAGS"
-  
   # Try C11 first, testing with stdatomic.h to ensure header is present
   CFLAGS="$CFLAGS -std=c11"
   AC_COMPILE_IFELSE([AC_LANG_SOURCE([[#include <stdatomic.h>]])], [
@@ -154,6 +152,7 @@ AC_CACHE_VAL([ac_cv_c_c11], [
 ])
 
 AC_MSG_RESULT([$ac_cv_c_c11])
+CFLAGS="$_VEEJAY_CFLAGS_SAVE"
 
 if test "x$ac_cv_c_c11" = xno; then
   AC_MSG_ERROR([C11 compiler support is mandatory for this project. Please use GCC >= 4.9 or Clang >= 3.8.])
@@ -344,12 +343,6 @@ case $host_cpu in
 
 	PROGRAM_NOPIC="-fno-PIC"
 
-        if test "x$enable_debug" != "xyes"; then
-            VEEJAY_CFLAGS="-O3 -ftree-vectorize -ffast-math -fopenmp"
-        else
-            VEEJAY_CFLAGS="-g -Wall"
-        fi
-
 	AC_MSG_RESULT([x86])
     ;;
 
@@ -358,15 +351,6 @@ case $host_cpu in
         AC_DEFINE(ARCH_X86_64,1,[Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-
-        VEEJAY_CFLAGS="-m64 "
-        if test "x$enable_debug" != "xyes"; then
-            VEEJAY_CFLAGS="$VEEJAY_CFLAGS -O3 -ftree-vectorize -ffast-math -fopenmp"
-        else
-            VEEJAY_CFLAGS="$VEEJAY_CFLAGS -g -Wall"
-        fi
-
-        CFLAGS="$CFLAGS -m64 -fopenmp"
 
 	AC_MSG_RESULT([x86_64])
     ;;
@@ -415,13 +399,6 @@ case $host_cpu in
      	 AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 have_arm=true
 
-
-        if test "x$enable_debug" != "xyes"; then
-            VEEJAY_CFLAGS="$VEEJAY_CFLAGS -O3 -ffast-math -ftree-vectorize -fopenmp"
-        else
-            VEEJAY_CFLAGS="$VEEJAY_CFLAGS -O3 -g -Wall -fopenmp"
-        fi
-
         AC_MSG_RESULT([aarch64])
      ;;
 
@@ -429,12 +406,6 @@ case $host_cpu in
          AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
 	 have_arm=true
         have_armv7a=true
-
-        if test "x$enable_debug" != "xyes"; then
-            VEEJAY_CFLAGS="$VEEJAY_CFLAGS -O3 -ffast-math -ftree-vectorize -fopenmp"
-        else
-            VEEJAY_CFLAGS="$VEEJAY_CFLAGS -O3 -g -Wall -fopenmp"
-        fi
 
         AC_MSG_RESULT([arm])
 	 ;;
@@ -450,26 +421,33 @@ dnl ----------------------------------------------------------
 dnl Sub-architecture / tuning
 dnl ----------------------------------------------------------
 AC_MSG_CHECKING([sub-architecture settings])
+ARCHFLAGS=""
+case $arch_target in
+  generic)
+    AC_MSG_RESULT([portable compiler defaults])
+  ;;
+  auto|native)
+    saved_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS -march=native"
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
+      [ARCHFLAGS="-march=native"],
+      [AC_MSG_ERROR([the compiler does not support -march=native])])
+    CFLAGS="$saved_CFLAGS"
+    AC_MSG_RESULT([$ARCHFLAGS])
+  ;;
+  *)
+    requested_arch_flag="-march=$arch_target"
+    saved_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS $requested_arch_flag"
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
+      [ARCHFLAGS="$requested_arch_flag"],
+      [AC_MSG_ERROR([the compiler does not support $requested_arch_flag])])
+    CFLAGS="$saved_CFLAGS"
+    AC_MSG_RESULT([$ARCHFLAGS])
+  ;;
+esac
 
-if test x$host_alias != x; then
-	if test x$have_x86cpu = xtrue; then
-        host_mod_cpu=`echo $host_cpu | tr _ -`
-		ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
-		AC_MSG_RESULT($ARCHFLAGS)
-	fi
-else
-	chmod +x $srcdir/cpuinfo.sh
-
-	if test "$arch_target" = "auto"; then
-		TMP=`$srcdir/cpuinfo.sh`
-		ARCHFLAGS=`cat veejay.arch`
-	else
-       	ARCHFLAGS="-mtune=$arch_target"
-	fi
-		AC_MSG_RESULT($ARCHFLAGS)
-fi
-
-if test x$have_x86cpu = xtrue; then
+if test x$have_x86cpu = xtrue && test "x$arch_target" != "xgeneric"; then
 
     # MMX
     AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mmx, [
@@ -627,7 +605,16 @@ if test x$have_x86cpu = xtrue; then
     fi
 fi
 
-if test x$have_arm = xtrue; then
+if test x$have_x86_64cpu = xtrue && test "x$arch_target" = "xgeneric"; then
+  AC_DEFINE(HAVE_ASM_SSE,1,[Compiling in baseline x86-64 SSE support])
+  AC_DEFINE(HAVE_SSE,1,[Compiling in baseline x86-64 SSE support])
+  AC_DEFINE(HAVE_ASM_SSE2,1,[Compiling in baseline x86-64 SSE2 support])
+  AC_DEFINE(HAVE_SSE2,1,[Compiling in baseline x86-64 SSE2 support])
+  have_asm_sse=true
+  have_asm_sse2=true
+fi
+
+if test x$have_arm = xtrue && test "x$arch_target" != "xgeneric"; then
 
     # NEON support
     if test x$have_armv7a = xtrue; then
@@ -663,7 +650,7 @@ if test x$have_arm = xtrue; then
     fi
 fi
 
-if test x$have_ppccpu = xtrue; then
+if test x$have_ppccpu = xtrue && test "x$arch_target" != "xgeneric"; then
 
     AC_MSG_CHECKING([compiler support for AltiVec])
     cat > conftest.c <<EOF
@@ -706,8 +693,8 @@ EOF
 fi
 
 
-VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $warnCFLAGS"
-VEEJAY_CXXFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $warnCXXFLAGS"
+VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $OPENMP_CFLAGS $warnCFLAGS"
+VEEJAY_CXXFLAGS="$VEEJAY_CFLAGS $warnCXXFLAGS"
 
 AC_MSG_NOTICE([Final VEEJAY_CFLAGS: $VEEJAY_CFLAGS])
 AC_MSG_NOTICE([Final VEEJAY_CXXFLAGS: $VEEJAY_CXXFLAGS])
@@ -727,31 +714,31 @@ AC_SUBST(LIBQRENCODE_CFLAGS)
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
-PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.35.2],have_avcodec=true,have_avcodec=false)
-PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
-PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
-PKG_CHECK_MODULES(LIBSWRESAMPLE,[libswresample >= 0.7.1],have_swresample=true,have_swresample=false)
+PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 58],have_avutil=true,have_avutil=false)
+PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 60],have_avcodec=true,have_avcodec=false)
+PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 60],have_avformat=true,have_avformat=false)
+PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 7],have_swscale=true,have_swscale=false)
+PKG_CHECK_MODULES(LIBSWRESAMPLE,[libswresample >= 4],have_swresample=true,have_swresample=false)
 
 if test x$have_swscale = xfalse;
 then
-	AC_MSG_ERROR([libswscale not found.])
+  AC_MSG_ERROR([FFmpeg 6 or newer is required (libswscale >= 7).])
 fi
 if test x$have_avutil = xfalse;
 then
-	AC_MSG_ERROR([libavutil not found.])
+  AC_MSG_ERROR([FFmpeg 6 or newer is required (libavutil >= 58).])
 fi
 if test x$have_avformat = xfalse;
 then
-	AC_MSG_ERROR([libavformat not found.])
+  AC_MSG_ERROR([FFmpeg 6 or newer is required (libavformat >= 60).])
 fi
 if test x$have_avcodec = xfalse;
 then
-	AC_MSG_ERROR([libavcodec >= 51.57 not found.])
+  AC_MSG_ERROR([FFmpeg 6 or newer is required (libavcodec >= 60).])
 fi
 if test x$have_swresample = xfalse;
 then
-	AC_MSG_ERROR([libswresample >= not found.])
+  AC_MSG_ERROR([FFmpeg 6 or newer is required (libswresample >= 4).])
 fi
 
 FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS} ${LIBSWRESAMPLE_CFLAGS}"
@@ -1282,7 +1269,7 @@ dnl Check to see if __progname is provided by the system
 dnl ********************************************************************
 AC_CACHE_CHECK([for __progname],
                [mjt_cv_extern___progname],
-               [AC_LINK_IFELSE([AC_LANG_PROGRAM([[]],
+               [AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <stdio.h>]],
                                                 [[extern char *__progname;
                                                   puts(__progname);]])],
                                [mjt_cv_extern___progname=yes],

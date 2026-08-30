@@ -606,7 +606,7 @@ void hyperfluid_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp single
     t->phase = hf_wrap_2pi(t->phase + hf_time_step(args[P_SPEED]));
 
-#pragma omp for schedule(static)
+#pragma omp for schedule(dynamic, 1)
     for (int y = 0; y < h; y++) {
         int ym = y > 0 ? y - 1 : 0;
         int yp = y + 1 < h ? y + 1 : h - 1;

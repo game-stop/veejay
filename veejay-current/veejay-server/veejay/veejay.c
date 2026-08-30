@@ -356,7 +356,7 @@ static void Usage(char *progname)
     fprintf(stderr, "     --split-screen <file>     Load video-wall split-screen configuration\n");
     fprintf(stderr, "     --fx-custom-default-values\n");
     fprintf(stderr, "                                Read FX defaults from ~/.veejay/livido and frei0r\n");
-    fprintf(stderr, "     --benchmark WxH           Run benchmark at the given resolution\n");
+    fprintf(stderr, "     --benchmark WxH           Benchmark memory and FX thread counts\n");
     fprintf(stderr, "\n");
 }
 
@@ -593,6 +593,7 @@ static int set_option(const char *name, char *value)
 		if( n == 2 ) {
 		    vj_mem_init(w,h);
 		    benchmark_veejay(w,h);
+            vje_benchmark_threads(w,h);
 		    exit(0);
 		}
     } else if (strcmp(name, "deinterlace") == 0 || strcmp(name, "I" )==0) {
@@ -1343,7 +1344,7 @@ int main(int argc, char **argv)
             "  [ System & Streaming ]\n"
             "\tVEEJAY_MAX_FILESIZE\t\tMaximum allowed file size for processing\n"
             "\tVEEJAY_NUM_DECODE_THREADS\tNumber of threads for avcodec decoding\n"
-            "\tVEEJAY_MULTITHREAD_TASKS\tNumber of parallel tasks (default=CPU cores)\n"
+            "\tVEEJAY_MULTITHREAD_TASKS\tOpenMP threads (default=resolution-aware, max 6)\n"
             "\tVEEJAY_AV_LOG\t\t\tSet libavcodec logging level\n"
             "\tVEEJAY_LOG_NET_IO\t\tIf set, enable network I/O logging\n"
             "\tVEEJAY_MMAP_PER_FILE\t\tEnable mmap allocation per file (in Kb)\n"

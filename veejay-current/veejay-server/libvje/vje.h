@@ -253,7 +253,6 @@ typedef struct vj_effect_t {
 	int rgb_conv;
 	int n_out;
 	int instance;
-	int parallel;
 	int rgba_only;
 	int motion;
 	int alpha;

@@ -222,7 +222,6 @@ vj_effect *bowshock_init(int w, int h)
     ve->description = "Bow Shock";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
 
     ve->defaults[BS_MODE]         = 0;
     ve->defaults[BS_DISPLACE]     = 76;
@@ -608,6 +607,8 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
             snare_delta > 0.12f
         );
 
+#pragma omp single
+    {
     s->impact_env = bs_env(s->impact_env, impact_target, 0.82f, 0.095f);
     s->shock_env = bs_env(s->shock_env, shock_target, 0.78f, 0.075f);
     s->snare_env = bs_env(s->snare_env, snare_target, 0.86f, 0.190f);
@@ -673,6 +674,7 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
     s->last_shock = shock_target;
     s->last_snare = snare_target;
     s->frame_count++;
+    }
 
     const int impact_i = (int)(s->impact_env * 256.0f);
     const int shock_i = (int)(s->shock_env * 256.0f);
@@ -731,9 +733,6 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
         nactive++;
     }
 
-    if(nactive <= 0 && swing_x == 0 && swing_y == 0)
-        return;
-
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++)
             src_y[i] = Y[i];
@@ -744,65 +743,30 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
         for(int i = 0; i < len; i++)
             src_v[i] = V[i];
 
-        if(nactive <= 0) {
+        if(mode_arg == BS_MODE_BOW) {
 #pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
                 const int row = y * w;
-                const int row_up = (y > 0 ? y - 1 : y) * w;
-                const int row_dn = (y < h - 1 ? y + 1 : y) * w;
-
-#pragma omp simd
-                for(int x = 0; x < w; x++) {
-                    const int i = row + x;
-                    const int xm = x > 0 ? x - 1 : x;
-                    const int xp = x < w - 1 ? x + 1 : x;
-
-                    const int edge =
-                        bs_absi((int)src_y[row + xp] - (int)src_y[row + xm]) +
-                        bs_absi((int)src_y[row_dn + x] - (int)src_y[row_up + x]);
-
-                    const int edge_gate = edge < 255 ? edge : 255;
-                    const int swing_gate = 64 + (edge_gate >> 2);
-
-                    int px = x + ((swing_x * swing_gate) >> 7);
-                    int py = y + ((swing_y * swing_gate) >> 7);
-
-                    px = px < 0 ? 0 : (px >= w ? w - 1 : px);
-                    py = py < 0 ? 0 : (py >= h ? h - 1 : py);
-
-                    const int pi = py * w + px;
-
-                    Y[i] = src_y[pi];
-                    U[i] = src_u[pi];
-                    V[i] = src_v[pi];
+                BS_ROW_SWITCH(BS_ACCUM_BOW);
             }
         }
-        }
-        else {
-            if(mode_arg == BS_MODE_BOW) {
-#pragma omp for schedule(static)
-                for(int y = 0; y < h; y++) {
-                    const int row = y * w;
-                    BS_ROW_SWITCH(BS_ACCUM_BOW);
-                }
-            }
-            else if(mode_arg == BS_MODE_TORSION) {
-#pragma omp for schedule(static)
-                for(int y = 0; y < h; y++) {
-                    const int row = y * w;
-                    BS_ROW_SWITCH(BS_ACCUM_TORSION);
-                }
-            }
-            else {
-#pragma omp for schedule(static)
-                for(int y = 0; y < h; y++) {
-                    const int row = y * w;
-                    BS_ROW_SWITCH(BS_ACCUM_HYBRID);
-                }
-            }
-
+        else if(mode_arg == BS_MODE_TORSION) {
 #pragma omp for schedule(static)
             for(int y = 0; y < h; y++) {
+                const int row = y * w;
+                BS_ROW_SWITCH(BS_ACCUM_TORSION);
+            }
+        }
+        else {
+#pragma omp for schedule(static)
+            for(int y = 0; y < h; y++) {
+                const int row = y * w;
+                BS_ROW_SWITCH(BS_ACCUM_HYBRID);
+            }
+        }
+
+#pragma omp for schedule(static)
+        for(int y = 0; y < h; y++) {
                 const int row = y * w;
                 const int row_up = (y > 0 ? y - 1 : y) * w;
                 const int row_dn = (y < h - 1 ? y + 1 : y) * w;
@@ -852,8 +816,7 @@ void bowshock_apply(void *ptr, VJFrame *frame, int *args)
                     U[i] = bs_u8(uu);
                     V[i] = bs_u8(vv);
                 }
-            }
-    }
+        }
 }
 
 

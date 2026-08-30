@@ -113,18 +113,16 @@ static char*	vj_avcodec_get_codec_name(int codec_id )
 	char name[64];
 	switch(codec_id)
 	{
-		case CODEC_ID_MJPEG: snprintf(name,sizeof(name),"MJPEG"); break;
-#if LIBAVCODEC_VERSION_MAJOR >= 59
+		case AV_CODEC_ID_MJPEG: snprintf(name,sizeof(name),"MJPEG"); break;
 		case AV_CODEC_ID_QOI: snprintf(name, sizeof(name), "QOI (ffmpeg)"); break;
-#endif
-		case CODEC_ID_MPEG4: snprintf(name,sizeof(name), "MPEG4"); break;
-		case CODEC_ID_MSMPEG4V3: snprintf(name,sizeof(name), "DIVX"); break;
-		case CODEC_ID_DVVIDEO: snprintf(name,sizeof(name), "DVVideo"); break;
-		case CODEC_ID_LJPEG: snprintf(name,sizeof(name), "LJPEG" );break;
-		case CODEC_ID_SP5X: snprintf(name,sizeof(name), "SP5x"); break;
-		case CODEC_ID_THEORA: snprintf(name,sizeof(name),"Theora");break;
-		case CODEC_ID_H264: snprintf(name,sizeof(name), "H264");break;
-		case CODEC_ID_HUFFYUV: snprintf(name,sizeof(name),"HuffYUV");break;
+		case AV_CODEC_ID_MPEG4: snprintf(name,sizeof(name), "MPEG4"); break;
+		case AV_CODEC_ID_MSMPEG4V3: snprintf(name,sizeof(name), "DIVX"); break;
+		case AV_CODEC_ID_DVVIDEO: snprintf(name,sizeof(name), "DVVideo"); break;
+		case AV_CODEC_ID_LJPEG: snprintf(name,sizeof(name), "LJPEG" );break;
+		case AV_CODEC_ID_SP5X: snprintf(name,sizeof(name), "SP5x"); break;
+		case AV_CODEC_ID_THEORA: snprintf(name,sizeof(name),"Theora");break;
+		case AV_CODEC_ID_H264: snprintf(name,sizeof(name), "H264");break;
+		case AV_CODEC_ID_HUFFYUV: snprintf(name,sizeof(name),"HuffYUV");break;
 		case CODEC_ID_CUDA_MJPEG_422F: 
             snprintf(name, sizeof(name), "CUDA MJPEG 4:2:2 Full Range "); 
             break;
@@ -156,7 +154,7 @@ uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 #ifdef SUPPORT_READ_DV2
 	vj_dv_encoder *dv = av->dv;
 	switch(av->encoder_id) {
-		case CODEC_ID_DVVIDEO:
+		case AV_CODEC_ID_DVVIDEO:
 			return dv->dv_video;
 	}
 #endif
@@ -199,7 +197,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		case 998:
 			selected_out_pixfmt = FMT_422;
 			break;
-		case CODEC_ID_HUFFYUV:
+		case AV_CODEC_ID_HUFFYUV:
 			selected_out_pixfmt = FMT_422;
 			break;
 		case CODEC_ID_CUDA_MJPEG_422F:
@@ -266,7 +264,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 	}
 
 #ifdef SUPPORT_READ_DV2
-	if( id == CODEC_ID_DVVIDEO )
+	if( id == AV_CODEC_ID_DVVIDEO )
 	{
 		if(!is_dv_resolution(frame->width, frame->height ))
 		{	
@@ -326,7 +324,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, VJFrame *frame, char *filenam
 		id != CODEC_ID_CUDA_MJPEG_422 && id != CODEC_ID_CUDA_MJPEG_422F && id != CODEC_ID_CUDA_MJPEG_444 && id != CODEC_ID_CUDA_MJPEG_444F)
 	{
 #ifdef __FALLBACK_LIBDV
-		if(id != CODEC_ID_DVVIDEO)
+		if(id != AV_CODEC_ID_DVVIDEO)
 		{
 #endif
 			e->codec = avcodec_find_encoder( id );
@@ -507,28 +505,18 @@ nvenc_fail:
 }
 
 
-	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996 && id != CODEC_ID_DVVIDEO && id != 995 && id != 994 && id != 993)
+	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996 && id != AV_CODEC_ID_DVVIDEO && id != 995 && id != 994 && id != 993)
 	{
 #ifdef __FALLBACK_LIBDV
-	  if(id != CODEC_ID_DVVIDEO )
+	  if(id != AV_CODEC_ID_DVVIDEO )
 		{
 #endif
-#if LIBAVCODEC_VERSION_MAJOR > 54  
    	    e->context = avcodec_alloc_context3(e->codec);
-#else
-		e->context = avcodec_alloc_context();
-#endif
 		e->context->bit_rate = 2750 * 1024;
 		e->context->width = frame->width;
  		e->context->height = frame->height;
 		
-#if LIBAVCODEC_VERSION_MAJOR >= 50
 		e->context->time_base = (AVRational) { 1, frame->fps };
-#else
-		e->context->frame_rate = frame->fps;
-		e->context->frame_rate_base = 1;
-#endif
-#if LIBAVCODEC_VERSION_MAJOR >= 60
 		e->packet = av_packet_alloc();
 		e->frame = av_frame_alloc();
 		e->frame->format = get_ffmpeg_pixfmt( selected_out_pixfmt );
@@ -549,26 +537,20 @@ nvenc_fail:
 		}
 
 		e->context->framerate = (AVRational) { 1, frame->fps };
-#endif
 		e->context->sample_aspect_ratio.den = 1;
 		e->context->sample_aspect_ratio.num = 1;
 		e->context->qcompress = 0.0;
 		e->context->qblur = 0.0;
 		e->context->max_b_frames = 0;
 		e->context->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
-		e->context->flags = CODEC_FLAG_QSCALE;
+		e->context->flags = AV_CODEC_FLAG_QSCALE;
 		e->context->gop_size = 0;
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;
-#if LIBAVCODEC_VERSION_MAJOR < 60
-		e->context->prediction_method = 0;
-#endif
 		e->context->dct_algo = FF_DCT_AUTO; 
 		e->context->pix_fmt = pf;
 
 		//pf = e->context->pix_fmt;
 		char *descr = vj_avcodec_get_codec_name( id );
-#if LIBAVCODEC_VERSION_MAJOR > 54
-
 		int n_threads = avhelper_set_num_decoders();
 
 		if (e->codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
@@ -581,9 +563,6 @@ nvenc_fail:
 		}
 
 		int ret = avcodec_open2( e->context, e->codec, NULL );
-#else
-		int ( avcodec_open( e->context, e->codec ) < 0 );
-#endif
 		if( ret < 0 ) {
 			av_strerror( ret, errbuf, sizeof(errbuf));
 			veejay_msg(VEEJAY_MSG_ERROR, "[AV] Unable to open codec '%s': %s" , descr, errbuf );
@@ -632,18 +611,12 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 	{
 		if(av->context)
 		{
-#if LIBAVCODEC_VERSION_MAJOR > 59
 			avcodec_free_context( &(av->context) );
-#else
-			avcodec_close( av->context );
-#endif
 		}
-#if LIBAVCODEC_VERSION_MAJOR >= 60
 		if(av->packet)
 			av_packet_free( &(av->packet) );
 		if(av->frame)
 			av_frame_free( &(av->frame) );
-#endif
 		if(av->data[0])
 			free(av->data[0]);
 		if(av->lzo)
@@ -713,14 +686,14 @@ int		vj_avcodec_find_codec( int encoder )
 	{
 		case ENCODER_MJPEG:
 		case ENCODER_QUICKTIME_MJPEG:
-			return CODEC_ID_MJPEG;
+			return AV_CODEC_ID_MJPEG;
 		case ENCODER_DVVIDEO:
 		case ENCODER_QUICKTIME_DV:
-			return CODEC_ID_DVVIDEO;
+			return AV_CODEC_ID_DVVIDEO;
 		case ENCODER_HUFFYUV:
-			return CODEC_ID_HUFFYUV;
+			return AV_CODEC_ID_HUFFYUV;
 		case ENCODER_LJPEG:
-			return CODEC_ID_LJPEG;	
+			return AV_CODEC_ID_LJPEG;
 		case ENCODER_YUV420:
 			return 999;
 		case ENCODER_YUV422:
@@ -851,7 +824,7 @@ void 		*vj_avcodec_start( VJFrame *frame, int encoder, char *filename )
 	int codec_id = vj_avcodec_find_codec( encoder );
 	void *ee = NULL;
 #ifndef SUPPORT_READ_DV2
-	if( codec_id == CODEC_ID_DVVIDEO ) {
+	if( codec_id == AV_CODEC_ID_DVVIDEO ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "[AV] No support for DV encoding built in");
 		return NULL;
 	}
@@ -881,14 +854,6 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 		av_log_set_level( AV_LOG_QUIET);
 	}
 
-#if LIBAVCODEC_VERSION_MAJOR < 54
-	avcodec_register_all();
-	
-#else
-#if LIBAVCODEC_VERSION_MAJOR < 60
-	av_register_all();
-#endif
-#endif
 	return 1;
 }
 
@@ -919,31 +884,6 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[4], uint8_t *dst
 
 static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t *buf, int len, AVFrame *frame )
 {
-#if LIBAVCODEC_VERSION_MAJOR < 60
-	if( avcodec_encode_video2) {
-		char errbuf[512];
-		int got_packet_ptr = 0;
-		pkt->data = buf;
-		pkt->size = len;
-
-		int res = avcodec_encode_video2( ctx, pkt, frame, &got_packet_ptr);
-		if( res < 0) {
-			av_strerror( res, errbuf, sizeof(errbuf));
-			veejay_msg(0, "[AV] Unable to encode frame: %s", errbuf);
-			return -1;
-		}
-
-		if( res == 0 ) {
-			return pkt->size;
-		}
-
-		return -1;
-	}
-	else if( avcodec_encode_video ) {
-		return avcodec_encode_video(ctx,buf,len,frame);
-	}
-#else
-
 	int ret = avcodec_send_frame( ctx, frame );
 	//av_frame_free(&enc_frame);
 
@@ -984,17 +924,11 @@ static int vj_avcodec_encode_video( AVPacket *pkt, AVCodecContext *ctx, uint8_t 
 	 }
 
 	 return total_bytes;
-
-#endif
-
-	return -1;
 }
 
 void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len ) 
 {
 	vj_encoder *av = (vj_encoder*) encoder;
-#if LIBAVCODEC_VERSION_MAJOR >= 60
-
 	int total_bytes = 0;
 
 	avcodec_send_frame(av->context, NULL);
@@ -1027,7 +961,6 @@ void	vj_avcodec_flush_frame(void *encoder, uint8_t *buf, int buf_len )
 	}
 
 	av_packet_free(&pkt);
-#endif
 }
 
 int vj_avcodec_encode_frame(void *encoder, long nframe, int format, 
@@ -1311,30 +1244,6 @@ int vj_avcodec_encode_frame(void *encoder, long nframe, int format,
 		return vj_dv_encode_frame( dv,src );
 	}
 #endif
-#if LIBAVCODEC_VERSION_MAJOR < 60
-	AVFrame pict;
-	veejay_memset( &pict, 0, sizeof(pict));
-
-	pict.quality = 1;
-	pict.pts = (int64_t)( (int64_t)nframe );
-	pict.data[0] = src[0];
-	pict.data[1] = src[1];
-	pict.data[2] = src[2];
-	pict.format  = av->out_frame->format;
-
-	pict.linesize[0] = ROUND_UP_4( av->out_frame->width );
-	pict.linesize[1] = ROUND_UP_4( av->out_frame->uv_width );
-	pict.linesize[2] = ROUND_UP_4( av->out_frame->uv_width );
-
-
-	pict.width = av->out_frame->width;
-	pict.height = av->out_frame->height;
-
-	AVPacket pkt;
-	veejay_memset(&pkt,0,sizeof(pkt));
-		
-	return vj_avcodec_encode_video( &pkt, av->context, buf, buf_len, &pict );
-#else
 	av->frame->pts = (int64_t) nframe;
 	av->frame->quality = FF_QP2LAMBDA * 3.0;
 	
@@ -1352,6 +1261,5 @@ int vj_avcodec_encode_frame(void *encoder, long nframe, int format,
 
 	//av->frame->quality = 1;
 	return vj_avcodec_encode_video( av->packet, av->context, buf, buf_len, av->frame );
-#endif
 }
 

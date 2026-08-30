@@ -117,7 +117,6 @@ vj_effect *isolate_init(int w, int h)
 
     ve->has_user = 0;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->sub_format = 1;
     ve->rgb_conv = 1;
 

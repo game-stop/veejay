@@ -18,13 +18,13 @@ AM_CPPFLAGS += -I /usr/X11R6/include \
 		$(LIBAVFORMAT_CFLAGS) $(LIBAVCODEC_CFLAGS) $(LIBAVUTIL_CFLAGS) $(LIBSWSCALE_CFLAGS) $(GLIB_CFLAGS) \
 		$(PTHREAD_CFLAGS) 
 
-pkginclude_HEADERS = core.h vj-task.h defs.h av.h avhelper.h avcommon.h vims.h vj-ndi-runtime.h
+pkginclude_HEADERS = core.h defs.h av.h avhelper.h avcommon.h vims.h vj-ndi-runtime.h
 
 VEEJAYCORE_LIB_FILE = libveejaycore.la
 
 lib_LTLIBRARIES = $(VEEJAYCORE_LIB_FILE) 
 
-libveejaycore_la_SOURCES = core.c vj-task.c avhelper.c vj-ndi-runtime.c 
+libveejaycore_la_SOURCES = core.c avhelper.c vj-ndi-runtime.c
 
 libveejaycore_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
@@ -44,10 +44,8 @@ if HAVE_ARMV7A
 libveejaycore_la_LIBADD+=$(top_builddir)/thirdparty/fastarm/libfastarm.la
 endif
 
-libveejaycore_la_LIBADD += $(LIBAVFORMAT_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS) $(LIBSWSCALE_LIBS) 
+libveejaycore_la_LIBADD += $(LIBAVFORMAT_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS) $(LIBSWSCALE_LIBS)
+libveejaycore_la_LIBADD += $(PTHREAD_LIBS) $(GLIB_LIBS) $(LIBM_LIBS) $(RT_LIBS) $(OPENMP_CFLAGS)
 
-libveejaycore_la_LDFLAGS +=	$(PTHREAD_LIBS)
-			$(GLIB_LIBS) \
-		 	$(LIBM_LIBS) $(RT_LIBS) \
-			-DDYNAMIC -O3 -Wall -rdynamic -Wl,-no-undefined 
+libveejaycore_la_LDFLAGS += -Wl,-no-undefined
 

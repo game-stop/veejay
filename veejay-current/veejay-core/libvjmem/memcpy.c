@@ -282,7 +282,7 @@ static inline void *__memcpy(void *restrict to, const void *restrict from, size_
 #ifdef HAVE_ASM_AVX
 #define AVX_MMREG_SIZE 32
 #endif
-#if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE4_1__)
+#if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE2__) || defined(__SSE4_1__)
 #define SSE_MMREG_SIZE 16
 #endif
 #ifdef HAVE_ASM_MMX
@@ -2757,24 +2757,6 @@ void    vj_mem_set_defaults(int w, int h) {
 	set_user_selected_memset();
 }
 
-static void	vj_frame_slow_job( void *arg )
-{
-	vj_task_arg_t *job = (vj_task_arg_t*) arg;
-	unsigned int i;
-	uint8_t **img = job->output;
-	uint8_t **p0_buffer = job->input;
-	uint8_t **p1_buffer = job->temp;
-	const float frac = job->fparam;
-	
-	for ( i = 0; i < 3; i ++ ) {
-		uint8_t *a = p0_buffer[i];
-		uint8_t *b = p1_buffer[i];
-		uint8_t *d = img[i];
-		const unsigned int len = job->strides[i];
-		yuv_interpolate_frames(d,a,b,len,frac );	
-	}
-}
-
 static inline void	vj_frame_slow_single1( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
 	yuv_interpolate_frames(img[0],p0_buffer[0],p1_buffer[0],len,frac );
@@ -2790,14 +2772,13 @@ void vj_frame_slow_single(uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **im
         return;
     }
 
-    #pragma omp parallel num_threads(2)
+    #pragma omp parallel sections
     {
-        int tid = omp_get_thread_num();
-        if (tid == 0)
+#pragma omp section
         {
             yuv_interpolate_frames(img[0],p0_buffer[0],p1_buffer[0],len,frac);
         }
-        else if (tid == 1)
+#pragma omp section
         {
             yuv_interpolate_frames_uv(img[1],p0_buffer[1],p1_buffer[1],uv_len,frac);
             yuv_interpolate_frames_uv(img[2],p0_buffer[2],p1_buffer[2],uv_len,frac);
@@ -2807,14 +2788,6 @@ void vj_frame_slow_single(uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **im
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
-	/*if( vj_task_get_workers() > 1 ) {
-		int input_sizes[4] = { len, uv_len, uv_len, 0 };
-		vj_task_set_float( frac );
-		vj_task_run( p0_buffer, img, p1_buffer,input_sizes, 4,(performer_job_routine) &vj_frame_slow_job, 0 );
-	} 
-	else {
-		vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );
-	}*/
     vj_frame_slow_single( p0_buffer, p1_buffer, img, len, uv_len, frac );
 }
 

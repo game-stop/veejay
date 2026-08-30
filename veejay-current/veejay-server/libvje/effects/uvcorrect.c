@@ -66,6 +66,8 @@ typedef struct {
     float iv_f;
     float chroma_drive_f;
     float rotate_drive_f;
+    int work_args[UVCORRECT_PARAMS];
+    int table_dirty;
 } uvcorrect_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -190,7 +192,8 @@ static void uvcorrect_rebuild_table(uvcorrect_t *uv,
                                     int iu_factor,
                                     int iv_factor,
                                     int uv_min,
-                                    int uv_max)
+                                    int uv_max,
+                                    int rebuild)
 {
     uint8_t *restrict table = uv->chrominance;
 
@@ -203,6 +206,9 @@ static void uvcorrect_rebuild_table(uvcorrect_t *uv,
 
 #pragma omp for schedule(static)
     for(int u = 0; u < 256; u++) {
+        if(!rebuild)
+            continue;
+
         const float uterm = ((float)u - (float)center_u) * uf;
 
         for(int v = 0; v < 256; v++) {
@@ -223,14 +229,16 @@ static void uvcorrect_rebuild_table(uvcorrect_t *uv,
 
 #pragma omp single
     {
-        uv->last_angle = angle;
-        uv->last_uc = center_u;
-        uv->last_vc = center_v;
-        uv->last_iu = iu_factor;
-        uv->last_iv = iv_factor;
-        uv->last_min = uv_min;
-        uv->last_max = uv_max;
-        uv->valid = 1;
+        if(rebuild) {
+            uv->last_angle = angle;
+            uv->last_uc = center_u;
+            uv->last_vc = center_v;
+            uv->last_iu = iu_factor;
+            uv->last_iv = iv_factor;
+            uv->last_min = uv_min;
+            uv->last_max = uv_max;
+            uv->valid = 1;
+        }
     }
 }
 
@@ -315,65 +323,79 @@ void uvcorrect_apply(void *ptr, VJFrame *frame, int *args)
 
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
-    int angle         = args[P_ANGLE];
-    int center_u      = args[P_CENTER_U];
-    int center_v      = args[P_CENTER_V];
-    int iu_factor     = args[P_INTENSITY_U];
-    int iv_factor     = args[P_INTENSITY_V];
-    int uv_min        = args[P_MIN_UV];
-    int uv_max        = args[P_MAX_UV];
-    int chroma_drive  = args[P_CHROMA_DRIVE];
-    int rotate_drive  = args[P_ROTATE_DRIVE];
-
     const float slow = 0.118f;
     const float fast = 0.176f;
 
-    if(!uv->smooth_valid) {
-        uv->angle_f = (float)angle;
-        uv->center_u_f = (float)center_u;
-        uv->center_v_f = (float)center_v;
-        uv->iu_f = (float)iu_factor;
-        uv->iv_f = (float)iv_factor;
-        uv->chroma_drive_f = (float)chroma_drive;
-        uv->rotate_drive_f = (float)rotate_drive;
-        uv->smooth_valid = 1;
-    } else {
-        uv->angle_f = uvcorrect_smoothf(uv->angle_f, (float)angle, fast);
-        uv->center_u_f = uvcorrect_smoothf(uv->center_u_f, (float)center_u, slow);
-        uv->center_v_f = uvcorrect_smoothf(uv->center_v_f, (float)center_v, slow);
-        uv->iu_f = uvcorrect_smoothf(uv->iu_f, (float)iu_factor, fast * 0.92f);
-        uv->iv_f = uvcorrect_smoothf(uv->iv_f, (float)iv_factor, fast * 0.92f);
-        uv->chroma_drive_f = uvcorrect_smoothf(uv->chroma_drive_f, (float)chroma_drive, fast * 1.08f);
-        uv->rotate_drive_f = uvcorrect_smoothf(uv->rotate_drive_f, (float)rotate_drive, fast * 1.08f);
+#pragma omp single
+    {
+        int angle = args[P_ANGLE];
+        int center_u = args[P_CENTER_U];
+        int center_v = args[P_CENTER_V];
+        int iu_factor = args[P_INTENSITY_U];
+        int iv_factor = args[P_INTENSITY_V];
+        int chroma_drive = args[P_CHROMA_DRIVE];
+        int rotate_drive = args[P_ROTATE_DRIVE];
+
+        if(!uv->smooth_valid) {
+            uv->angle_f = (float)angle;
+            uv->center_u_f = (float)center_u;
+            uv->center_v_f = (float)center_v;
+            uv->iu_f = (float)iu_factor;
+            uv->iv_f = (float)iv_factor;
+            uv->chroma_drive_f = (float)chroma_drive;
+            uv->rotate_drive_f = (float)rotate_drive;
+            uv->smooth_valid = 1;
+        } else {
+            uv->angle_f = uvcorrect_smoothf(uv->angle_f, (float)angle, fast);
+            uv->center_u_f = uvcorrect_smoothf(uv->center_u_f, (float)center_u, slow);
+            uv->center_v_f = uvcorrect_smoothf(uv->center_v_f, (float)center_v, slow);
+            uv->iu_f = uvcorrect_smoothf(uv->iu_f, (float)iu_factor, fast * 0.92f);
+            uv->iv_f = uvcorrect_smoothf(uv->iv_f, (float)iv_factor, fast * 0.92f);
+            uv->chroma_drive_f = uvcorrect_smoothf(uv->chroma_drive_f, (float)chroma_drive, fast * 1.08f);
+            uv->rotate_drive_f = uvcorrect_smoothf(uv->rotate_drive_f, (float)rotate_drive, fast * 1.08f);
+        }
+
+        uv->work_args[P_ANGLE] = clampi((int)(uv->angle_f + 0.5f), 1, 360);
+        uv->work_args[P_CENTER_U] = clampi((int)(uv->center_u_f + 0.5f), 0, 255);
+        uv->work_args[P_CENTER_V] = clampi((int)(uv->center_v_f + 0.5f), 0, 255);
+        uv->work_args[P_INTENSITY_U] = clampi((int)(uv->iu_f + 0.5f), 0, 100);
+        uv->work_args[P_INTENSITY_V] = clampi((int)(uv->iv_f + 0.5f), 0, 100);
+        uv->work_args[P_MIN_UV] = args[P_MIN_UV];
+        uv->work_args[P_MAX_UV] = args[P_MAX_UV];
+        uv->work_args[P_CHROMA_DRIVE] = clampi((int)(uv->chroma_drive_f + 0.5f), 0, 1000);
+        uv->work_args[P_ROTATE_DRIVE] = clampi((int)(uv->rotate_drive_f + 0.5f), 0, 1000);
+
+        if(uv->work_args[P_MIN_UV] > uv->work_args[P_MAX_UV]) {
+            const int tmp = uv->work_args[P_MIN_UV];
+            uv->work_args[P_MIN_UV] = uv->work_args[P_MAX_UV];
+            uv->work_args[P_MAX_UV] = tmp;
+        }
+
+        uv->table_dirty = uvcorrect_table_dirty(
+            uv,
+            uv->work_args[P_ANGLE],
+            uv->work_args[P_CENTER_U],
+            uv->work_args[P_CENTER_V],
+            uv->work_args[P_INTENSITY_U],
+            uv->work_args[P_INTENSITY_V],
+            uv->work_args[P_MIN_UV],
+            uv->work_args[P_MAX_UV]);
     }
 
-    angle = clampi((int)(uv->angle_f + 0.5f), 1, 360);
-    center_u = clampi((int)(uv->center_u_f + 0.5f), 0, 255);
-    center_v = clampi((int)(uv->center_v_f + 0.5f), 0, 255);
-    iu_factor = clampi((int)(uv->iu_f + 0.5f), 0, 100);
-    iv_factor = clampi((int)(uv->iv_f + 0.5f), 0, 100);
-    chroma_drive = clampi((int)(uv->chroma_drive_f + 0.5f), 0, 1000);
-    rotate_drive = clampi((int)(uv->rotate_drive_f + 0.5f), 0, 1000);
-
-    if(uv_min > uv_max) {
-        const int tmp = uv_min;
-        uv_min = uv_max;
-        uv_max = tmp;
-    }
-
-    const int table_dirty = uvcorrect_table_dirty(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
-
-    if(table_dirty)
-        uvcorrect_rebuild_table(uv, angle, center_u, center_v, iu_factor, iv_factor, uv_min, uv_max);
+    const int *work = uv->work_args;
+    uvcorrect_rebuild_table(uv,
+                            work[P_ANGLE], work[P_CENTER_U], work[P_CENTER_V],
+                            work[P_INTENSITY_U], work[P_INTENSITY_V],
+                            work[P_MIN_UV], work[P_MAX_UV], uv->table_dirty);
 
     uvcorrect_chrominance_treatment(
         uv,
         frame->data[1],
         frame->data[2],
         uv_len,
-        chroma_drive,
-        rotate_drive,
-        uv_min,
-        uv_max
+        work[P_CHROMA_DRIVE],
+        work[P_ROTATE_DRIVE],
+        work[P_MIN_UV],
+        work[P_MAX_UV]
     );
 }

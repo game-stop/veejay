@@ -209,7 +209,7 @@ void reflection_free(void *ptr)
     free(r);
 }
 
-void reflection_apply(void *ptr, VJFrame *frame, int *args)
+static void reflection_apply_serial(void *ptr, VJFrame *frame, int *args)
 {
     reflection_t *r = (reflection_t*)ptr;
 
@@ -278,4 +278,10 @@ void reflection_apply(void *ptr, VJFrame *frame, int *args)
             prev_row[x] = (uint8_t)i2;
         }
     }
+}
+
+void reflection_apply(void *ptr, VJFrame *frame, int *args)
+{
+#pragma omp single
+    reflection_apply_serial(ptr, frame, args);
 }

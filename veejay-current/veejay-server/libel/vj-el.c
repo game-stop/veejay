@@ -53,7 +53,6 @@
 #include <libavformat/avformat.h>
 #include <veejaycore/avhelper.h>
 #include <libel/av.h>
-#include <veejaycore/vj-task.h>
 #include <veejaycore/lzo.h>
 #include <libel/qoi.h>
 #include <math.h>

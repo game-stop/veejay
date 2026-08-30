@@ -85,7 +85,6 @@ vj_effect *bar_init(int width, int height)
     ve->description = "Horizontal Sliding Bars";
     ve->extra_frame = 1;
     ve->has_user = 0;
-    ve->parallel = 0;
     ve->param_description = vje_build_param_list(ve->num_params, "Divider", "Top Y", "Bot Y", "Top X", "Bot X");
 
     {

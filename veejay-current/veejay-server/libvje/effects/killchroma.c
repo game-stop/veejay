@@ -85,14 +85,13 @@ void killchroma_apply(void *ptr, VJFrame *frame, int *args)
     const int mode = args[P_MODE];
     const int len = frame->ssm ? frame->len : frame->uv_len;
 
-#pragma omp single
-    {
+#pragma omp for schedule(static)
+    for(int i = 0; i < len; i++) {
         if(mode == 0) {
-            veejay_memset(frame->data[1], 128, len);
-            veejay_memset(frame->data[2], 128, len);
-        }
-        else {
-            veejay_memset(frame->data[mode], 128, len);
+            frame->data[1][i] = 128;
+            frame->data[2][i] = 128;
+        } else {
+            frame->data[mode][i] = 128;
         }
     }
 }

@@ -199,8 +199,6 @@ void vj_mem_optimize(void) {
 
 int	vj_mem_threaded_init(int w, int h)
 {
-	task_init( w , h );
-
 	init_parallel_tasks( 0 ); // sets functions pointer to single/multi threaded versions
 	
 	return 1;

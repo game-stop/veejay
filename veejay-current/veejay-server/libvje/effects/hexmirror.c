@@ -289,7 +289,6 @@ vj_effect *hexmirror_init(int w, int h)
     ve->description = "Salsaman's Kaleidoscope";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-    ve->parallel = 0;
     ve->has_user = 0;
 
     ve->param_description = vje_build_param_list(

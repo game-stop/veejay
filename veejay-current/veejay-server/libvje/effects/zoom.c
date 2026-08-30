@@ -188,7 +188,7 @@ void zoom_free(void *ptr)
     free(z);
 }
 
-void zoom_apply(void *ptr, VJFrame *frame, int *args)
+static void zoom_apply_serial(void *ptr, VJFrame *frame, int *args)
 {
     zoom_t *z = (zoom_t*) ptr;
 
@@ -268,4 +268,10 @@ void zoom_apply(void *ptr, VJFrame *frame, int *args)
         viewport_process_dynamic_alpha(z->zoom_vp_, z->zoom_private_, frame->data);
     else
         viewport_process_dynamic(z->zoom_vp_, z->zoom_private_, frame->data);
+}
+
+void zoom_apply(void *ptr, VJFrame *frame, int *args)
+{
+#pragma omp single
+    zoom_apply_serial(ptr, frame, args);
 }

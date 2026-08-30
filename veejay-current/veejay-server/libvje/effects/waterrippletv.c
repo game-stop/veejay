@@ -71,6 +71,8 @@ typedef struct {
     float drops_env;
     float power_env;
     int smooth_ready;
+    int work_loopnum;
+    int work_decay;
 } ripple_tv;
 
 static inline int clampi(int v, int lo, int hi)
@@ -568,50 +570,51 @@ void waterrippletv_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->len;
 
-    const int fresh_rate = args[P_REFRESH_FREQ];
-    const int loopnum_arg = args[P_WAVESPEED];
-    const int decay_arg = args[P_DECAY];
-    const int drop_drive_arg = args[P_DROP_DRIVE];
-    const int ripple_power_arg = args[P_RIPPLE_POWER];
-
     const float fast = 0.235f;
     const float slow = 0.118f;
 
-    if(!rip->smooth_ready) {
-        rip->wavespeed_env = (float)loopnum_arg;
-        rip->decay_env = (float)decay_arg;
-        rip->drops_env = (float)drop_drive_arg;
-        rip->power_env = (float)ripple_power_arg;
-        rip->smooth_ready = 1;
+#pragma omp single
+    {
+        const int fresh_rate = args[P_REFRESH_FREQ];
+        const int loopnum_arg = args[P_WAVESPEED];
+        const int decay_arg = args[P_DECAY];
+        const int drop_drive_arg = args[P_DROP_DRIVE];
+        const int ripple_power_arg = args[P_RIPPLE_POWER];
+
+        if(!rip->smooth_ready) {
+            rip->wavespeed_env = (float)loopnum_arg;
+            rip->decay_env = (float)decay_arg;
+            rip->drops_env = (float)drop_drive_arg;
+            rip->power_env = (float)ripple_power_arg;
+            rip->smooth_ready = 1;
+        }
+
+        const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
+        const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
+        const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
+        const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
+
+        if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
+            rip->last_fresh_rate = fresh_rate;
+            rip->tick = 0;
+            rip->rain_period = 0;
+            waterripple_clear_maps(rip);
+        }
+
+        rip->tick++;
+        veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
+        raindrop(rip);
+        waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
+
+        rip->work_loopnum = loopnum + ((drop_drive * 3 + 500) / 1000);
+        if(drop_drive > 760)
+            rip->work_loopnum++;
+
+        rip->work_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
+        rip->work_decay = clampi(rip->work_decay, 1, 31);
     }
 
-    const int loopnum = clampi(waterripple_smooth_i(&rip->wavespeed_env, loopnum_arg, fast * 0.76f, slow), 1, 16);
-    const int decay = clampi(waterripple_smooth_i(&rip->decay_env, decay_arg, fast * 0.58f, slow), 1, 31);
-    const int drop_drive = clampi(waterripple_smooth_i(&rip->drops_env, drop_drive_arg, fast * 1.08f, slow), 0, 1000);
-    const int ripple_power = clampi(waterripple_smooth_i(&rip->power_env, ripple_power_arg, fast, slow), 0, 1000);
-
-    if(rip->last_fresh_rate != fresh_rate || rip->tick > fresh_rate) {
-        rip->last_fresh_rate = fresh_rate;
-        rip->tick = 0;
-        rip->rain_period = 0;
-        waterripple_clear_maps(rip);
-    }
-
-    rip->tick++;
-
-    veejay_memcpy(rip->ripple_data[0], frame->data[0], len);
-
-    raindrop(rip);
-    waterripple_inject_drive_drops(rip, drop_drive, ripple_power);
-
-    int effective_loopnum = loopnum + ((drop_drive * 3 + 500) / 1000);
-    if(drop_drive > 760)
-        effective_loopnum++;
-
-    int effective_decay = decay + ((drop_drive * 3 + 500) / 1000) - ((drop_drive * ripple_power + 500000) / 1000000);
-    effective_decay = clampi(effective_decay, 1, 31);
-
-    waterripple_simulate(rip, effective_loopnum, effective_decay);
+    waterripple_simulate(rip, rip->work_loopnum, rip->work_decay);
     waterripple_calc_vtable(rip);
     waterripple_render(frame, rip);
 }

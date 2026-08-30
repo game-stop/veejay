@@ -29,7 +29,6 @@
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
-#include <veejaycore/vj-task.h>
 #include <libyuv/mmx_macros.h>
 #include <veejaycore/avcommon.h>
 #ifdef HAVE_ARM

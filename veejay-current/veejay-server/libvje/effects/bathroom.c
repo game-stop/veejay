@@ -77,7 +77,6 @@ vj_effect *bathroom_init(int width, int height)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->motion = 1;
-    ve->parallel = 0;
     ve->alpha = FLAG_ALPHA_SRC_A | FLAG_ALPHA_OUT | FLAG_ALPHA_OPTIONAL;
     ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Distance", "X start position", "X end position");
     ve->hints = vje_init_value_hint_list(ve->num_params);
@@ -259,7 +258,7 @@ static void bathroom_apply_alpha(bathroom_t *b, VJFrame *frame, int val, int x0,
     }
 }
 
-void bathroom_apply(void *ptr, VJFrame *frame, int *args)
+static void bathroom_apply_serial(void *ptr, VJFrame *frame, int *args)
 {
     bathroom_t *b = (bathroom_t*) ptr;
 
@@ -319,6 +318,12 @@ void bathroom_apply(void *ptr, VJFrame *frame, int *args)
 
     if(b->motionmap && motion)
         motionmap_store_frame(b->motionmap, frame);
+}
+
+void bathroom_apply(void *ptr, VJFrame *frame, int *args)
+{
+#pragma omp single
+    bathroom_apply_serial(ptr, frame, args);
 }
 
 int bathroom_request_fx(void)

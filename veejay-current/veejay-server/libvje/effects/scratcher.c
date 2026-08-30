@@ -37,6 +37,7 @@ typedef struct {
     int direction;
     int last_pingpong;
     int last_n;
+    int store_current;
 
 
     float sm_opacity;
@@ -175,7 +176,7 @@ void scratcher_free(void *ptr)
     free(s);
 }
 
-static void scratcher_store_current(scratcher_t *s, VJFrame *src, int slot)
+static void scratcher_store_current(scratcher_t *s, VJFrame *src, int slot, int enabled)
 {
     const int len = src->len;
     const int uv_len = src->ssm ? src->len : src->uv_len;
@@ -191,8 +192,10 @@ static void scratcher_store_current(scratcher_t *s, VJFrame *src, int slot)
     const int bytes[3] = { len, uv_len, uv_len };
 
 #pragma omp for schedule(static)
-    for(int plane = 0; plane < 3; plane++)
-        veejay_memcpy(dst[plane], src_data[plane], bytes[plane]);
+    for(int plane = 0; plane < 3; plane++) {
+        if(enabled)
+            veejay_memcpy(dst[plane], src_data[plane], bytes[plane]);
+    }
 }
 
 static void scratcher_advance(scratcher_t *s, int n, int pingpong)
@@ -232,8 +235,7 @@ static void scratcher_advance(scratcher_t *s, int n, int pingpong)
 
 static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, int wet_q8, int chroma_q8)
 {
-    if(slot <= 0 || wet_q8 <= 0)
-        return;
+    const int enabled = slot > 0 && wet_q8 > 0;
 
     const int len = src->len;
     const int uv_len = src->ssm ? src->len : src->uv_len;
@@ -247,13 +249,17 @@ static void scratcher_blend_from_slot(scratcher_t *s, VJFrame *src, int slot, in
     const uint8_t *restrict hV = s->frame[2] + ((size_t)len * (size_t)slot);
 
 #pragma omp for schedule(static)
-        for(int i = 0; i < len; i++)
-            Y[i] = scratcher_mix_y(Y[i], hY[i], wet_q8);
+        for(int i = 0; i < len; i++) {
+            if(enabled)
+                Y[i] = scratcher_mix_y(Y[i], hY[i], wet_q8);
+        }
 
 #pragma omp for schedule(static)
         for(int i = 0; i < uv_len; i++) {
-            U[i] = scratcher_mix_uv(U[i], hU[i], chroma_q8);
-            V[i] = scratcher_mix_uv(V[i], hV[i], chroma_q8);
+            if(enabled) {
+                U[i] = scratcher_mix_uv(U[i], hU[i], chroma_q8);
+                V[i] = scratcher_mix_uv(V[i], hV[i], chroma_q8);
+            }
     }
 }
 
@@ -291,6 +297,8 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
 
         s->direction = 1;
     }
+
+    s->store_current = !pingpong || s->direction > 0;
     }
 
     n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
@@ -306,8 +314,7 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
 
     scratcher_blend_from_slot(s, src, slot, wet_q8, chroma_q8);
 
-    if(!pingpong || s->direction > 0)
-        scratcher_store_current(s, src, slot);
+    scratcher_store_current(s, src, slot, s->store_current);
 
     #pragma omp single
     scratcher_advance(s, n, pingpong);

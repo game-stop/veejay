@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
@@ -32,9 +33,14 @@
 #include <libavutil/pixfmt.h>
 #include <veejaycore/avcommon.h>
 #include <veejaycore/vjmem.h>
+#include <veejaycore/yuvconv.h>
 #include "effects/common.h"
 #include <libplugger/plugload.h>
 #include <veejaycore/vims.h>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -174,7 +180,6 @@ static struct {
     { pixelate_init,NULL,NULL,NULL,NULL,pixelate_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PIXELATE },
     { picinpic_init,picinpic_malloc,picinpic_free,NULL,NULL,NULL,picinpic_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_PICINPIC },
     { photoplay_init,photoplay_malloc,photoplay_free,NULL,NULL,photoplay_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_PHOTOPLAY },
-    { perspective_init,perspective_malloc,perspective_free,NULL,NULL,perspective_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PERSPECTIVE },
     { pencilsketch_init,NULL,NULL,NULL,NULL,pencilsketch_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PENCILSKETCH },
     { pencilsketch2_init,pencilsketch2_malloc,pencilsketch2_free,NULL,NULL,pencilsketch2_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_PENCILSKETCH2 },
     { overclock_init,overclock_malloc,overclock_free,NULL,NULL,overclock_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_OVERCLOCK },
@@ -239,8 +244,8 @@ static struct {
     { magicscratcher_init,magicscratcher_malloc,magicscratcher_free,NULL,NULL,magicscratcher_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_MAGICSCRATCHER },
     { lumamask_init,lumamask_malloc,lumamask_free,NULL,NULL,NULL,lumamask_apply,NULL,lumamask_requests_fx, lumamask_set_motionmap, VJ_VIDEO_EFFECT_LUMAMASK },
     { lumamagick_init,lumamagick_malloc,lumamagick_free,NULL,NULL,NULL,lumamagick_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAMAGICK },
-    { lumakey_init,lumakey_malloc,lumakey_free,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
-    { lumablend_init, lumablend_malloc,lumablend_free,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
+    { lumakey_init,NULL,NULL,NULL,NULL,NULL,lumakey_apply,NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMAKEY },
+    { lumablend_init,NULL,NULL,NULL,NULL,NULL, lumablend_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_LUMABLEND },
     { levelcorrection_init,levelcorrection_malloc,levelcorrection_free,NULL,NULL,levelcorrection_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_LEVELCORRECTION },
     { killchroma_init,NULL,NULL,NULL,NULL,killchroma_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_KILLCHROMA },
     { keyselect_init,keyselect_malloc,keyselect_free,NULL,NULL,NULL,keyselect_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_KEYSELECT },
@@ -260,7 +265,7 @@ static struct {
     { feathermask_init, feathermask_malloc, feathermask_free,NULL,NULL, feathermask_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_ALPHAFEATHERMASK },
     { integralblur_init, integralblur_malloc, integralblur_free,NULL,NULL, integralblur_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_INTEGRALBLUR },
     { enhancemask_init, enhancemask_malloc, enhancemask_free, NULL,NULL, enhancemask_apply,NULL,NULL, NULL,NULL, VJ_IMAGE_EFFECT_ENHANCEMASK },
-    { emboss_init, NULL, NULL, NULL, NULL, emboss_apply, NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EMBOSS }, 
+    { emboss_init, emboss_malloc, emboss_free, NULL, NULL, emboss_apply, NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_EMBOSS },
     { dupmagic_init, NULL, NULL, NULL, NULL, NULL, dupmagic_apply, NULL, NULL, NULL, VJ_VIDEO_EFFECT_DUPMAGIC },
     { dotillism_init, dotillism_malloc, dotillism_free, NULL,NULL, dotillism_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_DOTILLISM },
     { ghostwash_init, ghostwash_malloc, ghostwash_free, NULL,NULL, ghostwash_apply, NULL,NULL,NULL, NULL, VJ_IMAGE_EFFECT_GHOSTWASH },
@@ -332,7 +337,7 @@ static struct {
     { bar_init,bar_malloc,bar_free,NULL,NULL,NULL,bar_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_3BAR },
     { flashopacity_init,flashopacity_malloc,flashopacity_free,NULL,NULL,NULL,flashopacity_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_FLASHOPACITY },
     { buffer_init,buffer_malloc,buffer_free,NULL,NULL,buffer_apply,NULL, NULL,NULL,NULL,VJ_IMAGE_EFFECT_BUFFER },
-    { blackreplace_init,blackreplace_malloc,blackreplace_free,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
+    { blackreplace_init,NULL,NULL,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
     { darkreplace_init,darkreplace_malloc,darkreplace_free,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
     { morphologymixer_init, morphologymixer_malloc, morphologymixer_free, NULL,NULL,NULL, morphologymixer_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_MORPHOLOGY },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
@@ -450,13 +455,9 @@ int vje_init(int w, int h)
     for( i = 0; i < MAX_EFFECTS; i ++ )
         vj_fx_map[i] = -1;
 
-    int parallel_fx = 0;
-
     for( i = 0; vj_fx[i].fx_id != 0; i ++ ) {
         vj_fx_map[ vj_fx[i].fx_id ] = i;
         vj_effect_map[ i ] = vj_fx[i].fx_init(w,h);
-        if(vj_effect_map[i]->parallel > 0)
-            parallel_fx ++;
         num_fx ++;
         if( vj_fx[i].fx_id > LAST_ID ) {
             LAST_ID = vj_fx[i].fx_id;
@@ -490,7 +491,7 @@ int vje_init(int w, int h)
 
     plug_sys_init( PIX_FMT_YUVA444P, w,h, 0 );
 
-    veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Have %d FX (%d support parallelization)", num_fx, parallel_fx);
+    veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Have %d FX", num_fx);
 
     return 1;
 }
@@ -550,56 +551,6 @@ void vje_fx_free( int fx_id, int chain_id, int entry, void *ptr )
     }
 }
 
-static void vje_fx_parallel_apply( void *arg )
-{
-    vj_task_arg_t *v = (vj_task_arg_t*) arg;
-    VJFrame a,b;
-
-    int idx = v->iparams[0];
-    int extra_frame = v->iparams[1];
-    int *param_values = &(v->iparams[2]);
-
-    vj_task_set_to_frame( &a, 0, v->jobnum );
-
-    if(extra_frame) {
-#ifdef STRICT_CHECKING
-        assert( vj_fx[ idx ].fx_process != NULL );
-#endif
-	    vj_task_set_to_frame( &b, 1, v->jobnum );
-        vj_fx[ idx ].fx_process( v->ptr, &a, &b, param_values );
-    }
-    else {
-#ifdef STRICT_CHECKING
-        assert( vj_fx[ idx ].fx_filter != NULL );
-#endif
-        vj_fx[ idx ].fx_filter( v->ptr, &a, param_values );
-    }
-}
-
-static int vje_fx_parallize( vj_effect *fx, void *instance, int idx, VJFrame *A, VJFrame *B, int *args )
-{
-    if(!fx->parallel)
-        return 0;
-
-    if( vj_task_get_workers() <= 0 )
-	return 0;
-
-    int i;
-
-    vj_task_set_from_frame( A );
-    vj_task_set_param( idx, 0 );
-    vj_task_set_param( fx->extra_frame, 1 );
-    vj_task_set_ptr( instance ); 
-
-    for( i = 0; i < fx->num_params; i ++ ) {
-        vj_task_set_param( args[i], 2 + i );
-    }
-
-    vj_task_run( A->data, B->data, NULL, NULL, 4, (performer_job_routine) &vje_fx_parallel_apply, (fx->parallel == 2) );
-
-    return 1;
-}
-
 static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B, int *args, vj_effect *fx )
 {
     int n = plug_get_num_input_channels( plug_id );
@@ -623,6 +574,210 @@ static void vje_fx_plugin_apply( int plug_id, void *ptr, VJFrame *A, VJFrame *B,
         plug_push_frame( ptr, 1, 0, A );
 
     plug_process( ptr, A->timecode );
+}
+
+int vje_fx_needs_instance(int fx_id)
+{
+    if(fx_id <= 0 || fx_id >= MAX_EFFECTS)
+        return 0;
+
+    const int idx = vj_fx_map[ fx_id ];
+    if(idx < 0 || idx >= MAX_EFFECTS)
+        return 0;
+
+    return vj_fx[idx].fx_malloc != NULL;
+}
+
+void vje_fx_apply_collective( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
+{
+    vje_fx_apply(fx_id, ptr, A, B, args);
+}
+
+#ifdef _OPENMP
+typedef struct {
+    int fx_id;
+    void *instance;
+    int args[16];
+} vje_benchmark_fx_t;
+
+static double vje_benchmark_now(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double) ts.tv_sec + ((double) ts.tv_nsec * 1.0e-9);
+}
+
+static double vje_benchmark_sample(VJFrame *frame, vje_benchmark_fx_t *chain,
+                                   int chain_len, int threads, int frames)
+{
+    double started = 0.0;
+    double elapsed = 0.0;
+
+#pragma omp parallel num_threads(threads) shared(started, elapsed)
+    {
+        for(int warmup = 0; warmup < 3; warmup++) {
+            for(int effect = 0; effect < chain_len; effect++)
+                vje_fx_apply_collective(chain[effect].fx_id, chain[effect].instance,
+                                        frame, NULL, chain[effect].args);
+        }
+
+#pragma omp single
+        started = vje_benchmark_now();
+
+        for(int frame_num = 0; frame_num < frames; frame_num++) {
+            for(int effect = 0; effect < chain_len; effect++)
+                vje_fx_apply_collective(chain[effect].fx_id, chain[effect].instance,
+                                        frame, NULL, chain[effect].args);
+        }
+
+#pragma omp single
+        elapsed = vje_benchmark_now() - started;
+    }
+
+    return elapsed;
+}
+#endif
+
+int vje_benchmark_threads(int width, int height)
+{
+#ifndef _OPENMP
+    veejay_msg(VEEJAY_MSG_WARNING,
+               "FX thread benchmark skipped: this build has no OpenMP support");
+    return 0;
+#else
+    static const int effect_ids[] = {
+        VJ_IMAGE_EFFECT_EMBOSS,
+        VJ_IMAGE_EFFECT_SOFTBLUR,
+        VJ_IMAGE_EFFECT_SOBEL
+    };
+    enum { CHAIN_LEN = 3, SAMPLES = 3, FRAMES = 12 };
+    vje_benchmark_fx_t chain[CHAIN_LEN];
+    double results[3] = { 0.0, 0.0, 0.0 };
+    int candidates[3];
+    int candidate_count = 0;
+    int cpu_count = omp_get_num_procs();
+    int recommended = -1;
+    VJFrame *frame = NULL;
+    uint8_t *pixels = NULL;
+    int initialized = 0;
+
+    if(width < 64)
+        width = 64;
+    if(height < 64)
+        height = 64;
+    if(cpu_count < 1)
+        cpu_count = 1;
+
+    const int requested[] = { 6, cpu_count / 2, cpu_count - 1 };
+    for(int index = 0; index < 3; index++) {
+        int threads = requested[index];
+        if(threads < 1)
+            threads = 1;
+        if(threads > cpu_count)
+            threads = cpu_count;
+
+        int duplicate = 0;
+        for(int seen = 0; seen < candidate_count; seen++) {
+            if(candidates[seen] == threads)
+                duplicate = 1;
+        }
+        if(!duplicate)
+            candidates[candidate_count++] = threads;
+    }
+
+    memset(chain, 0, sizeof(chain));
+    if(!vje_init(width, height)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize effects for benchmark");
+        return 0;
+    }
+
+    frame = yuv_yuv_template(NULL, NULL, NULL, width, height, PIX_FMT_YUVJ422P);
+    if(!frame)
+        goto cleanup;
+
+    const size_t pixel_bytes = (size_t) frame->len + ((size_t) frame->uv_len * 2u);
+    pixels = (uint8_t *) vj_malloc(pixel_bytes);
+    if(!pixels)
+        goto cleanup;
+
+    frame->data[0] = pixels;
+    frame->data[1] = pixels + frame->len;
+    frame->data[2] = frame->data[1] + frame->uv_len;
+    for(int pixel = 0; pixel < frame->len; pixel++)
+        frame->data[0][pixel] = (uint8_t) ((pixel * 13 + pixel / width) & 0xff);
+    memset(frame->data[1], 96, (size_t) frame->uv_len);
+    memset(frame->data[2], 160, (size_t) frame->uv_len);
+
+    for(int effect = 0; effect < CHAIN_LEN; effect++) {
+        int error = 0;
+        chain[effect].fx_id = effect_ids[effect];
+        chain[effect].instance = vje_fx_malloc(effect_ids[effect], 0, effect,
+                                                width, height, &error);
+        if(error || !chain[effect].instance)
+            goto cleanup;
+        initialized++;
+
+        const int parameters = vje_get_num_params(effect_ids[effect]);
+        if(parameters > (int) (sizeof(chain[effect].args) / sizeof(chain[effect].args[0])))
+            goto cleanup;
+        for(int parameter = 0; parameter < parameters; parameter++)
+            chain[effect].args[parameter] = vje_get_param_default(effect_ids[effect], parameter);
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "FX thread benchmark %dx%d: Emboss, Soft Blur, Sobel (%d frames, %d samples)",
+               width, height, FRAMES, SAMPLES);
+
+    for(int candidate = 0; candidate < candidate_count; candidate++) {
+        double samples[SAMPLES];
+        for(int sample = 0; sample < SAMPLES; sample++)
+            samples[sample] = vje_benchmark_sample(frame, chain, CHAIN_LEN,
+                                                   candidates[candidate], FRAMES);
+
+        if(samples[0] > samples[1]) { double swap = samples[0]; samples[0] = samples[1]; samples[1] = swap; }
+        if(samples[1] > samples[2]) { double swap = samples[1]; samples[1] = samples[2]; samples[2] = swap; }
+        if(samples[0] > samples[1]) { double swap = samples[0]; samples[0] = samples[1]; samples[1] = swap; }
+        results[candidate] = samples[1];
+
+        veejay_msg(VEEJAY_MSG_INFO,
+                   "  %2d threads: %7.2f ms/frame, %7.2f frames/s",
+                   candidates[candidate],
+                   results[candidate] * 1000.0 / FRAMES,
+                   FRAMES / results[candidate]);
+    }
+
+    int fastest = 0;
+    for(int candidate = 1; candidate < candidate_count; candidate++) {
+        if(results[candidate] < results[fastest])
+            fastest = candidate;
+    }
+
+    recommended = fastest;
+    const double near_fastest = results[fastest] * 1.03;
+    for(int candidate = 0; candidate < candidate_count; candidate++) {
+        if(results[candidate] <= near_fastest &&
+           candidates[candidate] < candidates[recommended])
+            recommended = candidate;
+    }
+
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Recommended maximum: VEEJAY_MULTITHREAD_TASKS=%d%s",
+               candidates[recommended],
+               recommended != fastest ? " (within 3% of fastest, using fewer CPUs)" : "");
+
+cleanup:
+    for(int effect = 0; effect < initialized; effect++)
+        vje_fx_free(chain[effect].fx_id, 0, effect, chain[effect].instance);
+    free(pixels);
+    free(frame);
+
+    if(initialized != CHAIN_LEN || recommended < 0) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to prepare FX thread benchmark chain");
+        return 0;
+    }
+    return candidates[recommended];
+#endif
 }
 
 void vje_fx_apply( int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args )
@@ -1425,10 +1580,6 @@ int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *ds
     *dst = *src;
 
     return !(src->flags & VJ_BEAT_F_REJECT);
-}
-
-int vje_max_threads(int len) {
-    return vje_advise_num_threads(len);
 }
 
 void vje_dump(void) {

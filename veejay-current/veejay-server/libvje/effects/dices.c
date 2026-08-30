@@ -286,10 +286,9 @@ void dices_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict sCb = d->src[1];
     uint8_t *restrict sCr = d->src[2];
 
-    if((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation))
-    {
 #pragma omp single
-        {
+    {
+        if((cube_bits != d->g_cube_bits) || (orientation != d->g_orientation)) {
             d->g_cube_bits = cube_bits;
             d->g_orientation = (uint8_t)orientation;
             if(orientation == VJ_IMAGE_EFFECT_DICES_ORIENTATION_DEFAULT)

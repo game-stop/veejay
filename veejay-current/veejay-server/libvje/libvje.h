@@ -80,14 +80,22 @@ void vje_set_quality(int quality);
 int vje_get_quality(void);
 
 void vje_dump();
+int vje_benchmark_threads(int width, int height);
 
 // processing
 void vjert_apply( void *entry, VJFrame **frames, int chain_id, int chain_position, int *args ); //FIXME
+void vjert_frame_begin(void);
+void vjert_frame_end(void);
+int vjert_prepare_frame(void *entry, int chain_id, int chain_position,
+						VJFrame *frame, int *effect_id, int *e_flag,
+						void **fx_instance);
+void vjert_apply_frame(int effect_id, int e_flag, void *fx_instance,
+					   VJFrame **frames, int *args);
 void vjert_del_fx( void *ptr, int chain_id, int chain_position, int clear ); //FIXME
 void vjert_update( void *ptr, VJFrame *frame );
 
 const vj_beat_param_hint_t *vje_get_beat_hint(int fx_id, int parameter_id);
 int vje_get_beat_hint_copy(int fx_id, int parameter_id, vj_beat_param_hint_t *dst);
-int vje_max_threads(int len);
+int vje_advise_num_threads(const int len);
 
 #endif

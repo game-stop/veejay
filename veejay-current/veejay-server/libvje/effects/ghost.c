@@ -25,6 +25,7 @@ typedef struct {
     uint8_t *ghost_buf[4];
     uint8_t *diff_map;
     int diff_period;
+    int initialize_frame;
 } ghost_t;
 
 static inline int clampi(int v, int lo, int hi)
@@ -132,15 +133,20 @@ void ghost_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict dV = g->ghost_buf[2];
     uint8_t *restrict bm = g->diff_map;
 
-    if(g->diff_period == 0) {
+#pragma omp single
+    {
+        g->initialize_frame = (g->diff_period == 0);
+        if(g->initialize_frame)
+            g->diff_period = 1;
+    }
+
+    if(g->initialize_frame) {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             dY[i] = srcY[i];
             dU[i] = srcU[i];
             dV[i] = srcV[i];
         }
-#pragma omp single
-        g->diff_period = 1;
         return;
     }
 

@@ -44,6 +44,9 @@
 #define DM_CANDIDATES_LOW 9
 #define DM_CANDIDATES_HALF 9
 
+#define DM_FRAME_INITIALIZE (1 << 0)
+#define DM_FRAME_REFRESH    (1 << 1)
+
 typedef struct {
     int w;
     int h;
@@ -55,6 +58,7 @@ typedef struct {
     int last_block;
     int last_flow;
     int last_reset;
+    int frame_flags;
     int max_blocks;
     void *region;
     uint8_t *hist[3];
@@ -672,23 +676,6 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const size_t llen = (size_t) len;
 
     const int reset = args[P_RESET] > 0;
-
-    if (!d->initialized) {
-        dm_fill_history(d, frame_y, frame_u, frame_v);
-#pragma omp single
-        {
-        d->last_reset = reset;
-        d->frame++;
-        }
-        return;
-    }
-
-    if (reset && !d->last_reset)
-        dm_fill_history(d, frame_y, frame_u, frame_v);
-
-#pragma omp single
-    d->last_reset = reset;
-
     const int strength = args[P_MOSH];
     const int history_depth = args[P_HISTORY];
     const int block = args[P_BLOCK];
@@ -700,13 +687,29 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     const int flow_strength = args[P_FLOW_AMT];
     const int source_opacity = args[P_SRC_OPAC];
 
-    if (block != d->last_block || flow_mode != d->last_flow) {
 #pragma omp single
-        {
-        dm_clear_fields(d);
+    {
+        const int initialize = !d->initialized;
+        const int refresh = initialize || (reset && !d->last_reset);
+
+        d->frame_flags = (initialize ? DM_FRAME_INITIALIZE : 0) |
+                         (refresh ? DM_FRAME_REFRESH : 0);
+
+        if (block != d->last_block || flow_mode != d->last_flow)
+            dm_clear_fields(d);
+
         d->last_block = block;
         d->last_flow = flow_mode;
-        }
+        d->last_reset = reset;
+    }
+
+    if (d->frame_flags & DM_FRAME_REFRESH)
+        dm_fill_history(d, frame_y, frame_u, frame_v);
+
+    if (d->frame_flags & DM_FRAME_INITIALIZE) {
+#pragma omp single
+        d->frame++;
+        return;
     }
 
     uint8_t *cur_y;

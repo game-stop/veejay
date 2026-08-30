@@ -24,7 +24,7 @@
 
 #ifdef _OPENMP
 #include <omp.h>
-#define PS_OMP_FOR _Pragma("omp for schedule(static)")
+#define PS_OMP_FOR _Pragma("omp for schedule(dynamic, 1)")
 #define PS_THREAD_ID() omp_get_thread_num()
 #else
 #define PS_OMP_FOR

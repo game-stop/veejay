@@ -28,6 +28,10 @@
 #include <time.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <unistd.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include <veejaycore/defs.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-tag.h>
@@ -51,7 +55,6 @@
 #include <libel/pixbuf.h>
 #include <veejaycore/avcommon.h>
 #include <libveejay/vj-misc.h>
-#include <veejaycore/vj-task.h>
 #include <veejaycore/lzo.h>
 #include <libveejay/vj-viewport.h>
 #include <libveejay/vj-composite.h>
@@ -1190,8 +1193,7 @@ int vj_perform_get_audio_mix_mode(veejay_t *info)
 
 int vj_perform_set_audio_mix_crossfade(veejay_t *info, int crossfade)
 {
-    if(!info || !info->settings)
-        return 0;
+
 
     crossfade = vj_audio_mix_clampi(crossfade, 0, 100);
 
@@ -1210,8 +1212,7 @@ int vj_perform_set_audio_mix_crossfade(veejay_t *info, int crossfade)
 
 int vj_perform_get_audio_mix_crossfade(veejay_t *info)
 {
-    if(!info || !info->settings)
-        return 0;
+
 
     return vj_audio_mix_clampi(atomic_load_int(&info->settings->audio_mix_crossfade), 0, 100);
 }
@@ -2941,8 +2942,7 @@ static int vj_perform_audio_beat_apply_render_chains(
     int beat_fx = 0;
     int changed = 0;
 
-    if(!info || !info->settings)
-        return 0;
+
 
     settings = info->settings;
 
@@ -3331,6 +3331,85 @@ int vj_perform_get_next_sequence_id(veejay_t *info, int *type, int current, int 
         *new_current = slot;
 
     return id;
+}
+
+int vj_perform_setup_manual_transition(veejay_t *info,
+                                       int next_sample_id,
+                                       int next_type,
+                                       int sample_id,
+                                       int current_type)
+{
+
+
+    video_playback_setup *settings = info->settings;
+    atomic_store_int(&settings->manual_transition, 1);
+    atomic_store_int(&settings->manual_transition_target_owned, 0);
+    atomic_store_long_long(&settings->manual_transition_elapsed, 0);
+    atomic_store_long_long(&settings->manual_transition_duration, 0);
+
+    if(next_sample_id <= 0)
+        return 0;
+
+    vj_perform_setup_transition(info,
+                                next_sample_id,
+                                next_type,
+                                sample_id,
+                                current_type,
+                                -1,
+                                -1);
+    return atomic_load_int(&settings->transition.active) != 0;
+}
+
+int vj_perform_manual_transition_audio_begin(veejay_t *info, int source_id)
+{
+
+
+    video_playback_setup *settings = info->settings;
+    atomic_store_int(&settings->manual_transition, 1);
+    atomic_store_int(&settings->manual_transition_target_owned, 1);
+    atomic_store_long_long(&settings->manual_transition_elapsed, 0);
+
+    const long long start = atomic_load_long_long(&settings->transition.start);
+    const long long end = atomic_load_long_long(&settings->transition.end);
+    const long long span = end >= start ? end - start : start - end;
+    atomic_store_long_long(&settings->manual_transition_duration, span > 0 ? span : 1);
+
+    (void)source_id;
+    return 1;
+}
+
+void vj_perform_manual_transition_audio_end(veejay_t *info)
+{
+    if(!info || !info->settings)
+        return;
+
+    video_playback_setup *settings = info->settings;
+    atomic_store_int(&settings->manual_transition_target_owned, 0);
+    atomic_store_long_long(&settings->manual_transition_elapsed, 0);
+    atomic_store_long_long(&settings->manual_transition_duration, 0);
+}
+
+long vj_perform_take_manual_transition_audio_frame(veejay_t *info, int source_id)
+{
+    (void)source_id;
+
+    if(!info || !info->settings)
+        return -1;
+
+    video_playback_setup *settings = info->settings;
+    long long elapsed = atomic_load_long_long(&settings->manual_transition_elapsed);
+    const long long duration = atomic_load_long_long(&settings->manual_transition_duration);
+
+    if(duration <= 0)
+        return -1;
+
+    elapsed = elapsed + 1;
+    atomic_store_long_long(&settings->manual_transition_elapsed, elapsed);
+
+    if(elapsed >= duration)
+        return -1;
+
+    return elapsed;
 }
 
 void vj_perform_setup_transition(veejay_t *info,
@@ -4895,6 +4974,9 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
     int n_params = 0;
     int is_mixer = 0;
     int rgb = 0;
+    int effect_id = -1;
+    int e_flag = 0;
+    void *fx_instance = NULL;
     int alpha_flags = vje_get_alpha_flags(e);
 
     if(entry == NULL || !vje_get_info( e, &is_mixer, &n_params, &rgb)) {
@@ -4947,6 +5029,8 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
         return;
     }
 
+    VJFrame **apply_frames = frames;
+
     if( rgb ) {
 
         if(!vj_perform_format_changed_rgb(p, frames[0])) {
@@ -4958,12 +5042,28 @@ static void vj_perform_apply_first(veejay_t *info,performer_t *p, vjp_kf *todo_i
             yuv_convert_and_scale_rgb( p->yuv2rgba_scaler, frames[1], p->rgba_frame[1] );
         }
 
-        vjert_apply( entry, p->rgba_frame, p->chain_id,c, args );
-
-        yuv_convert_and_scale_from_rgb( p->rgba2yuv_scaler, p->rgba_frame[0],frames[0] );
+        apply_frames = p->rgba_frame;
     }
-    else {
-        vjert_apply( entry, frames, p->chain_id, c, args );
+
+    vjert_frame_begin();
+    if(vjert_prepare_frame(entry, p->chain_id, c, apply_frames[0],
+                           &effect_id, &e_flag, &fx_instance)) {
+#ifdef _OPENMP
+        const int n_threads = vje_advise_num_threads(apply_frames[0]->len);
+#pragma omp parallel num_threads(n_threads) \
+    shared(effect_id, e_flag, fx_instance, apply_frames, args)
+        {
+            vjert_apply_frame(effect_id, e_flag, fx_instance,
+                              apply_frames, args);
+        }
+#else
+        vjert_apply_frame(effect_id, e_flag, fx_instance, apply_frames, args);
+#endif
+    }
+    vjert_frame_end();
+
+    if( rgb ) {
+        yuv_convert_and_scale_from_rgb( p->rgba2yuv_scaler, p->rgba_frame[0],frames[0] );
     }
 
     vj_perform_alpha_commit_effect(alpha_flags, alpha_a_valid);
@@ -16508,8 +16608,7 @@ static int osd_audio_clock_line(veejay_t *info,
         return 0;
     dst[0] = '\0';
 
-    if(!info || !info->settings)
-        return 0;
+
 
     settings = info->settings;
     have_sync = vj_audio_sync_get_snapshot(&settings->audio_sync, &snap);

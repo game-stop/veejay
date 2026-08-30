@@ -97,6 +97,7 @@ typedef struct {
     float eff_saliency;
     float eff_warp_drive;
     int eff_initialized;
+    int work_args[TOPOMORPH_INTERNAL_PARAMS];
 } box_topomorph_t;
 
 static inline uint8_t clamp_u8_i32(const int v)
@@ -981,7 +982,7 @@ static void process_core_mirror(box_topomorph_t *restrict t,
     topo_mirror_kernels[mode][radius][sampler](t, frame, args);
 }
 
-void topomorph_apply(void *ptr, VJFrame *frame, int *args)
+static void topomorph_prepare(void *ptr, VJFrame *frame, int *args)
 {
     box_topomorph_t *t = (box_topomorph_t*) ptr;
     int eff[TOPOMORPH_INTERNAL_PARAMS];
@@ -1086,11 +1087,23 @@ void topomorph_apply(void *ptr, VJFrame *frame, int *args)
     if(eff[P_SALIENCY] > 0)
         update_saliency_poles(t, frame->data[0]);
 
-    if(eff[P_MIRROR] == 1)
-        process_core_mirror(t, frame, eff);
-    else
-        process_core_no_mirror(t, frame, eff);
+    for(int i = 0; i < TOPOMORPH_INTERNAL_PARAMS; i++)
+        t->work_args[i] = eff[i];
 }
+
+void topomorph_apply(void *ptr, VJFrame *frame, int *args)
+{
+    box_topomorph_t *t = (box_topomorph_t*) ptr;
+
+#pragma omp single
+    topomorph_prepare(ptr, frame, args);
+
+    if(t->work_args[P_MIRROR] == 1)
+        process_core_mirror(t, frame, t->work_args);
+    else
+        process_core_no_mirror(t, frame, t->work_args);
+}
+
 void topomorph_free(void *ptr)
 {
     box_topomorph_t *t = (box_topomorph_t*) ptr;

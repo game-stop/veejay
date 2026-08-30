@@ -28,7 +28,6 @@
 #include <veejaycore/defs.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
-#include <veejaycore/vj-task.h>
 
 #include <libyuv/yuvconv.h>
 #include <libavutil/avutil.h>
@@ -178,7 +177,9 @@ int avhelper_set_num_decoders(void) {
     }
     else {
         veejay_msg(VEEJAY_MSG_DEBUG, "[FFMPEG] env VEEJAY_NUM_DECODE_THREADS not set!");
-		int n = vj_task_get_num_cpus();
+		long n = sysconf(_SC_NPROCESSORS_ONLN);
+		if(n < 1)
+			n = 1;
 		if( n > 1 )
 			n_threads = 2;
 		if( n > 3 )

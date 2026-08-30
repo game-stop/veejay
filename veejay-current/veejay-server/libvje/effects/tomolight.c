@@ -1313,13 +1313,12 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
     const int len = t->len;
     const int reset = args[P_RESET] ? 1 : 0;
 
-    if(!t->seeded || (reset && !t->last_reset)) {
 #pragma omp single
-        tl_seed(t, frame);
+    {
+        if(!t->seeded || (reset && !t->last_reset))
+            tl_seed(t, frame);
+        t->last_reset = reset;
     }
-
-#pragma omp single
-    t->last_reset = reset;
 
     const int depth_source = clampi(args[P_DEPTH_SOURCE], 0, 4);
     const int use_motion = (depth_source == TL_SRC_MOTION || depth_source == TL_SRC_LUMA_MOTION);
@@ -1439,9 +1438,9 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
         tl_rebuild_fixed_chroma_luts(t, color_mode);
     }
 
-    if(use_motion && !t->prev_valid) {
 #pragma omp single
-        {
+    {
+        if(use_motion && !t->prev_valid) {
             veejay_memcpy(t->prev_y, frame->data[0], (size_t) len);
             t->prev_valid = 1;
         }
@@ -1506,9 +1505,9 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
     const int * restrict blur_y_rm = t->blur_y_rm;
     const int * restrict blur_y_ap = t->blur_y_ap;
 
-    if(t->last_apply_render_mode != render_mode) {
 #pragma omp single
-        {
+    {
+        if(t->last_apply_render_mode != render_mode) {
             veejay_memset(res_y, 0, (size_t) len);
             veejay_memset(glow, 0, (size_t) t->glen);
             veejay_memset(glow_tmp, 0, (size_t) t->glen);
@@ -1527,9 +1526,10 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    if(needs_src_copy) {
 #pragma omp single
-        veejay_memcpy(src_y, Y, (size_t) len);
+    {
+        if(needs_src_copy)
+            veejay_memcpy(src_y, Y, (size_t) len);
     }
 
         if(true_edge) {
@@ -1606,8 +1606,10 @@ void tomolight_apply(void *ptr, VJFrame *frame, int *args)
                 sum += (int)glow_tmp[blur_y_ap[gy] + gx] - (int)glow_tmp[blur_y_rm[gy] + gx];
             }
         }
-    if(!use_motion)
-        t->prev_valid = 0;
-
-    t->frame++;
+#pragma omp single
+    {
+        if(!use_motion)
+            t->prev_valid = 0;
+        t->frame++;
+    }
 }

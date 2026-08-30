@@ -487,9 +487,8 @@ int vj_sdl_init(void *ptr, int x, int y, int input_width, int input_height, int 
     }
 
     if(sdl_driver == NULL) {
-        int num_renderers = SDL_GetNumRenderDrivers();
-        int render_flags[3] = { SDL_RENDERER_PRESENTVSYNC, SDL_RENDERER_ACCELERATED, SDL_RENDERER_SOFTWARE };
-        for( i = 0; i < num_renderers && i < 3; i ++ ) {
+        int render_flags[3] = { SDL_RENDERER_ACCELERATED, SDL_RENDERER_PRESENTVSYNC, SDL_RENDERER_SOFTWARE };
+        for( i = 0; i < 3; i ++ ) {
             vjsdl->flags = render_flags[i];
             vjsdl->renderer = SDL_CreateRenderer( vjsdl->screen, -1, vjsdl->flags );
             if(vjsdl->renderer)
@@ -981,12 +980,20 @@ static int vj_sdl_present_prepared_internal(vj_sdl *vjsdl,
     const uint64_t present_started_ns = vj_perf_now_ns();
     SDL_RenderPresent(vjsdl->renderer);
     const uint64_t present_completed_ns = vj_perf_now_ns();
+    const uint64_t present_block_ns = present_completed_ns - present_started_ns;
     vj_perf_record(vjsdl->perf, VJ_PERF_STAGE_PRESENT_BLOCK,
                    present_started_ns, present_completed_ns);
+    if(present_block_ns > 100000000ULL) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[DISPLAY] SDL_RenderPresent blocked for %.3f ms (renderer=%s vsync=%s)",
+                   (double)present_block_ns / 1000000.0,
+                   vjsdl->renderer_name,
+                   (vjsdl->flags & SDL_RENDERER_PRESENTVSYNC) ? "yes" : "no");
+    }
 
     vjsdl->frame_prepared = 0;
     if(timing) {
-        timing->present_block_ns = present_completed_ns - present_started_ns;
+        timing->present_block_ns = present_block_ns;
         timing->completed_ns = present_completed_ns;
     }
     vj_sdl_timing_snapshot(vjsdl, timing);

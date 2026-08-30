@@ -369,7 +369,7 @@ void pointilism_apply(void *ptr, VJFrame *frame, int *args)
                     );
             }
         }
-
-        pointilism_copy_back(p, frame->data[0], frame->data[1], frame->data[2], len);
     }
+
+    pointilism_copy_back(p, frame->data[0], frame->data[1], frame->data[2], len);
 }

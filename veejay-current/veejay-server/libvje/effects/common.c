@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <math.h>
 #include <veejaycore/defs.h>
+#include <veejaycore/vj-msg.h>
 #include <libvje/vje.h>
 #include <libvje/internal.h>
 #include <veejaycore/vjmem.h>
@@ -86,7 +87,7 @@ int vje_advise_num_threads(const int len)
     if(!logged) {
         const char *env = getenv("VEEJAY_MULTITHREAD_TASKS");
 
-        veejay_msg(2,
+		veejay_msg(VEEJAY_MSG_INFO,
                "OpenMP worker policy: cpu=%d, mode=%s, requested=%s, auto-cap=6, selected=%d",
                ncores,
                user_forced ? "manual" : "auto",

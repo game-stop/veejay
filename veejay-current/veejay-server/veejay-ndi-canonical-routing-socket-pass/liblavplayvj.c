@@ -92,7 +92,6 @@
 #include <libveejay/vj-composite.h>
 #include <libveejay/vj-viewport.h>
 #include <libveejay/vj-OSC.h>
-#include <veejaycore/vj-task.h>
 #include <libveejay/vj-split.h>
 #include <libveejay/vj-perf.h>
 #include <libveejay/vj-output-graph.h>
@@ -841,8 +840,7 @@ static int veejay_track_align_current_clip_active(veejay_t *info)
 {
     video_playback_setup *settings;
 
-    if(!info || !info->settings)
-        return 0;
+
 
     settings = info->settings;
 
@@ -978,8 +976,7 @@ static int veejay_track_align_is_normal_transport(veejay_t *info)
 {
     video_playback_setup *settings;
 
-    if(!info || !info->settings)
-        return 0;
+
 
     settings = info->settings;
     return veejay_track_align_is_normal_values(info,
@@ -1324,8 +1321,7 @@ void veejay_transport_epoch_bump(veejay_t *info)
 
 int veejay_transport_epoch_get(veejay_t *info)
 {
-    if(!info || !info->settings)
-        return 0;
+
     return atomic_load_int(&info->settings->transport_epoch);
 }
 
@@ -3548,8 +3544,7 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
 {
     (void) rel_resume_pos;
 
-    if(!info || !info->settings)
-        return 0;
+
 
     video_playback_setup *settings = (video_playback_setup *) info->settings;
 
@@ -11471,7 +11466,7 @@ int veejay_audio_beat_get_status(veejay_t *info, int *enabled, int *open, long *
 
 static void veejay_openmp_warmup(int len)
 {
-    int n_threads = vje_max_threads(len);
+    int n_threads = vje_advise_num_threads(len);
     omp_set_dynamic(0);
     omp_set_num_threads(n_threads);
 
@@ -12153,7 +12148,7 @@ int veejay_main(veejay_t *info)
     int attr_inited = 0;
     int err;
 
-    if (vj_task_get_num_cpus() > 1) {
+    if (get_nprocs() > 1) {
         CPU_ZERO(&cpuset);
         CPU_SET(1, &cpuset);
 
@@ -13130,8 +13125,7 @@ static int veejay_audio_sync_sample_release_external(veejay_t *info, int sample_
 {
     video_playback_setup *settings;
 
-    if(!info || !info->settings)
-        return 0;
+
 
     settings = info->settings;
 
