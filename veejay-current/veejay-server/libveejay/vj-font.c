@@ -471,7 +471,13 @@ int vj_font_load_srt( void *font, const char *filename )
         fclose(f);
         return 0;
     }
-    fread( ff->fd_buf, len,1, f );
+    if( fread( ff->fd_buf, 1, len, f ) != len ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "Unable to read SRT file '%s'", filename );
+        free( ff->fd_buf );
+        ff->fd_buf = NULL;
+        fclose(f);
+        return 0;
+    }
 
     fclose( f );
 

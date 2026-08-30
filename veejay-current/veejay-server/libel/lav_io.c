@@ -73,8 +73,8 @@ static float        output_fps = 25.0;
 static int      output_yuv = 1; // 422
 
 
-char *get_filename_ext(char *filename) {
-	char *dot = strrchr(filename, '.');
+static const char *get_filename_ext(const char *filename) {
+    const char *dot = strrchr(filename, '.');
 	if(!dot || dot == filename) 
 		return NULL;
 	return dot + 1;
@@ -83,7 +83,7 @@ char *get_filename_ext(char *filename) {
 int lav_is_supported_image_file(const char *filename)
 {
     GSList *list, *iter;
-    char *ext;
+    const char *ext;
     int result = 0;
 
     if (!filename)

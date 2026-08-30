@@ -13999,12 +13999,6 @@ static void director_draw_output_pattern(DirectorApp *app,
     cairo_restore(cr);
 }
 
-static guint8 director_preview_clamp_byte(gint value)
-{
-    return (guint8)(value < 0 ? 0 : (value > 255 ? 255 : value));
-}
-
-
 #define FAST_CLAMP_BYTE(val) ((guint8)((val) < 0 ? 0 : ((val) > 255 ? 255 : (val))))
 static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
                                                       gsize payload_size,

@@ -2176,15 +2176,6 @@ static void midi_route_connector(cairo_t *cr, const GdkRGBA *fg, gboolean live,
     cairo_fill(cr);
 }
 
-static double midi_route_input_position(const VjMidiMapping *m, int raw)
-{
-    if(!m || m->input_max == m->input_min)
-        return 0.0;
-    raw = CLAMP(raw, MIN(m->input_min, m->input_max), MAX(m->input_min, m->input_max));
-    return CLAMP((double)(raw - m->input_min) /
-                 (double)(m->input_max - m->input_min), 0.0, 1.0);
-}
-
 static void midi_route_native_input_range(const VjMidiMapping *m, int *lo, int *hi)
 {
     int native_lo = 0, native_hi = 127;

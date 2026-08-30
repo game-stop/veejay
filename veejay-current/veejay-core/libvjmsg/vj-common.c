@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -377,7 +378,21 @@ char *veejay_msg_ringfetch(void)
 
 void veejay_msg_prnt(FILE *out, const char *buffer, size_t size)
 {
-    if(out) write(fileno(out), buffer, size);
+    if(!out)
+        return;
+
+    int fd = fileno(out);
+    size_t written = 0;
+    while(written < size) {
+        ssize_t result = write(fd, buffer + written, size - written);
+        if(result > 0) {
+            written += (size_t) result;
+            continue;
+        }
+        if(result < 0 && errno == EINTR)
+            continue;
+        break;
+    }
 }
 
 
