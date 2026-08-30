@@ -405,6 +405,7 @@ AM_CPPFLAGS = \
 veejay_director_CFLAGS = $(OP_CFLAGS)
 veejay_director_SOURCES = \
     veejay-director.c \
+    director-compat.h \
     director-client.c \
     director-client.h \
     director-wire.c \
