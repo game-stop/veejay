@@ -32,8 +32,6 @@
 #define ONEQTR_PI (M_PI / 4.0f)
 #define THRQTR_PI (3.0f * M_PI / 4.0f)
 
-extern int vje_is_parallel_enabled();
-
 int vje_advise_num_threads(const int len)
 {
     static int ncores = -1;
@@ -102,7 +100,7 @@ int vje_advise_num_threads(const int len)
 
 int	vje_setup_local_bufs( int use_thread_local, VJFrame *frame, uint8_t **restrict outY, uint8_t **restrict outU, uint8_t **restrict outV, uint8_t **restrict outA )
 {	
-	int utl = ( vje_is_parallel_enabled() && use_thread_local && frame->local != NULL );
+	int utl = ( use_thread_local && frame->local != NULL );
 
 	// if parallization is enabled and initialized, we can write to the frame's thread local buffer directly
 	// some effects take a copy of the source data , this is no longer required when thread local is used 

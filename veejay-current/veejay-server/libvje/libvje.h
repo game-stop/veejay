@@ -36,13 +36,9 @@ void vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 void vje_set_rgb_parameter_conversion_type(int full_range);
 int vje_get_rgb_parameter_conversion_type();
 void vje_set_bg(VJFrame *bg);
-// enable/disable running multithreaded FX 
-void vje_enable_parallel(); 
-void vje_disable_parallel();
 
 // init all FX descriptors
 int vje_init(int w, int h);
-int vje_is_parallel_enabled();
 
 int vje_fx_needs_instance(int fx_id);
 
