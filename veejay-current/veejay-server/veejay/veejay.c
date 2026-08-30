@@ -55,6 +55,9 @@
 #include <build.h>
 #include <libvje/libvje.h>
 #include <libstream/vj-ndi.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 extern void el_cache_configure(int t);
 extern void vj_avcodec_print_version();
@@ -1272,6 +1275,16 @@ int main(int argc, char **argv)
     vj_mem_init(0, 0);
     vj_mem_optimize();
     vevo_strict_init();
+
+    /* Disable OpenMP nested parallelism to prevent deadlocks.
+       When effects use #pragma omp parallel for within sequential chain execution,
+       nested parallelism can cause thread starvation and deadlock. Serializing 
+       nested regions prevents this issue while still allowing effects to parallelize
+       work within their own scope when called from a non-parallel context.
+     */
+#ifdef _OPENMP
+    omp_set_nested(0);
+#endif
 
     info = veejay_malloc();
     if (!info) {
