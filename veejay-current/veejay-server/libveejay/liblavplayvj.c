@@ -759,7 +759,7 @@ static void veejay_sample_video_diag_note(veejay_t *info,
     int start = 0;
     int end = 0;
     int loop = 0;
-    int speed = info->settings->current_playback_speed;
+    int speed = atomic_load_int(&info->settings->current_playback_speed);
     int sfd = playback_mode == VJ_PLAYBACK_MODE_SAMPLE ?
               sample_get_framedup(sample_id) :
               atomic_load_int(&info->settings->audio_slice_len);
@@ -1647,7 +1647,8 @@ void usleep_accurate(long long usec, video_playback_setup *settings)
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     const long long target_ns    = usec * 1000LL;
-    const long long threshold_ns = settings->clock_overshoot;
+    const long long threshold_ns =
+        atomic_load_long_long(&settings->clock_overshoot);
 
     const long long target_sec  = target_ns / 1000000000LL;
     const long long target_rem  = target_ns - target_sec * 1000000000LL;
@@ -1676,7 +1677,8 @@ void usleep_accurate(long long usec, video_playback_setup *settings)
         }
     }
 
-    vj_spin_until_absolute_deadline(&deadline, settings->pause_cost_ns);
+    vj_spin_until_absolute_deadline(
+        &deadline, atomic_load_double(&settings->pause_cost_ns));
 }
 
 static inline void usleep_hybrid(long long usec, video_playback_setup *settings)
@@ -1886,7 +1888,7 @@ static int veejay_track_align_is_normal_transport(veejay_t *info)
 
     settings = info->settings;
     return veejay_track_align_is_normal_values(info,
-                                               settings->current_playback_speed,
+                                               atomic_load_int(&settings->current_playback_speed),
                                                veejay_track_align_current_sfd(info),
                                                veejay_track_align_transport_fps(info));
 }
@@ -3140,7 +3142,7 @@ static int vj_pattern_apply_transport_loop(veejay_t *info,
     settings = info->settings;
     seq = info->seq;
     source_id = info->uc->sample_id;
-    signed_speed = settings->current_playback_speed;
+    signed_speed = atomic_load_int(&settings->current_playback_speed);
     source_start = 0;
     source_end = -1;
 
@@ -3470,7 +3472,7 @@ static void vj_pattern_transport_snapshot(veejay_t *info,
         snapshot->source_id = info->uc->sample_id;
     }
     if(info->settings) {
-        snapshot->speed = info->settings->current_playback_speed;
+        snapshot->speed = atomic_load_int(&info->settings->current_playback_speed);
         snapshot->frame = atomic_load_long_long(&info->settings->current_frame_num);
     }
 
@@ -3628,7 +3630,7 @@ static int vj_pattern_apply_transport_cutoff(veejay_t *info,
         return 0;
 
     settings = info->settings;
-    signed_speed = settings->current_playback_speed;
+    signed_speed = atomic_load_int(&settings->current_playback_speed);
 
     if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
        info->uc->sample_id > 0 && sample_exists(info->uc->sample_id))
@@ -3909,7 +3911,7 @@ static long long vj_pattern_sequence_slot_duration(veejay_t *info,
         if(speed < 1 && info && info->settings && info->uc &&
            info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
            info->uc->sample_id == sample_id &&
-           info->settings->current_playback_speed == 0)
+           atomic_load_int(&info->settings->current_playback_speed) == 0)
             speed = abs(info->settings->previous_playback_speed);
 
         dup = sample_get_framedup(sample_id);
@@ -4050,7 +4052,7 @@ static void vj_pattern_backend_tick(veejay_t *info)
         runtime->bank_tick_valid = 0;
     }
 
-    signed_speed = settings->current_playback_speed;
+    signed_speed = atomic_load_int(&settings->current_playback_speed);
     speed = abs(signed_speed);
     direction = signed_speed < 0 ? -1 : signed_speed > 0 ? 1 : 0;
     max_linear_delta = speed > 0 ? speed : 0;
@@ -4225,7 +4227,7 @@ int veejay_set_framedup(veejay_t *info, int n)
     if (n < 1)
         n = 1;
 
-    const int speed = settings->current_playback_speed;
+    const int speed = atomic_load_int(&settings->current_playback_speed);
     const int cur_dir = playback_dir(speed);
 
     int cur_sfd = 0;
@@ -4356,7 +4358,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
 
     speed = vj_clampi(speed, -MAX_SPEED, MAX_SPEED);
 
-    const int old_speed = settings->current_playback_speed;
+    const int old_speed = atomic_load_int(&settings->current_playback_speed);
     const int prev_dir = playback_dir(old_speed);
 
     int max_sfd = 1;
@@ -4364,7 +4366,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
     switch (info->uc->playback_mode) {
         case VJ_PLAYBACK_MODE_PLAIN:
             if (abs(speed) <= info->current_edit_list->total_frames) {
-                settings->current_playback_speed = speed;
+                atomic_store_int(&settings->current_playback_speed, speed);
             } else {
                 veejay_msg(VEEJAY_MSG_DEBUG,
                            "Speed %d too high to set",
@@ -4394,7 +4396,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
             }
 
             if (sample_set_speed(info->uc->sample_id, speed) != -1)
-                settings->current_playback_speed = speed;
+                atomic_store_int(&settings->current_playback_speed, speed);
 
             max_sfd = sample_get_framedup(info->uc->sample_id);
             break;
@@ -4406,11 +4408,12 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
                     len = 1;
                 if(abs(speed) > len)
                     speed = (speed < 0) ? -len : len;
-                settings->current_playback_speed = speed;
+                atomic_store_int(&settings->current_playback_speed, speed);
                 vj_tag_buffer_set_speed(info->uc->sample_id, speed);
                 max_sfd = vj_tag_get_buffer_slow(info->uc->sample_id);
             } else {
-                settings->current_playback_speed = (speed == 0) ? 0 : 1;
+                atomic_store_int(&settings->current_playback_speed,
+                                 (speed == 0) ? 0 : 1);
                 max_sfd = 1;
             }
             break;
@@ -4420,7 +4423,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
             return 0;
     }
 
-    const int effective_speed = settings->current_playback_speed;
+    const int effective_speed = atomic_load_int(&settings->current_playback_speed);
     const int cur_dir = playback_dir(effective_speed);
     const int speed_changed = (old_speed != effective_speed);
     const int real_direction_flip =
@@ -4596,7 +4599,7 @@ static void veejay_sample_resume_at(veejay_t *info, int cur_id)
     long long cur_frame = atomic_load_long_long(&settings->current_frame_num);
 
     if ((long long) pos != cur_frame) {
-        int speed = settings->current_playback_speed;
+        int speed = atomic_load_int(&settings->current_playback_speed);
         int dir = playback_dir(speed);
 
         int edge_type = (pos == start) ? AUDIO_EDGE_RESET : AUDIO_EDGE_JUMP;
@@ -4637,7 +4640,7 @@ int veejay_increase_frame(veejay_t *info, long num)
     long long max_frame_num = atomic_load_long_long(&settings->max_frame_num);
     long long next_frame = current_frame_num + (long long) num;
 
-    int speed = settings->current_playback_speed;
+    int speed = atomic_load_int(&settings->current_playback_speed);
 
     if (num == 0)
         return 1;
@@ -4930,7 +4933,7 @@ int veejay_set_frame(veejay_t *info, long framenum)
 #endif
 
     if ((long long)framenum != current_frame_num) {
-        const int dir = playback_dir(settings->current_playback_speed);
+        const int dir = playback_dir(atomic_load_int(&settings->current_playback_speed));
 
         veejay_video_mapping_publish(info, (long long)framenum);
         veejay_transport_epoch_bump(info);
@@ -5027,7 +5030,7 @@ static void veejay_set_framerate_internal(veejay_t *info, float fps,
         cur_frame = 0;
 
 #ifdef HAVE_JACK
-    const int align_speed_before = settings->current_playback_speed;
+    const int align_speed_before = atomic_load_int(&settings->current_playback_speed);
     const int align_sfd_before = veejay_track_align_current_sfd(info);
     const double align_old_fps = veejay_track_align_transport_fps(info);
     const int align_was_normal = veejay_track_align_is_normal_values(info,
@@ -5105,7 +5108,7 @@ static void veejay_set_framerate_internal(veejay_t *info, float fps,
      * truncation is used here.
      */
     {
-        const int align_speed_after = settings->current_playback_speed;
+        const int align_speed_after = atomic_load_int(&settings->current_playback_speed);
         const int align_sfd_after = veejay_track_align_current_sfd(info);
         const int align_is_normal = veejay_track_align_is_normal_values(info,
                                                                         align_speed_after,
@@ -5343,8 +5346,10 @@ static int veejay_start_playing_stream(veejay_t *info, int stream_id)
         return 0;
     }
 
-    if (settings->current_playback_speed == 0)
-        settings->current_playback_speed = 1;
+    int expected_speed = 0;
+    __atomic_compare_exchange_n(&settings->current_playback_speed,
+                                &expected_speed, 1, 0,
+                                __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE);
 
     atomic_store_int(&settings->sequence_boundary, 0);
     settings->sequence_random_id = 0;
@@ -6924,7 +6929,7 @@ static void veejay_pipe_write_status(veejay_t * info)
                     info->seq->active,
                     seq_cur,
                     info->real_fps,
-                    settings->current_frame_num,
+                    atomic_load_long_long(&settings->current_frame_num),
                     pm,
                     total_slots,
                     (settings->sample_record && settings->sample_record_id > 0 ? settings->sample_record_id : info->seq->rec_id),
@@ -6948,7 +6953,7 @@ static void veejay_pipe_write_status(veejay_t * info)
                 char *ptr = info->status_what;
 
                 ptr = vj_sprintf(ptr, info->real_fps);                 // 0
-                ptr = vj_sprintf(ptr, settings->current_frame_num);    // 1
+                ptr = vj_sprintf(ptr, atomic_load_long_long(&settings->current_frame_num)); // 1
                 ptr = vj_sprintf(ptr, info->uc->playback_mode);        // 2
 
                 *ptr++ = '0';
@@ -6958,7 +6963,7 @@ static void veejay_pipe_write_status(veejay_t * info)
 
                 ptr = vj_sprintf(ptr, settings->min_frame_num);        // 5
                 ptr = vj_sprintf(ptr, settings->max_frame_num);        // 6
-                ptr = vj_sprintf(ptr, settings->current_playback_speed); // 7
+                ptr = vj_sprintf(ptr, atomic_load_int(&settings->current_playback_speed)); // 7
 
                 for (int i = 0; i < 4; i++) {
                     *ptr++ = '0';
@@ -7010,7 +7015,7 @@ static void veejay_pipe_write_status(veejay_t * info)
                     info->seq->active,
                     seq_cur,
                     info->real_fps,
-                    settings->current_frame_num,
+                    atomic_load_long_long(&settings->current_frame_num),
                     info->uc->playback_mode,
                     total_slots,
                     (settings->sample_record && settings->sample_record_id > 0 ? settings->sample_record_id : info->seq->rec_id),
@@ -10740,20 +10745,21 @@ static void vj_set_realtime_priority(video_playback_setup *settings, int user_ma
     }
     
 
-    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] TID %lu: Running as high-priority task, clock overshoot set to %lld µs", (unsigned long)gettid(), settings->clock_overshoot);
+    veejay_msg(VEEJAY_MSG_INFO, "[AUDIO] TID %lu: Running as high-priority task, clock overshoot set to %lld µs", (unsigned long)gettid(), atomic_load_long_long(&settings->clock_overshoot));
 }
 
 static void vj_audio_setup_rt_thread(video_playback_setup *settings) {
 
 	long long overshoot = vj_calibrate_nanosleep_overshoot(10000);
-	
-	settings->clock_overshoot = (overshoot + overshoot / 4);
-	settings->pause_cost_ns = vj_calibrate_pause_cost_ns();
+    long long clock_overshoot = overshoot + overshoot / 4;
 
-	if (settings->clock_overshoot < 30000) 
-		settings->clock_overshoot = 30000;
-	if (settings->clock_overshoot > 300000) 
-		settings->clock_overshoot = 300000;
+    if (clock_overshoot < 30000)
+        clock_overshoot = 30000;
+    if (clock_overshoot > 300000)
+        clock_overshoot = 300000;
+
+    atomic_store_long_long(&settings->clock_overshoot, clock_overshoot);
+    atomic_store_double(&settings->pause_cost_ns, vj_calibrate_pause_cost_ns());
 	
 
 	settings->is_rt_kernel = vj_detect_preempt_rt();
@@ -10795,7 +10801,7 @@ static void veejay_producer_initialize_playmode(veejay_t *info) {
 			atomic_store_long_long(&settings->min_frame_num, 0);
 			atomic_store_long_long(&settings->max_frame_num, info->edit_list->total_frames);
 			veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %lld - %lld", settings->min_frame_num, settings->max_frame_num );
-            settings->current_playback_speed = 1;
+            atomic_store_int(&settings->current_playback_speed, 1);
         break;
 
         case VJ_PLAYBACK_MODE_TAG:
@@ -10896,7 +10902,7 @@ static inline int veejay_video_source_is_clocked(veejay_t *info)
     if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) {
         /* Keep non-unit speed and frame-dup/trick-play on the legacy transport
          * cursor until those modes get their own explicit video state. */
-        if(settings->current_playback_speed != 1)
+        if(atomic_load_int(&settings->current_playback_speed) != 1)
             return 0;
         if(atomic_load_int(&settings->audio_slice_len) > 1)
             return 0;
@@ -10923,7 +10929,7 @@ static inline int veejay_video_source_is_clocked(veejay_t *info)
                              &speed) != 0)
         return 0;
     if(end < start || loop != 1 || speed != 1 ||
-       settings->current_playback_speed != 1)
+    atomic_load_int(&settings->current_playback_speed) != 1)
         return 0;
     if(sample_get_framedup(info->uc->sample_id) > 1 ||
        atomic_load_int(&settings->audio_slice_len) > 1)
@@ -11012,7 +11018,7 @@ static inline void vj_audio_wait_for_jack_space(
     video_playback_setup *settings
 ) {
 
-    long min_busy_us = settings->clock_overshoot;
+    long min_busy_us = (long)atomic_load_long_long(&settings->clock_overshoot);
 
     while (vj_jack_get_ringbuffer_frames_free() < jack_frames_needed) {
 
@@ -11498,7 +11504,7 @@ static int vj_tempo_bridge_reverse_should_reanchor(
     if(!settings || spvf <= 0.0 || diff <= 0.0)
         return 0;
 
-    if(settings->current_playback_speed >= 0)
+    if(atomic_load_int(&settings->current_playback_speed) >= 0)
         return 0;
 
     sync_mode = atomic_load_int(&settings->audio_sync.mode);
@@ -11752,7 +11758,7 @@ static int veejay_track_align_get_adjustment(veejay_t *info,
         return 0;
     if(!vj_audio_sync_is_enabled(&settings->audio_sync))
         return 0;
-    if(settings->current_playback_speed < 0)
+    if(atomic_load_int(&settings->current_playback_speed) < 0)
         return 0;
     if(!vj_audio_sync_get_snapshot(&settings->audio_sync, &snap))
         return 0;
@@ -11965,8 +11971,8 @@ void *veejay_audio_producer_thread(void *arg)
     } else
 #endif
     {
-        settings->clock_overshoot = 30000;
-        settings->pause_cost_ns = 10.0;
+        atomic_store_long_long(&settings->clock_overshoot, 30000);
+        atomic_store_double(&settings->pause_cost_ns, 10.0);
     }
 
 #ifdef HAVE_JACK
@@ -12099,7 +12105,7 @@ void *veejay_audio_producer_thread(void *arg)
             audio_frame_accum -= (double)needed;
             if (audio_frame_accum < 0.0) audio_frame_accum = 0.0;
             long long media_frame = atomic_load_long_long(&settings->current_frame_num); 
-            const int speed = settings->current_playback_speed;
+            const int speed = atomic_load_int(&settings->current_playback_speed);
 			int decoded;
             double audio_loop_start_s = monotonic_now_s();
             double master_before_s = atomic_load_double(&settings->audio_master_s);
@@ -12660,13 +12666,13 @@ void *veejay_audio_producer_thread(void *arg)
                 slow_video_phase += runtime_rate;
                 int guard = 0;
                 while (slow_video_phase >= 1.0 && guard < 32) {
-                    vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, settings->current_playback_speed));
+                    vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, atomic_load_int(&settings->current_playback_speed)));
                     slow_video_phase -= 1.0;
                     guard++;
                 }
             } else {
                 slow_video_phase = 0.0;
-                vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, settings->current_playback_speed));
+                vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, atomic_load_int(&settings->current_playback_speed)));
             }
 
 				loop_count++;
@@ -12795,7 +12801,7 @@ void *veejay_audio_producer_thread(void *arg)
 				vj_runtime_publish_audio_clocks(settings, now, now);
 			}
 
-				vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, settings->current_playback_speed));
+                vj_perform_inc_frame(info, veejay_sync_adjusted_increment(info, atomic_load_int(&settings->current_playback_speed)));
 				loop_count++;
 
 				{
@@ -13683,6 +13689,12 @@ static void *veejay_producer_thread_loop(void *ptr)
 
     atomic_store_long_long(&settings->current_frame_num, -1);
     atomic_store_int(&settings->audio_mode, AUDIO_MODE_SILENCE_FILL);
+	veejay_producer_initialize_playmode(info);
+
+    pthread_mutex_lock(&settings->start_mutex);
+    settings->video_out_ready = 2;
+    pthread_cond_broadcast(&settings->start_cond);
+    pthread_mutex_unlock(&settings->start_mutex);
 
 	if(info->audio) {
 #ifdef HAVE_JACK
@@ -13709,7 +13721,6 @@ static void *veejay_producer_thread_loop(void *ptr)
     veejay_msg(VEEJAY_MSG_DEBUG, "[PRODUCER] Wait for playback to reach anchor");
 
     veejay_set_speed(info, 1, 0);
-	veejay_producer_initialize_playmode(info);
     {
         const long long mapping_min =
             atomic_load_long_long(&settings->min_frame_num);
@@ -14338,6 +14349,8 @@ veejay_t *veejay_malloc()
     info->settings->multitrack_program_layer = -1;
     info->settings->multitrack_layer0_entry = 0;
     info->settings->multitrack_layer1_entry = 1;
+	atomic_store_long_long(&info->settings->clock_overshoot, 30000);
+	atomic_store_double(&info->settings->pause_cost_ns, 10.0);
 	
 	veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
@@ -14652,8 +14665,18 @@ int veejay_main(veejay_t *info)
     }
 
 
-    veejay_producer_thread_audio_startup(info);
+    pthread_mutex_lock(&settings->start_mutex);
+    while(settings->video_out_ready < 2 &&
+          atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP)
+        pthread_cond_wait(&settings->start_cond, &settings->start_mutex);
+    const int producer_ready = settings->video_out_ready == 2;
+    pthread_mutex_unlock(&settings->start_mutex);
 
+    if(!producer_ready ||
+       atomic_load_int(&settings->state) == LAVPLAY_STATE_STOP)
+        return 0;
+
+    veejay_producer_thread_audio_startup(info);
 
     while (atomic_load_int(&settings->first_audio_frame_ready) == 0 &&
            atomic_load_int(&settings->state) != LAVPLAY_STATE_STOP) {
@@ -15215,7 +15238,7 @@ int veejay_toggle_audio(veejay_t * info, int audio)
 
     atomic_store_int(&settings->audio_mute, new_mute);
 
-    dir = playback_dir(settings->current_playback_speed);
+    dir = playback_dir(atomic_load_int(&settings->current_playback_speed));
     atomic_store_int(&settings->audio_slice, 0);
     atomic_store_int(&settings->audio_slice_len, settings->sfd > 0 ? settings->sfd : 1);
     settings->audio_last_stretched_samples = 0;

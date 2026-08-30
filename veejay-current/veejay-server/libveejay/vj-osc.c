@@ -38,6 +38,7 @@
 #include <libveejay/vj-lib.h>
 #include <veejaycore/vj-msg.h>
 #include <veejaycore/vjmem.h>
+#include <veejaycore/atomic.h>
 #include <libveejay/vj-OSC.h>
 #include <libveejay/vj-macro.h>
 #include <string.h>
@@ -441,7 +442,7 @@ static	int	osc_client_status_send( lo_address t, char *cmd )
 				 0,
 				 osc_info->settings->min_frame_num,
 				 osc_info->settings->max_frame_num,
-				 osc_info->settings->current_playback_speed,
+				 atomic_load_int(&osc_info->settings->current_playback_speed),
 				 0,0,0,0,0,
 				 (sample_size() + vj_tag_size()),
 				 (int) ( 100.0f / osc_info->settings->spvf ),

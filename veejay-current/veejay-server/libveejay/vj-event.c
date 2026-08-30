@@ -870,7 +870,7 @@ static long long vj_sequence_slot_duration(veejay_t *v,
            v && v->settings && v->uc &&
            v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
            v->uc->sample_id == sample_id &&
-           v->settings->current_playback_speed == 0)
+           atomic_load_int(&v->settings->current_playback_speed) == 0)
             speed = abs(v->settings->previous_playback_speed);
 
         looptype = sample_get_looptype(sample_id);
@@ -1966,7 +1966,7 @@ static void vj_event_mark_sample_audio_jump(veejay_t *v, int sample_id)
 
     int speed = 0;
     if(v->settings)
-        speed = v->settings->current_playback_speed;
+        speed = atomic_load_int(&v->settings->current_playback_speed);
 
     if(speed == 0)
         speed = sample_get_speed(sample_id);
@@ -4902,7 +4902,7 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
     int canceled_sync_start = vj_event_sync_start_cancel(v);
 
     if(canceled_sync_start && v && v->settings &&
-       v->settings->current_playback_speed == 0) {
+    atomic_load_int(&v->settings->current_playback_speed) == 0) {
         veejay_msg(VEEJAY_MSG_INFO,
                    "Canceled synchronized playback start; video remains paused");
         return;
@@ -4913,7 +4913,7 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
         if(!vj_event_stream_buffer_require(v))
             return;
 
-        int speed = v->settings->current_playback_speed;
+        int speed = atomic_load_int(&v->settings->current_playback_speed);
         if(speed != 0)
         {
             v->settings->previous_playback_speed = speed;
@@ -4929,7 +4929,9 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
                 resume = 1;
             vj_tag_buffer_set_speed(v->uc->sample_id, resume);
             veejay_set_speed(v, resume, 0);
-            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+            const int effective_speed =
+                atomic_load_int(&v->settings->current_playback_speed);
+            vj_event_audio_beat_user_transport_override(v, effective_speed);
             veejay_msg(VEEJAY_MSG_INFO,"Buffered stream is playing (resumed at speed %d)", resume);
         }
         vj_event_stream_buffer_update_range(v);
@@ -4938,7 +4940,7 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 
     if(!STREAM_PLAYING(v))
     {
-        int speed = v->settings->current_playback_speed;
+        int speed = atomic_load_int(&v->settings->current_playback_speed);
         if(speed != 0)
         {
             v->settings->previous_playback_speed = speed;
@@ -4949,7 +4951,9 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
         else
         {
             veejay_set_speed(v, v->settings->previous_playback_speed,0 );
-            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+            const int effective_speed =
+                atomic_load_int(&v->settings->current_playback_speed);
+            vj_event_audio_beat_user_transport_override(v, effective_speed);
             veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
         }
     }
@@ -4987,9 +4991,11 @@ void vj_event_play_stop_all(void *ptr, const char format[], va_list ap)
 {
     veejay_t *v = (veejay_t*) ptr;
     int canceled_sync_start = vj_event_sync_start_cancel(v);
+    const int current_speed =
+        atomic_load_int(&v->settings->current_playback_speed);
 
     if(canceled_sync_start && v && v->settings &&
-       v->settings->current_playback_speed == 0) {
+       current_speed == 0) {
         veejay_msg(VEEJAY_MSG_INFO,
                    "Canceled synchronized playback start; video remains paused");
         return;
@@ -4997,10 +5003,10 @@ void vj_event_play_stop_all(void *ptr, const char format[], va_list ap)
 
     if(STREAM_PLAYING(v))
     {
-        vj_tag_set_chain_paused( v->uc->sample_id, v->settings->current_playback_speed == 0 ? 0 : 1 );
+        vj_tag_set_chain_paused( v->uc->sample_id, current_speed == 0 ? 0 : 1 );
     }
     else if(SAMPLE_PLAYING(v)) {
-    int speed = v->settings->current_playback_speed;
+    int speed = current_speed;
         if(speed != 0)
         {
             v->settings->previous_playback_speed = speed;
@@ -5012,7 +5018,9 @@ void vj_event_play_stop_all(void *ptr, const char format[], va_list ap)
         else
         {
             veejay_set_speed(v, v->settings->previous_playback_speed,0 );
-            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+            const int effective_speed =
+                atomic_load_int(&v->settings->current_playback_speed);
+            vj_event_audio_beat_user_transport_override(v, effective_speed);
             sample_set_chain_paused( v->uc->sample_id, 0);
             veejay_msg(VEEJAY_MSG_INFO,"Video is playing (resumed at speed %d)", v->settings->previous_playback_speed);
         }
@@ -5095,7 +5103,7 @@ void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
         if(!vj_event_stream_buffer_require(v))
             return;
 
-        int speed = v->settings->current_playback_speed;
+        int speed = atomic_load_int(&v->settings->current_playback_speed);
         if(speed == 0)
             speed = -1;
         else if(speed > 0)
@@ -5104,14 +5112,16 @@ void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
         vj_tag_buffer_set_speed(v->uc->sample_id, speed);
         veejay_set_speed(v, speed, 0);
         vj_event_stream_buffer_update_range(v);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        const int effective_speed =
+            atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, effective_speed);
         veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing in reverse at speed %d", speed);
         return;
     }
 
     if (!STREAM_PLAYING(v))
     {
-        int speed = v->settings->current_playback_speed;
+        int speed = atomic_load_int(&v->settings->current_playback_speed);
 
         if (speed == 0)
         {
@@ -5123,7 +5133,9 @@ void vj_event_play_reverse(void *ptr, const char format[], va_list ap)
         }
 
         veejay_set_speed(v, speed, 0);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        const int effective_speed =
+            atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, effective_speed);
 
         int sfd = v->settings->sfd;
         if (sfd <= 0)
@@ -5161,7 +5173,7 @@ void vj_event_play_forward(void *ptr, const char format[], va_list ap)
         if(!vj_event_stream_buffer_require(v))
             return;
 
-        int speed = v->settings->current_playback_speed;
+        int speed = atomic_load_int(&v->settings->current_playback_speed);
         if(speed == 0)
             speed = 1;
         else if(speed < 0)
@@ -5170,14 +5182,16 @@ void vj_event_play_forward(void *ptr, const char format[], va_list ap)
         vj_tag_buffer_set_speed(v->uc->sample_id, speed);
         veejay_set_speed(v, speed, 0);
         vj_event_stream_buffer_update_range(v);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        const int effective_speed =
+            atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, effective_speed);
         veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing forward at speed %d", speed);
         return;
     }
 
     if (!STREAM_PLAYING(v))
     {
-        int speed = v->settings->current_playback_speed;
+        int speed = atomic_load_int(&v->settings->current_playback_speed);
 
         if (speed == 0)
             speed = 1;
@@ -5185,7 +5199,9 @@ void vj_event_play_forward(void *ptr, const char format[], va_list ap)
             speed = -speed;
 
         veejay_set_speed(v, speed, 0);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        const int effective_speed =
+            atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, effective_speed);
 
         int sfd = v->settings->sfd;
         if (sfd <= 0)
@@ -5218,8 +5234,9 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
         vj_tag_buffer_set_speed(v->uc->sample_id, args[0]);
         veejay_set_speed(v, args[0], 0);
         vj_event_stream_buffer_update_range(v);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
-        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing at speed %d", v->settings->current_playback_speed);
+        const int speed = atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing at speed %d", speed);
         return;
     }
 
@@ -5228,8 +5245,8 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
         int speed = 0;
         P_A(args,sizeof(args),NULL,0,format,ap);
         veejay_set_speed(v, args[0],0 );
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
-        speed = v->settings->current_playback_speed;
+        speed = atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, speed);
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
             speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
     }
@@ -5270,13 +5287,14 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
         if(!vj_event_stream_buffer_require(v))
             return;
         int speed = abs(args[0]);
-        if(v->settings->current_playback_speed < 0)
+        if(atomic_load_int(&v->settings->current_playback_speed) < 0)
             speed = -speed;
         vj_tag_buffer_set_speed(v->uc->sample_id, speed);
         veejay_set_speed(v, speed, 0);
         vj_event_stream_buffer_update_range(v);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
-        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing at speed %d", v->settings->current_playback_speed);
+        speed = atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, speed);
+        veejay_msg(VEEJAY_MSG_INFO, "Buffered stream is playing at speed %d", speed);
         return;
     }
 
@@ -5285,12 +5303,12 @@ void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
         P_A(args,sizeof(args),NULL,0,format,ap);
     
         int speed = abs(args[0]);
-        if( v->settings->current_playback_speed <  0 )
+        if(atomic_load_int(&v->settings->current_playback_speed) < 0)
             veejay_set_speed( v, -1 * speed,0 );
         else
             veejay_set_speed(v, speed,0 );
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
-        speed = v->settings->current_playback_speed;
+        speed = atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, speed);
         veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
             speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
     }
@@ -5643,7 +5661,7 @@ void vj_event_sample_end(void *ptr, const char format[], va_list ap)
             long vstart = v->uc->sample_start;
             long vend = v->uc->sample_end;
 
-            if(v->settings->current_playback_speed < 0)
+            if(atomic_load_int(&v->settings->current_playback_speed) < 0)
             {
                 long tmp = vend;
                 vend = vstart;
@@ -16954,7 +16972,7 @@ static void vj_event_sample_next1( veejay_t *v )
         return;
     }
     if( SAMPLE_PLAYING(v)) {
-        int s = (v->settings->current_playback_speed < 0 ? -1 : 1 );
+        int s = (atomic_load_int(&v->settings->current_playback_speed) < 0 ? -1 : 1 );
         int n = v->uc->sample_id + s;
         if( sample_exists(n) ) {
             veejay_change_playback_mode_transition(
@@ -17895,12 +17913,14 @@ void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap
             vj_tag_set_loops(cur_id, -1);
         }
 
-        if(v->settings && v->settings->current_playback_speed == 0) {
+        if(v->settings && atomic_load_int(&v->settings->current_playback_speed) == 0) {
             int resume_speed = v->settings->previous_playback_speed;
             if(resume_speed == 0)
                 resume_speed = 1;
             veejay_set_speed(v, resume_speed, 0);
-            vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+            const int effective_speed =
+                atomic_load_int(&v->settings->current_playback_speed);
+            vj_event_audio_beat_user_transport_override(v, effective_speed);
         }
 
         veejay_msg(VEEJAY_MSG_INFO,"Sample sequencer disabled; current source keeps looping");
@@ -17953,12 +17973,14 @@ void vj_event_sample_sequencer_active(void *ptr, const char format[], va_list ap
     v->seq->active = 1;
     v->seq->revision = vj_sequence_next_revision(v->seq->revision);
 
-    if(v->settings && v->settings->current_playback_speed == 0) {
+    if(v->settings && atomic_load_int(&v->settings->current_playback_speed) == 0) {
         int resume_speed = v->settings->previous_playback_speed;
         if(resume_speed == 0)
             resume_speed = 1;
         veejay_set_speed(v, resume_speed, 0);
-        vj_event_audio_beat_user_transport_override(v, v->settings->current_playback_speed);
+        const int effective_speed =
+            atomic_load_int(&v->settings->current_playback_speed);
+        vj_event_audio_beat_user_transport_override(v, effective_speed);
     }
 
     veejay_reset_sample_positions(v, -1);

@@ -6490,7 +6490,7 @@ static inline int ab_breakbeat_base_speed(veejay_t *v, vj_audio_beat_shared_t *s
     if(ab_breakbeat_state.active && ab_breakbeat_state.saved_speed != 0)
         speed = ab_breakbeat_state.saved_speed;
     else if(v && v->settings)
-        speed = v->settings->current_playback_speed;
+        speed = atomic_load_int(&v->settings->current_playback_speed);
 
     if(speed == 0)
         speed = ab_breakbeat_state.saved_speed;
@@ -6516,7 +6516,7 @@ static int ab_breakbeat_respect_user_pause(veejay_t *v, vj_audio_beat_shared_t *
     if(!v || !v->settings || !s)
         return 0;
 
-    if(v->settings->current_playback_speed != 0)
+    if(atomic_load_int(&v->settings->current_playback_speed) != 0)
         return 0;
 
     if(ab_load_i(&s->paused_by_beat))
@@ -6549,7 +6549,7 @@ static int ab_breakbeat_detect_user_resume(veejay_t *v, vj_audio_beat_shared_t *
     if(ab_load_l(&ab_breakbeat_user_override_until_ms) != AB_BREAKBEAT_USER_PAUSE_OVERRIDE)
         return 0;
 
-    speed = v->settings->current_playback_speed;
+    speed = atomic_load_int(&v->settings->current_playback_speed);
     if(speed == 0)
         return 0;
 
@@ -6682,7 +6682,7 @@ static inline long long ab_breakbeat_frame_from_hit_time(veejay_t *v,
         return ab_breakbeat_clamp_frame(v, frame);
 
     if(v && v->settings)
-        speed = v->settings->current_playback_speed;
+        speed = atomic_load_int(&v->settings->current_playback_speed);
     else if(ab_breakbeat_state.direction != 0)
         speed = ab_breakbeat_state.direction;
     else if(s)
@@ -8007,17 +8007,19 @@ static inline void ab_breakbeat_apply_transport(veejay_t *v, int speed)
 {
     vj_audio_beat_shared_t *s;
     int beat_owned_pause;
+    int current_speed;
 
     if(!v || !v->settings)
         return;
 
     s = &v->settings->audio_beat;
     beat_owned_pause = ab_load_i(&s->paused_by_beat);
+    current_speed = atomic_load_int(&v->settings->current_playback_speed);
 
     if(speed != 0)
         speed = 1;
 
-    if(v->settings->current_playback_speed == 0 && speed != 0)
+    if(current_speed == 0 && speed != 0)
     {
         if(!beat_owned_pause)
         {
@@ -8037,7 +8039,7 @@ static inline void ab_breakbeat_apply_transport(veejay_t *v, int speed)
 #endif
     }
 
-    if(v->settings->current_playback_speed != speed)
+    if(current_speed != speed)
         ab_set_speed_from_beat(v, speed, 0);
 
     if(speed == 0)
@@ -8062,7 +8064,7 @@ static int ab_breakbeat_resume_owned_pause(veejay_t *v, vj_audio_beat_shared_t *
     if(!ab_load_i(&s->paused_by_beat))
         return 0;
 
-    if(v->settings->current_playback_speed != 0)
+    if(atomic_load_int(&v->settings->current_playback_speed) != 0)
         return 0;
 
     speed = ab_load_i(&s->resume_speed);
@@ -8671,7 +8673,7 @@ static void ab_breakbeat_release_transport(veejay_t *v, vj_audio_beat_shared_t *
         return;
 
     if(v && v->settings && s)
-        user_parked = (v->settings->current_playback_speed == 0 &&
+        user_parked = (atomic_load_int(&v->settings->current_playback_speed) == 0 &&
                        !ab_load_i(&s->paused_by_beat));
 
     ab_breakbeat_restore_fps(v);
@@ -9424,7 +9426,7 @@ static int ab_breakbeat_source_loss_pause(veejay_t *v,
 
     atomic_store_int(&ab_source_loss_paused, 1);
 
-    speed = v->settings->current_playback_speed;
+    speed = atomic_load_int(&v->settings->current_playback_speed);
     if(speed == 0)
     {
         ab_store_i(&s->consumed_seq, hit_seq >= 0 ? hit_seq : ab_load_i(&s->hit_seq));
@@ -9477,7 +9479,7 @@ static int ab_breakbeat_source_loss_hold_active(veejay_t *v,
         return 0;
     }
 
-    return v->settings->current_playback_speed == 0;
+    return atomic_load_int(&v->settings->current_playback_speed) == 0;
 }
 
 int vj_audio_beat_consume(veejay_t *v, vj_audio_beat_shared_t *s)

@@ -6890,7 +6890,7 @@ int vj_perform_fill_audio_buffers(
     sample_ptr->direction_changed = atomic_load_int(&settings->audio_direction_changed);
     sample_ptr->max_sfd = atomic_load_int(&settings->audio_slice_len);
     sample_ptr->cur_sfd = atomic_load_int(&settings->audio_slice);
-    sample_ptr->speed = settings->current_playback_speed;
+    sample_ptr->speed = atomic_load_int(&settings->current_playback_speed);
 
     int num_samples = (el->audio_rate / el->video_fps);
     int result = 0;
@@ -7102,7 +7102,8 @@ static  int vj_perform_get_frame_( veejay_t *info, int s1, long long nframe, VJF
     }
 
     int cur_sfd = (s1 ? sample_get_framedups(s1 ) : 0);
-    int speed = (s1 ? sample_get_speed(s1) : info->settings->current_playback_speed);
+    int speed = (s1 ? sample_get_speed(s1) :
+                 atomic_load_int(&info->settings->current_playback_speed));
     if(speed == 0) {
         vj_el_chroma actual_chroma = VJ_EL_CHROMA_422;
         int res = vj_el_get_video_frame_ex(el,
@@ -8205,7 +8206,8 @@ static int vj_perform_record_presented_video_frame(veejay_t *info, VJFrame *src)
     atomic_store_long_long(&rv->source_frame, atomic_load_long_long(&info->settings->current_frame_num));
     atomic_store_int(&rv->sample_id, info->uc ? info->uc->sample_id : 0);
     atomic_store_int(&rv->playback_mode, info->uc ? info->uc->playback_mode : 0);
-    atomic_store_int(&rv->playback_speed, info->settings->current_playback_speed);
+    atomic_store_int(&rv->playback_speed,
+                     atomic_load_int(&info->settings->current_playback_speed));
     __sync_synchronize();
     atomic_store_int(&rv->valid, 1);
     __sync_add_and_fetch(&rec->video_writes, 1);
@@ -9169,7 +9171,7 @@ static void vj_perform_tag_fill_buffer(veejay_t *info, performer_t *p, VJFrame *
         dst->data[3] = p->primary_buffer[0]->alpha;
     }
 
-    if(settings && settings->current_playback_speed == 0) {
+    if(settings && atomic_load_int(&settings->current_playback_speed) == 0) {
         p->primary_buffer[0]->ssm = dst->ssm;
         return;
     }
@@ -9686,7 +9688,7 @@ static int vj_perform_track_align_normal_transport(veejay_t *info, editlist *el)
     if(!info || !info->settings || !el)
         return 0;
 
-    if(info->settings->current_playback_speed != 1)
+    if(atomic_load_int(&info->settings->current_playback_speed) != 1)
         return 0;
 
     if(vj_perform_track_align_current_sfd(info) > 1)
@@ -10650,7 +10652,7 @@ int vj_perform_queue_audio_chunk_ext(
     const double rate = vj_perform_runtime_audio_rate(info, el);
     const double effective_rate = vj_perform_runtime_effective_audio_rate(info, el);
     const int frame_bytes = el->audio_bps;
-    const int speed = settings->current_playback_speed;
+    const int speed = atomic_load_int(&settings->current_playback_speed);
     const int speed_abs = (speed < 0) ? -speed : speed;
     const int route_sfd = vj_perform_runtime_sfd(info);
 #ifdef HAVE_JACK
@@ -13280,7 +13282,7 @@ static int vj_perform_runtime_slow_audio_chunk(veejay_t *info,
         if (pred_len < 1)
             pred_len = 1;
         int got = vj_perform_queue_audio_frame(info, (void*)p, p->top_audio_buffer,
-                                               info->settings->current_playback_speed,
+                                               atomic_load_int(&info->settings->current_playback_speed),
                                                target_frame, info->uc->sample_id);
         return vj_audio_retime_slow_cubic_s16(dst, dst_samples, p->top_audio_buffer,
                                               got > 0 ? got : pred_len,
@@ -13300,7 +13302,7 @@ static int vj_perform_runtime_slow_audio_chunk(veejay_t *info,
     if (pred_len < 1)
         pred_len = 1;
 
-    int speed = settings->current_playback_speed;
+    int speed = atomic_load_int(&settings->current_playback_speed);
     int cur_dir = (speed > 0) ? 1 : ((speed < 0) ? -1 : 0);
     int speed_mag = abs(speed);
     if (speed_mag < 1)
@@ -13703,7 +13705,7 @@ int vj_perform_queue_audio_chunk_crossfade(
 
     const int bps = el->audio_bps;
     const int num_channels = el->audio_chans;
-    const int speed_a = info->settings->current_playback_speed;
+    const int speed_a = atomic_load_int(&info->settings->current_playback_speed);
     const int speed_b = sample_get_speed(sample_b);
 
     int num_samples_a =
@@ -16884,7 +16886,7 @@ static int vj_perform_osd_status(veejay_t *info, char *dst, size_t dst_len)
     char master_timecode[20];
     snprintf(master_timecode, sizeof(master_timecode), "%02d:%02d:%02d:%02d", tc.h, tc.m, tc.s, tc.f);
 
-    float speed = settings->current_playback_speed;
+    float speed = atomic_load_int(&settings->current_playback_speed);
     if(info->sfd)
         speed = 1.0f / info->sfd;
 
@@ -17594,18 +17596,20 @@ static void vj_perform_end_transition(veejay_t *info, int mode, int sample)
 int vj_perform_transition_sample(veejay_t *info, VJFrame *srcA, VJFrame *srcB)
 {
     video_playback_setup *settings = info->settings;
+    const int playback_speed =
+        atomic_load_int(&settings->current_playback_speed);
 
     long long cur_frame = atomic_load_long_long(&settings->current_frame_num);
 
     long long start = atomic_load_long_long(&settings->transition.start);
     long long end = atomic_load_long_long(&settings->transition.end);
 
-    if (settings->current_playback_speed > 0) {
+    if (playback_speed > 0) {
         settings->transition.timecode =
             (cur_frame - start) /
             (double)(end - start);
     }
-    else if (settings->current_playback_speed < 0) {
+    else if (playback_speed < 0) {
         settings->transition.timecode =
             (start - cur_frame) /
             (double)(start - end);
@@ -18800,10 +18804,10 @@ static void vj_perform_set_pingpong_turn_speed(veejay_t *info, int new_speed)
 
     if (info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
         if (sample_set_speed(info->uc->sample_id, new_speed) != -1)
-            settings->current_playback_speed = new_speed;
+            atomic_store_int(&settings->current_playback_speed, new_speed);
     }
     else {
-        settings->current_playback_speed = new_speed;
+        atomic_store_int(&settings->current_playback_speed, new_speed);
     }
 
     atomic_store_int(&settings->audio_slice, 0);
@@ -18857,13 +18861,12 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         atomic_load_int(&settings->transition.active) &&
         atomic_load_int(&settings->transition.global_state);
     int looptype = 1;
-    int speed = settings->current_playback_speed;
+    int speed = atomic_load_int(&settings->current_playback_speed);
 
     long long end = atomic_load_long_long(&settings->max_frame_num);
     long long start = atomic_load_long_long(&settings->min_frame_num);
 
-    const int prev_dir = (settings->current_playback_speed < 0 ? -1 :
-                         settings->current_playback_speed > 0 ? 1 : 0);
+    const int prev_dir = (speed < 0 ? -1 : speed > 0 ? 1 : 0);
     int cur_dir = prev_dir;
 
     if (mode == VJ_PLAYBACK_MODE_SAMPLE) {
@@ -18883,13 +18886,12 @@ void vj_perform_inc_frame(veejay_t *info, int num)
         end = s_end;
         looptype = s_loop;
         speed = s_speed;
-        settings->current_playback_speed = speed;
+        atomic_store_int(&settings->current_playback_speed, speed);
         cur_dir = (speed < 0) ? -1 : speed > 0 ? 1 : 0;
         num = speed;
     }
     else {
         looptype = 1;
-        speed = settings->current_playback_speed;
         cur_dir = (speed < 0) ? -1 : speed > 0 ? 1 : 0;
         num = speed;
 
@@ -18911,7 +18913,7 @@ void vj_perform_inc_frame(veejay_t *info, int num)
     }
 
     if (speed == 0) {
-        settings->current_playback_speed = 0;
+        atomic_store_int(&settings->current_playback_speed, 0);
         settings->sequence_random_id = 0;
         settings->sequence_random_ticks_left = 0;
         return;
@@ -19253,7 +19255,7 @@ int vj_perform_rand_update(veejay_t *info)
         return 0;
     if(settings->randplayer.mode == RANDMODE_SAMPLE)
     {
-        int step = abs(settings->current_playback_speed);
+        int step = abs(atomic_load_int(&settings->current_playback_speed));
         if(step < 1)
             step = 1;
 

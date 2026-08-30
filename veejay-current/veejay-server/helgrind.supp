@@ -1,0 +1,32 @@
+# GCC __atomic acquire/release operations are synchronization points, but
+# Helgrind reports accesses through these inline wrappers as data races.
+{
+   veejay-atomic-load-int
+   Helgrind:Race
+   fun:atomic_load_int
+}
+{
+   veejay-atomic-store-int
+   Helgrind:Race
+   fun:atomic_store_int
+}
+{
+   veejay-atomic-load-long-long
+   Helgrind:Race
+   fun:atomic_load_long_long
+}
+{
+   veejay-atomic-store-long-long
+   Helgrind:Race
+   fun:atomic_store_long_long
+}
+{
+   veejay-atomic-load-double
+   Helgrind:Race
+   fun:atomic_load_double
+}
+{
+   veejay-atomic-store-double
+   Helgrind:Race
+   fun:atomic_store_double
+}
