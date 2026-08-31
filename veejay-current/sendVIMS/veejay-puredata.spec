@@ -1,7 +1,7 @@
-Name:           veejay-sayvims
+Name:           veejay-puredata
 Version:        1.6.0
 Release:        1%{?dist}
-Summary:        Pure Data external for controlling Veejay via VIMS (sendVIMS)
+Summary:        Pure Data external for controlling Veejay via VIMS
 
 License:        GPL-2.0-or-later
 URL:            http://www.veejayhq.net
@@ -14,6 +14,8 @@ BuildRequires:  puredata-devel
 
 Requires:       puredata
 Recommends:     veejay >= 1.6.0
+Provides:       veejay-sayvims = %{version}-%{release}
+Obsoletes:      veejay-sayvims < %{version}-%{release}
 
 %description
 sendVIMS is a Pure Data external object that sends VIMS protocol events
@@ -39,4 +41,4 @@ that trigger Veejay events.
 
 %changelog
 * Mon Aug 31 2026 Niels Elburg <nwelburg@gmail.com> - 1.6.0-1
-- Initial RPM packaging
+- Initial RPM packaging as veejay-puredata

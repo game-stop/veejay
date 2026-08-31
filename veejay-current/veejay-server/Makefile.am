@@ -12,22 +12,28 @@ SUBDIRS += share
 ACLOCAL_AMFLAGS = -I m4 
 
 EXTRA_DIST = \
+ packaging.am \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
  autogen.sh \
  PKGBUILD \
+ $(PACKAGE).spec \
  doc/veejay-HOWTO.html \
  doc/README.quickstart.md \
  doc/README.whatis.md \
  doc/HOWTO.plugins.md \
  doc/VIMS.md \
  doc/README.network.md \
+ debian \
  debian/changelog \
  debian/control \
  debian/copyright \
  debian/rules \
  buildinfo.sh 
+
+# Include packaging targets
+include $(top_srcdir)/packaging.am
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = veejay.pc
@@ -55,11 +61,6 @@ MAINTAINERCLEANFILES = \
 	ltmain.sh \
 	stamp-h.in
 
-## make rpms
-rpm: Makefile
-	$(MAKE) dist
-	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
-
 ubuntu:
 	chmod a+x debian/rules
 	debuild -i -us -uc -b
@@ -70,13 +71,6 @@ release:
 
 snapshot:
 	$(MAKE) dist distdir=$(PACKAGE)-`date +%Y-%m-%d`
-
-## make debs
-deb: Makefile dist
-	-chmod -R +w $(PACKAGE)-$(VERSION)
-	rm -rf $(PACKAGE)-$(VERSION)
-	tar xzf $(PACKAGE)-$(VERSION).tar.gz
-	cd $(PACKAGE)-$(VERSION); dpkg-buildpackage -rfakeroot
 
 install-exec-hook:
 	@echo "You may need to run 'ldconfig' as root to update the shared library cache."

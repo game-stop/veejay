@@ -4,10 +4,20 @@ SUBDIRS = src man
 ACLOCAL_AMFLAGS = -I m4 
 
 EXTRA_DIST = \
+ packaging.am \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
- autogen.sh 
+ autogen.sh \
+ PKGBUILD \
+ veejay-director.spec \
+ debian
+
+RPM_SPEC_FILE = $(top_srcdir)/veejay-director.spec
+DEB_SOURCE_PACKAGE = veejay-director
+
+# Include packaging targets
+include $(top_srcdir)/packaging.am
 
 DISTCLEANFILES = \
 	confdefs.h \
@@ -30,14 +40,3 @@ MAINTAINERCLEANFILES = \
 	ltmain.sh \
 	stamp-h.in
 
-## make rpms
-rpm: Makefile
-	$(MAKE) dist
-	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
-
-## make debs
-deb: Makefile dist
-	-chmod -R +w $(PACKAGE)-$(VERSION)
-	rm -rf $(PACKAGE)-$(VERSION)
-	tar xzf $(PACKAGE)-$(VERSION).tar.gz
-	cd $(PACKAGE)-$(VERSION); dpkg-buildpackage -rfakeroot

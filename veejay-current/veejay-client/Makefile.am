@@ -4,10 +4,14 @@ SUBDIRS = src man
 ACLOCAL_AMFLAGS = -I m4 
 
 EXTRA_DIST = \
+ packaging.am \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
  autogen.sh \
+ PKGBUILD \
+ veejay-client.spec \
+ debian \
  debian/copyright \
  debian/changelog \
  debian/control \
@@ -115,6 +119,12 @@ EXTRA_DIST = \
  share/veejay-logo.png \
  gveejay-paths.sh.in  
 
+RPM_SPEC_FILE = $(top_srcdir)/veejay-client.spec
+DEB_SOURCE_PACKAGE = veejay-client
+
+# Include packaging targets
+include $(top_srcdir)/packaging.am
+
 DISTCLEANFILES = \
 	confdefs.h \
 	config.cache \
@@ -163,14 +173,3 @@ gveejay-path.h: gveejay-paths.sh
 dist-hook:
 	rm -f $(distdir)/gveejay-paths.sh
 
-## make rpms
-rpm: Makefile
-	$(MAKE) dist
-	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
-
-## make debs
-deb: Makefile dist
-	-chmod -R +w $(PACKAGE)-$(VERSION)
-	rm -rf $(PACKAGE)-$(VERSION)
-	tar xzf $(PACKAGE)-$(VERSION).tar.gz
-	cd $(PACKAGE)-$(VERSION); dpkg-buildpackage -rfakeroot

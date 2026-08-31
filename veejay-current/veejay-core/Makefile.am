@@ -8,11 +8,21 @@ SUBDIRS += veejaycore
 ACLOCAL_AMFLAGS = -I m4 
 
 EXTRA_DIST = \
+ packaging.am \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
  autogen.sh \
- buildinfo.sh 
+ buildinfo.sh \
+ PKGBUILD \
+ veejay-core.spec \
+ debian
+
+RPM_SPEC_FILE = $(top_srcdir)/veejay-core.spec
+DEB_SOURCE_PACKAGE = veejay-core
+
+# Include packaging targets
+include $(top_srcdir)/packaging.am
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = veejaycore.pc
@@ -37,11 +47,6 @@ MAINTAINERCLEANFILES = \
 	configure \
 	ltmain.sh \
 	stamp-h.in
-
-## make rpms
-rpm: Makefile
-	$(MAKE) dist
-	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
 
 release:
 	rm -rf .deps */.deps

@@ -14,6 +14,6 @@ override_dh_auto_build:
 	$(MAKE) PDINCLUDE=/usr/include/pd
 
 override_dh_auto_install:
-	$(MAKE) install DESTDIR=$(CURDIR)/debian/veejay-sayvims PREFIX=/usr PDINCLUDE=/usr/include/pd
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/veejay-puredata PREFIX=/usr PDINCLUDE=/usr/include/pd
 
 override_dh_auto_test:

@@ -1,5 +1,5 @@
-veejay-sayvims (1.6.0-1) unstable; urgency=medium
+veejay-puredata (1.6.0) unstable; urgency=medium
 
-  * Initial Debian packaging of the sendVIMS Pure Data external.
+  * Initial Debian packaging of the Veejay Pure Data external.
 
  -- Niels Elburg <nwelburg@gmail.com>  Mon, 31 Aug 2026 00:00:00 +0000

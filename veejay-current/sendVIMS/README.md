@@ -1,6 +1,6 @@
-# sendVIMS
+# veejay-puredata
 
-**sendVIMS** is a Pure Data external for controlling a VeeJay backend through
+**veejay-puredata** packages the `sendVIMS` Pure Data external for controlling a VeeJay backend through
 the VIMS protocol.
 
 It is intended for live patches, hardware/control surfaces, installations, and

@@ -1,20 +1,21 @@
 # Contributor: Niels Elburg <nwelburg@gmail.com>
-pkgname=veejay-sayvims
+pkgname=veejay-puredata
 pkgrel=1
 pkgver=1.6.0
-pkgdesc="Pure Data external for controlling Veejay via VIMS (sendVIMS)"
+pkgdesc="Pure Data external for controlling Veejay via VIMS"
 arch=('x86_64' 'aarch64')
 url="http://www.veejayhq.net"
 license=('GPL2')
 groups=()
 conflicts=('veejay-sayvims')
+provides=('veejay-sayvims')
+replaces=('veejay-sayvims')
 depends=('puredata')
 optdepends=('veejay: to control a local veejay backend')
 makedepends=('perl')
 source=()
 md5sums=()
 backup=()
-replaces=()
 
 build() {
 	cd $startdir

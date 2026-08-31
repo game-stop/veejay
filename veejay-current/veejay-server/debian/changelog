@@ -1,4 +1,4 @@
-veejay (1.6.0-1) unstable; urgency=medium
+veejay (1.6.0) unstable; urgency=medium
 
   * Refresh Build-Depends/Depends for the FFmpeg 6, GTK-free, SDL2-based
     build and the new veejay-core split (Closes: #nnnn).

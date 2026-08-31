@@ -14,6 +14,9 @@
 
 
 
+# packaging.am - Reusable Automake targets for chroot package builds
+# Include in root Makefile.am: include $(top_srcdir)/packaging.am
+
 am__is_gnu_make = { \
   if test -z '$(MAKELEVEL)'; then \
     false; \
@@ -158,9 +161,10 @@ am__define_uniq_tagged_files = \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
 DIST_SUBDIRS = $(SUBDIRS)
-am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in AUTHORS \
-	COPYING ChangeLog INSTALL NEWS README compile config.guess \
-	config.sub install-sh ltmain.sh missing
+am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
+	$(top_srcdir)/packaging.am AUTHORS COPYING ChangeLog INSTALL \
+	NEWS README compile config.guess config.sub depcomp install-sh \
+	ltmain.sh missing
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 distdir = $(PACKAGE)-$(VERSION)
 top_distdir = $(distdir)
@@ -374,11 +378,19 @@ top_srcdir = .
 SUBDIRS = src man
 ACLOCAL_AMFLAGS = -I m4 
 EXTRA_DIST = \
+ packaging.am \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
- autogen.sh 
+ autogen.sh \
+ PKGBUILD \
+ veejay-director.spec \
+ debian
 
+RPM_SPEC_FILE = $(top_srcdir)/veejay-director.spec
+DEB_SOURCE_PACKAGE = veejay-director
+
+# Include packaging targets
 DISTCLEANFILES = \
 	confdefs.h \
 	config.cache \
@@ -406,19 +418,19 @@ all: config.h
 .SUFFIXES:
 am--refresh: Makefile
 	@:
-$(srcdir)/Makefile.in: # $(srcdir)/Makefile.am  $(am__configure_deps)
+$(srcdir)/Makefile.in: # $(srcdir)/Makefile.am $(top_srcdir)/packaging.am $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
 	    *$$dep*) \
-	      echo ' cd $(srcdir) && $(AUTOMAKE) --gnu'; \
-	      $(am__cd) $(srcdir) && $(AUTOMAKE) --gnu \
+	      echo ' cd $(srcdir) && $(AUTOMAKE) --foreign'; \
+	      $(am__cd) $(srcdir) && $(AUTOMAKE) --foreign \
 		&& exit 0; \
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu Makefile
+	  $(AUTOMAKE) --foreign Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -428,6 +440,7 @@ Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	    echo ' cd $(top_builddir) && $(SHELL) ./config.status $@ $(am__maybe_remake_depfiles)'; \
 	    cd $(top_builddir) && $(SHELL) ./config.status $@ $(am__maybe_remake_depfiles);; \
 	esac;
+$(top_srcdir)/packaging.am $(am__empty):
 
 $(top_builddir)/config.status: $(top_srcdir)/configure $(CONFIG_STATUS_DEPENDENCIES)
 	$(SHELL) ./config.status --recheck
@@ -803,7 +816,7 @@ maintainer-clean-generic:
 	-test -z "$(MAINTAINERCLEANFILES)" || rm -f $(MAINTAINERCLEANFILES)
 clean: clean-recursive
 
-clean-am: clean-generic clean-libtool mostlyclean-am
+clean-am: clean-generic clean-libtool clean-local mostlyclean-am
 
 distclean: distclean-recursive
 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
@@ -875,9 +888,9 @@ uninstall-am:
 
 .PHONY: $(am__recursive_targets) CTAGS GTAGS TAGS all all-am \
 	am--refresh check check-am clean clean-cscope clean-generic \
-	clean-libtool cscope cscopelist-am ctags ctags-am dist \
-	dist-all dist-bzip2 dist-gzip dist-lzip dist-shar dist-tarZ \
-	dist-xz dist-zip dist-zstd distcheck distclean \
+	clean-libtool clean-local cscope cscopelist-am ctags ctags-am \
+	dist dist-all dist-bzip2 dist-gzip dist-lzip dist-shar \
+	dist-tarZ dist-xz dist-zip dist-zstd distcheck distclean \
 	distclean-generic distclean-hdr distclean-libtool \
 	distclean-tags distcleancheck distdir distuninstallcheck dvi \
 	dvi-am html html-am info info-am install install-am \
@@ -893,15 +906,70 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
-rpm: Makefile
-	$(MAKE) dist
-	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
+PACKAGING_BUILD_DIR ?= $(top_builddir)/packaging-build
 
-deb: Makefile dist
-	-chmod -R +w $(PACKAGE)-$(VERSION)
-	rm -rf $(PACKAGE)-$(VERSION)
-	tar xzf $(PACKAGE)-$(VERSION).tar.gz
-	cd $(PACKAGE)-$(VERSION); dpkg-buildpackage -rfakeroot
+DEB_SOURCE_PACKAGE ?= $(PACKAGE)
+SBUILD              ?= sbuild
+SBUILD_CHROOT       ?= unstable-amd64-sbuild
+SBUILD_ARGS         ?=
+
+ARCH_CHROOT_DIR     ?= /var/lib/archbuild/extra-x86_64
+
+MOCK_CONFIG         ?= fedora-rawhide-x86_64
+MOCK_ARGS           ?=
+RPM_SPEC_FILE       ?= $(top_srcdir)/$(PACKAGE).spec
+
+.PHONY: deb arch rpm clean-packaging
+
+deb: dist-gzip
+	@echo "==> Building Debian package with sbuild..."
+	@command -v "$(SBUILD)" >/dev/null 2>&1 || { \
+		echo "ERROR: '$(SBUILD)' not found. Install sbuild or pass SBUILD=/path/to/sbuild."; \
+		exit 127; \
+	}
+	rm -rf $(PACKAGING_BUILD_DIR)/deb
+	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/deb
+	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
+	tar -C $(PACKAGING_BUILD_DIR)/deb -xzf $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
+	cp -r $(top_srcdir)/debian $(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION)/
+	cd $(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION) && dpkg-buildpackage -S -us -uc
+	$(SBUILD) --chroot=$(SBUILD_CHROOT) $(SBUILD_ARGS) \
+		--distdir=$(PACKAGING_BUILD_DIR)/deb \
+		$(PACKAGING_BUILD_DIR)/deb/*.dsc
+	@echo "==> Debian build complete. Artifacts in $(PACKAGING_BUILD_DIR)/deb/"
+
+arch: dist-gzip
+	@echo "==> Building Arch Linux package with makechrootpkg..."
+	rm -rf $(PACKAGING_BUILD_DIR)/arch
+	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/arch
+	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/arch/
+	cp $(top_srcdir)/PKGBUILD $(PACKAGING_BUILD_DIR)/arch/
+	cd $(PACKAGING_BUILD_DIR)/arch && sed -i 's/^pkgver=.*/pkgver=$(VERSION)/' PKGBUILD
+	cd $(PACKAGING_BUILD_DIR)/arch && makechrootpkg -r $(ARCH_CHROOT_DIR)
+	@echo "==> Arch Linux build complete. Artifacts in $(PACKAGING_BUILD_DIR)/arch/"
+
+rpm: dist-gzip
+	@echo "==> Building RPM package with mock..."
+	rm -rf $(PACKAGING_BUILD_DIR)/rpm
+	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/rpm/BUILD \
+		$(PACKAGING_BUILD_DIR)/rpm/RPMS \
+		$(PACKAGING_BUILD_DIR)/rpm/SOURCES \
+		$(PACKAGING_BUILD_DIR)/rpm/SPECS \
+		$(PACKAGING_BUILD_DIR)/rpm/SRPMS
+	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/rpm/SOURCES/
+	cp $(RPM_SPEC_FILE) $(PACKAGING_BUILD_DIR)/rpm/SPECS/
+	rpmbuild -bs \
+		--define "_topdir $$(pwd)/$(PACKAGING_BUILD_DIR)/rpm" \
+		$(PACKAGING_BUILD_DIR)/rpm/SPECS/$$(basename $(RPM_SPEC_FILE))
+	mock -r $(MOCK_CONFIG) $(MOCK_ARGS) \
+		--resultdir=$(PACKAGING_BUILD_DIR)/rpm/RPMS \
+		--rebuild $(PACKAGING_BUILD_DIR)/rpm/SRPMS/*.src.rpm
+	@echo "==> RPM build complete. Artifacts in $(PACKAGING_BUILD_DIR)/rpm/"
+
+clean-packaging:
+	rm -rf $(PACKAGING_BUILD_DIR)
+
+clean-local: clean-packaging
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

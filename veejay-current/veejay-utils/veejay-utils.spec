@@ -24,7 +24,7 @@ Provides:       sayVIMS = %{version}-%{release}
 %description
 This package contains sayVIMS, a program to communicate with veejay
 over the network or local machine.
-See veejay-sayvims for the Pure Data (sendVIMS) equivalent.
+See veejay-puredata for the Pure Data (sendVIMS) equivalent.
 
 %prep
 %setup -q

@@ -7,10 +7,20 @@ SUBDIRS = src man
 # info to be copied into the dist
 #
 EXTRA_DIST = \
+ packaging.am \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
- autogen.sh 
+ autogen.sh \
+ PKGBUILD \
+ veejay-utils.spec \
+ debian
+
+RPM_SPEC_FILE = $(top_srcdir)/veejay-utils.spec
+DEB_SOURCE_PACKAGE = veejay-utils
+
+# Include packaging targets
+include $(top_srcdir)/packaging.am
 
 DISTCLEANFILES = \
 	confdefs.h \
@@ -34,14 +44,3 @@ MAINTAINERCLEANFILES = \
 	ltmain.sh \
 	stamp-h.in
 
-## make rpms
-rpm: Makefile
-	$(MAKE) dist
-	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
-
-## make debs
-deb: Makefile dist
-	-chmod -R +w $(PACKAGE)-$(VERSION)
-	rm -rf $(PACKAGE)-$(VERSION)
-	tar xzf $(PACKAGE)-$(VERSION).tar.gz
-	cd $(PACKAGE)-$(VERSION); dpkg-buildpackage -rfakeroot

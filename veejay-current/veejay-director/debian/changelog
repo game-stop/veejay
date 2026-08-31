@@ -1,4 +1,4 @@
-veejay-director (1.6.0-1) unstable; urgency=medium
+veejay-director (1.6.0) unstable; urgency=medium
 
   * Initial Debian packaging of veejay-director.
 

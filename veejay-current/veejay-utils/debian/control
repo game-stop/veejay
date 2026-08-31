@@ -13,6 +13,6 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, veejay-core (>= 1.6.0), veejay (>= 1.6.0)
 Description:  Additional command line utilities for veejay
  This package contains sayVIMS, a program to communicate with veejay over the network or local machine.
- See the veejay-sayvims package for the Pure Data (sendVIMS) equivalent.
+ See the veejay-puredata package for the Pure Data (sendVIMS) equivalent.
 
 

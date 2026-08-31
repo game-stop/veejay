@@ -1,4 +1,4 @@
-veejay-client (1.6.0-1) unstable; urgency=medium
+veejay-client (1.6.0) unstable; urgency=medium
 
   * Refresh Build-Depends/Depends for the GTK+3/SDL2-based reloaded build
     and the new veejay-core split (Closes: #nnnn).
