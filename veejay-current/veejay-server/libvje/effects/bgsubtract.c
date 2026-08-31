@@ -122,9 +122,6 @@ int bgsubtract_prepare(void *ptr, VJFrame *frame)
 {
     bgsubtract_t *b = (bgsubtract_t*) ptr;
 
-    if(!b || !frame || !frame->data[0])
-        return 0;
-
     if(b->auto_hist)
         vje_histogram_auto_eq_serial(frame);
 

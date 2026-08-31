@@ -156,7 +156,7 @@ void cali_free(void *ptr)
 void cali_apply(void *ptr, VJFrame *frame, int *args)
 {
     calidata_t *c = (calidata_t*) ptr;
-    if(!c || !frame || !args)
+    if(!c)
         return;
 
     if(!c->b[0] || !c->l[0] || !c->m[0] || c->mean[0] <= 0.0) {

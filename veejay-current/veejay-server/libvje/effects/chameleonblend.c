@@ -98,9 +98,6 @@ int chameleonblend_prepare(void *ptr, VJFrame *frame)
 {
     chameleonblend_t *c = (chameleonblend_t*) ptr;
 
-    if(!c || !frame || !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return 0;
-
     veejay_memcpy(c->bgimage[0], frame->data[0], frame->len);
     veejay_memcpy(c->bgimage[1], frame->data[1], frame->len);
     veejay_memcpy(c->bgimage[2], frame->data[2], frame->len);

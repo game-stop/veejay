@@ -491,9 +491,6 @@ void veejay_histogram_draw_rgb(
 
 void vje_histogram_auto_eq(VJFrame *frame)
 {
-    if (!frame || !frame->data[0] || frame->len <= 0)
-        return;
-
     uint32_t *restrict global_H = vje_auto_eq_H;
 
     #pragma omp master
@@ -545,9 +542,7 @@ void vje_histogram_auto_eq(VJFrame *frame)
 
 void vje_histogram_auto_eq_serial(VJFrame *frame)
 {
-    if (!frame || !frame->data[0] || frame->len <= 0)
-        return;
-
+    
     uint32_t H[256] = {0};
     const uint8_t *restrict p = frame->data[0];
     const int len = frame->len;

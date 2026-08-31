@@ -119,9 +119,6 @@ int diff_prepare(void *ptr, VJFrame *frame)
 {
     diff_t *d = (diff_t*) ptr;
 
-    if(!d || !frame || !frame->data[0] || !d->static_bg)
-        return 0;
-
     veejay_memcpy(d->static_bg, frame->data[0], frame->len);
 
     VJFrame tmp;

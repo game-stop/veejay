@@ -81,10 +81,6 @@ int bgpush_prepare(void *ptr, VJFrame *frame)
 {
     bgpush_t *b = (bgpush_t*) ptr;
 
-    if(!b || !b->frame_data || !frame ||
-       !frame->data[0] || !frame->data[1] || !frame->data[2])
-        return 0;
-
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
 
     veejay_memcpy(b->frame_ptr[0], frame->data[0], frame->len);

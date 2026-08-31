@@ -69,9 +69,6 @@ void contrast_apply(void *ptr, VJFrame *frame, int *s)
 {
     (void) ptr;
 
-    if(!frame || !s)
-        return;
-
     const int mode = clampi(s[0], 0, 2);
     const int luma = clampi(s[1], 0, 255);
     const int chroma = clampi(s[2], 0, 255);

@@ -135,9 +135,6 @@ int bgsubtractgauss_prepare(void *ptr, VJFrame *frame)
 {
     bgsubtract_t *b = (bgsubtract_t*) ptr;
 
-    if(!b || !frame || !frame->data[0])
-        return 0;
-
     const int len = frame->len;
     uint8_t *Y = frame->data[0];
 
