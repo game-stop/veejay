@@ -81,7 +81,7 @@ static struct {
     void  (*fx_filter)(void *ptr, VJFrame *frame, int *args);
     void  (*fx_process)(void *ptr, VJFrame *A, VJFrame *B, int *args);
     int   (*fx_transition_ready)(void *ptr, int w, int h );
-    int   (*fx_request_fx)();
+    int   (*fx_request_fx)(void);
     void  (*fx_request_set_private)(void *ptr, void *priv);
     int   fx_id;
 } vj_fx[] = {
@@ -340,7 +340,7 @@ static struct {
     { blackreplace_init,NULL,NULL,NULL,NULL,blackreplace_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLACKREPLACE },
     { darkreplace_init,darkreplace_malloc,darkreplace_free,NULL,NULL,NULL,darkreplace_apply,NULL,NULL,NULL,VJ_VIDEO_EFFECT_DARKREPLACEMIX },
     { morphologymixer_init, morphologymixer_malloc, morphologymixer_free, NULL,NULL,NULL, morphologymixer_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_MORPHOLOGY },
-    { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL, 0},
+    { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL,NULL, 0},
 
     // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
     //        1 motionmap per FX (set of FX that can request motionmap)

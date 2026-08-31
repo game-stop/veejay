@@ -62,6 +62,8 @@ extern  int vj_tag_size();
 #define BSIZE 256
 #define VJ_OSD_MAX_LINES 8
 
+static int fontconfig_initialized = 0;
+
 typedef struct
 {   
     int id;
@@ -1378,6 +1380,7 @@ static int vj_font_list_truetype(vj_font_t *f)
         veejay_msg(VEEJAY_MSG_ERROR, "Fontconfig initialization failed");
         return 0;
     }
+    fontconfig_initialized = 1;
 
     FcPattern *pat = FcPatternCreate();
     if (!pat)
@@ -1442,7 +1445,17 @@ int      vj_font_init_once() {
         return -1;
     }
 
+    fontconfig_initialized = 1;
+
     return 0;
+}
+
+void vj_font_shutdown(void)
+{
+    if(fontconfig_initialized) {
+        FcFini();
+        fontconfig_initialized = 0;
+    }
 }
 
 void    *vj_font_init( int w, int h, float fps, int is_osd )

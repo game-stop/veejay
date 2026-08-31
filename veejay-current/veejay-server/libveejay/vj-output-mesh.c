@@ -567,13 +567,39 @@ static inline void vj_output_mesh_indices(const vj_output_mesh *mesh,
     *i11 = base + down + right;
 }
 
-static void vj_output_mesh_clear_yuv444(const vj_output_mesh *mesh,
-                                        uint8_t *restrict output[3])
+static void vj_output_mesh_clear_plane_margins(const vj_output_mesh *mesh,
+                                               uint8_t *output,
+                                               uint8_t value)
 {
-    const size_t len = (size_t)mesh->dst_width * (size_t)mesh->dst_height;
-    memset(output[0], 0, len);
-    memset(output[1], 128, len);
-    memset(output[2], 128, len);
+    const int width = mesh->dst_width;
+    const int height = mesh->dst_height;
+    const int x0 = mesh->bound_x0;
+    const int x1 = mesh->bound_x1;
+    const int y0 = mesh->bound_y0;
+    const int y1 = mesh->bound_y1;
+
+    if(y0 > 0)
+        memset(output, value, (size_t)y0 * (size_t)width);
+    if(x0 > 0 || x1 < width) {
+        for(int y = y0; y < y1; y++) {
+            uint8_t *row = output + (size_t)y * (size_t)width;
+            if(x0 > 0)
+                memset(row, value, (size_t)x0);
+            if(x1 < width)
+                memset(row + x1, value, (size_t)(width - x1));
+        }
+    }
+    if(y1 < height)
+        memset(output + (size_t)y1 * (size_t)width, value,
+               (size_t)(height - y1) * (size_t)width);
+}
+
+static void vj_output_mesh_clear_yuv444_margins(const vj_output_mesh *mesh,
+                                                uint8_t *restrict output[3])
+{
+    vj_output_mesh_clear_plane_margins(mesh, output[0], 0);
+    vj_output_mesh_clear_plane_margins(mesh, output[1], 128);
+    vj_output_mesh_clear_plane_margins(mesh, output[2], 128);
 }
 
 void vj_output_mesh_render_yuv444(const vj_output_mesh *mesh,
@@ -598,7 +624,7 @@ void vj_output_mesh_render_yuv444(const vj_output_mesh *mesh,
     const int y1 = mesh->bound_y1;
 
     if(x0 != 0 || y0 != 0 || x1 != mesh->dst_width || y1 != mesh->dst_height)
-        vj_output_mesh_clear_yuv444(mesh, output);
+        vj_output_mesh_clear_yuv444_margins(mesh, output);
 
     const uint8_t *restrict src_y = input[0];
     const uint8_t *restrict src_u = input[1];
@@ -658,8 +684,8 @@ void vj_output_mesh_render_yuv444_alpha(const vj_output_mesh *mesh,
     const int y1 = mesh->bound_y1;
 
     if(x0 != 0 || y0 != 0 || x1 != mesh->dst_width || y1 != mesh->dst_height) {
-        vj_output_mesh_clear_yuv444(mesh, output);
-        memset(output[3], 0, len);
+        vj_output_mesh_clear_yuv444_margins(mesh, output);
+        vj_output_mesh_clear_plane_margins(mesh, output[3], 0);
     }
 
     const uint8_t *restrict src_y = input[0];
@@ -720,7 +746,7 @@ void vj_output_mesh_render_luma(const vj_output_mesh *mesh,
     const int y0 = mesh->bound_y0;
     const int y1 = mesh->bound_y1;
     if(x0 != 0 || y0 != 0 || x1 != mesh->dst_width || y1 != mesh->dst_height)
-        memset(output, 0, len);
+        vj_output_mesh_clear_plane_margins(mesh, output, 0);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) num_threads(mesh->n_threads)

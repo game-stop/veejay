@@ -446,14 +446,6 @@ static void draw_borders_serial(fragmenttv_t *m,
     }
 }
 
-static void draw_borders_parallel_no_overlap(fragmenttv_t *m,
-                                             uint8_t *Y,
-                                             int w,
-                                             int strength)
-{
-    draw_borders_serial(m, Y, w, strength);
-}
-
 static void draw_borders(fragmenttv_t *m,
                          uint8_t *Y,
                          int w,

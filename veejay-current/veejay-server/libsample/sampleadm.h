@@ -282,10 +282,10 @@ typedef enum {
 #define SAMPLE_DEC_BIBBER 1
 #define SAMPLE_DEC_FREEZE 2
 extern int sample_chain_free(int sample_id, int global);
-extern unsigned int sample_size();
-extern int sample_highest();
-extern int sample_highest_valid_id();
-extern int sample_verify();
+extern unsigned int sample_size(void);
+extern int sample_highest(void);
+extern int sample_highest_valid_id(void);
+extern int sample_verify(void);
 extern int sample_init(int len, void *font, editlist *el,void *info);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
@@ -302,7 +302,7 @@ extern int sample_chain_apply_full(sample_eff_chain **effect_chain,int chain_ind
     int source_type,int e_flag,int a_flag,int volume,int kf_status,int kf_type, int beat, uint32_t beat_param_mask);
 #endif
 extern int sample_set_state(int new_state);
-extern int sample_get_state();
+extern int sample_get_state(void);
 extern sample_info *sample_skeleton_new(long startFrame, long endFrame);
 extern sample_info *sample_get(int sample_id);
 void 	sample_new_simple( void *el, long start, long end );

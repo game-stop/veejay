@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "greyselect.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
 
@@ -205,6 +206,7 @@ static void greyselect_update_cache(greyselect_t *g, const int *args)
     int iv = 128;
 
     _rgb2yuv(red, green, blue, iy, iu, iv);
+    (void)iy;
 
     const float ut_f = (float)iu - 128.0f;
     const float vt_f = (float)iv - 128.0f;

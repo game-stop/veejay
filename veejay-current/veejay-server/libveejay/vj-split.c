@@ -26,6 +26,7 @@
 #include <pthread.h>
 #include <veejaycore/defs.h>
 #include <libvje/vje.h>
+#include <libvje/libvje.h>
 #include <libveejay/vj-split.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
@@ -832,21 +833,6 @@ static void vj_split_write_shm_header(v_screen_t *VJ_SPLIT_RESTRICT screen,
     data->header[6] = frame->height;
     data->header[7] = frame->range ? 1 : 0;
 }
-static inline int __advise_num_threads(const int len) {
-	static int ncores = -1;
-    if (ncores == -1) {
-        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
-    }
-    int nthreads = ncores;
-
-    if (len < (1920*1080)) nthreads = ncores / 2;
-    if (nthreads < 1) nthreads = 1;
-    if (nthreads > 6) nthreads = 6; // avoid too much overhead
-
-    return nthreads;
-}
-
-
 static int vj_split_allocate_screen(void *ptr, int screen_id, int wid, int hei, int fmt)
 {
     (void) fmt;
@@ -890,7 +876,7 @@ static int vj_split_allocate_screen(void *ptr, int screen_id, int wid, int hei, 
 
     box->width = wid;
     box->height = hei;
-    box->n_threads = __advise_num_threads(wid * hei);
+    box->n_threads = vje_advise_num_threads(wid * hei);
     x->frames[screen_id] = dst;
 
     return 1;

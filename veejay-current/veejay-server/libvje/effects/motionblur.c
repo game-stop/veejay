@@ -80,7 +80,7 @@ static inline uint8_t motionblur_uv_from_q8(int32_t v)
 {
     int out;
 
-    v = motionblur_clamp_q8(v, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
+    v = motionblur_clamp_q8(v, -(128 << MB_Q8_SHIFT), 127 << MB_Q8_SHIFT);
     out = motionblur_round_q8_signed(v) + 128;
 
     return (uint8_t)clampi(out, 0, 255);
@@ -314,8 +314,8 @@ void motionblur_apply(void *ptr, VJFrame *f, int *a)
             vv = ((accV_row[x] * decay_q8 + 128) >> MB_Q8_SHIFT) + ((int32_t)V_row[x] - 128) * alpha_q8;
 
             yv = motionblur_clamp_q8(yv, 0, 255 << MB_Q8_SHIFT);
-            uv = motionblur_clamp_q8(uv, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
-            vv = motionblur_clamp_q8(vv, -128 << MB_Q8_SHIFT, 127 << MB_Q8_SHIFT);
+            uv = motionblur_clamp_q8(uv, -(128 << MB_Q8_SHIFT), 127 << MB_Q8_SHIFT);
+            vv = motionblur_clamp_q8(vv, -(128 << MB_Q8_SHIFT), 127 << MB_Q8_SHIFT);
 
             accY_row[x] = yv;
             accU_row[x] = uv;

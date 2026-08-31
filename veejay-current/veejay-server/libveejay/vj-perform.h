@@ -68,13 +68,13 @@ void       vj_perform_free_plugin_frame(VJFrameInfo *f );
 
 void       vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int dst_link, VJFrame *frame);
 void       vj_perform_get_backstore( uint8_t **frame );
-int        vj_perform_get_sampling();
+int        vj_perform_get_sampling(void);
 
 int	vj_perform_get_width( veejay_t *info );
 int	vj_perform_get_height( veejay_t *info );
 
 void	vj_perform_follow_fade(veejay_t *info, int status);
-size_t	vj_perform_fx_chain_size();
+size_t	vj_perform_fx_chain_size(void);
 
 void	vj_perform_record_video_frame(veejay_t *info);
 

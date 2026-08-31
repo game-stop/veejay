@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "rgbkey.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
 

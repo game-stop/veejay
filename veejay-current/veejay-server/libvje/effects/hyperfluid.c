@@ -712,12 +712,12 @@ void hyperfluid_apply(void *ptr, VJFrame *frame, int *args)
                 if (prism_px > 0.05f) {
                     int ip = hf_nearest_index(sx + nx * prism_px, sy + ny * prism_px, w, h);
                     int ic = hf_nearest_index(sx, sy, w, h);
-                    int im = hf_nearest_index(sx - nx * prism_px, sy - ny * prism_px, w, h);
+                    int im_idx = hf_nearest_index(sx - nx * prism_px, sy - ny * prism_px, w, h);
                     float rp = (float) src_y[ip] + 1.402000f * ((float) src_v[ip] - 128.0f);
                     float uf = (float) src_u[ic] - 128.0f;
                     float vf = (float) src_v[ic] - 128.0f;
                     float gc = (float) src_y[ic] - 0.344136f * uf - 0.714136f * vf;
-                    float bm = (float) src_y[im] + 1.772000f * ((float) src_u[im] - 128.0f);
+                    float bm = (float) src_y[im_idx] + 1.772000f * ((float) src_u[im_idx] - 128.0f);
                     int py;
                     int pu;
                     int pv;

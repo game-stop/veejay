@@ -177,9 +177,27 @@ typedef char **(*livido_list_properties_f) (livido_port_t *);
 typedef int (*livido_keyframe_get_f)(livido_port_t *port, long pos, int dir );
 typedef int (*livido_keyframe_put_f)(livido_port_t *port, long pos, int dir );
 
+typedef union
+{
+    livido_malloc_f malloc;
+    livido_free_f free;
+    livido_memset_f memset;
+    livido_memcpy_f memcpy;
+    livido_port_new_f port_new;
+    livido_port_free_f port_free;
+    livido_property_set_f property_set;
+    livido_property_get_f property_get;
+    livido_property_num_elements_f property_num_elements;
+    livido_property_atom_type_f property_atom_type;
+    livido_property_element_size_f property_element_size;
+    livido_list_properties_f list_properties;
+    livido_keyframe_get_f keyframe_get;
+    livido_keyframe_put_f keyframe_put;
+} livido_setup_function_t;
+
 typedef struct
 {
-	void (*f)();
+    livido_setup_function_t f;
 } livido_setup_t;
 
 typedef livido_port_t *(*livido_setup_f) (const livido_setup_t list[], int );
@@ -203,21 +221,26 @@ static int (*livido_keyframe_put)(livido_port_t *port, long pos, int dir) = 0; \
 /* Using void* to pass base address of function, needs explicit typecast and host must match ordering */
 #define	LIVIDO_IMPORT(list) \
 {\
-	livido_malloc					= (livido_malloc_f) list[0].f;\
-	livido_free						= (livido_free_f) list[1].f;\
-	livido_memset					= (livido_memset_f) list[2].f;\
-	livido_memcpy					= (livido_memcpy_f) list[3].f;\
-	livido_port_new					= (livido_port_new_f) list[4].f;\
-	livido_port_free				= (livido_port_free_f) list[5].f;\
-	livido_property_set				= (livido_property_set_f) list[6].f;\
-	livido_property_get				= (livido_property_get_f) list[7].f;\
-	livido_property_num_elements	= (livido_property_num_elements_f) list[8].f;\
-	livido_property_atom_type		= (livido_property_atom_type_f) list[9].f;\
-	livido_property_element_size	= (livido_property_element_size_f) list[10].f;\
-	livido_list_properties			= (livido_list_properties_f) list[11].f;\
-	livido_keyframe_get				= (livido_keyframe_get_f) list[12].f;\
-	livido_keyframe_put				= (livido_keyframe_put_f) list[13].f;\
+    livido_malloc					= list[0].f.malloc;\
+    livido_free						= list[1].f.free;\
+    livido_memset					= list[2].f.memset;\
+    livido_memcpy					= list[3].f.memcpy;\
+    livido_port_new					= list[4].f.port_new;\
+    livido_port_free				= list[5].f.port_free;\
+    livido_property_set				= list[6].f.property_set;\
+    livido_property_get				= list[7].f.property_get;\
+    livido_property_num_elements		= list[8].f.property_num_elements;\
+    livido_property_atom_type			= list[9].f.property_atom_type;\
+    livido_property_element_size		= list[10].f.property_element_size;\
+    livido_list_properties			= list[11].f.list_properties;\
+    livido_keyframe_get				= list[12].f.keyframe_get;\
+    livido_keyframe_put				= list[13].f.keyframe_put;\
 }
+
+int init_instance(livido_port_t *filter_instance);
+int process_instance(livido_port_t *filter_instance, double timestamp);
+int deinit_instance(livido_port_t *filter_instance);
+livido_port_t *livido_setup(livido_setup_t list[], int version);
 
 LIVIDO_END_DECLS
 #endif// #ifndef __LIVIDO_H_

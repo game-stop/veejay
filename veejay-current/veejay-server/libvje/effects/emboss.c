@@ -227,86 +227,102 @@ static void emboss_test_framedata(const uint8_t *src, uint8_t *dst, int len)
     }
 }
 
-static void gray_emboss_framedata(const uint8_t *src, uint8_t *dst, int width, int len)
+static void gray_emboss_framedata(const uint8_t *src, uint8_t *dst, int width, int height)
 {
 #pragma omp for schedule(static)
-    for (int r = 1; r < len - 1; r += width)
+    for (int y = 1; y < height - 1; y++)
     {
+        const int row_above = (y - 1) * width;
+        const int row = y * width;
+        const int row_below = (y + 1) * width;
+
         for (int c = 1; c < width - 1; c++)
         {
-            int val = (src[r - 1 + c - 1] -
-                   src[r - 1 + c] -
-                   src[r - 1 + c + 1] +
-                   src[r + c - 1] -
-                   src[r + c] -
-                   src[r + c + 1] -
-                   src[r + 1 + c - 1] -
-                   src[r + 1 + c] - src[r + 1 + c + 1]
+            int val = (src[row_above + c - 1] -
+                   src[row_above + c] -
+                   src[row_above + c + 1] +
+                   src[row + c - 1] -
+                   src[row + c] -
+                   src[row + c + 1] -
+                   src[row_below + c - 1] -
+                   src[row_below + c] - src[row_below + c + 1]
                    ) / 9;
-            dst[r + c] = CLAMP_Y(val);
+            dst[row + c] = CLAMP_Y(val);
         }
     }
 }
 
-static void aggressive_emboss_framedata(const uint8_t *src, uint8_t *dst, int width, int len)
+static void aggressive_emboss_framedata(const uint8_t *src, uint8_t *dst, int width, int height)
 {
 #pragma omp for schedule(static)
-    for (int r = 1; r < len - 1; r += width)
+    for (int y = 1; y < height - 1; y++)
     {
+        const int row_above = (y - 1) * width;
+        const int row = y * width;
+        const int row_below = (y + 1) * width;
+
         for (int c = 1; c < width - 1; c++)
         {
-            int val = (src[r - 1 + c - 1] -
-                   src[r - 1 + c] -
-                   src[r - 1 + c + 1] +
-                   src[r + c - 1] -
-                   src[r + c] -
-                   src[r + c + 1] -
-                   src[r + 1 + c - 1] +
-                   src[r + 1 + c] + src[r + 1 + c + 1]
+            int val = (src[row_above + c - 1] -
+                   src[row_above + c] -
+                   src[row_above + c + 1] +
+                   src[row + c - 1] -
+                   src[row + c] -
+                   src[row + c + 1] -
+                   src[row_below + c - 1] +
+                   src[row_below + c] + src[row_below + c + 1]
                    ) / 9;
-            dst[r + c] = CLAMP_Y(val);
+            dst[row + c] = CLAMP_Y(val);
         }
     }
 }
 
-static void dark_emboss_framedata(const uint8_t *src, uint8_t *dst, int width, int len)
+static void dark_emboss_framedata(const uint8_t *src, uint8_t *dst, int width, int height)
 {
 #pragma omp for schedule(static)
-    for (int r = 1; r < len - 1; r += width)
+    for (int y = 1; y < height - 1; y++)
     {
+        const int row_above = (y - 1) * width;
+        const int row = y * width;
+        const int row_below = (y + 1) * width;
+
         for (int c = 1; c < width - 1; c++)
         {
-            int val = (src[r - 1 + c - 1] -
-                       src[r - 1 + c] -
-                       src[r - 1 + c + 1] +
-                       src[r + c - 1] +
-                       src[r + c] -
-                       src[r + c + 1] -
-                       src[r + 1 + c - 1] +
-                       src[r + 1 + c] + src[r + 1 + c + 1]
+            int val = (src[row_above + c - 1] -
+                       src[row_above + c] -
+                       src[row_above + c + 1] +
+                       src[row + c - 1] +
+                       src[row + c] -
+                       src[row + c + 1] -
+                       src[row_below + c - 1] +
+                       src[row_below + c] + src[row_below + c + 1]
                        ) / 9;
-            dst[c + r] = (uint8_t)clampi(val, 0, 255);
+            dst[row + c] = (uint8_t)clampi(val, 0, 255);
         }
     }
 }
 
-static void grayish_mood_framedata(const uint8_t *src, uint8_t *dst, int width, int len)
+static void grayish_mood_framedata(const uint8_t *src, uint8_t *dst, int width, int height)
 {
 #pragma omp for schedule(static)
-    for (int r = 1; r < len - 1; r += width)
+    for (int y = 1; y < height - 1; y++)
     {
+        const int row_above = (y - 1) * width;
+        const int row = y * width;
+        const int row_below = (y + 1) * width;
+
         for (int c = 1; c < width - 1; c++)
         {
-            int val = (src[r - 1 + c - 1] -
-                       src[r - 1 + c] -
-                       src[r - 1 + c + 1] -
-                       src[r + c - 1] -
-                       src[r + c] -
-                       src[r + c + 1] -
-                       src[r + 1 + c - 1] -
-                       src[r + 1 + c] - src[r + 1 + c + 1]
+            int val = (src[row_above + c - 1] -
+                       src[row_above + c] -
+                       src[row_above + c + 1] -
+                       src[row + c - 1] -
+                       src[row + c] -
+                       src[row + c + 1] -
+                       src[row_below + c - 1] -
+                       src[row_below + c] - src[row_below + c + 1]
                        ) / 9;
-            dst[c + r] = (uint8_t)clampi(val, 0, 255);
+            dst[row + c] = (uint8_t)clampi(val, 0, 255);
         }
     }
 }
@@ -363,16 +379,16 @@ void emboss_apply(void *ptr, VJFrame *frame, int *args)
             lines_white_balance_framedata(tmp, src, width, len);
             break;
         case 3:
-            gray_emboss_framedata(tmp, src, width, len);
+            gray_emboss_framedata(tmp, src, width, height);
             break;
         case 4:
-            aggressive_emboss_framedata(tmp, src, width, len);
+            aggressive_emboss_framedata(tmp, src, width, height);
             break;
         case 5:
-            dark_emboss_framedata(tmp, src, width, len);
+            dark_emboss_framedata(tmp, src, width, height);
             break;
         case 6:
-            grayish_mood_framedata(tmp, src, width, len);
+            grayish_mood_framedata(tmp, src, width, height);
             break;
         case 7:
             simpleedge_framedata(tmp, src, width, height);

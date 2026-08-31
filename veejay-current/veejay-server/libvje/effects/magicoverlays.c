@@ -520,7 +520,7 @@ void overlaymagic_addtest2(VJFrame *frame, VJFrame *frame2)
     overlaymagic_additive(frame, frame2);
 }
 
-void overlaymagic_additive_luma(VJFrame *frame, VJFrame *frame2)
+static void overlaymagic_additive_luma(VJFrame *frame, VJFrame *frame2)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
@@ -531,7 +531,7 @@ OVERLAYMAGIC_FOR()
         Y[i] = overlaymagic_u8((int)Y[i] + (int)Y2[i]);
 }
 
-void overlaymagic_screen_blend(VJFrame *frame, VJFrame *frame2)
+static void overlaymagic_screen_blend(VJFrame *frame, VJFrame *frame2)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
@@ -542,7 +542,7 @@ OVERLAYMAGIC_FOR()
         Y[i] = overlaymagic_u8(overlaymagic_screen((int)Y[i], (int)Y2[i]));
 }
 
-void overlaymagic_addtest6(VJFrame *frame, VJFrame *frame2)
+static void overlaymagic_addtest6(VJFrame *frame, VJFrame *frame2)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
@@ -556,7 +556,7 @@ OVERLAYMAGIC_FOR()
     }
 }
 
-void overlaymagic_addtest7(VJFrame *frame, VJFrame *frame2)
+static void overlaymagic_addtest7(VJFrame *frame, VJFrame *frame2)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
@@ -570,7 +570,7 @@ OVERLAYMAGIC_FOR()
     }
 }
 
-void overlaymagic_subtractive_clamped(VJFrame *frame, VJFrame *frame2)
+static void overlaymagic_subtractive_clamped(VJFrame *frame, VJFrame *frame2)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];
@@ -581,7 +581,7 @@ OVERLAYMAGIC_FOR()
         Y[i] = overlaymagic_u8((int)Y[i] - (((int)Y2[i] << 1) - 255));
 }
 
-void overlaymagic_swap(VJFrame *frame, VJFrame *frame2)
+static void overlaymagic_swap(VJFrame *frame, VJFrame *frame2)
 {
     const int len = frame->len;
     uint8_t *restrict Y = frame->data[0];

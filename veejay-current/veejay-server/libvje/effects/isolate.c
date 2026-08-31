@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "isolate.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
 
@@ -189,6 +190,7 @@ static void isolate_update_cache(isolate_t *s, const int *args)
     int iv = 128;
 
     _rgb2yuv(red, green, blue, iy, iu, iv);
+    (void)iy;
 
     const float ut_f = (float)iu - 128.0f;
     const float vt_f = (float)iv - 128.0f;

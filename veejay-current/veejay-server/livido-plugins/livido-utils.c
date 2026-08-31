@@ -44,7 +44,25 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "../libplugger/specs/livido.h"
+#include "livido-utils.h"
+
+int livido_default_num_threads(void) {
+  long online = sysconf(_SC_NPROCESSORS_ONLN);
+  int ncores = online > 0 ? (int) online : 1;
+  int nthreads = ncores - 1;
+  const char *env = getenv("VEEJAY_MULTITHREAD_TASKS");
+
+  if (env && *env) {
+    char *endp = NULL;
+    long requested = strtol(env, &endp, 10);
+    if (endp != env && requested > 0) nthreads = (int) requested;
+  }
+  if (nthreads < 1) nthreads = 1;
+  if (nthreads > ncores) nthreads = ncores;
+  return nthreads;
+}
 
 int livido_has_property (livido_port_t *port, const char *key) {
   if (livido_property_get(port,key,0,NULL)==LIVIDO_ERROR_NOSUCH_PROPERTY) return 0;
@@ -69,7 +87,7 @@ int livido_set_boolean_value (livido_port_t *port, const char *key, int value) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_BOOLEAN,1,&value);
 }
 
-int livido_set_string_value (livido_port_t *port, const char *key, char *value) {
+int livido_set_string_value (livido_port_t *port, const char *key, const char *value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_STRING,1,&value);
 }

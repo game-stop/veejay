@@ -85,7 +85,7 @@ int	plug_is_frei0r( void *instance );
 char	*plug_get_so_name_by_idx( int id );
 void	plug_get_parameters( void *instance, int *args, int *n_args);
 char	*plug_describe_param( void *plugin, int p );
-char	*list_plugins();
+char	*list_plugins(void);
 void    plug_clone_from_parameters(void *instance, void *fx_values);
 void	plug_clone_parameters( void *instance, void *fx_values );
 void	plug_set_defaults( void *instance, void *fx_values );

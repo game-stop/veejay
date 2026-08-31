@@ -112,6 +112,7 @@ void complexinvert_apply(void *ptr, VJFrame *frame, int *args)
     int iv = 128;
 
     _rgb2yuv(r, g, b, iy, iu, iv);
+    (void)iy;
 
     const float ut_f = (float)(iu - 128);
     const float vt_f = (float)(iv - 128);

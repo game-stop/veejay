@@ -399,17 +399,17 @@ static void solarize_process(void *ptr, VJFrame *frame, int *args, int force_mod
     }
 }
 
-void solarize_apply1(void *ptr, VJFrame *frame, int *args)
+static void solarize_apply1(void *ptr, VJFrame *frame, int *args)
 {
     solarize_process(ptr, frame, args, 0);
 }
 
-void solarize_apply_luma(void *ptr, VJFrame *frame, int *args)
+static void solarize_apply_luma(void *ptr, VJFrame *frame, int *args)
 {
     solarize_process(ptr, frame, args, 1);
 }
 
-void solarize_apply_color(void *ptr, VJFrame *frame, int *args)
+static void solarize_apply_color(void *ptr, VJFrame *frame, int *args)
 {
     solarize_process(ptr, frame, args, 2);
 }

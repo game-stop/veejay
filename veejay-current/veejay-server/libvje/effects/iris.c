@@ -114,7 +114,6 @@ void iris_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     const int shape = args[P_SHAPE];
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
     if(val <= 0) {
         iris_copy_frame(frame, frame2);
         return;

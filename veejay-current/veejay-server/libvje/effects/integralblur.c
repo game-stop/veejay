@@ -250,13 +250,10 @@ static void box_blur(integralblur_t *f, uint8_t *src, uint8_t *dst, int radius)
     }
 }
 
-static uint8_t *integralblur_blur_plane(integralblur_t *f, uint8_t *plane, int len, int radius, int iter)
+static uint8_t *integralblur_blur_plane(integralblur_t *f, uint8_t *source, int radius, int iter)
 {
-    uint8_t *src = f->mask;
-    uint8_t *dst = f->tmp;
-
-#pragma omp single
-    veejay_memcpy(src, plane, len);
+    uint8_t *src = source;
+    uint8_t *dst = f->mask;
 
     if(iter < 2) {
         for(int i = 0; i < iter; i++) {
@@ -283,7 +280,8 @@ static uint8_t *integralblur_blur_plane(integralblur_t *f, uint8_t *plane, int l
             r2 = f->max_radius;
 
         box_blur(f, src, dst, r1);
-        box_blur(f, dst, src, r2);
+        box_blur(f, dst, f->tmp, r2);
+        src = f->tmp;
     }
 
     return src;
@@ -328,10 +326,14 @@ void integralblur_apply(void *ptr, VJFrame *frame, int *args)
 
         if(plane_mix > 0) {
             uint8_t *blurred;
+            uint8_t *source = frame->data[p];
 
+            if(plane_mix < 255) {
 #pragma omp single
-            veejay_memcpy(f->orig, frame->data[p], len);
-            blurred = integralblur_blur_plane(f, frame->data[p], len, radius, iter);
+                veejay_memcpy(f->orig, source, len);
+                source = f->orig;
+            }
+            blurred = integralblur_blur_plane(f, source, radius, iter);
             integralblur_mix_plane(f, frame->data[p], blurred, len, plane_mix);
         }
     }

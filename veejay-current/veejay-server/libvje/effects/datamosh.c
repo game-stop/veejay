@@ -888,17 +888,17 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
         }
 
         const int old_x = d->field_x[bi];
-        const int old_y = d->field_y[bi];
+        const int old_field_y = d->field_y[bi];
         int new_x;
         int new_y;
 
         if (drive > 0) {
             const int follow = follow_lut[drive];
             new_x = (old_x * (255 - follow) + target_x * follow) / 255;
-            new_y = (old_y * (255 - follow) + target_y * follow) / 255;
+            new_y = (old_field_y * (255 - follow) + target_y * follow) / 255;
         } else {
             new_x = (old_x * field_keep) / 255;
-            new_y = (old_y * field_keep) / 255;
+            new_y = (old_field_y * field_keep) / 255;
         }
 
         const int fx = clampi(new_x, -32768, 32767);

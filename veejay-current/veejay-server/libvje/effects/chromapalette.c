@@ -178,6 +178,7 @@ void chromapalette_apply(void *ptr, VJFrame *frame, int *args)
     int target_v = 128;
 
     _rgb2yuv(r, g, b, target_y, target_u, target_v);
+    (void)target_y;
 
     target_u = clampi(target_u, 0, 255);
     target_v = clampi(target_v, 0, 255);

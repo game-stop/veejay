@@ -358,8 +358,8 @@ void photoplay_apply(void *ptr, VJFrame *frame, int *args)
         put_photo(p, dstY, p->photo_list[photo_index]->data[0], width, height, photo_index, m);
         put_photo(p, dstU, p->photo_list[photo_index]->data[1], width, height, photo_index, m);
         put_photo(p, dstV, p->photo_list[photo_index]->data[2], width, height, photo_index, m);
-    done:
-        ;
-        }
+    }
+done:
+    ;
     }
 }

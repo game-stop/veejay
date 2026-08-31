@@ -22,7 +22,7 @@
 #include <libswscale/swscale.h>
 #include "gaussblur.h"
 
-extern int yuv_sws_get_cpu_flags();
+extern int yuv_sws_get_cpu_flags(void);
 
 typedef struct {
     float radius;

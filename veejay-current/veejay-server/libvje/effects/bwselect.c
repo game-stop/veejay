@@ -115,8 +115,6 @@ void bwselect_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     uint8_t *restrict Y = frame->data[0];
-    uint8_t *restrict Cb = frame->data[1];
-    uint8_t *restrict Cr = frame->data[2];
     uint8_t *restrict A = frame->data[3];
     uint8_t *restrict table = b->table;
 

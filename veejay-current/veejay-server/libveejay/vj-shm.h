@@ -47,8 +47,8 @@ void	vj_shm_free(void *vv);
 int		vj_shm_get_status( void *vv );
 void	vj_shm_set_status( void *vv, int status );
 int		vj_shm_get_shm_id( void *vv );
-int		vj_shm_get_id();
-int		vj_shm_get_my_shmid();
+int		vj_shm_get_id(void);
+int		vj_shm_get_my_shmid(void);
 void	vj_shm_set_id(int v);
-int		vj_shm_get_my_id();
+int		vj_shm_get_my_id(void);
 #endif

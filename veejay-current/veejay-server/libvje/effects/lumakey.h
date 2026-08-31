@@ -22,4 +22,6 @@
 #define LUMAKEY_H
 vj_effect *lumakey_init(int w, int h);
 void lumakey_apply( void *ptr, VJFrame *frame, VJFrame *frame2, int *args);
+void *lumakey_malloc(int w, int h);
+void lumakey_free(void *ptr);
 #endif

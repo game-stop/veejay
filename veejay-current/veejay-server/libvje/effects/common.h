@@ -91,7 +91,7 @@ extern void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, const int val, c
 extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
 extern void veejay_msg(int type, const char format[], ...);
-extern int vje_get_rgb_parameter_conversion_type();
+extern int vje_get_rgb_parameter_conversion_type(void);
 
 
 #define ALPHA_BLEND( a0, p0, p1 ) ( ((0xff - a0) * p0 + (a0 * p1) ) >> 8 )
@@ -335,7 +335,7 @@ matrix_t matrix_placementG(int photoindex, int size, int w , int h);
 matrix_t matrix_placementH(int photoindex, int size, int w , int h);
 
 matrix_f get_matrix_func(int type);
-int get_matrix_func_n();
+int get_matrix_func_n(void);
 void fx_shuffle_int_array( int *A, unsigned int n );
 
 int power_of(int size);
@@ -423,7 +423,7 @@ void veejay_blur(uint8_t *dst,const uint8_t *src,int w,int qradius,int dstStep, 
 void veejay_blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
 extern void viewport_destroy(void *v);
 extern void vj_get_yuvgrey_template(VJFrame *src, int w, int h);
-extern int    yuv_use_auto_ccir_jpeg();
+extern int    yuv_use_auto_ccir_jpeg(void);
 
 void veejay_get_balloon_bbox(int cx, int cy, int bw, int bh, const int w, const int h, int radius, int *bbox);
 void veejay_draw_balloonUV( uint8_t *data, int cx, int cy, const int bw, const int bh, const int w, const int h, int radius, uint8_t value );
@@ -440,9 +440,9 @@ void vj_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, int threshold, int len )
 void binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, int w, int h );
 void binarify( uint8_t *bm, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len);
 
-void init_sqrt_map_pixel_values();
+void init_sqrt_map_pixel_values(void);
 float sqrt_table_get_pixel( int x, int h );
-void sqrt_table_pixels_free();
+void sqrt_table_pixels_free(void);
 
 
 typedef enum _vj_effect_orientation{

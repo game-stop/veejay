@@ -40,6 +40,8 @@ int vje_advise_num_threads(const int len)
     static int user_forced = 0;
     static int logged = 0;
 
+	(void) len;
+
     if(ncores == -1) {
         long online = sysconf(_SC_NPROCESSORS_ONLN);
         ncores = online > 0 ? (int) online : 1;
@@ -69,13 +71,7 @@ int vje_advise_num_threads(const int len)
     if(user_forced) {
         nthreads = user_threads;
     } else {
-        nthreads = ncores;
-
-        if(len < (1920 * 1080))
-            nthreads /= 2;
-
-        if(nthreads > 6)
-            nthreads = 6;
+		nthreads = ncores - 1;
     }
 
     if(nthreads < 1)
@@ -88,7 +84,7 @@ int vje_advise_num_threads(const int len)
         const char *env = getenv("VEEJAY_MULTITHREAD_TASKS");
 
 		veejay_msg(VEEJAY_MSG_INFO,
-               "OpenMP worker policy: cpu=%d, mode=%s, requested=%s, auto-cap=6, selected=%d",
+			   "OpenMP worker policy: cpu=%d, mode=%s, requested=%s, selected=%d",
                ncores,
                user_forced ? "manual" : "auto",
                (env && *env) ? env : "auto",
@@ -1390,7 +1386,7 @@ void	binarify_1src( uint8_t *dst, uint8_t *src, uint8_t threshold,int reverse, i
 
 void vje_diff_plane( uint8_t *A, uint8_t *B, uint8_t *O, const int threshold, const int len )
 {	
-	unsigned int i;
+	int i;
 	for( i = 0; i < len; i ++ ) {
 	    if( abs( A[i] - B[i] ) < threshold )
 			O[i] = 0;
@@ -1682,7 +1678,8 @@ void veejay_distance_transform8(uint8_t *plane, int w, int h, uint32_t *output)
 uint32_t 	veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M)
 {
 	uint32_t label = 0;
-	uint32_t x,y,i;
+	int x,y;
+	uint32_t i;
 	uint32_t p1,p2;
 	uint32_t Mi=0,Ma=0;
 	uint32_t Eq[5000];
@@ -1703,7 +1700,7 @@ uint32_t 	veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M)
 				if( p1 == 0 && p2 == 0 )
 				{
 					label++;
-					if( label > 5000 )
+					if( label >= 5000 )
 						return 0;
 
 					I[ y * w + x ] = Eq[ label ] = label;
@@ -1775,7 +1772,7 @@ static inline int	center_of_blob(
 	uint8_t label,
 	uint32_t *dx, uint32_t *dy, uint32_t *xsize, uint32_t *ysize)
 {
-	unsigned int i,j;
+	int i,j;
 	uint32_t product_row = 0;
 	uint32_t pixels_row = 0;
 	uint32_t product_col = 0;
@@ -1829,10 +1826,11 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 			int min_blob_weight)
 {
 	uint8_t label = 0;
-	uint32_t x,y,i;
+	int x,y,i;
 	uint8_t p1,p2;
 	uint32_t Mi=0,Ma=0;
 	uint8_t Eq[256];
+	const uint32_t min_blob_weight_u = (min_blob_weight > 0) ? (uint32_t) min_blob_weight : 0u;
 
 	uint8_t n_labels = 0;
 
@@ -1919,7 +1917,7 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 
 	for( i = 1; i <= n_labels; i ++ )
 	{
-		if( (M[i] * 8) >= min_blob_weight )
+		if( (M[i] * 8u) >= min_blob_weight_u )
 		{
 			if(! center_of_blob( I,w,h, i, &(XX[i]), &(YY[i]), &(xsize[i]), &(ysize[i]) ) )
 			{

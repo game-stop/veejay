@@ -975,6 +975,24 @@ static void vj_yuv422p_to_yuy2_avx2(const uint8_t *src[3],
 }
 #endif
 
+#ifdef HAVE_ASM_AVX2
+static int vj_yuv422p_to_yuy2_use_avx2(void)
+{
+    static int dispatch = 0;
+    int selected = __atomic_load_n(&dispatch, __ATOMIC_ACQUIRE);
+
+    if(selected == 0) {
+        __builtin_cpu_init();
+        int detected = __builtin_cpu_supports("avx2") ? 2 : 1;
+        __atomic_compare_exchange_n(&dispatch, &selected, detected, 0,
+                                    __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
+        selected = __atomic_load_n(&dispatch, __ATOMIC_ACQUIRE);
+    }
+
+    return selected == 2;
+}
+#endif
+
 #ifdef HAVE_ARM
 static void vj_yuv422p_to_yuy2_neon(const uint8_t *src[3],
                                      const int src_stride[3],
@@ -1013,7 +1031,17 @@ int vj_yuv422p_to_yuy2(const uint8_t *src[3], const int src_stride[3],
         return 0;
 
 #ifdef HAVE_ASM_AVX2
-    vj_yuv422p_to_yuy2_avx2(src, src_stride, dst, dst_pitch, width, height);
+    if(vj_yuv422p_to_yuy2_use_avx2()) {
+        vj_yuv422p_to_yuy2_avx2(src, src_stride, dst, dst_pitch, width, height);
+    } else {
+        for(int row = 0; row < height; row++) {
+            const uint8_t *y = src[0] + (size_t)row * (size_t)src_stride[0];
+            const uint8_t *u = src[1] + (size_t)row * (size_t)src_stride[1];
+            const uint8_t *v = src[2] + (size_t)row * (size_t)src_stride[2];
+            uint8_t *out = dst + (size_t)row * (size_t)dst_pitch;
+            vj_yuv422p_to_yuy2_scalar_row(y, u, v, out, 0, width);
+        }
+    }
 #elif defined(HAVE_ARM)
     vj_yuv422p_to_yuy2_neon(src, src_stride, dst, dst_pitch, width, height);
 #else

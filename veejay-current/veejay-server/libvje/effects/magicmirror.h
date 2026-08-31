@@ -24,6 +24,6 @@ vj_effect *magicmirror_init(int w, int h);
 void *magicmirror_malloc(int w, int h);
 void magicmirror_apply(void *ptr, VJFrame *frame, int *args);
 void magicmirror_free(void *ptr);
-int magicmirror_request_fx();
+int magicmirror_request_fx(void);
 void magicmirror_set_motionmap(void *ptr, void *priv);
 #endif

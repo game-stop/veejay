@@ -71,7 +71,7 @@ void average_blend_free(void *ptr)
 
 void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 {
-    avgblend_t *t = (avgblend_t *) ptr;
+    (void) ptr;
 
     const int recursions = args[0] < 1 ? 1 : args[0];
     const int weight = args[1];
@@ -99,9 +99,4 @@ void average_blend_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
             V1[i] = (uint8_t)(v + ((weight * ((int)V2[i] - v)) >> 8));
         }
     }
-}
-
-void average_blend_applyN(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
-{
-    average_blend_apply(ptr, frame, frame2, args);
 }

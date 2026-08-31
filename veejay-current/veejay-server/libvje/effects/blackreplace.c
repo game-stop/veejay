@@ -85,8 +85,6 @@ static inline uint8_t blend_u8(uint8_t a, uint8_t b, int t)
 
 void blackreplace_apply(void *ptr, VJFrame *frame, int *args)
 {
-    blackreplace_t *br = (blackreplace_t*) ptr;
-
     const int threshold = args[0];
     const int softness = args[1];
     const int red = args[2];

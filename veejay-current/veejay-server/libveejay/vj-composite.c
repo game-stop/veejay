@@ -82,8 +82,9 @@ void	composite_set_file_mode(void *data, const char *homedir, int mode, int id)
     (void)mode;
     (void)id;
 	composite_t *c = (composite_t*)data;
-    if(!c || !homedir)
+	if(!c || !homedir) {
         return;
+	}
 	snprintf(c->tmp_path, sizeof(c->tmp_path), "%s/viewport.cfg", homedir);
 	veejay_msg(VEEJAY_MSG_DEBUG, "Viewport configuration file [%s]", c->tmp_path);
 }

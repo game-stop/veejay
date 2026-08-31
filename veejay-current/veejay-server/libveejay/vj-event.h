@@ -32,7 +32,7 @@ void	vj_event_print_range			(	int n1,		int n2);
 int	veejay_finish_action_file(void *ptr, char *filename );
 int	veejay_load_action_file( void *ptr, char *filename );
 void	vj_event_select_macro(				void *ptr, const char format[], va_list ap);
-void    vj_event_stop();
+void    vj_event_stop(void);
 int  	vj_event_parse_msg( void *v, char *msg, int msg_len );
 int     vj_event_parse_and_maybe_requeue_events(void *ptr, char *buf, int len);
 void	vj_event_push_coords(void *ptr);

@@ -487,8 +487,3 @@ void spectralmotion_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp single
     s->timestamp++;
 }
-
-void spectralmotion_apply3(void *ptr, VJFrame *frame, int *args)
-{
-    spectralmotion_apply(ptr, frame, args);
-}

@@ -4723,6 +4723,12 @@ int veejay_free(veejay_t * info)
    	
 	sample_free(info->edit_list);
 
+#ifdef HAVE_FREETYPE
+    vj_font_destroy(info->font);
+    info->font = NULL;
+    vj_font_shutdown();
+#endif
+
 	if( info->plain_editlist )
 		vj_el_free(info->plain_editlist);
 
@@ -14183,6 +14189,7 @@ static void veejay_playback_close(veejay_t *info)
 #endif
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->osd );
+    info->osd = NULL;
 #endif
     vj_perform_free(info);
     vj_ndi_runtime_shutdown();

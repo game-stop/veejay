@@ -782,15 +782,8 @@ void tessaractslide_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     const int slice_width = clampi((int)lrintf(s->slice_width_f), ATS_MIN_SLICE, ATS_MAX_SLICE);
-    const int axis_eff = clampi((int)lrintf(s->axis_angle_f), 0, 360);
-    const int depth_push_eff = clampi((int)lrintf(s->depth_push_f), 0, 280);
-    const int slab_scale_eff = clampi((int)lrintf(s->slab_scale_f), 0, 240);
-    const int slide_speed_base = clampi((int)lrintf(s->slide_speed_f), 0, 220);
     const int edge_flash_eff = clampi((int)lrintf(s->edge_flash_f), 0, 260);
-    const int hat_flicker_eff = clampi((int)lrintf(s->hat_flicker_f), 0, 220);
-    const int hinge_eff = clampi((int)lrintf(s->hinge_fold_f), 0, 240);
 
-    const int impact_i = (int)(s->impact_env * 256.0f);
     const int snare_i = (int)(s->snare_env * 256.0f);
     const int hat_i = (int)(s->hat_env * 256.0f);
 

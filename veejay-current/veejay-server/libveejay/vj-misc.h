@@ -49,7 +49,7 @@ void	vj_get_yuvgrey_template(VJFrame *src, int w, int h);
 
 void	vj_get_yuv444_template(VJFrame *src, int w, int h);
 
-int	verify_working_dir();
+int	verify_working_dir(void);
 
 void	free_media_files( veejay_t *info, filelist_t *fl );
 

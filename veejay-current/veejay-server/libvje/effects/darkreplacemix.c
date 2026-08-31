@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "darkreplacemix.h"
 #include "opacity.h"
 
 typedef struct {

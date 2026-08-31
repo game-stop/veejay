@@ -25,7 +25,7 @@ void chameleonblend_apply( void *ptr, VJFrame *frame, VJFrame *source, int *args
 void *chameleonblend_malloc(int w, int h );
 void chameleonblend_free(void *ptr);
 int chameleonblend_prepare(void *ptr, VJFrame *frame);
-int chameleonblend_request_fx();
+int chameleonblend_request_fx(void);
 void chameleonblend_set_motionmap(void *ptr, void *priv);
 
 #endif

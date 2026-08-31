@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "keyselect.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
 
@@ -245,6 +246,7 @@ static void keyselect_update_cache(keyselect_t *s, const int *args)
     int iv = 128;
 
     _rgb2yuv(red, green, blue, iy, iu, iv);
+    (void)iy;
 
     const float ut_f = (float)iu - 128.0f;
     const float vt_f = (float)iv - 128.0f;

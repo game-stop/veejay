@@ -24,6 +24,6 @@ vj_effect *sinoids_init(int w, int h);
 void sinoids_free(void *ptr);
 void *sinoids_malloc(int w, int h);
 void sinoids_apply(void *ptr, VJFrame *frame, int *args);
-int sinoids_request_fx();
+int sinoids_request_fx(void);
 void sinoids_set_motionmap(void *ptr, void *priv );
 #endif

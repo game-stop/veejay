@@ -33,7 +33,7 @@ const char *yuv_get_pixfmt_description(int fmt);
 int yuv_to_alpha_fmt(int fmt);
 int alpha_fmt_to_yuv(int fmt);
 void  yuv_set_pixel_range(int full_range);
-int yuv_get_pixel_range();
+int yuv_get_pixel_range(void);
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
 // yuv 4:2:2 packet to yuv 4:2:2 planar
@@ -101,7 +101,7 @@ void	yuv_deinterlace(
 		int shift,
 		uint8_t *Y,uint8_t *U, uint8_t *V );
 
-void	yuv_free_lib();
+void	yuv_free_lib(void);
 
 void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
 
@@ -134,7 +134,7 @@ void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len, int u
 void	yuv_scale_pixels_from_y( uint8_t *plane, int len );
 void	yuv_scale_pixels_from_uv( uint8_t *plane, int len );
 void	yuv_scale_pixels_from_ycbcr( uint8_t *plane, float min, float max, int len );
-int 	yuv_use_auto_ccir_jpeg();
+int 	yuv_use_auto_ccir_jpeg(void);
 
 void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len );
 void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len );
@@ -146,7 +146,7 @@ void yuv444_yvu444_1plane(
 		uint8_t *dst_buffer);
 
 void	verify_CCIR_auto(int a, int b, VJFrame *dst );
-int	yuv_which_scaler();
+int	yuv_which_scaler(void);
 void yuv_interpolate_frames( uint8_t *dst, const uint8_t *a, const uint8_t *b, const int len, const float frac );
 void yuv_interpolate_frames_uv( uint8_t *dst, const uint8_t *a, const uint8_t *b, const int len, const float frac );
 #endif

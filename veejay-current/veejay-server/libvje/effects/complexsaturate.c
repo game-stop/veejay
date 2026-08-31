@@ -115,6 +115,7 @@ void complexsaturation_apply(void *ptr, VJFrame *frame, int *args)
     int iv = 128;
 
     _rgb2yuv(r, g, b, iy, iu, iv);
+    (void)iy;
 
     const int scale = 4096;
     const float ut_f = (float)(iu - 128);

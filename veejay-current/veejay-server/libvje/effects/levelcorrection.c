@@ -114,8 +114,6 @@ void levelcorrection_free(void *ptr)
 
 void levelcorrection_apply(void *ptr, VJFrame *frame, int *args)
 {
-    level_t *t = (level_t*) ptr;
-
     const int min = args[P_LEVEL_MIN];
     const int max = args[P_LEVEL_MAX];
     const int bmin = args[P_SHRINK_MIN];

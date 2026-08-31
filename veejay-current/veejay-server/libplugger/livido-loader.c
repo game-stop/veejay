@@ -56,8 +56,12 @@
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
 
-static void    livido_dummy_function(void)
-{	
+static int livido_dummy_keyframe(livido_port_t *port, long pos, int dir)
+{
+	(void)port;
+	(void)pos;
+	(void)dir;
+	return LIVIDO_ERROR_NOSUCH_PROPERTY;
 }
    
 static	char	make_valid_char_( const char c )
@@ -2709,20 +2713,20 @@ void*	deal_with_livido( void *handle, const char *name, int w, int h )
 	livido_setup_f livido_setup = dlsym( handle, "livido_setup" );
 
 	livido_setup_t setup[] = {
-		{	(void(*)())vj_malloc_					},	
-		{	(void(*)())free							},
-		{	(void(*)())veejay_memset				},
-	    {	(void(*)())veejay_memcpy				},
-	    {	(void(*)())vevo_port_new				},
-		{	(void(*)())vevo_port_free				},
-     	{	(void(*)())vevo_property_set			},
-		{	(void(*)())vevo_property_get			},
- 		{	(void(*)())vevo_property_num_elements	},
-       	{	(void(*)())vevo_property_atom_type		},
-       	{	(void(*)())vevo_property_element_size	},
-        {	(void(*)())vevo_list_properties			},
-		{	(void(*)())livido_dummy_function		},
-		{ 	(void(*)())livido_dummy_function		},
+		{ .f.malloc = vj_malloc_ },
+		{ .f.free = free },
+		{ .f.memset = veejay_memset },
+		{ .f.memcpy = veejay_memcpy },
+		{ .f.port_new = vevo_port_new },
+		{ .f.port_free = vevo_port_free },
+		{ .f.property_set = vevo_property_set },
+		{ .f.property_get = vevo_property_get },
+		{ .f.property_num_elements = vevo_property_num_elements },
+		{ .f.property_atom_type = vevo_property_atom_type },
+		{ .f.property_element_size = vevo_property_element_size },
+		{ .f.list_properties = vevo_list_properties },
+		{ .f.keyframe_get = livido_dummy_keyframe },
+		{ .f.keyframe_put = livido_dummy_keyframe },
 	};
 
 	void *livido_plugin = livido_setup( setup, LIVIDO_API_VERSION );

@@ -325,16 +325,3 @@ void bathroom_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp single
     bathroom_apply_serial(ptr, frame, args);
 }
-
-int bathroom_request_fx(void)
-{
-    return VJ_IMAGE_EFFECT_MOTIONMAP_ID;
-}
-
-void bathroom_set_motionmap(void *ptr, void *priv)
-{
-    bathroom_t *b = (bathroom_t*) ptr;
-
-    if(b)
-        b->motionmap = priv;
-}

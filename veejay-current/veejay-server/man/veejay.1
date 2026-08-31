@@ -1185,7 +1185,7 @@ Set the number of avcodec/FFmpeg/MJPEG decode threads to spawn.
 .TP
 .B VEEJAY_MULTITHREAD_TASKS
 Set the number of parallel pixel-processing tasks. By default, veejay uses the
-available CPU cores when multi-threaded processing is enabled.
+number of online CPU cores minus one, with a minimum of one task.
 
 .TP
 .B VEEJAY_AV_LOG

@@ -239,7 +239,7 @@ typedef struct {
 typedef int (*is_transition_ready_func)(void *ptr,int width, int height);
 
 typedef struct vj_effect_t {
-	char *description;			
+    const char *description;
 	int num_params;			
 	char **param_description;
 	vj_value_hint_t **hints;

@@ -221,13 +221,6 @@ static void overlaymagic1_apply_n(VJFrame *frame, VJFrame *frame2, int mode)
         Y[i] = mtracer_overlay_pixel(mode, Y[i], Y2[i]);
 }
 
-void overlaymagic1_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int n)
-{
-    (void)ptr;
-
-    overlaymagic1_apply_n(frame, frame2, n);
-}
-
 vj_effect *mtracer_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

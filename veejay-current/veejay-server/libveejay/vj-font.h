@@ -27,6 +27,7 @@ void	*vj_font_init(int s_w, int s_h, float fps, int osd);
 int	vj_font_srt_sequence_exists( void *font, int id );
 void vj_font_render(void *ctx, void *_picture, long nframe);
 void	vj_font_destroy(void *ctx);
+void    vj_font_shutdown(void);
 int	vj_font_load_srt( void *font, const char *filename );
 int	vj_font_save_srt( void *font , const char *filename );
 char	*vj_font_get_sequence( void *font, int seq );

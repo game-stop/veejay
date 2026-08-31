@@ -1120,9 +1120,6 @@ static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *
 void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
-
-    const int w = frame->width;
-    const int h = frame->height;
     const int len = frame->len;
 
 

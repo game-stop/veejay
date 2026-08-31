@@ -25,7 +25,7 @@
 int vj_osc_setup_addr_space(void *o);
 int vj_osc_get_packet(void *o);
 void vj_osc_free(void *o);
-void vj_osc_dump();
+void vj_osc_dump(void);
 void* vj_osc_allocate(int port_id);
  
 #endif

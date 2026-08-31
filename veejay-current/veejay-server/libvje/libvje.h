@@ -30,11 +30,11 @@ vj_beat_param_hint_t *vje_build_beat_hint_list(int num_params, ...);
 vj_beat_param_hint_t *vje_build_beat_hint_list_v2(int num_params, const vj_beat_param_hint_t *hints);
 
 // set/get pixel value ranges
-unsigned int get_pixel_range_min_UV(); 
-unsigned int get_pixel_range_min_Y(); 
+unsigned int get_pixel_range_min_UV(void);
+unsigned int get_pixel_range_min_Y(void);
 void vje_set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 void vje_set_rgb_parameter_conversion_type(int full_range);
-int vje_get_rgb_parameter_conversion_type();
+int vje_get_rgb_parameter_conversion_type(void);
 void vje_set_bg(VJFrame *bg);
 
 // init all FX descriptors
@@ -52,9 +52,9 @@ int vje_fx_is_transition_ready( int fx_id, void *ptr, int w, int h );
 uint8_t *vje_fx_get_bg( int fx_id, void *ptr, unsigned int plane);
 
 // informative
-int vje_get_last_id();
-int vje_max_effects();
-int vje_max_space();
+int vje_get_last_id(void);
+int vje_max_effects(void);
+int vje_max_space(void);
 int vje_get_info(int fx_id, int *is_mixer, int *n_params, int *rgba_only);
 int vje_is_plugin( int fx_id ); 
 int vje_get_num_params( int fx );
@@ -79,10 +79,11 @@ int vje_get_summary(int fx_id, char *dst, size_t max_len);
 void vje_set_quality(int quality);
 int vje_get_quality(void);
 
-void vje_dump();
+void vje_dump(void);
 int vje_benchmark_threads(int width, int height);
 
 // processing
+void vje_fx_apply_collective(int fx_id, void *ptr, VJFrame *A, VJFrame *B, int *args);
 void vjert_apply( void *entry, VJFrame **frames, int chain_id, int chain_position, int *args ); //FIXME
 void vjert_frame_begin(void);
 void vjert_frame_end(void);

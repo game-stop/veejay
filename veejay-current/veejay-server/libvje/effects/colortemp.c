@@ -870,6 +870,7 @@ void colortemp_apply(void *ptr, VJFrame *frame, int *args)
     int iu = 128;
     int iv = 128;
     _rgb2yuv(blackbody_t[temperature].r, blackbody_t[temperature].g, blackbody_t[temperature].b, iy, iu, iv);
+    (void)iy;
 
     iu -= 128;
     iv -= 128;

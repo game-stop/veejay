@@ -28,7 +28,7 @@
 
 void	veejay_set_instance( veejay_t *info );
 
-veejay_t *veejay_malloc();
+veejay_t *veejay_malloc(void);
 
 void veejay_change_playback_mode(veejay_t *info, int pm, int sample);
 void veejay_change_playback_mode_transition(veejay_t *info, int pm, int sample);
@@ -87,7 +87,7 @@ int veejay_increase_frame(veejay_t * info, long numframes);
 
 void	veejay_composite_transform_points( veejay_t *info, void *coords, int points, int blob_id, int cx, int cy,int w, int h, int num_objects,uint8_t *plane );
 
-void	veejay_composite_dummy(  );
+void	veejay_composite_dummy(void);
 
 int	veejay_composite_active( veejay_t *info );
 

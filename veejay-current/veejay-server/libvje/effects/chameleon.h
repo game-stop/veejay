@@ -25,7 +25,7 @@ void chameleon_apply( void *ptr, VJFrame *frame, int *args);
 void *chameleon_malloc(int w, int h );
 void chameleon_free(void *ptr);
 int chameleon_prepare(void *ptr, VJFrame *frame);
-int chameleon_request_fx();
+int chameleon_request_fx(void);
 void chameleon_set_motionmap(void *ptr, void *priv);
 
 #endif

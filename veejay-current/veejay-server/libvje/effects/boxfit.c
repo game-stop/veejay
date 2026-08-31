@@ -131,7 +131,6 @@ void boxfit_apply(void *ptr, VJFrame *frame, int *args)
 
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
 
     int min_s = boxfit_clampi(args[0], 2, boxfit_maxi(2, width / 8));
     int max_s = boxfit_clampi(args[1], 4, boxfit_maxi(4, width / 4));

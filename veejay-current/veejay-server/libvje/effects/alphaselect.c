@@ -83,6 +83,7 @@ void alphaselect_apply(void *ptr, VJFrame *frame, int *args)
 
     int iy = 0, iu = 128, iv = 128;
     _rgb2yuv(r, g, b, iy, iu, iv);
+    (void)iy;
 
     const int SCALE = 4096;
 

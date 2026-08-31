@@ -339,8 +339,9 @@ int sample_stop_encoder(int s1) {
    sample_info *si = sample_get(s1);
    if(!si) return 0;
 
-    if(!si->encoder_active && !si->encoder && !si->encoder_file)
+	if(!si->encoder_active && !si->encoder && !si->encoder_file) {
         return 0;
+	}
 
 	if( si->encoder) {
 		vj_avcodec_stop( si->encoder, si->encoder_format );

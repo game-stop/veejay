@@ -24,6 +24,6 @@ vj_effect *timedistort_init(int w, int h);
 void timedistort_apply( void *ptr, VJFrame *frame, int *args);
 void *timedistort_malloc(int w, int h);
 void timedistort_free(void *ptr);
-int timedistort_request_fx();
+int timedistort_request_fx(void);
 void timedistort_set_motionmap(void *ptr, void *priv);
 #endif

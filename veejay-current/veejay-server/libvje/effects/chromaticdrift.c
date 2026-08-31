@@ -18,6 +18,7 @@
  */
 
 #include "common.h"
+#include "chromaticdrift.h"
 #include "chromadrift.h"
 
 #include <math.h>

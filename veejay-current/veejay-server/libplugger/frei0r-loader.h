@@ -3,7 +3,7 @@
 
 void* 	deal_with_fr( void *handle, char *name, int read_plug_cfg );
  
-void frei0r_destroy();
+void frei0r_destroy(void);
 
 void*	frei0r_plug_init( void *plugin , int w, int h,int pf, int read_plug_cfg );
 

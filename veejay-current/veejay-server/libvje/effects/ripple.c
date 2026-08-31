@@ -427,22 +427,23 @@ void ripple_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict srcCb = r->ripple_data[1];
     uint8_t *restrict srcCr = r->ripple_data[2];
 
-    if(rebuild)
+    if(rebuild) {
         ripple_build_table(r, width, height, effective_waves, effective_ampli, effective_attn, effective_phase);
+    }
 
-        if(mix_q8 >= 256 && chroma_q8 >= 256) {
+    if(mix_q8 >= 256 && chroma_q8 >= 256) {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
-                const int src = table[i];
+        for(int i = 0; i < len; i++) {
+            const int src = table[i];
 
-                Y[i] = srcY[src];
-                Cb[i] = srcCb[src];
-                Cr[i] = srcCr[src];
-            }
+            Y[i] = srcY[src];
+            Cb[i] = srcCb[src];
+            Cr[i] = srcCr[src];
         }
-        else {
+    }
+    else {
 #pragma omp for schedule(static)
-            for(int i = 0; i < len; i++) {
+        for(int i = 0; i < len; i++) {
                 const int src = table[i];
 
                 Y[i] = ripple_mix_u8(srcY[i], srcY[src], mix_q8);

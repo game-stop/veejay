@@ -24,20 +24,6 @@ typedef struct
 	int n_threads;
 } hold_buffer_t;
 
-static inline int __advise_num_threads(const int len) {
-	static int ncores = -1;
-    if (ncores == -1) {
-        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
-    }
-    int nthreads = ncores;
-
-    if (len < (1920*1080)) nthreads = ncores / 2;
-    if (nthreads < 1) nthreads = 1;
-    if (nthreads > 6) nthreads = 6; // avoid too much overhead
-
-    return nthreads;
-}
-
 int	init_instance( livido_port_t *my_instance )
 {
 	int w = 0, h = 0;
@@ -58,7 +44,7 @@ int	init_instance( livido_port_t *my_instance )
 	hb->planes[2] = hb->planes[1] + (w*h);
 	hb->current   = 0;
 	
-	hb->n_threads = __advise_num_threads(w*h);
+	hb->n_threads = livido_default_num_threads();
 
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &hb);
 

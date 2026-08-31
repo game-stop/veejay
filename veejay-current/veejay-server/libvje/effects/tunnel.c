@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "tunnel.h"
 #include <veejaycore/vjmem.h>
 #include <math.h>
 #include <stdint.h>

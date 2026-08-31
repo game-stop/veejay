@@ -2085,19 +2085,31 @@ int         del_keyboard_event(int id )
     hnode_t *node;
     vj_keyboard_event *ev = get_keyboard_event( id );
 
-    keyboard_event_map_[ id ] = NULL;
-    uintptr_t tid = (uintptr_t) id;
-
     if(ev == NULL)
         return 0;
+
+    keyboard_event_map_[ id ] = NULL;
+    uintptr_t tid = (uintptr_t) id;
+    uintptr_t eid = (uintptr_t) ev->event_id;
+
     node = hash_lookup( keyboard_events, (void*) tid );
     if(!node)
         return 0;
+
+    hnode_t *event_node = hash_lookup(keyboard_eventid_map, (void*) eid);
+    if(event_node && hnode_get(event_node) == ev) {
+        hash_delete(keyboard_eventid_map, event_node);
+        hnode_destroy(event_node);
+    }
+
+    hash_delete( keyboard_events, node );
+    hnode_destroy(node);
+
     if(ev->arguments)
         free(ev->arguments);
     if(ev->vims )
         free(ev->vims );
-    hash_delete( keyboard_events, node );
+    free(ev);
 
     return 1;  
 }
@@ -3680,13 +3692,6 @@ void    vj_event_unregister_keyb_event( int sdl_key, int modifier )
         }
 
         veejay_msg(VEEJAY_MSG_DEBUG, "Dropped key binding for VIMS Bundle %d", ev->event_id);
-        
-        if( ev->vims )
-            free(ev->vims);
-        if( ev->arguments)
-            free(ev->arguments );
-
-        veejay_memset(ev, 0, sizeof( vj_keyboard_event ));
 
         del_keyboard_event( index );
     }
@@ -3698,6 +3703,10 @@ static int vj_event_update_key_collection(vj_keyboard_event *ev, int index)
     hnode_t *node2 = hnode_create( ev );
     if(!node || !node2)
     {
+        if(node)
+            hnode_destroy(node);
+        if(node2)
+            hnode_destroy(node2);
         veejay_msg(0,"Unable to create a new node");
         return 0;
     }
@@ -3708,11 +3717,13 @@ static int vj_event_update_key_collection(vj_keyboard_event *ev, int index)
     hnode_t *old = hash_lookup( keyboard_events, (void*) tid );
     if(old) {
         hash_delete( keyboard_events, old );
+        hnode_destroy(old);
     }
 
     old = hash_lookup( keyboard_eventid_map, (void*) eid );
     if(old) {
         hash_delete( keyboard_eventid_map, old );
+        hnode_destroy(old);
     }
 
     //register keybinding by index (SDLK key mne)
@@ -3926,10 +3937,43 @@ static void vj_event_destroy_bundles( hash_t *h )
     hash_destroy( h );
 }
 
+#ifdef HAVE_SDL
+static void vj_event_destroy_keyboard_events(void)
+{
+    if(keyboard_events) {
+        hscan_t scan = (hscan_t) {0};
+        hnode_t *node;
+
+        hash_scan_begin(&scan, keyboard_events);
+        while((node = hash_scan_next(&scan)) != NULL) {
+            vj_keyboard_event *ev = hnode_get(node);
+
+            if(ev) {
+                free(ev->arguments);
+                free(ev->vims);
+                free(ev);
+            }
+        }
+
+        hash_free_nodes(keyboard_events);
+        hash_destroy(keyboard_events);
+        keyboard_events = NULL;
+    }
+
+    if(keyboard_eventid_map) {
+        hash_free_nodes(keyboard_eventid_map);
+        hash_destroy(keyboard_eventid_map);
+        keyboard_eventid_map = NULL;
+    }
+
+    veejay_memset(keyboard_event_map_, 0, sizeof(keyboard_event_map_));
+}
+#endif
+
 void    vj_event_destroy(void *ptr)
 {
 #ifdef HAVE_SDL
-    //let's not destroy keyboard mappings, we are shutting down anyway so why bother
+    vj_event_destroy_keyboard_events();
 #endif
     if(BundleHash) {
         vj_event_destroy_bundles(BundleHash);
@@ -14818,7 +14862,7 @@ void vj_event_send_shm_info(void *ptr, const char format[], va_list ap)
                      v->video_output_width,
                      v->video_output_height,
                      v->pixel_format,
-                     vj_shm_get_my_id(v->shm));
+                     vj_shm_get_my_id());
 
     if (n <= 0)
     {
@@ -15977,7 +16021,7 @@ void    vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
     } else {
         vj_shm_set_status(v->shm, 1);
         veejay_msg(VEEJAY_MSG_INFO, "SHM video output enabled on key %d",
-                   vj_shm_get_my_id(v->shm));
+                   vj_shm_get_my_id());
     }
 }
 
@@ -15991,7 +16035,7 @@ void    vj_event_get_shm( void *ptr, const char format[], va_list ap )
         return;
     }
 
-    snprintf(tmp, sizeof(tmp)-1, "%016d", vj_shm_get_my_id( v->shm ) );
+    snprintf(tmp, sizeof(tmp)-1, "%016d", vj_shm_get_my_id() );
 
     SEND_MSG(v, tmp );
 }
@@ -16130,7 +16174,7 @@ void vj_event_routing_status(void *ptr, const char format[], va_list ap)
 
     ROUTE_APPEND("count=%d\n", count);
     ROUTE_APPEND("out.shm.enabled=%d\n", v->shm && vj_shm_get_status(v->shm) ? 1 : 0);
-    ROUTE_APPEND("out.shm.key=%d\n", v->shm ? vj_shm_get_my_id(v->shm) : 0);
+    ROUTE_APPEND("out.shm.key=%d\n", v->shm ? vj_shm_get_my_id() : 0);
     ROUTE_APPEND("out.tcp.enabled=1\n");
     ROUTE_APPEND("out.tcp.port=%d\n", v->uc ? v->uc->port : 0);
     ROUTE_APPEND("out.ndi.enabled=%d\n", v->ndi_send_enabled ? 1 : 0);

@@ -1344,7 +1344,7 @@ int main(int argc, char **argv)
             "  [ System & Streaming ]\n"
             "\tVEEJAY_MAX_FILESIZE\t\tMaximum allowed file size for processing\n"
             "\tVEEJAY_NUM_DECODE_THREADS\tNumber of threads for avcodec decoding\n"
-            "\tVEEJAY_MULTITHREAD_TASKS\tOpenMP threads (default=resolution-aware, max 6)\n"
+            "\tVEEJAY_MULTITHREAD_TASKS\tOpenMP threads (default=online CPU cores minus one)\n"
             "\tVEEJAY_AV_LOG\t\t\tSet libavcodec logging level\n"
             "\tVEEJAY_LOG_NET_IO\t\tIf set, enable network I/O logging\n"
             "\tVEEJAY_MMAP_PER_FILE\t\tEnable mmap allocation per file (in Kb)\n"

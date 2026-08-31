@@ -24,6 +24,6 @@ vj_effect *slice_init(int width, int height);
 void *slice_malloc(int width, int height);
 void slice_free(void *ptr);
 void slice_apply(void *ptr, VJFrame *frame, int *args);
-int slice_request_fx();
+int slice_request_fx(void);
 void slice_set_motionmap(void *ptr, void *priv);
 #endif

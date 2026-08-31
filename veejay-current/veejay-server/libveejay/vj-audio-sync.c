@@ -1756,7 +1756,7 @@ int vj_audio_sync_track_align_probe_target_audio(vj_audio_sync_shared_t *s,
                                                  int sample_rate,
                                                  int *confidence_pct)
 {
-    float tgt[VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES];
+    float tgt[VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES] = { 0.0f };
     float master[VJ_AUDIO_SYNC_ALIGN_PROBE_MAX_FEATURES];
     int tgt_count;
     int n;

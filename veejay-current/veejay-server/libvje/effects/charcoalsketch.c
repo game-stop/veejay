@@ -112,7 +112,6 @@ void charcoalsketch_apply(void *ptr, VJFrame *frame, int *args)
     const int grain = args[2];
     const int width = frame->width;
     const int height = frame->height;
-    const int len = frame->len;
 
     uint8_t *restrict Y = frame->data[0];
     uint8_t *restrict temp_Y = c->temp_Y;

@@ -308,10 +308,10 @@ static inline void softblur_plane(uint8_t *restrict src,
     softblur_blend_plane(src, plane, len, mix_q8);
 }
 
-static void softblur_plane_serial(const uint8_t *restrict input,
+static void softblur_plane_serial(const uint8_t *input,
                                   uint8_t *restrict src,
                                   uint8_t *restrict tmp,
-                                  uint8_t *restrict plane,
+                                  uint8_t *plane,
                                   int w,
                                   int h,
                                   int type,

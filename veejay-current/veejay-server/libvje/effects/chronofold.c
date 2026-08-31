@@ -19,6 +19,7 @@
  */
 
 #include "common.h"
+#include "chronofold.h"
 #include "chronocortex.h"
 
 #define CHRONOFOLD_PARAMS 10

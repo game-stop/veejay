@@ -313,7 +313,7 @@ void motionmap_scale_to(void *ptr,
     *pos = n;
 }
 
-void motionmap_lerp_frame(void *ptr, VJFrame *cur, VJFrame *prev, int N, int n)
+static void motionmap_lerp_frame(void *ptr, VJFrame *cur, VJFrame *prev, int N, int n)
 {
     motionmap_t *mm = (motionmap_t*) ptr;
 

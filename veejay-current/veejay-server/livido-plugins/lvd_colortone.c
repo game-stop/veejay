@@ -64,6 +64,7 @@ int	process_instance( livido_port_t *my_instance, double timecode )
 	
 	int		y,u,v;
 	GIMP_rgb2yuv( red, green, blue, y, u, v );
+	(void) y;
 
 	if( black_incl ) {
 		livido_memset( O[1], u, uv_len );

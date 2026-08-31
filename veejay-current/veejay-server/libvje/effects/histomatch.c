@@ -206,20 +206,6 @@ void histomatch_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
     uint32_t *restrict cdf = s->cdf;
     uint8_t *restrict lut = s->lut;
 
-    int *restrict hist_y1 = hist + H_Y1 * HIST_SIZE;
-    int *restrict hist_y2 = hist + H_Y2 * HIST_SIZE;
-    int *restrict hist_u1 = hist + H_U1 * HIST_SIZE;
-    int *restrict hist_u2 = hist + H_U2 * HIST_SIZE;
-    int *restrict hist_v1 = hist + H_V1 * HIST_SIZE;
-    int *restrict hist_v2 = hist + H_V2 * HIST_SIZE;
-
-    uint32_t *restrict cdf_y1 = cdf + H_Y1 * HIST_SIZE;
-    uint32_t *restrict cdf_y2 = cdf + H_Y2 * HIST_SIZE;
-    uint32_t *restrict cdf_u1 = cdf + H_U1 * HIST_SIZE;
-    uint32_t *restrict cdf_u2 = cdf + H_U2 * HIST_SIZE;
-    uint32_t *restrict cdf_v1 = cdf + H_V1 * HIST_SIZE;
-    uint32_t *restrict cdf_v2 = cdf + H_V2 * HIST_SIZE;
-
     uint8_t *restrict lut_y = lut;
     uint8_t *restrict lut_u = lut_y + HIST_SIZE;
     uint8_t *restrict lut_v = lut_u + HIST_SIZE;

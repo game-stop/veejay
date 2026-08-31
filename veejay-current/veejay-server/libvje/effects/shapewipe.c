@@ -111,7 +111,7 @@ static int is_img(const char *file)
     return 0;
 }
 
-static int find_shape_file(char *path, char **shapelist, int *shapeidx, int maxshapes)
+static int find_shape_file(const char *path, char **shapelist, int *shapeidx, int maxshapes)
 {
     if(!path || !shapelist || !shapeidx)
         return 0;
@@ -143,7 +143,7 @@ static int find_shape_file(char *path, char **shapelist, int *shapeidx, int maxs
     return 0;
 }
 
-static int find_shapes(char *path, char **shapelist, int *shapeidx, int maxshapes)
+static int find_shapes(const char *path, char **shapelist, int *shapeidx, int maxshapes)
 {
     if(!path || !shapelist || !shapeidx || *shapeidx >= maxshapes)
         return 0;

@@ -50,19 +50,7 @@ typedef struct
 	int n_threads;
 } particles_t;
 
-static inline int __advise_num_threads(const int len) {
-	static int ncores = -1;
-    if (ncores == -1) {
-        ncores = (int) sysconf(_SC_NPROCESSORS_ONLN);
-    }
-    int nthreads = ncores;
-    if(len < (1920*1080)) nthreads = ncores / 2;
-    if(nthreads < 1) nthreads = 1;
-    if(nthreads > 6) nthreads = 6;
-    return nthreads;
-}
-
-void init_particle(PARTICLE* particle, int w, int h)
+static void init_particle(PARTICLE* particle, int w, int h)
 {
   particle->xpos =  (w >> 1) - 20 + (int)(40.0 * (rand()/(RAND_MAX+1.0)));
   particle->ypos =  (h >> 1) - 20 + (int)(40.0 * (rand()/(RAND_MAX+1.0)));
@@ -113,7 +101,7 @@ int	init_instance( livido_port_t *my_instance )
         init_particle( particles->particles[i], w,h );
 	}
 
-	particles->n_threads = __advise_num_threads(w*h);
+	particles->n_threads = livido_default_num_threads();
 
 	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR,1, &particles);
 
@@ -197,7 +185,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 
 
     const int lim = w * h;
-	uint32_t temp,index,buf;
+	int temp,index,buf;
 	uint8_t *fire = parts->fire;
 	for( i = 0; i < number_of_particles; i ++ ) {
 	
@@ -206,7 +194,7 @@ int		process_instance( livido_port_t *my_instance, double timecode )
 			particles[i]->ypos += particles[i]->ydir;
 
 			/* is particle dead? */
-			if((particles[i]->ypos > (h -3)) || particles[i]->colorindex == 0 ||
+			if(particles[i]->ypos <= 1 || particles[i]->ypos > (h - 3) || particles[i]->colorindex == 0 ||
 				particles[i]->xpos <= 1 || particles[i]->xpos > (w - 3) ) {
 				particles[i]->dead = 1;
 				continue;

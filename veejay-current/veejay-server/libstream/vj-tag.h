@@ -216,7 +216,7 @@ int vj_tag_buffer_set_slow(int t1, int slow);
 int vj_tag_buffer_goto(int t1, int frame);
 int vj_tag_buffer_skip(int t1, int frames);
 int vj_tag_buffer_get_status(int t1, int *enabled, int *capacity, int *filled, int *position, int *speed, int *direction, int *mode, int *state);
-int 	vj_tag_get_last_tag();
+int 	vj_tag_get_last_tag(void);
 void vj_tag_set_last_tag(int id);
 
 void	*vj_tag_get_macro(int t1);
@@ -263,7 +263,7 @@ int     vj_tag_entry_is_rendering(int t1, int position);
 int		vj_tag_get_subrender(int t1, int position, int *do_subrender);
 void	vj_tag_set_subrender(int t1, int status);
 
-unsigned int 	vj_tag_size();
+unsigned int 	vj_tag_size(void);
 
 vj_tag 	*vj_tag_get(int id);
 /* always return effect (-1 = empty) */
@@ -399,7 +399,7 @@ int 	vj_tag_get_selected_entry(int s1);
 
 int 	vj_tag_set_effect_status(int s1, int status);
 int 	vj_tag_set_selected_entry(int s1, int position);
-void 	vj_tag_close_all();
+void 	vj_tag_close_all(void);
 
 int	vj_tag_composite(int t1);
 int	vj_tag_load_composite_config( void *compiz, int t1 );
@@ -421,15 +421,15 @@ void 	vj_tag_record_init(int w, int h);
 void vj_tag_get_method_filename(int t1, char *dst);
 int		vj_tag_get_last_tag(void);
 int		vj_tag_put( vj_tag *tag );
-void 	vj_tag_close_all(); 
+void 	vj_tag_close_all(void);
 int 	vj_tag_continue_record( int t1 );
 int 	vj_tag_set_logical_index(int t1, int stream_nr);
 int	vj_tag_set_description(int t1, char *descr);
 int	vj_tag_get_description(int t1, char *descr);
 void	vj_tag_get_by_type(int id, int type, char *descr );
-int	vj_tag_get_width();
-int	vj_tag_get_height();
-int	vj_tag_get_uvlen();
+int	vj_tag_get_width(void);
+int	vj_tag_get_height(void);
+int	vj_tag_get_uvlen(void);
 void  vj_tag_cali_prepare( int t1 , int pos, int cali_tag);
 void	vj_tag_cali_prepare_now(vj_tag *b);
 int	vj_tag_chain_set_kfs( int s1, int len, unsigned char *data );
@@ -439,14 +439,14 @@ void	vj_tag_set_kf_type(int t1, int entry, int type );
 int	vj_tag_chain_set_kf_status( int s1, int entry, int status );
 int	vj_tag_chain_reset_kf( int s1, int entry );
 int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active, int *method, int *entry, int *alpha );
-int	vj_tag_highest();
-int	vj_tag_highest_valid_id();
+int	vj_tag_highest(void);
+int	vj_tag_highest_valid_id(void);
 void    *vj_tag_get_kf_port( int s1, int entry );
 
 char *vj_tag_scan_devices( void );
 int vj_tag_grab_blackframe(int t1, int duration, int median_radius,int mode );
 int vj_tag_drop_blackframe(int t1);
-int    vj_tag_num_devices();
+int    vj_tag_num_devices(void);
 
 void	vj_tag_reload_config( void *compiz, int t1, int mode );
 

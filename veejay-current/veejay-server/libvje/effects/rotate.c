@@ -269,7 +269,7 @@ void rotate_apply(void *ptr, VJFrame *frame, int *args)
     float spin_drive;
     float wobble_drive;
 
-#pragma omp single
+#pragma omp single copyprivate(duration, rotate_value, spin_drive, wobble_drive)
     {
     if(!r->initialized) {
         r->sm_rotate = (float)rotate_arg;
