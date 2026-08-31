@@ -13,6 +13,8 @@ AM_CFLAGS = $(VEEJAY_CFLAGS) -Wno-unused-parameter
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 
+EXTRA_DIST = *.h ctmf/*.h effects/*.h specs/*.h
+
 libvje_la_SOURCES =	libvje.c vjert.c \
     ctmf/ctmf.c \
     effects/hist.c \

@@ -32,9 +32,6 @@
 #include <libvje/vje.h>
 #include <libvje/libvje.h>
 #include <veejaycore/vjmem.h>
-#ifdef HAVE_ARM
-#include <arm_neon.h>
-#endif
 #ifdef HAVE_ASM_SSE
 #include <emmintrin.h>
 #endif

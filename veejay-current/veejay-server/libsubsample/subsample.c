@@ -32,8 +32,9 @@
 #ifdef HAVE_ASM_SSE2
 #include <emmintrin.h>
 #endif
-#ifdef HAVE_ARM
+#if defined(HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
 #include <arm_neon.h>
+#define HAVE_ARM_SIMD 1
 #endif
 #include <math.h>
 #include <stdlib.h>
@@ -47,8 +48,9 @@
 #include <libvje/vje.h>
 #include <veejaycore/yuvconv.h>
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
 #include <immintrin.h>
+#include <libavutil/cpu.h>
 #endif
 
 #define BLANK_CRB in0[1]
@@ -120,236 +122,23 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 }
 */
 
-#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2)
 static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 {
-  const uint8_t *in0, *in1;
-  uint8_t *out;
-  int x, y = height;
-  in0 = buffer;
-  in1 = buffer + width;
-  out = buffer;
-  for (y = 0; y < height; y += 4) {
-    for (x = 0; x < width; x += 4) {
-     out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
-     out[1] = (in0[2] + 3 * (in0[3] + in1[2]) + (9 * in1[3]) + 8) >> 4;
-     out[2] = (in0[4] + 3 * (in0[5] + in1[4]) + (9 * in1[5]) + 8) >> 4;
-     out[3] = (in0[6] + 3 * (in0[7] + in1[6]) + (9 * in1[7]) + 8) >> 4;
+    if (buffer == NULL || width < 2 || height < 2)
+        return;
 
-      in0 += 8;
-      in1 += 8;
-      out += 4;
-    }
-    for (  ; x < width; x +=2 )
-    {
-    out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
-        in0 += 2;
-        in1 += 2;
-    out++;
-    }
-    in0 += width*2;
-    in1 += width*2;
-  }
-}
-#endif
-#ifdef HAVE_ARM
-void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
-{
-    const uint8_t *in0, *in1;
-    uint8_t *out;
-    int x, y;
+    uint8_t *out = buffer;
+    for (int y = 0; y + 1 < height; y += 2) {
+        const uint8_t *top = buffer + (size_t)y * width;
+        const uint8_t *bottom = top + width;
 
-    const uint8_t is_width_even = (width & 2) == 0;
-
-    in0 = buffer;
-    in1 = buffer + width;
-    out = buffer;
-
-    for (y = 0; y < height; y += 4)
-    {
-        for (x = 0; x < width; x += 4)
-        {
-            uint8x16_t vin0 = vld1q_u8(in0);
-            uint8x16_t vin1 = vld1q_u8(in1);
-
-            uint8x16_t vresult = vrhaddq_u8(vin0, vin1);
-            vst1q_u8(out, vresult);
-
-            in0 += 16;
-            in1 += 16;
-            out += 4;
+        for (int x = 0; x + 1 < width; x += 2) {
+            *out++ = (uint8_t)((top[x] +
+                                3 * (top[x + 1] + bottom[x]) +
+                                9 * bottom[x + 1] + 8) >> 4);
         }
-
-        if (!is_width_even)
-        {
-            uint8x8_t vin0 = vld1_u8(in0);
-            uint8x8_t vin1 = vld1_u8(in1);
-
-            uint8x8_t vresult = vrhadd_u8(vin0, vin1);
-            vst1_u8(out, vresult);
-
-            in0 += 8;
-            in1 += 8;
-            out += 1;
-        }
-
-        in0 += width * 2;
-        in1 += width * 2;
     }
 }
-#endif
-
-#ifdef HAVE_ARM
-void ss_444_to_420jpeg_cp(uint8_t *buffer, uint8_t *dest, int width, int height)
-{
-    const uint8_t *in0, *in1;
-    uint8_t *out;
-    int x, y;
-
-    const uint8_t is_width_even = (width & 2) == 0;
-
-    in0 = buffer;
-    in1 = buffer + width;
-    out = dest;
-
-    for (y = 0; y < height; y += 4)
-    {
-        for (x = 0; x < width; x += 4)
-        {
-            uint8x16_t vin0 = vld1q_u8(in0);
-            uint8x16_t vin1 = vld1q_u8(in1);
-
-            uint8x16_t vresult = vrhaddq_u8(vin0, vin1);
-
-            vst1q_u8(out, vresult);
-
-            in0 += 16;
-            in1 += 16;
-            out += 4;
-        }
-
-        if (!is_width_even)
-        {
-            uint8x8_t vin0 = vld1_u8(in0);
-            uint8x8_t vin1 = vld1_u8(in1);
-
-            uint8x8_t vresult = vrhadd_u8(vin0, vin1);
-
-            vst1_u8(out, vresult);
-
-            in0 += 8;
-            in1 += 8;
-            out += 1;
-        }
-
-        in0 += width * 2;
-        in1 += width * 2;
-    }
-}
-#endif
-#ifdef HAVE_ASM_SSE2
-static void ss_444_to_420jpeg_cp(uint8_t* buffer, uint8_t* dest, int width, int height) {
-    const uint8_t* in0, * in1;
-    uint8_t* out;
-    int x, y = height;
-    in0 = buffer;
-    in1 = buffer + width;
-    out = dest;
-
-    for (y = 0; y < height; y += 4) {
-        for (x = 0; x < width; x += 4) {
-            __m128i vin0 = _mm_unpacklo_epi8(_mm_loadu_si128((__m128i*)in0), _mm_setzero_si128());
-            __m128i vin1 = _mm_unpacklo_epi8(_mm_loadu_si128((__m128i*)in1), _mm_setzero_si128());
-
-            __m128i result0 = _mm_sra_epi16(_mm_adds_epu16(vin0, _mm_slli_epi16(vin1, 1)), _mm_set1_epi16(4));
-            __m128i result1 = _mm_sra_epi16(_mm_adds_epu16(vin1, _mm_slli_epi16(vin0, 1)), _mm_set1_epi16(4));
-
-            __m128i packed_result = _mm_packus_epi16(result0, result1);
-
-            _mm_storeu_si128((__m128i*)out, packed_result);
-
-            in0 += 16;
-            in1 += 16;
-            out += 16;
-        }
-
-        for (; x < width; x += 2) {
-            __m128i vin0 = _mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)in0), _mm_setzero_si128());
-            __m128i vin1 = _mm_unpacklo_epi8(_mm_loadl_epi64((__m128i*)in1), _mm_setzero_si128());
-
-            __m128i result = _mm_sra_epi16(_mm_adds_epu16(vin0, _mm_slli_epi16(vin1, 1)), _mm_set1_epi16(4));
-
-            __m128i packed_result = _mm_packus_epi16(result, result);
-
-            _mm_storel_epi64((__m128i*)out, packed_result);
-
-            in0 += 8;
-            in1 += 8;
-            out += 8;
-        }
-
-        in0 += width * 2;
-        in1 += width * 2;
-    }
-}
-#endif
-
-#ifdef HAVE_ASM_SSE2
-static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
-{
-    const uint8_t *in0, *in1;
-    uint8_t *out;
-    int x, y;
-
-    in0 = buffer;
-    in1 = buffer + width;
-    out = buffer;
-
-    for (y = 0; y < height; y += 4)
-    {
-        for (x = 0; x < width; x += 4)
-        {
-            __m128i vin0 = _mm_loadu_si128((__m128i*)in0);
-            __m128i vin1 = _mm_loadu_si128((__m128i*)in1);
-
-            __m128i vsum0 = _mm_adds_epu8(vin0, _mm_slli_epi16(vin1, 1));
-            __m128i vsum1 = _mm_adds_epu8(_mm_srli_epi16(vin0, 1), _mm_slli_epi16(vin1, 3));
-            __m128i vsum2 = _mm_adds_epu8(_mm_srli_epi16(vin0, 3), _mm_slli_epi16(vin1, 4));
-            __m128i vsum3 = _mm_adds_epu8(_mm_srli_epi16(vin0, 4), _mm_slli_epi16(vin1, 3));
-
-            vsum0 = _mm_srli_epi16(_mm_adds_epu8(vsum0, _mm_set1_epi8(8)), 4);
-            vsum1 = _mm_srli_epi16(_mm_adds_epu8(vsum1, _mm_set1_epi8(8)), 4);
-            vsum2 = _mm_srli_epi16(_mm_adds_epu8(vsum2, _mm_set1_epi8(8)), 4);
-            vsum3 = _mm_srli_epi16(_mm_adds_epu8(vsum3, _mm_set1_epi8(8)), 4);
-
-            __m128i vout = _mm_packus_epi16(_mm_packus_epi16(vsum0, vsum1), _mm_packus_epi16(vsum2, vsum3));
-            _mm_storeu_si128((__m128i*)out, vout);
-
-            in0 += 8;
-            in1 += 8;
-            out += 4;
-        }
-
-        for (; x < width; x += 2)
-        {
-            __m128i vin0 = _mm_loadl_epi64((__m128i*)in0);
-            __m128i vin1 = _mm_loadl_epi64((__m128i*)in1);
-
-            __m128i vsum = _mm_adds_epu8(vin0, _mm_slli_epi16(vin1, 1));
-            vsum = _mm_srli_epi16(_mm_adds_epu8(vsum, _mm_set1_epi8(8)), 4);
-
-            _mm_storel_epi64((__m128i*)out, vsum);
-
-            in0 += 2;
-            in1 += 2;
-            out++;
-        }
-
-        in0 += width * 2;
-        in1 += width * 2;
-    }
-}
-#endif
  
 
 /* horizontal interstitial siting
@@ -390,7 +179,6 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
  *   center sample is simply reused.
  *              
  */             
-#if !defined(HAVE_ARM) && !defined(HAVE_ASM_SSE2)
 static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
 {
   uint8_t *inm, *in0, *inp, *out0, *out1;
@@ -437,300 +225,27 @@ static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int hei
     out0 -= width;
   }
 }
-#endif
-#ifdef HAVE_ASM_SSE2
-static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
-{
-    uint8_t *inm, *in0, *inp, *out0, *out1;
-    int x, y;
-
-    uint8_t *saveme = data;
-
-    veejay_memcpy(saveme, buffer, width);
-
-    in0 = buffer + (width * height / 4) - 2;
-    inm = in0 - width / 2;
-    inp = in0 + width / 2;
-    out1 = buffer + (width * height) - 1;
-    out0 = out1 - width;
-
-    __m128i eight = _mm_set1_epi8(8);
-
-    for (y = height; y > 0; y -= 2) {
-        if (y == 2) {
-            in0 = saveme + width / 2 - 2;
-            inp = in0 + width / 2;
-        }
-        for (x = width; x > 0; x -= 2) {
-            __m128i vin0 = _mm_loadu_si128((__m128i*)in0);
-            __m128i vinm = _mm_loadu_si128((__m128i*)inm);
-            __m128i vinp = _mm_loadu_si128((__m128i*)inp);
-
-            __m128i vsum1 = _mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(vin0, vinp), _mm_adds_epu8(vinm, vin0)), _mm_adds_epu8(vinm, vinp)), eight);
-            __m128i vsum2 = _mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(vinm, vinp), _mm_adds_epu8(vin0, vin0)), eight);
-            __m128i vsum3 = _mm_adds_epu8(_mm_adds_epu8(_mm_adds_epu8(vinm, vinm), _mm_adds_epu8(vin0, vin0)), eight);
-
-            __m128i vout0 = _mm_srli_epi16(vsum1, 4);
-            __m128i vout1 = _mm_srli_epi16(vsum2, 4);
-            __m128i vout2 = _mm_srli_epi16(vsum3, 4);
-
-            _mm_storeu_si128((__m128i*)out1, vout0);
-            _mm_storeu_si128((__m128i*)out0, vout1);
-            _mm_storeu_si128((__m128i*)(out1 - width), vout2);
-
-            inm--;
-            in0--;
-            inp--;
-
-            out1 -= 2;
-            out0 -= 2;
-        }
-        out1 -= width;
-        out0 -= width;
-    }
-}
-#endif
-#ifdef HAVE_ARM
-static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
-{
-    uint8_t *inm, *in0, *inp, *out0, *out1;
-    int x, y;
-
-    uint8_t *saveme = data;
-    veejay_memcpy(saveme, buffer, width);
-
-    in0 = buffer + (width * height / 4) - 2;
-    inm = in0 - width / 2;
-    inp = in0 + width / 2;
-    out1 = buffer + (width * height) - 1;
-    out0 = out1 - width;
-
-    uint8x16_t zero = vdupq_n_u8(0);
-    uint8x16_t eight = vdupq_n_u8(8);
-
-    const uint8_t is_width_multiple_of_16 = (width & 14) == 0;
-
-    for (y = height; y > 0; y -= 2) {
-        if (y == 2) {
-            in0 = saveme + width / 2 - 2;
-            inp = in0 + width / 2;
-        }
-
-        if (is_width_multiple_of_16) {
-            for (x = width; x > 0; x -= 16) {
-                uint8x16_t vin0 = vld1q_u8(in0);
-                uint8x16_t vinm = vld1q_u8(inm);
-                uint8x16_t vinp = vld1q_u8(inp);
-
-                uint8x16_t vsum1 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vqaddq_u8(vin0, vinp), vinm), vin0), vinp);
-                uint8x16_t vsum2 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinp), vin0), vin0);
-                uint8x16_t vsum3 = vqaddq_u8(vqaddq_u8(vqaddq_u8(vinm, vinm), vin0), vin0);
-
-                uint8x16_t vout0 = vshrq_n_u8(vsum1, 4);
-                uint8x16_t vout1 = vshrq_n_u8(vsum2, 4);
-                uint8x16_t vout2 = vshrq_n_u8(vsum3, 4);
-
-                vst1q_u8(out1, vout0);
-                vst1q_u8(out0, vout1);
-                vst1q_u8(out1 - width, vout2);
-
-                inm -= 16;
-                in0 -= 16;
-                inp -= 16;
-
-                out1 -= 16;
-                out0 -= 16;
-            }
-        } else {
-            for (x = width; x > 0; x -= 2) {
-
-                if (x & 14) {
-                    uint8x8_t vin0 = vld1_u8(in0);
-                    uint8x8_t vinm = vld1_u8(inm);
-                    uint8x8_t vinp = vld1_u8(inp);
-
-                    uint8x8_t vsum1 = vqadd_u8(vqadd_u8(vqadd_u8(vqadd_u8(vin0, vinp), vinm), vin0), vinp);
-                    uint8x8_t vsum2 = vqadd_u8(vqadd_u8(vqadd_u8(vinm, vinp), vin0), vin0);
-                    uint8x8_t vsum3 = vqadd_u8(vqadd_u8(vqadd_u8(vinm, vinm), vin0), vin0);
-
-                    uint8x8_t vout0 = vshr_n_u8(vsum1, 4);
-                    uint8x8_t vout1 = vshr_n_u8(vsum2, 4);
-                    uint8x8_t vout2 = vshr_n_u8(vsum3, 4);
-
-                    vst1_u8(out1, vout0);
-                    vst1_u8(out0, vout1);
-                    vst1_u8(out1 - width, vout2);
-
-                    inm -= 8;
-                    in0 -= 8;
-                    inp -= 8;
-
-                    out1 -= 8;
-                    out0 -= 8;
-                }
-            }
-        }
-    }
-}
-#endif
 
 static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
-#if !defined(HAVE_ASM_SSE2) && !defined(HAVE_ARM) && !defined(HAVE_ASM_MMX)
-    uint8_t *in, *out0, *out1;
-    unsigned int x, y;
-    in = buffer + (width * height / 4) - 1;
-    out1 = buffer + (width * height) - 1;
-    out0 = out1 - width;
-    for (y = height - 1; y >= 0; y -= 2) {
-        for (x = width - 1; x >= 0; x -=2) {
-            uint8_t val = *(in--);
-            *(out1--) = val;
-            *(out1--) = val;
-            *(out0--) = val;
-            *(out0--) = val;
+    if (buffer == NULL || width <= 0 || height <= 0)
+        return;
+
+    uint8_t *in = buffer + ((size_t)width * height >> 2);
+
+    for (int row = (height >> 1) - 1; row >= 0; row--) {
+        uint8_t *out0 = buffer + (size_t)(row << 1) * width;
+        uint8_t *out1 = out0 + width;
+
+        for (int column = (width >> 1) - 1; column >= 0; column--) {
+            uint8_t value = *--in;
+            int output_column = column << 1;
+            out0[output_column] = value;
+            out0[output_column + 1] = value;
+            out1[output_column] = value;
+            out1[output_column + 1] = value;
         }
-        out0 -= width;
-        out1 -= width;
     }
-#endif
-
-#ifdef HAVE_ARM_NEON
-    uint8_t *in, *out0, *out1;
-    int x, y;
-
-    in = buffer + (width * height / 4) - 1;
-    out1 = buffer + (width * height) - 1;
-    out0 = out1 - width;
-
-    int optimized_pixels = width - (width & 7);
-
-    for (y = height - 1; y >= 0; y -= 2) {
-        for (x = optimized_pixels - 1; x >= 0; x -= 8) {
-            uint8x8_t val = vld1_u8(in);
-
-            uint8x8x2_t duplicated_val;
-            duplicated_val.val[0] = val;
-            duplicated_val.val[1] = val;
-
-            vst1q_u8(out1 - 8, vreinterpretq_u8_u16(vzip_u16(
-                vreinterpret_u16_u8(duplicated_val.val[0]),
-                vreinterpret_u16_u8(duplicated_val.val[1])
-            )));
-
-            vst1q_u8(out0 - 8, vreinterpretq_u8_u16(vzip_u16(
-                vreinterpret_u16_u8(duplicated_val.val[0]),
-                vreinterpret_u16_u8(duplicated_val.val[1])
-            )));
-
-            in -= 8;
-            out1 -= 8;
-            out0 -= 8;
-        }
-
-        for (x = width - 1; x >= optimized_pixels; x -= 2) {
-            uint8_t val = *(in--);
-            *(out1--) = val;
-            *(out1--) = val;
-            *(out0--) = val;
-            *(out0--) = val;
-        }
-
-        out0 -= width;
-        out1 -= width;
-    }
-#endif
-
-#ifdef HAVE_ARM_ASIMD
-    uint8_t *in, *out0, *out1;
-    unsigned int x, y;
-    in = buffer + (width * height / 4) - 1;
-    out1 = buffer + (width * height) - 1;
-    out0 = out1 - width;
-    uint8x16_t val, val_dup;
-
-    int optimized_pixels = width - (width & 15);
-
-    for (y = height - 1; y >= 0; y -= 2) {
-        for (x = optimized_pixels - 1; x >= 0; x -= 16) {
-            val = vld1q_u8(in);
-            val_dup = vdupq_n_u8(vgetq_lane_u8(val, 0));
-
-            vst1q_u8(out1 - 15, val_dup);
-            vst1q_u8(out0 - 15, val_dup);
-
-            in -= 16;
-            out1 -= 16;
-            out0 -= 16;
-        }
-
-        for (x = width - 1; x >= optimized_pixels; x -= 2) {
-            uint8_t val = *(in--);
-            *(out1--) = val;
-            *(out1--) = val;
-            *(out0--) = val;
-            *(out0--) = val;
-        }
-
-        out0 -= width;
-        out1 -= width;
-    }
-#endif
-
-#ifdef HAVE_ASM_SSE2
-    uint8_t *in, *out0, *out1;
-    unsigned int x, y;
-
-    in = buffer + (width * height / 4) - 1;
-    out1 = buffer + (width * height) - 1;
-    out0 = out1 - width;
-
-    for (y = height - 1; y >= 0; y -= 2) {
-        for (x = width - 1; x >= 0; x -= 2) {
-            uint8_t val = *(in--);
-
-            __m128i val128 = _mm_set1_epi8(val);
-
-            _mm_storel_epi64((__m128i*)(out1--), val128);
-            _mm_storel_epi64((__m128i*)(out1--), val128);
-            _mm_storel_epi64((__m128i*)(out0--), val128);
-            _mm_storel_epi64((__m128i*)(out0--), val128);
-        }
-        out0 -= width;
-        out1 -= width;
-    }
-#else
-#ifdef HAVE_ASM_MMX
-    int x,y;
-    const int mmx_stride = width >> 3;
-    uint8_t *src = buffer + ((width * height) >> 2)-1;
-    uint8_t *dst = buffer + (width * height) -1;
-    uint8_t *dst2 = dst - width;
-
-    for( y = height-1; y >= 0; y -= 2)
-    {
-        for( x = 0; x < mmx_stride; x ++ )
-        {
-            movq_m2r( *src,mm0 );
-            movq_m2r( *src,mm1 );
-            movq_r2m(mm0, *dst );
-            movq_r2m(mm1, *(dst+8) );
-            movq_r2m(mm0, *dst2 );
-            movq_r2m(mm1, *(dst2+8) );
-            dst += 16;
-            dst2 += 16;
-            src += 8;
-        }
-        dst -= width;   
-        dst2 -= width;
-    }
-
-    __asm__(_EMMS"       \n\t"
-                SFENCE"     \n\t"
-                :::"memory");
-#endif
-#endif
-
 }
 
 void ss_444_to_422_drop(uint8_t *restrict U, uint8_t *restrict V, int width, int height)
@@ -743,7 +258,8 @@ void ss_444_to_422_drop(uint8_t *restrict U, uint8_t *restrict V, int width, int
     }
 }
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+__attribute__((target("avx2")))
 void ss_444_to_422_drop_avx2(uint8_t *restrict U, uint8_t *restrict V, int width, int height) {
     const int stride = width >> 1;
 
@@ -795,7 +311,8 @@ void ss_444_to_422_average(uint8_t *restrict U, uint8_t *restrict V, int width, 
     }
 }
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+__attribute__((target("avx2")))
 void ss_444_to_422_average_avx2(uint8_t *restrict U, uint8_t *restrict V, int width, int height)
 {
     const size_t total_dest_pixels = ((size_t)width * height) >> 1;
@@ -808,7 +325,7 @@ void ss_444_to_422_average_avx2(uint8_t *restrict U, uint8_t *restrict V, int wi
 
     size_t i = 0;
 
-    for (; i <= total_dest_pixels - 16; i += 16) {
+    for (; i + 16 <= total_dest_pixels; i += 16) {
         size_t src_idx = i << 1;
         __m256i u_data = _mm256_loadu_si256((const __m256i*)(U + src_idx));
         __m256i u_shuf = _mm256_shuffle_epi8(u_data, shuf_mask);
@@ -942,7 +459,8 @@ void tr_422_to_444_dup(uint8_t *restrict chromaChannel, const int width,const in
     }
 }
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+__attribute__((target("avx2")))
 void tr_422_to_444_dup_avx2(uint8_t *restrict chromaChannel, const int width, const int height) {
     const int src_width = width >> 1;
 
@@ -1038,7 +556,6 @@ void ss_422_to_444_mitchell(uint8_t *restrict chroma, const int width, const int
  *            C
  */
 
-#if !defined(HAVE_ASM_SSE2) 
 static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 {
   uint8_t *in0, *in1, *out;
@@ -1066,47 +583,6 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
     in1 += width + 1;
   }
 }
-#endif
-#ifdef HAVE_ASM_SSE2
-static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
-{
-    uint8_t *in0, *in1, *out;
-    int x, y;
-
-    in0 = buffer;
-    in1 = buffer + width;
-    out = buffer;
-
-    for (y = 0; y < height; y += 2)
-    {
-        __m128i v0 = _mm_loadu_si128((__m128i*)in0);
-        __m128i v1 = _mm_loadu_si128((__m128i*)in1);
-        __m128i vsum = _mm_adds_epu8(v0, v1);
-        vsum = _mm_srli_epi16(vsum, 1);
-        __m128i vout = _mm_packus_epi16(vsum, _mm_setzero_si128());
-        _mm_storel_epi64((__m128i*)out, vout);
-        out++;
-        in0++;
-        in1++;
-
-        for (x = 2; x < width; x += 2)
-        {
-            v0 = _mm_loadu_si128((__m128i*)in0);
-            v1 = _mm_loadu_si128((__m128i*)in1);
-            vsum = _mm_adds_epu8(v0, v1);
-            vsum = _mm_srli_epi16(vsum, 1);
-            vout = _mm_packus_epi16(vsum, _mm_setzero_si128());
-            _mm_storel_epi64((__m128i*)out, vout);
-            in0 += 2;
-            in1 += 2;
-            out++;
-        }
-
-        in0 += width + 1;
-        in1 += width + 1;
-    }
-}
-#endif
 
 
 static subsample_444_to_422 subsample_444_to_422_in;
@@ -1114,33 +590,35 @@ static supersample_422_to_444 supersample_422_to_444_out;
 
 void chroma_subsample_init(void) {
     const char *mode = getenv("VEEJAY_SUBSAMPLE_MODE");
-#ifdef HAVE_ASM_AVX2
-    subsample_444_to_422 f = ss_444_to_422_drop_avx2;
-#else
     subsample_444_to_422 f = ss_444_to_422_drop;
+#ifdef HAVE_TARGET_AVX2
+    const int use_avx2 = (av_get_cpu_flags() & AV_CPU_FLAG_AVX2) != 0;
+    if (use_avx2)
+        f = ss_444_to_422_drop_avx2;
 #endif
     const char *selected = "drop";
 
     if (mode == NULL) {
         veejay_msg(VEEJAY_MSG_INFO, "Chroma subsampling: defaulting to 'drop' (set VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell)");
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
         veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for subsampling");
 #endif
     }
     else if (strcmp(mode, "drop") == 0) {
         selected = "drop";
-#ifdef HAVE_ASM_AVX2
-        f = ss_444_to_422_drop_avx2;
-#else
         f = ss_444_to_422_drop;
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
+        f = ss_444_to_422_drop_avx2;
 #endif
     }
     else if (strcmp(mode, "average") == 0) {
         selected = "average";
-#ifdef HAVE_ASM_AVX2
-        f = ss_444_to_422_average_avx2;
-#else
         f = ss_444_to_422_average;
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
+        f = ss_444_to_422_average_avx2;
 #endif
     }
     else if (strcmp(mode, "bilinear") == 0) {
@@ -1153,10 +631,10 @@ void chroma_subsample_init(void) {
     }
     else {
         veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE='%s', falling back to 'drop'", mode);
-#ifdef HAVE_ASM_AVX2
-        f = ss_444_to_422_drop_avx2;
-#else
         f = ss_444_to_422_drop;
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
+        f = ss_444_to_422_drop_avx2;
 #endif
     }
 
@@ -1168,25 +646,27 @@ void chroma_subsample_init(void) {
 void chroma_supersample_init(void)
 {
     const char *mode = getenv("VEEJAY_SUPERSAMPLE_MODE");
-#ifdef HAVE_ASM_AVX2
-    supersample_422_to_444 f = tr_422_to_444_dup_avx2;
-#else
     supersample_422_to_444 f = tr_422_to_444_dup;
+#ifdef HAVE_TARGET_AVX2
+    const int use_avx2 = (av_get_cpu_flags() & AV_CPU_FLAG_AVX2) != 0;
+    if (use_avx2)
+        f = tr_422_to_444_dup_avx2;
 #endif
     const char *selected = "dup";   // default
 
     if (mode == NULL) {
         veejay_msg(VEEJAY_MSG_INFO, "Chroma supersampling: defaulting to 'dup' (set VEEJAY_SUPERSAMPLE_MODE=dup|mitchell)");
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
         veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for supersampling");
 #endif
     }
     else if (strcmp(mode, "dup") == 0) {
         selected = "dup";
-#ifdef HAVE_ASM_AVX2
-        f = tr_422_to_444_dup_avx2;
-#else
         f = tr_422_to_444_dup;
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
+        f = tr_422_to_444_dup_avx2;
 #endif
     }
     else if (strcmp(mode, "mitchell") == 0) {
@@ -1195,10 +675,10 @@ void chroma_supersample_init(void)
     }
     else {
         veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUPERSAMPLE_MODE='%s', falling back to 'dup'", mode);
-#ifdef HAVE_ASM_AVX2
-        f = tr_422_to_444_dup_avx2;
-#else
         f = tr_422_to_444_dup;
+#ifdef HAVE_TARGET_AVX2
+    if (use_avx2)
+        f = tr_422_to_444_dup_avx2;
 #endif
     }
 

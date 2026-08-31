@@ -9,5 +9,7 @@ AM_CFLAGS = $(VEEJAY_CFLAGS)
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)
 
+EXTRA_DIST = *.h specs/*.h
+
 libvjplug_la_SOURCES = defaults.c utility.c frei0r-loader.c livido-loader.c plugload.c
 

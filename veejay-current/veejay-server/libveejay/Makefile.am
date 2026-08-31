@@ -2,6 +2,7 @@
 
 AM_CFLAGS = $(VEEJAY_CFLAGS)
 MAINTAINERCLEANFILES = Makefile.in
+EXTRA_DIST = *.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
               -DG_LOG_DOMAIN=\"veejay\" \

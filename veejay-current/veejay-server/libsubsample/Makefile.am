@@ -7,4 +7,5 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
 
 SUBSAMPLE_LIB_FILE = libsubsample.la
 noinst_LTLIBRARIES = $(SUBSAMPLE_LIB_FILE)
+EXTRA_DIST = *.h
 libsubsample_la_SOURCES = subsample.c 

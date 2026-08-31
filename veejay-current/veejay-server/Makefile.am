@@ -18,13 +18,11 @@ EXTRA_DIST = \
  autogen.sh \
  PKGBUILD \
  doc/veejay-HOWTO.html \
- doc/README.quickstart \
- doc/README.whatis \
- doc/README.performance \
- doc/HowtoPlugins.txt \
- doc/HowtoCache.txt \
- doc/VIMS.txt \
- doc/NET.txt \
+ doc/README.quickstart.md \
+ doc/README.whatis.md \
+ doc/HOWTO.plugins.md \
+ doc/VIMS.md \
+ doc/README.network.md \
  debian/changelog \
  debian/control \
  debian/copyright \

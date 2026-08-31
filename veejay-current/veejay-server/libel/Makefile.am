@@ -23,7 +23,7 @@ endif
 libel_la_LIBADD = $(PTHREAD_LIBS) $(NVJPEG_LIBS) $(NVJPEG_KERNEL_LO) $(NVJPEG_KERNEL_LIBS)
 libel_la_DEPENDENCIES = $(NVJPEG_KERNEL_LO)
 
-EXTRA_DIST = vj-nvjpeg-kernel.cu
+EXTRA_DIST = *.h vj-nvjpeg-kernel.cu
 CLEANFILES = vj-nvjpeg-kernel.lo vj-nvjpeg-kernel.o
 
 if HAVE_NVJPEG_CUDA_KERNEL
