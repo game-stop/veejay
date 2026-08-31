@@ -6781,7 +6781,9 @@ static gboolean vj_midi_observe_fx_parameter(GtkWidget *origin,
 static GtkWidget *vj_midi_observe_dynamic_widget(GtkWidget *origin)
 {
     for(GtkWidget *widget = origin; widget; widget = gtk_widget_get_parent(widget)) {
-        if(GTK_IS_RANGE(widget) || GTK_IS_SPIN_BUTTON(widget))
+        if(GTK_IS_RANGE(widget))
+            return widget;
+        if(GTK_IS_SPIN_BUTTON(widget))
             return widget;
     }
     return NULL;
@@ -8118,10 +8120,16 @@ static void sequence_vims_pattern_load_backend(void)
         return;
     }
 
-    if(!sequence_vims_parse_fixed_uint_local(body, 10, &revision) ||
-       !sequence_vims_parse_fixed_ll(body + 10, 3, &format_length_ll) ||
-       !sequence_vims_parse_fixed_ll(body + 13, 8, &data_length_ll))
-    {
+    gboolean is_valid = sequence_vims_parse_fixed_uint_local(body, 10, &revision);
+
+    if (is_valid) {
+        is_valid = sequence_vims_parse_fixed_ll(body + 10, 3, &format_length_ll);
+    }
+    if (is_valid) {
+        is_valid = sequence_vims_parse_fixed_ll(body + 13, 8, &data_length_ll);
+    }
+
+    if (!is_valid) {
         free(body);
         return;
     }

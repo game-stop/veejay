@@ -216,15 +216,19 @@ static int midi_vims_message_sane(const char *message)
     len = strlen(message);
     if(len < 5 || len > 4096)
         return 0;
-    if(!g_ascii_isdigit(message[0]) || !g_ascii_isdigit(message[1]) ||
-       !g_ascii_isdigit(message[2]) || message[3] != ':')
-        return 0;
+    if(!g_ascii_isdigit(message[0])) return 0;
+    if(!g_ascii_isdigit(message[1])) return 0;
+    if(!g_ascii_isdigit(message[2])) return 0;
+    if(message[3] != ':') return 0;
     if(message[len - 1] != ';')
         return 0;
     if(strchr(message, ';') != message + len - 1)
         return 0;
-    if(strchr(message, '\n') || strchr(message, '\r'))
-        return 0;
+    gboolean has_newline = (strchr(message, '\n') != NULL);
+    if (!has_newline) {
+        has_newline = (strchr(message, '\r') != NULL);
+    }
+    if (has_newline) return 0;
     int selector = (message[0] - '0') * 100 +
                    (message[1] - '0') * 10 +
                    (message[2] - '0');
@@ -862,12 +866,11 @@ static VjMidiEventType midi_live_key_type(VjMidiEventType type)
 
 static gboolean midi_live_same_control(const VjMidiEvent *a, const VjMidiEvent *b)
 {
-    if(!a || !b ||
-       a->source_client != b->source_client ||
-       a->source_port != b->source_port ||
-       a->channel != b->channel ||
-       midi_live_key_type(a->type) != midi_live_key_type(b->type))
-        return FALSE;
+    if(!a || !b) return FALSE;
+    if(a->source_client != b->source_client) return FALSE;
+    if(a->source_port != b->source_port) return FALSE;
+    if(a->channel != b->channel) return FALSE;
+    if(midi_live_key_type(a->type) != midi_live_key_type(b->type)) return FALSE;
 
     if(midi_live_key_type(a->type) == VJ_MIDI_EVENT_PROGRAM_CHANGE)
         return TRUE;
@@ -951,8 +954,8 @@ static void midi_live_update_active_control(GvrMidiControl *self,
                                             const VjMidiEvent *event,
                                             gint64 now)
 {
-    if(!event || midi_live_is_note(event))
-        return;
+    if(!event) return;
+    if(midi_live_is_note(event)) return;
 
     int index = midi_live_active_control_find(self, event);
     MidiLiveState state;
@@ -976,8 +979,8 @@ static gboolean midi_live_source_connected(const VjMidiDeviceInfo *devices,
 static gboolean midi_live_event_source_connected(GvrMidiControl *self,
                                                  const VjMidiEvent *event)
 {
-    return self && event &&
-           midi_live_source_connected(self->devices, self->device_count,
+    if(!self || !event) return FALSE;
+    return midi_live_source_connected(self->devices, self->device_count,
                                       event->source_client, event->source_port);
 }
 
@@ -1566,9 +1569,13 @@ static int midi_route_event_matches(const VjMidiMapping *mapping,
         return 0;
     if(require_enabled && !mapping->enabled)
         return 0;
-    if(mapping->device && strcmp(mapping->device, VJ_MIDI_ANY_DEVICE) != 0 &&
-       g_strcmp0(mapping->device, event->device_name) != 0)
-        return 0;
+    if(mapping->device) {
+        if(strcmp(mapping->device, VJ_MIDI_ANY_DEVICE) != 0) {
+            if(g_strcmp0(mapping->device, event->device_name) != 0) {
+                return 0;
+            }
+        }
+    }
     if(mapping->event_type != event->type) {
         if(!(mapping->event_type == VJ_MIDI_EVENT_NOTE_ON &&
              event->type == VJ_MIDI_EVENT_NOTE_OFF &&
@@ -2802,12 +2809,18 @@ static gboolean midi_route_live_draw(GtkWidget *widget, cairo_t *cr, gpointer da
             ? midi_vims_controlled_arg_index(m->action.args_template)
             : -1;
     if(controlled_arg >= 0) {
-        if(m->action.args_template && strstr(m->action.args_template, "$NORM")) {
+        gboolean has_norm = FALSE;
+        gboolean has_raw = FALSE;
+        if(m->action.args_template) {
+            has_norm = (strstr(m->action.args_template, "$NORM") != NULL);
+            has_raw = (strstr(m->action.args_template, "$RAW") != NULL);
+        }
+        
+        if(has_norm) {
             g_snprintf(target_detail, sizeof(target_detail),
                        "%s   ·   ARG %d = %.3f",
                        target, controlled_arg + 1, n);
-        } else if(m->action.args_template && strstr(m->action.args_template, "$RAW") &&
-                  live && event) {
+        } else if(has_raw && live && event) {
             g_snprintf(target_detail, sizeof(target_detail),
                        "%s   ·   ARG %d = %d",
                        target, controlled_arg + 1, event->value);
@@ -3069,8 +3082,10 @@ static GPtrArray *midi_vims_argument_tokens(const char *args)
     const char *p = args ? args : "";
 
     while(*p) {
-        while(*p && g_ascii_isspace(*p))
+        while(*p) {
+            if(!g_ascii_isspace(*p)) break;
             p++;
+        }
         if(!*p)
             break;
 

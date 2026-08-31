@@ -847,8 +847,10 @@ static char *midi_upgrade_fx_args_template(int vims_id, char *args)
     int tokens = 0;
     char *last = NULL;
     for(char *p = copy; *p;) {
-        while(*p && g_ascii_isspace(*p))
+        while(*p) {
+            if(!g_ascii_isspace(*p)) break;
             p++;
+        }
         if(!*p)
             break;
         last = p;
