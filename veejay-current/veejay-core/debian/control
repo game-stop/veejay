@@ -1,0 +1,20 @@
+Source: veejay-core
+Section: libs
+Priority: optional
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper-compat (= 13), pkg-config, autoconf, automake, libtool,
+ libglib2.0-dev, libavutil-dev (>= 7:6.0), libavcodec-dev (>= 7:6.0),
+ libavformat-dev (>= 7:6.0), libswscale-dev
+Standards-Version: 4.6.2
+Homepage: http://www.veejayhq.net
+Vcs-Git: https://github.com/game-stop/veejay-core.git
+
+Package: veejay-core
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Core runtime library shared by the Veejay video tools
+ libveejaycore provides the shared memory, messaging, YUV/pixel and
+ networking primitives used by veejay, veejay-director, veejay-eidolon
+ and the veejay command line utilities.
+ .
+ This package installs the shared library, headers and pkg-config file.

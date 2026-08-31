@@ -1,0 +1,29 @@
+# Contributor: Niels Elburg <nwelburg@gmail.com>
+pkgname=veejay-core
+pkgrel=1
+pkgver=1.6.0
+pkgdesc="Core runtime library shared by the Veejay video tools"
+arch=('x86_64' 'aarch64')
+url="http://www.veejayhq.net"
+license=('GPL2')
+groups=()
+conflicts=('veejay-core')
+depends=('glib2' 'ffmpeg')
+optdepends=()
+makedepends=('pkgconf')
+source=()
+md5sums=()
+backup=()
+replaces=()
+
+build() {
+	cd $startdir
+	./autogen.sh
+	./configure --prefix=/usr
+	make || return 1
+}
+
+package() {
+	cd $startdir
+	make DESTDIR="$pkgdir/" install
+}
