@@ -1,19 +1,21 @@
 # Contributor: Luciano A. Ferrer <laferrer@gmail.com>
 # Modified for ArchLinux by Niels <nwelburg@gmail.com>
-pkgname=reloaded
+pkgname=veejay-client
 pkgrel=1
-pkgver=1.5.9
+pkgver=1.6.0
 pkgdesc="Reloaded is the graphical user interface for Veejay"
-arch=('i686' 'x86_64')
+arch=('x86_64' 'aarch64')
 url="http://www.veejayhq.net"
-license=('GPL')
+license=('GPL2')
 groups=()
 conflicts=('reloaded')
-depends=('libxml2' 'veejay' 'gtk2' 'glib2' 'glade' 'alsa-lib' )
-optdepends=()
+provides=('reloaded')
+depends=('veejay-core' 'gtk3' 'libx11' 'sdl2' 'ffmpeg' 'alsa-lib')
+optdepends=('veejay: to control a local veejay backend')
+makedepends=('pkgconf')
 source=()
 md5sums=()
-changelog=('ChangeLog')
+changelog=ChangeLog
 backup=()
 replaces=()
 
@@ -29,3 +31,4 @@ package() {
 	cd $startdir
 	make DESTDIR="$pkgdir/" install
 }
+

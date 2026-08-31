@@ -9,4 +9,4 @@ export DH_OPTIONS
 
 
 %:
-	dh $@  --with autotools-dev
+	dh $@

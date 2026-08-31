@@ -1,3 +1,10 @@
+veejay-client (1.6.0-1) unstable; urgency=medium
+
+  * Refresh Build-Depends/Depends for the GTK+3/SDL2-based reloaded build
+    and the new veejay-core split (Closes: #nnnn).
+
+ -- Niels Elburg <nwelburg@gmail.com>  Mon, 31 Aug 2026 00:00:00 +0000
+
 veejay-client (1.5.47-1) unstable; urgency=low
 
   * New release

@@ -2,14 +2,17 @@ Source: veejay-client
 Section: video
 Priority: optional
 Maintainer: Niels Elburg <nwelburg@gmail.com>
-Build-Depends: debhelper (>= 8.0.0), autotools-dev, libavcodec-dev,libavformat-dev,libavutil-dev,libswscale-dev,libgtk2.0-dev,libsdl1.2-dev,libxml2-dev,libx11-dev,libmjpegtools-dev,libasound2-dev,libglade2-dev,libgtk2.0-dev,libx11-dev,veejay (>= 1.5.47)
-Standards-Version: 3.9.4
+Build-Depends: debhelper-compat (= 13), pkg-config, autoconf, automake, libtool,
+ veejay-core (>= 1.6.0), libgtk-3-dev, libx11-dev, libavutil-dev,
+ libsdl2-dev, libasound2-dev
+Standards-Version: 4.6.2
 Homepage: http://www.veejayhq.net
 Vcs-Git: git://github.com/game-stop/veejay.git
 
 Package: veejay-client
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, veejay (>= 1.5.47)
+Depends: ${shlibs:Depends}, ${misc:Depends}, veejay-core (>= 1.6.0)
+Recommends: veejay (>= 1.6.0)
 Description:  Reloaded, a graphical interface for veejay.
  This program requires a running veejay.
  Features:
