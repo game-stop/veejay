@@ -299,8 +299,6 @@ static veejay_ndi_sender_gate_t veejay_ndi_sender_gate = {
 
 static vj_ndi_sender *veejay_ndi_sender_acquire(veejay_t *info)
 {
-    if(!info)
-        return NULL;
     pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
     while(veejay_ndi_sender_gate.writer)
         pthread_cond_wait(&veejay_ndi_sender_gate.cond,
@@ -707,7 +705,7 @@ static void veejay_sample_video_diag_note(veejay_t *info,
     int sample_id;
     int playback_mode;
 
-    if(!info || !info->uc || !info->settings || !diag ||
+    if(!info->uc || !diag ||
        !veejay_sample_diag_enabled())
         return;
 
@@ -1180,7 +1178,7 @@ static void veejay_sample_thread_diag_note(veejay_t *info,
     int sample_id;
     int playback_mode;
 
-    if(!info || !info->uc || !diag || !role ||
+    if(!info->uc || !diag || !role ||
        !veejay_sample_diag_enabled())
         return;
 
@@ -1254,7 +1252,7 @@ static void veejay_sample_audio_diag_note(veejay_t *info,
     int sample_id;
     int playback_mode;
 
-    if(!info || !info->uc || !info->settings || !diag ||
+    if(!info->uc || !diag ||
        !veejay_sample_diag_enabled())
         return;
 
@@ -1340,14 +1338,14 @@ static inline double vj_runtime_master_clock_now_s(veejay_t *info,
     if(uses_audio_clock)
         *uses_audio_clock = 0;
 
-    if(info && info->ndi_follow_clock && info->uc &&
+    if(info->ndi_follow_clock && info->uc &&
        info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG &&
        info->uc->sample_id > 0 &&
        vj_tag_get_ndi_clock(info->uc->sample_id, &master_s, NULL))
         return master_s;
 
 #ifdef HAVE_JACK
-    if(info && info->settings && info->audio == AUDIO_PLAY) {
+    if(info->audio == AUDIO_PLAY) {
         video_playback_setup *settings = info->settings;
 
         /*
@@ -1379,9 +1377,6 @@ static inline void vj_runtime_publish_audio_clocks(video_playback_setup *setting
                                                    double queued_s)
 {
     double anchor_s;
-
-    if(!settings)
-        return;
 
     anchor_s = atomic_load_double(&settings->audio_start_offset);
 
@@ -1471,9 +1466,6 @@ static inline double vj_runtime_tempo_follow_correction(video_playback_setup *se
     double correction;
     double max_corr;
 
-    if(!settings)
-        return 1.0;
-
     mode = atomic_load_int(&settings->audio_sync.mode);
     if(mode != VJ_AUDIO_SYNC_MODE_TEMPO_FOLLOW)
         return 1.0;
@@ -1510,9 +1502,6 @@ static inline double vj_runtime_tempo_follow_correction(video_playback_setup *se
 static inline double vj_runtime_effective_spvf(video_playback_setup *settings)
 {
     double spvf;
-
-    if(!settings)
-        return 1.0 / 25.0;
 
     spvf = settings->spvf;
     if(spvf <= 0.0)
@@ -1557,9 +1546,6 @@ static void vj_runtime_reanchor_clock(veejay_t *info,
     long long anchor_frame;
     int using_audio_clock = 0;
 
-    if(!info || !info->settings)
-        return;
-
     settings = info->settings;
 
     if(frame < 0)
@@ -1581,9 +1567,6 @@ static void vj_runtime_reanchor_clock(veejay_t *info,
 
 static void vj_runtime_update_frame_fps(veejay_t *info, float fps)
 {
-    if (info == NULL || info->settings == NULL)
-        return;
-
     video_playback_setup *settings = info->settings;
 
     if (info->effect_frame1) info->effect_frame1->fps = fps;
@@ -1766,9 +1749,6 @@ static double veejay_track_align_media_fps(veejay_t *info)
 {
     editlist *el = NULL;
 
-    if(!info)
-        return 25.0;
-
     if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
         el = sample_get_editlist(info->uc->sample_id);
     if(!el)
@@ -1786,9 +1766,6 @@ static double veejay_track_align_transport_fps(veejay_t *info)
 {
     video_playback_setup *settings;
     double fps;
-
-    if(!info || !info->settings)
-        return 25.0;
 
     settings = info->settings;
     fps = (double)settings->output_fps;
@@ -1839,9 +1816,6 @@ static int veejay_track_align_current_sfd(veejay_t *info)
 {
     video_playback_setup *settings;
     int sfd = 1;
-
-    if(!info || !info->settings)
-        return 1;
 
     settings = info->settings;
 
@@ -1915,9 +1889,6 @@ static void veejay_track_align_integrate_linear_active(veejay_t *info, const cha
     double source_fps;
     double elapsed_s;
     double frames_accum;
-
-    if(!info || !info->settings)
-        return;
 
     settings = info->settings;
     if(!atomic_load_int(&settings->track_align_linear_active))
@@ -2139,7 +2110,7 @@ int veejay_write_recovery_files(veejay_t *info)
     int re = 0;
     int rs = 0;
 
-    if(!info || !info->homedir || !info->uc)
+    if(!info->homedir || !info->uc)
         return 0;
 
     if(__atomic_load_n(&veejay_recovery_complete_, __ATOMIC_ACQUIRE))
@@ -2228,9 +2199,6 @@ void veejay_transport_epoch_bump(veejay_t *info)
     video_playback_setup *settings;
     int current;
     int next;
-
-    if(!info || !info->settings)
-        return;
 
     settings = info->settings;
     current = __atomic_load_n(&settings->transport_epoch, __ATOMIC_RELAXED);
@@ -3136,7 +3104,7 @@ static int vj_pattern_apply_transport_loop(veejay_t *info,
     int mapped_frame;
     long long absolute_frame;
 
-    if(!info || !info->settings || !info->uc || !info->seq || !runtime)
+    if(!info->uc || !info->seq || !runtime)
         return 0;
 
     settings = info->settings;
@@ -3328,7 +3296,7 @@ static int vj_pattern_master_client_ensure(veejay_t *info,
 {
     vj_client *client;
 
-    if(!info || !runtime)
+    if(!runtime)
         return 0;
     if(info->master_client) {
         runtime->master_missing_reported = 0;
@@ -3384,7 +3352,7 @@ static int vj_pattern_fire_message(veejay_t *info,
 {
     int delivered = 0;
 
-    if(!info || !runtime || !target || !event || !event->message || runtime->replaying)
+    if(!runtime || !target || !event || !event->message || runtime->replaying)
         return 0;
 
     if(vj_pattern_tick_command_seen(runtime, event)) {
@@ -3463,18 +3431,14 @@ static void vj_pattern_transport_snapshot(veejay_t *info,
         return;
 
     memset(snapshot, 0, sizeof(*snapshot));
-    if(!info)
-        return;
 
     snapshot->epoch = (unsigned int)veejay_transport_epoch_get(info);
     if(info->uc) {
         snapshot->playback_mode = info->uc->playback_mode;
         snapshot->source_id = info->uc->sample_id;
     }
-    if(info->settings) {
-        snapshot->speed = atomic_load_int(&info->settings->current_playback_speed);
-        snapshot->frame = atomic_load_long_long(&info->settings->current_frame_num);
-    }
+    snapshot->speed = atomic_load_int(&info->settings->current_playback_speed);
+    snapshot->frame = atomic_load_long_long(&info->settings->current_frame_num);
 
     if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE &&
        info->uc->sample_id > 0 && sample_exists(info->uc->sample_id))
@@ -3621,7 +3585,7 @@ static int vj_pattern_apply_transport_cutoff(veejay_t *info,
     int cutoff;
     long long target_frame;
 
-    if(!info || !info->settings || !info->uc || !runtime ||
+    if(!info->uc || !runtime ||
        !runtime->tick_transport_changed || !runtime->tick_transport_rebase)
         return 0;
 
@@ -3970,7 +3934,7 @@ static int vj_pattern_sequence_layout(veejay_t *info,
     if(start) *start = -1;
     if(length) *length = -1;
     if(entries) *entries = 0;
-    if(!info || !info->seq || bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
+    if(!info->seq || bank < 0 || bank >= VJ_SEQUENCE_BANKS ||
        slot < 0 || slot >= MAX_SEQUENCES)
         return 0;
 
@@ -4027,7 +3991,7 @@ static void vj_pattern_backend_tick(veejay_t *info)
     int loop_type = 1;
     int loops_remaining = 0;
 
-    if(!info || !info->settings || !info->uc || !info->seq)
+    if(!info->uc || !info->seq)
         return;
 
     settings = info->settings;
@@ -4182,9 +4146,6 @@ static inline int playback_retime_audio_slice(int old_sfd, int new_sfd, int old_
 
 static void veejay_output_hold_release_timed(veejay_t *info, const char *reason, int log_release)
 {
-    if(!info || !info->settings)
-        return;
-
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
     if(!settings->output_hold_active && !settings->output_hold_capture &&
@@ -4484,9 +4445,6 @@ static int veejay_sync_adjusted_increment(veejay_t *info, int speed)
 {
     int adjustment;
 
-    if(!info || !info->settings)
-        return speed;
-
     adjustment = atomic_exchange_int(&info->settings->sync_adjust_frames, 0);
     if(adjustment < -4)
         adjustment = -4;
@@ -4501,9 +4459,6 @@ static void veejay_sync_start_tick(veejay_t *info)
     video_playback_setup *settings;
     long long target_us;
     int speed;
-
-    if(!info || !info->settings)
-        return;
 
     settings = info->settings;
     if(!atomic_load_int(&settings->sync_start_armed))
@@ -4821,9 +4776,6 @@ static inline void safe_join(pthread_t *t, const char *name)
 
 static void veejay_request_stop_fast(veejay_t *info)
 {
-    if (!info || !info->settings)
-        return;
-
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
     atomic_store_int(&settings->state, LAVPLAY_STATE_STOP);
@@ -4840,9 +4792,6 @@ static void veejay_request_stop_fast(veejay_t *info)
 
 static void veejay_wake_playback_waiters(veejay_t *info)
 {
-    if (!info || !info->settings)
-        return;
-
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
     veejay_request_stop_fast(info);
@@ -4860,10 +4809,6 @@ static void veejay_wake_playback_waiters(veejay_t *info)
 
 void veejay_busy(veejay_t * info)
 {
-	if (!info || !info->settings) {
-        return;
-    }
-
 	video_playback_setup *settings = (video_playback_setup*)(info->settings);
 
     veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for threads to finish...");
@@ -5011,9 +4956,6 @@ void vj_audio_beat_set_video_fps(vj_audio_beat_shared_t *s, double fps);
 static void veejay_set_framerate_internal(veejay_t *info, float fps,
                                           int reset_presentation)
 {
-    if (info == NULL || info->settings == NULL)
-        return;
-
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
     fps = vj_runtime_clamp_fps(fps);
@@ -5239,9 +5181,6 @@ static void veejay_log_sample_transport_state(veejay_t *info,
                                               const char *where,
                                               int sample_id)
 {
-    if (!info || !info->settings)
-        return;
-
     int start = 0;
     int end = 0;
     int looptype = 0;
@@ -5498,7 +5437,7 @@ static void veejay_sequence_prepare_selected_sample_positions(veejay_t *info)
 {
     int mask = veejay_sequence_selected_bank_mask(info);
 
-    if(!info || !info->seq)
+    if(!info->seq)
         return;
 
     veejay_sequence_store_active_bank(info);
@@ -5763,7 +5702,7 @@ void veejay_sample_set_initial_positions(veejay_t *info)
     int first_slot = 0;
     int first_id;
 
-    if(!info || !info->seq)
+    if(!info->seq)
         return;
 
     veejay_sequence_prepare_selected_sample_positions(info);
@@ -5860,7 +5799,7 @@ static int veejay_find_ndi_stream(const char *source_name)
 
 int veejay_create_ndi_stream(veejay_t *info, const char *source_name)
 {
-    if(!info || !source_name || !*source_name)
+    if(!source_name || !*source_name)
         return 0;
 
     int id = veejay_find_ndi_stream(source_name);
@@ -6601,7 +6540,7 @@ static char *veejay_pipe_append_chain_entry_status(veejay_t *info, char *ptr)
     int is_video;
     int num_params;
 
-    if(!info || !info->uc)
+    if(!info->uc)
         return veejay_pipe_append_zero_chain_entry_status(ptr);
 
     current_id = info->uc->sample_id;
@@ -7399,7 +7338,7 @@ static void veejay_sdl_update_visibility(veejay_t *info, const SDL_Event *event)
 
 static int veejay_sdl_event_wanted(veejay_t *info, const SDL_Event *event)
 {
-    if(!info || !event)
+    if(!event)
         return 0;
 
     switch(event->type) {
@@ -7634,9 +7573,6 @@ static void veejay_output_poll_events(veejay_t *info)
 {
     static uint64_t next_output_control_poll_ns = 0;
 
-    if(!info)
-        return;
-
     if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT) {
         const uint64_t now_ns = vj_perf_now_ns();
         if(now_ns >= next_output_control_poll_ns) {
@@ -7722,7 +7658,7 @@ static void veejay_ndi_xml_escape(char *dst, size_t dst_size, const char *src)
 
 static vj_ndi_sender *veejay_ndi_create_sender(veejay_t *info, const char *name)
 {
-    if(!info || !name || !*name)
+    if(!name || !*name)
         return NULL;
     const int audio_rate = info->edit_list && info->edit_list->audio_rate > 0 ?
                            info->edit_list->audio_rate :
@@ -7754,7 +7690,7 @@ static vj_ndi_sender *veejay_ndi_create_sender(veejay_t *info, const char *name)
 
 int veejay_ndi_start_sender(veejay_t *info)
 {
-    if(!info || !info->ndi_send_enabled)
+    if(!info->ndi_send_enabled)
         return 1;
     pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
     veejay_ndi_sender_wait_for_readers_locked();
@@ -7770,8 +7706,6 @@ int veejay_ndi_start_sender(veejay_t *info)
 
 void veejay_ndi_stop_sender(veejay_t *info)
 {
-    if(!info)
-        return;
     pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
     veejay_ndi_sender_wait_for_readers_locked();
     vj_ndi_sender *sender = (vj_ndi_sender*)info->ndi_sender;
@@ -7784,8 +7718,6 @@ void veejay_ndi_stop_sender(veejay_t *info)
 
 int veejay_ndi_set_sender(veejay_t *info, int enabled, const char *name)
 {
-    if(!info)
-        return 0;
     if(!enabled) {
         pthread_mutex_lock(&veejay_ndi_sender_gate.mutex);
         veejay_ndi_sender_wait_for_readers_locked();
@@ -7835,7 +7767,7 @@ int veejay_ndi_set_sender(veejay_t *info, int enabled, const char *name)
 
 int veejay_ndi_set_receiver(veejay_t *info, const char *source_name)
 {
-    if(!info || info->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
         return 0;
     const int disable = !source_name || !*source_name ||
                         strcmp(source_name, "-") == 0;
@@ -8077,7 +8009,7 @@ int veejay_setup_video_out(veejay_t *info)
 int veejay_sdl_output_set(veejay_t *info, int enabled, int width, int height, int x, int y)
 {
 #ifdef HAVE_SDL
-    if(!info || !info->sdl || width < 0 || height < 0 ||
+    if(!info->sdl || width < 0 || height < 0 ||
        ((width == 0) != (height == 0)))
         return 0;
 
@@ -8212,9 +8144,6 @@ static pthread_cond_t veejay_output_preview_cond = PTHREAD_COND_INITIALIZER;
 
 static veejay_output_source_state *veejay_output_preview_state_acquire(veejay_t *info)
 {
-    if(!info)
-        return NULL;
-
     pthread_mutex_lock(&veejay_output_preview_gate);
     veejay_output_source_state *state =
         (veejay_output_source_state*)info->output_input_buffer;
@@ -8242,8 +8171,6 @@ static void veejay_output_preview_state_release(veejay_output_source_state *stat
 
 static void veejay_output_source_free(veejay_t *info)
 {
-    if(!info)
-        return;
     if(info->input_shm) {
         vj_shm_free_slave(info->input_shm);
         info->input_shm = NULL;
@@ -8312,7 +8239,7 @@ static int veejay_output_alloc_frame_storage(VJFrame *frame, uint8_t **storage)
 static int veejay_output_projection_init(veejay_t *info,
                                          veejay_output_source_state *state)
 {
-    if(!info || !state)
+    if(!state)
         return 0;
 
     if(!state->projection_preview_mutex_initialized) {
@@ -8408,7 +8335,7 @@ static void veejay_output_copy_444(VJFrame *dst, const VJFrame *src)
 
 static int veejay_output_capture_pre_projection(veejay_t *info, VJFrame *mapped)
 {
-    if(!info || !mapped || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+    if(!mapped || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return 0;
 
     veejay_output_source_state *state = veejay_output_preview_state_acquire(info);
@@ -8455,7 +8382,7 @@ void veejay_output_request_pre_projection_preview(veejay_t *info)
 
 void *veejay_output_lock_pre_projection_preview_frame(veejay_t *info, VJFrame *frame)
 {
-    if(!info || !frame || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+    if(!frame || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return NULL;
 
     veejay_output_source_state *state = veejay_output_preview_state_acquire(info);
@@ -8484,7 +8411,7 @@ void veejay_output_unlock_pre_projection_preview_frame(void *token)
 
 static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped)
 {
-    if(!info || !mapped || !info->settings->composite || !info->composite ||
+    if(!mapped || !info->settings->composite || !info->composite ||
        info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return mapped;
 
@@ -8520,7 +8447,7 @@ static VJFrame *veejay_output_apply_projection(veejay_t *info, VJFrame *mapped)
 
 static VJFrame *veejay_output_apply_pattern_projection(veejay_t *info, VJFrame *pattern)
 {
-    if(!info || !pattern || !info->settings->composite || !info->composite ||
+    if(!pattern || !info->settings->composite || !info->composite ||
        info->instance_role == VJ_INSTANCE_ROLE_OUTPUT)
         return pattern;
 
@@ -8574,7 +8501,7 @@ static int veejay_output_source_host_is_local(const char *host)
 
 static int veejay_output_pattern_projection_init(veejay_t *info)
 {
-    if(!info || info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ||
+    if(info->instance_role == VJ_INSTANCE_ROLE_OUTPUT ||
        !info->composite || info->output_input_buffer)
         return 1;
 
@@ -8953,7 +8880,7 @@ static void veejay_output_graph_snapshot(veejay_t *info,
         *pattern = VJ_OUTPUT_PATTERN_PROGRAM;
     for(int i = 0; i < VJ_OUTPUT_GRAPH_MAX_SLICES; i++)
         valid[i] = 0;
-    if(!info || !info->output_graph)
+    if(!info->output_graph)
         return;
     if(pattern)
         *pattern = vj_output_graph_get_pattern((vj_output_graph*)info->output_graph);
@@ -8967,7 +8894,7 @@ static void veejay_output_graph_restore(veejay_t *info,
                                         const vj_output_slice_config slices[VJ_OUTPUT_GRAPH_MAX_SLICES],
                                         const int valid[VJ_OUTPUT_GRAPH_MAX_SLICES])
 {
-    if(!info || !info->output_graph)
+    if(!info->output_graph)
         return;
     vj_output_graph_set_pattern((vj_output_graph*)info->output_graph, pattern);
     for(int i = 0; i < VJ_OUTPUT_GRAPH_MAX_SLICES; i++) {
@@ -8982,7 +8909,7 @@ static int veejay_output_switch_source_internal(veejay_t *info,
                                                 int port,
                                                 int32_t known_shm_key)
 {
-    if(!info || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT ||
+    if(info->instance_role != VJ_INSTANCE_ROLE_OUTPUT ||
        !host || !host[0] || port <= 0 || port > 65535 || known_shm_key < 0)
         return 0;
 
@@ -9056,7 +8983,7 @@ int veejay_output_switch_source_shm(veejay_t *info, int port, int32_t key)
 
 int veejay_output_disconnect_source(veejay_t *info)
 {
-    if(!info || info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
+    if(info->instance_role != VJ_INSTANCE_ROLE_OUTPUT)
         return 0;
 
     veejay_output_source_state *state =
@@ -9109,7 +9036,7 @@ static int veejay_output_present_idle_graph(veejay_t *info,
                                             uint64_t *next_present_ns,
                                             int force)
 {
-    if(!info || !info->output_graph || !info->output_input_frame || !next_present_ns)
+    if(!info->output_graph || !info->output_input_frame || !next_present_ns)
         return 0;
     if(!force && now_ns < *next_present_ns)
         return 0;
@@ -9125,7 +9052,7 @@ static int veejay_output_present_idle_graph(veejay_t *info,
 #ifdef HAVE_SDL
 static int veejay_sdl_output_initialize_owner(veejay_t *info)
 {
-    if(!info || !info->sdl)
+    if(!info->sdl)
         return 0;
     if(atomic_load_int(&info->sdl_output_initialized))
         return 1;
@@ -9168,7 +9095,7 @@ static int veejay_sdl_output_initialize_owner(veejay_t *info)
 
 static int veejay_sdl_output_sync_owner(veejay_t *info)
 {
-    if(!info || !info->sdl)
+    if(!info->sdl)
         return 1;
 
     const int enabled = atomic_load_int(&info->sdl_output_enabled);
@@ -10837,7 +10764,7 @@ static int veejay_clocked_video_source_bounds(veejay_t *info,
 {
     video_playback_setup *settings;
 
-    if(!info || !info->settings || !info->uc || !min_frame || !max_frame)
+    if(!info->uc || !min_frame || !max_frame)
         return 0;
 
     settings = info->settings;
@@ -10900,7 +10827,7 @@ static inline int veejay_video_source_is_clocked(veejay_t *info)
     int loop = 0;
     int speed = 0;
 
-    if(!info || !info->settings || !info->uc)
+    if(!info->uc)
         return 0;
 
     settings = info->settings;
@@ -11570,9 +11497,6 @@ static inline int vj_audio_pacing_effective_sfd(veejay_t *info)
     int info_sfd = 1;
     int slice_len = 1;
 
-    if(!info || !info->settings)
-        return sfd > 0 ? sfd : 1;
-
     settings = info->settings;
 
     if(settings->sfd > 0)
@@ -11752,7 +11676,7 @@ static int veejay_track_align_get_adjustment(veejay_t *info,
         adj->offset_ms = 0;
     }
 
-    if(!info || !info->settings || !adj)
+    if(!adj)
         return 0;
 
     if(media_fps <= 0.0)
@@ -12907,9 +12831,6 @@ static void veejay_audio_sync_leave_external_playback(veejay_t *info)
     video_playback_setup *settings;
     int mode;
 
-    if(!info || !info->settings)
-        return;
-
     settings = info->settings;
 
     mode = atomic_load_int(&settings->audio_sync.mode);
@@ -13003,9 +12924,6 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
     video_playback_setup *settings;
     int ret;
 
-    if(!info || !info->settings)
-        return;
-
     settings = info->settings;
 
     if(veejay_audio_sync_thread_disabled(settings)) {
@@ -13057,9 +12975,6 @@ static void veejay_audio_sync_thread_startup(veejay_t *info)
 int veejay_audio_sync_set_mode_control(veejay_t *info, int mode)
 {
     video_playback_setup *settings;
-
-    if(!info || !info->settings)
-        return -1;
 
     if(mode < VJ_AUDIO_SYNC_MODE_OFF)
         mode = VJ_AUDIO_SYNC_MODE_OFF;
@@ -13147,9 +13062,6 @@ int veejay_audio_sync_set_enabled(veejay_t *info, int enabled)
 
 int veejay_audio_sync_set_bridge_correction(veejay_t *info, int max_pct)
 {
-    if(!info || !info->settings)
-        return -1;
-
     if(veejay_audio_sync_thread_disabled(info->settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
                    "[AUDIO-SYNC] bridge correction request ignored; audio sync/control thread is disabled");
@@ -13172,9 +13084,6 @@ static void veejay_audio_beat_thread_startup(veejay_t *info)
 {
     video_playback_setup *settings;
     int ret;
-
-    if(!info || !info->settings)
-        return;
 
     settings = info->settings;
 
@@ -13235,9 +13144,6 @@ static editlist *veejay_audio_beat_current_editlist(veejay_t *info)
 {
     editlist *el = NULL;
 
-    if(!info)
-        return NULL;
-
     if(info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
         el = sample_get_editlist(info->uc->sample_id);
 
@@ -13297,9 +13203,6 @@ static void veejay_audio_beat_prepare_sync_source(veejay_t *info)
     int record_source;
     int external_mode;
     int use_push_source;
-
-    if(!info || !info->settings)
-        return;
 
     settings = info->settings;
 
@@ -13372,9 +13275,6 @@ int veejay_audio_beat_set_enabled(veejay_t *info, int enabled)
     video_playback_setup *settings;
     int rc;
 
-    if(!info || !info->settings)
-        return -1;
-
     settings = info->settings;
     enabled = enabled ? 1 : 0;
 
@@ -13443,9 +13343,6 @@ int veejay_audio_beat_toggle(veejay_t *info)
     video_playback_setup *settings;
     int enabled;
     int rc;
-
-    if(!info || !info->settings)
-        return -1;
 
     settings = info->settings;
 
@@ -13517,9 +13414,6 @@ int veejay_audio_beat_push_config_ex(veejay_t *info,
 {
 #ifdef HAVE_JACK
     video_playback_setup *settings;
-
-    if(!info || !info->settings)
-        return -1;
 
     settings = info->settings;
 
@@ -13623,9 +13517,6 @@ int veejay_audio_beat_get_status(veejay_t *info, int *enabled, int *open, long *
 {
 #ifdef HAVE_JACK
     vj_audio_beat_shared_t *s;
-
-    if(!info || !info->settings)
-        return -1;
 
     s = &info->settings->audio_beat;
 
@@ -15431,9 +15322,6 @@ int veejay_audio_sync_wav_profile_set(veejay_t *info, int profile, const char *p
     struct stat st;
     int length_ms;
 
-    if(!info || !info->settings)
-        return -1;
-
     profile = veejay_audio_sync_sanitize_profile(profile);
     if(profile <= 0) {
         veejay_msg(VEEJAY_MSG_WARNING,
@@ -15470,9 +15358,6 @@ int veejay_audio_sync_wav_profile_clear(veejay_t *info, int profile)
 {
     video_playback_setup *settings;
 
-    if(!info || !info->settings)
-        return -1;
-
     profile = veejay_audio_sync_sanitize_profile(profile);
     if(profile <= 0)
         return -1;
@@ -15498,9 +15383,6 @@ static int veejay_audio_sync_wav_profile_arm(veejay_t *info,
     vj_audio_sync_wav_profile_t *p;
     int limit_ms;
     int enable_rc;
-
-    if(!info || !info->settings)
-        return -1;
 
     profile = veejay_audio_sync_sanitize_profile(profile);
     if(profile <= 0)
@@ -15649,7 +15531,7 @@ static int veejay_audio_sync_activate_sample_profile(veejay_t *info,
 
     (void)force;
 
-    if(!info || !info->settings || sample_id <= 0)
+    if(sample_id <= 0)
         return 0;
 
     if(!sample_get_audio_sync_profile(sample_id,
@@ -15759,7 +15641,7 @@ static int veejay_audio_sync_current_sample_profile_mode(veejay_t *info, int *sa
     if(profile)
         *profile = 0;
 
-    if(!info || !info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
+    if(!info->uc || info->uc->playback_mode != VJ_PLAYBACK_MODE_SAMPLE)
         return SAMPLE_AUDIO_SYNC_OFF;
 
     id = info->uc->sample_id;
@@ -15794,9 +15676,6 @@ int vj_perform_audio_sync_sample_seek_rearm(veejay_t *info, int sample_id, long 
     long start_ms;
     int sync_mode;
     int rc;
-
-    if(!info || !info->settings)
-        return -1;
 
     if(sample_id == 0 && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
         sample_id = info->uc->sample_id;
@@ -15911,9 +15790,6 @@ int veejay_audio_sync_sample_profile_set(veejay_t *info,
 {
     long current_frame;
 
-    if(!info || !info->settings)
-        return -1;
-
     if(sample_id == 0 && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
         sample_id = info->uc->sample_id;
 
@@ -15938,9 +15814,6 @@ int veejay_audio_sync_sample_profile_set(veejay_t *info,
 
 int veejay_audio_sync_sample_profile_clear(veejay_t *info, int sample_id)
 {
-    if(!info)
-        return -1;
-
     if(sample_id == 0 && info->uc && info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
         sample_id = info->uc->sample_id;
 
@@ -15960,9 +15833,6 @@ int veejay_audio_sync_sample_profile_rearm(veejay_t *info, int sample_id)
 {
     long current_frame;
 
-    if(!info || !info->settings)
-        return -1;
-
     current_frame = (long)atomic_load_long_long(&info->settings->current_frame_num);
     return vj_perform_audio_sync_sample_seek_rearm(info, sample_id, current_frame, "manual-rearm") > 0 ? 1 : -1;
 }
@@ -15970,9 +15840,6 @@ int veejay_audio_sync_sample_profile_rearm(veejay_t *info, int sample_id)
 int veejay_audio_sync_set_external_jack(veejay_t *info, int mode, int channels)
 {
     video_playback_setup *settings;
-
-    if(!info || !info->settings)
-        return -1;
 
     settings = info->settings;
 
@@ -15998,7 +15865,7 @@ static int veejay_audio_sync_wav_plain_limit_ms(veejay_t *info)
     double fps;
     long long frames;
 
-    if(!info || !info->uc)
+    if(!info->uc)
         return 0;
 
     if(info->uc->playback_mode != VJ_PLAYBACK_MODE_PLAIN)
@@ -16009,7 +15876,7 @@ static int veejay_audio_sync_wav_plain_limit_ms(veejay_t *info)
         return 0;
 
     fps = el->video_fps;
-    if(fps <= 0.0 && info->settings && info->settings->output_fps > 0.0f)
+    if(fps <= 0.0 && info->settings->output_fps > 0.0f)
         fps = (double)info->settings->output_fps;
     if(fps <= 0.0)
         fps = 25.0;
@@ -16029,12 +15896,6 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
     struct stat st;
     int limit_ms;
     int enable_rc;
-
-    if(!info || !info->settings) {
-        veejay_msg(VEEJAY_MSG_WARNING,
-                   "[AUDIO-SYNC][WAV] rejected request: missing veejay/settings");
-        return -1;
-    }
 
     if(!path || !path[0]) {
         veejay_msg(VEEJAY_MSG_WARNING,
@@ -16152,9 +16013,6 @@ int veejay_audio_sync_set_external_wav(veejay_t *info, const char *path, int loo
 
 int veejay_audio_sync_set_target_clock(veejay_t *info, int bpm_x10, int phase_pct, int confidence_pct)
 {
-    if(!info || !info->settings)
-        return -1;
-
     if(veejay_audio_sync_thread_disabled(info->settings)) {
         veejay_msg(VEEJAY_MSG_WARNING,
                    "[AUDIO-SYNC] target clock request ignored; audio sync/control thread is disabled");
@@ -16191,9 +16049,6 @@ int veejay_set_record_audio_source(veejay_t *info, int source)
 {
     video_playback_setup *settings;
     int old;
-
-    if(!info || !info->settings)
-        return -1;
 
     if(source < VJ_RECORD_AUDIO_SOURCE_AUTO)
         source = VJ_RECORD_AUDIO_SOURCE_AUTO;
