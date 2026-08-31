@@ -1,5 +1,5 @@
 #! /bin/bash
-# Generated automatically by config.status (reloaded) 1.5.63
+# Generated automatically by config.status (reloaded) 1.6.0
 # NOTE: Changes made to this file will be lost: look at ltmain.sh.
 
 # Provide generalized library-building support services.
@@ -70,7 +70,7 @@ host=x86_64-pc-linux-gnu
 host_os=linux-gnu
 
 # The build system.
-build_alias=
+build_alias=x86_64-linux-gnu
 build=x86_64-pc-linux-gnu
 build_os=linux-gnu
 

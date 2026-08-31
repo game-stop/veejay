@@ -1,0 +1,5 @@
+veejay-director (1.6.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging of veejay-director.
+
+ -- Niels Elburg <nwelburg@gmail.com>  Mon, 31 Aug 2026 00:00:00 +0000

@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export DH_VERBOSE=1
+export DH_OPTIONS
+
+%:
+	dh $@
+
+# NDI is dlopen()'d at runtime by director-ndi.c, so only the SDK header is
+# needed to build against it. The SDK install location has no portable
+# convention, so this reads NDI_SDK_DIR (a packaging-only build variable,
+# unrelated to the SDK's own runtime-only NDI_RUNTIME_DIR_V6 used by the
+# NDI library itself to locate libndi.so at runtime), defaulting to this
+# build host's known location. Override with e.g.
+# NDI_SDK_DIR=/path/to/sdk dpkg-buildpackage -us -uc -b
+NDI_SDK_DIR ?= /opt/ndi6
+ifneq ($(wildcard $(NDI_SDK_DIR)/include/Processing.NDI.Lib.h),)
+NDI_CONFIGURE_FLAGS := --with-ndi=$(NDI_SDK_DIR)
+endif
+
+override_dh_auto_configure:
+	dh_auto_configure -- $(NDI_CONFIGURE_FLAGS)

@@ -1,0 +1,41 @@
+# Contributor: Niels Elburg <nwelburg@gmail.com>
+pkgname=veejay-director
+pkgrel=1
+pkgver=1.6.0
+pkgdesc="Graphical remote-control and mesh director for Veejay"
+arch=('x86_64' 'aarch64')
+url="http://www.veejayhq.net"
+license=('GPL2')
+groups=()
+conflicts=('veejay-director')
+depends=('veejay-core' 'gtk3' 'libx11' 'sdl2')
+optdepends=('veejay: to control a local veejay backend')
+makedepends=('pkgconf')
+source=()
+md5sums=()
+backup=()
+replaces=()
+
+build() {
+	export PKG_CONFIG_PATH=/usr/lib/pkgconfig
+	cd $startdir
+	./autogen.sh
+	# NDI is dlopen()'d at runtime by director-ndi.c, so only the SDK header
+	# is needed to build against it. The SDK install location has no
+	# portable convention, so this reads NDI_SDK_DIR (defaulting to this
+	# build host's known location) and only passes --with-ndi when the
+	# header is actually there; otherwise configure's own "auto" detection
+	# leaves NDI disabled.
+	NDI_SDK_DIR="${NDI_SDK_DIR:-/opt/ndi6}"
+	if [ -f "$NDI_SDK_DIR/include/Processing.NDI.Lib.h" ]; then
+		./configure --prefix=/usr --with-ndi="$NDI_SDK_DIR"
+	else
+		./configure --prefix=/usr
+	fi
+	make || return 1
+}
+
+package() {
+	cd $startdir
+	make DESTDIR="$pkgdir/" install
+}

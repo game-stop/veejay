@@ -237,12 +237,12 @@ AUTOMAKE = ${SHELL} '/home/veejay/vj6/veejay/veejay-current/veejay-director/miss
 AWK = gawk
 CC = gcc
 CCAS = gcc
-CCASDEPMODE = depmode=gcc3
+CCASDEPMODE = depmode=none
 CCASFLAGS = 
-CCDEPMODE = depmode=gcc3
+CCDEPMODE = depmode=none
 CFLAGS =  -Wall -Wunused    -m64 -fPIC -DPIC -DFILE_OFFSET_BITS=64 -D_LARGE_FILES -msse -mfpmath=sse -fno-stack-protector -Wno-deprecated-declarations
 CPP = gcc -E
-CPPFLAGS = 
+CPPFLAGS = -Wdate-time -D_FORTIFY_SOURCE=3
 CSCOPE = cscope
 CTAGS = ctags
 CYGPATH_W = echo
@@ -270,7 +270,7 @@ INSTALL_PROGRAM = ${INSTALL}
 INSTALL_SCRIPT = ${INSTALL}
 INSTALL_STRIP_PROGRAM = $(install_sh) -c -s
 LD = /usr/bin/ld -m elf_x86_64
-LDFLAGS = 
+LDFLAGS = -Wl,-Bsymbolic-functions -flto=auto -ffat-lto-objects -Wl,-z,relro
 LIBAVUTIL_CFLAGS = -I/usr/include/x86_64-linux-gnu 
 LIBAVUTIL_LIBS = -lavutil 
 LIBGETOPT_LIB = 
@@ -283,10 +283,10 @@ LIBX11_LIBS = -lX11
 LIPO = 
 LN_S = ln -s
 LTLIBOBJS = 
-LT_AGE = 63
-LT_CURRENT = 63
-LT_RELEASE = 1.5.63
-LT_REVISION = 63
+LT_AGE = 0
+LT_CURRENT = 0
+LT_RELEASE = 1.6.0
+LT_REVISION = 0
 LT_SYS_LIBRARY_PATH = 
 MAINT = #
 MAKEINFO = ${SHELL} '/home/veejay/vj6/veejay/veejay-current/veejay-director/missing' makeinfo
@@ -304,10 +304,10 @@ OTOOL64 =
 PACKAGE = reloaded
 PACKAGE_BUGREPORT = nwelburg@gmail.com
 PACKAGE_NAME = reloaded
-PACKAGE_STRING = reloaded 1.5.63
+PACKAGE_STRING = reloaded 1.6.0
 PACKAGE_TARNAME = reloaded
 PACKAGE_URL = 
-PACKAGE_VERSION = 1.5.63
+PACKAGE_VERSION = 1.6.0
 PATH_SEPARATOR = :
 PKG_CONFIG = /usr/bin/pkg-config
 PKG_CONFIG_LIBDIR = 
@@ -323,9 +323,9 @@ SED = /usr/bin/sed
 SET_MAKE = 
 SHELL = /bin/bash
 STRIP = strip
-VEEJAYCORE_CFLAGS = -I/usr/local/include 
-VEEJAYCORE_LIBS = -L/usr/local/lib -lveejaycore 
-VERSION = 1.5.63
+VEEJAYCORE_CFLAGS = 
+VEEJAYCORE_LIBS = -lveejaycore 
+VERSION = 1.6.0
 XMKMF = 
 X_CFLAGS = 
 X_EXTRA_LIBS = 
@@ -345,7 +345,7 @@ am__tar = $${TAR-tar} chof - "$$tardir"
 am__untar = $${TAR-tar} xf -
 bindir = ${exec_prefix}/bin
 build = x86_64-pc-linux-gnu
-build_alias = 
+build_alias = x86_64-linux-gnu
 build_cpu = x86_64
 build_os = linux-gnu
 build_vendor = pc
@@ -362,25 +362,25 @@ host_os = linux-gnu
 host_vendor = pc
 htmldir = ${docdir}
 includedir = ${prefix}/include
-infodir = ${datarootdir}/info
+infodir = ${prefix}/share/info
 install_sh = ${SHELL} /home/veejay/vj6/veejay/veejay-current/veejay-director/install-sh
-libdir = ${exec_prefix}/lib
+libdir = ${prefix}/lib/x86_64-linux-gnu
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
-localstatedir = ${prefix}/var
-mandir = ${datarootdir}/man
+localstatedir = /var
+mandir = ${prefix}/share/man
 mkdir_p = $(MKDIR_P)
 oldincludedir = /usr/include
 pdfdir = ${docdir}
-prefix = /usr/local
+prefix = /usr
 program_transform_name = s,x,x,
 psdir = ${docdir}
 reloaded_datadir = ${prefix}/share/reloaded
-runstatedir = ${localstatedir}/run
+runstatedir = /run
 sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
 srcdir = .
-sysconfdir = ${prefix}/etc
+sysconfdir = /etc
 target = x86_64-pc-linux-gnu
 target_alias = 
 target_cpu = x86_64
@@ -527,14 +527,14 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-include ./$(DEPDIR)/veejay_director-director-client.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-director-model.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-director-ndi.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-director-presets.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-director-wire.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-gtkviewportmesh.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-gtkvjlogview.Po # am--include-marker
-include ./$(DEPDIR)/veejay_director-veejay-director.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-director-client.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-director-model.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-director-ndi.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-director-presets.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-director-wire.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-gtkviewportmesh.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-gtkvjlogview.Po # am--include-marker
+#include ./$(DEPDIR)/veejay_director-veejay-director.Po # am--include-marker
 
 $(am__depfiles_remade):
 	@$(MKDIR_P) $(@D)
@@ -543,137 +543,137 @@ $(am__depfiles_remade):
 am--depfiles: $(am__depfiles_remade)
 
 .c.o:
-	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-#	$(AM_V_CC)source='$<' object='$@' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(COMPILE) -c -o $@ $<
+#	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+#	$(AM_V_CC)source='$<' object='$@' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(COMPILE) -c -o $@ $<
 
 .c.obj:
-	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
-#	$(AM_V_CC)source='$<' object='$@' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+#	$(AM_V_CC)$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ `$(CYGPATH_W) '$<'`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Po
+#	$(AM_V_CC)source='$<' object='$@' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .c.lo:
-	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
-	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
-#	$(AM_V_CC)source='$<' object='$@' libtool=yes \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(LTCOMPILE) -c -o $@ $<
+#	$(AM_V_CC)$(LTCOMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/$*.Tpo $(DEPDIR)/$*.Plo
+#	$(AM_V_CC)source='$<' object='$@' libtool=yes 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(LTCOMPILE) -c -o $@ $<
 
 veejay_director-veejay-director.o: veejay-director.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-veejay-director.o -MD -MP -MF $(DEPDIR)/veejay_director-veejay-director.Tpo -c -o veejay_director-veejay-director.o `test -f 'veejay-director.c' || echo '$(srcdir)/'`veejay-director.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-veejay-director.Tpo $(DEPDIR)/veejay_director-veejay-director.Po
-#	$(AM_V_CC)source='veejay-director.c' object='veejay_director-veejay-director.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-veejay-director.o `test -f 'veejay-director.c' || echo '$(srcdir)/'`veejay-director.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-veejay-director.o -MD -MP -MF $(DEPDIR)/veejay_director-veejay-director.Tpo -c -o veejay_director-veejay-director.o `test -f 'veejay-director.c' || echo '$(srcdir)/'`veejay-director.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-veejay-director.Tpo $(DEPDIR)/veejay_director-veejay-director.Po
+#	$(AM_V_CC)source='veejay-director.c' object='veejay_director-veejay-director.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-veejay-director.o `test -f 'veejay-director.c' || echo '$(srcdir)/'`veejay-director.c
 
 veejay_director-veejay-director.obj: veejay-director.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-veejay-director.obj -MD -MP -MF $(DEPDIR)/veejay_director-veejay-director.Tpo -c -o veejay_director-veejay-director.obj `if test -f 'veejay-director.c'; then $(CYGPATH_W) 'veejay-director.c'; else $(CYGPATH_W) '$(srcdir)/veejay-director.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-veejay-director.Tpo $(DEPDIR)/veejay_director-veejay-director.Po
-#	$(AM_V_CC)source='veejay-director.c' object='veejay_director-veejay-director.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-veejay-director.obj `if test -f 'veejay-director.c'; then $(CYGPATH_W) 'veejay-director.c'; else $(CYGPATH_W) '$(srcdir)/veejay-director.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-veejay-director.obj -MD -MP -MF $(DEPDIR)/veejay_director-veejay-director.Tpo -c -o veejay_director-veejay-director.obj `if test -f 'veejay-director.c'; then $(CYGPATH_W) 'veejay-director.c'; else $(CYGPATH_W) '$(srcdir)/veejay-director.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-veejay-director.Tpo $(DEPDIR)/veejay_director-veejay-director.Po
+#	$(AM_V_CC)source='veejay-director.c' object='veejay_director-veejay-director.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-veejay-director.obj `if test -f 'veejay-director.c'; then $(CYGPATH_W) 'veejay-director.c'; else $(CYGPATH_W) '$(srcdir)/veejay-director.c'; fi`
 
 veejay_director-director-client.o: director-client.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-client.o -MD -MP -MF $(DEPDIR)/veejay_director-director-client.Tpo -c -o veejay_director-director-client.o `test -f 'director-client.c' || echo '$(srcdir)/'`director-client.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-client.Tpo $(DEPDIR)/veejay_director-director-client.Po
-#	$(AM_V_CC)source='director-client.c' object='veejay_director-director-client.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-client.o `test -f 'director-client.c' || echo '$(srcdir)/'`director-client.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-client.o -MD -MP -MF $(DEPDIR)/veejay_director-director-client.Tpo -c -o veejay_director-director-client.o `test -f 'director-client.c' || echo '$(srcdir)/'`director-client.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-client.Tpo $(DEPDIR)/veejay_director-director-client.Po
+#	$(AM_V_CC)source='director-client.c' object='veejay_director-director-client.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-client.o `test -f 'director-client.c' || echo '$(srcdir)/'`director-client.c
 
 veejay_director-director-client.obj: director-client.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-client.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-client.Tpo -c -o veejay_director-director-client.obj `if test -f 'director-client.c'; then $(CYGPATH_W) 'director-client.c'; else $(CYGPATH_W) '$(srcdir)/director-client.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-client.Tpo $(DEPDIR)/veejay_director-director-client.Po
-#	$(AM_V_CC)source='director-client.c' object='veejay_director-director-client.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-client.obj `if test -f 'director-client.c'; then $(CYGPATH_W) 'director-client.c'; else $(CYGPATH_W) '$(srcdir)/director-client.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-client.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-client.Tpo -c -o veejay_director-director-client.obj `if test -f 'director-client.c'; then $(CYGPATH_W) 'director-client.c'; else $(CYGPATH_W) '$(srcdir)/director-client.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-client.Tpo $(DEPDIR)/veejay_director-director-client.Po
+#	$(AM_V_CC)source='director-client.c' object='veejay_director-director-client.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-client.obj `if test -f 'director-client.c'; then $(CYGPATH_W) 'director-client.c'; else $(CYGPATH_W) '$(srcdir)/director-client.c'; fi`
 
 veejay_director-director-wire.o: director-wire.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-wire.o -MD -MP -MF $(DEPDIR)/veejay_director-director-wire.Tpo -c -o veejay_director-director-wire.o `test -f 'director-wire.c' || echo '$(srcdir)/'`director-wire.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-wire.Tpo $(DEPDIR)/veejay_director-director-wire.Po
-#	$(AM_V_CC)source='director-wire.c' object='veejay_director-director-wire.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-wire.o `test -f 'director-wire.c' || echo '$(srcdir)/'`director-wire.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-wire.o -MD -MP -MF $(DEPDIR)/veejay_director-director-wire.Tpo -c -o veejay_director-director-wire.o `test -f 'director-wire.c' || echo '$(srcdir)/'`director-wire.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-wire.Tpo $(DEPDIR)/veejay_director-director-wire.Po
+#	$(AM_V_CC)source='director-wire.c' object='veejay_director-director-wire.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-wire.o `test -f 'director-wire.c' || echo '$(srcdir)/'`director-wire.c
 
 veejay_director-director-wire.obj: director-wire.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-wire.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-wire.Tpo -c -o veejay_director-director-wire.obj `if test -f 'director-wire.c'; then $(CYGPATH_W) 'director-wire.c'; else $(CYGPATH_W) '$(srcdir)/director-wire.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-wire.Tpo $(DEPDIR)/veejay_director-director-wire.Po
-#	$(AM_V_CC)source='director-wire.c' object='veejay_director-director-wire.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-wire.obj `if test -f 'director-wire.c'; then $(CYGPATH_W) 'director-wire.c'; else $(CYGPATH_W) '$(srcdir)/director-wire.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-wire.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-wire.Tpo -c -o veejay_director-director-wire.obj `if test -f 'director-wire.c'; then $(CYGPATH_W) 'director-wire.c'; else $(CYGPATH_W) '$(srcdir)/director-wire.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-wire.Tpo $(DEPDIR)/veejay_director-director-wire.Po
+#	$(AM_V_CC)source='director-wire.c' object='veejay_director-director-wire.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-wire.obj `if test -f 'director-wire.c'; then $(CYGPATH_W) 'director-wire.c'; else $(CYGPATH_W) '$(srcdir)/director-wire.c'; fi`
 
 veejay_director-director-ndi.o: director-ndi.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-ndi.o -MD -MP -MF $(DEPDIR)/veejay_director-director-ndi.Tpo -c -o veejay_director-director-ndi.o `test -f 'director-ndi.c' || echo '$(srcdir)/'`director-ndi.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-ndi.Tpo $(DEPDIR)/veejay_director-director-ndi.Po
-#	$(AM_V_CC)source='director-ndi.c' object='veejay_director-director-ndi.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-ndi.o `test -f 'director-ndi.c' || echo '$(srcdir)/'`director-ndi.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-ndi.o -MD -MP -MF $(DEPDIR)/veejay_director-director-ndi.Tpo -c -o veejay_director-director-ndi.o `test -f 'director-ndi.c' || echo '$(srcdir)/'`director-ndi.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-ndi.Tpo $(DEPDIR)/veejay_director-director-ndi.Po
+#	$(AM_V_CC)source='director-ndi.c' object='veejay_director-director-ndi.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-ndi.o `test -f 'director-ndi.c' || echo '$(srcdir)/'`director-ndi.c
 
 veejay_director-director-ndi.obj: director-ndi.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-ndi.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-ndi.Tpo -c -o veejay_director-director-ndi.obj `if test -f 'director-ndi.c'; then $(CYGPATH_W) 'director-ndi.c'; else $(CYGPATH_W) '$(srcdir)/director-ndi.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-ndi.Tpo $(DEPDIR)/veejay_director-director-ndi.Po
-#	$(AM_V_CC)source='director-ndi.c' object='veejay_director-director-ndi.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-ndi.obj `if test -f 'director-ndi.c'; then $(CYGPATH_W) 'director-ndi.c'; else $(CYGPATH_W) '$(srcdir)/director-ndi.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-ndi.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-ndi.Tpo -c -o veejay_director-director-ndi.obj `if test -f 'director-ndi.c'; then $(CYGPATH_W) 'director-ndi.c'; else $(CYGPATH_W) '$(srcdir)/director-ndi.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-ndi.Tpo $(DEPDIR)/veejay_director-director-ndi.Po
+#	$(AM_V_CC)source='director-ndi.c' object='veejay_director-director-ndi.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-ndi.obj `if test -f 'director-ndi.c'; then $(CYGPATH_W) 'director-ndi.c'; else $(CYGPATH_W) '$(srcdir)/director-ndi.c'; fi`
 
 veejay_director-director-model.o: director-model.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-model.o -MD -MP -MF $(DEPDIR)/veejay_director-director-model.Tpo -c -o veejay_director-director-model.o `test -f 'director-model.c' || echo '$(srcdir)/'`director-model.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-model.Tpo $(DEPDIR)/veejay_director-director-model.Po
-#	$(AM_V_CC)source='director-model.c' object='veejay_director-director-model.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-model.o `test -f 'director-model.c' || echo '$(srcdir)/'`director-model.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-model.o -MD -MP -MF $(DEPDIR)/veejay_director-director-model.Tpo -c -o veejay_director-director-model.o `test -f 'director-model.c' || echo '$(srcdir)/'`director-model.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-model.Tpo $(DEPDIR)/veejay_director-director-model.Po
+#	$(AM_V_CC)source='director-model.c' object='veejay_director-director-model.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-model.o `test -f 'director-model.c' || echo '$(srcdir)/'`director-model.c
 
 veejay_director-director-model.obj: director-model.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-model.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-model.Tpo -c -o veejay_director-director-model.obj `if test -f 'director-model.c'; then $(CYGPATH_W) 'director-model.c'; else $(CYGPATH_W) '$(srcdir)/director-model.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-model.Tpo $(DEPDIR)/veejay_director-director-model.Po
-#	$(AM_V_CC)source='director-model.c' object='veejay_director-director-model.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-model.obj `if test -f 'director-model.c'; then $(CYGPATH_W) 'director-model.c'; else $(CYGPATH_W) '$(srcdir)/director-model.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-model.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-model.Tpo -c -o veejay_director-director-model.obj `if test -f 'director-model.c'; then $(CYGPATH_W) 'director-model.c'; else $(CYGPATH_W) '$(srcdir)/director-model.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-model.Tpo $(DEPDIR)/veejay_director-director-model.Po
+#	$(AM_V_CC)source='director-model.c' object='veejay_director-director-model.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-model.obj `if test -f 'director-model.c'; then $(CYGPATH_W) 'director-model.c'; else $(CYGPATH_W) '$(srcdir)/director-model.c'; fi`
 
 veejay_director-gtkviewportmesh.o: gtkviewportmesh.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkviewportmesh.o -MD -MP -MF $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo -c -o veejay_director-gtkviewportmesh.o `test -f 'gtkviewportmesh.c' || echo '$(srcdir)/'`gtkviewportmesh.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo $(DEPDIR)/veejay_director-gtkviewportmesh.Po
-#	$(AM_V_CC)source='gtkviewportmesh.c' object='veejay_director-gtkviewportmesh.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkviewportmesh.o `test -f 'gtkviewportmesh.c' || echo '$(srcdir)/'`gtkviewportmesh.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkviewportmesh.o -MD -MP -MF $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo -c -o veejay_director-gtkviewportmesh.o `test -f 'gtkviewportmesh.c' || echo '$(srcdir)/'`gtkviewportmesh.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo $(DEPDIR)/veejay_director-gtkviewportmesh.Po
+#	$(AM_V_CC)source='gtkviewportmesh.c' object='veejay_director-gtkviewportmesh.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkviewportmesh.o `test -f 'gtkviewportmesh.c' || echo '$(srcdir)/'`gtkviewportmesh.c
 
 veejay_director-gtkviewportmesh.obj: gtkviewportmesh.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkviewportmesh.obj -MD -MP -MF $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo -c -o veejay_director-gtkviewportmesh.obj `if test -f 'gtkviewportmesh.c'; then $(CYGPATH_W) 'gtkviewportmesh.c'; else $(CYGPATH_W) '$(srcdir)/gtkviewportmesh.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo $(DEPDIR)/veejay_director-gtkviewportmesh.Po
-#	$(AM_V_CC)source='gtkviewportmesh.c' object='veejay_director-gtkviewportmesh.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkviewportmesh.obj `if test -f 'gtkviewportmesh.c'; then $(CYGPATH_W) 'gtkviewportmesh.c'; else $(CYGPATH_W) '$(srcdir)/gtkviewportmesh.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkviewportmesh.obj -MD -MP -MF $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo -c -o veejay_director-gtkviewportmesh.obj `if test -f 'gtkviewportmesh.c'; then $(CYGPATH_W) 'gtkviewportmesh.c'; else $(CYGPATH_W) '$(srcdir)/gtkviewportmesh.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkviewportmesh.Tpo $(DEPDIR)/veejay_director-gtkviewportmesh.Po
+#	$(AM_V_CC)source='gtkviewportmesh.c' object='veejay_director-gtkviewportmesh.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkviewportmesh.obj `if test -f 'gtkviewportmesh.c'; then $(CYGPATH_W) 'gtkviewportmesh.c'; else $(CYGPATH_W) '$(srcdir)/gtkviewportmesh.c'; fi`
 
 veejay_director-gtkvjlogview.o: gtkvjlogview.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkvjlogview.o -MD -MP -MF $(DEPDIR)/veejay_director-gtkvjlogview.Tpo -c -o veejay_director-gtkvjlogview.o `test -f 'gtkvjlogview.c' || echo '$(srcdir)/'`gtkvjlogview.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkvjlogview.Tpo $(DEPDIR)/veejay_director-gtkvjlogview.Po
-#	$(AM_V_CC)source='gtkvjlogview.c' object='veejay_director-gtkvjlogview.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkvjlogview.o `test -f 'gtkvjlogview.c' || echo '$(srcdir)/'`gtkvjlogview.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkvjlogview.o -MD -MP -MF $(DEPDIR)/veejay_director-gtkvjlogview.Tpo -c -o veejay_director-gtkvjlogview.o `test -f 'gtkvjlogview.c' || echo '$(srcdir)/'`gtkvjlogview.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkvjlogview.Tpo $(DEPDIR)/veejay_director-gtkvjlogview.Po
+#	$(AM_V_CC)source='gtkvjlogview.c' object='veejay_director-gtkvjlogview.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkvjlogview.o `test -f 'gtkvjlogview.c' || echo '$(srcdir)/'`gtkvjlogview.c
 
 veejay_director-gtkvjlogview.obj: gtkvjlogview.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkvjlogview.obj -MD -MP -MF $(DEPDIR)/veejay_director-gtkvjlogview.Tpo -c -o veejay_director-gtkvjlogview.obj `if test -f 'gtkvjlogview.c'; then $(CYGPATH_W) 'gtkvjlogview.c'; else $(CYGPATH_W) '$(srcdir)/gtkvjlogview.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkvjlogview.Tpo $(DEPDIR)/veejay_director-gtkvjlogview.Po
-#	$(AM_V_CC)source='gtkvjlogview.c' object='veejay_director-gtkvjlogview.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkvjlogview.obj `if test -f 'gtkvjlogview.c'; then $(CYGPATH_W) 'gtkvjlogview.c'; else $(CYGPATH_W) '$(srcdir)/gtkvjlogview.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-gtkvjlogview.obj -MD -MP -MF $(DEPDIR)/veejay_director-gtkvjlogview.Tpo -c -o veejay_director-gtkvjlogview.obj `if test -f 'gtkvjlogview.c'; then $(CYGPATH_W) 'gtkvjlogview.c'; else $(CYGPATH_W) '$(srcdir)/gtkvjlogview.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-gtkvjlogview.Tpo $(DEPDIR)/veejay_director-gtkvjlogview.Po
+#	$(AM_V_CC)source='gtkvjlogview.c' object='veejay_director-gtkvjlogview.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-gtkvjlogview.obj `if test -f 'gtkvjlogview.c'; then $(CYGPATH_W) 'gtkvjlogview.c'; else $(CYGPATH_W) '$(srcdir)/gtkvjlogview.c'; fi`
 
 veejay_director-director-presets.o: director-presets.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-presets.o -MD -MP -MF $(DEPDIR)/veejay_director-director-presets.Tpo -c -o veejay_director-director-presets.o `test -f 'director-presets.c' || echo '$(srcdir)/'`director-presets.c
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-presets.Tpo $(DEPDIR)/veejay_director-director-presets.Po
-#	$(AM_V_CC)source='director-presets.c' object='veejay_director-director-presets.o' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-presets.o `test -f 'director-presets.c' || echo '$(srcdir)/'`director-presets.c
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-presets.o -MD -MP -MF $(DEPDIR)/veejay_director-director-presets.Tpo -c -o veejay_director-director-presets.o `test -f 'director-presets.c' || echo '$(srcdir)/'`director-presets.c
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-presets.Tpo $(DEPDIR)/veejay_director-director-presets.Po
+#	$(AM_V_CC)source='director-presets.c' object='veejay_director-director-presets.o' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-presets.o `test -f 'director-presets.c' || echo '$(srcdir)/'`director-presets.c
 
 veejay_director-director-presets.obj: director-presets.c
-	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-presets.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-presets.Tpo -c -o veejay_director-director-presets.obj `if test -f 'director-presets.c'; then $(CYGPATH_W) 'director-presets.c'; else $(CYGPATH_W) '$(srcdir)/director-presets.c'; fi`
-	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-presets.Tpo $(DEPDIR)/veejay_director-director-presets.Po
-#	$(AM_V_CC)source='director-presets.c' object='veejay_director-director-presets.obj' libtool=no \
-#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
-#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-presets.obj `if test -f 'director-presets.c'; then $(CYGPATH_W) 'director-presets.c'; else $(CYGPATH_W) '$(srcdir)/director-presets.c'; fi`
+#	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -MT veejay_director-director-presets.obj -MD -MP -MF $(DEPDIR)/veejay_director-director-presets.Tpo -c -o veejay_director-director-presets.obj `if test -f 'director-presets.c'; then $(CYGPATH_W) 'director-presets.c'; else $(CYGPATH_W) '$(srcdir)/director-presets.c'; fi`
+#	$(AM_V_at)$(am__mv) $(DEPDIR)/veejay_director-director-presets.Tpo $(DEPDIR)/veejay_director-director-presets.Po
+#	$(AM_V_CC)source='director-presets.c' object='veejay_director-director-presets.obj' libtool=no 
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) 
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(veejay_director_CFLAGS) $(CFLAGS) -c -o veejay_director-director-presets.obj `if test -f 'director-presets.c'; then $(CYGPATH_W) 'director-presets.c'; else $(CYGPATH_W) '$(srcdir)/director-presets.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

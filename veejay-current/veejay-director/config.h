@@ -227,7 +227,7 @@
 #define PACKAGE_NAME "reloaded"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "reloaded 1.5.63"
+#define PACKAGE_STRING "reloaded 1.6.0"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "reloaded"
@@ -236,7 +236,7 @@
 #define PACKAGE_URL ""
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.5.63"
+#define PACKAGE_VERSION "1.6.0"
 
 /* The size of `float', as computed by sizeof. */
 #define SIZEOF_FLOAT 4
@@ -347,7 +347,7 @@
 /* #undef VALIDATE_VIMS */
 
 /* Version number of package */
-#define VERSION "1.5.63"
+#define VERSION "1.6.0"
 
 /* Define WORDS_BIGENDIAN to 1 if your processor stores words with the most
    significant byte first (like Motorola and SPARC, unlike Intel). */
