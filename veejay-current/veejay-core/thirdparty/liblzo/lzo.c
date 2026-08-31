@@ -30,7 +30,6 @@
 
 #ifdef HAVE_ARM_ASIMD
 #include <arm_neon.h>
-#include <arm_sve.h>
 #endif
 #if defined (__SSE2__) || defined(__SSE4_2__) || defined(_SSE4_1__)
 #include <immintrin.h>

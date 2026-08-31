@@ -17,6 +17,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <libvjmem/cpu.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -31,14 +32,15 @@
 #include <libavcodec/avcodec.h>
 #include <libyuv/mmx_macros.h>
 #include <veejaycore/avcommon.h>
-#ifdef HAVE_ARM
+#if defined(HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
 #include <arm_neon.h>
+#define HAVE_ARM_SIMD 1
 #endif
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
 
-#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_SSE4_1) || defined(HAVE_ASM_AVX) || defined(HAVE_ASM_AVX2)
+#if defined(HAVE_ASM_SSE2) || defined(HAVE_ASM_SSE4_1) || defined(HAVE_ASM_AVX) || defined(HAVE_ASM_AVX2) || defined(HAVE_TARGET_AVX2)
 #include <emmintrin.h> // SSE2
 #include <tmmintrin.h> // SSSE3 (for _mm_srai_epi16)
 #include <smmintrin.h> // SSE4.1
@@ -846,7 +848,7 @@ void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 
 
 // non mmx functions
-#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
+#if !defined(HAVE_ASM_MMX)
 void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
         int width, int height)
 {
@@ -942,7 +944,8 @@ static inline void vj_yuv422p_to_yuy2_scalar_row(const uint8_t *y,
     }
 }
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+__attribute__((target("avx2")))
 static void vj_yuv422p_to_yuy2_avx2(const uint8_t *src[3],
                                      const int src_stride[3],
                                      uint8_t *dst,
@@ -975,15 +978,15 @@ static void vj_yuv422p_to_yuy2_avx2(const uint8_t *src[3],
 }
 #endif
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
 static int vj_yuv422p_to_yuy2_use_avx2(void)
 {
     static int dispatch = 0;
     int selected = __atomic_load_n(&dispatch, __ATOMIC_ACQUIRE);
 
     if(selected == 0) {
-        __builtin_cpu_init();
-        int detected = __builtin_cpu_supports("avx2") ? 2 : 1;
+        int detected = vj_cpu_supports((uint32_t) vj_cpu_get_flags(),
+                                       AV_CPU_FLAG_AVX2) ? 2 : 1;
         __atomic_compare_exchange_n(&dispatch, &selected, detected, 0,
                                     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE);
         selected = __atomic_load_n(&dispatch, __ATOMIC_ACQUIRE);
@@ -993,7 +996,7 @@ static int vj_yuv422p_to_yuy2_use_avx2(void)
 }
 #endif
 
-#ifdef HAVE_ARM
+#ifdef HAVE_ARM_SIMD
 static void vj_yuv422p_to_yuy2_neon(const uint8_t *src[3],
                                      const int src_stride[3],
                                      uint8_t *dst,
@@ -1030,7 +1033,7 @@ int vj_yuv422p_to_yuy2(const uint8_t *src[3], const int src_stride[3],
        src_stride[2] < (width >> 1) || dst_pitch < width * 2)
         return 0;
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
     if(vj_yuv422p_to_yuy2_use_avx2()) {
         vj_yuv422p_to_yuy2_avx2(src, src_stride, dst, dst_pitch, width, height);
     } else {
@@ -1042,7 +1045,7 @@ int vj_yuv422p_to_yuy2(const uint8_t *src[3], const int src_stride[3],
             vj_yuv422p_to_yuy2_scalar_row(y, u, v, out, 0, width);
         }
     }
-#elif defined(HAVE_ARM)
+#elif defined(HAVE_ARM_SIMD)
     vj_yuv422p_to_yuy2_neon(src, src_stride, dst, dst_pitch, width, height);
 #else
     for(int row = 0; row < height; row++) {
@@ -1408,32 +1411,28 @@ void yuv422to420planar(uint8_t *src[3], uint8_t *dst[3], int len ) {
 
 }
 
-#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM)
+#if !defined(HAVE_ASM_MMX) && !defined(HAVE_ARM_SIMD)
 void    yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 {
-    unsigned int x,y;
-    unsigned int k=0;
+    int x,y;
     const int hei = h >> 1;
     const int wid = w >> 1;
-    uint8_t *u = dst[1];
-    uint8_t *v = dst[2];
-    uint8_t *a = src[1];
-    uint8_t *b = src[2];
     for( y = 0 ; y < hei; y ++ ) {
-        u = dst[1] + ( (y << 1 ) * wid ); //@ dup
-        v = dst[2] + ( (y << 1 ) * wid );
+        uint8_t *u = dst[1] + ( (y << 1 ) * wid );
+        uint8_t *v = dst[2] + ( (y << 1 ) * wid );
+        uint8_t *a = src[1] + y * wid;
+        uint8_t *b = src[2] + y * wid;
         for( x= 0; x < wid ; x ++ ) {
-            u[k] = a[ y * wid + x];
-            u[k + wid ] = a[y*wid+x];
-            v[k] = b[ y * wid + x];
-            v[k + wid ] = b[y * wid + x ];
-            k += 2;
+            u[x] = a[x];
+            u[x + wid] = a[x];
+            v[x] = b[x];
+            v[x + wid] = b[x];
         }
     }
 }
 #endif
 
-#ifdef HAVE_ARM
+#ifdef HAVE_ARM_SIMD
 void yuv420to422planar(uint8_t *src[3], uint8_t *dst[3], int w, int h) {
     const int wid = w >> 1;
     const int hei = h >> 1;
@@ -1452,7 +1451,8 @@ void yuv420to422planar(uint8_t *src[3], uint8_t *dst[3], int w, int h) {
         uint8_t *v_even = v_dst + (y << 1) * wid;
         uint8_t *v_odd = v_dst + ((y << 1) + 1) * wid;
 
-        for (int x = 0; x < wid; x += 8) {
+        int x = 0;
+        for (; x + 7 < wid; x += 8) {
             uint8x8_t u_values = vld1_u8(a);
             uint8x8_t v_values = vld1_u8(b);
 
@@ -1468,6 +1468,13 @@ void yuv420to422planar(uint8_t *src[3], uint8_t *dst[3], int w, int h) {
             u_odd += 8;
             v_even += 8;
             v_odd += 8;
+        }
+
+        for (; x < wid; x++) {
+            *u_even++ = *a;
+            *u_odd++ = *a++;
+            *v_even++ = *b;
+            *v_odd++ = *b++;
         }
     }
 }

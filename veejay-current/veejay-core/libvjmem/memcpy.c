@@ -141,19 +141,15 @@
 #include <veejaycore/defs.h>
 #include <libyuv/yuvconv.h>
 #include <veejaycore/veejaycore.h>
-#include <libavutil/cpu.h>
+#include "cpu.h"
 #include <omp.h>
-#ifdef HAVE_ARM
+#if defined(HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
 #include <arm_neon.h>
 #endif
-#ifdef HAVE_ARM_NEON
+#ifdef HAVE_ARMV7A
 #include <fastarm/new_arm.h>
 #endif
-#ifdef HAVE_ARM_ASIMD
-#include <arm_neon.h>
-#include <arm_sve.h>
-#endif
-#if defined (__SSE2__) || defined(__SSE4_2__) || defined(_SSE4_1__)
+#if defined (__SSE2__) || defined(__SSE4_2__) || defined(_SSE4_1__) || defined(HAVE_TARGET_SSE4_1) || defined(HAVE_TARGET_SSE4_2) || defined(HAVE_TARGET_AVX) || defined(HAVE_TARGET_AVX2)
 #include <immintrin.h>
 #endif
 
@@ -279,7 +275,7 @@ static inline void *__memcpy(void *restrict to, const void *restrict from, size_
     return to;
 }
 
-#ifdef HAVE_ASM_AVX
+#if defined(HAVE_ASM_AVX) || defined(HAVE_TARGET_AVX)
 #define AVX_MMREG_SIZE 32
 #endif
 #if defined(HAVE_ASM_SSE) || defined(HAVE_ASM_SSE2) || defined(__SSE2__) || defined(__SSE4_1__)
@@ -484,7 +480,8 @@ void	packed_plane_clear( size_t len, void *to )
 	}
 }
 
-#if defined (__SSE4_1__)
+#ifdef HAVE_TARGET_SSE4_1
+__attribute__((target("sse4.1")))
 static void *sse41_memcpy(void *restrict dst, const void *restrict src, size_t len) {
   void *retval = dst;
   unsigned char *to = (unsigned char*) dst;
@@ -503,7 +500,13 @@ static void *sse41_memcpy(void *restrict dst, const void *restrict src, size_t l
       delta = SSE_MMREG_SIZE - delta;
       len -= delta;
       __memcpy(to, from, delta);
+            to += delta;
+            from += delta;
     }
+        if (len < 128) {
+            __memcpy(to, from, len);
+            return retval;
+        }
 
     __m128i xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
 
@@ -514,14 +517,14 @@ static void *sse41_memcpy(void *restrict dst, const void *restrict src, size_t l
     _mm_prefetch((char *)from + 224, _MM_HINT_NTA);
 
     // Load data into registers
-    xmm0 = _mm_load_si128((__m128i *)from);
-    xmm1 = _mm_load_si128((__m128i *)((char *)from + 16));
-    xmm2 = _mm_load_si128((__m128i *)((char *)from + 32));
-    xmm3 = _mm_load_si128((__m128i *)((char *)from + 48));
-    xmm4 = _mm_load_si128((__m128i *)((char *)from + 64));
-    xmm5 = _mm_load_si128((__m128i *)((char *)from + 80));
-    xmm6 = _mm_load_si128((__m128i *)((char *)from + 96));
-    xmm7 = _mm_load_si128((__m128i *)((char *)from + 112));
+    xmm0 = _mm_loadu_si128((__m128i *)from);
+    xmm1 = _mm_loadu_si128((__m128i *)((char *)from + 16));
+    xmm2 = _mm_loadu_si128((__m128i *)((char *)from + 32));
+    xmm3 = _mm_loadu_si128((__m128i *)((char *)from + 48));
+    xmm4 = _mm_loadu_si128((__m128i *)((char *)from + 64));
+    xmm5 = _mm_loadu_si128((__m128i *)((char *)from + 80));
+    xmm6 = _mm_loadu_si128((__m128i *)((char *)from + 96));
+    xmm7 = _mm_loadu_si128((__m128i *)((char *)from + 112));
 
     // Store data from registers to destination
     _mm_store_si128((__m128i *)to, xmm0);
@@ -548,7 +551,8 @@ static void *sse41_memcpy(void *restrict dst, const void *restrict src, size_t l
 }
 #endif
 
-#if defined (__SSE4_2__ )
+#ifdef HAVE_TARGET_SSE4_2
+__attribute__((target("sse4.2")))
 static void *sse42_memcpy(void *restrict dst, const void *restrict src, size_t len) {
   void *retval = dst;
   unsigned char *to = (unsigned char*) dst;
@@ -567,7 +571,13 @@ static void *sse42_memcpy(void *restrict dst, const void *restrict src, size_t l
       delta = SSE_MMREG_SIZE - delta;
       len -= delta;
       __memcpy(to, from, delta);
+            to += delta;
+            from += delta;
     }
+        if (len < 128) {
+            __memcpy(to, from, len);
+            return retval;
+        }
 
     __m128i xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7;
 
@@ -578,14 +588,14 @@ static void *sse42_memcpy(void *restrict dst, const void *restrict src, size_t l
     _mm_prefetch((char *)from + 224, _MM_HINT_NTA);
 
     // Load data into registers
-    xmm0 = _mm_load_si128((__m128i *)from);
-    xmm1 = _mm_load_si128((__m128i *)((char *)from + 16));
-    xmm2 = _mm_load_si128((__m128i *)((char *)from + 32));
-    xmm3 = _mm_load_si128((__m128i *)((char *)from + 48));
-    xmm4 = _mm_load_si128((__m128i *)((char *)from + 64));
-    xmm5 = _mm_load_si128((__m128i *)((char *)from + 80));
-    xmm6 = _mm_load_si128((__m128i *)((char *)from + 96));
-    xmm7 = _mm_load_si128((__m128i *)((char *)from + 112));
+    xmm0 = _mm_loadu_si128((__m128i *)from);
+    xmm1 = _mm_loadu_si128((__m128i *)((char *)from + 16));
+    xmm2 = _mm_loadu_si128((__m128i *)((char *)from + 32));
+    xmm3 = _mm_loadu_si128((__m128i *)((char *)from + 48));
+    xmm4 = _mm_loadu_si128((__m128i *)((char *)from + 64));
+    xmm5 = _mm_loadu_si128((__m128i *)((char *)from + 80));
+    xmm6 = _mm_loadu_si128((__m128i *)((char *)from + 96));
+    xmm7 = _mm_loadu_si128((__m128i *)((char *)from + 112));
 
     // Store data from registers to destination
     _mm_storeu_si128((__m128i *)to, xmm0);
@@ -780,7 +790,7 @@ static void *sse_memcpy2(void *restrict to, const void *restrict from, size_t le
 		i = len >> 7; /* len/128 */
 		len&=127;
 
-		for(; i>1; i--)
+        for(; i>0; i--)
 		{   
 			__asm__ __volatile__ (
 				"movups (%0),  %%xmm0\n"
@@ -803,19 +813,7 @@ static void *sse_memcpy2(void *restrict to, const void *restrict from, size_t le
 			from = ((const unsigned char *)from) + 128;
 			to = ((unsigned char *)to) + 128;
 		}
-		
-		if (len >= SSE_MMREG_SIZE) {
-            __asm__ __volatile__ (
-                "movups (%0),  %%xmm0\n"
-                "movntps %%xmm0, (%1)\n"
-                :: "r" (from), "r" (to) : "memory");
-            from = ((const unsigned char *)from) + 16;
-            to = ((unsigned char *)to) + 16;
-        }
-		if (len) {
-            memcpy(to, from, len);
-        }
-		/* since movntq is weakly-ordered, a "sfence"
+		/* Since movntps is weakly ordered, an sfence
 		 * is needed to become ordered again. */
 		__asm__ __volatile__ ("sfence":::"memory");
   }
@@ -918,7 +916,8 @@ static void * sse_memcpy(void *restrict to, const void *restrict from, size_t le
 }
 #endif
 
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
+__attribute__((target("avx2")))
 void *avx2_memcpy(void *restrict dst0, const void *restrict src0, size_t len0) {
     char *dst = (char *)dst0;
     const char *src = (const char *)src0;
@@ -1030,7 +1029,7 @@ void *avx2_memset(void *dst0, int c, size_t len0) {
 }
 #endif
 
-#ifdef HAVE_ASM_AVX
+#ifdef HAVE_TARGET_AVX
 __attribute__((target("avx")))
 void *avx_memset(void *dst0, int c, size_t len0) {
     void *retval = dst0;
@@ -1078,95 +1077,7 @@ void *avx_memset(void *dst0, int c, size_t len0) {
 
 #endif
 
-#ifdef HAVE_ASM_AVX512
-#define AVX512_MMREG_SIZE 64  // 512-bit register = 64 bytes
-static void * avx512_memcpy(void *restrict to, const void *restrict from, size_t len) {
-    void *retval = to;
-    size_t i;
-    __asm__ __volatile__ (
-        "   prefetchnta (%0)\n"
-        "   prefetchnta 64(%0)\n"
-        "   prefetchnta 128(%0)\n"
-        "   prefetchnta 192(%0)\n"
-        "   prefetchnta 256(%0)\n"
-        "   prefetchnta 320(%0)\n"
-        "   prefetchnta 384(%0)\n"
-        "   prefetchnta 448(%0)\n"
-        "   prefetchnta 512(%0)\n"
-        "   prefetchnta 576(%0)\n"
-        "   prefetchnta 640(%0)\n"
-        :: "r" (from));
-
-    if (len >= 512) {
-        register uintptr_t delta;
-        delta = ((uintptr_t)to) & (AVX512_MMREG_SIZE - 1);
-        if (delta) {
-            delta = AVX512_MMREG_SIZE - delta;
-            len -= delta;
-            memcpy(to, from, delta);
-            from = (char *)from + delta;
-            to = (char *)to + delta;
-        }
-
-        i = len >> 8; // len / 256
-        len &= 255;
-        if (((uintptr_t)from) & 63) {
-            for (; i > 0; i--) {
-                __asm__ __volatile__ (
-                "vmovups    (%0), %%ymm0\n"
-                "vmovups  32(%0), %%ymm1\n"
-                "vmovups  64(%0), %%ymm2\n"
-                "vmovups  96(%0), %%ymm3\n"
-                "vmovups  128(%0), %%ymm4\n"
-                "vmovups  160(%0), %%ymm5\n"
-                "vmovups  192(%0), %%ymm6\n"
-                "vmovups  224(%0), %%ymm7\n"
-                "vmovntps %%ymm0,   (%1)\n"
-                "vmovntps %%ymm1, 32(%1)\n"
-                "vmovntps %%ymm2, 64(%1)\n"
-                "vmovntps %%ymm3, 96(%1)\n"
-                "vmovntps %%ymm4, 128(%1)\n"
-                "vmovntps %%ymm5, 160(%1)\n"
-                "vmovntps %%ymm6, 192(%1)\n"
-                "vmovntps %%ymm7, 224(%1)\n"
-                :: "r" (from), "r" (to) : "memory");
-                from = ((const unsigned char *)from) + 256;
-                to = ((unsigned char *)to) + 256;
-            }
-        } else {
-            for (; i > 0; i--) {
-                __asm__ __volatile__ (
-                "vmovaps    (%0), %%ymm0\n"
-                "vmovaps  32(%0), %%ymm1\n"
-                "vmovaps  64(%0), %%ymm2\n"
-                "vmovaps  96(%0), %%ymm3\n"
-                "vmovaps  128(%0), %%ymm4\n"
-                "vmovaps  160(%0), %%ymm5\n"
-                "vmovaps  192(%0), %%ymm6\n"
-                "vmovaps  224(%0), %%ymm7\n"
-                "vmovntps %%ymm0,   (%1)\n"
-                "vmovntps %%ymm1, 32(%1)\n"
-                "vmovntps %%ymm2, 64(%1)\n"
-                "vmovntps %%ymm3, 96(%1)\n"
-                "vmovntps %%ymm4, 128(%1)\n"
-                "vmovntps %%ymm5, 160(%1)\n"
-                "vmovntps %%ymm6, 192(%1)\n"
-                "vmovntps %%ymm7, 224(%1)\n"
-                :: "r" (from), "r" (to) : "memory");
-                from = ((const unsigned char *)from) + 256;
-                to = ((unsigned char *)to) + 256;
-            }
-        }
-        __asm__ __volatile__ ("sfence" ::: "memory");
-    }
-
-    if (len) memcpy(to, from, len);
-
-    return retval;
-}
-#endif
-
-#ifdef HAVE_ASM_AVX
+#ifdef HAVE_TARGET_AVX
 __attribute__((target("avx")))
 static void* avx_memcpy(void *restrict destination, const void *restrict source, size_t size)
 {
@@ -1277,6 +1188,7 @@ static void* avx_memcpy(void *restrict destination, const void *restrict source,
 }
 
 
+__attribute__((target("avx")))
 static void * avx_memcpy2(void *restrict to, const void *restrict from, size_t len)
 {
   void *retval;
@@ -1363,7 +1275,7 @@ static void * avx_memcpy2(void *restrict to, const void *restrict from, size_t l
   if(len) __memcpy(to, from, len);
   return retval;
 }
-#endif /* HAVE_ASM_AVX */
+#endif /* HAVE_TARGET_AVX */
 
 #ifdef HAVE_ASM_MMX
 static void * mmx_memcpy(void *restrict to, const void *restrict from, size_t len)
@@ -1728,7 +1640,8 @@ void *memset_skylake(void *s, int c, size_t n) {
 }
 #endif
 
-#ifdef HAVE_ASM_SSE4_2
+#ifdef HAVE_TARGET_SSE4_2
+__attribute__((target("sse4.2")))
 void *sse42_memset(void *ptr, int value, size_t num) {
     uint8_t *dest = (uint8_t *)ptr;
     uint8_t byte_value = (uint8_t)value;
@@ -1761,6 +1674,7 @@ void *sse42_memset(void *ptr, int value, size_t num) {
 
     return ptr;
 }
+__attribute__((target("sse4.2")))
 void *sse42_aligned_memset(void *to, int value, size_t len) {
 
     if (len < 128) {
@@ -1788,7 +1702,8 @@ void *sse42_aligned_memset(void *to, int value, size_t len) {
 	return retval;
 }
 #endif
-#ifdef HAVE_ASM_SSE4_1
+#ifdef HAVE_TARGET_SSE4_1
+__attribute__((target("sse4.1")))
 void *sse41_memset_v2(void *to, int value, size_t len) {
   void *retval = to;
   size_t remainder = (uintptr_t)to % 16;
@@ -1820,6 +1735,7 @@ void *sse41_memset_v2(void *to, int value, size_t len) {
   return retval;
 }
 
+__attribute__((target("sse4.1")))
 void *sse41_memset(void *to, int value, size_t len) {
 
 	if (len < 128) {
@@ -1877,30 +1793,10 @@ static void *linux_kernel_memcpy(void *restrict to, const void *restrict from, s
 #ifdef HAVE_ARM_NEON
 static inline void memcpy_neon_256(uint8_t *restrict dst, const uint8_t *restrict src)
 {
-    __asm__ volatile(
-        "pld [%[src], #64]      \n\t"
-        "pld [%[src], #128]     \n\t"
-        "pld [%[src], #192]     \n\t"
-        "pld [%[src], #256]     \n\t"
-
-        "vld1.8 {q0-q3},   [%[src]]! \n\t"
-        "vld1.8 {q4-q7},   [%[src]]! \n\t"
-        "vld1.8 {q8-q11},  [%[src]]! \n\t"
-        "vld1.8 {q12-q15}, [%[src]]  \n\t"
-
-        "vst1.8 {q0-q3},   [%[dst]]! \n\t"
-        "vst1.8 {q4-q7},   [%[dst]]! \n\t"
-        "vst1.8 {q8-q11},  [%[dst]]! \n\t"
-        "vst1.8 {q12-q15}, [%[dst]]  \n\t"
-
-        : [src] "+r"(src), [dst] "+r"(dst)
-        :
-        : "memory",
-          "q0","q1","q2","q3",
-          "q4","q5","q6","q7",
-          "q8","q9","q10","q11",
-          "q12","q13","q14","q15"
-    );
+    for (int offset = 0; offset < 256; offset += 16) {
+        uint8x16_t data = vld1q_u8(src + offset);
+        vst1q_u8(dst + offset, data);
+    }
 }
 
 static void *memcpy_neon(void *restrict to, const void *restrict from, size_t n )
@@ -1933,57 +1829,6 @@ static void *memcpy_neon(void *restrict to, const void *restrict from, size_t n 
 #endif
 
 #ifdef HAVE_ARM_ASIMD
-static inline void memcpy_neon_256(uint8_t *restrict dst, const uint8_t *restrict src)
-{
-    __asm__ volatile(
-        "prfm pldl1keep, [%[src], #64]      \n\t"
-        "prfm pldl1keep, [%[src], #128]     \n\t"
-        "prfm pldl1keep, [%[src], #192]     \n\t"
-        "prfm pldl1keep, [%[src], #256]     \n\t"
-
-        "ld1 {v0.16b,  v1.16b,  v2.16b,  v3.16b},  [%[src]], #64 \n\t"
-        "ld1 {v4.16b,  v5.16b,  v6.16b,  v7.16b},  [%[src]], #64 \n\t"
-        "ld1 {v8.16b,  v9.16b,  v10.16b, v11.16b}, [%[src]], #64 \n\t"
-        "ld1 {v12.16b, v13.16b, v14.16b, v15.16b}, [%[src]]      \n\t"
-
-        "st1 {v0.16b,  v1.16b,  v2.16b,  v3.16b},  [%[dst]], #64 \n\t"
-        "st1 {v4.16b,  v5.16b,  v6.16b,  v7.16b},  [%[dst]], #64 \n\t"
-        "st1 {v8.16b,  v9.16b,  v10.16b, v11.16b}, [%[dst]], #64 \n\t"
-        "st1 {v12.16b, v13.16b, v14.16b, v15.16b}, [%[dst]]      \n\t"
-
-        : [src] "+r"(src), [dst] "+r"(dst)
-        :
-        : "memory",
-          "v0","v1","v2","v3","v4","v5","v6","v7",
-          "v8","v9","v10","v11","v12","v13","v14","v15"
-    );
-}
-
-static inline void *memcpy_neon(void *restrict to, const void *restrict from, size_t n)
-{
-    void *ret = to;
-
-    if (__builtin_expect(n < 64, 0)) {
-        return memcpy(to, from, n);
-    }
-
-    uint8_t *dst = (uint8_t *)to;
-    const uint8_t *src = (const uint8_t *)from;
-
-    size_t blocks = n >> 8;
-    while (blocks--) {
-        memcpy_neon_256(dst, src);
-        dst += 256;
-        src += 256;
-    }
-
-    n &= 255;
-    if (n)
-        memcpy(dst, src, n);
-
-    return ret;
-}
-
 static inline void memcpy_asimd_256(uint8_t *restrict dst, const uint8_t *restrict src) {
     uint8x16_t data;
     for (int i = 0; i < 16; ++i) {
@@ -2017,15 +1862,6 @@ static void *memcpy_asimd(void *restrict to, const void *restrict from, size_t n
 
     return retval;
 }
-static void memcpy_asimd_256v2(uint8_t *dst, const uint8_t *src) {
-    uint8x16_t data;
-    for (int i = 0; i < 16; ++i) {
-        data = vld1q_u8(src);
-        vst1q_u8(dst, data);
-        src += 16;
-        dst += 16;
-    }
-}
 #endif
 
 #ifdef HAVE_ARM_ASIMD
@@ -2055,49 +1891,6 @@ void *memset_asimd(void *restrict dst, int val, size_t len)
     return dst;
 }
 
-void *memset_asimd_v2(void *dst, int val, size_t len)
-{
-    if (dst == NULL || len == 0)
-        return dst;
-
-    uint8_t byte = (uint8_t)val;
-    uint8_t *p = (uint8_t *)dst;
-    uint8x16_t v = vdupq_n_u8(byte);
-
-    size_t misalign = (uintptr_t)p & 15;
-    if (misalign) {
-        size_t prologue = 16 - misalign;
-        if (prologue > len)
-            prologue = len;
-
-        for (size_t i = 0; i < prologue; i++)
-            *p++ = byte;
-
-        len -= prologue;
-    }
-
-    while (len >= 64) {
-        vst1q_u8(p + 0,  v);
-        vst1q_u8(p + 16, v);
-        vst1q_u8(p + 32, v);
-        vst1q_u8(p + 48, v);
-        p += 64;
-        len -= 64;
-    }
-
-    while (len >= 16) {
-        vst1q_u8(p, v);
-        p += 16;
-        len -= 16;
-    }
-
-    while (len--) {
-        *p++ = byte;
-    }
-
-    return dst;
-}
-
 void *memset_asimd_v4(void *dst, int val, size_t len)
 {
     if (dst == NULL || len == 0)
@@ -2121,7 +1914,7 @@ void *memset_asimd_64(void *ptr, int value, size_t size) {
 
     uint8_t *dst = (uint8_t*) ptr;
 	if( size == 0 || NULL == dst ) 
-		return dst;
+        return ptr;
 
 	uint8x16_t value_v = vdupq_n_u8(value);
 
@@ -2161,13 +1954,13 @@ void *memset_asimd_64(void *ptr, int value, size_t size) {
         dst++;
         remaining_bytes--;
     }
-    return dst;
+    return ptr;
 }
 
 void *memset_asimd_32(void *ptr, int value, size_t size) {
     uint8_t *dst = (uint8_t*) ptr;
 	if( size == 0 || dst == NULL ) 
-		return dst;
+        return ptr;
 
 	uint8x16_t value_v = vdupq_n_u8(value);
 
@@ -2204,92 +1997,9 @@ void *memset_asimd_32(void *ptr, int value, size_t size) {
         remaining_bytes--;
     }
 
-    return dst;
+    return ptr;
 }
 
-#endif
-
-
-#ifdef __aarch64__
-void *memset_asimd_v3(void *dst, int val, size_t len)
-{
-    if (dst == NULL || len == 0)
-        return dst;
-
-    uint8_t byte = (uint8_t)val;
-    uint8_t *p = (uint8_t *)dst;
-
-    if (len < 64) {
-        while (len--)
-            *p++ = byte;
-        return dst;
-    }
-
-#if defined(__linux__)
-    if (byte == 0) {
-        uint64_t zva_len = 64;
-
-        while (((uintptr_t)p & (zva_len - 1)) && len) {
-            *p++ = 0;
-            len--;
-        }
-
-        while (len >= zva_len) {
-            __asm__ volatile(
-                "dc zva, %0"
-                :
-                : "r"(p)
-                : "memory");
-            p += zva_len;
-            len -= zva_len;
-        }
-
-        while (len--)
-            *p++ = 0;
-
-        return dst;
-    }
-#endif
-
-    __asm__ volatile(
-        "dup v0.16b, %w[val]\n"
-        :
-        : [val] "r"(byte)
-        : "v0");
-
-    while (((uintptr_t)p & 15) && len) {
-        *p++ = byte;
-        len--;
-    }
-
-    while (len >= 64) {
-        __asm__ volatile(
-            "stp q0, q0, [%0]\n"
-            "stp q0, q0, [%0, #32]\n"
-            :
-            : "r"(p)
-            : "memory");
-
-        p += 64;
-        len -= 64;
-    }
-
-    while (len >= 16) {
-        __asm__ volatile(
-            "str q0, [%0]"
-            :
-            : "r"(p)
-            : "memory");
-
-        p += 16;
-        len -= 16;
-    }
-
-    while (len--)
-        *p++ = byte;
-
-    return dst;
-}
 #endif
 
 
@@ -2332,20 +2042,17 @@ static struct {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     { "linux kernel memcpy()", linux_kernel_memcpy, 0, 0 },
 #endif
-#ifdef HAVE_ASM_AVX512
-    { "AVX-512 optimized memcpy()", avx512_memcpy, 0, AV_CPU_FLAG_AVX512 },
-#endif
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
     { "AVX2 optimized memcpy()", avx2_memcpy, 0, AV_CPU_FLAG_AVX2 },
 #endif
-#ifdef HAVE_ASM_AVX
+#ifdef HAVE_TARGET_AVX
     { "AVX optimized memcpy()", avx_memcpy, 0, AV_CPU_FLAG_AVX },
     { "AVX simple memcpy()", avx_memcpy2, 0, AV_CPU_FLAG_AVX },
 #endif
-#if defined (__SSE4_1__)
+#ifdef HAVE_TARGET_SSE4_1
     { "SSE4_1 optimized memcpy()", sse41_memcpy, 0, AV_CPU_FLAG_SSE4 },
 #endif
-#if defined (__SSE4_2__)
+#ifdef HAVE_TARGET_SSE4_2
     { "SSE4_2 optimized memcpy()", sse42_memcpy, 0, AV_CPU_FLAG_SSE42 },
 #endif
 #if defined (__SSE2__)
@@ -2391,22 +2098,22 @@ static struct {
 static struct {
     const char *name;
     void *(*function)(void *to, int c, size_t len);
-    uint32_t cpu_require;
     double t;
+    uint32_t cpu_require;
 } memset_method[] = {
     { NULL, NULL, 0, 0 },
     { "glibc memset()", memset, 0, 0},
-#ifdef HAVE_ASM_AVX2
+#ifdef HAVE_TARGET_AVX2
     { "AVX2 optimized memset()", avx2_memset, 0, AV_CPU_FLAG_AVX2 },
 #endif
-#ifdef HAVE_ASM_AVX
+#ifdef HAVE_TARGET_AVX
     { "AVX optimized memset()", avx_memset, 0, AV_CPU_FLAG_AVX },
 #endif
-#if defined (__SSE4_1__)
+#ifdef HAVE_TARGET_SSE4_1
     { "SSE4_1 memset()", sse41_memset, 0, AV_CPU_FLAG_SSE4 },
     { "SSE4_1 memset() v2", sse41_memset_v2, 0, AV_CPU_FLAG_SSE4 },
 #endif
-#if defined (__SSE4_2__)
+#ifdef HAVE_TARGET_SSE4_2
     { "SSE4_2 unaligned memset()", sse42_memset, 0, AV_CPU_FLAG_SSE42 },
     { "SSE4_2 aligned memset()", sse42_aligned_memset, 0, AV_CPU_FLAG_SSE42 },
 #endif
@@ -2419,10 +2126,7 @@ static struct {
     { "Advanced SIMD memset() 64-line", memset_asimd_64, 0, AV_CPU_FLAG_ARMV8 },
     { "Advanced SIMD memset() 32-line", memset_asimd_32, 0, AV_CPU_FLAG_ARMV8 },
 #endif
-#ifdef __aarch64__
-    { "ARM64 memset tuned/DC ZVA()", memset_asimd_v3, 0, AV_CPU_FLAG_ARMV8 },
-#endif
-#ifdef HAVE_ARM7A
+#ifdef HAVE_ARMV7A
     { "memset align 0", memset_new_align_0, 0, 0 },
     { "memset align 8", memset_new_align_8, 0, 0 },
     { "memset align 32", memset_new_align_32, 0, 0 },
@@ -2471,10 +2175,17 @@ static void check_cpu_governor_advice(void) {
 static int set_user_selected_memcpy(void)
 {
 	char *mm = getenv( "VEEJAY_MEMCPY_METHOD" );
+    uint32_t cpu_flags = (uint32_t) vj_cpu_get_flags();
 	if( mm ) {
 		int i;
 		for( i = 1; memcpy_method[i].name; i ++ ) {
 			if( strcasecmp( memcpy_method[i].name, mm ) == 0 ) {
+                if (!vj_cpu_supports(cpu_flags, memcpy_method[i].cpu_require)) {
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                            "Ignoring unsupported memcpy method '%s'",
+                            memcpy_method[i].name);
+                    return 0;
+                }
 				veejay_msg(VEEJAY_MSG_INFO, "Using user selected memcpy method '%s'",
 							memcpy_method[i].name );
 				return i;
@@ -2487,10 +2198,17 @@ static int set_user_selected_memcpy(void)
 static int set_user_selected_memset(void)
 {
 	char *mm = getenv( "VEEJAY_MEMSET_METHOD" );
+    uint32_t cpu_flags = (uint32_t) vj_cpu_get_flags();
 	if( mm ) {
 		int i;
 		for( i = 1; memset_method[i].name; i ++ ) {
 			if( strcasecmp( memset_method[i].name, mm ) == 0 ) {
+                if (!vj_cpu_supports(cpu_flags, memset_method[i].cpu_require)) {
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                            "Ignoring unsupported memset method '%s'",
+                            memset_method[i].name);
+                    return 0;
+                }
 				veejay_msg(VEEJAY_MSG_INFO, "Using user selected memset method '%s'",
 							memset_method[i].name );
 				return i;
@@ -2550,7 +2268,7 @@ void find_best_memcpy(void)
   lock_buffers(buf2, bufsize);
   lock_buffers(validbuf, bufsize);
 
-  int cpu_flags = av_get_cpu_flags();
+	uint32_t cpu_flags = (uint32_t) vj_cpu_get_flags();
   veejay_msg(VEEJAY_MSG_INFO, "Finding best memcpy ... (copy %ld blocks of %2.2f Mb)",FIND_BEST_MAX_ITERATIONS, bufsize / 1048576.0f );
 
   memset(buf1,0, bufsize);
@@ -2569,7 +2287,7 @@ void find_best_memcpy(void)
 	
 		veejay_msg(VEEJAY_MSG_INFO, "Testing method %s", memcpy_method[i].name );
 
-		if( memcpy_method[i].cpu_require && !(cpu_flags & memcpy_method[i].cpu_require ) ) {
+        if (!vj_cpu_supports(cpu_flags, memcpy_method[i].cpu_require)) {
 			memcpy_method[i].t = 0.0;
 			continue;
 		}
@@ -2653,7 +2371,7 @@ void find_best_memset(void)
 	char *buf1, *buf2;
 	int i, k;
 	int bufsize = (BENCHMARK_WID * BENCHMARK_HEI * 3);
-	int cpu_flags = av_get_cpu_flags();
+    uint32_t cpu_flags = (uint32_t) vj_cpu_get_flags();
 	
 	if (!(buf1 = (char*) vj_malloc( bufsize * sizeof(char) )))
 			return;
@@ -2675,7 +2393,7 @@ void find_best_memset(void)
     consume_buffer((unsigned char *)buf2, bufsize);
 
     for (i = 1; memset_method[i].name != NULL; i++) {
-      if (memset_method[i].cpu_require && !(cpu_flags & memset_method[i].cpu_require)) {
+      if (!vj_cpu_supports(cpu_flags, memset_method[i].cpu_require)) {
           memset_method[i].t = 0.0;
           continue;
       }
@@ -2750,11 +2468,15 @@ void    vj_mem_set_defaults(int w, int h) {
 	if( h > 0 )
 		BENCHMARK_HEI = h;
 
-	veejay_memset = memset_method[1].function;
-	veejay_memcpy = memcpy_method[1].function;
+    int memcpy_method_index = set_user_selected_memcpy();
+    int memset_method_index = set_user_selected_memset();
 
-	set_user_selected_memcpy();
-	set_user_selected_memset();
+    veejay_memcpy = memcpy_method_index > 0
+        ? memcpy_method[memcpy_method_index].function
+        : memcpy_method[1].function;
+    veejay_memset = memset_method_index > 0
+        ? memset_method[memset_method_index].function
+        : memset_method[1].function;
 }
 
 static inline void	vj_frame_slow_single1( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )

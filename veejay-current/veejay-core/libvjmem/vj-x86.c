@@ -19,6 +19,7 @@
 #include <config.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvevo/libvevo.h>
@@ -88,24 +89,14 @@ static int has_cpuid(void)
 }
 
 #ifdef HAVE_ARM
-#define WORD_SIZE 4
 static int get_cache_line_size(void) {
-#if defined(__aarch64__)
-    uint64_t ctr_el0;
-    asm volatile("mrs %0, ctr_el0" : "=r"(ctr_el0));
-    // Bits 32-34: Log2(Number of 4-byte words per cache line)
-    int cwgr_val = (int)((ctr_el0 >> 32) & 0x7);
-#elif defined(__arm__)
-    uint32_t ctr_el0;
-    asm volatile("mrc p15, 0, %0, c0, c0, 1" : "=r"(ctr_el0));
-    // Bits 0-2: Log2(Number of 4-byte words per cache line)
-    int cwgr_val = (int)(ctr_el0 & 0x7);
-#else
-    //assume 64-byte cache line
-    int cwgr_val = 4;
+#ifdef _SC_LEVEL1_DCACHE_LINESIZE
+	long detected_size = sysconf(_SC_LEVEL1_DCACHE_LINESIZE);
+	if (detected_size > 0 && detected_size <= INT_MAX) {
+		return (int)detected_size;
+	}
 #endif
-
-    return WORD_SIZE << cwgr_val;
+	return 64;
 }
 #endif
 
