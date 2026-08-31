@@ -1,0 +1,49 @@
+Name:           veejay-utils
+Version:        1.6.0
+Release:        1%{?dist}
+Summary:        Additional command line utilities for veejay
+
+License:        GPL-2.0-or-later
+URL:            http://www.veejayhq.net
+Source0:        %{name}-%{version}.tar.gz
+
+BuildRequires:  gcc
+BuildRequires:  make
+BuildRequires:  autoconf
+BuildRequires:  automake
+BuildRequires:  libtool
+BuildRequires:  pkgconfig
+BuildRequires:  veejay-core-devel >= 1.6.0
+BuildRequires:  veejay-devel >= 1.6.0
+BuildRequires:  ffmpeg-devel
+
+Requires:       veejay-core%{?_isa} >= 1.6.0
+Requires:       veejay%{?_isa} >= 1.6.0
+Provides:       sayVIMS = %{version}-%{release}
+
+%description
+This package contains sayVIMS, a program to communicate with veejay
+over the network or local machine.
+See veejay-sayvims for the Pure Data (sendVIMS) equivalent.
+
+%prep
+%setup -q
+
+%build
+./autogen.sh
+%configure
+%make_build
+
+%install
+%make_install
+find %{buildroot} -name '*.la' -delete
+
+%files
+%license COPYING
+%doc README.md
+%{_bindir}/sayVIMS
+%{_mandir}/man1/sayVIMS.1*
+
+%changelog
+* Mon Aug 31 2026 Niels Elburg <nwelburg@gmail.com> - 1.6.0-1
+- Initial RPM packaging

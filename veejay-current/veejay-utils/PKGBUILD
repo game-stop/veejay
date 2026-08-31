@@ -1,19 +1,21 @@
 # Contributor: Luciano A. Ferrer <laferrer@gmail.com>
 # Modified for ArchLinux by Niels <nwelburg@gmail.com>
-pkgname=sayVIMS
+pkgname=veejay-utils
 pkgrel=1
-pkgver=1.5.47
-pkgdesc="sayVIMS is the commandline utility for veejay remote-access"
-arch=('i686' 'x86_64')
+pkgver=1.6.0
+pkgdesc="Additional command line utilities for veejay (sayVIMS)"
+arch=('x86_64' 'aarch64')
 url="http://www.veejayhq.net"
-license=('GPL')
+license=('GPL2')
 groups=()
 conflicts=('sayVIMS')
-depends=( 'veejay'  )
+provides=('sayVIMS')
+depends=('veejay-core' 'veejay' 'ffmpeg')
 optdepends=()
+makedepends=('pkgconf')
 source=()
 md5sums=()
-changelog=('ChangeLog')
+changelog=ChangeLog
 backup=()
 replaces=()
 
@@ -29,3 +31,4 @@ package() {
 	cd $startdir
 	make DESTDIR="$pkgdir/" install
 }
+
