@@ -1,0 +1,17 @@
+Source: veejay-eidolon
+Section: video
+Priority: optional
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper-compat (= 13), pkg-config, autoconf, automake, libtool,
+ veejay-core (>= 1.6.0), libavutil-dev, libx11-dev
+Standards-Version: 4.6.2
+Homepage: http://www.veejayhq.net
+Vcs-Git: https://github.com/game-stop/veejay-eidolon.git
+
+Package: veejay-eidolon
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, veejay-core (>= 1.6.0)
+Recommends: veejay (>= 1.6.0)
+Description: Generative/life-simulation sample source for Veejay
+ eidolon is a small standalone tool built on libveejaycore that feeds
+ generated or evolving frame content into a running veejay backend.
