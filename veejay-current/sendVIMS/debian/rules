@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+export DH_VERBOSE=1
+export DH_OPTIONS
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	./configure --prefix=/usr
+
+override_dh_auto_build:
+	$(MAKE) PDINCLUDE=/usr/include/pd
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/veejay-sayvims PREFIX=/usr PDINCLUDE=/usr/include/pd
+
+override_dh_auto_test:

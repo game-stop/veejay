@@ -1,0 +1,17 @@
+Source: veejay-sayvims
+Section: sound
+Priority: optional
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper-compat (= 13), puredata-dev, perl
+Standards-Version: 4.6.2
+Homepage: http://www.veejayhq.net
+
+Package: veejay-sayvims
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, puredata
+Recommends: veejay (>= 1.6.0)
+Description: Pure Data external for controlling Veejay via VIMS (sendVIMS)
+ sendVIMS is a Pure Data external object that sends VIMS protocol events
+ to a running Veejay backend and receives its periodic status stream as
+ a Pd list. Intended for live patches, control surfaces and automation
+ that trigger Veejay events.

@@ -1,0 +1,28 @@
+# Contributor: Niels Elburg <nwelburg@gmail.com>
+pkgname=veejay-sayvims
+pkgrel=1
+pkgver=1.6.0
+pkgdesc="Pure Data external for controlling Veejay via VIMS (sendVIMS)"
+arch=('x86_64' 'aarch64')
+url="http://www.veejayhq.net"
+license=('GPL2')
+groups=()
+conflicts=('veejay-sayvims')
+depends=('puredata')
+optdepends=('veejay: to control a local veejay backend')
+makedepends=('perl')
+source=()
+md5sums=()
+backup=()
+replaces=()
+
+build() {
+	cd $startdir
+	./configure --prefix=/usr
+	make PDINCLUDE=/usr/include/pd || return 1
+}
+
+package() {
+	cd $startdir
+	make DESTDIR="$pkgdir/" PREFIX=/usr PDINCLUDE=/usr/include/pd install
+}
