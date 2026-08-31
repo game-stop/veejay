@@ -5561,6 +5561,11 @@ effect_constr* _effect_new( char *effect_line )
     if(descr_len <= 0) return NULL;
 
     ec = vj_calloc( sizeof(effect_constr));
+    if(descr_len >= (int) sizeof(ec->description)) {
+        veejay_msg(VEEJAY_MSG_ERROR, "FX description of %d bytes is too long", descr_len);
+        free(ec);
+        return NULL;
+    }
     strncpy( ec->description, effect_line+3, descr_len );
 
     if(sscanf(effect_line+(descr_len+3), "%03d%1d%1d%1d%02d", &(ec->id),&(ec->is_video),&(ec->has_rgb),&(ec->is_gen), &(ec->num_arg)) != 5 ) {
@@ -13135,7 +13140,6 @@ void load_effectlist_info(void)
     GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
     GtkWidget *tree3 = glade_xml_get_widget_( info->main_window, "tree_alphalist");
     GtkListStore *store,*store2,*store3;
-    char line[4096];
 
     GtkTreeIter iter;
     gint i,offset=0;
@@ -13147,49 +13151,76 @@ void load_effectlist_info(void)
 
     reset_fxtree();
 
+    if( fxtext == NULL || fxlen <= 0 ) {
+        veejay_msg(VEEJAY_MSG_ERROR, "No FX list received");
+        free(fxtext);
+        return;
+    }
+
+    /* single FX summaries can be larger than any fixed buffer, size to the reply */
+    char *line = (char*) vj_calloc( fxlen + 1 );
+    if( line == NULL ) {
+        free(fxtext);
+        return;
+    }
+
     store = fxlist_data.stores[0].list;
     store2 = fxlist_data.stores[1].list;
     store3 = fxlist_data.stores[2].list;
 
     int ec_idx = 0;
     int hi_id = 0;
-    while( offset < fxlen )
+    while( offset + 4 <= fxlen )
     {
         char tmp_len[5];
         veejay_memset(tmp_len,0,sizeof(tmp_len));
 
         strncpy(tmp_len, fxtext + offset, 4 );
         int len = 0;
-        if( sscanf(tmp_len, "%4d", &len ) != 1 ) {
-            veejay_msg(0, "FX header length error");
-            exit(0);
+        if( sscanf(tmp_len, "%4d", &len ) != 1 || len < 0 ) {
+            veejay_msg(VEEJAY_MSG_ERROR, "FX header length error");
+            break;
         }
 
         offset += 4;
 
+        if( len > (fxlen - offset) ) {
+            veejay_msg(VEEJAY_MSG_ERROR, "FX entry of %d bytes exceeds remaining %d bytes", len, fxlen - offset );
+            break;
+        }
+
         if(len > 0)
         {
             effect_constr *ec;
-            veejay_memset( line,0,sizeof(line));
+            veejay_memset( line,0,fxlen + 1);
             memcpy( line, fxtext + offset, len );
 
             int bad_len = strlen(line);
             if( len != bad_len ) {
-                veejay_msg(0, "Expected %d bytes, only got %d", len, bad_len );
-                exit(0);
+                veejay_msg(VEEJAY_MSG_ERROR, "Expected %d bytes, only got %d", len, bad_len );
+                break;
             }
 
             ec = _effect_new(line);
             if( ec  ) {
-                info->effect_info[ec->id] = ec;
-                ec_idx ++;
-                if( hi_id < ec->id )
-                    hi_id = ec->id;
+                if( ec->id < 0 || ec->id >= EFFECT_LIST_SIZE ) {
+                    veejay_msg(VEEJAY_MSG_ERROR, "FX id %d out of range", ec->id );
+                    _effect_free( ec );
+                }
+                else {
+                    _effect_free( info->effect_info[ec->id] );
+                    info->effect_info[ec->id] = ec;
+                    ec_idx ++;
+                    if( hi_id < ec->id )
+                        hi_id = ec->id;
+                }
             }
         }
 
         offset += len;
     }
+
+    free(line);
 
     for( i = 0; i <= hi_id; i ++)
     {
