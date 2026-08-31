@@ -480,10 +480,23 @@ if test x$have_x86cpu = xtrue && test "x$arch_target" != "xgeneric"; then
         fi
     ])
 	    if test $ac_cv_flag_mmx2 = yes; then
-	    	AC_DEFINE(HAVE_ASM_MMX2,1,[Compiling in MMX2])
-	    	AC_DEFINE(HAVE_ASM_MMXEXT,1,[Compiling in MMXEXT])
-        VEEJAY_CFLAGS="$VEEJAY_CFLAGS -mmmxext"
-	    fi   
+            AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]], [[
+                char buffer[64];
+                __asm__ __volatile__(
+                    "prefetchnta (%0)\n\t"
+                    "movntq %%mm0, (%0)\n\t"
+                    "sfence"
+                    :: "r" (buffer) : "memory");
+            ]])],
+                [have_asm_mmx2=true],
+                [have_asm_mmx2=false])
+            if test $have_asm_mmx2 = true; then
+                AC_DEFINE(HAVE_ASM_MMX2,1,[Compiling in MMX2])
+                AC_DEFINE(HAVE_ASM_MMXEXT,1,[Compiling in MMXEXT])
+            fi
+        else
+            have_asm_mmx2=false
+        fi
 
     # AVX
     AC_CACHE_CHECK(for AVX on processor(s), ac_cv_flag_avx, [
