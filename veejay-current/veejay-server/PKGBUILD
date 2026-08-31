@@ -1,16 +1,17 @@
 # Contributor: Luciano A. Ferrer <laferrer@gmail.com>
 # Modified for ArchLinux by Niels <nwelburg@gmail.com>
-kgname=veejay
+pkgname=veejay
 pkgrel=1
-pkgver=1.5.50
+pkgver=1.6.0
 pkgdesc="Veejay is a visual instrument and realtime video sampler for GNU/Linux, server"
-arch=('i686' 'x86_64')
+arch=('x86_64' 'aarch64')
 url="http://www.veejayhq.net"
-license=('GPL')
+license=('GPL2')
 groups=()
 conflicts=('veejay')
-depends=('libxml2' 'ffmpeg' 'sdl' 'gtk2' 'gdk-pixbuf2' 'libsm' )
-optdepends=('liblo' 'libdv' 'libquicktime' 'jack')
+depends=('veejay-core' 'glib2' 'ffmpeg' 'libxml2' 'freetype2' 'fontconfig' 'sdl2' 'libunwind' 'libx11' 'libxinerama' 'libjpeg-turbo' 'gdk-pixbuf2')
+optdepends=('liblo: OSC control support' 'libdv: DV capture/playback' 'libquicktime: Quicktime file support' 'jack2: JACK audio output' 'cuda: nvJPEG hardware MJPEG decode')
+makedepends=('pkgconf')
 source=()
 md5sums=()
 backup=()
@@ -27,3 +28,4 @@ package() {
 	cd $startdir
 	make DESTDIR="$pkgdir/" install
 }
+

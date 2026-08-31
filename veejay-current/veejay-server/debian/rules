@@ -9,4 +9,26 @@ export DH_OPTIONS
 
 
 %:
-	dh $@  --with autotools-dev
+	dh $@
+
+# NDI support is dlopen()'d at runtime (NDI_LIBS is just -ldl), so it never
+# creates a dpkg-shlibdeps problem; only the SDK header is needed at build
+# time. The SDK ships outside any standard include path and its install
+# location has no portable build-time convention, so plain configure
+# "auto" (system include paths only) leaves it disabled by default. To
+# build with NDI support on a host that has the SDK installed, add an
+# override_dh_auto_configure target here that runs
+# `dh_auto_configure -- --with-ndi=/path/to/sdk`.
+# Note: NDI_RUNTIME_DIR_V6 (as named by this SDK's own header) is a
+# runtime-only variable the NDI library reads via dlopen() to locate
+# libndi.so.6; it is unrelated to locating headers at build time.
+
+# nvjpeg is auto-detected by configure: enabled only if the CUDA toolkit is
+# present on the build host, disabled otherwise. libnvjpeg itself isn't a
+# Debian-tracked package, so tell dpkg-shlibdeps not to fail when it can't
+# find shlibs info for it (the binary simply won't get an automatic Depends
+# on it; users need the CUDA runtime installed to use that optional codec path).
+override_dh_shlibdeps:
+	dh_shlibdeps -- --ignore-missing-info
+
+

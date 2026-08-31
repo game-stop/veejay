@@ -2,14 +2,20 @@ Source: veejay
 Section: video
 Priority: optional
 Maintainer: Niels Elburg <nwelburg@gmail.com>
-Build-Depends: debhelper (>= 8.0.0), autotools-dev, libavcodec-dev,libavformat-dev,libavutil-dev,libswscale-dev,libgtk2.0-dev,libjack-dev,libjpeg-dev,libsdl1.2-dev,libxml2-dev,libx11-dev,libmjpegtools-dev,libfreetype6-dev,libquicktime-dev,libdv4-dev,libunwind-dev
-Standards-Version: 3.9.4
+Build-Depends: debhelper-compat (= 13), pkg-config, autoconf, automake, libtool,
+ veejay-core (>= 1.6.0), libglib2.0-dev, libavutil-dev (>= 7:6.0),
+ libavcodec-dev (>= 7:6.0), libavformat-dev (>= 7:6.0), libswscale-dev,
+ libswresample-dev, libx11-dev, libxinerama-dev, libjpeg-dev,
+ libgdk-pixbuf-2.0-dev, libdv4-dev, libquicktime-dev, libsdl2-dev,
+ liblo-dev, libjack-dev, libxml2-dev, libfreetype-dev, libfontconfig-dev,
+ libunwind-dev
+Standards-Version: 4.6.2
 Homepage: http://www.veejayhq.net
 Vcs-Git: git://code.dyne.org/veejay.git
 
 Package: veejay
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, veejay-core (>= 1.6.0)
 Description: Veejay a visual instrument and realtime video sampler.
  With veejay, you can play the video like you would play a piano. The
  engine is based upon ffmpeg and the mjpegtools featuring a client-server
