@@ -906,38 +906,88 @@ uninstall-am:
 .PRECIOUS: Makefile
 
 
+# Build working directory and tool defaults (can be overridden on command line or in Makefile.am)
 PACKAGING_BUILD_DIR ?= $(top_builddir)/packaging-build
 
+# Debian / sbuild settings
 DEB_SOURCE_PACKAGE ?= $(PACKAGE)
 SBUILD              ?= sbuild
-SBUILD_CHROOT       ?= unstable-amd64-sbuild
+SBUILD_CREATECHROOT ?= sbuild-createchroot
+SBUILD_CHROOT_MODE  ?= schroot
+SBUILD_DIST         ?= unstable
+SBUILD_ARCH         ?= $(shell dpkg --print-architecture 2>/dev/null || echo amd64)
+SBUILD_MIRROR       ?= http://deb.debian.org/debian
+SBUILD_UNSHARE_TARBALL ?= $(HOME)/.cache/sbuild/$(SBUILD_DIST)-$(SBUILD_ARCH).tar.zst
+SBUILD_CREATE_DIR   ?= /tmp/sbuild-create-$(SBUILD_DIST)-$(SBUILD_ARCH)-$(shell id -u 2>/dev/null || echo user)
+SBUILD_CHROOT       ?= $(if $(filter unshare,$(SBUILD_CHROOT_MODE)),$(SBUILD_UNSHARE_TARBALL),$(SBUILD_DIST)-$(SBUILD_ARCH)-sbuild)
 SBUILD_ARGS         ?=
 
+# Arch Linux / makechrootpkg settings
 ARCH_CHROOT_DIR     ?= /var/lib/archbuild/extra-x86_64
 
+# RPM / mock settings
 MOCK_CONFIG         ?= fedora-rawhide-x86_64
 MOCK_ARGS           ?=
 RPM_SPEC_FILE       ?= $(top_srcdir)/$(PACKAGE).spec
 
-.PHONY: deb arch rpm clean-packaging
+.PHONY: deb arch rpm clean-packaging check-sbuild sbuild
 
-deb: dist-gzip
-	@echo "==> Building Debian package with sbuild..."
+sbuild:
+	@command -v "$(SBUILD_CREATECHROOT)" >/dev/null 2>&1 || { \
+		echo "ERROR: '$(SBUILD_CREATECHROOT)' not found. Install sbuild or pass SBUILD_CREATECHROOT=/path/to/sbuild-createchroot."; \
+		exit 127; \
+	}
+	@if test "$(SBUILD_CHROOT_MODE)" != "unshare"; then \
+		echo "ERROR: make sbuild creates unshare tarball chroots; run with SBUILD_CHROOT_MODE=unshare."; \
+		exit 1; \
+	fi
+	@if test -e "$(SBUILD_CHROOT)"; then \
+		echo "==> sbuild unshare chroot already exists: $(SBUILD_CHROOT)"; \
+	else \
+		echo "==> Creating sbuild unshare chroot $(SBUILD_CHROOT) for $(SBUILD_DIST)/$(SBUILD_ARCH)..."; \
+		rm -rf "$(SBUILD_CREATE_DIR)"; \
+		$(MKDIR_P) "$$(dirname "$(SBUILD_CHROOT)")" "$$(dirname "$(SBUILD_CREATE_DIR)")"; \
+		$(SBUILD_CREATECHROOT) --chroot-mode=unshare --arch=$(SBUILD_ARCH) \
+			--make-sbuild-tarball="$(SBUILD_CHROOT)" \
+			$(SBUILD_DIST) "$(SBUILD_CREATE_DIR)" "$(SBUILD_MIRROR)"; \
+	fi
+
+check-sbuild:
 	@command -v "$(SBUILD)" >/dev/null 2>&1 || { \
 		echo "ERROR: '$(SBUILD)' not found. Install sbuild or pass SBUILD=/path/to/sbuild."; \
 		exit 127; \
 	}
+	@if test "$(SBUILD_CHROOT_MODE)" = "schroot" && ! id -nG | tr ' ' '\n' | grep -qx sbuild; then \
+		echo "ERROR: user '$$(id -un)' is not an effective member of the sbuild group."; \
+		echo "Run: sudo sbuild-adduser $$(id -un), then log out/in or run: newgrp sbuild"; \
+		exit 1; \
+	fi
+	@if test "$(SBUILD_CHROOT_MODE)" = "unshare" && test -n "$(SBUILD_CHROOT)" && \
+	   test ! -e "$(SBUILD_CHROOT)" && test ! -e "$${HOME}/.cache/sbuild/$(SBUILD_CHROOT)"; then \
+		echo "ERROR: unshare chroot '$(SBUILD_CHROOT)' was not found as a path or under $${HOME}/.cache/sbuild."; \
+		echo "Run: make sbuild SBUILD_CHROOT_MODE=unshare, or pass SBUILD_CHROOT=/path/to/chroot."; \
+		exit 1; \
+	fi
+
+# ------------------------------------------------------------------------------
+# Debian Target (sbuild)
+# ------------------------------------------------------------------------------
+deb: check-sbuild dist-gzip
+	@echo "==> Building Debian package with sbuild..."
 	rm -rf $(PACKAGING_BUILD_DIR)/deb
 	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/deb
 	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
 	tar -C $(PACKAGING_BUILD_DIR)/deb -xzf $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
 	cp -r $(top_srcdir)/debian $(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION)/
 	cd $(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION) && dpkg-buildpackage -S -us -uc
-	$(SBUILD) --chroot=$(SBUILD_CHROOT) $(SBUILD_ARGS) \
-		--distdir=$(PACKAGING_BUILD_DIR)/deb \
+	$(SBUILD) --chroot-mode=$(SBUILD_CHROOT_MODE) --dist=$(SBUILD_DIST) --chroot=$(SBUILD_CHROOT) $(SBUILD_ARGS) \
+		--build-dir=$(PACKAGING_BUILD_DIR)/deb \
 		$(PACKAGING_BUILD_DIR)/deb/*.dsc
 	@echo "==> Debian build complete. Artifacts in $(PACKAGING_BUILD_DIR)/deb/"
 
+# ------------------------------------------------------------------------------
+# Arch Linux Target (makechrootpkg)
+# ------------------------------------------------------------------------------
 arch: dist-gzip
 	@echo "==> Building Arch Linux package with makechrootpkg..."
 	rm -rf $(PACKAGING_BUILD_DIR)/arch
@@ -948,6 +998,9 @@ arch: dist-gzip
 	cd $(PACKAGING_BUILD_DIR)/arch && makechrootpkg -r $(ARCH_CHROOT_DIR)
 	@echo "==> Arch Linux build complete. Artifacts in $(PACKAGING_BUILD_DIR)/arch/"
 
+# ------------------------------------------------------------------------------
+# RPM Target (mock)
+# ------------------------------------------------------------------------------
 rpm: dist-gzip
 	@echo "==> Building RPM package with mock..."
 	rm -rf $(PACKAGING_BUILD_DIR)/rpm
@@ -966,6 +1019,9 @@ rpm: dist-gzip
 		--rebuild $(PACKAGING_BUILD_DIR)/rpm/SRPMS/*.src.rpm
 	@echo "==> RPM build complete. Artifacts in $(PACKAGING_BUILD_DIR)/rpm/"
 
+# ------------------------------------------------------------------------------
+# Clean Rule
+# ------------------------------------------------------------------------------
 clean-packaging:
 	rm -rf $(PACKAGING_BUILD_DIR)
 
