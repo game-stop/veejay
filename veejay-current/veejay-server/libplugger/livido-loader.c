@@ -879,18 +879,23 @@ static void *livido_async_worker(void *data)
 		int wait_error = 0;
 
 		pthread_mutex_lock(&state->mutex);
-		while(!state->stop &&
-			  (slot_index = livido_async_find_runnable_slot(state)) < 0)
-		{
-			wait_error = pthread_cond_wait(&state->cond, &state->mutex);
-			if(wait_error != 0) {
-				veejay_msg(VEEJAY_MSG_ERROR,
-						   "Non-real-time Livido worker wait failed: %s",
-						   strerror(wait_error));
-				state->stop = 1;
-				break;
-			}
-		}
+		while(!state->stop)
+        {
+            slot_index = livido_async_find_runnable_slot(state);
+            
+            if(slot_index >= 0) {
+                break;
+            }
+
+            wait_error = pthread_cond_wait(&state->cond, &state->mutex);
+            if(wait_error != 0) {
+                veejay_msg(VEEJAY_MSG_ERROR,
+                           "Non-real-time Livido worker wait failed: %s",
+                           strerror(wait_error));
+                state->stop = 1;
+                break;
+            }
+        }
 
 		if(state->stop) {
 			pthread_mutex_unlock(&state->mutex);
