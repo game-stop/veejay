@@ -31,6 +31,7 @@
 
 typedef struct {
     uint8_t *nervous_buf[3];
+    int capacity;
     int write_pos;
     int filled;
     uint32_t seed;
@@ -107,15 +108,29 @@ void nervous_free(void *ptr)
 
 void *nervous_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     nervous_t *n = (nervous_t*) vj_calloc(sizeof(nervous_t));
 
     if(!n)
         return NULL;
 
     const size_t len = (size_t)w * (size_t)h;
-    const size_t plane_len = len * (size_t)N_MAX;
+    if(len > SIZE_MAX / 3u) {
+        free(n);
+        return NULL;
+    }
+    const size_t slot_bytes = len * 3u;
+    const int capacity = vje_history_capacity("Nervous", 0, slot_bytes,
+                                               1, N_MAX, 0);
+    if(capacity == 0 || (size_t)capacity > SIZE_MAX / slot_bytes) {
+        free(n);
+        return NULL;
+    }
+    const size_t plane_len = len * (size_t)capacity;
 
-    n->nervous_buf[0] = (uint8_t*) vj_malloc(plane_len * 3u);
+    n->nervous_buf[0] = (uint8_t*) vj_malloc(slot_bytes * (size_t)capacity);
 
     if(!n->nervous_buf[0]) {
         free(n);
@@ -125,6 +140,7 @@ void *nervous_malloc(int w, int h)
     n->nervous_buf[1] = n->nervous_buf[0] + plane_len;
     n->nervous_buf[2] = n->nervous_buf[1] + plane_len;
 
+    n->capacity = capacity;
     n->write_pos = 0;
     n->filled = 0;
     n->seed = 0x5eedeed5u ^ (uint32_t)w ^ ((uint32_t)h << 16);
@@ -142,7 +158,7 @@ void nervous_apply(void *ptr, VJFrame *frame, int *args)
 
     const int len = frame->len;
     const int uv_len = frame->ssm ? frame->len : frame->uv_len;
-    const int length = clampi(args[P_BUFFER_LENGTH], 1, N_MAX);
+    const int length = clampi(args[P_BUFFER_LENGTH], 1, n->capacity);
 
 #pragma omp single
     {

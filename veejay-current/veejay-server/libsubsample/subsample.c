@@ -32,16 +32,13 @@
 #ifdef HAVE_ASM_SSE2
 #include <emmintrin.h>
 #endif
-#if defined(HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
-#include <arm_neon.h>
-#define HAVE_ARM_SIMD 1
-#endif
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <libvje/vje.h>
 #include <libsubsample/subsample.h>
+#include <libsubsample/subsample-arch.h>
 #include <veejaycore/mjpeg_types.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
@@ -82,6 +79,7 @@ const char *ssm_description[SSM_COUNT] = {
 
 typedef void (*subsample_444_to_422)( uint8_t *restrict U, uint8_t *restrict V, const int width, const int height );
 typedef void (*supersample_422_to_444)( uint8_t *restrict chroma, const int width, const int height );
+typedef void (*chroma_plane_scaler)(uint8_t *buffer, int width, int height);
 
 /*************************************************************************
  * Chroma Subsampling
@@ -587,11 +585,22 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 
 static subsample_444_to_422 subsample_444_to_422_in;
 static supersample_422_to_444 supersample_422_to_444_out;
+static chroma_plane_scaler subsample_444_to_420_in = ss_444_to_420jpeg;
+static chroma_plane_scaler supersample_420_to_444_out = ss_420jpeg_to_444;
 
 void chroma_subsample_init(void) {
     const char *mode = getenv("VEEJAY_SUBSAMPLE_MODE");
     subsample_444_to_422 f = ss_444_to_422_drop;
-#ifdef HAVE_TARGET_AVX2
+#if defined(SUBSAMPLE_HAVE_ESP32)
+    f = ss_444_to_422_drop_esp32;
+    subsample_444_to_420_in = ss_444_to_420jpeg_esp32;
+#elif defined(SUBSAMPLE_HAVE_NEON)
+    f = ss_444_to_422_drop_neon;
+    subsample_444_to_420_in = ss_444_to_420jpeg_neon;
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    f = ss_444_to_422_drop_altivec;
+    subsample_444_to_420_in = ss_444_to_420jpeg_altivec;
+#elif defined(HAVE_TARGET_AVX2)
     const int use_avx2 = (av_get_cpu_flags() & AV_CPU_FLAG_AVX2) != 0;
     if (use_avx2)
         f = ss_444_to_422_drop_avx2;
@@ -600,25 +609,38 @@ void chroma_subsample_init(void) {
 
     if (mode == NULL) {
         veejay_msg(VEEJAY_MSG_INFO, "Chroma subsampling: defaulting to 'drop' (set VEEJAY_SUBSAMPLE_MODE=drop|average|bilinear|mitchell)");
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for subsampling");
+#if defined(SUBSAMPLE_HAVE_ESP32)
+        veejay_msg(VEEJAY_MSG_DEBUG, "ESP32 routines available for chroma subsampling");
+#elif defined(SUBSAMPLE_HAVE_NEON)
+        veejay_msg(VEEJAY_MSG_DEBUG, "NEON available for chroma subsampling");
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    veejay_msg(VEEJAY_MSG_DEBUG, "AltiVec available for chroma subsampling");
+#elif defined(HAVE_TARGET_AVX2)
+        if (use_avx2)
+            veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for subsampling");
 #endif
     }
     else if (strcmp(mode, "drop") == 0) {
         selected = "drop";
         f = ss_444_to_422_drop;
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        f = ss_444_to_422_drop_avx2;
+#if defined(SUBSAMPLE_HAVE_ESP32)
+        f = ss_444_to_422_drop_esp32;
+#elif defined(SUBSAMPLE_HAVE_NEON)
+        f = ss_444_to_422_drop_neon;
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    f = ss_444_to_422_drop_altivec;
+#elif defined(HAVE_TARGET_AVX2)
+        if (use_avx2)
+            f = ss_444_to_422_drop_avx2;
 #endif
     }
     else if (strcmp(mode, "average") == 0) {
         selected = "average";
         f = ss_444_to_422_average;
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        f = ss_444_to_422_average_avx2;
+#if defined(HAVE_TARGET_AVX2) && !defined(SUBSAMPLE_HAVE_ESP32) && \
+    !defined(SUBSAMPLE_HAVE_NEON)
+        if (use_avx2)
+            f = ss_444_to_422_average_avx2;
 #endif
     }
     else if (strcmp(mode, "bilinear") == 0) {
@@ -632,9 +654,15 @@ void chroma_subsample_init(void) {
     else {
         veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUBSAMPLE_MODE='%s', falling back to 'drop'", mode);
         f = ss_444_to_422_drop;
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        f = ss_444_to_422_drop_avx2;
+#if defined(SUBSAMPLE_HAVE_ESP32)
+        f = ss_444_to_422_drop_esp32;
+#elif defined(SUBSAMPLE_HAVE_NEON)
+        f = ss_444_to_422_drop_neon;
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    f = ss_444_to_422_drop_altivec;
+#elif defined(HAVE_TARGET_AVX2)
+        if (use_avx2)
+            f = ss_444_to_422_drop_avx2;
 #endif
     }
 
@@ -647,7 +675,16 @@ void chroma_supersample_init(void)
 {
     const char *mode = getenv("VEEJAY_SUPERSAMPLE_MODE");
     supersample_422_to_444 f = tr_422_to_444_dup;
-#ifdef HAVE_TARGET_AVX2
+#if defined(SUBSAMPLE_HAVE_ESP32)
+    f = tr_422_to_444_dup_esp32;
+    supersample_420_to_444_out = ss_420jpeg_to_444_esp32;
+#elif defined(SUBSAMPLE_HAVE_NEON)
+    f = tr_422_to_444_dup_neon;
+    supersample_420_to_444_out = ss_420jpeg_to_444_neon;
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    f = tr_422_to_444_dup_altivec;
+    supersample_420_to_444_out = ss_420jpeg_to_444_altivec;
+#elif defined(HAVE_TARGET_AVX2)
     const int use_avx2 = (av_get_cpu_flags() & AV_CPU_FLAG_AVX2) != 0;
     if (use_avx2)
         f = tr_422_to_444_dup_avx2;
@@ -656,17 +693,29 @@ void chroma_supersample_init(void)
 
     if (mode == NULL) {
         veejay_msg(VEEJAY_MSG_INFO, "Chroma supersampling: defaulting to 'dup' (set VEEJAY_SUPERSAMPLE_MODE=dup|mitchell)");
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for supersampling");
+#if defined(SUBSAMPLE_HAVE_ESP32)
+        veejay_msg(VEEJAY_MSG_DEBUG, "ESP32 routines available for chroma supersampling");
+#elif defined(SUBSAMPLE_HAVE_NEON)
+        veejay_msg(VEEJAY_MSG_DEBUG, "NEON available for chroma supersampling");
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    veejay_msg(VEEJAY_MSG_DEBUG, "AltiVec available for chroma supersampling");
+#elif defined(HAVE_TARGET_AVX2)
+        if (use_avx2)
+            veejay_msg(VEEJAY_MSG_DEBUG, "AVX2 available for supersampling");
 #endif
     }
     else if (strcmp(mode, "dup") == 0) {
         selected = "dup";
         f = tr_422_to_444_dup;
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        f = tr_422_to_444_dup_avx2;
+#if defined(SUBSAMPLE_HAVE_ESP32)
+        f = tr_422_to_444_dup_esp32;
+#elif defined(SUBSAMPLE_HAVE_NEON)
+        f = tr_422_to_444_dup_neon;
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    f = tr_422_to_444_dup_altivec;
+#elif defined(HAVE_TARGET_AVX2)
+        if (use_avx2)
+            f = tr_422_to_444_dup_avx2;
 #endif
     }
     else if (strcmp(mode, "mitchell") == 0) {
@@ -676,9 +725,15 @@ void chroma_supersample_init(void)
     else {
         veejay_msg(VEEJAY_MSG_WARNING, "Invalid VEEJAY_SUPERSAMPLE_MODE='%s', falling back to 'dup'", mode);
         f = tr_422_to_444_dup;
-#ifdef HAVE_TARGET_AVX2
-    if (use_avx2)
-        f = tr_422_to_444_dup_avx2;
+#if defined(SUBSAMPLE_HAVE_ESP32)
+        f = tr_422_to_444_dup_esp32;
+#elif defined(SUBSAMPLE_HAVE_NEON)
+        f = tr_422_to_444_dup_neon;
+#elif defined(SUBSAMPLE_HAVE_ALTIVEC)
+    f = tr_422_to_444_dup_altivec;
+#elif defined(HAVE_TARGET_AVX2)
+        if (use_avx2)
+            f = tr_422_to_444_dup_avx2;
 #endif
     }
 
@@ -696,8 +751,8 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
             break;
         case SSM_420_JPEG_BOX:
         case SSM_420_JPEG_TR: 
-            ss_444_to_420jpeg(ycbcr[1], frame->width, frame->height);
-            ss_444_to_420jpeg(ycbcr[2], frame->width, frame->height);
+            subsample_444_to_420_in(ycbcr[1], frame->width, frame->height);
+            subsample_444_to_420_in(ycbcr[2], frame->width, frame->height);
             break;
         case SSM_420_MPEG2:
             ss_444_to_420mpeg2(ycbcr[1], frame->width, frame->height);
@@ -724,8 +779,8 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
             supersample_422_to_444_out(ycbcr[2], frame->width, frame->height);
         break;
         case SSM_420_JPEG_BOX:
-            ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
-            ss_420jpeg_to_444(ycbcr[2], frame->width, frame->height);
+            supersample_420_to_444_out(ycbcr[1], frame->width, frame->height);
+            supersample_420_to_444_out(ycbcr[2], frame->width, frame->height);
         break;
         case SSM_420_JPEG_TR:
             tr_420jpeg_to_444(_chroma_supersample_data,ycbcr[1], frame->width, frame->height);

@@ -26,9 +26,8 @@
 #include "common.h"
 #include "baltantv.h"
 
-#define PLANES 64
+#define BALTAN_MAX_PLANES 64
 #define MAX_TAPS 8
-#define PLANE_MASK (PLANES - 1)
 
 typedef struct
 {
@@ -36,13 +35,17 @@ typedef struct
     int16_t *historyU;
     int16_t *historyV;
     int plane;
+    int planes;
+    int plane_mask;
     int frame_size;
     int uv_size;
 } baltantv_t;
 
-static inline int baltan_plane_index(int plane, int t, int stride)
+static inline int baltan_plane_index(const baltantv_t *b, int plane,
+                                     int t, int stride)
 {
-    return (plane - (t * stride) + (PLANES * MAX_TAPS)) & PLANE_MASK;
+    return (plane - (t * stride) +
+            (BALTAN_MAX_PLANES * MAX_TAPS)) & b->plane_mask;
 }
 
 vj_effect *baltantv_init(int w, int h)
@@ -82,18 +85,35 @@ vj_effect *baltantv_init(int w, int h)
 
 void *baltantv_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     baltantv_t *b = (baltantv_t*) vj_calloc(sizeof(baltantv_t));
 
     if(!b)
         return NULL;
 
     const int len = w * h;
+    if((size_t)len > SIZE_MAX / 5u) {
+        free(b);
+        return NULL;
+    }
+    const size_t slot_bytes = (size_t)len * 5u;
+    const int planes = vje_history_capacity("BaltanTV", 0, slot_bytes,
+                                             2, BALTAN_MAX_PLANES, 1);
+    if(planes == 0 || (size_t)planes > SIZE_MAX / slot_bytes) {
+        free(b);
+        return NULL;
+    }
+    const size_t plane_bank = (size_t)len * (size_t)planes;
 
     b->frame_size = len;
     b->uv_size = len;
-    b->historyY = (uint8_t*) vj_calloc(sizeof(uint8_t) * len * PLANES);
-    b->historyU = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
-    b->historyV = (int16_t*) vj_calloc(sizeof(int16_t) * len * PLANES);
+    b->planes = planes;
+    b->plane_mask = planes - 1;
+    b->historyY = (uint8_t*) vj_calloc(plane_bank);
+    b->historyU = (int16_t*) vj_calloc(sizeof(int16_t) * plane_bank);
+    b->historyV = (int16_t*) vj_calloc(sizeof(int16_t) * plane_bank);
 
     if(!b->historyY || !b->historyU || !b->historyV)
     {
@@ -142,9 +162,10 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
     const int inv_taps_q16 = 65536 / taps;
     const int live_chroma = 255 - chromaPersist;
 
-    uint8_t *restrict dstY = b->historyY + (plane * len);
-    int16_t *restrict dstU = b->historyU + (plane * len);
-    int16_t *restrict dstV = b->historyV + (plane * len);
+    const size_t plane_offset = (size_t)plane * (size_t)len;
+    uint8_t *restrict dstY = b->historyY + plane_offset;
+    int16_t *restrict dstU = b->historyU + plane_offset;
+    int16_t *restrict dstV = b->historyV + plane_offset;
 
     #pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
@@ -163,8 +184,8 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
 
         for(int t = 0; t < taps; t++)
         {
-            const int idx = baltan_plane_index(plane, t, stride);
-            const int off = idx * len + i;
+            const int idx = baltan_plane_index(b, plane, t, stride);
+            const size_t off = (size_t)idx * (size_t)len + (size_t)i;
 
             accumY += b->historyY[off];
             accumU += b->historyU[off];
@@ -187,5 +208,5 @@ void baltantv_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     #pragma omp single
-    b->plane = (plane + 1) & PLANE_MASK;
+    b->plane = (plane + 1) & b->plane_mask;
 }

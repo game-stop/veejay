@@ -144,7 +144,7 @@
 #include <libvje/libvje.h>
 #include <libvje/effects/shapewipe.h>
 
-#include <omp.h>
+#include <libvje/omp-compat.h>
 
 #define VALUE_NOT_FILLED -10000
 

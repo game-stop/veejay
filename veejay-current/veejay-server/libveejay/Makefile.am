@@ -85,6 +85,7 @@ libveejay_la_LIBADD = \
     $(top_builddir)/libvjxml/libvjxml.la \
     $(SDL2_LIBS) \
     $(X_LIBS) \
+    $(X_EXTRA_LIBS) \
     $(PTHREAD_LIBS) \
     $(FT_LDFLAGS) \
     $(FT_LIBS) \
@@ -111,7 +112,6 @@ libveejay_la_LIBADD = \
 
 libveejay_la_LDFLAGS += \
     -DDYNAMIC \
-    -O3 \
     -Wall \
     -rdynamic \
     -Wl,-no-undefined

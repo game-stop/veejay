@@ -26,7 +26,6 @@
 
 #define SS_PARAMS       12
 #define SS_HISTORY_MAX  32
-#define SS_HISTORY_MASK (SS_HISTORY_MAX - 1)
 #define SS_GEOM_MODES   32
 
 #define P_MODE         0
@@ -194,6 +193,8 @@ typedef struct {
 
     int frame;
     int write_pos;
+    int history_capacity;
+    int history_mask;
     int seeded;
     int last_reset;
     int last_depth;
@@ -248,7 +249,7 @@ typedef struct {
 
 static void ss_refresh_history_planes(slitscan_t *s)
 {
-    for(int k = 0; k < SS_HISTORY_MAX; k++) {
+    for(int k = 0; k < s->history_capacity; k++) {
         const size_t base = (size_t)k * 3u * (size_t)s->len;
         s->hist_y[k] = s->history + base;
         s->hist_u[k] = s->hist_y[k] + s->len;
@@ -279,7 +280,7 @@ static void ss_copy_current_to_slot(slitscan_t *s, VJFrame *frame, int slot)
 
 static void ss_seed_history(slitscan_t *s, VJFrame *frame)
 {
-    for(int k = 0; k < SS_HISTORY_MAX; k++) {
+    for(int k = 0; k < s->history_capacity; k++) {
         ss_copy_current_to_slot(s, frame, k);
     }
     veejay_memcpy(s->prev_y, frame->data[0], s->len);
@@ -412,7 +413,7 @@ static void ss_render_shape_hard(slitscan_t *s, const ss_render_cfg *cfg)
         const uint32_t g16 = ss_geom_time_u16(cfg->geom[idx], cfg);
         const uint16_t tq = s->time_lut[g16 >> 8];
         const int back = tq >> 8;
-        const int slot = (cfg->write_slot - back) & SS_HISTORY_MASK;
+        const int slot = (cfg->write_slot - back) & s->history_mask;
 
         const uint8_t sy = s->hist_y[slot][idx];
         const uint8_t su = s->hist_u[slot][idx];
@@ -433,10 +434,11 @@ static void ss_render_shape_soft(slitscan_t *s, const ss_render_cfg *cfg)
         const int back0 = tq >> 8;
         const int frac = tq & 255;
         int back1 = back0 + 1;
-        back1 = (back1 >= SS_HISTORY_MAX) ? (SS_HISTORY_MAX - 1) : back1;
+        back1 = (back1 >= s->history_capacity) ?
+            (s->history_capacity - 1) : back1;
 
-        const int slot0 = (cfg->write_slot - back0) & SS_HISTORY_MASK;
-        const int slot1 = (cfg->write_slot - back1) & SS_HISTORY_MASK;
+        const int slot0 = (cfg->write_slot - back0) & s->history_mask;
+        const int slot1 = (cfg->write_slot - back1) & s->history_mask;
         const int q = ((slot1 != slot0) ? ((frac * cfg->time_blend_q8 + 128) >> 8) : 0);
         const int iq = 256 - q;
 
@@ -464,7 +466,7 @@ static void ss_render_source_hard(slitscan_t *s, const ss_render_cfg *cfg)
 
         const uint16_t tq = s->time_lut[t];
         const int back = tq >> 8;
-        const int slot = (cfg->write_slot - back) & SS_HISTORY_MASK;
+        const int slot = (cfg->write_slot - back) & s->history_mask;
 
         const uint8_t sy = s->hist_y[slot][idx];
         const uint8_t su = s->hist_u[slot][idx];
@@ -488,10 +490,11 @@ static void ss_render_source_soft(slitscan_t *s, const ss_render_cfg *cfg)
         const int back0 = tq >> 8;
         const int frac = tq & 255;
         int back1 = back0 + 1;
-        back1 = (back1 >= SS_HISTORY_MAX) ? (SS_HISTORY_MAX - 1) : back1;
+        back1 = (back1 >= s->history_capacity) ?
+            (s->history_capacity - 1) : back1;
 
-        const int slot0 = (cfg->write_slot - back0) & SS_HISTORY_MASK;
-        const int slot1 = (cfg->write_slot - back1) & SS_HISTORY_MASK;
+        const int slot0 = (cfg->write_slot - back0) & s->history_mask;
+        const int slot1 = (cfg->write_slot - back1) & s->history_mask;
         const int q = ((slot1 != slot0) ? ((frac * cfg->time_blend_q8 + 128) >> 8) : 0);
         const int iq = 256 - q;
 
@@ -1394,11 +1397,32 @@ vj_effect *slitscan_init(int w, int h)
 
 void *slitscan_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     slitscan_t *s = (slitscan_t*) vj_calloc(sizeof(slitscan_t));
     if(!s) return NULL;
 
     const int len = w * h;
-    const size_t history_bytes = (size_t)SS_HISTORY_MAX * 3u * (size_t)len;
+    if((size_t)len > SIZE_MAX / 7u) {
+        free(s);
+        return NULL;
+    }
+    const size_t fixed_bytes = (size_t)len * 7u;
+    const size_t slot_bytes = (size_t)len * 3u;
+    const int history_capacity = vje_history_capacity("Slit Scan Time",
+                                                       fixed_bytes,
+                                                       slot_bytes,
+                                                       1,
+                                                       SS_HISTORY_MAX,
+                                                       1);
+    if(history_capacity == 0 ||
+       (size_t)history_capacity > (SIZE_MAX - fixed_bytes) / slot_bytes)
+    {
+        free(s);
+        return NULL;
+    }
+    const size_t history_bytes = (size_t)history_capacity * slot_bytes;
     const size_t prev_bytes = (size_t)len;
     const size_t u16_plane_bytes = (size_t)len * sizeof(uint16_t);
 
@@ -1425,6 +1449,8 @@ void *slitscan_malloc(int w, int h)
     s->w = w;
     s->h = h;
     s->len = len;
+    s->history_capacity = history_capacity;
+    s->history_mask = history_capacity - 1;
     s->history = s->region + history_off;
     s->prev_y = s->region + prev_off;
     s->geom = (uint16_t*)(void*)(s->region + geom_off);
@@ -1482,7 +1508,7 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     const int reset = args[P_RESET] ? 1 : 0;
 
     int target_amount = ss_clampi(amount, 0, 100);
-    int target_depth = ss_clampi(depth, 1, SS_HISTORY_MAX);
+    int target_depth = ss_clampi(depth, 1, s->history_capacity);
     int target_source_gain = ss_clampi(source_gain, 0, 100);
     int target_motion = ss_clampi(motion, 0, 100);
     int target_time_offset = ss_clampi(time_offset, 0, 1000);
@@ -1515,7 +1541,7 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     }
 
     amount = ss_clampi((int)(s->sm_amount + 0.5f), 0, 100);
-    depth = ss_clampi((int)(s->sm_depth + 0.5f), 1, SS_HISTORY_MAX);
+    depth = ss_clampi((int)(s->sm_depth + 0.5f), 1, s->history_capacity);
     source_gain = ss_clampi((int)(s->sm_source_gain + 0.5f), 0, 100);
     motion = ss_clampi((int)(s->sm_motion + 0.5f), 0, 100);
     time_offset = ss_clampi((int)(s->sm_time_offset + 0.5f), 0, 1000);
@@ -1540,7 +1566,7 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
 
     if(amount <= 0 || depth <= 1) {
         veejay_memcpy(s->prev_y, cur_y, len);
-        s->write_pos = (s->write_pos + 1) & SS_HISTORY_MASK;
+        s->write_pos = (s->write_pos + 1) & s->history_mask;
         s->frame++;
         return;
     }
@@ -1595,7 +1621,7 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
 #pragma omp single
         {
             veejay_memcpy(s->prev_y, cur_y, len);
-            s->write_pos = (s->write_pos + 1) & SS_HISTORY_MASK;
+            s->write_pos = (s->write_pos + 1) & s->history_mask;
             s->frame++;
         }
 }

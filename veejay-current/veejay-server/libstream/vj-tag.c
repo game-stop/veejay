@@ -332,6 +332,73 @@ static inline int vj_tag_buffer_clampi(int v, int lo, int hi)
     return v < lo ? lo : v > hi ? hi : v;
 }
 
+#define VJ_TAG_BUFFER_MIB (1024ULL * 1024ULL)
+#define VJ_TAG_BUFFER_AUTO_MIN_BYTES (64ULL * VJ_TAG_BUFFER_MIB)
+#define VJ_TAG_BUFFER_AUTO_MAX_BYTES (512ULL * VJ_TAG_BUFFER_MIB)
+#define VJ_TAG_BUFFER_HEADROOM_MIN_BYTES (128ULL * VJ_TAG_BUFFER_MIB)
+#define VJ_TAG_BUFFER_HEADROOM_MAX_BYTES (1024ULL * VJ_TAG_BUFFER_MIB)
+
+static int vj_tag_buffer_env_status = 0;
+static size_t vj_tag_buffer_env_bytes = 0;
+static pthread_once_t vj_tag_buffer_env_once = PTHREAD_ONCE_INIT;
+
+static void vj_tag_buffer_env_initialize(void)
+{
+    vj_tag_buffer_env_status =
+        vj_mem_parse_env_mb("VEEJAY_STREAM_BUFFER_MAX_MB",
+                            &vj_tag_buffer_env_bytes);
+    if(vj_tag_buffer_env_status < 0) {
+        const char *setting = getenv("VEEJAY_STREAM_BUFFER_MAX_MB");
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "Ignoring invalid VEEJAY_STREAM_BUFFER_MAX_MB='%s' (expected auto, off, or MiB)",
+                   setting ? setting : "");
+        vj_tag_buffer_env_status = 0;
+    }
+}
+
+static size_t vj_tag_buffer_budget(const char **policy)
+{
+    vj_mem_info_t memory;
+    const int have_memory = vj_mem_get_info(&memory);
+    uint64_t ceiling = 0;
+
+    pthread_once(&vj_tag_buffer_env_once, vj_tag_buffer_env_initialize);
+
+    if(vj_tag_buffer_env_status > 0) {
+        *policy = "environment";
+        ceiling = (uint64_t)vj_tag_buffer_env_bytes;
+    }
+    else if(have_memory) {
+        *policy = "auto";
+        ceiling = memory.total_bytes / 8u;
+        if(ceiling < VJ_TAG_BUFFER_AUTO_MIN_BYTES)
+            ceiling = VJ_TAG_BUFFER_AUTO_MIN_BYTES;
+        if(ceiling > VJ_TAG_BUFFER_AUTO_MAX_BYTES)
+            ceiling = VJ_TAG_BUFFER_AUTO_MAX_BYTES;
+    }
+    else {
+        *policy = "unavailable";
+        return 0;
+    }
+
+    if(have_memory) {
+        uint64_t headroom = memory.total_bytes / 8u;
+        if(headroom < VJ_TAG_BUFFER_HEADROOM_MIN_BYTES)
+            headroom = VJ_TAG_BUFFER_HEADROOM_MIN_BYTES;
+        if(headroom > VJ_TAG_BUFFER_HEADROOM_MAX_BYTES)
+            headroom = VJ_TAG_BUFFER_HEADROOM_MAX_BYTES;
+
+        const uint64_t usable = memory.available_bytes > headroom ?
+                                memory.available_bytes - headroom : 0;
+        if(ceiling > usable)
+            ceiling = usable;
+    }
+
+    if(ceiling > SIZE_MAX)
+        ceiling = SIZE_MAX;
+    return (size_t)ceiling;
+}
+
 static inline int vj_tag_buffer_oldest_slot(vj_tag_info_t *info)
 {
     if(info->buffer_fill < info->buffer_length)
@@ -454,6 +521,7 @@ int vj_tag_set_buffer_length(int t1, int n_frames)
         n_frames = 0;
     if(n_frames > 2160000)
         n_frames = 2160000;
+    const int requested_frames = n_frames;
 
     vj_tag_info_t *info = tag->info;
     pthread_mutex_lock(&info->mutex);
@@ -475,15 +543,49 @@ int vj_tag_set_buffer_length(int t1, int n_frames)
     info->capture_seq = 0;
 
     if(n_frames > 0) {
-        int len = vj_tag_input ? (vj_tag_input->width * vj_tag_input->height) : 0;
-        int uv_len = vj_tag_input ? vj_tag_input->uv_len : 0;
-        size_t frame_size = (size_t)len + (2u * (size_t)uv_len);
-        size_t total = frame_size * (size_t)n_frames;
-
-        if(len <= 0 || uv_len <= 0 || frame_size == 0 || total / frame_size != (size_t)n_frames) {
+        const int width = vj_tag_input ? vj_tag_input->width : 0;
+        const int height = vj_tag_input ? vj_tag_input->height : 0;
+        if(width <= 0 || height <= 0 || width > INT_MAX / height) {
             pthread_mutex_unlock(&info->mutex);
             return 0;
         }
+        int len = width * height;
+        int uv_len = vj_tag_input ? vj_tag_input->uv_len : 0;
+
+        if(uv_len <= 0 ||
+           (size_t)uv_len > (SIZE_MAX - (size_t)len) / 2u) {
+            pthread_mutex_unlock(&info->mutex);
+            return 0;
+        }
+        size_t frame_size = (size_t)len + (2u * (size_t)uv_len);
+
+        const char *policy = NULL;
+        const size_t budget = vj_tag_buffer_budget(&policy);
+        size_t permitted_frames = budget / frame_size;
+        if(permitted_frames > 2160000u)
+            permitted_frames = 2160000u;
+        if((size_t)n_frames > permitted_frames) {
+            n_frames = (int)permitted_frames;
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "Stream %d trickplay buffer requested %d frames; clamped to %d (policy=%s budget=%.2fMB frame=%.2fMB)",
+                       t1,
+                       requested_frames,
+                       n_frames,
+                       policy,
+                       (double)budget / (1024.0 * 1024.0),
+                       (double)frame_size / (1024.0 * 1024.0));
+        }
+
+        if(n_frames == 0) {
+            pthread_mutex_unlock(&info->mutex);
+            return 1;
+        }
+
+        if((size_t)n_frames > SIZE_MAX / frame_size) {
+            pthread_mutex_unlock(&info->mutex);
+            return 0;
+        }
+        const size_t total = frame_size * (size_t)n_frames;
 
         info->frame_buffer = (uint8_t*) vj_malloc(total);
         if(!info->frame_buffer) {

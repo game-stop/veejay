@@ -19,7 +19,7 @@
  */
 
 #include <config.h>
-#include <omp.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <math.h>
@@ -32,6 +32,123 @@
 
 #define ONEQTR_PI (M_PI / 4.0f)
 #define THRQTR_PI (3.0f * M_PI / 4.0f)
+
+#define VJE_HISTORY_MIB (1024ULL * 1024ULL)
+#define VJE_HISTORY_AUTO_MIN_BYTES (64ULL * VJE_HISTORY_MIB)
+#define VJE_HISTORY_AUTO_MAX_BYTES (512ULL * VJE_HISTORY_MIB)
+#define VJE_HISTORY_HEADROOM_MIN_BYTES (128ULL * VJE_HISTORY_MIB)
+#define VJE_HISTORY_HEADROOM_MAX_BYTES (1024ULL * VJE_HISTORY_MIB)
+
+static int vje_history_env_status = 0;
+static size_t vje_history_env_bytes = 0;
+static pthread_once_t vje_history_env_once = PTHREAD_ONCE_INIT;
+
+static void vje_history_env_initialize(void)
+{
+	vje_history_env_status =
+		vj_mem_parse_env_mb("VEEJAY_FX_HISTORY_MAX_MB",
+							&vje_history_env_bytes);
+	if(vje_history_env_status < 0) {
+		const char *setting = getenv("VEEJAY_FX_HISTORY_MAX_MB");
+		veejay_msg(VEEJAY_MSG_WARNING,
+				   "[FXMEM] ignoring invalid VEEJAY_FX_HISTORY_MAX_MB='%s' (expected auto, off, or MiB)",
+				   setting ? setting : "");
+		vje_history_env_status = 0;
+	}
+}
+
+static size_t vje_history_budget(const char **policy)
+{
+	vj_mem_info_t memory;
+	const int have_memory = vj_mem_get_info(&memory);
+	uint64_t ceiling = 0;
+
+	pthread_once(&vje_history_env_once, vje_history_env_initialize);
+
+	if(vje_history_env_status > 0) {
+		*policy = "environment";
+		ceiling = (uint64_t)vje_history_env_bytes;
+	}
+	else if(have_memory) {
+		*policy = "auto";
+		ceiling = memory.total_bytes / 8u;
+		if(ceiling < VJE_HISTORY_AUTO_MIN_BYTES)
+			ceiling = VJE_HISTORY_AUTO_MIN_BYTES;
+		if(ceiling > VJE_HISTORY_AUTO_MAX_BYTES)
+			ceiling = VJE_HISTORY_AUTO_MAX_BYTES;
+	}
+	else {
+		*policy = "unavailable";
+		return 0;
+	}
+
+	if(have_memory) {
+		uint64_t headroom = memory.total_bytes / 8u;
+		if(headroom < VJE_HISTORY_HEADROOM_MIN_BYTES)
+			headroom = VJE_HISTORY_HEADROOM_MIN_BYTES;
+		if(headroom > VJE_HISTORY_HEADROOM_MAX_BYTES)
+			headroom = VJE_HISTORY_HEADROOM_MAX_BYTES;
+
+		const uint64_t usable = memory.available_bytes > headroom ?
+								memory.available_bytes - headroom : 0;
+		if(ceiling > usable)
+			ceiling = usable;
+	}
+
+	if(ceiling > SIZE_MAX)
+		ceiling = SIZE_MAX;
+	return (size_t)ceiling;
+}
+
+int vje_history_capacity(const char *owner,
+						 size_t fixed_bytes,
+						 size_t slot_bytes,
+						 int minimum,
+						 int maximum,
+						 int power_of_two)
+{
+	const char *policy = NULL;
+	const size_t budget = vje_history_budget(&policy);
+	int capacity = 0;
+
+	if(slot_bytes > 0 && minimum > 0 && maximum >= minimum &&
+	   budget >= fixed_bytes)
+	{
+		const size_t available_slots = (budget - fixed_bytes) / slot_bytes;
+		capacity = available_slots > (size_t)maximum ?
+				   maximum : (int)available_slots;
+	}
+
+	if(power_of_two && capacity > 0) {
+		int rounded = 1;
+		while(rounded <= capacity / 2)
+			rounded <<= 1;
+		capacity = rounded;
+	}
+
+	if(capacity < minimum) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				   "[FXMEM] %s requires at least %d history slots (policy=%s budget=%.2fMB fixed=%.2fMB slot=%.2fMB)",
+				   owner ? owner : "effect",
+				   minimum,
+				   policy,
+				   (double)budget / (1024.0 * 1024.0),
+				   (double)fixed_bytes / (1024.0 * 1024.0),
+				   (double)slot_bytes / (1024.0 * 1024.0));
+		return 0;
+	}
+
+	veejay_msg(capacity < maximum ? VEEJAY_MSG_INFO : VEEJAY_MSG_DEBUG,
+			   "[FXMEM] %s history=%d/%d policy=%s budget=%.2fMB allocation=%.2fMB",
+			   owner ? owner : "effect",
+			   capacity,
+			   maximum,
+			   policy,
+			   (double)budget / (1024.0 * 1024.0),
+			   (double)(fixed_bytes + ((size_t)capacity * slot_bytes)) /
+				   (1024.0 * 1024.0));
+	return capacity;
+}
 
 int vje_advise_num_threads(const int len)
 {

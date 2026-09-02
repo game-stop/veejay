@@ -8017,9 +8017,13 @@ void vj_event_stream_set_buffer_length(void *ptr, const char format[], va_list a
         return;
     }
 
+    const int actual_length = vj_tag_get_buffer_length(stream_id);
+
     if(v && v->uc && STREAM_PLAYING(v) && v->uc->sample_id == stream_id) {
         int duration = vj_tag_get_buffer_duration(stream_id);
-        int transport_length = (args[1] > 0) ? (duration > 0 ? duration : 1) : vj_tag_get_n_frames(stream_id);
+        int transport_length = (actual_length > 0) ?
+                               (duration > 0 ? duration : 1) :
+                               vj_tag_get_n_frames(stream_id);
         if(transport_length < 1)
             transport_length = 1;
         atomic_store_long_long(&v->settings->min_frame_num, 0);
@@ -8027,7 +8031,9 @@ void vj_event_stream_set_buffer_length(void *ptr, const char format[], va_list a
         atomic_store_long_long(&v->settings->current_frame_num, 0);
     }
 
-    veejay_msg(VEEJAY_MSG_INFO, "Stream %d trickplay buffer length is %d frames", stream_id, args[1]);
+    veejay_msg(VEEJAY_MSG_INFO,
+               "Stream %d trickplay buffer length is %d frames",
+               stream_id, actual_length);
 }
 
 void vj_event_stream_buffer_forward(void *ptr, const char format[], va_list ap)

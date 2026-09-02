@@ -24,6 +24,7 @@
 
 typedef struct {
     uint8_t *cframe[4];
+    int capacity;
     int cnframe;
     int cnreverse;
     int chroma_restart;
@@ -81,15 +82,30 @@ vj_effect *chromascratcher_init(int w, int h)
 
 void *chromascratcher_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     chromascratcher_t *c = (chromascratcher_t*) vj_calloc(sizeof(chromascratcher_t));
 
     if(!c)
         return NULL;
 
     const int len = w * h;
-    const int plane_bank = len * MAX_SCRATCH_FRAMES;
+    if((size_t)len > SIZE_MAX / 3u) {
+        free(c);
+        return NULL;
+    }
+    const size_t slot_bytes = (size_t)len * 3u;
+    const int capacity = vje_history_capacity("Matte Scratcher", 0,
+                                               slot_bytes, 1,
+                                               MAX_SCRATCH_FRAMES - 1, 0);
+    if(capacity == 0 || (size_t)capacity > SIZE_MAX / slot_bytes) {
+        free(c);
+        return NULL;
+    }
+    const size_t plane_bank = (size_t)len * (size_t)capacity;
 
-    c->cframe[0] = (uint8_t *) vj_malloc(plane_bank * 3 * sizeof(uint8_t));
+    c->cframe[0] = (uint8_t *) vj_malloc(slot_bytes * (size_t)capacity);
 
     if(!c->cframe[0]) {
         free(c);
@@ -99,6 +115,7 @@ void *chromascratcher_malloc(int w, int h)
     c->cframe[1] = c->cframe[0] + plane_bank;
     c->cframe[2] = c->cframe[1] + plane_bank;
     c->cframe[3] = NULL;
+    c->capacity = capacity;
     veejay_memset(c->cframe[0], pixel_Y_lo_, plane_bank);
     veejay_memset(c->cframe[1], 128, plane_bank);
     veejay_memset(c->cframe[2], 128, plane_bank);
@@ -172,7 +189,7 @@ static void chromastore_frame(chromascratcher_t *c, VJFrame *src, int n, int no_
     c->cnframe = cnframe;
 }
 
-static void chromascratcher_apply_simple(chromascratcher_t *c, VJFrame *frame, int mode, int opacity, int offset)
+static void chromascratcher_apply_simple(chromascratcher_t *c, VJFrame *frame, int mode, int opacity, size_t offset)
 {
     const int len = frame->len;
     const int op_a = opacity;
@@ -222,7 +239,7 @@ void chromascratcher_apply(void *ptr, VJFrame *frame, int *args)
     const int len = frame->len;
 
 
-    int n = chromascratcher_clampi(args[0], 0, MAX_SCRATCH_FRAMES - 1);
+    int n = chromascratcher_clampi(args[0], 0, c->capacity);
     int opacity = args[1];
     int mode = chromascratcher_clampi(args[2], 0, 29);
     int no_reverse = args[3] == 0 ? 1 : 0;
@@ -248,7 +265,7 @@ void chromascratcher_apply(void *ptr, VJFrame *frame, int *args)
     if(n <= 0)
         return;
 
-    const int offset = len * c->cnframe;
+    const size_t offset = (size_t)len * (size_t)c->cnframe;
 
 #pragma omp single
     {

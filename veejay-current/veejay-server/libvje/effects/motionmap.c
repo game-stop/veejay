@@ -21,7 +21,7 @@
 #include "common.h"
 #include <limits.h>
 #include <stdint.h>
-#include <omp.h>
+#include <libvje/omp-compat.h>
 #include <veejaycore/vjmem.h>
 #include <veejaycore/vj-msg.h>
 #include "motionmap.h"

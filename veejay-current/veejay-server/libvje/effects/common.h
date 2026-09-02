@@ -89,6 +89,12 @@ extern void set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 
 extern void veejay_msg(int type, const char format[], ...);
 extern int vje_get_rgb_parameter_conversion_type(void);
+extern int vje_history_capacity(const char *owner,
+								size_t fixed_bytes,
+								size_t slot_bytes,
+								int minimum,
+								int maximum,
+								int power_of_two);
 
 
 #define ALPHA_BLEND( a0, p0, p1 ) ( ((0xff - a0) * p0 + (a0 * p1) ) >> 8 )

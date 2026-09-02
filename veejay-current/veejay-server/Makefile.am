@@ -15,7 +15,6 @@ EXTRA_DIST = \
  packaging.am \
  autogen.sh\
  depcomp \
- cpuinfo.sh \
  autogen.sh \
  PKGBUILD \
  $(PACKAGE).spec \

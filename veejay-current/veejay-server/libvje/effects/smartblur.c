@@ -22,7 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <omp.h>
+#include <libvje/omp-compat.h>
 #include <veejaycore/vjmem.h>
 #include "smartblur.h"
 

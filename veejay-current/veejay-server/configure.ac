@@ -98,9 +98,14 @@ AC_ARG_WITH([nvjpeg],
 	[AS_HELP_STRING([--with-nvjpeg@<:@=DIR@:>@],
 		[enable optional nvJPEG MJPEG decode; look for CUDA headers, nvcc and libraries below DIR])],
 	[with_nvjpeg="$withval"], [with_nvjpeg=auto])
+AC_ARG_WITH([mediamtx],
+  [AS_HELP_STRING([--with-mediamtx@<:@=PATH@:>@],
+    [enable optional MediaMTX gateway integration; use the executable at PATH])],
+  [with_mediamtx="$withval"], [with_mediamtx=auto])
 AC_ARG_VAR([CUDA_HOME], [CUDA toolkit prefix used for nvJPEG detection])
 AC_ARG_VAR([CUDA_PATH], [CUDA toolkit prefix used for nvJPEG detection])
 AC_ARG_VAR([NVCC], [path to the NVIDIA CUDA compiler])
+AC_ARG_VAR([MEDIAMTX], [path to the MediaMTX executable])
 
 arch_target="generic"
 AC_ARG_WITH(arch-target, AS_HELP_STRING( [--with-arch-target=generic, native, auto or user defined],
@@ -116,6 +121,33 @@ dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
 AC_OPENMP
+have_openmp=false
+OPENMP_PRAGMA_CFLAGS=""
+if test "x$enable_openmp" != "xno" &&
+   test -n "$ac_cv_prog_c_openmp" &&
+   test "x$ac_cv_prog_c_openmp" != "xunsupported"; then
+  have_openmp=true
+else
+  AC_CACHE_CHECK([for a flag to ignore disabled OpenMP pragmas],
+           [vj_cv_c_openmp_pragma_flag], [
+    vj_save_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS -Werror -Wunknown-pragmas -Wno-unknown-pragmas"
+    AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+int main(void)
+{
+#pragma omp parallel
+  { }
+  return 0;
+}
+]])], [vj_cv_c_openmp_pragma_flag="-Wno-unknown-pragmas"],
+   [vj_cv_c_openmp_pragma_flag="none"])
+    CFLAGS="$vj_save_CFLAGS"
+  ])
+  if test "x$vj_cv_c_openmp_pragma_flag" != "xnone"; then
+    OPENMP_PRAGMA_CFLAGS="$vj_cv_c_openmp_pragma_flag"
+  fi
+  AC_MSG_NOTICE([OpenMP unavailable or disabled; building serial code paths])
+fi
 dnl AM_PROG_CC_STDC
 AC_PROG_YACC
 AC_PROG_CXX
@@ -331,6 +363,7 @@ have_ps2=false
 have_arm=false
 have_armv7a=false
 have_aarch64=false
+have_esp32=false
 
 
 AC_MSG_CHECKING([Architecture])
@@ -394,7 +427,7 @@ case $host_cpu in
 	fi
 	;;
 
-    aarch64*)
+    aarch64*|arm64*)
       AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
       have_arm=true
       have_aarch64=true
@@ -427,6 +460,19 @@ case $host_cpu in
       AC_MSG_RESULT([arm])
     ;;
 
+    xtensa*|riscv32*)
+      case $host_vendor in
+        esp|esp32*)
+          AC_DEFINE(HAVE_ESP32,1,[Compiling for an Espressif ESP32 target])
+          have_esp32=true
+          AC_MSG_RESULT([esp32 ($host_cpu)])
+        ;;
+        *)
+          AC_MSG_ERROR([$host is not a recognized Espressif ESP32 target])
+        ;;
+      esac
+    ;;
+
     *)
         AC_MSG_ERROR([unknown architecture])
     ;;
@@ -445,7 +491,7 @@ case $arch_target in
   ;;
   auto|native)
     saved_CFLAGS="$CFLAGS"
-    if test x$have_ppccpu = xtrue; then
+    if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then
       requested_arch_flag="-mcpu=native"
     else
       requested_arch_flag="-march=native"
@@ -458,7 +504,7 @@ case $arch_target in
     AC_MSG_RESULT([$ARCHFLAGS])
   ;;
   *)
-    if test x$have_ppccpu = xtrue; then
+    if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then
       requested_arch_flag="-mcpu=$arch_target"
     else
       requested_arch_flag="-march=$arch_target"
@@ -744,7 +790,7 @@ EOF
 fi
 
 
-VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $OPENMP_CFLAGS $warnCFLAGS"
+VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $OPENMP_CFLAGS $OPENMP_PRAGMA_CFLAGS $warnCFLAGS"
 VEEJAY_CXXFLAGS="$VEEJAY_CFLAGS $warnCXXFLAGS"
 
 AC_MSG_NOTICE([Final VEEJAY_CFLAGS: $VEEJAY_CFLAGS])
@@ -803,6 +849,55 @@ FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${
 FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS} ${LIBSWRESAMPLE_LIBS}"
 AC_SUBST(FFMPEG_CFLAGS)
 AC_SUBST(FFMPEG_LIBS)
+
+have_libcurl=false
+have_mediamtx_executable=false
+have_mediamtx=false
+LIBCURL_CFLAGS=""
+LIBCURL_LIBS=""
+
+if test "x$with_mediamtx" != "xno"; then
+  PKG_CHECK_MODULES([LIBCURL], [libcurl >= 7.68],
+                    [have_libcurl=true], [have_libcurl=false])
+
+  if test -n "$MEDIAMTX"; then
+    AC_MSG_CHECKING([whether $MEDIAMTX is an executable MediaMTX binary])
+    if test -x "$MEDIAMTX"; then
+      have_mediamtx_executable=true
+      AC_MSG_RESULT([yes])
+    else
+      AC_MSG_RESULT([no])
+    fi
+  elif test "x$with_mediamtx" != "xauto" && test "x$with_mediamtx" != "xyes"; then
+    AC_MSG_CHECKING([whether $with_mediamtx is an executable MediaMTX binary])
+    if test -x "$with_mediamtx"; then
+      MEDIAMTX="$with_mediamtx"
+      have_mediamtx_executable=true
+      AC_MSG_RESULT([yes])
+    else
+      AC_MSG_RESULT([no])
+    fi
+  else
+    AC_PATH_PROG([MEDIAMTX], [mediamtx], [])
+    if test -n "$MEDIAMTX"; then
+      have_mediamtx_executable=true
+    fi
+  fi
+
+  if test "x$have_libcurl" = "xtrue" && test "x$have_mediamtx_executable" = "xtrue"; then
+    have_mediamtx=true
+    AC_DEFINE([HAVE_MEDIAMTX], [1],
+              [Compile optional MediaMTX gateway integration])
+  elif test "x$with_mediamtx" != "xauto"; then
+    AC_MSG_ERROR([MediaMTX integration requested, but libcurl >= 7.68 or the MediaMTX executable is unavailable])
+  else
+    AC_MSG_NOTICE([MediaMTX executable or libcurl development files not found; gateway integration will not be built])
+  fi
+fi
+
+AC_SUBST([LIBCURL_CFLAGS])
+AC_SUBST([LIBCURL_LIBS])
+AC_SUBST([MEDIAMTX])
 
 AC_SUBST(LIBM_LIBS)
 
@@ -1482,6 +1577,8 @@ AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_NVJPEG, test x$have_nvjpeg = xtrue)
 AM_CONDITIONAL(HAVE_NVJPEG_CUDA_KERNEL, test x$have_nvjpeg_kernel = xtrue)
 AM_CONDITIONAL(HAVE_NDI, test x$have_ndi = xtrue)
+AM_CONDITIONAL(HAVE_MEDIAMTX, test x$have_mediamtx = xtrue)
+AM_CONDITIONAL(HAVE_ALTIVEC, test x$have_altivec = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 AM_CONDITIONAL(HAVE_XDPMS, test x$have_xdpms = xtrue)
@@ -1491,7 +1588,14 @@ dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
 dnl We do this last as it can screw up library detection etc...
 
-CFLAGS="$ARCHFLAGS $CFLAGS"
+veejay_cflags_without_optimization=""
+for flag in $CFLAGS; do
+  case $flag in
+    -O*) ;;
+    *) veejay_cflags_without_optimization="$veejay_cflags_without_optimization $flag" ;;
+  esac
+done
+CFLAGS="$ARCHFLAGS$veejay_cflags_without_optimization -O3"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
 
 dnl	output some info on what veejay was build
@@ -1555,7 +1659,7 @@ AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 
 
-AC_MSG_NOTICE([ Compiler flags: $VEEJAY_CFLAGS])
+AC_MSG_NOTICE([ Compiler flags: $VEEJAY_CFLAGS $CFLAGS])
 AC_MSG_NOTICE([   architecture: $arch_target])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
@@ -1595,6 +1699,9 @@ if test "$have_mips" = "true" ; then
 AC_MSG_NOTICE([   mips])
 AC_MSG_NOTICE([    PS/2 enabled        : ${have_ps2}])
 fi
+if test "$have_esp32" = "true" ; then
+AC_MSG_NOTICE([   ESP32 target         : ${host}])
+fi
 AC_MSG_NOTICE([])
 if test "$have_linux" = "true" ; then
 AC_MSG_NOTICE([   Platform: Linux])
@@ -1629,3 +1736,6 @@ AC_MSG_NOTICE([  - libunwind                     : ${have_unwind}])
 AC_MSG_NOTICE([  - nvJPEG MJPEG decode           : ${have_nvjpeg}])
 AC_MSG_NOTICE([  - nvJPEG GPU 4:4:4 output        : ${have_nvjpeg_kernel}])
 AC_MSG_NOTICE([  - NDI network video/audio       : ${have_ndi}])
+AC_MSG_NOTICE([  - MediaMTX gateway               : ${have_mediamtx}])
+AC_MSG_NOTICE([    libcurl                        : ${have_libcurl}])
+AC_MSG_NOTICE([    MediaMTX executable            : ${MEDIAMTX:-not found}])

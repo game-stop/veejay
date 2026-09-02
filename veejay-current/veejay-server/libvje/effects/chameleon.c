@@ -28,8 +28,7 @@
 #include "chameleon.h"
 #include "motionmap.h"
 
-#define PLANES_DEPTH 6
-#define PLANES (1 << PLANES_DEPTH)
+#define CHAMELEON_MAX_PLANES 64
 
 typedef struct {
     int last_mode_;
@@ -41,6 +40,9 @@ typedef struct {
     uint8_t *timebuffer;
     uint8_t *tmpimage[4];
     int plane;
+    int planes;
+    int planes_depth;
+    int plane_mask;
     uint8_t *bgimage[4];
 } chameleon_t;
 
@@ -52,7 +54,7 @@ static inline int chameleon_clampi(int v, int lo, int hi)
 static void chameleon_reset_history(chameleon_t *c, int len)
 {
     veejay_memset(c->sum, 0, sizeof(int32_t) * (size_t)len);
-    veejay_memset(c->timebuffer, 0, (size_t)len * PLANES);
+    veejay_memset(c->timebuffer, 0, (size_t)len * (size_t)c->planes);
     c->plane = 0;
 }
 
@@ -114,6 +116,10 @@ int chameleon_prepare(void *ptr, VJFrame *frame)
 
 void *chameleon_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || w > INT_MAX / 2 ||
+       (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     chameleon_t *c = (chameleon_t*) vj_calloc(sizeof(chameleon_t));
 
     if(!c)
@@ -121,8 +127,33 @@ void *chameleon_malloc(int w, int h)
 
     const int len = w * h;
     const int safe_zone = w * 2;
+    const size_t plane_bytes = (size_t)len;
+    const size_t safe_zone_bytes = (size_t)safe_zone;
+    if(safe_zone_bytes > SIZE_MAX / 3u ||
+       plane_bytes > (SIZE_MAX - (safe_zone_bytes * 3u)) / 10u) {
+        free(c);
+        return NULL;
+    }
+    const size_t fixed_bytes = plane_bytes * 10u +
+                               safe_zone_bytes * 3u;
+    const size_t bg_plane_bytes = plane_bytes + safe_zone_bytes;
+    const int planes = vje_history_capacity("ChameleonTV",
+                                             fixed_bytes,
+                                             plane_bytes,
+                                             2,
+                                             CHAMELEON_MAX_PLANES,
+                                             1);
+    if(planes == 0) {
+        free(c);
+        return NULL;
+    }
 
-    c->bgimage[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (size_t)(len + safe_zone) * 3u);
+    c->planes = planes;
+    c->plane_mask = planes - 1;
+    for(int value = planes; value > 1; value >>= 1)
+        c->planes_depth++;
+
+    c->bgimage[0] = (uint8_t*) vj_malloc(bg_plane_bytes * 3u);
 
     if(!c->bgimage[0]) {
         free(c);
@@ -146,7 +177,7 @@ void *chameleon_malloc(int w, int h)
         return NULL;
     }
 
-    c->timebuffer = (uint8_t*) vj_calloc((size_t)len * PLANES);
+    c->timebuffer = (uint8_t*) vj_calloc((size_t)len * (size_t)planes);
 
     if(!c->timebuffer) {
         free(c->bgimage[0]);
@@ -156,16 +187,16 @@ void *chameleon_malloc(int w, int h)
         return NULL;
     }
 
-    c->bgimage[1] = c->bgimage[0] + len + safe_zone;
-    c->bgimage[2] = c->bgimage[1] + len + safe_zone;
+    c->bgimage[1] = c->bgimage[0] + bg_plane_bytes;
+    c->bgimage[2] = c->bgimage[1] + bg_plane_bytes;
     c->tmpimage[1] = c->tmpimage[0] + len;
     c->tmpimage[2] = c->tmpimage[1] + len;
 
-    veejay_memset(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
+    veejay_memset(c->bgimage[0], pixel_Y_lo_, bg_plane_bytes);
     veejay_memset(c->tmpimage[0], pixel_Y_lo_, len);
 
     for(int i = 1; i < 3; i++) {
-        veejay_memset(c->bgimage[i], 128, len + safe_zone);
+        veejay_memset(c->bgimage[i], 128, bg_plane_bytes);
         veejay_memset(c->tmpimage[i], 128, len);
     }
 
@@ -209,13 +240,13 @@ static void drawChameleon(chameleon_t *cb, VJFrame *src, VJFrame *dest, int sens
         sum_s[i] = current_sum;
         time_p[i] = (uint8_t)y;
 
-        int diff = (y << PLANES_DEPTH) - current_sum;
+        int diff = (y << cb->planes_depth) - current_sum;
 
         if(diff < 0)
             diff = -diff;
 
         const uint32_t dist = (uint32_t)diff * (uint32_t)sensitivity;
-        const uint32_t a_calc = dist >> PLANES_DEPTH;
+        const uint32_t a_calc = dist >> cb->planes_depth;
         const int alpha = a_calc > 255 ? 255 : (int)a_calc;
 
         if(appearing) {
@@ -230,7 +261,7 @@ static void drawChameleon(chameleon_t *cb, VJFrame *src, VJFrame *dest, int sens
     }
 
 #pragma omp single
-    cb->plane = (cb->plane + 1) & (PLANES - 1);
+    cb->plane = (cb->plane + 1) & cb->plane_mask;
 }
 
 void chameleon_apply(void *ptr, VJFrame *frame, int *args)

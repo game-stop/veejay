@@ -54,6 +54,7 @@ typedef struct {
     int frame;
     int initialized;
     int hist_head;
+    int history_capacity;
     int canvas_ping;
     int last_block;
     int last_flow;
@@ -429,7 +430,7 @@ static void dm_fill_history(datamosh_t *d, const uint8_t *src_y, const uint8_t *
     const size_t len = (size_t) d->len;
 
     const uint8_t *restrict src[3] = { src_y, src_u, src_v };
-    for (int i = 0; i < DM_HISTORY_MAX; i++) {
+    for (int i = 0; i < d->history_capacity; i++) {
 #pragma omp for schedule(static)
         for (int plane = 0; plane < 3; plane++) {
             uint8_t *dst[3] = {
@@ -468,7 +469,7 @@ static void dm_push_history(datamosh_t *d,
  #pragma omp single
     {
         d->hist_head++;
-        if (d->hist_head >= DM_HISTORY_MAX)
+        if (d->hist_head >= d->history_capacity)
             d->hist_head = 0;
     }
 
@@ -585,6 +586,9 @@ void datamosh_free(void *ptr)
 
 void *datamosh_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     datamosh_t *d = (datamosh_t *) vj_calloc(sizeof(datamosh_t));
     if (!d)
         return NULL;
@@ -593,9 +597,29 @@ void *datamosh_malloc(int w, int h)
     const int max_bw = (w + DM_MIN_BLOCK - 1) / DM_MIN_BLOCK;
     const int max_bh = (h + DM_MIN_BLOCK - 1) / DM_MIN_BLOCK;
     const size_t max_blocks = (size_t) max_bw * (size_t) max_bh;
+    if(len > SIZE_MAX / 6u ||
+       max_blocks > (SIZE_MAX - (len * 6u)) / 5u) {
+        free(d);
+        return NULL;
+    }
+
+    const size_t fixed_bytes = len * 6u + max_blocks * 5u;
+    const size_t slot_bytes = len * 3u;
+    const int history_capacity = vje_history_capacity("Datamosh",
+                                                       fixed_bytes,
+                                                       slot_bytes,
+                                                       1,
+                                                       DM_HISTORY_MAX,
+                                                       0);
+    if(history_capacity == 0 ||
+       (size_t)history_capacity > (SIZE_MAX - fixed_bytes) / slot_bytes)
+    {
+        free(d);
+        return NULL;
+    }
 
     size_t total = 0;
-    total += (size_t) 3 * DM_HISTORY_MAX * len;
+    total += (size_t) 3 * (size_t)history_capacity * len;
     total += (size_t) 2 * 3 * len;
     total = dm_align_size(total, sizeof(int16_t));
     total += max_blocks * sizeof(int16_t);
@@ -611,9 +635,9 @@ void *datamosh_malloc(int w, int h)
 
     size_t off = 0;
 
-    d->hist[0] = region + off; off += (size_t) DM_HISTORY_MAX * len;
-    d->hist[1] = region + off; off += (size_t) DM_HISTORY_MAX * len;
-    d->hist[2] = region + off; off += (size_t) DM_HISTORY_MAX * len;
+    d->hist[0] = region + off; off += (size_t) history_capacity * len;
+    d->hist[1] = region + off; off += (size_t) history_capacity * len;
+    d->hist[2] = region + off; off += (size_t) history_capacity * len;
 
     d->canvas[0][0] = region + off; off += len;
     d->canvas[0][1] = region + off; off += len;
@@ -632,6 +656,7 @@ void *datamosh_malloc(int w, int h)
     d->h = h;
     d->len = (int) len;
     d->max_blocks = (int) max_blocks;
+    d->history_capacity = history_capacity;
     d->region = region;
     d->last_block = 0;
     d->last_flow = -1;
@@ -677,7 +702,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
 
     const int reset = args[P_RESET] > 0;
     const int strength = args[P_MOSH];
-    const int history_depth = args[P_HISTORY];
+    const int history_depth = clampi(args[P_HISTORY], 1, d->history_capacity);
     const int block = args[P_BLOCK];
     const int motion = args[P_MOTION];
     const int persist = args[P_PERSIST];
@@ -717,7 +742,8 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *cur_v;
     dm_push_history(d, frame_y, frame_u, frame_v, &cur_y, &cur_u, &cur_v);
 
-    const int prev_slot = (d->hist_head > 0) ? (d->hist_head - 1) : (DM_HISTORY_MAX - 1);
+    const int prev_slot = (d->hist_head > 0) ?
+                          (d->hist_head - 1) : (d->history_capacity - 1);
     const uint8_t * restrict prev_y = d->hist[0] + (size_t) prev_slot * llen;
 
     if (strength <= 0) {
@@ -913,7 +939,7 @@ void datamosh_apply(void *ptr, VJFrame *frame, int *args)
 
         const int back = back_lut[e];
         int hslot = d->hist_head - back;
-        hslot += (hslot < 0) ? DM_HISTORY_MAX : 0;
+        hslot += (hslot < 0) ? d->history_capacity : 0;
 
         const uint8_t * restrict hy = d->hist[0] + (size_t) hslot * llen;
         const uint8_t * restrict hu = d->hist[1] + (size_t) hslot * llen;

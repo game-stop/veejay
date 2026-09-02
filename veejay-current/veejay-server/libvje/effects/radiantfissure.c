@@ -45,6 +45,7 @@ typedef struct {
     int len;
     int frame;
     int filled;
+    int history_capacity;
 
     uint8_t *region;
 
@@ -150,11 +151,11 @@ static inline int wba_ramp255(int v, int range)
     return (v * 255) / range;
 }
 
-static inline int wba_slot_for_age(int write_slot, int age)
+static inline int wba_slot_for_age(int write_slot, int age, int capacity)
 {
     int slot = write_slot - age;
     if (slot < 0)
-        slot += WBA_MAX_FRAMES;
+        slot += capacity;
     return slot;
 }
 
@@ -577,6 +578,10 @@ void *radiantfissure_malloc(int w, int h)
     size_t total;
     uint8_t *p;
     int s;
+
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     c = (radiantfissure_t *) vj_calloc(sizeof(radiantfissure_t));
     if (!c)
         return NULL;
@@ -587,8 +592,26 @@ void *radiantfissure_malloc(int w, int h)
     c->frame = 0;
     c->filled = 0;
     len = (size_t) c->len;
-
-    total = len * ((size_t)WBA_MAX_FRAMES * 3u + 5u);
+    if(len > SIZE_MAX / 5u) {
+        free(c);
+        return NULL;
+    }
+    const size_t fixed_bytes = len * 5u;
+    const size_t slot_bytes = len * 3u;
+    const int history_capacity = vje_history_capacity("Radiant Fissure",
+                                                       fixed_bytes,
+                                                       slot_bytes,
+                                                       1,
+                                                       WBA_MAX_FRAMES,
+                                                       0);
+    if(history_capacity == 0 ||
+       (size_t)history_capacity > (SIZE_MAX - fixed_bytes) / slot_bytes)
+    {
+        free(c);
+        return NULL;
+    }
+    c->history_capacity = history_capacity;
+    total = fixed_bytes + ((size_t)history_capacity * slot_bytes);
 
     c->region = (uint8_t *) vj_malloc(total);
     if (!c->region) {
@@ -598,7 +621,7 @@ void *radiantfissure_malloc(int w, int h)
 
     p = c->region;
 
-    for (s = 0; s < WBA_MAX_FRAMES; s++) {
+    for (s = 0; s < c->history_capacity; s++) {
         c->ring_y[s] = p; p += len;
         c->ring_u[s] = p; p += len;
         c->ring_v[s] = p; p += len;
@@ -611,7 +634,7 @@ void *radiantfissure_malloc(int w, int h)
     c->trail_u = p; p += len;
     c->trail_v = p;
 
-    for (s = 0; s < WBA_MAX_FRAMES; s++) {
+    for (s = 0; s < c->history_capacity; s++) {
         veejay_memset(c->ring_y[s], 0, len);
         veejay_memset(c->ring_u[s], 128, len);
         veejay_memset(c->ring_v[s], 128, len);
@@ -722,7 +745,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
 
     opacity = clampi(opacity, 0, 100);
     step = clampi(step, 3, 14);
-    time_depth = clampi(time_depth, 1, WBA_MAX_FRAMES);
+    time_depth = clampi(time_depth, 1, c->history_capacity);
 
     opacity_q8 = (opacity * 255 + 50) / 100;
     white_forge_q8 = (white_forge * 256 + 50) / 100;
@@ -734,7 +757,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     else
         stroke_chroma_q8 = 256 + (((stroke_chroma - 50) * 384 + 25) / 50);
 
-    for (a = 0; a < WBA_MAX_FRAMES; a++) {
+    for (a = 0; a < c->history_capacity; a++) {
         int base = 100 + a * 6;
         int gain_q8 = (base * 256 + 50) / 100;
 
@@ -742,7 +765,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
         chroma_gain_age_q8[a] = clampi(gain_q8, 0, 2048);
     }
 
-    write_slot = c->frame % WBA_MAX_FRAMES;
+    write_slot = c->frame % c->history_capacity;
 
     curY = c->ring_y[write_slot];
     curU = c->ring_u[write_slot];
@@ -752,8 +775,8 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
     lastEdgeY = c->last_stable_y;
 
     available = c->filled + 1;
-    if (available > WBA_MAX_FRAMES)
-        available = WBA_MAX_FRAMES;
+    if (available > c->history_capacity)
+        available = c->history_capacity;
 
     max_age = time_depth - 1;
     if (max_age > available - 1)
@@ -1004,9 +1027,12 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
             u_age = clampi(u_age, 0, max_age);
             v_age = clampi(v_age, 0, max_age);
 
-            y_slot = wba_slot_for_age(write_slot, y_age);
-            u_slot = wba_slot_for_age(write_slot, u_age);
-            v_slot = wba_slot_for_age(write_slot, v_age);
+            y_slot = wba_slot_for_age(write_slot, y_age,
+                                      c->history_capacity);
+            u_slot = wba_slot_for_age(write_slot, u_age,
+                                      c->history_capacity);
+            v_slot = wba_slot_for_age(write_slot, v_age,
+                                      c->history_capacity);
 
             if (step > 3) {
                 int jlim = step / 3;
@@ -1157,7 +1183,7 @@ void radiantfissure_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    if (c->filled < WBA_MAX_FRAMES)
+    if (c->filled < c->history_capacity)
         c->filled++;
 
     c->frame++;

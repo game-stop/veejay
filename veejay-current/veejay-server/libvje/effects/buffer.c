@@ -19,6 +19,7 @@
  */
 #include "common.h"
 #include "buffer.h"
+#include <veejaycore/vj-msg.h>
 
 #define MAX_FRAMES 1500
 #define BUFFER_PARAMS 3
@@ -36,8 +37,13 @@ typedef struct {
 
 typedef struct {
     buffer_slot_t *slots;
+    int capacity;
+    int policy_capacity;
+    int policy_ready;
+    int clamp_reported;
     int write_pos;
     int filled;
+    int apply_delay;
     int apply_write_slot;
 } buffer_t;
 
@@ -46,7 +52,7 @@ static void buffer_release(buffer_t *b)
     if(!b || !b->slots)
         return;
 
-    for(int i = 0; i < MAX_FRAMES; i++)
+    for(int i = 0; i < b->capacity; i++)
     {
         if(b->slots[i].data)
             free(b->slots[i].data);
@@ -58,6 +64,47 @@ static void buffer_release(buffer_t *b)
 
     b->write_pos = 0;
     b->filled = 0;
+}
+
+static int buffer_resize(buffer_t *b, int capacity)
+{
+    if(capacity == b->capacity)
+        return 1;
+    if(capacity <= 0) {
+        buffer_release(b);
+        free(b->slots);
+        b->slots = NULL;
+        b->capacity = 0;
+        return 1;
+    }
+
+    buffer_slot_t *slots = (buffer_slot_t*)
+        vj_calloc(sizeof(buffer_slot_t) * (size_t)capacity);
+    if(!slots)
+        return 0;
+
+    int keep = b->filled < capacity ? b->filled : capacity;
+    if(b->capacity > 0 && b->slots && keep > 0) {
+        int first = b->write_pos - keep;
+        while(first < 0)
+            first += b->capacity;
+
+        for(int i = 0; i < keep; i++) {
+            const int old_index = (first + i) % b->capacity;
+            slots[i] = b->slots[old_index];
+            b->slots[old_index].data = NULL;
+            b->slots[old_index].capacity = 0;
+            b->slots[old_index].valid = 0;
+        }
+    }
+
+    buffer_release(b);
+    free(b->slots);
+    b->slots = slots;
+    b->capacity = capacity;
+    b->filled = keep;
+    b->write_pos = keep % capacity;
+    return 1;
 }
 
 vj_effect *buffer_init(int w, int h)
@@ -109,16 +156,6 @@ void *buffer_malloc(int w, int h)
     if(!b)
         return NULL;
 
-    b->slots = (buffer_slot_t*) vj_calloc(sizeof(buffer_slot_t) * MAX_FRAMES);
-
-    if(!b->slots) {
-        free(b);
-        return NULL;
-    }
-
-    b->write_pos = 0;
-    b->filled = 0;
-
     return b;
 }
 
@@ -140,9 +177,14 @@ void buffer_free(void *ptr)
 static int buffer_store_slot(buffer_slot_t *slot, VJFrame *frame)
 {
     const int has_alpha = frame->data[3] != NULL;
+    if(frame->len <= 0 || frame->uv_len < 0)
+        return 0;
+
     const size_t y_len = (size_t)frame->len;
     const size_t uv_len = (size_t)frame->uv_len;
     const size_t a_len = has_alpha ? y_len : 0;
+    if(uv_len > (SIZE_MAX - y_len - a_len) / 2u)
+        return 0;
     const size_t total = y_len + uv_len + uv_len + a_len;
 
     if(total == 0)
@@ -205,6 +247,9 @@ static void buffer_store_slot_data(buffer_slot_t *slot, VJFrame *frame)
 
 static int buffer_put_frame(buffer_t *b, VJFrame *frame)
 {
+    if(!b || !b->slots || b->capacity <= 0)
+        return -1;
+
     buffer_slot_t *slot = &b->slots[b->write_pos];
     const int pos = b->write_pos;
 
@@ -212,10 +257,10 @@ static int buffer_put_frame(buffer_t *b, VJFrame *frame)
         return -1;
 
     b->write_pos++;
-    if(b->write_pos >= MAX_FRAMES)
+    if(b->write_pos >= b->capacity)
         b->write_pos = 0;
 
-    if(b->filled < MAX_FRAMES)
+    if(b->filled < b->capacity)
         b->filled++;
 
     return pos;
@@ -223,12 +268,12 @@ static int buffer_put_frame(buffer_t *b, VJFrame *frame)
 
 static buffer_slot_t *buffer_get_tap(buffer_t *b, int delay)
 {
-    if(delay <= 0 || delay > b->filled)
+    if(delay <= 0 || delay >= b->filled)
         return NULL;
 
-    int pos = b->write_pos - delay;
-    if(pos < 0)
-        pos += MAX_FRAMES;
+    int pos = b->write_pos - delay - 1;
+    while(pos < 0)
+        pos += b->capacity;
 
     buffer_slot_t *slot = &b->slots[pos];
 
@@ -371,26 +416,67 @@ static void buffer_black(VJFrame *frame)
 void buffer_apply(void *ptr, VJFrame *frame, int *args)
 {
     buffer_t *b = (buffer_t*) ptr;
-    int delay = args[P_DELAY];
+    const int requested_delay = args[P_DELAY];
     const int opacity = args[P_OPACITY];
     const int feedback = args[P_FEEDBACK];
 
-    if(delay < 0)
-        delay = 0;
-    else if(delay > MAX_FRAMES)
-        delay = MAX_FRAMES;
-
     int write_slot;
 #pragma omp single
-    b->apply_write_slot = buffer_put_frame(b, frame);
+    {
+        int delay = requested_delay;
+        if(delay < 0)
+            delay = 0;
+        else if(delay > MAX_FRAMES)
+            delay = MAX_FRAMES;
+
+        if(delay == 0) {
+            buffer_resize(b, 0);
+            b->apply_delay = 0;
+            b->apply_write_slot = -1;
+        }
+        else {
+            if(!b->policy_ready) {
+                const size_t y_bytes = frame->len > 0 ? (size_t)frame->len : 0;
+                const size_t uv_bytes = frame->uv_len > 0 ? (size_t)frame->uv_len : 0;
+                size_t slot_bytes = 0;
+
+                if(y_bytes > 0 && uv_bytes <= (SIZE_MAX - (2u * y_bytes)) / 2u)
+                    slot_bytes = (2u * y_bytes) + (2u * uv_bytes);
+
+                b->policy_capacity = slot_bytes > 0 ?
+                    vje_history_capacity("Frame Delay", 0, slot_bytes,
+                                         2, MAX_FRAMES + 1, 0) : 0;
+                b->policy_ready = 1;
+            }
+
+            const int maximum_delay = b->policy_capacity > 0 ?
+                                      b->policy_capacity - 1 : 0;
+            if(delay > maximum_delay) {
+                if(!b->clamp_reported) {
+                    veejay_msg(VEEJAY_MSG_WARNING,
+                               "[FXMEM] Frame Delay requested %d frames; clamped to %d",
+                               delay, maximum_delay);
+                    b->clamp_reported = 1;
+                }
+                delay = maximum_delay;
+            }
+
+            if(delay > 0 && buffer_resize(b, delay + 1)) {
+                b->apply_delay = delay;
+                b->apply_write_slot = buffer_put_frame(b, frame);
+            }
+            else {
+                b->apply_delay = 0;
+                b->apply_write_slot = -1;
+            }
+        }
+    }
+    const int delay = b->apply_delay;
     write_slot = b->apply_write_slot;
-    if(write_slot < 0)
+    if(delay <= 0 || write_slot < 0)
         return;
 
     buffer_store_slot_data(&b->slots[write_slot], frame);
-
-    if(delay == 0)
-        return;
 
     buffer_slot_t *tap = buffer_get_tap(b, delay);
 

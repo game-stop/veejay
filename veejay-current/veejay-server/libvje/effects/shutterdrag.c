@@ -210,13 +210,33 @@ vj_effect *shutterdrag_init(int w, int h)
 
 void *shutterdrag_malloc(int width, int height)
 {
+    if(width <= 0 || height <= 0 ||
+       (size_t)width > (size_t)INT_MAX / (size_t)height)
+        return NULL;
+
     shutterdrag_t *sb = (shutterdrag_t*)vj_calloc(sizeof(shutterdrag_t));
 
     if(!sb)
         return NULL;
 
     const int pixels = width * height;
-    const int hlen = SHUTTER_HISTORY_LEN;
+    if((size_t)pixels > SIZE_MAX / (sizeof(int32_t) * 4u)) {
+        free(sb);
+        return NULL;
+    }
+    const size_t fixed_bytes = sizeof(int32_t) * (size_t)pixels * 4u;
+    const size_t slot_bytes = (size_t)pixels * 3u;
+    const int hlen = vje_history_capacity("Shutter Drag",
+                                           fixed_bytes,
+                                           slot_bytes,
+                                           1,
+                                           SHUTTER_HISTORY_LEN,
+                                           0);
+    if(hlen == 0 || (size_t)hlen > (SIZE_MAX - fixed_bytes) / slot_bytes) {
+        free(sb);
+        return NULL;
+    }
+    const size_t history_plane_bytes = (size_t)pixels * (size_t)hlen;
 
     sb->width = width;
     sb->height = height;
@@ -226,7 +246,7 @@ void *shutterdrag_malloc(int width, int height)
     sb->first_frame = 1;
     sb->smooth_init = 0;
 
-    sb->feedback_block = (int32_t*)vj_malloc(sizeof(int32_t) * (size_t)pixels * 4u);
+    sb->feedback_block = (int32_t*)vj_malloc(fixed_bytes);
 
     if(!sb->feedback_block) {
         free(sb);
@@ -238,7 +258,7 @@ void *shutterdrag_malloc(int width, int height)
     sb->feedbackU = sb->feedbackY_next + pixels;
     sb->feedbackV = sb->feedbackU + pixels;
 
-    sb->history_block = (uint8_t*)vj_malloc((size_t)pixels * (size_t)hlen * 3u);
+    sb->history_block = (uint8_t*)vj_malloc(slot_bytes * (size_t)hlen);
 
     if(!sb->history_block) {
         free(sb->feedback_block);
@@ -247,8 +267,8 @@ void *shutterdrag_malloc(int width, int height)
     }
 
     sb->historyY = sb->history_block;
-    sb->historyU = sb->historyY + (pixels * hlen);
-    sb->historyV = sb->historyU + (pixels * hlen);
+    sb->historyU = sb->historyY + history_plane_bytes;
+    sb->historyV = sb->historyU + history_plane_bytes;
     return (void*)sb;
 }
 
@@ -280,7 +300,7 @@ static void shutterdrag_seed_state(shutterdrag_t *sb, VJFrame *frame)
     uint8_t *restrict hV = sb->historyV;
 
     for(int i = 0; i < pixels; i++) {
-        const int i3 = i * hlen;
+        const size_t i3 = (size_t)i * (size_t)hlen;
         const int32_t yfp = (int32_t)Y[i] << FIXED_BITS;
         const int32_t ufp = ((int32_t)U[i] - 128) << FIXED_BITS;
         const int32_t vfp = ((int32_t)V[i] - 128) << FIXED_BITS;
@@ -444,7 +464,7 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp for schedule(static)
         for(int i = 0; i < pixels; i++) {
-            const int i3 = i * hlen + pos;
+            const size_t i3 = (size_t)i * (size_t)hlen + (size_t)pos;
 
             hY[i3] = Y[i];
             hU[i3] = U[i];
@@ -457,7 +477,7 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
 
             for(int x = 0; x < w; x++) {
                 const int i = row + x;
-                const int i3 = i * hlen;
+                const size_t i3 = (size_t)i * (size_t)hlen;
                 const uint8_t cur = hY[i3 + pos];
 
                 int64_t fb = shutter_mix_fp(fbY_old[i], (int64_t)cur << FIXED_BITS, alpha);
@@ -466,8 +486,10 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
                 fb = (fb * decay) >> FIXED_BITS;
 
                 if(propagate > 0 && x > 0 && x < w - 1 && y > 0 && y < h - 1) {
-                    const int gx = (int)hY[(i + 1) * hlen + pos] - (int)hY[(i - 1) * hlen + pos];
-                    const int gy = (int)hY[(i + w) * hlen + pos] - (int)hY[(i - w) * hlen + pos];
+                    const int gx = (int)hY[(size_t)(i + 1) * (size_t)hlen + (size_t)pos] -
+                                   (int)hY[(size_t)(i - 1) * (size_t)hlen + (size_t)pos];
+                    const int gy = (int)hY[(size_t)(i + w) * (size_t)hlen + (size_t)pos] -
+                                   (int)hY[(size_t)(i - w) * (size_t)hlen + (size_t)pos];
                     const int agx = gx < 0 ? -gx : gx;
                     const int agy = gy < 0 ? -gy : gy;
                     const int nidx = (agx > agy)
@@ -489,7 +511,9 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
 
                 fbY_new[i] = (int32_t)fb;
 
-                const int hsum = (int)hY[i3] + (int)hY[i3 + 1] + (int)hY[i3 + 2];
+                int hsum = 0;
+                for(int k = 0; k < hlen; k++)
+                    hsum += (int)hY[i3 + (size_t)k];
                 const int64_t hist_fp = ((int64_t)hsum << FIXED_BITS) / hlen;
                 const int64_t out_fp = shutter_mix_fp(fb, hist_fp, history_mix);
 
@@ -506,7 +530,7 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp for schedule(static)
         for(int i = 0; i < pixels; i++) {
-            const int i3 = i * hlen;
+            const size_t i3 = (size_t)i * (size_t)hlen;
             int64_t fu = shutter_mix_fp(fbU[i], ((int64_t)((int)hU[i3 + pos] - 128)) << FIXED_BITS, alpha);
             int64_t fv = shutter_mix_fp(fbV[i], ((int64_t)((int)hV[i3 + pos] - 128)) << FIXED_BITS, alpha);
 
@@ -526,8 +550,12 @@ void shutterdrag_apply(void *ptr, VJFrame *frame, int *args)
             fbU[i] = (int32_t)fu;
             fbV[i] = (int32_t)fv;
 
-            const int hu_sum = (int)hU[i3] + (int)hU[i3 + 1] + (int)hU[i3 + 2] - (128 * hlen);
-            const int hv_sum = (int)hV[i3] + (int)hV[i3 + 1] + (int)hV[i3 + 2] - (128 * hlen);
+            int hu_sum = -(128 * hlen);
+            int hv_sum = -(128 * hlen);
+            for(int k = 0; k < hlen; k++) {
+                hu_sum += (int)hU[i3 + (size_t)k];
+                hv_sum += (int)hV[i3 + (size_t)k];
+            }
             const int64_t hu_fp = ((int64_t)hu_sum << FIXED_BITS) / hlen;
             const int64_t hv_fp = ((int64_t)hv_sum << FIXED_BITS) / hlen;
             const int64_t out_u = shutter_mix_fp(fu, hu_fp, history_mix);

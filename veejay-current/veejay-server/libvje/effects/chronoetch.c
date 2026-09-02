@@ -41,6 +41,7 @@ typedef struct {
     int len;
     int frame;
     int filled;
+    int history_capacity;
 
     uint8_t *region;
 
@@ -103,11 +104,11 @@ static inline int tas_ramp255(int v, int range)
     return (v * 255) / range;
 }
 
-static inline int tas_slot_for_age(int write_slot, int age)
+static inline int tas_slot_for_age(int write_slot, int age, int capacity)
 {
     int slot = write_slot - age;
     if (slot < 0)
-        slot += TAS_MAX_FRAMES;
+        slot += capacity;
     return slot;
 }
 
@@ -486,7 +487,7 @@ void *chronoetch_malloc(int w, int h)
     int s;
     int i;
 
-    if (w <= 0 || h <= 0)
+    if (w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
         return NULL;
 
     c = (chronoetch_t *) vj_calloc(sizeof(chronoetch_t));
@@ -500,8 +501,27 @@ void *chronoetch_malloc(int w, int h)
     c->filled = 0;
 
     len = (size_t) c->len;
+    if(len > SIZE_MAX / 5u) {
+        free(c);
+        return NULL;
+    }
+    const size_t fixed_bytes = len * 5u;
+    const size_t slot_bytes = len * 3u;
+    const int history_capacity = vje_history_capacity("Chrono Etch",
+                                                       fixed_bytes,
+                                                       slot_bytes,
+                                                       1,
+                                                       TAS_MAX_FRAMES,
+                                                       0);
+    if(history_capacity == 0 ||
+       (size_t)history_capacity > (SIZE_MAX - fixed_bytes) / slot_bytes)
+    {
+        free(c);
+        return NULL;
+    }
 
-    total = len * ((size_t)TAS_MAX_FRAMES * 3u + 5u);
+    c->history_capacity = history_capacity;
+    total = fixed_bytes + ((size_t)history_capacity * slot_bytes);
 
     c->region = (uint8_t *) vj_malloc(total);
     if (!c->region) {
@@ -511,7 +531,7 @@ void *chronoetch_malloc(int w, int h)
 
     p = c->region;
 
-    for (s = 0; s < TAS_MAX_FRAMES; s++) {
+    for (s = 0; s < c->history_capacity; s++) {
         c->ring_y[s] = p; p += len;
         c->ring_u[s] = p; p += len;
         c->ring_v[s] = p; p += len;
@@ -524,7 +544,7 @@ void *chronoetch_malloc(int w, int h)
     c->trail_u = p; p += len;
     c->trail_v = p;
 
-    for (s = 0; s < TAS_MAX_FRAMES; s++) {
+    for (s = 0; s < c->history_capacity; s++) {
         for (i = 0; i < c->len; i++) {
             c->ring_y[s][i] = 0;
             c->ring_u[s][i] = 128;
@@ -620,7 +640,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
 
     opacity       = tas_clampi(args[P_OPACITY],       0, 100);
     step          = tas_clampi(args[P_STEP],          3, 14);
-    time_depth    = tas_clampi(args[P_TIME_DEPTH],    1, TAS_MAX_FRAMES);
+    time_depth    = tas_clampi(args[P_TIME_DEPTH],    1, c->history_capacity);
     rib_length    = tas_clampi(args[P_RIB_LENGTH],    2, 96);
     edge_sens     = tas_scale_1000_to_100(args[P_EDGE]);
     motion_age    = tas_scale_1000_to_100(args[P_MOTION_AGE]);
@@ -642,7 +662,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
 
     stroke_chroma_q8 = tas_clampi(stroke_chroma_q8, 0, 2048);
 
-    for (a = 0; a < TAS_MAX_FRAMES; a++) {
+    for (a = 0; a < c->history_capacity; a++) {
         int base = 100 + chroma_tear * 2 + a * 8;
         int gain_q8 = (base * 256 + 50) / 100;
 
@@ -650,7 +670,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
         chroma_gain_age_q8[a] = tas_clampi(gain_q8, 0, 2048);
     }
 
-    write_slot = c->frame % TAS_MAX_FRAMES;
+    write_slot = c->frame % c->history_capacity;
 
     curY = c->ring_y[write_slot];
     curU = c->ring_u[write_slot];
@@ -660,8 +680,8 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
     lastEdgeY = c->last_stable_y;
 
     available = c->filled + 1;
-    if (available > TAS_MAX_FRAMES)
-        available = TAS_MAX_FRAMES;
+    if (available > c->history_capacity)
+        available = c->history_capacity;
 
     max_age = time_depth - 1;
     if (max_age > available - 1)
@@ -852,9 +872,12 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
             u_age = tas_clampi(u_age, 0, max_age);
             v_age = tas_clampi(v_age, 0, max_age);
 
-            y_slot = tas_slot_for_age(write_slot, y_age);
-            u_slot = tas_slot_for_age(write_slot, u_age);
-            v_slot = tas_slot_for_age(write_slot, v_age);
+            y_slot = tas_slot_for_age(write_slot, y_age,
+                                      c->history_capacity);
+            u_slot = tas_slot_for_age(write_slot, u_age,
+                                      c->history_capacity);
+            v_slot = tas_slot_for_age(write_slot, v_age,
+                                      c->history_capacity);
 
             if (step > 3) {
                 int jlim = step / 3;
@@ -922,7 +945,7 @@ void chronoetch_apply(void *ptr, VJFrame *frame, int *args)
         }
     }
 
-    if (c->filled < TAS_MAX_FRAMES)
+    if (c->filled < c->history_capacity)
         c->filled++;
 
     c->frame++;

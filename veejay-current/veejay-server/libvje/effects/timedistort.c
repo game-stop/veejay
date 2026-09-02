@@ -186,28 +186,33 @@ static void timedistort_init_plane_tables(timedistort_t *td, int len)
 void *timedistort_malloc(int w, int h)
 {
     timedistort_t *td;
-    const int try_planes[] = { 256, 128, 64 };
+
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     const int len = w * h;
+    if((size_t)len > SIZE_MAX / 5u)
+        return NULL;
+    const size_t fixed_bytes = (size_t)len * 5u;
+    const size_t slot_bytes = (size_t)len * 3u;
+    const int planes = vje_history_capacity("TimeDistortionTV",
+                                             fixed_bytes,
+                                             slot_bytes,
+                                             2,
+                                             TD_MAX_PLANES,
+                                             1);
+    if(planes == 0 || (size_t)planes > (SIZE_MAX - fixed_bytes) / slot_bytes)
+        return NULL;
 
     td = (timedistort_t*) vj_calloc(sizeof(timedistort_t));
     if(!td)
         return NULL;
 
     td->len = len;
-
-    for(int t = 0; t < 3; t++) {
-        const int planes = try_planes[t];
-        const size_t total = ((size_t)len * 3u) +
-                             ((size_t)planes * 3u * (size_t)len) +
-                             ((size_t)len * 2u);
-
-        td->region = (uint8_t*) vj_malloc(total);
-        if(td->region) {
-            td->n_planes = planes;
-            td->plane_mask = planes - 1;
-            break;
-        }
-    }
+    td->n_planes = planes;
+    td->plane_mask = planes - 1;
+    td->region = (uint8_t*) vj_malloc(fixed_bytes +
+                                      ((size_t)planes * slot_bytes));
 
     if(!td->region) {
         free(td);

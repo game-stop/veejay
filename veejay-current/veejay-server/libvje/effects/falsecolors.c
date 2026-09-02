@@ -21,7 +21,7 @@
 #include "common.h"
 #include "falsecolors.h"
 #include <math.h>
-#include <omp.h>
+#include <libvje/omp-compat.h>
 
 #define FALSECOLORS_PARAMS 6
 

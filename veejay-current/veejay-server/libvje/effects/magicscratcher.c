@@ -31,6 +31,7 @@
 
 typedef struct {
     uint8_t *mframe;
+    int capacity;
     int write_pos;
     int read_pos;
     int reverse;
@@ -101,12 +102,24 @@ vj_effect *magicscratcher_init(int w, int h)
 
 void *magicscratcher_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     magicscratcher_t *m = (magicscratcher_t*) vj_calloc(sizeof(magicscratcher_t));
 
     if(!m)
         return NULL;
 
-    m->mframe = (uint8_t*) vj_malloc((size_t)w * (size_t)h * (size_t)MAX_SCRATCH_FRAMES);
+    const size_t slot_bytes = (size_t)w * (size_t)h;
+    const int capacity = vje_history_capacity("Magic Overlay Scratcher", 0,
+                                               slot_bytes, 1,
+                                               MAX_SCRATCH_FRAMES - 1, 0);
+    if(capacity == 0 || (size_t)capacity > SIZE_MAX / slot_bytes) {
+        free(m);
+        return NULL;
+    }
+
+    m->mframe = (uint8_t*) vj_malloc(slot_bytes * (size_t)capacity);
 
     if(!m->mframe) {
         free(m);
@@ -114,6 +127,7 @@ void *magicscratcher_malloc(int w, int h)
     }
 
 
+    m->capacity = capacity;
     return (void*) m;
 }
 
@@ -130,7 +144,7 @@ static void magicscratcher_seed(magicscratcher_t *m, const uint8_t *restrict Y, 
     const int do_seed = !m->seeded;
 
 #pragma omp for schedule(static)
-    for(int i = 0; i < MAX_SCRATCH_FRAMES; i++)
+    for(int i = 0; i < m->capacity; i++)
         if(do_seed)
             veejay_memcpy(m->mframe + (size_t)len * (size_t)i, Y, len);
 
@@ -183,7 +197,7 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
     magicscratcher_t *m = (magicscratcher_t*) ptr;
 
     const int mode = args[P_MODE];
-    const int n = clampi(args[P_SCRATCH_FRAMES], 1, MAX_SCRATCH_FRAMES - 1);
+    const int n = clampi(args[P_SCRATCH_FRAMES], 1, m->capacity);
     const int pingpong = args[P_PINGPONG];
     const int grayscale = args[P_GRAYSCALE];
     const int len = frame->len;
@@ -201,7 +215,7 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
     int read_slot = m->write_pos - 1 - m->read_pos;
 
     while(read_slot < 0)
-        read_slot += MAX_SCRATCH_FRAMES;
+        read_slot += m->capacity;
 
     uint8_t *restrict history = m->mframe + (size_t)len * (size_t)read_slot;
     uint8_t *restrict write = m->mframe + (size_t)len * (size_t)m->write_pos;
@@ -219,7 +233,7 @@ void magicscratcher_apply(void *ptr, VJFrame *frame, int *args)
     {
         m->write_pos++;
 
-        if(m->write_pos >= MAX_SCRATCH_FRAMES)
+        if(m->write_pos >= m->capacity)
             m->write_pos = 0;
     }
 

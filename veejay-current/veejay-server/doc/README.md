@@ -19,4 +19,5 @@
 ### Special concerns : codecs and hardware stuff
 * [README video codec](./README.video-codec.md) : What codec choose and how
 * [README network](./README.network.md) : Advanced veejay network communication (aka how to use/synchronize multiple server over the network)
+* [README MediaMTX](./README.mediamtx.md) : Planned WebRTC/WHIP ingest and processed RTSP output gateway
 * [README odroid-xu3](./README.odroid-xu3.md)

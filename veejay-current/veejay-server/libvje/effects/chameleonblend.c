@@ -28,8 +28,7 @@
 #include "chameleonblend.h"
 #include "motionmap.h"
 
-#define PLANES_DEPTH 6
-#define PLANES (1 << PLANES_DEPTH)
+#define CHAMELEON_BLEND_MAX_PLANES 64
 
 typedef struct {
     int last_mode_;
@@ -40,6 +39,9 @@ typedef struct {
     int32_t *sum;
     uint8_t *timebuffer;
     int plane;
+    int planes;
+    int planes_depth;
+    int plane_mask;
     uint8_t *bgimage[4];
 } chameleonblend_t;
 
@@ -57,7 +59,8 @@ static void chameleonblend_reset_history(chameleonblend_t *c, int len)
         veejay_memset(c->sum, 0, sizeof(int32_t) * len);
 
     if(c->timebuffer)
-        veejay_memset(c->timebuffer, 0, len * PLANES);
+        veejay_memset(c->timebuffer, 0,
+                      (size_t)len * (size_t)c->planes);
 
     c->plane = 0;
 }
@@ -121,6 +124,10 @@ int chameleonblend_prepare(void *ptr, VJFrame *frame)
 
 void *chameleonblend_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || w > INT_MAX / 2 ||
+       (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     chameleonblend_t *c = (chameleonblend_t*) vj_calloc(sizeof(chameleonblend_t));
 
     if(!c)
@@ -128,8 +135,33 @@ void *chameleonblend_malloc(int w, int h)
 
     const int len = w * h;
     const int safe_zone = w * 2;
+    const size_t plane_bytes = (size_t)len;
+    const size_t safe_zone_bytes = (size_t)safe_zone;
+    if(safe_zone_bytes > SIZE_MAX / 3u ||
+       plane_bytes > (SIZE_MAX - (safe_zone_bytes * 3u)) / 7u) {
+        free(c);
+        return NULL;
+    }
+    const size_t fixed_bytes = plane_bytes * 7u +
+                               safe_zone_bytes * 3u;
+    const size_t bg_plane_bytes = plane_bytes + safe_zone_bytes;
+    const int planes = vje_history_capacity("ChameleonMixTV",
+                                             fixed_bytes,
+                                             plane_bytes,
+                                             2,
+                                             CHAMELEON_BLEND_MAX_PLANES,
+                                             1);
+    if(planes == 0) {
+        free(c);
+        return NULL;
+    }
 
-    c->bgimage[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (len + safe_zone) * 3);
+    c->planes = planes;
+    c->plane_mask = planes - 1;
+    for(int value = planes; value > 1; value >>= 1)
+        c->planes_depth++;
+
+    c->bgimage[0] = (uint8_t*) vj_malloc(bg_plane_bytes * 3u);
 
     if(!c->bgimage[0]) {
         free(c);
@@ -144,7 +176,7 @@ void *chameleonblend_malloc(int w, int h)
         return NULL;
     }
 
-    c->timebuffer = (uint8_t*) vj_calloc(len * PLANES);
+    c->timebuffer = (uint8_t*) vj_calloc((size_t)len * (size_t)planes);
 
     if(!c->timebuffer) {
         free(c->bgimage[0]);
@@ -153,13 +185,13 @@ void *chameleonblend_malloc(int w, int h)
         return NULL;
     }
 
-    c->bgimage[1] = c->bgimage[0] + len + safe_zone;
-    c->bgimage[2] = c->bgimage[1] + len + safe_zone;
+    c->bgimage[1] = c->bgimage[0] + bg_plane_bytes;
+    c->bgimage[2] = c->bgimage[1] + bg_plane_bytes;
 
-    veejay_memset(c->bgimage[0], pixel_Y_lo_, len + safe_zone);
+    veejay_memset(c->bgimage[0], pixel_Y_lo_, bg_plane_bytes);
 
     for(int i = 1; i < 3; i++)
-        veejay_memset(c->bgimage[i], 128, len + safe_zone);
+        veejay_memset(c->bgimage[i], 128, bg_plane_bytes);
     c->last_mode_ = -1;
 
     return c;
@@ -186,7 +218,8 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
 {
     const int video_area = src->len;
 
-    uint8_t *restrict p_buf = cb->timebuffer + (cb->plane * video_area);
+    uint8_t *restrict p_buf = cb->timebuffer +
+                              ((size_t)cb->plane * (size_t)video_area);
     int32_t *restrict s_buf = cb->sum;
 
     uint8_t *restrict bgY = cb->bgimage[0];
@@ -210,12 +243,12 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
         s_buf[i] = current_sum;
         p_buf[i] = (uint8_t)y;
 
-        int diff = (y << PLANES_DEPTH) - current_sum;
+        int diff = (y << cb->planes_depth) - current_sum;
 
         if(diff < 0)
             diff = -diff;
 
-        const int alpha_calc = (diff << 3) >> PLANES_DEPTH;
+        const int alpha_calc = (diff << 3) >> cb->planes_depth;
         const int alpha = alpha_calc > 255 ? 255 : alpha_calc;
 
         if(appearing) {
@@ -230,7 +263,7 @@ static void drawChameleonBlend(chameleonblend_t *cb, VJFrame *src, VJFrame *dest
         }
     }
 
-    cb->plane = (cb->plane + 1) & (PLANES - 1);
+    cb->plane = (cb->plane + 1) & cb->plane_mask;
 }
 
 

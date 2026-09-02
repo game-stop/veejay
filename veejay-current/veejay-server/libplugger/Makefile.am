@@ -1,5 +1,5 @@
 MAINTAINERCLEANFILES = Makefile.in
-AM_CPPFLAGS = -I$(top_srcdir)/libplugger -I$(includedir) \
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/libplugger -I$(includedir) \
               -I$(top_srcdir)/thirdparty
 
 AM_CPPFLAGS += ${FFMPEG_CFLAGS} 

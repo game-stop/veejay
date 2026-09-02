@@ -249,6 +249,15 @@ static long el_cache_purge_owner(global_raw_frame_cache_t *cache,
                                  el_cache_owner_t *owner);
 
 static int memory_threshold = 30;
+static int memory_threshold_explicit = 0;
+static int global_cache_disabled = 0;
+static const char *cache_policy_name = "unresolved";
+static size_t cache_budget_bytes = 0;
+
+#define EL_CACHE_LOW_MEMORY_BYTES (1536ULL * 1024ULL * 1024ULL)
+#define EL_CACHE_MEDIUM_MEMORY_BYTES (3ULL * 1024ULL * 1024ULL * 1024ULL)
+#define EL_CACHE_AUTO_MEDIUM_BYTES (64ULL * 1024ULL * 1024ULL)
+#define EL_CACHE_AUTO_MAX_BYTES (1024ULL * 1024ULL * 1024ULL)
 
 static inline uint64_t editlist_source_hash(const editlist *e)
 {
@@ -326,25 +335,95 @@ void el_cache_configure(int t) {
 	}
 
 	memory_threshold = t;
+	memory_threshold_explicit = 1;
+	global_cache_disabled = (t == 0);
 	veejay_msg(VEEJAY_MSG_DEBUG,
 	           "[ELCACHE] configured memory_percent=%d",
 	           memory_threshold);
 }
 
-static long get_available_cache_capacity(void) {
-    long page_size = sysconf(_SC_PAGESIZE);
-    long available_pages = sysconf(_SC_AVPHYS_PAGES);
+static uint64_t el_cache_percent(uint64_t bytes, unsigned int percent)
+{
+    return (bytes / 100u) * percent + ((bytes % 100u) * percent) / 100u;
+}
 
-    if (page_size == -1 || available_pages == -1) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Unable to query free memory, assuming you have room for 250 video frames");
-        return 250;
+static int el_cache_frame_size(size_t *frame_size)
+{
+    if(!frame_size || !el_out_ || el_out_->len <= 0 || el_out_->uv_len < 0)
+        return 0;
+
+    const size_t y_bytes = (size_t)el_out_->len;
+    const size_t uv_bytes = (size_t)el_out_->uv_len;
+    if(uv_bytes > (SIZE_MAX - sizeof(raw_frame_node_t) - y_bytes) / 2u)
+        return 0;
+
+    *frame_size = sizeof(raw_frame_node_t) + y_bytes + (2u * uv_bytes);
+    return 1;
+}
+
+static long get_available_cache_capacity(void)
+{
+    vj_mem_info_t memory;
+    size_t frame_size = 0;
+    size_t configured_bytes = 0;
+    uint64_t budget = 0;
+    const int have_memory = vj_mem_get_info(&memory);
+
+    if(!el_cache_frame_size(&frame_size)) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[ELCACHE] unable to determine frame size; disabling raw frame cache");
+        return 0;
     }
 
-    unsigned long available_bytes = (unsigned long)available_pages * (unsigned long)page_size;
-    unsigned long cache_budget = available_bytes * memory_threshold / 100;
-    
-    size_t frame_size = sizeof(raw_frame_node_t) + el_out_->len + (2 * el_out_->uv_len);
-    return (long)(cache_budget / frame_size);
+    if(memory_threshold_explicit) {
+        cache_policy_name = "command-line";
+        if(have_memory)
+            budget = el_cache_percent(memory.available_bytes,
+                                      (unsigned int)memory_threshold);
+    }
+    else {
+        const int env_status = vj_mem_parse_env_mb("VEEJAY_CACHE_MAX_MB",
+                                                    &configured_bytes);
+        if(env_status < 0) {
+            const char *setting = getenv("VEEJAY_CACHE_MAX_MB");
+            veejay_msg(VEEJAY_MSG_WARNING,
+                       "[ELCACHE] ignoring invalid VEEJAY_CACHE_MAX_MB='%s' (expected auto, off, or MiB)",
+                       setting ? setting : "");
+        }
+
+        if(env_status > 0) {
+            cache_policy_name = "environment";
+            budget = (uint64_t)configured_bytes;
+        }
+        else if(have_memory) {
+            cache_policy_name = "auto";
+            if(memory.total_bytes <= EL_CACHE_LOW_MEMORY_BYTES)
+                budget = 0;
+            else if(memory.total_bytes <= EL_CACHE_MEDIUM_MEMORY_BYTES)
+                budget = EL_CACHE_AUTO_MEDIUM_BYTES;
+            else {
+                budget = el_cache_percent(memory.available_bytes, 30u);
+                if(budget > EL_CACHE_AUTO_MAX_BYTES)
+                    budget = EL_CACHE_AUTO_MAX_BYTES;
+            }
+        }
+    }
+
+    if(!have_memory && budget == 0) {
+        veejay_msg(VEEJAY_MSG_WARNING,
+                   "[ELCACHE] unable to determine available memory; disabling raw frame cache");
+        return 0;
+    }
+    if(have_memory && budget > memory.available_bytes)
+        budget = memory.available_bytes;
+    if(budget > SIZE_MAX)
+        budget = SIZE_MAX;
+
+    cache_budget_bytes = (size_t)budget;
+    const size_t capacity = cache_budget_bytes / frame_size;
+    if(capacity > (size_t)LONG_MAX)
+        return LONG_MAX;
+    return (long)capacity;
 }
 
 static size_t el_cache_index_size(long capacity)
@@ -367,7 +446,8 @@ static size_t el_cache_index_size(long capacity)
 
 static global_raw_frame_cache_t *get_global_cache(void) {
 
-	if(memory_threshold == 0)
+    if(global_cache_disabled ||
+       (memory_threshold_explicit && memory_threshold == 0))
 		return NULL;
 
     if (global_cache == NULL) {
@@ -377,6 +457,16 @@ static global_raw_frame_cache_t *get_global_cache(void) {
 			return NULL;
 		}
         global_cache->capacity = get_available_cache_capacity();
+        if(global_cache->capacity <= 0) {
+            veejay_msg(VEEJAY_MSG_INFO,
+                       "[ELCACHE] disabled policy=%s budget=%.2fMB (override with -m or VEEJAY_CACHE_MAX_MB)",
+                       cache_policy_name,
+                       (double)cache_budget_bytes / (1024.0 * 1024.0));
+            free(global_cache);
+            global_cache = NULL;
+            global_cache_disabled = 1;
+            return NULL;
+        }
         long reserve = global_cache->capacity / 16;
         if(reserve < 32)
             reserve = 32;
@@ -402,7 +492,14 @@ static global_raw_frame_cache_t *get_global_cache(void) {
             return NULL;
         }
 
-        size_t frame_size = sizeof(raw_frame_node_t) + el_out_->len + (2 * el_out_->uv_len);
+        size_t frame_size = 0;
+        if(!el_cache_frame_size(&frame_size)) {
+            free(global_cache->index_buckets);
+            free(global_cache);
+            global_cache = NULL;
+            global_cache_disabled = 1;
+            return NULL;
+        }
         long probe_mb = 32;
         const char *probe_setting = getenv("VEEJAY_CACHE_PROBE_MB");
         if(probe_setting && *probe_setting) {
@@ -429,7 +526,8 @@ static global_raw_frame_cache_t *get_global_cache(void) {
         double total_mb = ((double)global_cache->capacity * (double)frame_size) /
                           (1024.0 * 1024.0);
         veejay_msg(VEEJAY_MSG_DEBUG,
-                   "[ELCACHE] initialized memory_percent=%d capacity=%ld usable=%ld probe=%ld probe_budget=%ldMB buckets=%zu frame_bytes=%zu budget=%.2fMB borrow_limit=%ld",
+                   "[ELCACHE] initialized policy=%s memory_percent=%d capacity=%ld usable=%ld probe=%ld probe_budget=%ldMB buckets=%zu frame_bytes=%zu budget=%.2fMB borrow_limit=%ld",
+                   cache_policy_name,
                    memory_threshold,
                    global_cache->capacity,
                    global_cache->usable_capacity,

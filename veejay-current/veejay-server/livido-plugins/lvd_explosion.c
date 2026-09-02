@@ -24,7 +24,6 @@
 #ifndef IS_LIVIDO_PLUGIN
 #define IS_LIVIDO_PLUGIN
 #endif
-#include <omp.h>
 #include <unistd.h> 
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN

@@ -347,7 +347,7 @@ static void Usage(char *progname)
     fprintf(stderr, "\n");
 
     fprintf(stderr, "Cache, rendering and utilities:\n");
-    fprintf(stderr, "  -m/--memory <num>            Cache memory percentage (0=disable, max=100)\n");
+    fprintf(stderr, "  -m/--memory <num>            Cache memory percentage (0=disable, max=80)\n");
     fprintf(stderr, "  -j/--max_cache, --max-cache <num>\n");
     fprintf(stderr, "                                Divide cache memory over N samples\n");
     fprintf(stderr, "  -t/--timer <num>             Select timer: 0=none, 1=default (default: 1)\n");

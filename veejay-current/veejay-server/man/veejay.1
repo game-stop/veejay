@@ -555,8 +555,11 @@ Commands are received on port offset + 4.
 
 .TP
 .B -m/--memory 
-Set maximum memory to use for cache, as a percentage of total system RAM.
-Use 0 to disable. Valid range is 0-100. Default is 30.
+Set maximum memory to use for the decoded-frame cache, as a percentage of
+available memory when the cache is created. Use 0 to disable. Values above 80
+are capped at 80. This option overrides
+.BR VEEJAY_CACHE_MAX_MB
+and the automatic policy.
 
 .TP
 .B -j/--max_cache/--max-cache 
@@ -1339,13 +1342,47 @@ and
 .BR software .
 
 .TP
+.B VEEJAY_CACHE_MAX_MB
+Sets the decoded-frame cache ceiling in MiB. The values
+.BR auto
+and
+.BR off
+select automatic policy and disable the cache respectively. A command-line
+.B -m/--memory
+setting takes precedence. When unset, the automatic policy disables the cache
+on systems with at most 1.5 GiB of effective memory, uses at most 64 MiB on
+systems with at most 3 GiB, and otherwise uses at most 30 percent of available
+memory capped at 1 GiB.
+
+.TP
 .B VEEJAY_CACHE_PROBE_MB
-Configures the editlist cache size.
+Configures the decoded-frame cache admission probation window.
 Valid range is from
 .BR 4
 to
 .BR 512
 MB.
+
+.TP
+.B VEEJAY_FX_HISTORY_MAX_MB
+Sets the per-instance ceiling in MiB for effects that retain frame history.
+The values
+.BR auto
+and
+.BR off
+select automatic policy and prevent history allocation respectively. The
+automatic ceiling is one eighth of effective system memory, bounded to 64 MiB
+through 512 MiB, and may be reduced to preserve available-memory headroom.
+
+.TP
+.B VEEJAY_STREAM_BUFFER_MAX_MB
+Sets the per-stream trick-play buffer ceiling in MiB. The values
+.BR auto
+and
+.BR off
+select automatic policy and disable trick-play buffering respectively. The
+automatic ceiling is one eighth of effective system memory, bounded to 64 MiB
+through 512 MiB, and may be reduced to preserve available-memory headroom.
 
 .TP
 .B VEEJAY_STRICT_PORT

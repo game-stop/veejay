@@ -45,6 +45,7 @@ typedef struct {
     int len;
     int frame;
     int filled;
+    int history_capacity;
 
     uint8_t *region;
 
@@ -156,12 +157,12 @@ static inline int bca_ramp255(int v, int range)
     return (v * 255) / range;
 }
 
-static inline int bca_slot_for_age(int write_slot, int age)
+static inline int bca_slot_for_age(int write_slot, int age, int capacity)
 {
     int slot = write_slot - age;
 
     if(slot < 0)
-        slot += BCA_MAX_FRAMES;
+        slot += capacity;
 
     return slot;
 }
@@ -614,19 +615,43 @@ vj_effect *meteorvector_init(int w, int h)
 
 void *meteorvector_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     meteorvector_t *c = (meteorvector_t *) vj_calloc(sizeof(meteorvector_t));
-    const size_t len = (size_t)w * (size_t)h;
-    const size_t total = len * ((size_t)BCA_MAX_FRAMES * 3u + 5u);
     uint8_t *p;
 
     if(!c)
         return NULL;
+
+    const size_t len = (size_t)w * (size_t)h;
+    if(len > SIZE_MAX / 5u) {
+        free(c);
+        return NULL;
+    }
+    const size_t fixed_bytes = len * 5u;
+    const size_t slot_bytes = len * 3u;
+    const int history_capacity = vje_history_capacity("Meteor Vector",
+                                                       fixed_bytes,
+                                                       slot_bytes,
+                                                       1,
+                                                       BCA_MAX_FRAMES,
+                                                       0);
+    if(history_capacity == 0 ||
+       (size_t)history_capacity > (SIZE_MAX - fixed_bytes) / slot_bytes)
+    {
+        free(c);
+        return NULL;
+    }
+    const size_t total = fixed_bytes +
+                         ((size_t)history_capacity * slot_bytes);
 
     c->w = w;
     c->h = h;
     c->len = w * h;
     c->frame = 0;
     c->filled = 0;
+    c->history_capacity = history_capacity;
 
     c->region = (uint8_t *) vj_malloc(total);
 
@@ -637,7 +662,7 @@ void *meteorvector_malloc(int w, int h)
 
     p = c->region;
 
-    for(int s = 0; s < BCA_MAX_FRAMES; s++) {
+    for(int s = 0; s < c->history_capacity; s++) {
         c->ring_y[s] = p; p += len;
         c->ring_u[s] = p; p += len;
         c->ring_v[s] = p; p += len;
@@ -649,7 +674,7 @@ void *meteorvector_malloc(int w, int h)
     c->trail_u = p; p += len;
     c->trail_v = p;
 
-    for(int s = 0; s < BCA_MAX_FRAMES; s++) {
+    for(int s = 0; s < c->history_capacity; s++) {
         veejay_memset(c->ring_y[s], 0, len);
         veejay_memset(c->ring_u[s], 128, len);
         veejay_memset(c->ring_v[s], 128, len);
@@ -683,7 +708,7 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     const int w = c->w;
     const int rows = c->h;
     const int process_len = c->len;
-    const int write_slot = c->frame & (BCA_MAX_FRAMES - 1);
+    const int write_slot = c->frame % c->history_capacity;
 
     uint8_t *restrict curY = c->ring_y[write_slot];
     uint8_t *restrict curU = c->ring_u[write_slot];
@@ -693,7 +718,7 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
 
     int opacity = bca_clampi(args[P_OPACITY], 0, 100);
     int step = bca_clampi(args[P_STEP], 3, 14);
-    int time_depth = bca_clampi(args[P_TIME_DEPTH], 1, BCA_MAX_FRAMES);
+    int time_depth = bca_clampi(args[P_TIME_DEPTH], 1, c->history_capacity);
     int head_size = bca_clampi(args[P_HEAD_SIZE], 1, 8);
     int tail_length = bca_param1000_to_range(args[P_TAIL_LENGTH], 2, 112);
     int edge_sens = bca_param1000_to_100(args[P_EDGE]);
@@ -716,7 +741,7 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
     else
         stroke_chroma_q8 = 256 + (((stroke_chroma - 50) * 384 + 25) / 50);
 
-    for(int a = 0; a < BCA_MAX_FRAMES; a++) {
+    for(int a = 0; a < c->history_capacity; a++) {
         const int base = 100 + a * 7;
         int gain_q8 = (base * 256 + 50) / 100;
 
@@ -726,8 +751,8 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
 
     int available = c->filled + 1;
 
-    if(available > BCA_MAX_FRAMES)
-        available = BCA_MAX_FRAMES;
+    if(available > c->history_capacity)
+        available = c->history_capacity;
 
     int max_age = time_depth - 1;
 
@@ -954,7 +979,8 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
             }
 
             const int head_slot = write_slot;
-            const int tail_slot = bca_slot_for_age(write_slot, age);
+            const int tail_slot = bca_slot_for_age(write_slot, age,
+                                                   c->history_capacity);
             int draw_x = x;
             int draw_y = y;
             int local_tail;
@@ -1023,7 +1049,7 @@ void meteorvector_apply(void *ptr, VJFrame *frame, int *args)
 
 #pragma omp single
     {
-        if(c->filled < BCA_MAX_FRAMES)
+        if(c->filled < c->history_capacity)
             c->filled++;
 
         c->frame++;

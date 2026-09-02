@@ -19,7 +19,6 @@
  */
 #include "common.h"
 #include "escherdroste.h"
-#include <omp.h>
 
 #define GAMMA_LUT_SIZE 1024
 

@@ -18,9 +18,9 @@ lvd_explosion_la_SOURCES = lvd_explosion.c
 
 EXTRA_DIST = *.h livido-utils.c
 
-AM_CPPFLAGS = $(FFMPEG_CFLAGS) $(VEEJAY_CFLAGS)
-AM_CFLAGS = -I@top_srcdir@/include $(VEEJAY_CFLAGS) -fopenmp -Wno-unused-parameter -Wno-unused-function
-AM_LDFLAGS = -module -avoid-version -lm -export-dynamic -fopenmp
+AM_CPPFLAGS = $(FFMPEG_CFLAGS)
+AM_CFLAGS = -I@top_srcdir@/include $(VEEJAY_CFLAGS) -Wno-unused-parameter -Wno-unused-function
+AM_LDFLAGS = -module -avoid-version -lm -export-dynamic $(OPENMP_CFLAGS)
 AM_LIBTOOLFLAGS = --tag=disable-static
 
 lividoplugindir = @libdir@/livido-plugins

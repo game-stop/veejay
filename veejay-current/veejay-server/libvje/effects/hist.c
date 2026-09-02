@@ -19,7 +19,7 @@
  */
 
 #include <config.h>
-#include <omp.h>
+#include <libvje/omp-compat.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <math.h>

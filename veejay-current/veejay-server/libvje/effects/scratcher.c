@@ -32,6 +32,7 @@
 
 typedef struct {
     uint8_t *frame[3];
+    int capacity;
 
     int phase_q8;
     int direction;
@@ -135,31 +136,48 @@ vj_effect *scratcher_init(int w, int h)
 
 void *scratcher_malloc(int w, int h)
 {
+    if(w <= 0 || h <= 0 || (size_t)w > (size_t)INT_MAX / (size_t)h)
+        return NULL;
+
     scratcher_t *s = (scratcher_t*)vj_calloc(sizeof(scratcher_t));
 
     if(!s)
         return NULL;
 
     const int len = w * h;
+    if((size_t)len > SIZE_MAX / 3u) {
+        free(s);
+        return NULL;
+    }
+    const size_t slot_bytes = (size_t)len * 3u;
+    const int capacity = vje_history_capacity("Overlay Scratcher", 0,
+                                               slot_bytes, 1,
+                                               MAX_SCRATCH_FRAMES - 1, 0);
+    if(capacity == 0 || (size_t)capacity > SIZE_MAX / slot_bytes) {
+        free(s);
+        return NULL;
+    }
+    const size_t plane_bank = (size_t)len * (size_t)capacity;
 
-    s->frame[0] = (uint8_t*)vj_malloc((size_t)len * 3u * (size_t)MAX_SCRATCH_FRAMES);
+    s->frame[0] = (uint8_t*)vj_malloc(slot_bytes * (size_t)capacity);
 
     if(!s->frame[0]) {
         free(s);
         return NULL;
     }
 
-    s->frame[1] = s->frame[0] + ((size_t)len * (size_t)MAX_SCRATCH_FRAMES);
-    s->frame[2] = s->frame[1] + ((size_t)len * (size_t)MAX_SCRATCH_FRAMES);
+    s->frame[1] = s->frame[0] + plane_bank;
+    s->frame[2] = s->frame[1] + plane_bank;
 
-    veejay_memset(s->frame[0], pixel_Y_lo_, len * MAX_SCRATCH_FRAMES);
-    veejay_memset(s->frame[1], 128, len * MAX_SCRATCH_FRAMES);
-    veejay_memset(s->frame[2], 128, len * MAX_SCRATCH_FRAMES);
+    veejay_memset(s->frame[0], pixel_Y_lo_, plane_bank);
+    veejay_memset(s->frame[1], 128, plane_bank);
+    veejay_memset(s->frame[2], 128, plane_bank);
 
+    s->capacity = capacity;
     s->phase_q8 = 0;
     s->direction = 1;
     s->last_pingpong = 1;
-    s->last_n = 8;
+    s->last_n = capacity < 8 ? capacity : 8;
     s->sm_opacity = 150.0f;
     s->sm_buffer = 8.0f;
     s->sm_mix = 1000.0f;
@@ -282,7 +300,7 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
     scratcher_smooth_to(&s->sm_mix,     (float)raw_mix, follow);
     scratcher_smooth_to(&s->sm_chroma,  (float)raw_chroma, follow);
 
-    const int next_n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
+    const int next_n = clampi((int)(s->sm_buffer + 0.5f), 1, s->capacity);
 
     if(next_n != s->last_n || pingpong != s->last_pingpong) {
         s->last_n = next_n;
@@ -301,7 +319,7 @@ void scratcher_apply(void *ptr, VJFrame *src, int *args)
     s->store_current = !pingpong || s->direction > 0;
     }
 
-    n = clampi((int)(s->sm_buffer + 0.5f), 1, MAX_SCRATCH_FRAMES - 1);
+    n = clampi((int)(s->sm_buffer + 0.5f), 1, s->capacity);
     const int slot = clampi((s->phase_q8 + 128) >> 8, 0, n - 1);
     int wet_q8 = ((int)(s->sm_opacity + 0.5f) * 256 + 127) / 255;
 

@@ -19,7 +19,7 @@
  */
 #include "common.h"
 #include "xraysolarization.h"
-#include <omp.h>
+#include <libvje/omp-compat.h>
 
 #define XRAY_PARAMS 10
 

@@ -13,7 +13,6 @@
 LIVIDO_PLUGIN
 #include	"utils.h"
 #include	"livido-utils.c"
-#include <omp.h>
 
 typedef struct
 {
