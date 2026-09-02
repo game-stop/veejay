@@ -801,6 +801,23 @@ if test "x$enable_compile_warnings" != "xno" ; then
  fi
 fi
 
+release_cflags=""
+for flag in $CFLAGS; do
+	case $flag in
+		-g*) ;;
+		*) release_cflags="$release_cflags $flag" ;;
+	esac
+done
+release_cxxflags=""
+for flag in $CXXFLAGS; do
+	case $flag in
+		-g*) ;;
+		*) release_cxxflags="$release_cxxflags $flag" ;;
+	esac
+done
+CFLAGS="$release_cflags"
+CXXFLAGS="$release_cxxflags"
+
 if test "x$cflags_set" != "xyes" ; then
   if test -n $debug_or_profiling ; then
   	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"

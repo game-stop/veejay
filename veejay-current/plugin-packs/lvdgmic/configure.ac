@@ -323,14 +323,14 @@ OPT_CFLAGS="-O3 -ftree-vectorize -ffast-math"
 cflags_without_optimization=""
 for flag in $CFLAGS; do
 	case $flag in
-		-O*) ;;
+		-O*|-g*) ;;
 		*) cflags_without_optimization="$cflags_without_optimization $flag" ;;
 	esac
 done
 cxxflags_without_optimization=""
 for flag in $CXXFLAGS; do
 	case $flag in
-		-O*) ;;
+		-O*|-g*) ;;
 		*) cxxflags_without_optimization="$cxxflags_without_optimization $flag" ;;
 	esac
 done

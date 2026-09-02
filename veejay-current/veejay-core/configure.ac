@@ -860,14 +860,14 @@ dnl We do this last as it can screw up library detection etc...
 veejaycore_cflags_without_optimization=""
 for flag in $CFLAGS; do
     case $flag in
-        -O*) ;;
+        -O*|-g*) ;;
         *) veejaycore_cflags_without_optimization="$veejaycore_cflags_without_optimization $flag" ;;
     esac
 done
 veejaycore_cxxflags_without_optimization=""
 for flag in $CXXFLAGS; do
     case $flag in
-        -O*) ;;
+        -O*|-g*) ;;
         *) veejaycore_cxxflags_without_optimization="$veejaycore_cxxflags_without_optimization $flag" ;;
     esac
 done

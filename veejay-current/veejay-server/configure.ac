@@ -1594,14 +1594,14 @@ dnl We do this last as it can screw up library detection etc...
 veejay_cflags_without_optimization=""
 for flag in $CFLAGS; do
   case $flag in
-    -O*) ;;
+    -O*|-g*) ;;
     *) veejay_cflags_without_optimization="$veejay_cflags_without_optimization $flag" ;;
   esac
 done
 veejay_cxxflags_without_optimization=""
 for flag in $CXXFLAGS; do
   case $flag in
-    -O*) ;;
+    -O*|-g*) ;;
     *) veejay_cxxflags_without_optimization="$veejay_cxxflags_without_optimization $flag" ;;
   esac
 done
