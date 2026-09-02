@@ -67,6 +67,8 @@ Depending on the configured build, VeeJay supports SDL2 windowed or full-screen 
 
 VeeJay is split into independent autotools projects and must be built in dependency order.
 
+For Debian, RPM, Arch, ARM, AArch64, and PowerPC binary release profiles, see the [binary release target matrix](veejay-current/RELEASE_TARGETS.md).
+
 ### Typical Debian/Ubuntu build dependencies
 
 The exact package set depends on enabled outputs and optional plugins. A useful base installation is:
