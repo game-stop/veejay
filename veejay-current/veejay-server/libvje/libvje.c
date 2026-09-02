@@ -46,7 +46,7 @@
 #include <assert.h>
 #endif
 
-#define MAX_EFFECTS 4096
+#define MAX_EFFECTS 1024
 #define NUM_CHAINS 2
 #define MAX_ENTRY_PER_CHAIN 20
 
