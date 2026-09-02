@@ -2,6 +2,12 @@ dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([veejaycore],[1.6.0],[http://www.veejayhq.net])
 AC_PREREQ([2.69])
+
+USER_CFLAGS="$CFLAGS"
+dnl Build modes below own optimization and debug flags; preserve only caller input here.
+CFLAGS="${CFLAGS-}"
+CXXFLAGS="${CXXFLAGS-}"
+
 AC_USE_SYSTEM_EXTENSIONS
 AC_CONFIG_SRCDIR([veejaycore/core.c])
 
@@ -36,8 +42,6 @@ dnl Options
 
 #AC_CONFIG_MACRO_DIR([m4])
 
-
-USER_CFLAGS="$CFLAGS"
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
 AC_ARG_ENABLE([strict],
@@ -852,6 +856,23 @@ dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
 dnl We do this last as it can screw up library detection etc...
+
+veejaycore_cflags_without_optimization=""
+for flag in $CFLAGS; do
+    case $flag in
+        -O*) ;;
+        *) veejaycore_cflags_without_optimization="$veejaycore_cflags_without_optimization $flag" ;;
+    esac
+done
+veejaycore_cxxflags_without_optimization=""
+for flag in $CXXFLAGS; do
+    case $flag in
+        -O*) ;;
+        *) veejaycore_cxxflags_without_optimization="$veejaycore_cxxflags_without_optimization $flag" ;;
+    esac
+done
+CFLAGS="$veejaycore_cflags_without_optimization -O3"
+CXXFLAGS="$veejaycore_cxxflags_without_optimization -O3"
 
 dnl	output some info on what veejay was build
 BUILD_PLATFORM=${build}

@@ -52,7 +52,9 @@ AC_ARG_WITH([arch-target],
 						   [Use portable defaults, native tuning, or a compiler-validated CPU target]),
 			[arch_target="$withval"])
 
-
+dnl Build modes below own optimization and debug flags; preserve only caller input here.
+CFLAGS="${CFLAGS-}"
+CXXFLAGS="${CXXFLAGS-}"
 
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -236,8 +238,23 @@ esac
 
 AC_MSG_RESULT($CFLAGS)
 
-CFLAGS="$CFLAGS $ARCHFLAGS -O3 -ftree-vectorize -ffast-math"
-CXXFLAGS="$CXXFLAGS $ARCHFLAGS -O3 -ftree-vectorize -ffast-math"
+OPT_CFLAGS="-O3 -ftree-vectorize -ffast-math"
+cflags_without_optimization=""
+for flag in $CFLAGS; do
+	case $flag in
+		-O*) ;;
+		*) cflags_without_optimization="$cflags_without_optimization $flag" ;;
+	esac
+done
+cxxflags_without_optimization=""
+for flag in $CXXFLAGS; do
+	case $flag in
+		-O*) ;;
+		*) cxxflags_without_optimization="$cxxflags_without_optimization $flag" ;;
+	esac
+done
+CFLAGS="$cflags_without_optimization $ARCHFLAGS $OPT_CFLAGS"
+CXXFLAGS="$cxxflags_without_optimization $ARCHFLAGS $OPT_CFLAGS"
 
 
 if test "x${GCC}" != "xyes" ; then
@@ -267,10 +284,11 @@ fi
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
   	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
+		CXXFLAGS="$debugCFLAGS $CXXFLAGS $warnCXXFLAGS"
   else
  	CFLAGS="$CFLAGS $warnCFLAGS -DSILENT"
+		CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   fi
-  CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   cflags_set=yes
 fi
 

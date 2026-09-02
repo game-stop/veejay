@@ -2,6 +2,11 @@ dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 AC_INIT([reloaded],[1.6.0],[nwelburg@gmail.com])
 AC_PREREQ([2.71])
+
+dnl Keep release optimization explicit so build options alone control debug flags.
+CFLAGS="${CFLAGS--O2}"
+CXXFLAGS="${CXXFLAGS--O2}"
+
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 RELOADED_MAJOR_VERSION=1

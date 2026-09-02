@@ -66,9 +66,9 @@ build_autogen_project() {
     echo "==> Building ${dir}"
     cd "${ROOT_DIR}/${dir}"
 
-    clean_previous_build "${dir}"
     ./autogen.sh
     ./configure "${CONFIGURE_ARGS[@]}"
+    clean_previous_build "${dir}"
     make -j"${JOBS}"
     sudo make install
     mark_built "${dir}"

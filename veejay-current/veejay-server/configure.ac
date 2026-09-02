@@ -3,6 +3,11 @@ dnl AC_INIT
 AC_INIT([veejay],[1.6.0],[http://www.veejayhq.net])
 AC_PREREQ([2.69])
 
+USER_CFLAGS="$CFLAGS"
+dnl Build modes below own optimization and debug flags; preserve only caller input here.
+CFLAGS="${CFLAGS-}"
+CXXFLAGS="${CXXFLAGS-}"
+
 AC_USE_SYSTEM_EXTENSIONS
 
 AC_CONFIG_SRCDIR([veejay/veejay.c])
@@ -38,8 +43,6 @@ dnl Options
 
 dnl AC_CONFIG_MACRO_DIR([m4])
 
-
-USER_CFLAGS="$CFLAGS"
 dnl enable auto vectorization for libvjmem, libvje and libyuv
 
 AC_ARG_ENABLE([strict],
@@ -1595,8 +1598,15 @@ for flag in $CFLAGS; do
     *) veejay_cflags_without_optimization="$veejay_cflags_without_optimization $flag" ;;
   esac
 done
+veejay_cxxflags_without_optimization=""
+for flag in $CXXFLAGS; do
+  case $flag in
+    -O*) ;;
+    *) veejay_cxxflags_without_optimization="$veejay_cxxflags_without_optimization $flag" ;;
+  esac
+done
 CFLAGS="$ARCHFLAGS$veejay_cflags_without_optimization -O3"
-CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
+CXXFLAGS="$ARCHFLAGS$veejay_cxxflags_without_optimization -O3"
 
 dnl	output some info on what veejay was build
 BUILD_PLATFORM=${build}
