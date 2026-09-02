@@ -482,8 +482,11 @@ static void topo_nm_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *re
     const int w = t->width; \
     const int h = t->height; \
     const int size = w * h; \
-    t->time += (double)args[P_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000100 + (double)args[P_WARP_KICK] * 0.0000200; \
-    t->phase += (double)args[P_ROT_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000140; \
+    _Pragma("omp single") \
+    { \
+        t->time += (double)args[P_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000100 + (double)args[P_WARP_KICK] * 0.0000200; \
+        t->phase += (double)args[P_ROT_SPEED] * 0.0000725 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000140; \
+    } \
     const float branches = (float)args[P_BRANCHES]; \
     const float swirl = (float)args[P_SWIRL] * 0.001f; \
     const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \
@@ -550,8 +553,11 @@ static void topo_m_m##MODE_ID##_r##RADIUS_ID##_s##SAMPLE_ID(box_topomorph_t *res
     const int size = w * h; \
     const int half_w = w >> 1; \
     const int half_h = h >> 1; \
-    t->time += (double)args[P_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000150; \
-    t->phase += (double)args[P_ROT_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000060 + (double)args[P_WARP_KICK] * 0.0000110; \
+    _Pragma("omp single") \
+    { \
+        t->time += (double)args[P_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000075 + (double)args[P_WARP_KICK] * 0.0000150; \
+        t->phase += (double)args[P_ROT_SPEED] * 0.00005 + (double)args[P_WARP_ENV] * 0.0000060 + (double)args[P_WARP_KICK] * 0.0000110; \
+    } \
     const float branches = (float)args[P_BRANCHES]; \
     const float swirl = (float)args[P_SWIRL] * 0.001f; \
     const float zoom = 0.8f + ((float)args[P_SCALE] * 0.024f); \

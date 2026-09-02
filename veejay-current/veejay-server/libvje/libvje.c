@@ -304,7 +304,7 @@ static struct {
     { cartonize_init,NULL,NULL,NULL,NULL,cartonize_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_CARTONIZE},
     { charcoalsketch_init,charcoalsketch_malloc,charcoalsketch_free,NULL,NULL,charcoalsketch_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHARCOAL},
     { bwselect_init,bwselect_malloc,bwselect_free,NULL,NULL,bwselect_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BWSELECT },
-    { bwotsu_init,NULL,NULL,NULL,NULL,bwotsu_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BWOTSU },
+    { bwotsu_init,bwotsu_malloc,bwotsu_free,NULL,NULL,bwotsu_apply,NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_BWOTSU },
     { borders_init,NULL,NULL,NULL,NULL,borders_apply,NULL,NULL,NULL,NULL,VJ_VIDEO_EFFECT_BORDERS }, 
     { boids_init,boids_malloc,boids_free,NULL,NULL,boids_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_VIDBOIDS },
     { bloom_init,bloom_malloc,bloom_free,NULL,NULL,bloom_apply,NULL,NULL,NULL,NULL,VJ_IMAGE_EFFECT_BLOOM },

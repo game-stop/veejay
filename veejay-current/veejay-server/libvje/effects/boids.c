@@ -122,10 +122,10 @@ static void blob_home_position(boids_t *b, int blob_id, int w, int h, double v[2
     const double rad = (theta / 180.0) * M_PI;
     const double ratio = h > 0 ? ((double)w / (double)h) : 1.0;
     const double cx = (double)(w >> 1);
-    const double cy = (double)(h >> 1) * ratio;
+    const double cy = (double)(h >> 1);
 
     v[0] = cx + a_cos(rad) * (double)b->blob_home_radius_;
-    v[1] = cy + a_sin(rad) * (double)b->blob_home_radius_;
+    v[1] = cy + a_sin(rad) * ((double)b->blob_home_radius_ / ratio);
 }
 
 static void blob_init_(boids_t *g, blob_t *b, int blob_id, int w, int h)

@@ -483,6 +483,17 @@ void bowshock_free(void *ptr)
 
 #define BS_ROW_SWITCH(ACCUM) do {                                        \
     switch(nactive) {                                                    \
+        case 0:                                                          \
+            BS_OMP_SIMD                                                  \
+            for(int x = 0; x < w; x++) {                                 \
+                const int i = row + x;                                   \
+                map_dx[i] = 0;                                           \
+                map_dy[i] = 0;                                           \
+                map_wave[i] = 0;                                         \
+                map_glow[i] = 0;                                         \
+                map_pull[i] = 0;                                         \
+            }                                                            \
+            break;                                                       \
         case 1:                                                          \
             BS_OMP_SIMD                                                  \
             for(int x = 0; x < w; x++) {                                 \

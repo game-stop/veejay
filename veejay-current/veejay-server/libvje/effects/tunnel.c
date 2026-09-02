@@ -112,6 +112,7 @@ typedef struct {
 
     float zoom_state;
     float zoom_vel;
+    float frame_zoom;
     float swirl_state;
     int state_ready;
 } box_tunnel_t;
@@ -653,75 +654,79 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
     const float chroma_flow_target = (float)chroma_flow * 0.001f;
     const float feedback_target = (float)feedback;
 
-    if(!t->drive_state_ready) {
-        t->travel_drive_state = travel_target;
-        t->zoom_drive_state = zoom_target_drive;
-        t->chroma_flow_state = chroma_flow_target;
-        t->feedback_state = feedback_target;
-        t->drive_state_ready = 1;
-    } else {
-        t->travel_drive_state += (travel_target - t->travel_drive_state) * 0.115f;
-        t->zoom_drive_state += (zoom_target_drive - t->zoom_drive_state) * 0.105f;
-        t->chroma_flow_state += (chroma_flow_target - t->chroma_flow_state) * 0.105f;
-        t->feedback_state += (feedback_target - t->feedback_state) * 0.075f;
+#pragma omp single
+    {
+        if(!t->drive_state_ready) {
+            t->travel_drive_state = travel_target;
+            t->zoom_drive_state = zoom_target_drive;
+            t->chroma_flow_state = chroma_flow_target;
+            t->feedback_state = feedback_target;
+            t->drive_state_ready = 1;
+        } else {
+            t->travel_drive_state += (travel_target - t->travel_drive_state) * 0.115f;
+            t->zoom_drive_state += (zoom_target_drive - t->zoom_drive_state) * 0.105f;
+            t->chroma_flow_state += (chroma_flow_target - t->chroma_flow_state) * 0.105f;
+            t->feedback_state += (feedback_target - t->feedback_state) * 0.075f;
+        }
+
+        const float travel_f = t->travel_drive_state;
+        const float zoom_drive_f = t->zoom_drive_state;
+        const float raw_speed = (float)speed_arg * 0.01f;
+        const float base_vel = ((float)speed_arg * 0.005f) + (raw_speed * raw_speed * raw_speed * 0.15f);
+        const float drive_dir = (base_vel < 0.0f) ? -1.0f : 1.0f;
+        const float drive_vel = drive_dir * travel_f * 0.145f;
+        const float speed_target = base_vel + drive_vel;
+
+        t->vel_state += (speed_target - t->vel_state) * 0.135f;
+        t->time += t->vel_state;
+
+        float ci_target = tanhf((float)p1_arg * 0.015f) * 0.75f;
+        ci_target += travel_f * 0.125f * ((ci_target < 0.0f) ? -1.0f : 1.0f);
+        t->acc_state += (ci_target - t->acc_state) * 0.070f;
+
+        const float cs_input = (float)p2_arg * 0.01f;
+        float cs_target = 0.2f * cs_input * cs_input + 0.02f;
+        cs_target += travel_f * 0.032f;
+        t->phase_vel += (cs_target - t->phase_vel) * 0.055f;
+
+        float swirl_target = tanhf((float)swirl_arg * 0.02f) * 1.2f;
+        swirl_target += travel_f * 0.115f * ((swirl_target < 0.0f) ? -1.0f : 1.0f);
+        t->swirl_state += (swirl_target - t->swirl_state) * 0.135f;
+
+        const float zoom_base = ((float)zoom_arg * 0.01f) + 0.2f;
+
+        if(!t->state_ready) {
+            t->zoom_state = zoom_base;
+            t->state_ready = 1;
+        }
+
+        const float zoom_target = zoom_base * (1.0f + zoom_drive_f * 0.110f);
+        const float z_force = zoom_target - t->zoom_state;
+
+        t->zoom_vel += z_force * 0.060f;
+        t->zoom_vel *= 0.84f;
+        t->zoom_state += t->zoom_vel;
+
+        const float zoom_breathe = 1.0f + zoom_drive_f * 0.030f * FAST_SIN_T(t, t->drive_phase * 0.37f + (float)t->time * 0.63f);
+        t->frame_zoom = t->zoom_state * zoom_breathe;
+
+        float po_target = (float)offset_arg * 0.002f;
+        po_target += travel_f * 0.165f;
+        t->phase += (po_target - t->phase) * 0.055f;
+
+        t->drive_phase += t->vel_state * 0.35f + travel_f * 0.030f + zoom_drive_f * 0.012f;
     }
 
     const float travel_f = t->travel_drive_state;
-    const float zoom_drive_f = t->zoom_drive_state;
     const float chroma_flow_f = t->chroma_flow_state;
+    const float curve_int = t->acc_state;
+    const float curve_spd = t->phase_vel;
+    const float swirl = t->swirl_state;
+    const float swirl_sin = swirl * 0.7f;
+    const float zoom = t->frame_zoom;
+    const float phase_offset = t->phase;
 
     feedback = tunnel_clampi((int)(t->feedback_state + 0.5f), 0, 100);
-
-    float raw_speed = (float)speed_arg * 0.01f;
-    float base_vel = ((float)speed_arg * 0.005f) + (raw_speed * raw_speed * raw_speed * 0.15f);
-    float drive_dir = (base_vel < 0.0f) ? -1.0f : 1.0f;
-    float drive_vel = drive_dir * travel_f * 0.145f;
-    float speed_target = base_vel + drive_vel;
-
-    t->vel_state += (speed_target - t->vel_state) * 0.135f;
-    t->time += t->vel_state;
-
-    float ci_target = tanhf((float)p1_arg * 0.015f) * 0.75f;
-    ci_target += travel_f * 0.125f * ((ci_target < 0.0f) ? -1.0f : 1.0f);
-    t->acc_state += (ci_target - t->acc_state) * 0.070f;
-    float curve_int = t->acc_state;
-
-    float cs_input = (float)p2_arg * 0.01f;
-    float cs_target = 0.2f * cs_input * cs_input + 0.02f;
-    cs_target += travel_f * 0.032f;
-
-    t->phase_vel += (cs_target - t->phase_vel) * 0.055f;
-    float curve_spd = t->phase_vel;
-
-    float swirl_target = tanhf((float)swirl_arg * 0.02f) * 1.2f;
-    swirl_target += travel_f * 0.115f * ((swirl_target < 0.0f) ? -1.0f : 1.0f);
-    t->swirl_state += (swirl_target - t->swirl_state) * 0.135f;
-    float swirl = t->swirl_state;
-    float swirl_sin = swirl * 0.7f;
-
-    float zoom_base = ((float)zoom_arg * 0.01f) + 0.2f;
-
-    if(!t->state_ready) {
-        t->zoom_state = zoom_base;
-        t->state_ready = 1;
-    }
-
-    float zoom_target = zoom_base * (1.0f + zoom_drive_f * 0.110f);
-    float z_force = zoom_target - t->zoom_state;
-
-    t->zoom_vel += z_force * 0.060f;
-    t->zoom_vel *= 0.84f;
-    t->zoom_state += t->zoom_vel;
-
-    float zoom_breathe = 1.0f + zoom_drive_f * 0.030f * FAST_SIN_T(t, t->drive_phase * 0.37f + (float)t->time * 0.63f);
-    float zoom = t->zoom_state * zoom_breathe;
-
-    float po_target = (float)offset_arg * 0.002f;
-    po_target += travel_f * 0.165f;
-    t->phase += (po_target - t->phase) * 0.055f;
-    float phase_offset = t->phase;
-
-    t->drive_phase += t->vel_state * 0.35f + travel_f * 0.030f + zoom_drive_f * 0.012f;
 
     if(travel_f > 0.001f) {
         int fb_drop = (int)(travel_f * 8.0f + 0.5f);
@@ -809,18 +814,18 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
                     sample_bilinear_yuv_fast(srcY, srcU, srcV, u_fp, v_fp, w, h, &y1, &u1, &v1);
 
                     accY = (int32_t)((y0 + y1) << (FP_SHIFT - 1));
-                    accU = (int32_t)((u0 + u1) << (FP_SHIFT - 1));
-                    accV = (int32_t)((v0 + v1) << (FP_SHIFT - 1));
+                    accU = (int32_t)(u0 + u1) * (FP_ONE >> 1);
+                    accV = (int32_t)(v0 + v1) * (FP_ONE >> 1);
                 } else {
                     accY = (int32_t)y0 << FP_SHIFT;
-                    accU = (int32_t)u0 << FP_SHIFT;
-                    accV = (int32_t)v0 << FP_SHIFT;
+                    accU = (int32_t)u0 * FP_ONE;
+                    accV = (int32_t)v0 * FP_ONE;
                 }
 
                 if(chroma_active) {
                     int wave = (int)(FAST_SIN_T(t, wave_lut[i] * 0.85f + chroma_phase) * (float)chroma_bias);
-                    accU += (int32_t)wave << FP_SHIFT;
-                    accV -= (int32_t)(wave >> 1) << FP_SHIFT;
+                    accU += (int32_t)wave * FP_ONE;
+                    accV -= (int32_t)(wave >> 1) * FP_ONE;
                 }
 
                 tunnel_write_pixel(t, i, accY, accU, accV, fb_fp, inv_fb_fp, chroma_fb_fp, inv_chroma_fp, chroma_limit);
@@ -851,8 +856,8 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
                 int si = ty * w + tx;
 
                 int32_t accY = (int32_t)srcY[si] << FP_SHIFT;
-                int32_t accU = ((int32_t)srcU[si] - 128) << FP_SHIFT;
-                int32_t accV = ((int32_t)srcV[si] - 128) << FP_SHIFT;
+                int32_t accU = ((int32_t)srcU[si] - 128) * FP_ONE;
+                int32_t accV = ((int32_t)srcV[si] - 128) * FP_ONE;
 
                 if(layer_active) {
                     v_fp = frac_to_fp_fast(v + layer_step);
@@ -862,14 +867,14 @@ void tunnel_apply(void *ptr, VJFrame *frame, int *args)
                     si = ty * w + tx;
 
                     accY = (accY + ((int32_t)srcY[si] << FP_SHIFT)) >> 1;
-                    accU = (accU + (((int32_t)srcU[si] - 128) << FP_SHIFT)) >> 1;
-                    accV = (accV + (((int32_t)srcV[si] - 128) << FP_SHIFT)) >> 1;
+                    accU = (accU + ((int32_t)srcU[si] - 128) * FP_ONE) >> 1;
+                    accV = (accV + ((int32_t)srcV[si] - 128) * FP_ONE) >> 1;
                 }
 
                 if(chroma_active) {
                     int wave = (int)(FAST_SIN_T(t, wave_lut[i] * 0.85f + chroma_phase) * (float)chroma_bias);
-                    accU += (int32_t)wave << FP_SHIFT;
-                    accV -= (int32_t)(wave >> 1) << FP_SHIFT;
+                    accU += (int32_t)wave * FP_ONE;
+                    accV -= (int32_t)(wave >> 1) * FP_ONE;
                 }
 
                 tunnel_write_pixel(t, i, accY, accU, accV, fb_fp, inv_fb_fp, chroma_fb_fp, inv_chroma_fp, chroma_limit);

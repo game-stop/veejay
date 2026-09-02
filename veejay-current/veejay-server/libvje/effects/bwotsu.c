@@ -21,6 +21,11 @@
 #include "common.h"
 #include "bwotsu.h"
 
+typedef struct {
+    uint32_t histogram[256];
+    uint32_t threshold;
+} bwotsu_t;
+
 vj_effect *bwotsu_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
@@ -51,9 +56,22 @@ vj_effect *bwotsu_init(int w, int h)
     return ve;
 }
 
+void *bwotsu_malloc(int w, int h)
+{
+    (void)w;
+    (void)h;
+
+    return vj_calloc(sizeof(bwotsu_t));
+}
+
+void bwotsu_free(void *ptr)
+{
+    free(ptr);
+}
+
 void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
 {
-    (void) ptr;
+    bwotsu_t *s = (bwotsu_t *)ptr;
     int mode = args[0];
     const int skew = args[1];
     const int invert = args[2];
@@ -68,8 +86,7 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
     if(mode == 1 && !A)
         mode = 0;
 
-    uint32_t histogram[256] = { 0 };
-    uint32_t threshold = 0;
+    uint32_t local_histogram[256] = { 0 };
     const int use_lookup = skew != 0xff;
     uint8_t lookup[256];
 
@@ -79,25 +96,35 @@ void bwotsu_apply(void *ptr, VJFrame *frame, int *args)
     const uint8_t low = invert ? 0xff : 0x00;
     const uint8_t high = invert ? 0x00 : 0xff;
 
+#pragma omp single
+    veejay_memset(s->histogram, 0, sizeof(s->histogram));
+
     if(use_lookup) {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             const uint8_t y = lookup[Y[i]];
-#pragma omp atomic update
-            histogram[y]++;
+            local_histogram[y]++;
         }
     }
     else {
 #pragma omp for schedule(static)
         for(int i = 0; i < len; i++) {
             const uint8_t y = Y[i];
-#pragma omp atomic update
-            histogram[y]++;
+            local_histogram[y]++;
         }
     }
 
+#pragma omp critical(bwotsu_histogram_merge)
+    {
+        for(int i = 0; i < 256; i++)
+            s->histogram[i] += local_histogram[i];
+    }
+
+#pragma omp barrier
 #pragma omp single
-    threshold = otsu_method(histogram);
+    s->threshold = otsu_method(s->histogram);
+
+    const uint32_t threshold = s->threshold;
 
     if(mode == 0) {
 #pragma omp for schedule(static)

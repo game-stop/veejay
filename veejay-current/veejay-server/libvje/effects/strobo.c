@@ -38,6 +38,8 @@ typedef struct {
     int pulse_count;
     int strobe_countdown;
     int update_now;
+    uint32_t histogram[256];
+    int base_threshold;
 
     float eff_threshold;
     float eff_color_hold;
@@ -313,14 +315,26 @@ void strobo_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *restrict bU = s->buf[1];
     uint8_t *restrict bV = s->buf[2];
 
-    uint32_t histogram[256];
+    uint32_t local_histogram[256] = { 0 };
 
-    veejay_memset(histogram, 0, sizeof(histogram));
+#pragma omp single
+    veejay_memset(s->histogram, 0, sizeof(s->histogram));
 
+#pragma omp for schedule(static)
     for(int i = 0; i < len; i++)
-        histogram[Y[i]]++;
+        local_histogram[Y[i]]++;
 
-    const int base_threshold = (int)otsu_method(histogram);
+#pragma omp critical(strobo_histogram_merge)
+    {
+        for(int i = 0; i < 256; i++)
+            s->histogram[i] += local_histogram[i];
+    }
+
+#pragma omp barrier
+#pragma omp single
+    s->base_threshold = (int)otsu_method(s->histogram);
+
+    const int base_threshold = s->base_threshold;
     const int threshold = clampi(base_threshold + ((threshold_bias - 128) >> 1), 0, 255);
     const int color_total = (int)(sizeof(strobo_rainbow) / sizeof(strobo_rainbow[0]));
     const int base_color_index = (s->timestamp / color_hold) % color_total;

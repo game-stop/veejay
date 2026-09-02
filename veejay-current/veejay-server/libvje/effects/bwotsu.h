@@ -21,5 +21,7 @@
 #ifndef BWOTSU_H
 #define BWOTSU_H
 vj_effect *bwotsu_init(int w, int h);
+void *bwotsu_malloc(int w, int h);
+void bwotsu_free(void *ptr);
 void bwotsu_apply(void *ptr, VJFrame *frame, int *args);
 #endif
