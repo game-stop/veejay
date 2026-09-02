@@ -145,8 +145,8 @@ gmic_lightrelief_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 #gmic_sketchbw_la_SOURCES = gmic_sketchbw.c
 #gmic_sketchbw_la_LIBADD = -L$(top_builddir)/liblvdgmic -llvdgmic
 
-AM_CPPFLAGS=$(FFMPEG_CFLAGS) -I$(top_srcdir)/liblvdgmic
-AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS) -DSILENT
+AM_CPPFLAGS=$(FFMPEG_CFLAGS) -I$(top_srcdir)/liblvdgmic -I$(top_srcdir)/include
+AM_CPPFLAGS+=-DSILENT
 AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lgmic -lstdc++ -DDYNAMIC -rdynamic 
 AM_LIBTOOLFLAGS = --tag=disable-static
 

@@ -556,7 +556,8 @@ static gpointer director_client_worker(gpointer data)
                 if(failure_since > 0)
                     wake_at = MIN(wake_at, failure_since + DIRECTOR_FAILURE_EXPIRE_US);
                 gint64 wait_us = MAX((gint64)1000, wake_at - now);
-                DirectorRequest *request = g_async_queue_timeout_pop(client->requests, wait_us);
+                DirectorRequest *request = g_async_queue_timeout_pop(client->requests,
+                                                                      (guint64)wait_us);
                 if(!request)
                     continue;
                 if(request->type == DIRECTOR_REQUEST_STOP) {
@@ -572,7 +573,7 @@ static gpointer director_client_worker(gpointer data)
         gint64 wait_us = refresh_at > now ? refresh_at - now : 0;
         DirectorRequest *request = !g_queue_is_empty(&pending) ?
             g_queue_pop_head(&pending) :
-            (wait_us > 0 ? g_async_queue_timeout_pop(client->requests, wait_us) :
+            (wait_us > 0 ? g_async_queue_timeout_pop(client->requests, (guint64)wait_us) :
                            g_async_queue_try_pop(client->requests));
         if(request) {
             if(request->type == DIRECTOR_REQUEST_STOP) {

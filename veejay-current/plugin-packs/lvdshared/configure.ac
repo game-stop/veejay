@@ -31,8 +31,6 @@ AC_SUBST(LT_AGE)
 dnl **********************************************************************
 dnl Options
 
-dnl kill CFLAGS
-CFLAGS=""
 AC_ARG_ENABLE([strict],
 		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
 AC_ARG_ENABLE([debug],
@@ -47,12 +45,11 @@ AC_ARG_ENABLE([simd-accel],
               AS_HELP_STRING([--enable-simd-accel],[use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
 AC_ARG_WITH([extra-cflags],
             AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
-
-
-user_specified_target=
-AC_ARG_WITH([arch-target], AS_HELP_STRING( [--with-arch-target=CPU_TYPE],
-                                         [Set a specific sub-architecture (defaults to native)]),
-                [ user_specified_target="$withval" ])
+arch_target="generic"
+AC_ARG_WITH([arch-target],
+			AS_HELP_STRING([--with-arch-target=generic, native, auto or CPU],
+						   [Use portable defaults, native tuning, or a compiler-validated CPU target]),
+			[arch_target="$withval"])
 
 
 
@@ -185,15 +182,6 @@ case $host_cpu in
 	have_x86cpu=true
 
 	PROGRAM_NOPIC="-fno-PIC"
-
-   	dnl If the host is pentium, align on double word boundary
-    	case $host_cpu in
-		i686)
-			CFLAGS="-ffast-math -O3 -ftree-vectorize"
-		;;
-	*)
-		;;
-	esac 
 	
     ;;
   x86_64*|k8-*)
@@ -201,31 +189,25 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="-m64 -fPIC -DPIC -ftree-vectorize -O3 -ffast-math"
     ;;
-  aarch64* |arm)
+  aarch64*|arm64*)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-fPIC -DPIC"
-	 fi
-	 CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
 	 have_arm=true
-	 AC_MSG_RESULT([arm])
+	 AC_MSG_RESULT([aarch64])
      ;;
-  arm7* )
+  armv7*|armv8l)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
-	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-fPIC -DPIC"
-	 fi
-	 CFLAGS="$CFLAGS -fPIC -DPIC -fopenmp"
+	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARMv7-A CPU])
 	 have_arm=true
 	 have_armv7a=true
-	 AC_MSG_RESULT([arm7])
+	 AC_MSG_RESULT([armv7])
 	 ;;
-  powerpc | powerpc64)
+  arm*)
+     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	 have_arm=true
+	 AC_MSG_RESULT([arm])
+	 ;;
+  powerpc | powerpc64 | powerpc64le)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
 	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
 	have_ppccpu=true
@@ -267,6 +249,32 @@ esac
 
 AC_SUBST(PROGRAM_NOPIC)
 
+AC_MSG_CHECKING([sub-architecture settings])
+ARCHFLAGS=""
+case $arch_target in
+	generic)
+		AC_MSG_RESULT([portable compiler defaults])
+		;;
+	auto|native)
+		if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then requested_arch_flag="-mcpu=native"; else requested_arch_flag="-march=native"; fi
+		saved_CFLAGS="$CFLAGS"
+		CFLAGS="$CFLAGS $requested_arch_flag"
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])], [ARCHFLAGS="$requested_arch_flag"],
+			[AC_MSG_ERROR([the compiler does not support $requested_arch_flag])])
+		CFLAGS="$saved_CFLAGS"
+		AC_MSG_RESULT([$ARCHFLAGS])
+		;;
+	*)
+		if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then requested_arch_flag="-mcpu=$arch_target"; else requested_arch_flag="-march=$arch_target"; fi
+		saved_CFLAGS="$CFLAGS"
+		CFLAGS="$CFLAGS $requested_arch_flag"
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])], [ARCHFLAGS="$requested_arch_flag"],
+			[AC_MSG_ERROR([the compiler does not support $requested_arch_flag])])
+		CFLAGS="$saved_CFLAGS"
+		AC_MSG_RESULT([$ARCHFLAGS])
+		;;
+esac
+
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
@@ -291,8 +299,8 @@ AC_SUBST(FFMPEG_LIBS)
 
 AC_MSG_RESULT($CFLAGS)
 
-CFLAGS="$ARCHFLAGS $CFLAGS"
-CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
+CFLAGS="$CFLAGS $ARCHFLAGS -O3 -ftree-vectorize -ffast-math"
+CXXFLAGS="$CXXFLAGS $ARCHFLAGS -O3 -ftree-vectorize -ffast-math"
 
 
 if test "x${GCC}" != "xyes" ; then

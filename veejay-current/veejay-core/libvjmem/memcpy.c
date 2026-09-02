@@ -142,7 +142,6 @@
 #include <libyuv/yuvconv.h>
 #include <veejaycore/veejaycore.h>
 #include "cpu.h"
-#include <omp.h>
 #if defined(HAVE_ARM_NEON) || defined(HAVE_ARM_ASIMD)
 #include <arm_neon.h>
 #endif

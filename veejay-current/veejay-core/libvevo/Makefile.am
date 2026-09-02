@@ -1,7 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 AM_CFLAGS = $(VEEJAY_CFLAGS)
 
-AM_CPPFLAGS = -I$(top_srcdir)/libvevo -I$(includedir) \
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/libvevo -I$(includedir) \
               -I$(top_srcdir)/thirdparty \
               -I$(top_srcdir)/libvjmem \
               -I$(top_srcdir)/libvjmsg

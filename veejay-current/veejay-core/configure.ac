@@ -77,6 +77,33 @@ dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
 AC_OPENMP
+have_openmp=false
+OPENMP_PRAGMA_CFLAGS=""
+if test "x$enable_openmp" != "xno" &&
+   test -n "$ac_cv_prog_c_openmp" &&
+   test "x$ac_cv_prog_c_openmp" != "xunsupported"; then
+    have_openmp=true
+else
+    AC_CACHE_CHECK([for a flag to ignore disabled OpenMP pragmas],
+                   [vj_cv_c_openmp_pragma_flag], [
+        vj_save_CFLAGS="$CFLAGS"
+        CFLAGS="$CFLAGS -Werror -Wunknown-pragmas -Wno-unknown-pragmas"
+        AC_COMPILE_IFELSE([AC_LANG_SOURCE([[
+int main(void)
+{
+#pragma omp parallel
+    { }
+    return 0;
+}
+]])], [vj_cv_c_openmp_pragma_flag="-Wno-unknown-pragmas"],
+     [vj_cv_c_openmp_pragma_flag="none"])
+        CFLAGS="$vj_save_CFLAGS"
+    ])
+    if test "x$vj_cv_c_openmp_pragma_flag" != "xnone"; then
+        OPENMP_PRAGMA_CFLAGS="$vj_cv_c_openmp_pragma_flag"
+    fi
+    AC_MSG_NOTICE([OpenMP unavailable or disabled; building serial code paths])
+fi
 dnl AM_PROG_CC_STDC
 AC_PROG_YACC
 AC_PROG_CXX
@@ -314,7 +341,7 @@ case $host_cpu in
 	fi
 	;;
 
-    aarch64*)
+    aarch64*|arm64*)
      	 AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
      have_arm=true
      have_aarch64=true
@@ -365,7 +392,7 @@ case $arch_target in
     ;;
     auto|native)
         saved_CFLAGS="$CFLAGS"
-        if test x$have_ppccpu = xtrue; then
+        if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then
             requested_arch_flag="-mcpu=native"
         else
             requested_arch_flag="-march=native"
@@ -378,7 +405,7 @@ case $arch_target in
         AC_MSG_RESULT([$ARCHFLAGS])
     ;;
     *)
-        if test x$have_ppccpu = xtrue; then
+        if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then
             requested_arch_flag="-mcpu=$arch_target"
         else
             requested_arch_flag="-march=$arch_target"
@@ -718,7 +745,7 @@ EOF
 fi
 
 
-VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $OPENMP_CFLAGS $warnCFLAGS"
+VEEJAY_CFLAGS="$VEEJAY_CFLAGS $ARCHFLAGS $OPENMP_CFLAGS $OPENMP_PRAGMA_CFLAGS $warnCFLAGS"
 VEEJAY_CXXFLAGS="$VEEJAY_CFLAGS $warnCXXFLAGS"
 
 AC_MSG_NOTICE([Final VEEJAY_CFLAGS: $VEEJAY_CFLAGS])

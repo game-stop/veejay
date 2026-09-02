@@ -20,7 +20,15 @@
 #ifndef VJ_X86_H
 #define VJ_X86_H
 
+#include <stddef.h>
+#include <stdint.h>
+
 #define MAX_WORKERS 256 
+
+typedef struct {
+	uint64_t total_bytes;
+	uint64_t available_bytes;
+} vj_mem_info_t;
 
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, int val, size_t len);
@@ -40,6 +48,8 @@ extern void packed_plane_clear( size_t len, void *to );
 extern void yuyv_plane_clear( size_t len, void *to );
 extern int cpu_get_cacheline_size(void);
 extern int mem_align_size(void);
+extern int vj_mem_get_info(vj_mem_info_t *info);
+extern int vj_mem_parse_env_mb(const char *name, size_t *bytes);
 extern char *veejay_strncat( char *s1, char *s2, size_t n );
 extern char *veejay_strncpy( char *s1, const char *s2, size_t n );
 extern void yuyv_plane_init(void);

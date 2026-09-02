@@ -1057,7 +1057,9 @@ gboolean director_projector_camera_map_lookup(const DirectorProjectorCameraMap *
     const gsize count = (gsize)map->camera_width * (gsize)map->camera_height;
     if(!values || size != count * sizeof(guint32))
         return FALSE;
-    const guint32 value = GUINT32_FROM_LE(values[(gsize)camera_y * map->camera_width + camera_x]);
+    const gsize camera_index = (gsize)camera_y * (gsize)map->camera_width +
+                               (gsize)camera_x;
+    const guint32 value = GUINT32_FROM_LE(values[camera_index]);
     if(value == DIRECTOR_CAMERA_MAP_INVALID)
         return FALSE;
     const gint x = (gint)(value & 0xffffu);
@@ -1533,7 +1535,7 @@ static void key_file_set_input_routes(GKeyFile *file,
     for(gint i = 0; i < count; i++) {
         const DirectorInputRoute *route = g_ptr_array_index((GPtrArray*)routes, (guint)i);
         gchar *key = g_strdup_printf("input-route-%d-type", i);
-        g_key_file_set_integer(file, group, key, route ? route->type : 0);
+        g_key_file_set_integer(file, group, key, route ? (gint)route->type : 0);
         g_free(key);
         key = g_strdup_printf("input-route-%d-source-instance", i);
         g_key_file_set_string(file, group, key, route && route->source_instance_id ? route->source_instance_id : "");
@@ -2339,7 +2341,7 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
         for(gint m = 0; m < camera_maps; m++) {
             group = g_strdup_printf("Venue %d CameraMap %d", v, m);
             gchar *instance_id = key_file_get_string_default(file, group, "instance-id", "");
-            gchar *format = key_file_get_string_default(file, group, "format", "");
+            gchar *map_format = key_file_get_string_default(file, group, "format", "");
             gchar *encoded = key_file_get_string_default(file, group, "data-base64", "");
             gint cw = key_file_get_integer_default(file, group, "camera-width", 0);
             gint ch = key_file_get_integer_default(file, group, "camera-height", 0);
@@ -2349,7 +2351,7 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
             gint valid = key_file_get_integer_default(file, group, "valid-pixels", 0);
             gdouble confidence = g_key_file_get_double(file, group, "mean-confidence", NULL);
             gint64 updated = g_key_file_get_int64(file, group, "updated-us", NULL);
-            if(*instance_id && g_strcmp0(format, "u32le-camera-to-projector-v1") == 0 &&
+            if(*instance_id && g_strcmp0(map_format, "u32le-camera-to-projector-v1") == 0 &&
                cw > 0 && ch > 0 && cw <= 8192 && ch <= 8192 &&
                pw > 0 && ph > 0 && pw <= 65534 && ph <= 65534 &&
                (gsize)cw * (gsize)ch <= (64u * 1024u * 1024u) / sizeof(guint32) &&
@@ -2359,7 +2361,7 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
                 const gsize encoded_len = strlen(encoded);
                 if(encoded_len > ((expected + 2u) / 3u) * 4u + 8u) {
                     g_free(instance_id);
-                    g_free(format);
+                    g_free(map_format);
                     g_free(encoded);
                     g_free(group);
                     continue;
@@ -2398,7 +2400,7 @@ DirectorShow *director_show_load(const gchar *path, GError **error)
                 g_free(raw);
             }
             g_free(instance_id);
-            g_free(format);
+            g_free(map_format);
             g_free(encoded);
             g_free(group);
         }
@@ -3549,15 +3551,15 @@ static void director_instance_append_perf_history(DirectorInstance *instance)
     DirectorStageMetric *output_graph = director_instance_find_stage(instance, "output_graph");
 
     if(producer)
-        sample.producer_ms = producer->recent_us / 1000.0;
+        sample.producer_ms = (gdouble)producer->recent_us / 1000.0;
     if(renderer) {
         const guint64 wait_us = (queue_wait ? queue_wait->recent_us : 0) +
                                 (sync_wait ? sync_wait->recent_us : 0);
         sample.renderer_work_ms = renderer->recent_us > wait_us ?
-                                  (renderer->recent_us - wait_us) / 1000.0 : 0.0;
+                                  (gdouble)(renderer->recent_us - wait_us) / 1000.0 : 0.0;
     }
     if(output_graph)
-        sample.output_graph_ms = output_graph->recent_us / 1000.0;
+        sample.output_graph_ms = (gdouble)output_graph->recent_us / 1000.0;
 
     instance->perf_history[instance->perf_history_head] = sample;
     instance->perf_history_head = (instance->perf_history_head + 1u) % DIRECTOR_PERF_HISTORY;

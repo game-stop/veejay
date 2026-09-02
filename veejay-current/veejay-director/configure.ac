@@ -30,8 +30,6 @@ AC_SUBST(LT_AGE)
 
 dnl AC_CONFIG_MACRO_DIR([m4])
 
-dnl kill CFLAGS
-CFLAGS=""
 AC_ARG_ENABLE([strict],
 		AS_HELP_STRING([--enable-strict],[Compile in paranoia assertion checking]))
 AC_ARG_ENABLE([debug],
@@ -55,10 +53,11 @@ AC_ARG_ENABLE([simd-accel],
 AC_ARG_WITH([extra-cflags],
             AS_HELP_STRING([--with-extra-cflags=flags],[Options to be added to CFLAGS (optional)]))
 
-arch_target="auto"
-AC_ARG_WITH([arch-target], AS_HELP_STRING( [--with-arch-target=generic or auto],
-					[Build a generic binary or auto-detect current cpu type (defaults to auto-detect)]),
-					[ arch_target="$withval"])
+arch_target="generic"
+AC_ARG_WITH([arch-target],
+			AS_HELP_STRING([--with-arch-target=generic, native, auto or CPU],
+						   [Use portable defaults, native tuning, or a compiler-validated CPU target]),
+			[arch_target="$withval"])
 
 AC_USE_SYSTEM_EXTENSIONS
 
@@ -359,8 +358,7 @@ have_mips=false
 have_ppccpu=false
 have_ps2=false
 have_arm=false
-
-OP_CFLAGS=""
+have_armv7a=false
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -371,10 +369,6 @@ case $host_cpu in
 
 	PROGRAM_NOPIC="-fno-PIC"
 
-	if test -z $debug_or_profiling ; then
-		OP_CFLAGS="-O2"
- 	fi
-
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
 		i686)
@@ -384,19 +378,15 @@ case $host_cpu in
 		;;
 	esac 
 	
+	AC_MSG_RESULT([x86])
     ;;
   x86_64*|k8-*)
     	AC_DEFINE(HAVE_X86_CPU,1, [Compiling for x86-64 architecture CPU])
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	if test -z $debug_or_profiling ; then
-		OP_CFLAGS="-O2"
- 	fi
-
-	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
-  powerpc | powerpc64)
+  powerpc | powerpc64 | powerpc64le)
 	AC_DEFINE(HAVE_PPCCPU,1, [Compiling for PowerPC CPU])
 	AC_DEFINE(ARCH_PPC,1,[Compiling for PowerPC])
 	have_ppccpu=true
@@ -432,34 +422,29 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	fi
 
 	;;
-   aarch64* |arm)
+   aarch64*|arm64*)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
-	 fi
-	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
 	 have_arm=true
-	 AC_MSG_RESULT([arm])
+	 AC_MSG_RESULT([aarch64])
      ;;
-   arm7* )
+   armv7*|armv8l)
      AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
-	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARM7L CPU])
-	 if test "x$enable_debug" != "xyes" ; then
-	    VJE_CFLAGS="-O3 -ffast-math -ftree-vectorize -m64 -fPIC -DPIC"
-	    SUBSAMPLE_CFLAGS="-m64 -fPIC -DPIC"
-	 fi
-	 CFLAGS="$CFLAGS -m64 -fPIC -DPIC -fopenmp"
+	 AC_DEFINE(HAVE_ARMV7A,1,[Compiling for ARMv7-A CPU])
 	 have_arm=true
 	 have_armv7a=true
-	 AC_MSG_RESULT([arm7])
+	 AC_MSG_RESULT([armv7])
+	 ;;
+   arm*)
+     AC_DEFINE(HAVE_ARM,1,[Compiling for ARM CPU])
+	 have_arm=true
+	 AC_MSG_RESULT([arm])
 	 ;;
   *)
     AC_MSG_RESULT([unknown])
     ;;
 esac
 
-CFLAGS="$CFLAGS -DFILE_OFFSET_BITS=64 -D_LARGE_FILES"
+CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
 dnl programs such as yuvdenoise and y4mspatialfilter can use this flag by
@@ -467,37 +452,9 @@ dnl simply adding programname_CFLAGS=@PROGRAM_NOPIC@ to the Makefile.am
 
 AC_SUBST(PROGRAM_NOPIC)
 
-dnl ARM architecture detect NEON and set CFLAGS
-if test x$have_arm = xtrue
-then
-	AC_CACHE_CHECK(for NEON on processor(s), ac_cv_flag_neon, [
-		if grep "^Features.* neon" /proc/cpuinfo > /dev/null; then
-			ac_cv_flag_neon=yes
-		else
-			ac_cv_flag_neon=no
-		fi
-	])
-	AC_MSG_RESULT($ac_cv_flag_neon)	
-
-	if test $ac_cv_flag_neon = yes ; then
-		AC_DEFINE(HAVE_ARM_NEON,1,[Compiling in NEON support])
-		USER_CFLAGS="-mfpu=neon $USER_CFLAGS"
-
-	else
-		USER_CFLAGS="-march=native $USER_CFLAGS"
-	fi
-	
-	if test "x$enable_debug" != "xyes" ; then
-		USER_CFLAGS="$USER_CFLAGS -O3 -fno-stack-protector"
-	else
-		USER_CFLAGS="$USER_CFLAGS -g -Wall"
-	fi
-
-	CFLAGS="$USER_CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
-fi
-
-
-if test x$have_x86cpu = xtrue
+if test x$have_x86cpu = xtrue &&
+   test x$cross_compiling != xyes &&
+   { test "x$arch_target" = xnative || test "x$arch_target" = xauto; }
 then
     if test x$have_darwin = xtrue
     then
@@ -637,8 +594,19 @@ then
     fi
 fi
 
+if test x$have_x86_64cpu = xtrue; then
+	AC_DEFINE(HAVE_ASM_SSE,1,[x86-64 ABI baseline includes SSE])
+	AC_DEFINE(HAVE_SSE,1,[x86-64 ABI baseline includes SSE])
+	AC_DEFINE(HAVE_ASM_SSE2,1,[x86-64 ABI baseline includes SSE2])
+	AC_DEFINE(HAVE_SSE2,1,[x86-64 ABI baseline includes SSE2])
+	have_asm_sse=true
+	have_asm_sse2=true
+fi
 
-if test x$have_ppccpu = xtrue
+
+if test x$have_ppccpu = xtrue &&
+   test x$cross_compiling != xyes &&
+   { test "x$arch_target" = xnative || test "x$arch_target" = xauto; }
 then
     AC_MSG_CHECKING([compiler support for AltiVec])
     cat > conftest.c <<EOF
@@ -686,49 +654,41 @@ EOF
 
 fi
 
-if test ! -r $srcdir/cpuinfo.sh; then
-       AC_MSG_ERROR([cpuinfo.sh script not found - do a cvs update])
-fi
-
-
-if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
-	if test x$host_alias != x; then
-		dnl Cross compiling
-		AC_MSG_CHECKING(sub-architecture settings)
-		if test x$have_x86cpu = xtrue; then
-			host_mod_cpu=`echo $host_cpu|tr _ -`
-			ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
-			AC_MSG_RESULT($ARCHFLAGS)
-		fi
-	else
-  		AC_MSG_CHECKING(sub-architecture settings ...)
-		
-		chmod +x $srcdir/cpuinfo.sh
-
-		if test "$arch_target" = "auto"; then
-			ARCHFLAGS=`$srcdir/cpuinfo.sh`
+AC_MSG_CHECKING([sub-architecture settings])
+ARCHFLAGS=""
+case $arch_target in
+	generic)
+		AC_MSG_RESULT([portable compiler defaults])
+		;;
+	auto|native)
+		if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then
+			requested_arch_flag="-mcpu=native"
 		else
-       			ARCHFLAGS="-mtune=generic"
+			requested_arch_flag="-march=native"
 		fi
-		AC_MSG_RESULT($ARCHFLAGS)
-
-	fi
-fi
-
-
-if test x$have_x86cpu = xtrue;
-then
-	if test -z $debug_or_profiling ;
-	then
-		if test x$ac_cv_flag_sse = xyes; then
-			CFLAGS="$CFLAGS -msse -mfpmath=sse"
+		saved_CFLAGS="$CFLAGS"
+		CFLAGS="$CFLAGS $requested_arch_flag"
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
+			[ARCHFLAGS="$requested_arch_flag"],
+			[AC_MSG_ERROR([the compiler does not support $requested_arch_flag])])
+		CFLAGS="$saved_CFLAGS"
+		AC_MSG_RESULT([$ARCHFLAGS])
+		;;
+	*)
+		if test x$have_ppccpu = xtrue || test x$have_arm = xtrue; then
+			requested_arch_flag="-mcpu=$arch_target"
+		else
+			requested_arch_flag="-march=$arch_target"
 		fi
-
-		if test x$av_cv_flag_sse2 = xyes; then
-			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
-		fi
-	fi	
-fi
+		saved_CFLAGS="$CFLAGS"
+		CFLAGS="$CFLAGS $requested_arch_flag"
+		AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [])],
+			[ARCHFLAGS="$requested_arch_flag"],
+			[AC_MSG_ERROR([the compiler does not support $requested_arch_flag])])
+		CFLAGS="$saved_CFLAGS"
+		AC_MSG_RESULT([$ARCHFLAGS])
+		;;
+esac
 
 AC_MSG_RESULT($CFLAGS)
 
@@ -809,10 +769,8 @@ dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
 dnl We do this last as it can screw up library detection etc...
 
-CFLAGS="$ARCHFLAGS $CFLAGS"
-CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
-
-AC_SUBST(OP_CFLAGS)
+CFLAGS="$CFLAGS $ARCHFLAGS"
+CXXFLAGS="$CXXFLAGS $ARCHFLAGS"
 
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
@@ -876,7 +834,6 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ veejay-director ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
-AC_MSG_NOTICE([			$OP_CFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])

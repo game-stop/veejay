@@ -15,8 +15,6 @@ AM_CPPFLAGS = \
 
 bin_PROGRAMS = reloaded
 
-reloaded_CFLAGS = $(OP_CFLAGS)
-
 reloaded_SOURCES = \
     cellrendererspin.c \
     gtktimeselection.c \

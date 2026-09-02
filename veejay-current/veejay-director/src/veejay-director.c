@@ -1793,7 +1793,7 @@ static void director_media_move(DirectorApp *app, gint delta)
     app->show->dirty = TRUE;
     director_refresh_media_bank(app);
     GList *children = gtk_container_get_children(GTK_CONTAINER(app->media_flow));
-    GtkWidget *child = g_list_nth_data(children, target);
+    GtkWidget *child = g_list_nth_data(children, (guint)target);
     if(child)
         gtk_flow_box_select_child(GTK_FLOW_BOX(app->media_flow), GTK_FLOW_BOX_CHILD(child));
     g_list_free(children);
@@ -4720,7 +4720,7 @@ static gdouble director_metric_recent_ms(DirectorInstance *instance,
                                          const gchar *name)
 {
     DirectorStageMetric *metric = director_stage_metric(instance, name);
-    return metric ? metric->recent_us / 1000.0 : 0.0;
+    return metric ? (gdouble)metric->recent_us / 1000.0 : 0.0;
 }
 
 #define DIRECTOR_THEME_BG          0x27282fU
@@ -4814,8 +4814,9 @@ static gboolean on_perf_canvas_draw(GtkWidget *widget, cairo_t *cr, gpointer dat
         return FALSE;
     }
 
-    const gdouble budget_ms = instance->budget_us / 1000.0;
-    const gdouble fps = instance->budget_us > 0 ? 1000000.0 / instance->budget_us : 0.0;
+    const gdouble budget_ms = (gdouble)instance->budget_us / 1000.0;
+    const gdouble fps = instance->budget_us > 0 ?
+                        1000000.0 / (gdouble)instance->budget_us : 0.0;
     const gdouble left = 70.0;
     const gdouble right = 24.0;
     const gdouble graph_width = MAX(160.0, allocation.width - left - right);
@@ -4897,8 +4898,8 @@ static gboolean on_perf_canvas_draw(GtkWidget *widget, cairo_t *cr, gpointer dat
         DirectorStageMetric *metric = director_stage_metric(instance, director_stage_order[i]);
         if(!metric || metric->count == 0)
             continue;
-        stage_max = MAX(stage_max, metric->recent_us / 1000.0 * 1.05);
-        stage_max = MAX(stage_max, metric->p95_us / 1000.0 * 1.05);
+        stage_max = MAX(stage_max, (gdouble)metric->recent_us / 1000.0 * 1.05);
+        stage_max = MAX(stage_max, (gdouble)metric->p95_us / 1000.0 * 1.05);
         row_count++;
     }
 
@@ -4919,9 +4920,9 @@ static gboolean on_perf_canvas_draw(GtkWidget *widget, cairo_t *cr, gpointer dat
         DirectorStageMetric *metric = director_stage_metric(instance, director_stage_order[i]);
         if(!metric || metric->count == 0)
             continue;
-        const gdouble recent_ms = metric->recent_us / 1000.0;
-        const gdouble p95_ms = metric->p95_us / 1000.0;
-        const gdouble max_ms = metric->max_us / 1000.0;
+        const gdouble recent_ms = (gdouble)metric->recent_us / 1000.0;
+        const gdouble p95_ms = (gdouble)metric->p95_us / 1000.0;
+        const gdouble max_ms = (gdouble)metric->max_us / 1000.0;
         const gdouble y = rows_y + row * row_height;
         const gdouble bw = CLAMP(recent_ms / stage_max, 0.0, 1.0) * bar_width;
         const gdouble p95_x = bar_x + CLAMP(p95_ms / stage_max, 0.0, 1.0) * bar_width;
@@ -4997,8 +4998,9 @@ static void director_update_perf_ui(DirectorApp *app)
         return;
     }
 
-    const gdouble budget_ms = instance->budget_us / 1000.0;
-    const gdouble fps = instance->budget_us > 0 ? 1000000.0 / instance->budget_us : 0.0;
+    const gdouble budget_ms = (gdouble)instance->budget_us / 1000.0;
+    const gdouble fps = instance->budget_us > 0 ?
+                        1000000.0 / (gdouble)instance->budget_us : 0.0;
     const gdouble producer_ms = director_metric_recent_ms(instance, "producer_total");
     const gdouble renderer_cycle_ms = director_metric_recent_ms(instance, "renderer_total");
     const gdouble queue_wait_ms = director_metric_recent_ms(instance, "queue_wait");
@@ -6152,12 +6154,19 @@ static void director_eidolon_append_transcript(DirectorApp *app,
         if(text[i] != '\r')
             g_string_append_c(clean, text[i]);
     }
-    g_string_append_len(instance->eidolon_transcript, clean->str, clean->len);
     const gsize max_len = 512 * 1024;
+    const gchar *append_text = clean->str;
+    gsize append_len = clean->len;
+    if(append_len > max_len) {
+        append_text += append_len - max_len;
+        append_len = max_len;
+        g_string_truncate(instance->eidolon_transcript, 0);
+    }
+    g_string_append_len(instance->eidolon_transcript, append_text, (gssize)append_len);
     gboolean trimmed = FALSE;
     if(instance->eidolon_transcript->len > max_len) {
         const gsize remove_len = instance->eidolon_transcript->len - max_len;
-        g_string_erase(instance->eidolon_transcript, 0, remove_len);
+        g_string_erase(instance->eidolon_transcript, 0, (gssize)remove_len);
         trimmed = TRUE;
     }
     if(trimmed) {
@@ -6971,9 +6980,9 @@ static gboolean director_calibration_parse_device_payload(DirectorApp *app,
     while(p < end) {
         if(end - p < 3 || !g_ascii_isdigit(p[0]) || !g_ascii_isdigit(p[1]) || !g_ascii_isdigit(p[2]))
             return FALSE;
-        gint desc_len = (p[0]-'0') * 100 + (p[1]-'0') * 10 + (p[2]-'0');
+        const gsize desc_len = (gsize)((p[0]-'0') * 100 + (p[1]-'0') * 10 + (p[2]-'0'));
         p += 3;
-        if(desc_len < 0 || p + desc_len > end)
+        if(desc_len > (gsize)(end - p))
             return FALSE;
         gchar *description = g_strndup(p, desc_len);
         p += desc_len;
@@ -6981,9 +6990,9 @@ static gboolean director_calibration_parse_device_payload(DirectorApp *app,
             g_free(description);
             return FALSE;
         }
-        gint path_len = (p[0]-'0') * 100 + (p[1]-'0') * 10 + (p[2]-'0');
+        const gsize path_len = (gsize)((p[0]-'0') * 100 + (p[1]-'0') * 10 + (p[2]-'0'));
         p += 3;
-        if(path_len <= 0 || p + path_len > end) {
+        if(path_len == 0 || path_len > (gsize)(end - p)) {
             g_free(description);
             return FALSE;
         }
@@ -9913,8 +9922,7 @@ static gchar *director_monitor_name(GdkMonitor *monitor)
 }
 
 static gchar *director_monitor_label(GdkDisplay *display,
-                                     GdkMonitor *monitor,
-                                     gint index)
+                                     GdkMonitor *monitor)
 {
     GdkRectangle geometry = { 0, 0, 0, 0 };
     gdk_monitor_get_geometry(monitor, &geometry);
@@ -10044,7 +10052,7 @@ static void director_populate_display_combo(DirectorApp *app)
         gchar *id = director_monitor_id(monitor, i);
         gchar *connector = director_monitor_connector(monitor);
         gchar *name = director_monitor_name(monitor);
-        gchar *label = director_monitor_label(display, monitor, i);
+        gchar *label = director_monitor_label(display, monitor);
         gboolean exact = FALSE;
         gboolean possible = FALSE;
         if(instance && instance->display_index >= 0) {
@@ -10252,7 +10260,7 @@ static gchar *director_connected_displays_text(void)
     GString *text = g_string_new(NULL);
     for(gint i = 0; i < count; i++) {
         GdkMonitor *monitor = gdk_display_get_monitor(display, i);
-        gchar *label = director_monitor_label(display, monitor, i);
+        gchar *label = director_monitor_label(display, monitor);
         if(i > 0)
             g_string_append_c(text, '\n');
         g_string_append(text, label);
@@ -10783,22 +10791,29 @@ static gboolean director_prepare_split_screen_config(DirectorApp *app,
         columns = MAX(columns, receiver->split_column + 1);
     }
 
-    if(rows <= 0 || columns <= 0 || (guint)(rows * columns) != receiver_count) {
+    if(rows <= 0 || columns <= 0 || rows > G_MAXINT / columns) {
+        g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
+                    "Native video wall for '%s' must contain one screen for every %d×%d cell",
+                    master->id, columns, rows);
+        return FALSE;
+    }
+    const gint cell_count = rows * columns;
+    if((guint)cell_count != receiver_count) {
         g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
                     "Native video wall for '%s' must contain one screen for every %d×%d cell",
                     master->id, columns, rows);
         return FALSE;
     }
 
-    GPtrArray *cells = g_ptr_array_sized_new((guint)(rows * columns));
-    g_ptr_array_set_size(cells, (guint)(rows * columns));
+    GPtrArray *cells = g_ptr_array_sized_new((guint)cell_count);
+    g_ptr_array_set_size(cells, cell_count);
     for(guint i = 0; i < app->show->instances->len; i++) {
         DirectorInstance *receiver = g_ptr_array_index(app->show->instances, i);
         if(receiver == master || !receiver->split_master_instance_id ||
            g_strcmp0(receiver->split_master_instance_id, master->id) != 0)
             continue;
         const gint index = receiver->split_row * columns + receiver->split_column;
-        if(index < 0 || index >= rows * columns || cells->pdata[index]) {
+        if(index < 0 || index >= cell_count || cells->pdata[index]) {
             g_ptr_array_free(cells, TRUE);
             g_set_error(error, G_IO_ERROR, G_IO_ERROR_INVALID_ARGUMENT,
                         "Native video wall for '%s' has a duplicate or invalid screen cell",
@@ -14006,14 +14021,17 @@ static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
                                                       gint height,
                                                       gboolean full_range)
 {
+    if(!payload || width <= 0 || height <= 0 ||
+       width == G_MAXINT || height == G_MAXINT)
+        return NULL;
+
     const gsize y_size = (gsize)width * (gsize)height;
     const gsize uv_width = (gsize)(width + 1) / 2;
     const gsize uv_height = (gsize)(height + 1) / 2;
     const gsize uv_size = uv_width * uv_height;
     const gboolean grayscale = (payload_size == y_size);
-    
-    if(!payload || width <= 0 || height <= 0 ||
-       (!grayscale && payload_size < y_size + uv_size * 2))
+
+    if(!grayscale && payload_size < y_size + uv_size * 2)
         return NULL;
 
     GdkPixbuf *pixbuf = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, width, height);
@@ -14022,6 +14040,8 @@ static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
 
     guint8 *restrict dst = gdk_pixbuf_get_pixels(pixbuf);
     const gint rowstride = gdk_pixbuf_get_rowstride(pixbuf);
+    const gsize rowstride_size = (gsize)rowstride;
+    const gsize width_size = (gsize)width;
     
     const guint8 *restrict plane_y = payload;
     const guint8 *restrict plane_u = grayscale ? NULL : payload + y_size;
@@ -14033,8 +14053,8 @@ static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
     // Hoist the invariants out of the loops
     if (grayscale) {
         for(gint y = 0; y < height; y++) {
-            guint8 *restrict row = dst + (gsize)y * rowstride;
-            const guint8 *restrict py_row = plane_y + (gsize)y * width;
+            guint8 *restrict row = dst + (gsize)y * rowstride_size;
+            const guint8 *restrict py_row = plane_y + (gsize)y * width_size;
             
             for(gint x = 0; x < width; x++) {
                 guint8 yy = py_row[x];
@@ -14046,8 +14066,8 @@ static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
     } 
     else if (full_range) {
         for(gint y = 0; y < height; y++) {
-            guint8 * __restrict row = dst + (gsize)y * rowstride;
-            const guint8 *restrict py_row = plane_y + (gsize)y * width;
+            guint8 * __restrict row = dst + (gsize)y * rowstride_size;
+            const guint8 *restrict py_row = plane_y + (gsize)y * width_size;
             const guint8 *restrict pu_row = plane_u + (gsize)(y >> 1) * uv_width;
             const guint8 *restrict pv_row = plane_v + (gsize)(y >> 1) * uv_width;
 
@@ -14086,8 +14106,8 @@ static GdkPixbuf *director_preview_pixbuf_from_yuv420(const guint8 *payload,
     } 
     else {
         for(gint y = 0; y < height; y++) {
-            guint8 * __restrict row = dst + (gsize)y * rowstride;
-            const guint8 *restrict py_row = plane_y + (gsize)y * width;
+            guint8 * __restrict row = dst + (gsize)y * rowstride_size;
+            const guint8 *restrict py_row = plane_y + (gsize)y * width_size;
             const guint8 *restrict pu_row = plane_u + (gsize)(y >> 1) * uv_width;
             const guint8 *restrict pv_row = plane_v + (gsize)(y >> 1) * uv_width;
 
@@ -14361,7 +14381,7 @@ static gint64 director_screen_preview_interval_us(DirectorApp *app,
 
     gdouble fps = 25.0;
     if(instance && instance->budget_us > 0)
-        fps = 1000000.0 / instance->budget_us;
+        fps = 1000000.0 / (gdouble)instance->budget_us;
     else if(instance && instance->fps > 0.0)
         fps = instance->fps;
     fps = CLAMP(fps, 1.0, 240.0);
@@ -15330,7 +15350,7 @@ static void director_draw_source_crop_inset(DirectorApp *app, cairo_t *cr,
 }
 
 static void director_canvas_remove_geometry(gdouble x, gdouble y,
-                                            gdouble w, gdouble h,
+                                            gdouble w,
                                             gdouble *rx, gdouble *ry,
                                             gdouble *rw, gdouble *rh)
 {
@@ -15342,11 +15362,11 @@ static void director_canvas_remove_geometry(gdouble x, gdouble y,
 }
 
 static gboolean director_canvas_remove_hit(gdouble x, gdouble y,
-                                           gdouble w, gdouble h,
+                                           gdouble w,
                                            gdouble px, gdouble py)
 {
     gdouble rx, ry, rw, rh;
-    director_canvas_remove_geometry(x, y, w, h, &rx, &ry, &rw, &rh);
+    director_canvas_remove_geometry(x, y, w, &rx, &ry, &rw, &rh);
     return px >= rx && px <= rx + rw && py >= ry && py <= ry + rh;
 }
 
@@ -15399,7 +15419,7 @@ static void director_draw_selected_area_controls(cairo_t *cr,
     director_draw_resize_handle(cr, x + w, y + h, color);
 
     gdouble rx, ry, rw, rh;
-    director_canvas_remove_geometry(x, y, w, h, &rx, &ry, &rw, &rh);
+    director_canvas_remove_geometry(x, y, w, &rx, &ry, &rw, &rh);
     cairo_rectangle(cr, rx, ry, rw, rh);
     director_cairo_set_theme(cr, 0x1b1c20U, 0.92);
     cairo_fill_preserve(cr);
@@ -15699,7 +15719,7 @@ static gboolean on_canvas_button(GtkWidget *widget, GdkEventButton *event, gpoin
     if(selected->enabled) {
         gdouble x, y, w, h;
         director_canvas_rectangle(app, selected, &x, &y, &w, &h);
-        if(director_canvas_remove_hit(x, y, w, h, event->x, event->y)) {
+        if(director_canvas_remove_hit(x, y, w, event->x, event->y)) {
             director_remove_selected_area(app);
             return TRUE;
         }
@@ -21280,7 +21300,7 @@ static void on_stage_preflight(GtkButton *button, gpointer data)
         if(ready)
             frame_budget_expected++;
         if(ready && instance->budget_us > 0 && instance->stages->len > 0) {
-            const gdouble budget_ms = instance->budget_us / 1000.0;
+            const gdouble budget_ms = (gdouble)instance->budget_us / 1000.0;
             const gdouble producer_ms = director_metric_recent_ms(instance, "producer_total");
             const gdouble renderer_cycle_ms = director_metric_recent_ms(instance, "renderer_total");
             const gdouble queue_wait_ms = director_metric_recent_ms(instance, "queue_wait");

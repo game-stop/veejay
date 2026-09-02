@@ -3,8 +3,8 @@ lividoplugin_LTLIBRARIES = lvd_shmin.la lvd_shmout.la
 lvd_shmin_la_SOURCES = lvd_shmin.c
 lvd_shmout_la_SOURCES = lvd_shmout.c
 
-AM_CPPFLAGS=$(FFMPEG_CFLAGS) $(VEEJAYCORE_CFLAGS) -I$(top_srcdir)/lvdshm
-AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS) -DSILENT
+AM_CPPFLAGS=$(FFMPEG_CFLAGS) $(VEEJAYCORE_CFLAGS) -I$(top_srcdir)/lvdshm -I$(top_srcdir)/include
+AM_CPPFLAGS+=-DSILENT
 AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lstdc++ -DDYNAMIC -rdynamic $(FFMPEG_LIBS)
 AM_LIBTOOLFLAGS = --tag=disable-static
 

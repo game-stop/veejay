@@ -73,11 +73,12 @@ sendVIMS.pd_linux: selectors.h
 
 PDINCLUDE ?= /usr/include/pd
 PD_CFLAGS  = -DPD -fPIC -I$(PDINCLUDE)
+STRIP ?= strip
 
 .c.pd_linux:
 	$(CC) $(PD_CFLAGS) $(OPTI_CFLAGS) $(DEBUG_CFLAGS) -DVERSION=\"$(VERSION)\" -o $*.o -c $*.c
 	$(CC) -rdynamic  -shared -o $*.pd_linux $*.o -lm
-	strip --strip-unneeded $*.pd_linux
+	$(STRIP) --strip-unneeded $*.pd_linux
 	rm $*.o
 
 clean:

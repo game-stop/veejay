@@ -2,8 +2,7 @@ lividoplugin_LTLIBRARIES = lvd_aa.la
 
 lvd_aa_la_SOURCES = lvd_aa.c
 
-AM_CPPFLAGS=$(FFMPEG_CFLAGS) $(FREETYPE2_CFLAGS) -I$(top_srcdir)/plugins
-AM_CFLAGS=-I@top_srcdir@/include $(OPTCFLAGS)
+AM_CPPFLAGS=$(FFMPEG_CFLAGS) $(FREETYPE2_CFLAGS) -I$(top_srcdir)/plugins -I$(top_srcdir)/include
 AM_LDFLAGS=-module -avoid-version -lm -export-dynamic -lstdc++ -DDYNAMIC -rdynamic $(AA_LIBS) $(FREETYPE2_LIBS) $(FFMPEG_LIBS)
 AM_LIBTOOLFLAGS = --tag=disable-static
 

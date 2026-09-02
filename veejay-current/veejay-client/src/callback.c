@@ -7872,6 +7872,29 @@ void on_curve_fx_param_changed(GtkComboBox *widget, gpointer user_data)
         return;
 
     gint active_kf_id = get_vj_kf_active_parameter();
+    gint previous_kf_id = info->uc.selected_parameter_id;
+
+    if(active_kf_id != previous_kf_id && curve_editor_is_local_dirty()) {
+        on_curve_buttonstore_clicked(NULL, NULL);
+
+        if(curve_editor_is_local_dirty()) {
+            gint previous_combo_id = 0;
+            int old_lock = info->status_lock;
+
+            if(previous_kf_id == VJ_KF_PARAM_CHAIN_OPACITY)
+                previous_combo_id = 1;
+            else if(previous_kf_id >= 0)
+                previous_combo_id = previous_kf_id + 2;
+
+            info->status_lock = 1;
+            gtk_combo_box_set_active(widget, previous_combo_id);
+            info->status_lock = old_lock;
+
+            vj_msg(VEEJAY_MSG_ERROR,
+                   "Unable to save the current FX animation; parameter selection was not changed");
+            return;
+        }
+    }
 
     vj_kf_select_parameter(active_kf_id);
 

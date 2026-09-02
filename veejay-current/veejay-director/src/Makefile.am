@@ -13,8 +13,6 @@ AM_CPPFLAGS = \
 
 bin_PROGRAMS = veejay-director
 
-veejay_director_CFLAGS = $(OP_CFLAGS)
-
 veejay_director_SOURCES = \
     veejay-director.c \
     director-compat.h \

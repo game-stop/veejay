@@ -27,9 +27,9 @@ static inline gchar *director_utf8_make_valid_compat(const gchar *text, gssize l
     const gchar *end = input + length;
 
     if(g_utf8_validate(input, length, NULL))
-        return g_strndup(input, length);
+        return g_strndup(input, (gsize)length);
 
-    GString *result = g_string_sized_new(length + 8);
+    GString *result = g_string_sized_new((gsize)length + 8u);
     const gchar *p = input;
     while(p < end) {
         const gchar *invalid = NULL;
