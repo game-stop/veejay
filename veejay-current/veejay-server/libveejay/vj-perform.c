@@ -17029,35 +17029,15 @@ static inline void vj_output_hold_planes(performer_t *p, const int plane_sizes[4
     planes[3] = plane_sizes[3] > 0 ? (planes[2] + plane_sizes[2]) : NULL;
 }
 
-static inline void vj_perform_output_hold_advance(video_playback_setup *s, int manual)
+static inline void vj_perform_source_hold_tick(veejay_t *info)
 {
-    if(!s->output_hold_active)
+    video_playback_setup *settings = info->settings;
+
+    if(!atomic_load_int(&settings->hold_status))
         return;
 
-    if(s->output_hold_frames_left > 0)
-        s->output_hold_frames_left--;
-
-    s->hold_pos = s->output_hold_frames_left;
-    s->hold_resume++;
-
-    if(s->output_hold_frames_left > 0)
-        return;
-
-    s->output_hold_active = 0;
-    s->output_hold_capture = 0;
-    s->output_hold_frames_left = 0;
-    s->output_hold_frames_total = 0;
-    s->hold_status = 0;
-    s->hold_pos = 0;
-    s->hold_resume = 0;
-
-    if(!manual) {
-        s->output_hold_ready = 0;
-        s->hold_fx_prev = 0;
-    }
-
-    atomic_store_double(&s->smoothed_drift_us, 0.0);
-    veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze");
+    if(atomic_add_fetch_old_int(&settings->hold_pos, -1) <= 1)
+        veejay_hold_frame(info, 0, 0);
 }
 
 static inline int vj_perform_output_hold_replay(veejay_t *info,
@@ -17065,14 +17045,12 @@ static inline int vj_perform_output_hold_replay(veejay_t *info,
                                                 VJFrame *dst)
 {
     video_playback_setup *s = info->settings;
-    const int manual = s->hold_fx ? 1 : 0;
-    const int timed = s->output_hold_active ? 1 : 0;
 
-    if(!manual && !timed)
+    if(!s->hold_fx)
         return 0;
 
     if(s->output_hold_capture || !s->output_hold_ready ||
-       (manual && !s->hold_fx_prev))
+       !s->hold_fx_prev)
         return 0;
 
     int plane_sizes[4];
@@ -17087,19 +17065,14 @@ static inline int vj_perform_output_hold_replay(veejay_t *info,
     vj_output_hold_planes(p, plane_sizes, hold_planes);
     vj_frame_copy(hold_planes, dst->data, plane_sizes);
 
-    if(timed)
-        vj_perform_output_hold_advance(s, manual);
-
     return 1;
 }
 
 static inline void vj_perform_output_hold_update(veejay_t *info, performer_t *p, VJFrame *dst)
 {
     video_playback_setup *s = info->settings;
-    const int manual = s->hold_fx ? 1 : 0;
-    const int timed = s->output_hold_active ? 1 : 0;
 
-    if(!manual && !timed) {
+    if(!s->hold_fx) {
         s->hold_fx_prev = 0;
         s->output_hold_capture = 0;
         return;
@@ -17108,33 +17081,28 @@ static inline void vj_perform_output_hold_update(veejay_t *info, performer_t *p,
     int plane_sizes[4];
     size_t need = vj_output_hold_frame_size(dst, plane_sizes);
     if(need == 0 || !vj_output_hold_ensure_buffer(p, need)) {
-        s->output_hold_active = 0;
         s->output_hold_capture = 0;
-        s->output_hold_frames_left = 0;
-        s->hold_status = 0;
-        s->hold_pos = 0;
-        s->hold_resume = 0;
+        s->output_hold_ready = 0;
+        s->hold_fx_prev = 0;
         return;
     }
 
     uint8_t *hold_planes[4];
     vj_output_hold_planes(p, plane_sizes, hold_planes);
 
-    const int capture = s->output_hold_capture || !s->output_hold_ready || (manual && !s->hold_fx_prev);
+    const int capture = s->output_hold_capture ||
+                        !s->output_hold_ready ||
+                        !s->hold_fx_prev;
 
     if(capture) {
         vj_frame_copy(dst->data, hold_planes, plane_sizes);
         s->output_hold_capture = 0;
         s->output_hold_ready = 1;
-        if(manual)
-            s->hold_fx_prev = 1;
+        s->hold_fx_prev = 1;
     }
     else {
         vj_frame_copy(hold_planes, dst->data, plane_sizes);
     }
-
-    if(timed)
-        vj_perform_output_hold_advance(s, manual);
 }
 
 
@@ -18466,6 +18434,7 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
     if(vj_perform_output_hold_replay(info, p, dst)) {
         if(vj_perform_record_presented_video_frame(info, dst))
             vj_perform_record_video_frame(info);
+        vj_perform_source_hold_tick(info);
         return 1;
     }
 
@@ -18691,6 +18660,8 @@ int vj_perform_queue_video_frame(veejay_t *info, VJFrame *dst)
 
     if(vj_perform_record_presented_video_frame(info, dst))
         vj_perform_record_video_frame(info);
+
+    vj_perform_source_hold_tick(info);
 
     return 1;
 }

@@ -4963,8 +4963,8 @@ void vj_event_set_freeze(void *ptr, const char format[], va_list ap)
     }
     else {
         v->settings->hold_fx_prev = 0;
-        if(!v->settings->output_hold_active)
-            v->settings->output_hold_ready = 0;
+        v->settings->output_hold_capture = 0;
+        v->settings->output_hold_ready = 0;
     }
     veejay_msg(VEEJAY_MSG_INFO, "%s final output", (fx_hold == 0 ? "Unfreeze" : "Freeze"));
 }
@@ -5246,12 +5246,13 @@ void    vj_event_hold_frame( void *ptr, const char format[], va_list ap )
     if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v) || STREAM_PLAYING(v)) {
         P_A( args,sizeof(args),NULL,0,format, ap);
 
-        if(args[2] < 0)
-            args[2] = 0;
-        else if(args[2] > 999)
-            args[2] = 999;
+        int frames = args[2];
+        if(frames < 0)
+            frames = 0;
+        else if(frames > 999)
+            frames = 999;
 
-        veejay_hold_frame(v, 0, args[2]);
+        veejay_hold_frame(v, 0, frames);
     } else {
         p_invalid_mode();
     }

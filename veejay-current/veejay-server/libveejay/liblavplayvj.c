@@ -4144,38 +4144,26 @@ static inline int playback_retime_audio_slice(int old_sfd, int new_sfd, int old_
     return vj_clampi((old_slice * new_sfd) / old_sfd, 0, new_sfd - 1);
 }
 
-static void veejay_output_hold_release_timed(veejay_t *info, const char *reason, int log_release)
+static void veejay_source_hold_release(veejay_t *info, int resume, int log_release)
 {
     video_playback_setup *settings = (video_playback_setup*) info->settings;
 
-    if(!settings->output_hold_active && !settings->output_hold_capture &&
-       settings->output_hold_frames_left <= 0 && settings->hold_status <= 0)
+    if(!atomic_exchange_int(&settings->hold_status, 0))
         return;
 
-    settings->output_hold_active = 0;
-    settings->output_hold_capture = 0;
-    settings->output_hold_frames_left = 0;
-    settings->output_hold_frames_total = 0;
-    settings->hold_status = 0;
-    settings->hold_pos = 0;
-    settings->hold_resume = 0;
+    const int resume_speed =
+        atomic_exchange_int(&settings->hold_resume, 0);
 
-    if(!settings->hold_fx)
-        settings->output_hold_ready = 0;
+    atomic_store_int(&settings->hold_pos, 0);
 
     atomic_store_double(&settings->smoothed_drift_us, 0.0);
 
-    if(log_release) {
-        if(reason && reason[0])
-            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze (%s)", reason);
-        else
-            veejay_msg(VEEJAY_MSG_INFO, "HOLD: Released full output freeze");
-    }
-}
+    if(resume && resume_speed != 0 &&
+       atomic_load_int(&settings->current_playback_speed) == 0)
+        veejay_set_speed(info, resume_speed, 0);
 
-static inline void veejay_output_hold_release_on_transport(veejay_t *info)
-{
-    veejay_output_hold_release_timed(info, "transport", 1);
+    if(log_release)
+        veejay_msg(VEEJAY_MSG_INFO, "HOLD: Source playback resumed");
 }
 
 
@@ -4183,7 +4171,7 @@ int veejay_set_framedup(veejay_t *info, int n)
 {
     video_playback_setup *settings = info->settings;
 
-    veejay_output_hold_release_on_transport(info);
+    veejay_source_hold_release(info, 1, 0);
 
     if (n < 1)
         n = 1;
@@ -4313,7 +4301,7 @@ int veejay_set_speed(veejay_t *info, int speed, int force_seek)
     video_playback_setup *settings =
         (video_playback_setup *)info->settings;
 
-    veejay_output_hold_release_on_transport(info);
+    veejay_source_hold_release(info, 0, 0);
 
     int len = 0;
 
@@ -4505,36 +4493,31 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos)
 {
     (void) rel_resume_pos;
 
-
-
     video_playback_setup *settings = (video_playback_setup *) info->settings;
 
     if(hold_pos <= 0) {
-        veejay_output_hold_release_timed(info, NULL, 1);
+        veejay_source_hold_release(info, 1, 1);
         return 1;
     }
 
-    if(settings->output_hold_active)
+    if(atomic_load_int(&settings->hold_status))
         return 1;
 
-    int frames = hold_pos;
-    if(frames < 1)
-        frames = 1;
-    else if(frames > 999)
-        frames = 999;
+    const int frames = vj_clampi(hold_pos, 1, 999);
+    const int resume_speed =
+        atomic_load_int(&settings->current_playback_speed);
 
-    if(!settings->output_hold_active)
-        settings->output_hold_capture = 1;
+    if(resume_speed != 0)
+        settings->previous_playback_speed = resume_speed;
 
-    settings->output_hold_active = 1;
-    settings->output_hold_frames_left = frames;
-    settings->output_hold_frames_total = frames;
-    settings->hold_status = 1;
-    settings->hold_pos = frames;
-    settings->hold_resume = 0;
+    veejay_set_speed(info, 0, 0);
+
+    atomic_store_int(&settings->hold_resume, resume_speed);
+    atomic_store_int(&settings->hold_pos, frames);
+    atomic_store_int(&settings->hold_status, 1);
 
     veejay_msg(VEEJAY_MSG_INFO,
-               "HOLD: Full output freeze for %d frame%s",
+               "HOLD: Source paused for %d frame%s; FX continue",
                frames, frames == 1 ? "" : "s");
 
     return 1;
@@ -4836,7 +4819,7 @@ int veejay_set_frame(veejay_t *info, long framenum)
 {
     video_playback_setup *settings = (video_playback_setup *)info->settings;
 
-    veejay_output_hold_release_on_transport(info);
+    veejay_source_hold_release(info, 1, 0);
 
     long long min_frame = atomic_load_long_long(&settings->min_frame_num);
     long long max_frame = atomic_load_long_long(&settings->max_frame_num);
@@ -5528,7 +5511,7 @@ void veejay_change_playback_mode(veejay_t *info, int new_pm, int sample_id)
         veejay_transport_epoch_bump(info);
     }
 
-    veejay_output_hold_release_on_transport(info);
+    veejay_source_hold_release(info, 1, 0);
 
     if (current_pm == VJ_PLAYBACK_MODE_SAMPLE) {
         if (cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_SAMPLE) {
@@ -5689,7 +5672,7 @@ void veejay_change_playback_mode_transition(veejay_t *info,
                                            current_id,
                                            current_pm))
     {
-        veejay_output_hold_release_on_transport(info);
+        veejay_source_hold_release(info, 1, 0);
         return;
     }
 
@@ -13975,7 +13958,7 @@ static void *veejay_producer_thread_loop(void *ptr)
         packet->source_frame = vf->frame_num;
         if(settings->composite)
             packet->flags |= VJ_VIDEO_PACKET_COMPOSITE;
-        if(settings->output_hold_active)
+        if(settings->hold_fx)
             packet->flags |= VJ_VIDEO_PACKET_HELD_FRAME;
 
         const uint64_t producer_end = vj_perf_now_ns();
