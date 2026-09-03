@@ -42,6 +42,7 @@ typedef struct {
     int smooth_args[10];
     int smooth_init;
     int map_ready;
+    int update_this_frame;
     uint8_t *buf[3];
 } fractalkaleido_t;
 
@@ -334,8 +335,8 @@ static void fractalkaleido_apply1_twistinversion(void *ptr, VJFrame *frame, int 
 
     const int w = frame->width;
     const int h = frame->height;
-    const int hw = w >> 1;
-    const int hh = h >> 1;
+    const int hw = (w - 1) >> 1;
+    const int hh = (h - 1) >> 1;
 
     const int segments_i = (args[0] < 2) ? 2 : args[0];
     const float rnorm = args[1] * (1.0f / 360.0f);
@@ -455,8 +456,8 @@ static void fractalkaleido_apply1(void *ptr, VJFrame *frame, int *args, float ba
 
     const int w = frame->width;
     const int h = frame->height;
-    const int hw = w >> 1;
-    const int hh = h >> 1;
+    const int hw = (w - 1) >> 1;
+    const int hh = (h - 1) >> 1;
 
     const int segments_i = (args[0] < 2) ? 2 : args[0];
     const float rnorm = args[1] * (1.0f / 360.0f);
@@ -576,8 +577,8 @@ static void fractalkaleido_apply1_segcouple(void *ptr, VJFrame *frame, int *args
 
     const int w = frame->width;
     const int h = frame->height;
-    const int hw = w >> 1;
-    const int hh = h >> 1;
+    const int hw = (w - 1) >> 1;
+    const int hh = (h - 1) >> 1;
 
     const int segments_i = (args[0] < 2 ? 2 : args[0]);
     const float rnorm = args[1] * (1.0f / 360.0f);
@@ -708,8 +709,8 @@ static void fractalkaleido_apply1_vortex(void *ptr, VJFrame *frame, int *args, f
 
     const int w = frame->width;
     const int h = frame->height;
-    const int hw = w >> 1;
-    const int hh = h >> 1;
+    const int hw = (w - 1) >> 1;
+    const int hh = (h - 1) >> 1;
 
     const int segments_i = (args[0] < 2 ? 2 : args[0]);
     const float rnorm = args[1] * (1.0f / 360.0f);
@@ -832,8 +833,8 @@ static void fractalkaleido_apply1_wave(void *ptr, VJFrame *frame, int *args, flo
 
     const int w = frame->width;
     const int h = frame->height;
-    const int hw = w >> 1;
-    const int hh = h >> 1;
+    const int hw = (w - 1) >> 1;
+    const int hh = (h - 1) >> 1;
 
     const int segments_i = (args[0] < 2) ? 2 : args[0];
     const float rnorm = args[1] * (1.0f / 360.0f);
@@ -1024,8 +1025,8 @@ static void fractalkaleido_apply1_radialclassic(void *ptr, VJFrame *frame, int *
 
     const int w = frame->width;
     const int h = frame->height;
-    const int hw = w >> 1;
-    const int hh = h >> 1;
+    const int hw = (w - 1) >> 1;
+    const int hh = (h - 1) >> 1;
 
     const int segments_i = (args[0] < 2 ? 2 : args[0]);
     const float scale_val = args[2] * (1.0f / 1000.0f);
@@ -1121,8 +1122,6 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     fractalkaleido_t *s = (fractalkaleido_t*) ptr;
 
     const int len = frame->len;
-
-
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -1130,65 +1129,58 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
     uint8_t *restrict outU = s->buf[1];
     uint8_t *restrict outV = s->buf[2];
 
-    int eff[10];
-    int map_args[10];
-    int needs_update;
-    int changed;
-
-    eff[0]  = args[0];
-    eff[1]  = args[1];
-    eff[2]  = args[2];
-    eff[3]  = args[3];
-    eff[4]  = args[4];
-    eff[5]  = args[5] ? 1 : 0;
-    eff[6]  = args[6];
-    eff[7]  = args[7];
-    eff[8]  = args[8];
-    eff[9]  = args[9];
-
-
-    if (!s->smooth_init) {
-        for (int i = 0; i < 10; i++)
-            s->smooth_args[i] = eff[i];
-
-        s->smooth_init = 1;
-    } else {
-        s->smooth_args[0] = eff[0];
-        s->smooth_args[1] = eff[1];
-        s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 5, 10);
-        s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 1, 10);
-        s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 1, 10);
-        s->smooth_args[5] = eff[5];
-        s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 4, 10);
-        s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 5, 10);
-        s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 5, 10);
-        s->smooth_args[9] = eff[9];
-    }
-
-    for (int i = 0; i < 10; i++)
-        map_args[i] = s->smooth_args[i];
-
-    changed = 0;
-    for (int i = 0; i < 10; i++) {
-        if (s->last_args[i] != map_args[i]) {
-            changed = 1;
-            break;
-        }
-    }
-
-    needs_update = (!s->map_ready) || changed || (map_args[6] != 0);
-
-    if(needs_update) {
-        const int mode = map_args[9];
-        float rot_speed = map_args[6] * 0.0002f;
-        float base_angle;
-
 #pragma omp single
-        {
+    {
+        int eff[10];
+        int changed = 0;
+
+        eff[0] = args[0];
+        eff[1] = args[1];
+        eff[2] = args[2];
+        eff[3] = args[3];
+        eff[4] = args[4];
+        eff[5] = args[5] ? 1 : 0;
+        eff[6] = args[6];
+        eff[7] = args[7];
+        eff[8] = args[8];
+        eff[9] = args[9];
+
+        if(!s->smooth_init) {
+            for(int i = 0; i < 10; i++)
+                s->smooth_args[i] = eff[i];
+
+            s->smooth_init = 1;
+        } else {
+            s->smooth_args[0] = eff[0];
+            s->smooth_args[1] = eff[1];
+            s->smooth_args[2] = fk_smooth_i(s->smooth_args[2], eff[2], 5, 10);
+            s->smooth_args[3] = fk_smooth_i(s->smooth_args[3], eff[3], 1, 10);
+            s->smooth_args[4] = fk_smooth_i(s->smooth_args[4], eff[4], 1, 10);
+            s->smooth_args[5] = eff[5];
+            s->smooth_args[6] = fk_smooth_i(s->smooth_args[6], eff[6], 4, 10);
+            s->smooth_args[7] = fk_smooth_i(s->smooth_args[7], eff[7], 5, 10);
+            s->smooth_args[8] = fk_smooth_i(s->smooth_args[8], eff[8], 5, 10);
+            s->smooth_args[9] = eff[9];
+        }
+
+        for(int i = 0; i < 10; i++) {
+            if(s->last_args[i] != s->smooth_args[i]) {
+                changed = 1;
+                break;
+            }
+        }
+
+        s->update_this_frame = (!s->map_ready) || changed || (s->smooth_args[6] != 0);
+        if(s->update_this_frame) {
+            const float rot_speed = s->smooth_args[6] * 0.0002f;
             s->angle = wrap_angle(s->angle + rot_speed);
         }
+    }
 
-        base_angle = wrap_angle(s->angle + (map_args[1] / 360.0f) * TWO_PI);
+    if(s->update_this_frame) {
+        int *map_args = s->smooth_args;
+        const int mode = map_args[9];
+        const float base_angle = wrap_angle(s->angle + (map_args[1] / 360.0f) * TWO_PI);
 
         switch(mode) {
             case 1: fractalkaleido_apply1_wave(s, frame, map_args, base_angle); break;
@@ -1204,7 +1196,7 @@ void fractalkaleido_apply(void *ptr, VJFrame *frame, int *args) {
 
 #pragma omp single
         {
-            for (int i = 0; i < 10; i++)
+            for(int i = 0; i < 10; i++)
                 s->last_args[i] = map_args[i];
 
             s->map_ready = 1;
