@@ -83,7 +83,7 @@
 #include <veejaycore/avcommon.h>
 #include <libel/vj-nvjpeg.h>
 
-extern int avhelper_set_num_decoders();
+extern int avhelper_set_num_decoders(void);
 
 //#include <pthread.h>
 typedef struct {
@@ -208,10 +208,10 @@ static	struct
  {	V4L2_CID_WHITE_BALANCE_TEMPERATURE, "temperature", VEVO_ATOM_TYPE_INT, v4l2_set_temperature, v4l2_get_temperature },
  {	V4L2_CID_HFLIP,				"fliph",		VEVO_ATOM_TYPE_BOOL, v4l2_set_hflip, 		v4l2_get_hflip },
  {	V4L2_CID_EXPOSURE,			"exposure",		VEVO_ATOM_TYPE_INT,  v4l2_set_exposure,		v4l2_get_exposure },
- {	V4L2_CID_BASE,				NULL,			-1 }
+ {	V4L2_CID_BASE,				NULL,			-1, NULL, NULL }
 };
 
-static	const	char	*v4l2_get_std(int std) {
+static	const	char	*v4l2_get_std(v4l2_std_id std) {
 	unsigned int i;
 	for(i=0; v4l2_video_standards[i].std != 0 ; i ++ ) {
 		if( v4l2_video_standards[i].std == std )
@@ -254,7 +254,7 @@ static	int	vioctl( int fd, int request, void *arg )
 
 static	void	v4l2_free_buffers( v4l2info *v )
 {
-	int i;
+	uint32_t i;
 	for( i = 0; i < v->reqbuf.count ; i ++ ) {
 		munmap( v->buffers[i].start, v->buffers[i].length );
 	}
@@ -277,7 +277,7 @@ static	int	v4l2_vidioc_qbuf( v4l2info *v )
 {
 	v->buftype = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 
-	int i;
+	uint32_t i;
 	for( i = 0; i < v->reqbuf.count ; i ++ ) {
 		veejay_memset( &(v->buffer),0,sizeof(v->buffer));
 		v->buffer.type = v->buftype; //v->reqbuf.type;
@@ -346,10 +346,10 @@ int	v4l2_ffmpeg2v4l2( int pf)
 			return V4L2_PIX_FMT_RGB24;
 		case AV_PIX_FMT_BGR24:
 			return V4L2_PIX_FMT_BGR24;
-		case AV_PIX_FMT_BGR32:
+		case AV_PIX_FMT_BGRA:
 		case AV_PIX_FMT_ABGR:
 			return V4L2_PIX_FMT_BGR32;
-		case AV_PIX_FMT_RGB32:
+		case AV_PIX_FMT_RGBA:
 		case AV_PIX_FMT_ARGB:
 			return V4L2_PIX_FMT_RGB32;
 		case AV_PIX_FMT_YUV420P:
@@ -434,7 +434,7 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 		standard.index ++;
 	}
 
-	int std_id = (norm == 'p' ? V4L2_STD_PAL: V4L2_STD_NTSC);
+	v4l2_std_id std_id = (norm == 'p' ? V4L2_STD_PAL: V4L2_STD_NTSC);
 
 	if( -1 == ioctl( v->fd, VIDIOC_G_STD, &current ) ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: unable to get video standard from video device:%s",
@@ -525,7 +525,7 @@ static int v4l2_tryout_pixel_format(v4l2info *v, int pf, int w, int h, int *src_
         return 0;
     }
 
-    if (format.fmt.pix.pixelformat != pf) {
+    if (format.fmt.pix.pixelformat != (uint32_t) pf) {
         return 0; 
     }
 
@@ -753,7 +753,7 @@ static	int	v4l2_negotiate_pixel_format( v4l2info *v, int host_fmt, int wid, int 
 		veejay_msg(VEEJAY_MSG_INFO,"env VEEJAY_V4L2_GREYSCALE_ONLY=[0|1] not set, capturing in color");
 	}
 
-	if( strstr(v->capability.driver, "uvcvideo")) {
+	if( strstr((const char *) v->capability.driver, "uvcvideo")) {
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Defaulting to MJPEG for UVC webcams");
 		prefer_jpeg = 1;
 	}
@@ -1201,11 +1201,11 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			return NULL;
 		}
 
-		for( i = 0; i < v->reqbuf.count; i ++ ) {
+		for( uint32_t buffer_index = 0; buffer_index < v->reqbuf.count; buffer_index ++ ) {
 			memset( &(v->buffer), 0, sizeof(v->buffer));
 			v->buffer.type 	= v->reqbuf.type;
 			v->buffer.memory= V4L2_MEMORY_MMAP;
-			v->buffer.index = i;
+			v->buffer.index = buffer_index;
 
 			if( -1 == vioctl( fd, VIDIOC_QUERYBUF, &(v->buffer)) ) {
 				veejay_msg(0, "v4l2: VIDIOC_QUERYBUF failed with %s",strerror(errno));
@@ -1215,10 +1215,10 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 				return NULL;
 			}
 
-			v->buffers[i].length = v->buffer.length;
-			v->buffers[i].start  = mmap( NULL, v->buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,fd, v->buffer.m.offset );
+			v->buffers[buffer_index].length = v->buffer.length;
+			v->buffers[buffer_index].start  = mmap( NULL, v->buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED,fd, v->buffer.m.offset );
 		
-			if( MAP_FAILED == v->buffers[i].start ) {
+			if( MAP_FAILED == v->buffers[buffer_index].start ) {
 				veejay_msg(0,  "v4l2: mmap( NULL, %d , PROT_READ|PROT_WRITE , MAP_SHARED , %d, %d ) failed",
 					v->buffer.length,fd, v->buffer.m.offset );
 		//	int k;
@@ -1283,7 +1283,7 @@ v4l2_rw_fallback:
 			return NULL;
 		}
 
-		int min = v->format.fmt.pix.width * 2;
+		uint32_t min = v->format.fmt.pix.width * 2U;
 		if( v->format.fmt.pix.bytesperline < min )
 			v->format.fmt.pix.bytesperline = min;
 		min = v->format.fmt.pix.bytesperline * v->format.fmt.pix.height;
@@ -1498,8 +1498,8 @@ void	v4l2_close( void *d )
 			veejay_msg(0, "v4l2: VIDIOC_STREAMOFF failed with %s", strerror(errno));
 		}
 
-		for( i = 0; i < v->reqbuf.count; i ++ ) {
-			munmap( v->buffers[i].start, v->buffers[i].length );
+		for( uint32_t buffer_index = 0; buffer_index < v->reqbuf.count; buffer_index ++ ) {
+			munmap( v->buffers[buffer_index].start, v->buffers[buffer_index].length );
 		}
 	} else {
 		free( v->buffers[0].start );
@@ -1553,6 +1553,7 @@ void	v4l2_close( void *d )
 
 
 void	v4l2_set_hue( void *d, int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_HUE, value );
 }
 int32_t	v4l2_get_hue( void *d ) {
@@ -1560,6 +1561,7 @@ int32_t	v4l2_get_hue( void *d ) {
 }
 
 void	v4l2_set_contrast( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_CONTRAST, value );
 }
 int32_t v4l2_get_contrast( void *d ) {
@@ -1574,6 +1576,7 @@ void	v4l2_set_input_channel( void *d, int num )
 
 // brightness
 void	v4l2_set_brightness( void *d, int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_BRIGHTNESS, value );
 }
 int32_t v4l2_get_brightness( void *d ) {
@@ -1582,6 +1585,7 @@ int32_t v4l2_get_brightness( void *d ) {
 
 // saturation
 void	v4l2_set_saturation( void *d, int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_SATURATION, value );
 }
 int32_t	v4l2_get_saturation( void *d ) {
@@ -1591,6 +1595,7 @@ int32_t	v4l2_get_saturation( void *d ) {
 
 // gamma
 void	v4l2_set_gamma( void *d, int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_GAMMA, value );
 }
 int32_t v4l2_get_gamma( void *d ) {
@@ -1600,6 +1605,7 @@ int32_t v4l2_get_gamma( void *d ) {
 
 // sharpness
 void	v4l2_set_sharpness( void *d, int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_SHARPNESS , value );
 }
 int32_t v4l2_get_sharpness( void *d ) {
@@ -1608,6 +1614,7 @@ int32_t v4l2_get_sharpness( void *d ) {
 
 // gain
 void	v4l2_set_gain( void *d, int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_GAIN, value );
 }
 int32_t v4l2_get_gain( void *d ) {
@@ -1616,6 +1623,7 @@ int32_t v4l2_get_gain( void *d ) {
 
 // red balance
 void	v4l2_set_red_balance( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_RED_BALANCE, value );
 }
 int32_t v4l2_get_red_balance( void *d ) {
@@ -1623,15 +1631,20 @@ int32_t v4l2_get_red_balance( void *d ) {
 }
 // green balance does not exist
 void	v4l2_set_green_balance( void *d,int32_t type, int32_t value ) {
+	(void) d;
+	(void) type;
+	(void) value;
 //	v4l2_set_control( d, V4L2_CID_GREEN_BALANCE, value );
 }
 int32_t v4l2_get_green_balance( void *d ) {
+	(void) d;
 //	return v4l2_get_control( d, V4L2_CID_GREEN_BALANCE );
 	return -1;
 }
 
 // auto white balance
 void	v4l2_set_auto_white_balance( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_AUTO_WHITE_BALANCE , value );
 }
 int32_t  v4l2_get_auto_white_balance( void *d ) {
@@ -1640,6 +1653,7 @@ int32_t  v4l2_get_auto_white_balance( void *d ) {
 
 // blue balance
 void	v4l2_set_blue_balance( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_BLUE_BALANCE, value );
 }
 int32_t	v4l2_get_blue_balance( void *d ) {
@@ -1648,6 +1662,7 @@ int32_t	v4l2_get_blue_balance( void *d ) {
 
 // backlight compensation
 void 	v4l2_set_backlight_compensation( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_BACKLIGHT_COMPENSATION, value );
 }
 int32_t v4l2_get_backlight_compensation( void *d ) {
@@ -1656,6 +1671,7 @@ int32_t v4l2_get_backlight_compensation( void *d ) {
 
 // auto gain
 void	v4l2_set_autogain( void *d,int32_t type, int32_t value ) {	
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_AUTOGAIN , value );
 }
 int32_t v4l2_get_autogain( void *d ) {
@@ -1664,6 +1680,7 @@ int32_t v4l2_get_autogain( void *d ) {
 
 // auto hue
 void	v4l2_set_hue_auto( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_HUE_AUTO , value );
 }
 int32_t	v4l2_get_hue_auto( void *d ) {
@@ -1672,6 +1689,7 @@ int32_t	v4l2_get_hue_auto( void *d ) {
 
 // hflip
 void	v4l2_set_hflip( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control(d, V4L2_CID_HFLIP, value );
 }
 int32_t v4l2_get_hflip( void *d ) {
@@ -1680,6 +1698,7 @@ int32_t v4l2_get_hflip( void *d ) {
 
 // white balance temperature
 void	v4l2_set_temperature( void *d,int32_t type, int32_t value ) {
+	(void) type;
 	v4l2_set_control(d, V4L2_CID_WHITE_BALANCE_TEMPERATURE,value );
 }
 int32_t	v4l2_get_temperature( void *d ) {
@@ -1710,6 +1729,7 @@ int32_t v4l2_get_exposure( void *d ) {
 
 void	v4l2_set_black_level( void *d ,int32_t type, int32_t value )
 {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_BLACK_LEVEL, value );
 } 
 
@@ -1717,6 +1737,7 @@ int32_t v4l2_get_black_level( void *d ) {
 	return v4l2_get_control( d, V4L2_CID_BLACK_LEVEL );
 }
 void	v4l2_set_whiteness(void *d,int32_t type, int32_t value) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_WHITENESS, value );
 }
 
@@ -1724,6 +1745,7 @@ int32_t v4l2_get_whiteness(void *d) {
 	return v4l2_get_control( d, V4L2_CID_WHITENESS);
 }
 void	v4l2_set_vflip(void *d, int32_t type, int32_t value) {
+	(void) type;
 	v4l2_set_control( d, V4L2_CID_VFLIP, value );
 }
 
@@ -1746,7 +1768,7 @@ uint32_t				v4l2_get_property_id( const char *name )
 const char* 			v4l2_get_property_name( const int id ) {
 	int i;
 	for( i = 0; property_list[i].key != NULL; i ++ ) {
-		if( property_list[i].id == id ) 
+		if( property_list[i].id == (uint32_t) id ) 
 			return property_list[i].key;
 	}
 	return NULL;
@@ -1763,8 +1785,10 @@ static	int		find_property_id( const uint32_t id ) {
 
 void	v4l2_get_controls( void *d, void *port )
 {
-	v4l2info *v = (v4l2info*) d;
+	if( d == NULL || port == NULL )
+		return;
 
+	v4l2info *v = (v4l2info*) d;
 
 	struct v4l2_queryctrl queryctrl;
 	struct v4l2_querymenu querymenu;
@@ -1809,6 +1833,9 @@ void	v4l2_get_controls( void *d, void *port )
 
 int32_t	v4l2_get_control( void *d, int32_t type )
 {
+	if( d == NULL )
+		return -1;
+
 	v4l2info *v = (v4l2info*) d;
 	struct v4l2_queryctrl queryctrl;
 	struct v4l2_control control;
@@ -1843,6 +1870,9 @@ int32_t	v4l2_get_control( void *d, int32_t type )
 
 void	v4l2_set_control( void *d, uint32_t type,  int32_t value )
 {
+	if( d == NULL )
+		return;
+
 	v4l2info *v = (v4l2info*) d;
 	struct v4l2_queryctrl queryctrl;
 	struct v4l2_control control;
@@ -1896,6 +1926,9 @@ int		v4l2_set_roi( void *d, int w, int h, int x, int y )
 {
 	v4l2info *v = (v4l2info*)d;
 
+	if( d == NULL )
+		return 0;
+
 	struct v4l2_cropcap cropcap;
 	struct v4l2_crop crop;
 
@@ -1923,6 +1956,9 @@ int		v4l2_set_roi( void *d, int w, int h, int x, int y )
 
 int		v4l2_reset_roi( void *d )
 {
+	if( d == NULL )
+		return 0;
+
 	v4l2info *v = (v4l2info*)d;
 	struct v4l2_cropcap cropcap;
 	struct v4l2_crop crop;
@@ -1946,6 +1982,9 @@ int		v4l2_reset_roi( void *d )
 
 int v4l2_get_currentscaling_factor_and_pixel_aspect(void *d, int *dwidth, int *dheight, double *daspect)
 {
+    if( d == NULL )
+        return 0;
+
     v4l2info *v = (v4l2info*) d;
     struct v4l2_cropcap cropcap;
     struct v4l2_crop crop;
