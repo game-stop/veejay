@@ -5160,8 +5160,10 @@ long vj_calc_next_sub_audioframe(veejay_t *info, int b, audio_chain_entry_t *aud
     sb.start = audio_entry->start;
     sb.end = audio_entry->end;
     sb.speed = audio_entry->speed;
+    sb.sample_id = b;
     sb.offset = audio_entry->offset;
     sb.direction = (sb.speed < 0 ? -1: 1);
+    sb.direction_changed = 0; // unused in this flow but initialized for completeness
     sb.loopmode = audio_entry->loopmode;
     sb.cur_sfd = audio_entry->cur_sfd;
     sb.max_sfd = audio_entry->max_sfd;
