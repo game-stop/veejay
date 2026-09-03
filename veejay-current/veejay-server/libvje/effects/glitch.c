@@ -211,9 +211,9 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     int *restrict lsfr_lut = g->lsfr_lut;
 
 #pragma omp for schedule(static)
-    for(int plane = 0; plane < 2; plane++) {
-        uint8_t *dst[2] = { bU, bV };
-        const uint8_t *src[2] = { U, V };
+    for(int plane = 0; plane < 3; plane++) {
+        uint8_t *dst[3] = { bY, bU, bV };
+        const uint8_t *src[3] = { Y, U, V };
         veejay_memcpy(dst[plane], src[plane], len);
     }
 
@@ -241,16 +241,6 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
     }
 
 #pragma omp for schedule(static)
-    for(int i = 0; i < len; i++) {
-        const int q = lsfr_lut[i] % noise_qty;
-        const int centered = q - half_qty;
-        const int noise = (centered * noise_mul) / 100;
-
-        bY[i] = CLAMP_Y((int)Y[i] + noise);
-        lsfr_lut[i] = fastrand(lsfr_lut[i]);
-    }
-
-#pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
         const int ny = glitch_wrap_once(y + distortion_y, height);
         const int row = y * width;
@@ -261,11 +251,16 @@ void glitch_apply(void *ptr, VJFrame *frame, int *args)
             const int nx = glitch_wrap_once(x + distortion_x, width);
             const int src = row + x;
             const int dst = drow + nx;
-            const int alpha = ((int)Y[dst] * chroma_alpha_scale) >> 8;
+            const int q = lsfr_lut[dst] % noise_qty;
+            const int centered = q - half_qty;
+            const int noise = (centered * noise_mul) / 100;
+            const int noisy_y = CLAMP_Y((int)bY[dst] + noise);
+            const int alpha = ((int)bY[dst] * chroma_alpha_scale) >> 8;
 
             U[src] = glitch_blend255(U[src], bU[dst], 255 - alpha);
             V[src] = glitch_blend255(V[src], bV[dst], 255 - alpha);
-            Y[src] = (uint8_t)(((int)Y[src] + (int)bY[dst] + 1) >> 1);
+            Y[src] = (uint8_t)(((int)bY[src] + noisy_y + 1) >> 1);
+            lsfr_lut[dst] = fastrand(lsfr_lut[dst]);
         }
     }
 }

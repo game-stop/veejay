@@ -207,19 +207,22 @@ void tracer_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
 
     const float param_coeff = 0.185f;
 
-    if(!t->state_ready) {
-        t->opacity_s = (float)opacity_arg;
-        t->buffer_s = (float)buffer_arg;
-        t->mix_drive_s = (float)mix_drive_arg;
-        t->feed_drive_s = (float)feed_drive_arg;
-        t->chroma_trail_s = (float)chroma_trail_arg;
-        t->state_ready = 1;
-    } else {
-        t->opacity_s = tracer_smoothf(t->opacity_s, (float)opacity_arg, param_coeff);
-        t->buffer_s = tracer_smoothf(t->buffer_s, (float)buffer_arg, param_coeff * 0.80f);
-        t->mix_drive_s = tracer_smoothf(t->mix_drive_s, (float)mix_drive_arg, param_coeff);
-        t->feed_drive_s = tracer_smoothf(t->feed_drive_s, (float)feed_drive_arg, param_coeff * 0.90f);
-        t->chroma_trail_s = tracer_smoothf(t->chroma_trail_s, (float)chroma_trail_arg, param_coeff * 0.76f);
+#pragma omp single
+    {
+        if(!t->state_ready) {
+            t->opacity_s = (float)opacity_arg;
+            t->buffer_s = (float)buffer_arg;
+            t->mix_drive_s = (float)mix_drive_arg;
+            t->feed_drive_s = (float)feed_drive_arg;
+            t->chroma_trail_s = (float)chroma_trail_arg;
+            t->state_ready = 1;
+        } else {
+            t->opacity_s = tracer_smoothf(t->opacity_s, (float)opacity_arg, param_coeff);
+            t->buffer_s = tracer_smoothf(t->buffer_s, (float)buffer_arg, param_coeff * 0.80f);
+            t->mix_drive_s = tracer_smoothf(t->mix_drive_s, (float)mix_drive_arg, param_coeff);
+            t->feed_drive_s = tracer_smoothf(t->feed_drive_s, (float)feed_drive_arg, param_coeff * 0.90f);
+            t->chroma_trail_s = tracer_smoothf(t->chroma_trail_s, (float)chroma_trail_arg, param_coeff * 0.76f);
+        }
     }
 
     const float mix_t = tracer_clampf(t->mix_drive_s * 0.001f, 0.0f, 1.0f);

@@ -60,6 +60,7 @@ typedef struct {
     int len;
     int frame;
     int seeded;
+    int seed_this_frame;
     int last_reset;
     int last_cell_size;
     int cols;
@@ -299,7 +300,7 @@ void kineticdisplay_free(void *ptr)
     free(k);
 }
 
-static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, const uint8_t *V, int cell_size)
+static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, const uint8_t *V, int cell_size, int enabled)
 {
     const int w = k->w;
     const int h = k->h;
@@ -309,6 +310,9 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
 
 #pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
+        if(!enabled)
+            continue;
+
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
             const int x0 = cx * cell_size;
@@ -325,9 +329,11 @@ static void kd_seed_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, cons
                 const int off = y * w;
                 for(int x = x0; x < x1; x++) {
                     const int p = off + x;
-                    sum_y += Y[p];
+                    const int yy = Y[p];
+                    sum_y += yy;
                     sum_u += U[p];
                     sum_v += V[p];
+                    k->prev_y[p] = (uint8_t)yy;
                     count++;
                 }
             }
@@ -410,7 +416,7 @@ static int kd_delay_airport(int cx, int cy, int frame, int lag, int motion, uint
 
 static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, const uint8_t *V,
                             int cell_size, int threshold, int dither, int speed, int lag,
-                            int persistence, int contrast, int motion_react, int mode)
+                            int persistence, int contrast, int motion_react, int mode, int enabled)
 {
     const int w = k->w;
     const int h = k->h;
@@ -453,6 +459,9 @@ static void kd_update_cells(kinetic_t *k, const uint8_t *Y, const uint8_t *U, co
 
 #pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
+        if(!enabled)
+            continue;
+
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
             const int x0 = cx * cell_size;
@@ -629,7 +638,7 @@ static void kd_lit_adjust_broken(int *lit, int *fx_u, int *fx_v, int phase,
     }
 }
 
-static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amount, int brightness, int mode)
+static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amount, int brightness, int mode, int enabled)
 {
     uint8_t *Y = frame->data[0];
     uint8_t *U = frame->data[1];
@@ -651,6 +660,9 @@ static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amo
 
 #pragma omp for schedule(static)
     for(int cy = 0; cy < rows; cy++) {
+        if(!enabled)
+            continue;
+
         for(int cx = 0; cx < cols; cx++) {
             const int idx = cy * max_cols + cx;
             const int x0 = cx * cell_size;
@@ -696,6 +708,7 @@ static void kd_render_cells(kinetic_t *k, VJFrame *frame, int cell_size, int amo
                     const int sy = Y[p];
                     const int su = U[p];
                     const int sv = V[p];
+                    k->prev_y[p] = (uint8_t)sy;
 
                     int fy = dark;
                     int fu = 128;
@@ -948,34 +961,24 @@ void kineticdisplay_apply(void *ptr, VJFrame *frame, int *args)
             kd_clear_cells(k);
             k->seeded = 0;
         }
+
+        k->seed_this_frame = !k->seeded || (reset && !k->last_reset);
+        k->last_reset = reset;
     }
 
-    const int do_seed = !k->seeded || (reset && !k->last_reset);
-#pragma omp single
-    k->last_reset = reset;
+    const int do_seed = k->seed_this_frame;
+    const int enabled = amount > 0;
 
-    if(do_seed) {
-        kd_seed_cells(k, Y, U, V, cell_size);
+    kd_seed_cells(k, Y, U, V, cell_size, do_seed);
 
-#pragma omp single
-        veejay_memcpy(k->prev_y, Y, k->len);
-    }
+    kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode, enabled);
 
-    if(amount > 0) {
-        kd_update_cells(k, Y, U, V, cell_size, threshold, dither, speed, lag, persistence, contrast, motion_react, mode);
-
-#pragma omp single
-        veejay_memcpy(k->prev_y, Y, k->len);
-
-        kd_render_cells(k, frame, cell_size, amount, brightness, mode);
-    }
-    else {
-#pragma omp single
-        veejay_memcpy(k->prev_y, Y, k->len);
-    }
+    kd_render_cells(k, frame, cell_size, amount, brightness, mode, enabled);
 
 #pragma omp single
     {
+        if(!enabled && !do_seed)
+            veejay_memcpy(k->prev_y, Y, k->len);
         if(do_seed)
             k->seeded = 1;
         k->frame++;

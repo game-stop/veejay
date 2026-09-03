@@ -294,22 +294,31 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
     const int shimmer_drive_arg = args[P_SHIMMER_DRIVE];
     const int jitter_drive_arg = args[P_JITTER_DRIVE];
 
+    // Read the shared state explicitly into local variables
+    float my_eff_shimmer = s->eff_shimmer;
+    float my_eff_mix = s->eff_mix;
+    float my_eff_shimmer_drive = s->eff_shimmer_drive;
+    float my_eff_jitter_drive = s->eff_jitter_drive;
+    uint32_t my_beat_seed = s->beat_seed;
+    uint32_t my_seed = s->seed;
+    int my_initialized = s->initialized;
+
     int shimmer = shimmer_arg;
     int mix = mix_arg;
     int shimmer_drive = shimmer_drive_arg;
     int jitter_drive = jitter_drive_arg;
 
-    if(!s->initialized) {
-        s->eff_shimmer = (float)shimmer;
-        s->eff_mix = (float)mix;
-        s->eff_shimmer_drive = (float)shimmer_drive;
-        s->eff_jitter_drive = (float)jitter_drive;
-        s->initialized = 1;
+    if(!my_initialized) {
+        my_eff_shimmer = (float)shimmer;
+        my_eff_mix = (float)mix;
+        my_eff_shimmer_drive = (float)shimmer_drive;
+        my_eff_jitter_drive = (float)jitter_drive;
     } else {
-        shimmer = smuck_smooth_i(&s->eff_shimmer, shimmer, 0.30f, 0.075f);
-        mix = smuck_smooth_i(&s->eff_mix, mix, 0.24f, 0.075f);
-        shimmer_drive = smuck_smooth_i(&s->eff_shimmer_drive, shimmer_drive, 0.34f, 0.090f);
-        jitter_drive = smuck_smooth_i(&s->eff_jitter_drive, jitter_drive, 0.38f, 0.100f);
+        // Because inputs and copies are uniformly aligned, every thread independently arrives at the exact same output.
+        shimmer = smuck_smooth_i(&my_eff_shimmer, shimmer, 0.30f, 0.075f);
+        mix = smuck_smooth_i(&my_eff_mix, mix, 0.24f, 0.075f);
+        shimmer_drive = smuck_smooth_i(&my_eff_shimmer_drive, shimmer_drive, 0.34f, 0.090f);
+        jitter_drive = smuck_smooth_i(&my_eff_jitter_drive, jitter_drive, 0.38f, 0.100f);
     }
 
     shimmer = clampi(shimmer, 0, 17);
@@ -333,15 +342,18 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
     const int my = (direction == 1 || direction == 2) ? 1 : 0;
 
     if(!static_seed || jitter_drive > 0)
-        s->beat_seed = smuck_hash_u32(s->beat_seed + 0x6d2b79f5U + (uint32_t)(jitter_drive * 23 + shimmer_drive * 11));
+        my_beat_seed = smuck_hash_u32(my_beat_seed + 0x6d2b79f5U + (uint32_t)(jitter_drive * 23 + shimmer_drive * 11));
 
-    const uint32_t base_seed = static_seed ? 0x1337BEEFU : s->seed;
+    const uint32_t base_seed = static_seed ? 0x1337BEEFU : my_seed;
     const uint32_t drive_seed = smuck_hash_u32(((uint32_t)shimmer_drive * 0x45d9f3bu) ^
                                                ((uint32_t)jitter_drive * 0x27d4eb2du));
     const uint32_t drive_mask = (uint32_t)-(shimmer_drive > 0 || jitter_drive > 0);
     const uint32_t seed = base_seed ^
-                          (s->beat_seed & (uint32_t)-(jitter_drive > 0)) ^
+                          (my_beat_seed & (uint32_t)-(jitter_drive > 0)) ^
                           (drive_seed & drive_mask);
+
+    if(!static_seed)
+        my_seed = smuck_hash_u32(my_seed + 0x6d2b79f5U);
 
     uint8_t *restrict Y = frame->data[0];
 
@@ -414,7 +426,15 @@ void smuck_apply(void *ptr, VJFrame *frame, int *args)
                 }
             }
         }
-    if(!static_seed)
+
 #pragma omp single
-        s->seed = smuck_hash_u32(s->seed + 0x6d2b79f5U);
+    {
+        s->eff_shimmer = my_eff_shimmer;
+        s->eff_mix = my_eff_mix;
+        s->eff_shimmer_drive = my_eff_shimmer_drive;
+        s->eff_jitter_drive = my_eff_jitter_drive;
+        s->beat_seed = my_beat_seed;
+        s->seed = my_seed;
+        s->initialized = 1;
+    }
 }

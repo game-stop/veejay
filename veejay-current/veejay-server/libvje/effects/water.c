@@ -289,28 +289,27 @@ static void water_clear_maps(water_t *w)
 
 static void water_drop(water_t *w, int power)
 {
-    if(w->map_w <= 4 || w->map_h <= 4)
-        return;
+    if(w->map_w > 4 && w->map_h > 4) {
+        const int x = (int)((wfastrand(w) >> 8) % (unsigned int)(w->map_w - 4)) + 2;
+        const int y = (int)((wfastrand(w) >> 8) % (unsigned int)(w->map_h - 4)) + 2;
 
-    const int x = (int)((wfastrand(w) >> 8) % (unsigned int)(w->map_w - 4)) + 2;
-    const int y = (int)((wfastrand(w) >> 8) % (unsigned int)(w->map_h - 4)) + 2;
+        int *maps[2] = { w->map1, w->map2 };
 
-    int *maps[2] = { w->map1, w->map2 };
+        for(int m = 0; m < 2; m++) {
+            int *p = maps[m] + y * w->map_w + x;
 
-    for(int m = 0; m < 2; m++) {
-        int *p = maps[m] + y * w->map_w + x;
+            *p = power;
 
-        *p = power;
+            *(p - w->map_w) = power >> 1;
+            *(p - 1)        = power >> 1;
+            *(p + 1)        = power >> 1;
+            *(p + w->map_w) = power >> 1;
 
-        *(p - w->map_w) = power >> 1;
-        *(p - 1)        = power >> 1;
-        *(p + 1)        = power >> 1;
-        *(p + w->map_w) = power >> 1;
-
-        *(p - w->map_w - 1) = power >> 2;
-        *(p - w->map_w + 1) = power >> 2;
-        *(p + w->map_w - 1) = power >> 2;
-        *(p + w->map_w + 1) = power >> 2;
+            *(p - w->map_w - 1) = power >> 2;
+            *(p - w->map_w + 1) = power >> 2;
+            *(p + w->map_w - 1) = power >> 2;
+            *(p + w->map_w + 1) = power >> 2;
+        }
     }
 }
 
@@ -319,30 +318,28 @@ static void water_inject_drive_drops(water_t *w, int drop_drive, int ripple_powe
     drop_drive = clampi(drop_drive, 0, 1000);
     ripple_power = clampi(ripple_power, 0, 1000);
 
-    if(drop_drive <= 0 || ripple_power <= 0)
-        return;
+    if(drop_drive > 0 && ripple_power > 0) {
+        const int max_drops = 1 + ((drop_drive * 15 + 500) / 1000);
+        int count = (drop_drive * max_drops + 900) / 1800;
 
-    const int max_drops = 1 + ((drop_drive * 15 + 500) / 1000);
-    int count = (drop_drive * max_drops + 900) / 1800;
+        const int chance = drop_drive - 100;
+        if(chance > 0 && (int)((wfastrand(w) >> 8) % 1000u) < chance)
+            count++;
 
-    const int chance = drop_drive - 100;
-    if(chance > 0 && (int)((wfastrand(w) >> 8) % 1000u) < chance)
-        count++;
+        if(drop_drive > 760)
+            count += (drop_drive - 700) / 150;
 
-    if(drop_drive > 760)
-        count += (drop_drive - 700) / 150;
+        if(count > 22)
+            count = 22;
 
-    if(count > 22)
-        count = 22;
+        if(count > 0) {
+            const int magnitude = 2 + ((ripple_power * 24 + 500) / 1000);
+            const int power = -(magnitude << w->point);
 
-    if(count <= 0)
-        return;
-
-    const int magnitude = 2 + ((ripple_power * 24 + 500) / 1000);
-    const int power = -(magnitude << w->point);
-
-    for(int i = 0; i < count; i++)
-        water_drop(w, power);
+            for(int i = 0; i < count; i++)
+                water_drop(w, power);
+        }
+    }
 }
 
 static void water_raindrop(water_t *w, int fresh_rate)
@@ -509,33 +506,32 @@ static void water_build_motion_diff(water_t *w, const uint8_t *restrict in, int 
 
 static void water_inject_motion_map(water_t *w, const uint8_t *restrict diff, int width, int height)
 {
-    if(w->map_w <= 2 || w->map_h <= 2)
-        return;
-
-    const int shift = w->point + w->impact - 8;
+    if(w->map_w > 2 && w->map_h > 2) {
+        const int shift = w->point + w->impact - 8;
 
 #pragma omp for schedule(static)
-    for(int my = 1; my < w->map_h - 1; my++) {
-        int *restrict p = w->map1 + my * w->map_w;
-        int *restrict q = w->map2 + my * w->map_w;
+        for(int my = 1; my < w->map_h - 1; my++) {
+            int *restrict p = w->map1 + my * w->map_w;
+            int *restrict q = w->map2 + my * w->map_w;
 
-        const int py = clampi(my << 1, 0, height - 1);
-        const int py1 = clampi(py + 1, 0, height - 1);
+            const int py = clampi(my << 1, 0, height - 1);
+            const int py1 = clampi(py + 1, 0, height - 1);
 
-        for(int mx = 1; mx < w->map_w - 1; mx++) {
-            const int px = clampi(mx << 1, 0, width - 1);
-            const int px1 = clampi(px + 1, 0, width - 1);
+            for(int mx = 1; mx < w->map_w - 1; mx++) {
+                const int px = clampi(mx << 1, 0, width - 1);
+                const int px1 = clampi(px + 1, 0, width - 1);
 
-            const int h =
-                (int)diff[py  * width + px] +
-                (int)diff[py  * width + px1] +
-                (int)diff[py1 * width + px] +
-                (int)diff[py1 * width + px1];
+                const int h =
+                    (int)diff[py  * width + px] +
+                    (int)diff[py  * width + px1] +
+                    (int)diff[py1 * width + px] +
+                    (int)diff[py1 * width + px1];
 
-            const int val = (h > 0) ? (h << shift) : 0;
+                const int val = (h > 0) ? (h << shift) : 0;
 
-            p[mx] = val;
-            q[mx] = val;
+                p[mx] = val;
+                q[mx] = val;
+            }
         }
     }
 }
@@ -545,64 +541,63 @@ static void water_simulate(water_t *w, int loopnum, int decay)
     const int wi = w->map_w;
     const int hi = w->map_h;
 
-    if(wi <= 2 || hi <= 2)
-        return;
+    if(wi > 2 && hi > 2) {
+        loopnum = clampi(loopnum, 1, 16);
+        decay = clampi(decay, 1, 31);
 
-    loopnum = clampi(loopnum, 1, 16);
-    decay = clampi(decay, 1, 31);
-
-    for(int n = 0; n < loopnum; n++) {
+        for(int n = 0; n < loopnum; n++) {
 #pragma omp for schedule(static)
-        for(int y = 1; y < hi - 1; y++) {
-            const int row = y * wi;
+            for(int y = 1; y < hi - 1; y++) {
+                const int row = y * wi;
 
-            for(int x = 1; x < wi - 1; x++) {
-                const int idx = row + x;
+                for(int x = 1; x < wi - 1; x++) {
+                    const int idx = row + x;
 
-                int h =
-                    w->map1[idx - wi - 1] +
-                    w->map1[idx - wi + 1] +
-                    w->map1[idx + wi - 1] +
-                    w->map1[idx + wi + 1] +
-                    w->map1[idx - wi] +
-                    w->map1[idx - 1] +
-                    w->map1[idx + 1] +
-                    w->map1[idx + wi] -
-                    w->map1[idx] * 9;
+                    int h =
+                        w->map1[idx - wi - 1] +
+                        w->map1[idx - wi + 1] +
+                        w->map1[idx + wi - 1] +
+                        w->map1[idx + wi + 1] +
+                        w->map1[idx - wi] +
+                        w->map1[idx - 1] +
+                        w->map1[idx + 1] +
+                        w->map1[idx + wi] -
+                        w->map1[idx] * 9;
 
-                h >>= 3;
+                    h >>= 3;
 
-                int v = w->map1[idx] - w->map2[idx];
+                    int v = w->map1[idx] - w->map2[idx];
 
-                v += h - (v >> decay);
+                    v += h - (v >> decay);
 
-                w->map3[idx] = v + w->map1[idx];
+                    w->map3[idx] = v + w->map1[idx];
+                }
             }
-        }
 
 #pragma omp for schedule(static)
-        for(int y = 1; y < hi - 1; y++) {
-            const int row = y * wi;
+            for(int y = 1; y < hi - 1; y++) {
+                const int row = y * wi;
 
-            for(int x = 1; x < wi - 1; x++) {
-                const int idx = row + x;
+                for(int x = 1; x < wi - 1; x++) {
+                    const int idx = row + x;
 
-                const int h =
-                    w->map3[idx - wi] +
-                    w->map3[idx - 1] +
-                    w->map3[idx + 1] +
-                    w->map3[idx + wi] +
-                    w->map3[idx] * 60;
+                    const int h =
+                        w->map3[idx - wi] +
+                        w->map3[idx - 1] +
+                        w->map3[idx + 1] +
+                        w->map3[idx + wi] +
+                        w->map3[idx] * 60;
 
-                w->map2[idx] = h >> 6;
+                    w->map2[idx] = h >> 6;
+                }
             }
-        }
 
 #pragma omp single
-        {
-            int *tmp = w->map1;
-            w->map1 = w->map2;
-            w->map2 = tmp;
+            {
+                int *tmp = w->map1;
+                w->map1 = w->map2;
+                w->map2 = tmp;
+            }
         }
     }
 }
@@ -612,22 +607,21 @@ static void water_calc_vtable(water_t *w)
     const int wi = w->map_w;
     const int hi = w->map_h;
 
-    if(wi <= 1 || hi <= 1)
-        return;
-
+    if(wi > 1 && hi > 1) {
 #pragma omp for schedule(static)
-    for(int y = 0; y < hi - 1; y++) {
-        const int row = y * wi;
+        for(int y = 0; y < hi - 1; y++) {
+            const int row = y * wi;
 
-        for(int x = 0; x < wi - 1; x++) {
-            const int idx = row + x;
-            const int vi = idx << 1;
+            for(int x = 0; x < wi - 1; x++) {
+                const int idx = row + x;
+                const int vi = idx << 1;
 
-            const int dh = ((w->map1[idx] - w->map1[idx + 1]) >> (w->point - 1)) & 0xff;
-            const int dv = ((w->map1[idx] - w->map1[idx + wi]) >> (w->point - 1)) & 0xff;
+                const int dh = ((w->map1[idx] - w->map1[idx + 1]) >> (w->point - 1)) & 0xff;
+                const int dv = ((w->map1[idx] - w->map1[idx + wi]) >> (w->point - 1)) & 0xff;
 
-            w->vtable[vi]     = (int8_t)((uint8_t)w->sqrtable[dh]);
-            w->vtable[vi + 1] = (int8_t)((uint8_t)w->sqrtable[dv]);
+                w->vtable[vi]     = (int8_t)((uint8_t)w->sqrtable[dh]);
+                w->vtable[vi + 1] = (int8_t)((uint8_t)w->sqrtable[dv]);
+            }
         }
     }
 }
@@ -753,70 +747,71 @@ void water_apply(void *ptr, VJFrame *frame, VJFrame *frame2, int *args)
         }
     }
 
+    int my_have_img = w->have_img;
+
 #pragma omp single
     veejay_memcpy(w->src_img, frame->data[0], len);
 
-    if(mode == 0 && !w->have_img) {
+    if(mode == 0 && !my_have_img) {
 #pragma omp single
         {
             veejay_memcpy(w->bg_img, frame->data[0], len);
             w->have_img = 1;
         }
-        return;
-    }
+    } else {
+        const int motion_mode = (mode == 3 || mode == 4) ? 1 : ((mode == 5 || mode == 6) ? 2 : 0);
+        const int use_motion = mode != 0;
+        const int preview = (mode == 1 || mode == 3 || mode == 5);
+        if(use_motion) {
+            const uint8_t *restrict in = frame2->data[0];
+            const int seed_motion = !my_have_img;
 
-    const int motion_mode = (mode == 3 || mode == 4) ? 1 : ((mode == 5 || mode == 6) ? 2 : 0);
-    const int use_motion = mode != 0;
-    const int preview = (mode == 1 || mode == 3 || mode == 5);
-    if(use_motion) {
-        const uint8_t *restrict in = frame2->data[0];
-        const int seed_motion = !w->have_img;
-
-        if(motion_mode != 0) {
-            water_blur_luma(w, frame2->data[0], width, height);
-            in = w->blur_img;
-        }
+            if(motion_mode != 0) {
+                water_blur_luma(w, frame2->data[0], width, height);
+                in = w->blur_img;
+            }
 
 #pragma omp single
-        {
-            if(seed_motion) {
-                veejay_memcpy(w->bg_img, in, len);
-                w->have_img = 1;
-                veejay_memset(w->diff_img, 0, len);
+            {
+                if(seed_motion) {
+                    veejay_memcpy(w->bg_img, in, len);
+                    w->have_img = 1;
+                    veejay_memset(w->diff_img, 0, len);
+                }
+            }
+
+            if(!seed_motion) {
+                water_build_motion_diff(w, in, threshold_eff, len, motion_mode);
+                water_inject_motion_map(w, w->diff_img, width, height);
             }
         }
 
-        if(!seed_motion) {
-            water_build_motion_diff(w, in, threshold_eff, len, motion_mode);
-            water_inject_motion_map(w, w->diff_img, width, height);
+        if(preview) {
+            water_draw_motion_frame(frame, w);
         }
-    }
-
-    if(preview) {
-        water_draw_motion_frame(frame, w);
-    }
-    else {
+        else {
 #pragma omp single
-        {
-            if(mode == 0) {
-                water_raindrop(w, fresh_rate);
-                veejay_memcpy(w->bg_img, frame->data[0], len);
-            }
-            else if(mode == 4) {
-                water_raindrop(w, fresh_rate);
+            {
+                if(mode == 0) {
+                    water_raindrop(w, fresh_rate);
+                    veejay_memcpy(w->bg_img, frame->data[0], len);
+                }
+                else if(mode == 4) {
+                    water_raindrop(w, fresh_rate);
+                }
+
+                water_inject_drive_drops(w, drop_drive, ripple_power);
+                w->loopnum = loopnum_eff;
             }
 
-            water_inject_drive_drops(w, drop_drive, ripple_power);
-            w->loopnum = loopnum_eff;
+            water_simulate(w, loopnum_eff, decay_eff);
+            water_calc_vtable(w);
+            water_render(frame, w);
         }
 
-        water_simulate(w, loopnum_eff, decay_eff);
-        water_calc_vtable(w);
-        water_render(frame, w);
-    }
-
-    if(!preview) {
+        if(!preview) {
 #pragma omp single
-        w->frame_counter++;
+            w->frame_counter++;
+        }
     }
 }

@@ -471,33 +471,38 @@ void buffer_apply(void *ptr, VJFrame *frame, int *args)
             }
         }
     }
+    
     const int delay = b->apply_delay;
     write_slot = b->apply_write_slot;
-    if(delay <= 0 || write_slot < 0)
-        return;
-
-    buffer_store_slot_data(&b->slots[write_slot], frame);
-
-    buffer_slot_t *tap = buffer_get_tap(b, delay);
-
-    if(!tap) {
-        if(opacity >= 255)
-            buffer_black(frame);
-        return;
-    }
-
-    if(opacity >= 255)
-        buffer_copy_slot(tap, frame);
-
-    const int do_mix = opacity > 0 && opacity < 255;
-    const int do_feedback_mix = feedback > 0 && feedback < 255;
-
-    if(do_mix)
-        buffer_mix_slot(tap, frame, opacity);
-
-    if(do_feedback_mix)
-        buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
-
-    if(feedback >= 255)
+    
+    if(delay > 0 && write_slot >= 0) {
         buffer_store_slot_data(&b->slots[write_slot], frame);
+
+        buffer_slot_t *tap = buffer_get_tap(b, delay);
+
+        if(!tap) {
+            if(opacity >= 255) {
+                buffer_black(frame);
+            }
+        } else {
+            if(opacity >= 255) {
+                buffer_copy_slot(tap, frame);
+            }
+
+            const int do_mix = opacity > 0 && opacity < 255;
+            const int do_feedback_mix = feedback > 0 && feedback < 255;
+
+            if(do_mix) {
+                buffer_mix_slot(tap, frame, opacity);
+            }
+
+            if(do_feedback_mix) {
+                buffer_feedback_slot(&b->slots[write_slot], frame, feedback);
+            }
+
+            if(feedback >= 255) {
+                buffer_store_slot_data(&b->slots[write_slot], frame);
+            }
+        }
+    }
 }

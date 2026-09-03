@@ -200,6 +200,9 @@ typedef struct {
     int last_depth;
     int last_mode;
     int smooth_ready;
+    int seed_this_frame;
+    int rebuild_geom;
+    int bypass_this_frame;
 
     float sm_amount;
     float sm_depth;
@@ -273,20 +276,41 @@ static void ss_build_time_lut(slitscan_t *s, int depth)
 static void ss_copy_current_to_slot(slitscan_t *s, VJFrame *frame, int slot)
 {
     const int len = s->len;
-    veejay_memcpy(s->hist_y[slot], frame->data[0], len);
-    veejay_memcpy(s->hist_u[slot], frame->data[1], len);
-    veejay_memcpy(s->hist_v[slot], frame->data[2], len);
+    uint8_t *dst[3] = {
+        s->hist_y[slot],
+        s->hist_u[slot],
+        s->hist_v[slot]
+    };
+
+#pragma omp for schedule(static)
+    for(int plane = 0; plane < 3; plane++) {
+        veejay_memcpy(dst[plane], frame->data[plane], len);
+    }
 }
 
-static void ss_seed_history(slitscan_t *s, VJFrame *frame)
+static void ss_seed_history(slitscan_t *s, VJFrame *frame, int enabled)
 {
-    for(int k = 0; k < s->history_capacity; k++) {
-        ss_copy_current_to_slot(s, frame, k);
+    const int planes = s->history_capacity * 3;
+
+#pragma omp for schedule(static)
+    for(int job = 0; job <= planes; job++) {
+        if(!enabled) {
+            continue;
+        }
+
+        if(job == planes) {
+            veejay_memcpy(s->prev_y, frame->data[0], s->len);
+        } else {
+            const int slot = job / 3;
+            const int plane = job % 3;
+            uint8_t *dst[3] = {
+                s->hist_y[slot],
+                s->hist_u[slot],
+                s->hist_v[slot]
+            };
+            veejay_memcpy(dst[plane], frame->data[plane], s->len);
+        }
     }
-    veejay_memcpy(s->prev_y, frame->data[0], s->len);
-    s->write_pos = 0;
-    s->frame = 0;
-    s->seeded = 1;
 }
 
 
@@ -1266,9 +1290,6 @@ static const ss_geom_builder_fn ss_geom_builders[SS_GEOM_MODES] = {
 static void ss_build_geom(slitscan_t *s, int mode)
 {
     mode = ss_clampi(mode, 0, SS_GEOM_MODES - 1);
-    if(s->last_mode == mode) {
-        return;
-    }
 
     const int w = s->w;
     const int h = s->h;
@@ -1299,7 +1320,6 @@ static void ss_build_geom(slitscan_t *s, int mode)
     };
 
     ss_geom_builders[mode](s, &c);
-    s->last_mode = mode;
 }
 
 vj_effect *slitscan_init(int w, int h)
@@ -1477,6 +1497,7 @@ void *slitscan_malloc(int w, int h)
     ss_build_math_luts(s);
     ss_build_center_polar_luts(s);
     ss_build_geom(s, SS_MODE_ROWS);
+    s->last_mode = SS_MODE_ROWS;
     ss_build_time_lut(s, 16);
     return (void*)s;
 }
@@ -1496,7 +1517,7 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     const int len = s->len;
     int amount = args[P_AMOUNT];
     int depth = args[P_DEPTH];
-    const int mode = args[P_MODE];
+    const int mode = ss_clampi(args[P_MODE], 0, SS_GEOM_MODES - 1);
     const int source = args[P_SOURCE];
     int source_gain = args[P_SOURCE_GAIN];
     int motion = args[P_MOTION];
@@ -1516,28 +1537,53 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     int target_time_blend = ss_clampi(time_blend, 0, 100);
     int target_chroma = ss_clampi(chroma, 0, 100);
 
-    if(!s->smooth_ready) {
-        s->sm_amount = (float)target_amount;
-        s->sm_depth = (float)target_depth;
-        s->sm_source_gain = (float)target_source_gain;
-        s->sm_motion = (float)target_motion;
-        s->sm_time_offset = (float)target_time_offset;
-        s->sm_time_scale = (float)target_time_scale;
-        s->sm_time_blend = (float)target_time_blend;
-        s->sm_chroma = (float)target_chroma;
-        s->smooth_ready = 1;
-    } else {
-        const float fast = 0.30f;
-        const float slow = 0.095f;
+#pragma omp single
+    {
+        if(!s->smooth_ready) {
+            s->sm_amount = (float)target_amount;
+            s->sm_depth = (float)target_depth;
+            s->sm_source_gain = (float)target_source_gain;
+            s->sm_motion = (float)target_motion;
+            s->sm_time_offset = (float)target_time_offset;
+            s->sm_time_scale = (float)target_time_scale;
+            s->sm_time_blend = (float)target_time_blend;
+            s->sm_chroma = (float)target_chroma;
+            s->smooth_ready = 1;
+        } else {
+            const float fast = 0.30f;
+            const float slow = 0.095f;
 
-        s->sm_amount = ss_smooth_param(s->sm_amount, (float)target_amount, fast, slow);
-        s->sm_depth = ss_smooth_param(s->sm_depth, (float)target_depth, fast, slow);
-        s->sm_source_gain = ss_smooth_param(s->sm_source_gain, (float)target_source_gain, fast, slow);
-        s->sm_motion = ss_smooth_param(s->sm_motion, (float)target_motion, fast, slow);
-        s->sm_time_offset = ss_smooth_param(s->sm_time_offset, (float)target_time_offset, fast, slow);
-        s->sm_time_scale = ss_smooth_param(s->sm_time_scale, (float)target_time_scale, fast, slow);
-        s->sm_time_blend = ss_smooth_param(s->sm_time_blend, (float)target_time_blend, fast, slow);
-        s->sm_chroma = ss_smooth_param(s->sm_chroma, (float)target_chroma, fast, slow);
+            s->sm_amount = ss_smooth_param(s->sm_amount, (float)target_amount, fast, slow);
+            s->sm_depth = ss_smooth_param(s->sm_depth, (float)target_depth, fast, slow);
+            s->sm_source_gain = ss_smooth_param(s->sm_source_gain, (float)target_source_gain, fast, slow);
+            s->sm_motion = ss_smooth_param(s->sm_motion, (float)target_motion, fast, slow);
+            s->sm_time_offset = ss_smooth_param(s->sm_time_offset, (float)target_time_offset, fast, slow);
+            s->sm_time_scale = ss_smooth_param(s->sm_time_scale, (float)target_time_scale, fast, slow);
+            s->sm_time_blend = ss_smooth_param(s->sm_time_blend, (float)target_time_blend, fast, slow);
+            s->sm_chroma = ss_smooth_param(s->sm_chroma, (float)target_chroma, fast, slow);
+        }
+
+        const int prepared_amount = ss_clampi((int)(s->sm_amount + 0.5f), 0, 100);
+        const int prepared_depth = ss_clampi((int)(s->sm_depth + 0.5f), 1, s->history_capacity);
+
+        s->seed_this_frame = (!s->seeded || (reset && !s->last_reset));
+        if(s->seed_this_frame) {
+            s->write_pos = 0;
+            s->frame = 0;
+            s->seeded = 1;
+            s->smooth_ready = 0;
+        }
+        s->last_reset = reset;
+
+        s->rebuild_geom = (s->last_mode != mode);
+        if(s->rebuild_geom) {
+            s->last_mode = mode;
+        }
+
+        s->bypass_this_frame = (prepared_amount <= 0 || prepared_depth <= 1);
+        if(!s->bypass_this_frame) {
+            ss_build_time_lut(s, prepared_depth);
+        }
     }
 
     amount = ss_clampi((int)(s->sm_amount + 0.5f), 0, 100);
@@ -1549,13 +1595,11 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     time_blend = ss_clampi((int)(s->sm_time_blend + 0.5f), 0, 100);
     chroma = ss_clampi((int)(s->sm_chroma + 0.5f), 0, 100);
 
-    if(!s->seeded || (reset && !s->last_reset)) {
-        ss_seed_history(s, frame);
-        s->smooth_ready = 0;
-    }
-    s->last_reset = reset;
+    ss_seed_history(s, frame, s->seed_this_frame);
 
-    ss_build_geom(s, mode);
+    if(s->rebuild_geom) {
+        ss_build_geom(s, mode);
+    }
 
     const int write_slot = s->write_pos;
     ss_copy_current_to_slot(s, frame, write_slot);
@@ -1564,64 +1608,57 @@ void slitscan_apply(void *ptr, VJFrame *frame, int *args)
     uint8_t *cur_u = s->hist_u[write_slot];
     uint8_t *cur_v = s->hist_v[write_slot];
 
-    if(amount <= 0 || depth <= 1) {
+    if(!s->bypass_this_frame) {
+        const int amount_q8 = (amount * 256 + 50) / 100;
+        const int chroma_q8 = (amount_q8 * ((chroma * 256 + 50) / 100) + 128) >> 8;
+        const int source_gain_q8 = (source_gain * 256 + 50) / 100;
+        const int time_blend_q8 = (time_blend * 256 + 50) / 100;
+        const int motion_mul_q8 = (motion * 1024 + 50) / 100;
+        const uint32_t phase_base = ((uint32_t)time_offset * 65535u) / 1000u;
+        const uint32_t scale_q16 = ((uint32_t)time_scale * 65536u) / 100u;
+        const uint32_t drift = ((uint32_t)s->frame * 181u) & 65535u;
+        const uint32_t phase64 = (uint32_t)(s->frame & 63);
+        const uint32_t pulse = (phase64 <= 31u) ? (phase64 * 2048u) : ((63u - phase64) * 2048u);
+        uint32_t time_add = 0u;
+        time_add = (time_motion == SS_TMOVE_DRIFT_FWD) ? drift : time_add;
+        time_add = (time_motion == SS_TMOVE_DRIFT_REV) ? ((0u - drift) & 65535u) : time_add;
+        time_add = (time_motion == SS_TMOVE_PULSE) ? pulse : time_add;
+        const int time_reverse = (time_motion == SS_TMOVE_REVERSE);
+        const int use_source = (source != SS_SRC_SHAPE && source_gain_q8 > 0);
+        const int use_soft = (time_blend_q8 > 0);
+        const ss_render_fn render = (!use_source)
+            ? (use_soft ? ss_render_shape_soft : ss_render_shape_hard)
+            : (use_soft ? ss_render_source_soft : ss_render_source_hard);
+
+        ss_render_cfg cfg;
+        cfg.geom = s->geom;
+        cfg.cur_y = cur_y;
+        cfg.cur_u = cur_u;
+        cfg.cur_v = cur_v;
+        cfg.out_y = frame->data[0];
+        cfg.out_u = frame->data[1];
+        cfg.out_v = frame->data[2];
+        cfg.prev_y = s->prev_y;
+        cfg.len = len;
+        cfg.write_slot = write_slot;
+        cfg.amount_q8 = amount_q8;
+        cfg.chroma_q8 = chroma_q8;
+        cfg.source = source;
+        cfg.source_gain_q8 = source_gain_q8;
+        cfg.motion_mul_q8 = motion_mul_q8;
+        cfg.time_blend_q8 = time_blend_q8;
+        cfg.phase_base = phase_base;
+        cfg.scale_q16 = scale_q16;
+        cfg.time_add = time_add;
+        cfg.time_reverse = time_reverse;
+
+        render(s, &cfg);
+    }
+
+#pragma omp single
+    {
         veejay_memcpy(s->prev_y, cur_y, len);
         s->write_pos = (s->write_pos + 1) & s->history_mask;
         s->frame++;
-        return;
     }
-
-    ss_build_time_lut(s, depth);
-
-    const int amount_q8 = (amount * 256 + 50) / 100;
-    const int chroma_q8 = (amount_q8 * ((chroma * 256 + 50) / 100) + 128) >> 8;
-    const int source_gain_q8 = (source_gain * 256 + 50) / 100;
-    const int time_blend_q8 = (time_blend * 256 + 50) / 100;
-    const int motion_mul_q8 = (motion * 1024 + 50) / 100;
-    const uint32_t phase_base = ((uint32_t)time_offset * 65535u) / 1000u;
-    const uint32_t scale_q16 = ((uint32_t)time_scale * 65536u) / 100u;
-    const uint32_t drift = ((uint32_t)s->frame * 181u) & 65535u;
-    const uint32_t phase64 = (uint32_t)(s->frame & 63);
-    const uint32_t pulse = (phase64 <= 31u) ? (phase64 * 2048u) : ((63u - phase64) * 2048u);
-    uint32_t time_add = 0u;
-    time_add = (time_motion == SS_TMOVE_DRIFT_FWD) ? drift : time_add;
-    time_add = (time_motion == SS_TMOVE_DRIFT_REV) ? ((0u - drift) & 65535u) : time_add;
-    time_add = (time_motion == SS_TMOVE_PULSE) ? pulse : time_add;
-    const int time_reverse = (time_motion == SS_TMOVE_REVERSE);
-    const int use_source = (source != SS_SRC_SHAPE && source_gain_q8 > 0);
-    const int use_soft = (time_blend_q8 > 0);
-    const ss_render_fn render = (!use_source)
-        ? (use_soft ? ss_render_shape_soft : ss_render_shape_hard)
-        : (use_soft ? ss_render_source_soft : ss_render_source_hard);
-
-    ss_render_cfg cfg;
-    cfg.geom = s->geom;
-    cfg.cur_y = cur_y;
-    cfg.cur_u = cur_u;
-    cfg.cur_v = cur_v;
-    cfg.out_y = frame->data[0];
-    cfg.out_u = frame->data[1];
-    cfg.out_v = frame->data[2];
-    cfg.prev_y = s->prev_y;
-    cfg.len = len;
-    cfg.write_slot = write_slot;
-    cfg.amount_q8 = amount_q8;
-    cfg.chroma_q8 = chroma_q8;
-    cfg.source = source;
-    cfg.source_gain_q8 = source_gain_q8;
-    cfg.motion_mul_q8 = motion_mul_q8;
-    cfg.time_blend_q8 = time_blend_q8;
-    cfg.phase_base = phase_base;
-    cfg.scale_q16 = scale_q16;
-    cfg.time_add = time_add;
-    cfg.time_reverse = time_reverse;
-
-    render(s, &cfg);
-
-#pragma omp single
-        {
-            veejay_memcpy(s->prev_y, cur_y, len);
-            s->write_pos = (s->write_pos + 1) & s->history_mask;
-            s->frame++;
-        }
 }
