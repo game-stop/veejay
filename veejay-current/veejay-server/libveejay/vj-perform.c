@@ -1927,7 +1927,7 @@ static int vj_audio_record_tap_pop(vj_record_audio_tap_t *tap,
        tap_frame_bytes != frame_bytes)
     {
         veejay_memset(dst, 0, (size_t)frames * (size_t)frame_bytes);
-        __sync_add_and_fetch(&tap->underruns, 1);
+        atomic_add_and_fetch_long_long(&tap->underruns, 1);
         return frames;
     }
 
@@ -1970,7 +1970,7 @@ static int vj_audio_record_tap_pop(vj_record_audio_tap_t *tap,
         veejay_memset(dst + ((size_t)copied * (size_t)frame_bytes),
                       0,
                       (size_t)(frames - copied) * (size_t)frame_bytes);
-        __sync_add_and_fetch(&tap->underruns, 1);
+        atomic_add_and_fetch_long_long(&tap->underruns, 1);
     }
 
     return frames;
@@ -8190,7 +8190,7 @@ static int vj_perform_record_presented_video_frame(veejay_t *info, VJFrame *src)
                      atomic_load_int(&info->settings->current_playback_speed));
     __sync_synchronize();
     atomic_store_int(&rv->valid, 1);
-    __sync_add_and_fetch(&rec->video_writes, 1);
+    atomic_add_and_fetch_long_long(&rec->video_writes, 1);
 
     return 1;
 }
@@ -8415,7 +8415,7 @@ static int vj_perform_record_audio_frame(
     {
         veejay_memset(p->audio_rec_buffer, 0, (size_t)wanted_frames * (size_t)frame_bytes);
         if(info->recording)
-            __sync_add_and_fetch(&info->recording->audio_silence_records, 1);
+            atomic_add_and_fetch_long_long(&info->recording->audio_silence_records, 1);
         return wanted_frames;
     }
 
@@ -8449,7 +8449,7 @@ static int vj_perform_record_audio_frame(
         }
 
         if(info->recording)
-            __sync_add_and_fetch(&info->recording->audio_records, 1);
+            atomic_add_and_fetch_long_long(&info->recording->audio_records, 1);
         return frames;
     }
 
@@ -8469,11 +8469,11 @@ static int vj_perform_record_audio_frame(
                           0,
                           (size_t)(wanted_frames - frames) * (size_t)frame_bytes);
             if(info->recording)
-                __sync_add_and_fetch(&info->recording->audio_silence_records, 1);
+                atomic_add_and_fetch_long_long(&info->recording->audio_silence_records, 1);
         }
 
         if(info->recording)
-            __sync_add_and_fetch(&info->recording->audio_records, 1);
+            atomic_add_and_fetch_long_long(&info->recording->audio_records, 1);
 
         return wanted_frames;
     }
@@ -8506,7 +8506,7 @@ static int vj_perform_record_audio_frame(
         }
 
         if(info->recording)
-            __sync_add_and_fetch(&info->recording->audio_records, 1);
+            atomic_add_and_fetch_long_long(&info->recording->audio_records, 1);
         return frames;
     }
 
@@ -8514,7 +8514,7 @@ static int vj_perform_record_audio_frame(
     {
         veejay_memset(p->audio_rec_buffer, 0, (size_t)wanted_frames * (size_t)frame_bytes);
         if(info->recording)
-            __sync_add_and_fetch(&info->recording->audio_silence_records, 1);
+            atomic_add_and_fetch_long_long(&info->recording->audio_silence_records, 1);
         return wanted_frames;
     }
 
@@ -8526,7 +8526,7 @@ static int vj_perform_record_audio_frame(
     );
 
     if(info->recording)
-        __sync_add_and_fetch(&info->recording->audio_records, 1);
+        atomic_add_and_fetch_long_long(&info->recording->audio_records, 1);
 
     return frames;
 #else
@@ -8971,7 +8971,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample, int type) {
 
     res = vj_perform_render_sample_frame(info, p, frame, sample,type);
     if(info->recording)
-        __sync_add_and_fetch(&info->recording->video_records, 1);
+        atomic_add_and_fetch_long_long(&info->recording->video_records, 1);
 
     if( res == 2 )
     {
@@ -9083,7 +9083,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 
     res = vj_perform_render_tag_frame(info, frame);
     if(info->recording)
-        __sync_add_and_fetch(&info->recording->video_records, 1);
+        atomic_add_and_fetch_long_long(&info->recording->video_records, 1);
 
     if( res == 2)
     {

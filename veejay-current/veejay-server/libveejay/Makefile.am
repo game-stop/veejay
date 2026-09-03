@@ -105,6 +105,7 @@ libveejay_la_LIBADD = \
     $(JACK_LIBS) \
     $(LIBQUICKTIME_LIBS) \
     $(RT_LIBS) \
+    $(ATOMIC_LIBS) \
     $(LIBQRENCODE_LIBS) \
     $(VEEJAYCORE_LIBS) \
     $(NDI_LIBS) \

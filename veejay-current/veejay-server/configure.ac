@@ -214,6 +214,34 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
   AC_MSG_ERROR([GNU built-in atomics are mandatory.])
 ])
 
+AC_MSG_CHECKING([whether 64-bit GNU atomics link without libatomic])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+static volatile unsigned long long vj_atomic_test_value;
+]], [[
+  return (int) __atomic_fetch_add(&vj_atomic_test_value, 1, __ATOMIC_SEQ_CST);
+]])], [
+  AC_MSG_RESULT([yes])
+  ATOMIC_LIBS=""
+], [
+  AC_MSG_RESULT([no])
+  vj_save_LIBS="$LIBS"
+  LIBS="$LIBS -latomic"
+  AC_MSG_CHECKING([whether 64-bit GNU atomics link with libatomic])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+static volatile unsigned long long vj_atomic_test_value;
+]], [[
+  return (int) __atomic_fetch_add(&vj_atomic_test_value, 1, __ATOMIC_SEQ_CST);
+]])], [
+    AC_MSG_RESULT([yes])
+    ATOMIC_LIBS="-latomic"
+  ], [
+    AC_MSG_RESULT([no])
+    AC_MSG_ERROR([64-bit GNU atomics are mandatory, but neither the compiler nor libatomic provides them.])
+  ])
+  LIBS="$vj_save_LIBS"
+])
+AC_SUBST([ATOMIC_LIBS])
+
 AC_CHECK_FUNCS([posix_memalign memalign fmax lround pow bzero gettimeofday memset mmap strndup strstr strncasecmp])
 AC_CHECK_FUNCS([sched_get_priority_max])
 AC_CHECK_FUNCS([select socket getpagesize memcpy])

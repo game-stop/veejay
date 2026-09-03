@@ -19,7 +19,11 @@ EXTRA_DIST = \
  PKGBUILD \
  $(PACKAGE).spec \
  doc/veejay-HOWTO.html \
+ doc/HOWTO.debugging.md \
  doc/README.quickstart.md \
+ doc/README.alpha.md \
+ doc/README.security \
+ doc/README.video-codec.md \
  doc/README.whatis.md \
  doc/HOWTO.plugins.md \
  doc/VIMS.md \

@@ -27,14 +27,18 @@
 #ifdef SUBSAMPLE_HAVE_ESP32
 static inline uint32_t esp32_load_u32(const uint8_t *source)
 {
-    uint32_t value;
-    memcpy(&value, source, sizeof(value));
-    return value;
+    return (uint32_t)source[0] |
+           ((uint32_t)source[1] << 8) |
+           ((uint32_t)source[2] << 16) |
+           ((uint32_t)source[3] << 24);
 }
 
 static inline void esp32_store_u32(uint8_t *destination, uint32_t value)
 {
-    memcpy(destination, &value, sizeof(value));
+    destination[0] = (uint8_t)value;
+    destination[1] = (uint8_t)(value >> 8);
+    destination[2] = (uint8_t)(value >> 16);
+    destination[3] = (uint8_t)(value >> 24);
 }
 
 static inline uint32_t esp32_pack_even_bytes(uint32_t low, uint32_t high)
