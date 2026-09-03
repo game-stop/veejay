@@ -8,6 +8,7 @@ EXTRA_DIST = \
  autogen.sh\
  depcomp \
  autogen.sh \
+ README.md \
  PKGBUILD \
  veejay-director.spec \
  debian

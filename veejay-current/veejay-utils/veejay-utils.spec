@@ -6,6 +6,8 @@ Summary:        Additional command line utilities for veejay
 License:        GPL-2.0-or-later
 URL:            http://www.veejayhq.net
 Source0:        %{name}-%{version}.tar.gz
+%{!?veejay_arch_target:%global veejay_arch_target generic}
+%global debug_package %{nil}
 
 BuildRequires:  gcc
 BuildRequires:  make
@@ -15,7 +17,11 @@ BuildRequires:  libtool
 BuildRequires:  pkgconfig
 BuildRequires:  veejay-core-devel >= 1.6.0
 BuildRequires:  veejay-devel >= 1.6.0
-BuildRequires:  ffmpeg-devel
+BuildRequires:  pkgconfig(libavcodec)
+BuildRequires:  pkgconfig(libavformat)
+BuildRequires:  pkgconfig(libavutil)
+BuildRequires:  pkgconfig(libswscale)
+BuildRequires:  pkgconfig(libswresample)
 
 Requires:       veejay-core%{?_isa} >= 1.6.0
 Requires:       veejay%{?_isa} >= 1.6.0
@@ -31,7 +37,7 @@ See veejay-puredata for the Pure Data (sendVIMS) equivalent.
 
 %build
 ./autogen.sh
-%configure
+%configure --with-arch-target=%{veejay_arch_target}
 %make_build
 
 %install

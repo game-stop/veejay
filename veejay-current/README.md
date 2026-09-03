@@ -2,6 +2,8 @@
 
 `run-and-install-locally.sh` builds and installs the VeeJay source tree from the repository root.
 
+For Debian, RPM, Arch, ARM, AArch64, and PowerPC binary release profiles, see [RELEASE_TARGETS.md](RELEASE_TARGETS.md).
+
 ## Prerequisites
 
 Install all VeeJay build dependencies before running this script. The script does not install compiler packages, development headers, libraries, or other dependencies.

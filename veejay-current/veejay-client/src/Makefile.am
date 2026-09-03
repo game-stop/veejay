@@ -1,6 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 MAINTAINERCLEANFILES = Makefile.in
+EXTRA_DIST = callback.c
 
 AM_CPPFLAGS = \
     -I$(top_srcdir) \
@@ -15,6 +16,43 @@ AM_CPPFLAGS = \
 
 bin_PROGRAMS = reloaded
 
+reloaded_headers = \
+    callback.h \
+    cellrendererspin.h \
+    common.h \
+    curve.h \
+    format_codes.h \
+    gtk3curve.h \
+    gtkeditlistview.h \
+    gtkmediaview.h \
+    gtkmidicontrol.h \
+    gtkmultitrackedit.h \
+    gtkpreviewcache.h \
+    gtksamplebankview.h \
+    gtksequencebankview.h \
+    gtkshapeselector.h \
+    gtktimeselection.h \
+    gtkvimshistoryview.h \
+    gtkvimspatternview.h \
+    gtkvimsview.h \
+    keyboard.h \
+    mjpeg_logging.h \
+    mjpeg_types.h \
+    mpegconsts.h \
+    mpegtimecode.h \
+    multitrack.h \
+    sequence.h \
+    tracksources.h \
+    utils-gtk.h \
+    utils.h \
+    videodev_mjpeg.h \
+    vj-api.h \
+    vj-midi-engine.h \
+    vj-midi-map.h \
+    vmidi.h \
+    yuv4mpeg.h \
+    yuv4mpeg_intern.h
+
 reloaded_SOURCES = \
     cellrendererspin.c \
     gtktimeselection.c \
@@ -26,9 +64,7 @@ reloaded_SOURCES = \
     sequence.c \
     multitrack.c \
     gtkmultitrackedit.c \
-    gtkmultitrackedit.h \
     gtkshapeselector.c \
-    gtkshapeselector.h \
     vj-api.c \
     mjpeg_logging.c \
     mpegconsts.c \
@@ -46,11 +82,8 @@ reloaded_SOURCES = \
     gtkpreviewcache.c \
     utils-gtk.c \
     vj-midi-engine.c \
-    vj-midi-engine.h \
     vj-midi-map.c \
-    vj-midi-map.h \
     gtkmidicontrol.c \
-    gtkmidicontrol.h \
     $(reloaded_headers)
 
 reloaded_LDFLAGS = \

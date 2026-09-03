@@ -516,10 +516,10 @@ VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
             f->yuv_fmt = fmt;
             f->range = 1;
             break;
-        case PIX_FMT_BGR32:
-        case PIX_FMT_RGB32:
         case PIX_FMT_ARGB:
+        case PIX_FMT_RGBA:
         case PIX_FMT_ABGR:
+        case PIX_FMT_BGRA:
             f->stride[0] = w * 4;
             f->uv_width = 0; f->uv_height = 0;
             f->data[1] = NULL; f->data[2] = NULL;
@@ -597,10 +597,10 @@ size_t yuv_frame_bytes(VJFrame *f)
             break;
         case PIX_FMT_RGB24:
         case PIX_FMT_BGR24:
-        case PIX_FMT_RGB32:
-        case PIX_FMT_BGR32:
         case PIX_FMT_ARGB:
+        case PIX_FMT_RGBA:
         case PIX_FMT_ABGR:
+        case PIX_FMT_BGRA:
             total += f->stride[0] * f->height;
             break;
 

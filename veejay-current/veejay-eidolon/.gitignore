@@ -28,6 +28,8 @@
 /debian/veejay-eidolon/
 /libtool
 /INSTALL
+/.packaging-dist.lock
+/packaging-build/
 
 # Generated Makefiles
 /Makefile

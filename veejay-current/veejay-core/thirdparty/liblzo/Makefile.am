@@ -9,5 +9,5 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
 
 VJLZO_LIB_FILE = libvjlzo.la
 noinst_LTLIBRARIES = $(VJLZO_LIB_FILE)
-libvjlzo_la_SOURCES = minilzo.c lzo.c 
+libvjlzo_la_SOURCES = minilzo.c minilzo.h lzoconf.h lzodefs.h lzo.c
 pkginclude_HEADERS = lzo.h

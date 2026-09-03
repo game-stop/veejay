@@ -6,6 +6,8 @@ Summary:        Graphical remote-control and mesh director for Veejay
 License:        GPL-2.0-or-later
 URL:            http://www.veejayhq.net
 Source0:        %{name}-%{version}.tar.gz
+%{!?veejay_arch_target:%global veejay_arch_target generic}
+%global debug_package %{nil}
 
 BuildRequires:  gcc
 BuildRequires:  gcc-c++
@@ -17,7 +19,11 @@ BuildRequires:  pkgconfig
 BuildRequires:  veejay-core-devel >= 1.6.0
 BuildRequires:  gtk3-devel
 BuildRequires:  libX11-devel
-BuildRequires:  ffmpeg-devel
+BuildRequires:  pkgconfig(libavcodec)
+BuildRequires:  pkgconfig(libavformat)
+BuildRequires:  pkgconfig(libavutil)
+BuildRequires:  pkgconfig(libswscale)
+BuildRequires:  pkgconfig(libswresample)
 BuildRequires:  SDL2-devel
 
 Requires:       veejay-core%{?_isa} >= 1.6.0
@@ -32,7 +38,7 @@ NDI_SDK_DIR pointing at an installed NDI SDK to enable it.
 This program requires a running veejay backend to control.
 
 %prep
-%setup -q
+%setup -q -n reloaded-%{version}
 
 %build
 ./autogen.sh
@@ -43,9 +49,9 @@ This program requires a running veejay backend to control.
 # there; otherwise configure's own "auto" detection leaves NDI disabled.
 NDI_SDK_DIR="${NDI_SDK_DIR:-/opt/ndi6}"
 if [ -f "$NDI_SDK_DIR/include/Processing.NDI.Lib.h" ]; then
-  %configure --with-ndi="$NDI_SDK_DIR"
+  %configure --with-arch-target=%{veejay_arch_target} --with-ndi="$NDI_SDK_DIR"
 else
-  %configure
+  %configure --with-arch-target=%{veejay_arch_target}
 fi
 %make_build
 
@@ -58,6 +64,7 @@ find %{buildroot} -name '*.la' -delete
 %doc README.md
 %{_bindir}/veejay-director
 %{_mandir}/man1/veejay-director.1*
+%{_datadir}/applications/org.veejay.Director.desktop
 
 %changelog
 * Mon Aug 31 2026 Niels Elburg <nwelburg@gmail.com> - 1.6.0-1

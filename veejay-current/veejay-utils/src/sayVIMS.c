@@ -38,11 +38,6 @@
 #endif
 
 #define SHM_ID_LEN 16
-#define STA_LEN_SIZE 6
-#define HEADER_READ_SIZE 5
-#define STATUS_HEADER_SIZE HEADER_READ_SIZE
-#define STATUS_MAX_BODY 999
-#define STATUS_TOKEN_COUNT 43
 #define MAX_FRAME_READ_RETRIES 5
 
 static int interactive = 0;
@@ -268,25 +263,35 @@ static int vj_flush(int frames)
     char status[VJ_STATUS_BUF_SIZE];
 
     while (frames > 0) {
-        char sta_len[STA_LEN_SIZE] = {0};
+        char sta_len[VJ_STATUS_WIRE_HEADER_LEN + 1] = {0};
         int bytes = 0;
 
         if (!vj_client_poll(sayvims, V_STATUS))
             continue;
 
-        if (read_full(sayvims, V_STATUS, (unsigned char*)sta_len, STATUS_HEADER_SIZE) <= 0) {
+        if (read_full(sayvims, V_STATUS, (unsigned char*)sta_len,
+                      VJ_STATUS_WIRE_HEADER_LEN) <= 0) {
             fprintf(stderr, "Connection closed or error reading status header\n");
             return 0;
         }
 
-        sta_len[STATUS_HEADER_SIZE] = '\0';
+        sta_len[VJ_STATUS_WIRE_HEADER_LEN] = '\0';
 
-        if (sta_len[0] != 'V' || sta_len[4] != 'D') {
+        if (sta_len[0] != 'V' ||
+            sta_len[VJ_STATUS_WIRE_HEADER_LEN - 1] != 'S') {
             fprintf(stderr, "Invalid status header: '%s'\n", sta_len);
-            continue;
+            return 0;
         }
 
-        if (sscanf(sta_len + 1, "%03d", &bytes) != 1 || bytes <= 0 || bytes > STATUS_MAX_BODY) {
+        for (int i = 1; i < VJ_STATUS_WIRE_HEADER_LEN - 1; i++) {
+            if (sta_len[i] < '0' || sta_len[i] > '9') {
+                fprintf(stderr, "Invalid status length/header: '%s'\n", sta_len);
+                return 0;
+            }
+            bytes = (bytes * 10) + (sta_len[i] - '0');
+        }
+
+        if (bytes <= 0 || bytes > VJ_STATUS_WIRE_MAX_PAYLOAD) {
             fprintf(stderr, "Invalid status length/header: '%s'\n", sta_len);
             return 0;
         }

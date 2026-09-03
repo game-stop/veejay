@@ -6,5 +6,4 @@ AM_CPPFLAGS = -I$(top_srcdir) -I$(includedir) \
 
 FASTARM_LIB_FILE = libfastarm.la
 noinst_LTLIBRARIES = $(FASTARM_LIB_FILE)
-libfastarm_la_SOURCES = new_arm.S
-EXTRA_DIST= 
+libfastarm_la_SOURCES = new_arm.S new_arm.h

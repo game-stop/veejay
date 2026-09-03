@@ -3,8 +3,10 @@
 pkgname=veejay-utils
 pkgrel=1
 pkgver=1.6.0
+_veejay_arch_target=generic
+_source_name=veejay-utils
 pkgdesc="Additional command line utilities for veejay (sayVIMS)"
-arch=('x86_64' 'aarch64')
+arch=('x86_64' 'armv7h' 'aarch64' 'powerpc' 'powerpc64' 'powerpc64le')
 url="http://www.veejayhq.net"
 license=('GPL2')
 groups=()
@@ -13,22 +15,21 @@ provides=('sayVIMS')
 depends=('veejay-core' 'veejay' 'ffmpeg')
 optdepends=()
 makedepends=('pkgconf')
-source=()
-md5sums=()
-changelog=ChangeLog
+source=("${_source_name}-${pkgver}.tar.gz")
+sha256sums=('SKIP')
 backup=()
 replaces=()
 
 build() {
 	export PKG_CONFIG_PATH=/usr/lib/pkgconfig
-	cd $startdir
+	cd "$srcdir/${_source_name}-${pkgver}"
   ./autogen.sh
-  ./configure --prefix=/usr
+	./configure --prefix=/usr --with-arch-target="$_veejay_arch_target"
   make || return 1
 }
 
 package() {
-	cd $startdir
+	cd "$srcdir/${_source_name}-${pkgver}"
 	make DESTDIR="$pkgdir/" install
 }
 

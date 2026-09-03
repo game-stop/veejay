@@ -3,11 +3,15 @@
 
 # Build working directory and tool defaults (can be overridden on command line or in Makefile.am)
 PACKAGING_BUILD_DIR ?= $(top_builddir)/packaging-build
+PACKAGING_DIST_LOCK ?= $(top_builddir)/.packaging-dist.lock
+FLOCK               ?= flock
+VEEJAY_ARCH_TARGET  ?= generic
 
 # Debian / sbuild settings
 DEB_SOURCE_PACKAGE ?= $(PACKAGE)
 SBUILD              ?= sbuild
 SBUILD_CREATECHROOT ?= sbuild-createchroot
+SBUILD_CREATE_ARGS  ?=
 SBUILD_CHROOT_MODE  ?= schroot
 SBUILD_DIST         ?= unstable
 SBUILD_ARCH         ?= $(shell dpkg --print-architecture 2>/dev/null || echo amd64)
@@ -16,16 +20,31 @@ SBUILD_UNSHARE_TARBALL ?= $(HOME)/.cache/sbuild/$(SBUILD_DIST)-$(SBUILD_ARCH).ta
 SBUILD_CREATE_DIR   ?= /tmp/sbuild-create-$(SBUILD_DIST)-$(SBUILD_ARCH)-$(shell id -u 2>/dev/null || echo user)
 SBUILD_CHROOT       ?= $(if $(filter unshare,$(SBUILD_CHROOT_MODE)),$(SBUILD_UNSHARE_TARBALL),$(SBUILD_DIST)-$(SBUILD_ARCH)-sbuild)
 SBUILD_ARGS         ?=
+SBUILD_LOCAL_PACKAGE_DIR ?=
+SBUILD_LOCAL_PACKAGES = $(wildcard $(SBUILD_LOCAL_PACKAGE_DIR)/*.deb)
+SBUILD_LOCAL_PACKAGE_ARG = $(if $(strip $(SBUILD_LOCAL_PACKAGES)),--extra-package=$(SBUILD_LOCAL_PACKAGE_DIR))
 
 # Arch Linux / makechrootpkg settings
 ARCH_CHROOT_DIR     ?= /var/lib/archbuild/extra-x86_64
+ARCH_LOCAL_PACKAGE_DIR ?=
+ARCH_LOCAL_PACKAGES = $(filter-out %.sig,$(wildcard $(ARCH_LOCAL_PACKAGE_DIR)/*.pkg.tar.*))
+ARCH_LOCAL_PACKAGE_ARGS = $(foreach package,$(ARCH_LOCAL_PACKAGES),-I $(package))
 
 # RPM / mock settings
+MOCK                ?= mock
 MOCK_CONFIG         ?= fedora-rawhide-x86_64
 MOCK_ARGS           ?=
+MOCK_LOCAL_PACKAGE_DIR ?=
+MOCK_LOCAL_PACKAGES = $(filter-out %.src.rpm,$(wildcard $(MOCK_LOCAL_PACKAGE_DIR)/*.rpm))
 RPM_SPEC_FILE       ?= $(top_srcdir)/$(PACKAGE).spec
 
-.PHONY: deb arch rpm clean-packaging check-sbuild sbuild
+.PHONY: deb arch rpm clean-packaging check-sbuild check-flock sbuild
+
+check-flock:
+	@command -v "$(FLOCK)" >/dev/null 2>&1 || { \
+		echo "ERROR: '$(FLOCK)' not found. Install util-linux or pass FLOCK=/path/to/flock."; \
+		exit 127; \
+	}
 
 sbuild:
 	@command -v "$(SBUILD_CREATECHROOT)" >/dev/null 2>&1 || { \
@@ -42,7 +61,7 @@ sbuild:
 		echo "==> Creating sbuild unshare chroot $(SBUILD_CHROOT) for $(SBUILD_DIST)/$(SBUILD_ARCH)..."; \
 		rm -rf "$(SBUILD_CREATE_DIR)"; \
 		$(MKDIR_P) "$$(dirname "$(SBUILD_CHROOT)")" "$$(dirname "$(SBUILD_CREATE_DIR)")"; \
-		$(SBUILD_CREATECHROOT) --chroot-mode=unshare --arch=$(SBUILD_ARCH) \
+		$(SBUILD_CREATECHROOT) --chroot-mode=unshare --arch=$(SBUILD_ARCH) $(SBUILD_CREATE_ARGS) \
 			--make-sbuild-tarball="$(SBUILD_CHROOT)" \
 			$(SBUILD_DIST) "$(SBUILD_CREATE_DIR)" "$(SBUILD_MIRROR)"; \
 	fi
@@ -67,15 +86,21 @@ check-sbuild:
 # ------------------------------------------------------------------------------
 # Debian Target (sbuild)
 # ------------------------------------------------------------------------------
-deb: check-sbuild dist-gzip
+deb: check-sbuild check-flock
 	@echo "==> Building Debian package with sbuild..."
 	rm -rf $(PACKAGING_BUILD_DIR)/deb
 	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/deb
-	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
+	@exec 9>"$(PACKAGING_DIST_LOCK)"; \
+		$(FLOCK) 9; \
+		$(MAKE) dist-gzip; \
+		cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
 	tar -C $(PACKAGING_BUILD_DIR)/deb -xzf $(PACKAGING_BUILD_DIR)/deb/$(DEB_SOURCE_PACKAGE)_$(VERSION).orig.tar.gz
 	cp -r $(top_srcdir)/debian $(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION)/
+	printf '%s\n' 'VEEJAY_ARCH_TARGET := $(VEEJAY_ARCH_TARGET)' > \
+		$(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION)/debian/veejay-release.mk
 	cd $(PACKAGING_BUILD_DIR)/deb/$(PACKAGE)-$(VERSION) && dpkg-buildpackage -S -us -uc
-	$(SBUILD) --chroot-mode=$(SBUILD_CHROOT_MODE) --dist=$(SBUILD_DIST) --chroot=$(SBUILD_CHROOT) $(SBUILD_ARGS) \
+	$(SBUILD) --arch=$(SBUILD_ARCH) --chroot-mode=$(SBUILD_CHROOT_MODE) --dist=$(SBUILD_DIST) --chroot=$(SBUILD_CHROOT) $(SBUILD_ARGS) \
+		$(SBUILD_LOCAL_PACKAGE_ARG) \
 		--build-dir=$(PACKAGING_BUILD_DIR)/deb \
 		$(PACKAGING_BUILD_DIR)/deb/*.dsc
 	@echo "==> Debian build complete. Artifacts in $(PACKAGING_BUILD_DIR)/deb/"
@@ -83,20 +108,25 @@ deb: check-sbuild dist-gzip
 # ------------------------------------------------------------------------------
 # Arch Linux Target (makechrootpkg)
 # ------------------------------------------------------------------------------
-arch: dist-gzip
+arch: check-flock
 	@echo "==> Building Arch Linux package with makechrootpkg..."
 	rm -rf $(PACKAGING_BUILD_DIR)/arch
 	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/arch
-	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/arch/
+	@exec 9>"$(PACKAGING_DIST_LOCK)"; \
+		$(FLOCK) 9; \
+		$(MAKE) dist-gzip; \
+		cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/arch/
 	cp $(top_srcdir)/PKGBUILD $(PACKAGING_BUILD_DIR)/arch/
 	cd $(PACKAGING_BUILD_DIR)/arch && sed -i 's/^pkgver=.*/pkgver=$(VERSION)/' PKGBUILD
-	cd $(PACKAGING_BUILD_DIR)/arch && makechrootpkg -r $(ARCH_CHROOT_DIR)
+	cd $(PACKAGING_BUILD_DIR)/arch && sed -i \
+		"s/^_veejay_arch_target=.*/_veejay_arch_target='$(VEEJAY_ARCH_TARGET)'/" PKGBUILD
+	cd $(PACKAGING_BUILD_DIR)/arch && makechrootpkg $(ARCH_LOCAL_PACKAGE_ARGS) -r $(ARCH_CHROOT_DIR)
 	@echo "==> Arch Linux build complete. Artifacts in $(PACKAGING_BUILD_DIR)/arch/"
 
 # ------------------------------------------------------------------------------
 # RPM Target (mock)
 # ------------------------------------------------------------------------------
-rpm: dist-gzip
+rpm: check-flock
 	@echo "==> Building RPM package with mock..."
 	rm -rf $(PACKAGING_BUILD_DIR)/rpm
 	$(MKDIR_P) $(PACKAGING_BUILD_DIR)/rpm/BUILD \
@@ -104,12 +134,23 @@ rpm: dist-gzip
 		$(PACKAGING_BUILD_DIR)/rpm/SOURCES \
 		$(PACKAGING_BUILD_DIR)/rpm/SPECS \
 		$(PACKAGING_BUILD_DIR)/rpm/SRPMS
-	cp $(PACKAGE)-$(VERSION).tar.gz $(PACKAGING_BUILD_DIR)/rpm/SOURCES/
+	@exec 9>"$(PACKAGING_DIST_LOCK)"; \
+		$(FLOCK) 9; \
+		$(MAKE) dist-gzip; \
+		cp $(PACKAGE)-$(VERSION).tar.gz \
+			$(PACKAGING_BUILD_DIR)/rpm/SOURCES/$(DEB_SOURCE_PACKAGE)-$(VERSION).tar.gz
 	cp $(RPM_SPEC_FILE) $(PACKAGING_BUILD_DIR)/rpm/SPECS/
 	rpmbuild -bs \
 		--define "_topdir $$(pwd)/$(PACKAGING_BUILD_DIR)/rpm" \
+		--define "veejay_arch_target $(VEEJAY_ARCH_TARGET)" \
 		$(PACKAGING_BUILD_DIR)/rpm/SPECS/$$(basename $(RPM_SPEC_FILE))
-	mock -r $(MOCK_CONFIG) $(MOCK_ARGS) \
+	@if test -n "$(strip $(MOCK_LOCAL_PACKAGES))"; then \
+		$(MOCK) -r $(MOCK_CONFIG) $(MOCK_ARGS) --init; \
+		$(MOCK) -r $(MOCK_CONFIG) $(MOCK_ARGS) --install $(MOCK_LOCAL_PACKAGES); \
+	fi
+	$(MOCK) -r $(MOCK_CONFIG) $(MOCK_ARGS) \
+		$(if $(strip $(MOCK_LOCAL_PACKAGES)),--no-clean) \
+		--define "veejay_arch_target $(VEEJAY_ARCH_TARGET)" \
 		--resultdir=$(PACKAGING_BUILD_DIR)/rpm/RPMS \
 		--rebuild $(PACKAGING_BUILD_DIR)/rpm/SRPMS/*.src.rpm
 	@echo "==> RPM build complete. Artifacts in $(PACKAGING_BUILD_DIR)/rpm/"

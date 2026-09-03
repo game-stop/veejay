@@ -6,6 +6,7 @@ Summary:        Pure Data external for controlling Veejay via VIMS
 License:        GPL-2.0-or-later
 URL:            http://www.veejayhq.net
 Source0:        %{name}-%{version}.tar.gz
+%global debug_package %{nil}
 
 BuildRequires:  gcc
 BuildRequires:  make

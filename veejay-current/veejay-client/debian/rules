@@ -6,7 +6,12 @@
 
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
+VEEJAY_ARCH_TARGET ?= generic
+-include debian/veejay-release.mk
 
 
 %:
 	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- --with-arch-target=$(VEEJAY_ARCH_TARGET)

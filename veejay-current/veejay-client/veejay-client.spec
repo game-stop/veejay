@@ -6,6 +6,8 @@ Summary:        Reloaded, a graphical interface for veejay
 License:        GPL-2.0-or-later
 URL:            http://www.veejayhq.net
 Source0:        %{name}-%{version}.tar.gz
+%{!?veejay_arch_target:%global veejay_arch_target generic}
+%global debug_package %{nil}
 
 BuildRequires:  gcc
 BuildRequires:  make
@@ -13,14 +15,18 @@ BuildRequires:  autoconf
 BuildRequires:  automake
 BuildRequires:  libtool
 BuildRequires:  pkgconfig
-BuildRequires:  veejay-core-devel >= 1.5.67
+BuildRequires:  veejay-core-devel >= 1.6.0
 BuildRequires:  gtk3-devel
 BuildRequires:  libX11-devel
-BuildRequires:  ffmpeg-devel
+BuildRequires:  pkgconfig(libavcodec)
+BuildRequires:  pkgconfig(libavformat)
+BuildRequires:  pkgconfig(libavutil)
+BuildRequires:  pkgconfig(libswscale)
+BuildRequires:  pkgconfig(libswresample)
 BuildRequires:  SDL2-devel
 BuildRequires:  alsa-lib-devel
 
-Requires:       veejay-core%{?_isa} >= 1.5.67
+Requires:       veejay-core%{?_isa} >= 1.6.0
 Recommends:     veejay >= 1.6.0
 
 %description
@@ -34,11 +40,11 @@ Features:
 * Tracks multiple veejay servers
 
 %prep
-%setup -q
+%setup -q -n reloaded-%{version}
 
 %build
 ./autogen.sh
-%configure
+%configure --with-arch-target=%{veejay_arch_target}
 %make_build
 
 %install
@@ -50,7 +56,8 @@ find %{buildroot} -name '*.la' -delete
 %doc README.md
 %{_bindir}/reloaded
 %{_mandir}/man1/reloaded.1*
+%{_datadir}/reloaded/
 
 %changelog
-+ Mon Aug 31 2026 Niels Elburg <nwelburg@gmail.com> - 1.6.0-1
+* Mon Aug 31 2026 Niels Elburg <nwelburg@gmail.com> - 1.6.0-1
 - Refresh spec for the GTK+3/SDL2-based
