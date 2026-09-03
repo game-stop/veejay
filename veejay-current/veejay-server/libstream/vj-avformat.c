@@ -89,7 +89,7 @@ static int eval_state(threaded_t *t, vj_tag *tag)
 
                 veejay_msg(VEEJAY_MSG_INFO, "[%s] Ready", tag->source_name );
 			} else {
-                t->state = STATE_ERROR;
+                t->state = STATE_QUIT;
             }
 	}
 
