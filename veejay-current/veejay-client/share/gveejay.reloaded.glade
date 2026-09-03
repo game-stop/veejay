@@ -14743,7 +14743,7 @@
                                               <object class="GtkLabel" id="sample_loopstop_label">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">False</property>
-                                                <property name="tooltip-text" translatable="yes">Boundary used by sequence and macro playback</property>
+                                                <property name="tooltip-text" translatable="yes">Boundary used by sequence</property>
                                                 <property name="label" translatable="yes">Loop stop frame</property>
                                                 <property name="width-chars">14</property>
                                                 <property name="xalign">0</property>
@@ -14755,7 +14755,7 @@
                                               <object class="GtkSpinButton" id="sample_loopstop">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">True</property>
-                                                <property name="tooltip-text" translatable="yes">Set the frame where sequence and macro playback roll over</property>
+                                                <property name="tooltip-text" translatable="yes">Set the frame where sequence rolls over</property>
                                                 <property name="hexpand">True</property>
                                                 <property name="halign">fill</property>
                                                 <property name="adjustment">loop_stop</property>
@@ -14769,7 +14769,7 @@
                                                 <property name="can-focus">False</property>
                                                 <property name="xalign">0</property>
                                                 <property name="wrap">True</property>
-                                                <property name="label" translatable="yes">Start and end define the playable range. Loop stop is an optional rollover cue for sequence and macro playback.</property>
+                                                <property name="label" translatable="yes">Start and end define the playable range. Loop stop is an optional rollover cue for sequence playback.</property>
                                                 <style><class name="property-hint"/></style>
                                               </object>
                                               <packing><property name="left-attach">0</property><property name="top-attach">3</property><property name="width">3</property></packing>
@@ -15602,7 +15602,7 @@
                                               <object class="GtkSpinButton" id="stream_loopstop">
                                                 <property name="visible">True</property>
                                                 <property name="can-focus">True</property>
-                                                <property name="tooltip-text" translatable="yes">Frame where sequence and macro playback roll over within the virtual stream timeline</property>
+                                                <property name="tooltip-text" translatable="yes">Frame where sequence playback roll over within the virtual stream timeline</property>
                                                 <property name="width-chars">8</property>
                                                 <property name="max-width-chars">10</property>
                                                 <property name="hexpand">False</property>
@@ -22980,7 +22980,7 @@
                                         <property name="left-padding">0</property>
                                         <child>
                                           <object class="GtkBox" id="hbox840">
-                                            <property name="visible">True</property>
+                                            <property name="visible">False</property>
                                             <property name="can-focus">False</property>
                                             <property name="spacing">2</property>
                                             <property name="valign">center</property>
