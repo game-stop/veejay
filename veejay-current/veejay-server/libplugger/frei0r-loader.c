@@ -70,7 +70,7 @@ typedef void (*f0r_set_param_value_f)(f0r_instance_t *instance, f0r_param_t *par
 
 typedef void (*f0r_get_param_value_f)(f0r_instance_t *instance, f0r_param_t *param, int param_index );
 
-int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in );
+void	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in );
 void	frei0r_process_frame_f( void *plugin, double timecode );
 int	frei0r_get_param_f( void *port, void *dst );
 
@@ -463,31 +463,29 @@ int	frei0r_get_param_f( void *port, void *dst )
 	return 1;
 }
 
-int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
+void	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 {
 	fr0_conv_t *fr = NULL;
 	int err = vevo_property_get(plugin, "HOST_conv",0,&fr);
 	if( err != VEVO_NO_ERROR )
-		return 0;
+		return;
 
 	if( dir == 1 ) {
 		if( seqno == 0 )
 			fr->last = in;
-		return 1;
+		return;
 	}
 	else if ( dir == 0 ) {
 		if( seqno < 0 || seqno >= fr->in_count )
-			return 0;
+			return;
 
 		if(!frei0r_ensure_scaler(fr, in, fr->in_count))
-			return 0;
+			return;
 
 		yuv_convert_and_scale_rgb( fr->in_scaler, in, fr->in[seqno]);
 		if(seqno == 0)
 			fr->last = in;
 	}
-
-	return 1;
 }
 
 static char 	*split_parameter_name( const char *name, const char *vj_name ) 
