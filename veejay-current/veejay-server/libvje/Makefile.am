@@ -275,5 +275,8 @@ libvje_la_SOURCES =	libvje.c vjert.c \
     effects/fractalcrystal.c \
     effects/fractalbiome.c \
     effects/xraysolarization.c \
-    effects/livingsignalcolony.c
+    effects/livingsignalcolony.c \
+    effects/chronotesselation.c \
+    effects/volumetrictelemetry.c
+
 

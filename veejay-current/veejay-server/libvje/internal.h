@@ -283,8 +283,10 @@
 #include "./effects/fractalbiome.h"
 #include "./effects/xraysolarization.h"
 #include "./effects/livingsignalcolony.h"
+#include "./effects/chronotesselation.h"
+#include "./effects/volumetrictelemetry.h"
 
-#define VJ_IMAGE_EFFECT_MIN 3
+#define VJ_IMAGE_EFFECT_MIN 1
 #define VJ_IMAGE_EFFECT_MAX 198
 
 #define VJ_VIDEO_EFFECT_MIN 200
@@ -602,6 +604,8 @@ enum {
     VJ_IMAGE_EFFECT_FRACTALORGANISM = 5,
     VJ_IMAGE_EFFECT_FRACTALCRYSTAL = 4,
     VJ_IMAGE_EFFECT_FRACTALBIOME = 3,
+    VJ_IMAGE_EFFECT_CHRONOTESSELATION = 2,
+    VJ_IMAGE_EFFECT_VOLUMETRICTELEMETRY = 1,
     VJ_IMAGE_EFFECT_DUMMY=0,
 };
 

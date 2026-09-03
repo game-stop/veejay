@@ -134,6 +134,8 @@ static struct {
     { chronovein_init, chronovein_malloc,chronovein_free, NULL,NULL, chronovein_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHRONOVEIN },
     { chronoglass_init, chronoglass_malloc,chronoglass_free, NULL,NULL, chronoglass_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHRONOGLASS },
     { chronomirror_init, chronomirror_malloc,chronomirror_free, NULL,NULL, chronomirror_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHRONOMIRROR },
+    { chronotesselation_init, chronotesselation_malloc,chronotesselation_free, NULL,NULL, chronotesselation_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHRONOTESSELATION },
+    { volumetrictelemetry_init, volumetrictelemetry_malloc,volumetrictelemetry_free, NULL,NULL, volumetrictelemetry_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_VOLUMETRICTELEMETRY },
     { chronoetch_init, chronoetch_malloc,chronoetch_free, NULL,NULL, chronoetch_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_CHRONOETCH },
     { radiantfissure_init, radiantfissure_malloc, radiantfissure_free, NULL,NULL, radiantfissure_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_RADIANTFISSURE },
     { meteorvector_init, meteorvector_malloc, meteorvector_free, NULL,NULL, meteorvector_apply, NULL,NULL,NULL,NULL, VJ_IMAGE_EFFECT_METEORVECTOR },
@@ -342,9 +344,6 @@ static struct {
     { morphologymixer_init, morphologymixer_malloc, morphologymixer_free, NULL,NULL,NULL, morphologymixer_apply, NULL,NULL,NULL, VJ_VIDEO_EFFECT_MORPHOLOGY },
     { NULL,NULL,NULL,NULL,NULL, NULL,NULL,NULL,NULL,NULL, 0},
 
-    // FIXME: global tagged FX : motionmap, bgsubtract, bgsubtractgauss, bgpush
-    //        1 motionmap per FX (set of FX that can request motionmap)
-    //        1 static bg per motionmap
 };
 
 static int *vj_fx_map = NULL;
