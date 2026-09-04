@@ -4,6 +4,7 @@ pkgname=veejay
 pkgrel=1
 pkgver=1.6.0
 _veejay_arch_target=generic
+_veejay_nvjpeg=no
 _source_name=veejay
 pkgdesc="Veejay is a visual instrument and realtime video sampler for GNU/Linux, server"
 arch=('x86_64' 'armv7h' 'aarch64' 'powerpc' 'powerpc64' 'powerpc64le')
@@ -12,17 +13,23 @@ license=('GPL2')
 groups=()
 conflicts=('veejay')
 depends=('veejay-core' 'glib2' 'ffmpeg' 'libxml2' 'freetype2' 'fontconfig' 'sdl2' 'libunwind' 'libx11' 'libxinerama' 'libjpeg-turbo' 'gdk-pixbuf2')
-optdepends=('liblo: OSC control support' 'libdv: DV capture/playback' 'libquicktime: Quicktime file support' 'jack2: JACK audio output' 'cuda: nvJPEG hardware MJPEG decode')
+optdepends=('liblo: OSC control support' 'libdv: DV capture/playback' 'libquicktime: Quicktime file support' 'jack2: JACK audio output')
 makedepends=('pkgconf')
 source=("${_source_name}-${pkgver}.tar.gz")
 sha256sums=('SKIP')
 backup=()
 replaces=()
 
+if [[ $_veejay_nvjpeg == yes ]]; then
+	depends+=('cuda')
+fi
+
 build() {
 	cd "$srcdir/${_source_name}-${pkgver}"
 	./autogen.sh
-	./configure --prefix=/usr --with-arch-target="$_veejay_arch_target"
+	./configure --prefix=/usr \
+		--with-arch-target="$_veejay_arch_target" \
+		--with-nvjpeg="$_veejay_nvjpeg"
 	make || return 1
 }
 
@@ -30,4 +37,3 @@ package() {
 	cd "$srcdir/${_source_name}-${pkgver}"
 	make DESTDIR="$pkgdir/" install
 }
-

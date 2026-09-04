@@ -7,14 +7,17 @@ export DH_VERBOSE=1
 # This has to be exported to make some magic below work.
 export DH_OPTIONS
 VEEJAY_ARCH_TARGET ?= generic
--include debian/veejay-release.mk
+VEEJAY_NVJPEG_CONFIGURE ?= --with-nvjpeg=no
+ifneq ($(wildcard debian/veejay-release.mk),)
+include debian/veejay-release.mk
+endif
 
 
 %:
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- --with-arch-target=$(VEEJAY_ARCH_TARGET)
+	dh_auto_configure -- --with-arch-target=$(VEEJAY_ARCH_TARGET) $(VEEJAY_NVJPEG_CONFIGURE)
 
 # NDI support is dlopen()'d at runtime (NDI_LIBS is just -ldl), so it never
 # creates a dpkg-shlibdeps problem; only the SDK header is needed at build
@@ -28,12 +31,10 @@ override_dh_auto_configure:
 # runtime-only variable the NDI library reads via dlopen() to locate
 # libndi.so.6; it is unrelated to locating headers at build time.
 
-# nvjpeg is auto-detected by configure: enabled only if the CUDA toolkit is
-# present on the build host, disabled otherwise. libnvjpeg itself isn't a
-# Debian-tracked package, so tell dpkg-shlibdeps not to fail when it can't
-# find shlibs info for it (the binary simply won't get an automatic Depends
-# on it; users need the CUDA runtime installed to use that optional codec path).
+# Release builds default to a CUDA-neutral server. The release workflow writes
+# --with-nvjpeg=yes to veejay-release.mk for the explicit -nvjpeg variant and
+# verifies both the configure result and packaged ELF dependencies. libnvjpeg
+# can lack Debian shlibs metadata, so do not fail dependency generation solely
+# because that optional vendor library has no distro-owned package record.
 override_dh_shlibdeps:
 	dh_shlibdeps -- --ignore-missing-info
-
-

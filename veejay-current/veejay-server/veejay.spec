@@ -7,6 +7,7 @@ License:        GPL-2.0-or-later
 URL:            http://www.veejayhq.net
 Source0:        %{name}-%{version}.tar.gz
 %{!?veejay_arch_target:%global veejay_arch_target generic}
+%{!?veejay_nvjpeg:%global veejay_nvjpeg no}
 %global debug_package %{nil}
 
 BuildRequires:  gcc
@@ -39,12 +40,11 @@ BuildRequires:  jack-audio-connection-kit-devel
 
 Requires:       veejay-core%{?_isa} >= 1.6.0
 
-# nvjpeg is auto-detected by configure: enabled only if the CUDA toolkit is
-# present on the build host, disabled otherwise. libnvjpeg itself isn't
-# packaged for any distro, so exclude it from rpmbuild's automatic
-# find-requires scan (the binary simply won't get an automatic Requires on
-# it; users need the CUDA runtime installed to use that optional codec path).
-%global __requires_exclude ^libnvjpeg\.so.*$
+# CUDA is supplied by NVIDIA rather than Fedora. Explicit -nvjpeg release
+# builds link against these libraries, but they cannot be resolved from the
+# stock Fedora repositories used to build and install the suite. Users of that
+# variant must install the matching NVIDIA CUDA runtime repository packages.
+%global __requires_exclude ^(libnvjpeg|libcudart)\.so.*$
 
 %description
 With veejay, you can play the video like you would play a piano. The
@@ -58,9 +58,9 @@ possible further processing.
 Can cluster to allow a number of machines to work together over the
 network (uncompressed streaming, veejay chaining).
 
-nvJPEG hardware MJPEG decode is auto-detected at build time when the
-CUDA toolkit is present; NDI network video/audio is dlopen()'d at
-runtime and opt-in via --with-ndi=DIR at build time.
+nvJPEG hardware MJPEG encode/decode is selected at build time with the
+veejay_nvjpeg RPM macro; NDI network video/audio is dlopen()'d at runtime
+and opt-in via --with-ndi=DIR at build time.
 
 %package devel
 Summary:        Development files for veejay
@@ -76,7 +76,7 @@ the Veejay server library.
 
 %build
 ./autogen.sh
-%configure --with-arch-target=%{veejay_arch_target}
+%configure --with-arch-target=%{veejay_arch_target} --with-nvjpeg=%{veejay_nvjpeg}
 %make_build
 
 %install
