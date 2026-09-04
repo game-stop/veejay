@@ -35,9 +35,9 @@ vj_effect *colormap_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
 
-    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 46;
-    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 109;
-    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 92;
+    ve->limits[0][0] = 0; ve->limits[1][0] = 255; ve->defaults[0] = 50;
+    ve->limits[0][1] = 0; ve->limits[1][1] = 255; ve->defaults[1] = 50;
+    ve->limits[0][2] = 0; ve->limits[1][2] = 255; ve->defaults[2] = 50;
 
     ve->description = "Color Harmony";
     ve->sub_format = -1;
