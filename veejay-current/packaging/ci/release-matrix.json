@@ -1,0 +1,184 @@
+{
+  "include": [
+    {
+      "format": "deb",
+      "release_target": "amd64-generic",
+      "suite_target": "amd64-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "ubuntu-24.04"
+    },
+    {
+      "format": "deb",
+      "release_target": "amd64-x86-64-v3",
+      "suite_target": "amd64-x86-64-v3",
+      "arch_target": "x86-64-v3",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "ubuntu-24.04"
+    },
+    {
+      "format": "deb",
+      "release_target": "arm64-generic",
+      "suite_target": "arm64-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "ubuntu-24.04-arm"
+    },
+    {
+      "format": "deb",
+      "release_target": "arm64-cortex-a72",
+      "suite_target": "arm64-cortex-a72",
+      "arch_target": "cortex-a72",
+      "variant": "standard",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "ubuntu-24.04-arm"
+    },
+    {
+      "format": "rpm",
+      "release_target": "amd64-generic",
+      "suite_target": "amd64-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "fedora-43"
+    },
+    {
+      "format": "rpm",
+      "release_target": "amd64-x86-64-v3",
+      "suite_target": "amd64-x86-64-v3",
+      "arch_target": "x86-64-v3",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "fedora-43"
+    },
+    {
+      "format": "rpm",
+      "release_target": "arm64-generic",
+      "suite_target": "arm64-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "fedora-43"
+    },
+    {
+      "format": "rpm",
+      "release_target": "arm64-cortex-a72",
+      "suite_target": "arm64-cortex-a72",
+      "arch_target": "cortex-a72",
+      "variant": "standard",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "fedora-43"
+    },
+    {
+      "format": "arch",
+      "release_target": "amd64-generic",
+      "suite_target": "amd64-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "archlinux"
+    },
+    {
+      "format": "arch",
+      "release_target": "amd64-x86-64-v3",
+      "suite_target": "amd64-x86-64-v3",
+      "arch_target": "x86-64-v3",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "archlinux"
+    },
+    {
+      "format": "deb",
+      "release_target": "amd64-generic",
+      "suite_target": "amd64-generic-nvjpeg",
+      "arch_target": "generic",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04",
+      "environment": "ubuntu-24.04+cuda-13.3"
+    },
+    {
+      "format": "deb",
+      "release_target": "amd64-x86-64-v3",
+      "suite_target": "amd64-x86-64-v3-nvjpeg",
+      "arch_target": "x86-64-v3",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04",
+      "environment": "ubuntu-24.04+cuda-13.3"
+    },
+    {
+      "format": "deb",
+      "release_target": "arm64-generic",
+      "suite_target": "arm64-generic-nvjpeg",
+      "arch_target": "generic",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "ubuntu-24.04-arm+cuda-13.3"
+    },
+    {
+      "format": "deb",
+      "release_target": "arm64-cortex-a72",
+      "suite_target": "arm64-cortex-a72-nvjpeg",
+      "arch_target": "cortex-a72",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "ubuntu-24.04-arm+cuda-13.3"
+    },
+    {
+      "format": "rpm",
+      "release_target": "amd64-generic",
+      "suite_target": "amd64-generic-nvjpeg",
+      "arch_target": "generic",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04",
+      "environment": "fedora-43+cuda-13.3"
+    },
+    {
+      "format": "rpm",
+      "release_target": "amd64-x86-64-v3",
+      "suite_target": "amd64-x86-64-v3-nvjpeg",
+      "arch_target": "x86-64-v3",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04",
+      "environment": "fedora-43+cuda-13.3"
+    },
+    {
+      "format": "rpm",
+      "release_target": "arm64-generic",
+      "suite_target": "arm64-generic-nvjpeg",
+      "arch_target": "generic",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "fedora-43+cuda-13.3"
+    },
+    {
+      "format": "rpm",
+      "release_target": "arm64-cortex-a72",
+      "suite_target": "arm64-cortex-a72-nvjpeg",
+      "arch_target": "cortex-a72",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04-arm",
+      "environment": "fedora-43+cuda-13.3"
+    },
+    {
+      "format": "arch",
+      "release_target": "amd64-generic",
+      "suite_target": "amd64-generic-nvjpeg",
+      "arch_target": "generic",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04",
+      "environment": "archlinux+cuda-13.3-build-toolkit"
+    },
+    {
+      "format": "arch",
+      "release_target": "amd64-x86-64-v3",
+      "suite_target": "amd64-x86-64-v3-nvjpeg",
+      "arch_target": "x86-64-v3",
+      "variant": "nvjpeg",
+      "runner": "ubuntu-24.04",
+      "environment": "archlinux+cuda-13.3-build-toolkit"
+    }
+  ]
+}
