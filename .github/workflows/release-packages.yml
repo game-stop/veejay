@@ -51,7 +51,13 @@ jobs:
           set -euo pipefail
           git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"
           test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "refs/tags/${RELEASE_TAG}")"
-          version="$(veejay-current/packaging/ci/release-version.sh check-tag "$RELEASE_TAG")"
+          version="$(veejay-current/packaging/ci/release-version.sh check)"
+          tag_version="${RELEASE_TAG#v}"
+          if [[ "$tag_version" != "$version" ]]; then
+            printf "ERROR: release tag '%s' does not match package version '%s'\n" \
+              "$RELEASE_TAG" "$version" >&2
+            exit 1
+          fi
           printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
