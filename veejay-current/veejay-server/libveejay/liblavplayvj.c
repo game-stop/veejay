@@ -13533,8 +13533,6 @@ static void veejay_openmp_warmup(int len)
 {
     int n_threads = vje_advise_num_threads(len);
     omp_set_dynamic(0);
-    omp_set_num_threads(n_threads);
-
 #pragma omp parallel num_threads(n_threads)
     {
 #pragma omp single
@@ -14338,7 +14336,10 @@ veejay_t *veejay_malloc()
 	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();
 
+    plug_set_omp_threads_num_lock_state(1);
     omp_set_num_threads( info->settings->ncpu );
+    plug_set_omp_threads_num_lock_state(0);
+    
 
 	int status = 0;
 	int acj    = 0;

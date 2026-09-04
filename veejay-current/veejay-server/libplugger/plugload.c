@@ -60,6 +60,7 @@
 #include <libplugger/frei0r-loader.h>
 #include <libplugger/livido-loader.h>
 #include <libvje/libvje.h>
+#include <veejaycore/atomic.h>
 
 static	vevo_port_t **index_map_ = NULL;
 static  vevo_port_t *illegal_plugins_ =NULL;
@@ -71,6 +72,8 @@ static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
 static  int read_cfg = 0;
+static volatile g_veejay_omp_unlocked = 0;
+
 
 static struct {
 	const char *path;
@@ -85,6 +88,23 @@ static struct {
 //forward decl
 void plug_print_all();
 
+void plug_set_omp_threads_num_lock_state(int unlocked) {
+	atomic_store_int(&g_veejay_omp_unlocked, unlocked);
+}
+
+void omp_set_num_threads(int num_threads) {
+	typedef void (*omp_set_num_threads_f)(int);
+	static omp_set_num_threads_f real_omp_set_num_threads = NULL;
+
+	if(!real_omp_set_num_threads) {
+		real_omp_set_num_threads = (omp_set_num_threads_f)dlsym(RTLD_NEXT, "omp_set_num_threads");
+	}
+	if(real_omp_set_num_threads) {
+		int is_unlocked = atomic_load_int(&g_veejay_omp_unlocked);
+		int safe_threads = is_unlocked ? num_threads: 1;
+		real_omp_set_num_threads(safe_threads);
+	}
+}
 
 static	int	select_f( const struct dirent *d )
 {

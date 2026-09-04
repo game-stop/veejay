@@ -1080,11 +1080,17 @@ static int livido_async_state_create(void *instance, int flags)
 	state->next = livido_async_states;
 	livido_async_states = state;
 
-	/*
-	 * This raw pthread is deliberately outside the host OpenMP team. A Livido
-	 * callback may therefore create its own level-one OpenMP team without
-	 * enabling nested teams for internal VeeJay effects.
-	 */
+	setenv("OMP_THREAD_LIMIT", "1", 1);
+    
+    // 2. Default all parallel regions to 1 thread
+    setenv("OMP_NUM_THREADS", "1", 1);
+    
+    // 3. Disable nested parallelism entirely
+    setenv("OMP_MAX_ACTIVE_LEVELS", "0", 1);
+    
+    // 4. Force threads to yield immediately instead of spinning (if any slip through)
+    setenv("OMP_WAIT_POLICY", "PASSIVE", 1);
+
 	error = pthread_create(&state->thread, NULL, livido_async_worker, state);
 	if(error != 0) {
 		livido_async_states = state->next;

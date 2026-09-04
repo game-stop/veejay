@@ -44,6 +44,9 @@ typedef struct {
 	unsigned int flags;
 } plug_capabilities_t;
 
+void omp_set_num_threads(int num_threads);
+void plug_set_omp_threads_num_lock_state(int unlocked);
+
 void	plug_sys_free(void);
 void	plug_sys_init( int fmt, int w, int h, int cfg );
 void	plug_sys_set_palette( int palette );

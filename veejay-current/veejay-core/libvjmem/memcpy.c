@@ -2493,7 +2493,7 @@ void vj_frame_slow_single(uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **im
         return;
     }
 
-    #pragma omp parallel sections
+    #pragma omp sections
     {
 #pragma omp section
         {
