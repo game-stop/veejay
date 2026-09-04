@@ -1,0 +1,315 @@
+name: Distro package release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing version tag to build and publish, for example v1.6.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distro-release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CUDA_SERIES: 13-3
+
+jobs:
+  prepare:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    outputs:
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      version: ${{ steps.release.outputs.version }}
+      deb_matrix: ${{ steps.matrix.outputs.deb }}
+      rpm_matrix: ${{ steps.matrix.outputs.rpm }}
+      arch_matrix: ${{ steps.matrix.outputs.arch }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Validate tag and package versions
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          git show-ref --verify --quiet "refs/tags/${RELEASE_TAG}"
+          test "$(git rev-parse HEAD)" = "$(git rev-list -n 1 "refs/tags/${RELEASE_TAG}")"
+          version="$(veejay-current/packaging/ci/release-version.sh check-tag "$RELEASE_TAG")"
+          printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
+      - name: Load standard-runner build matrix
+        id: matrix
+        run: |
+          set -euo pipefail
+          matrix=veejay-current/packaging/ci/release-matrix.json
+          jq -e '
+            (.include | length == 20) and
+            ([.include[] | select(.variant == "standard")] | length == 10) and
+            ([.include[] | select(.variant == "nvjpeg")] | length == 10) and
+            ([.include[] | "\(.format):\(.suite_target)"] | unique | length == 20) and
+            all(.include[];
+              (.format == "deb" or .format == "rpm" or .format == "arch") and
+              (.runner == "ubuntu-24.04" or .runner == "ubuntu-24.04-arm") and
+              ((.variant == "standard" and .suite_target == .release_target) or
+               (.variant == "nvjpeg" and .suite_target == (.release_target + "-nvjpeg")))
+            )
+          ' "$matrix" >/dev/null
+          for format in deb rpm arch; do
+            value="$(jq -c --arg format "$format" \
+              '{include: [.include[] | select(.format == $format)]}' "$matrix")"
+            printf '%s=%s\n' "$format" "$value" >> "$GITHUB_OUTPUT"
+          done
+
+  deb:
+    name: DEB / ${{ matrix.suite_target }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.prepare.outputs.deb_matrix) }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Install Debian packaging tools
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential curl devscripts equivs git gzip
+
+      - name: Install NVIDIA CUDA build toolkit
+        if: matrix.variant == 'nvjpeg'
+        run: veejay-current/packaging/ci/install-cuda-toolkit.sh
+
+      - name: Build package suite
+        env:
+          PACKAGE_BUILD_ENVIRONMENT: ${{ matrix.environment }}
+          PACKAGE_VARIANT: ${{ matrix.variant }}
+          RELEASE_TARGET: ${{ matrix.release_target }}
+        run: |
+          veejay-current/packaging/ci/deb-suite-builder.sh \
+            '${{ matrix.arch_target }}'
+
+      - name: Upload package suite
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-deb-${{ matrix.suite_target }}
+          path: veejay-current/release-packages/${{ matrix.suite_target }}/deb/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  rpm:
+    name: RPM / ${{ matrix.suite_target }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.prepare.outputs.rpm_matrix) }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Install NVIDIA CUDA build toolkit
+        if: matrix.variant == 'nvjpeg'
+        run: veejay-current/packaging/ci/install-cuda-toolkit.sh
+
+      - name: Build package suite in Fedora
+        env:
+          ARCH_TARGET: ${{ matrix.arch_target }}
+          PACKAGE_BUILD_ENVIRONMENT: ${{ matrix.environment }}
+          PACKAGE_VARIANT: ${{ matrix.variant }}
+          RELEASE_TARGET: ${{ matrix.release_target }}
+        run: |
+          set -euo pipefail
+          cuda_args=()
+          if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
+            : "${CUDA_HOME:?CUDA_HOME was not exported by the toolkit installer}"
+            : "${CUDA_LIBRARY_PATH:?CUDA_LIBRARY_PATH was not exported by the toolkit installer}"
+            : "${NVCC:?NVCC was not exported by the toolkit installer}"
+            cuda_args+=(
+              --volume "${CUDA_HOME}:${CUDA_HOME}:ro"
+              --env CUDA_HOME
+              --env CUDA_PATH
+              --env CUDA_LIBRARY_PATH
+              --env CUDA_SERIES
+              --env LD_LIBRARY_PATH
+              --env NVCC
+            )
+          fi
+          docker run --rm \
+            --env ARCH_TARGET \
+            --env PACKAGE_BUILD_ENVIRONMENT \
+            --env PACKAGE_VARIANT \
+            --env RELEASE_TARGET \
+            "${cuda_args[@]}" \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace/veejay-current \
+            fedora:43 \
+            bash -lc '
+              set -euo pipefail
+              dnf install -y \
+                alsa-lib-devel autoconf automake binutils cpio findutils fontconfig-devel \
+                freetype-devel gcc gcc-c++ gdk-pixbuf2-devel git-core glib2-devel \
+                gzip jack-audio-connection-kit-devel libdv-devel \
+                libjpeg-turbo-devel liblo-devel libtool libunwind-devel \
+                libX11-devel libXinerama-devel libxml2-devel make \
+                pkgconf-pkg-config rpm-build SDL2-devel shadow-utils tar which \
+                ffmpeg-free-devel
+              packaging/ci/rpm-suite-builder.sh "$ARCH_TARGET"
+            '
+
+      - name: Upload package suite
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-rpm-${{ matrix.suite_target }}
+          path: veejay-current/release-packages/${{ matrix.suite_target }}/rpm/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  arch:
+    name: Arch / ${{ matrix.suite_target }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.prepare.outputs.arch_matrix) }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Install NVIDIA CUDA build toolkit
+        if: matrix.variant == 'nvjpeg'
+        run: veejay-current/packaging/ci/install-cuda-toolkit.sh
+
+      - name: Build package suite in Arch Linux
+        env:
+          ARCH_TARGET: ${{ matrix.arch_target }}
+          PACKAGE_BUILD_ENVIRONMENT: ${{ matrix.environment }}
+          PACKAGE_VARIANT: ${{ matrix.variant }}
+          RELEASE_TARGET: ${{ matrix.release_target }}
+        run: |
+          set -euo pipefail
+          cuda_args=()
+          if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
+            : "${CUDA_HOME:?CUDA_HOME was not exported by the toolkit installer}"
+            : "${CUDA_LIBRARY_PATH:?CUDA_LIBRARY_PATH was not exported by the toolkit installer}"
+            : "${NVCC:?NVCC was not exported by the toolkit installer}"
+            cuda_args+=(
+              --volume "${CUDA_HOME}:${CUDA_HOME}:ro"
+              --env CUDA_HOME
+              --env CUDA_PATH
+              --env CUDA_LIBRARY_PATH
+              --env CUDA_SERIES
+              --env LD_LIBRARY_PATH
+              --env NVCC
+            )
+          fi
+          docker run --rm \
+            --env ARCH_TARGET \
+            --env PACKAGE_BUILD_ENVIRONMENT \
+            --env PACKAGE_VARIANT \
+            --env RELEASE_TARGET \
+            "${cuda_args[@]}" \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace/veejay-current \
+            archlinux:base-devel \
+            bash -lc '
+              set -euo pipefail
+              pacman -Syu --noconfirm --needed git sudo
+              packaging/ci/arch-suite-builder.sh "$ARCH_TARGET"
+            '
+
+      - name: Upload package suite
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-arch-${{ matrix.suite_target }}
+          path: veejay-current/release-packages/${{ matrix.suite_target }}/arch/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release
+    needs: [prepare, deb, rpm, arch]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Download package suites
+        uses: actions/download-artifact@v4
+        with:
+          pattern: packages-*
+          path: downloaded-packages
+          merge-multiple: false
+
+      - name: Stage uniquely named release assets
+        run: |
+          veejay-current/packaging/ci/stage-release-assets.sh \
+            downloaded-packages release-assets
+
+      - name: Preserve combined release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: veejay-${{ needs.prepare.outputs.version }}-distro-packages
+          path: release-assets/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" release-assets/* \
+              --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" release-assets/* \
+              --generate-notes --title "VeeJay ${VERSION}" --verify-tag \
+              --repo "$GITHUB_REPOSITORY"
+          fi
