@@ -42,6 +42,15 @@ typedef struct {
 
     float drift_phase;
     int initialized;
+
+    int frame_tiles;
+    int frame_small_w;
+    int frame_small_h;
+    int frame_phase_px;
+    int frame_phase_py;
+    int frame_tile_q8;
+    int frame_tile_off_x;
+    int frame_tile_off_y;
 } tiler_t;
 
 static inline int tiler_clampi(int v, int lo, int hi)
@@ -197,52 +206,68 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
     const int width = frame->width;
     const int height = frame->height;
 
-    int max_tiles = (width < height ? width : height) / 8;
-    if(max_tiles < 2)
-        max_tiles = 2;
+#pragma omp single
+    {
+        int max_tiles = (width < height ? width : height) / 8;
+        if(max_tiles < 2)
+            max_tiles = 2;
 
-    const int tiles_arg = args[P_TILES];
-    const int phase_x_arg = args[P_PHASE_X];
-    const int phase_y_arg = args[P_PHASE_Y];
-    const int drift_arg = args[P_DRIFT_SPEED];
-    const int opacity_arg = args[P_OPACITY];
+        const int tiles_arg = args[P_TILES];
+        const int phase_x_arg = args[P_PHASE_X];
+        const int phase_y_arg = args[P_PHASE_Y];
+        const int drift_arg = args[P_DRIFT_SPEED];
+        const int opacity_arg = args[P_OPACITY];
+        const float fast_a = 0.34f;
+        const float slow_r = 0.085f;
 
-    const float fast_a = 0.34f;
-    const float slow_r = 0.085f;
+        if(!s->initialized) {
+            s->tiles_s = (float)tiles_arg;
+            s->phase_x_s = (float)phase_x_arg;
+            s->phase_y_s = (float)phase_y_arg;
+            s->drift_s = (float)drift_arg;
+            s->opacity_s = (float)opacity_arg;
+            s->initialized = 1;
+        }
 
-    if(!s->initialized) {
-        s->tiles_s = (float)tiles_arg;
-        s->phase_x_s = (float)phase_x_arg;
-        s->phase_y_s = (float)phase_y_arg;
-        s->drift_s = (float)drift_arg;
-        s->opacity_s = (float)opacity_arg;
-        s->initialized = 1;
+        int tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
+        int phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
+        int phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
+        int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
+        int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
+
+        tiles = tiler_clampi(tiles, 2, max_tiles);
+        phase_x = tiler_clampi(phase_x, 0, 1000);
+        phase_y = tiler_clampi(phase_y, 0, 1000);
+        drift = tiler_clampi(drift, -1000, 1000);
+        opacity = tiler_clampi(opacity, 0, 255);
+
+        s->drift_phase += (float)drift * 0.018f;
+        if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
+            s->drift_phase = 0.0f;
+
+        s->frame_tile_q8 = (opacity * 256 + 127) / 255;
+        if(opacity > 0) {
+            s->frame_tiles = tiles;
+            s->frame_phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
+            s->frame_phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
+            s->frame_small_w = (width + tiles - 1) / tiles;
+            s->frame_small_h = (height + tiles - 1) / tiles;
+            s->frame_tile_off_x = (s->frame_phase_px / tiles) % s->frame_small_w;
+            s->frame_tile_off_y = (s->frame_phase_py / tiles) % s->frame_small_h;
+        }
     }
 
-    int tiles = tiler_smooth_to(&s->tiles_s, tiles_arg, fast_a, slow_r);
-    int phase_x = tiler_smooth_to(&s->phase_x_s, phase_x_arg, fast_a * 0.56f, slow_r);
-    int phase_y = tiler_smooth_to(&s->phase_y_s, phase_y_arg, fast_a * 0.56f, slow_r);
-    int drift = tiler_smooth_to(&s->drift_s, drift_arg, fast_a * 0.48f, slow_r);
-    int opacity = tiler_smooth_to(&s->opacity_s, opacity_arg, fast_a * 0.82f, slow_r);
-
-    tiles = tiler_clampi(tiles, 2, max_tiles);
-    phase_x = tiler_clampi(phase_x, 0, 1000);
-    phase_y = tiler_clampi(phase_y, 0, 1000);
-    drift = tiler_clampi(drift, -1000, 1000);
-    opacity = tiler_clampi(opacity, 0, 255);
-
-    s->drift_phase += (float)drift * 0.018f;
-    if(s->drift_phase > 32768.0f || s->drift_phase < -32768.0f)
-        s->drift_phase = 0.0f;
-
-    if(opacity <= 0)
+    const int tile_q8 = s->frame_tile_q8;
+    if(tile_q8 <= 0)
         return;
 
-    const int phase_px = tiler_wrapi(((phase_x * width) + 500) / 1000 + (int)s->drift_phase, width);
-    const int phase_py = tiler_wrapi(((phase_y * height) + 500) / 1000 + (int)(s->drift_phase * 0.618f), height);
-
-    const int small_w = (width  + tiles - 1) / tiles;
-    const int small_h = (height + tiles - 1) / tiles;
+    const int tiles = s->frame_tiles;
+    const int small_w = s->frame_small_w;
+    const int small_h = s->frame_small_h;
+    const int phase_px = s->frame_phase_px;
+    const int phase_py = s->frame_phase_py;
+    const int tile_off_x = s->frame_tile_off_x;
+    const int tile_off_y = s->frame_tile_off_y;
     uint8_t *restrict srcY = frame->data[0];
     uint8_t *restrict srcU = frame->data[1];
     uint8_t *restrict srcV = frame->data[2];
@@ -267,10 +292,6 @@ void tiler_apply(void *ptr, VJFrame *frame, int *args)
                 bufV[dst] = srcV[src];
             }
         }
-
-        const int tile_q8 = (opacity * 256 + 127) / 255;
-        const int tile_off_x = (phase_px / tiles) % small_w;
-        const int tile_off_y = (phase_py / tiles) % small_h;
 
 #pragma omp for schedule(static)
     for(int y = 0; y < height; y++) {
