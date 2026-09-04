@@ -43,6 +43,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
+      - name: Use current release tooling
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
+
       - name: Validate tag and package versions
         id: release
         env:
@@ -100,6 +105,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.release_tag }}
 
+      - name: Use current release tooling
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
+
       - name: Install Debian packaging tools
         env:
           DEBIAN_FRONTEND: noninteractive
@@ -145,6 +155,11 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Use current release tooling
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
 
       - name: Install NVIDIA CUDA build toolkit
         if: matrix.variant == 'nvjpeg'
@@ -220,6 +235,11 @@ jobs:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.release_tag }}
 
+      - name: Use current release tooling
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
+
       - name: Install NVIDIA CUDA build toolkit
         if: matrix.variant == 'nvjpeg'
         run: veejay-current/packaging/ci/install-cuda-toolkit.sh
@@ -283,6 +303,11 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ needs.prepare.outputs.release_tag }}
+
+      - name: Use current release tooling
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
 
       - name: Download package suites
         uses: actions/download-artifact@v4

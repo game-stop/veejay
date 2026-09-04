@@ -23,6 +23,7 @@ PACKAGE_ROOT="${DEB_PACKAGE_ROOT:-${ROOT_DIR}/release-packages/${SUITE_TARGET}/d
 
 if [[ $EUID -eq 0 ]]; then
     SUDO=()
+    BUILD_DEPS_ROOT=()
     BUILD_DEPS_TOOL='apt-get -y --no-install-recommends'
 else
     command -v sudo >/dev/null 2>&1 || {
@@ -30,7 +31,8 @@ else
         exit 127
     }
     SUDO=(sudo)
-    BUILD_DEPS_TOOL='sudo apt-get -y --no-install-recommends'
+    BUILD_DEPS_ROOT=(--root-cmd sudo)
+    BUILD_DEPS_TOOL='apt-get -y --no-install-recommends'
 fi
 
 for command_name in cc dpkg-buildpackage dpkg-deb mk-build-deps; do
@@ -72,7 +74,8 @@ build_project() {
 
     (
         cd "$source_dir"
-        mk-build-deps --install --remove --tool "$BUILD_DEPS_TOOL" debian/control
+        mk-build-deps --install --remove "${BUILD_DEPS_ROOT[@]}" \
+            --tool "$BUILD_DEPS_TOOL" debian/control
         DEB_BUILD_OPTIONS="nocheck parallel=$(nproc)" \
             dpkg-buildpackage -us -uc -b
     )
