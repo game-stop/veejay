@@ -159,7 +159,10 @@ jobs:
       - name: Use current release tooling
         env:
           WORKFLOW_SHA: ${{ github.workflow_sha }}
-        run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
+        run: |
+          git restore --source="$WORKFLOW_SHA" --worktree -- \
+            veejay-current/packaging/ci \
+            veejay-current/veejay-server/veejay.spec
 
       - name: Install NVIDIA CUDA build toolkit
         if: matrix.variant == 'nvjpeg'

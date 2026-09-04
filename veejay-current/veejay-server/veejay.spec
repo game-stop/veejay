@@ -82,6 +82,9 @@ the Veejay server library.
 %install
 %make_install
 find %{buildroot} \( -name '*.la' -o -name '*.a' \) -delete
+%if 0%{?veejay_ci_verify}
+install -D -m 0644 config.h "%{_topdir}/VEEJAY-CONFIG/config.h"
+%endif
 
 %files
 %license COPYING

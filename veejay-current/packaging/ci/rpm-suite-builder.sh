@@ -98,11 +98,12 @@ build_project() {
         --define "_smp_build_ncpus ${BUILD_JOBS}" \
         --define "veejay_arch_target ${ARCH_TARGET}" \
         --define "veejay_nvjpeg ${nvjpeg_setting}" \
+        --define "veejay_ci_verify 1" \
         "${topdir}/SPECS/${spec_name}"
 
     if [[ "$project" == veejay-server ]]; then
         "${ROOT_DIR}/packaging/ci/verify-nvjpeg-config.sh" \
-            "$PACKAGE_VARIANT" "${topdir}/BUILD" | \
+            "$PACKAGE_VARIANT" "${topdir}/VEEJAY-CONFIG" | \
             tee "${PACKAGE_ROOT}/NVJPEG-CONFIG-VERIFICATION.txt"
     fi
 
