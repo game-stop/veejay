@@ -60,14 +60,63 @@ if [[ "$START_PROJECT" == core ]]; then
 fi
 mkdir -p "$BUILD_ROOT" "$PACKAGE_ROOT"
 
+# makepkg has no pacman-style --assume-installed option. Represent the
+# read-only CUDA toolkit mounted by CI without adding the provider to assets.
+install_cuda_provider() {
+    if pacman -T cuda >/dev/null 2>&1; then
+        return
+    fi
+
+    local provider_root="${BUILD_ROOT}/cuda-build-provider"
+    local cuda_version="${CUDA_SERIES:-13-3}"
+    local provider_package=''
+
+    cuda_version="${cuda_version//-/.}"
+    [[ "$cuda_version" =~ ^[0-9]+([.][0-9]+)*$ ]] || {
+        printf "ERROR: CUDA_SERIES produced invalid Arch version '%s'\n" "$cuda_version" >&2
+        exit 2
+    }
+
+    rm -rf -- "$provider_root"
+    mkdir -p "$provider_root"
+    printf '%s\n' \
+        'pkgname=veejay-cuda-build-provider' \
+        "pkgver=${cuda_version}" \
+        'pkgrel=1' \
+        'pkgdesc="Temporary provider for the CUDA toolkit mounted by VeeJay CI"' \
+        "arch=('any')" \
+        "license=('custom')" \
+        'provides=("cuda=${pkgver}")' \
+        "conflicts=('cuda')" \
+        "options=('!strip')" \
+        'package() {' \
+        '    install -D -m 0644 /dev/null "$pkgdir/usr/share/veejay/cuda-build-provider"' \
+        '}' > "${provider_root}/PKGBUILD"
+    chown -R builder:builder "$provider_root"
+
+    (
+        cd "$provider_root"
+        runuser -u builder -- makepkg \
+            --config "$MAKEPKG_CONFIG" \
+            --noconfirm --cleanbuild
+    )
+
+    provider_package="$(find "$provider_root" -maxdepth 1 -type f \
+        -name 'veejay-cuda-build-provider-*.pkg.tar.*' ! -name '*.sig' -print -quit)"
+    [[ -n "$provider_package" ]] || {
+        printf 'ERROR: temporary CUDA provider package was not created\n' >&2
+        exit 1
+    }
+    pacman -U --needed --noconfirm "$provider_package"
+    pacman -T cuda >/dev/null
+}
+
 build_project() {
     local label="$1"
     local project="$2"
     local archive_name="$3"
     local work_dir="${BUILD_ROOT}/${label}"
-    local cuda_assumed_version=''
     local -a cuda_environment=()
-    local -a dependency_options=()
 
     if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
         : "${CUDA_HOME:?CUDA_HOME must identify the mounted CUDA toolkit}"
@@ -82,11 +131,6 @@ build_project() {
             "NVCC=${NVCC:-${CUDA_HOME}/bin/nvcc}"
             "LD_LIBRARY_PATH=${CUDA_LIBRARY_PATH:-${CUDA_HOME}/lib64}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         )
-        # Keep `cuda` in the resulting package's runtime dependencies without
-        # downloading Arch's multi-gigabyte toolkit over the mounted CI copy.
-        cuda_assumed_version="${CUDA_SERIES:-13-3}"
-        cuda_assumed_version="${cuda_assumed_version//-/.}"
-        dependency_options=(--assume-installed "cuda=${cuda_assumed_version}")
     fi
 
     rm -rf -- "$work_dir"
@@ -107,8 +151,7 @@ build_project() {
         cd "$work_dir"
         runuser -u builder -- "${cuda_environment[@]}" makepkg \
             --config "$MAKEPKG_CONFIG" \
-            --syncdeps --needed --noconfirm --cleanbuild \
-            "${dependency_options[@]}"
+            --syncdeps --needed --noconfirm --cleanbuild
     )
 
     if [[ "$project" == veejay-server ]]; then
@@ -127,11 +170,6 @@ build_project() {
 install_package() {
     local prefix="$1"
     local -a matches=()
-    local -a dependency_options=()
-
-    if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
-        dependency_options=(--assume-installed 'cuda=13.3')
-    fi
 
     mapfile -d '' -t matches < <(
         find "$PACKAGE_ROOT" -maxdepth 1 -type f \
@@ -141,9 +179,12 @@ install_package() {
         printf "ERROR: built Arch package '%s' was not found\n" "$prefix" >&2
         exit 1
     }
-    pacman -U --needed --noconfirm \
-        "${dependency_options[@]}" "${matches[@]}"
+    pacman -U --needed --noconfirm "${matches[@]}"
 }
+
+if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
+    install_cuda_provider
+fi
 
 case "$START_PROJECT" in
     core)
