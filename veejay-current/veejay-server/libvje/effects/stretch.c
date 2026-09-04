@@ -257,8 +257,11 @@ void stretch_apply(void *ptr, VJFrame *frame, int *args)
             const int cb = (int)Cb[i] - 128;
             const int cr = (int)Cr[i] - 128;
 
-            int out_cb = 128 + cb + ((cb * effective_gain) >> 8);
-            int out_cr = 128 + cr - ((cr * effective_gain) >> 8);
+            const int cb_prod = cb * effective_gain;
+            const int cr_prod = cr * effective_gain;
+
+            int out_cb = 128 + cb + ((cb_prod + (cb_prod >= 0 ? 128 : -128)) >> 8);
+            int out_cr = 128 + cr + ((cr_prod + (cr_prod >= 0 ? 128 : -128)) >> 8);
 
             if(beat_twist_q8 > 0) {
                 out_cb += (cr * beat_twist_q8) >> 8;
