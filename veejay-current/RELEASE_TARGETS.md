@@ -31,6 +31,24 @@ On AArch64, ASIMD is part of the architecture baseline and is enabled in the gen
 
 On PowerPC, generic packages retain scalar fallbacks. ArchPOWER's PPC64LE distribution baseline is POWER8, so its foreign builder overrides the VeeJay generic profile to `-mcpu=powerpc64`; this keeps VeeJay's own generic code scalar even though the surrounding distribution still requires a POWER8-class machine. A non-generic target enables AltiVec only after a compiler probe; `libsubsample` then selects its AltiVec backend at compile time. Keep specialized ARM and PowerPC packages in profile-labelled repositories because they can fault on an older CPU.
 
+## GitHub-hosted distro releases
+
+`.github/workflows/release-packages.yml` publishes unsigned distro packages from an existing `vVERSION` tag. It runs automatically when that tag is pushed and can also be started manually by supplying the existing tag. The workflow refuses to build when the tag and the versions in Autotools, Debian, RPM, Arch, or `sendVIMS` metadata differ.
+
+The automated matrix deliberately uses only standard GitHub-hosted native Linux runners. It builds 10 standard suites and a matching, explicitly enabled `-nvjpeg` companion for every suite, for 20 release suites in total:
+
+| Package ecosystem | Standard release targets | nvJPEG companions | Build environment |
+|---|---|---|---|
+| Debian/Ubuntu `.deb` | `amd64-generic`, `amd64-x86-64-v3`, `arm64-generic`, `arm64-cortex-a72` | The same names with `-nvjpeg` appended | Ubuntu 24.04 x64/arm64 runner; NVIDIA CUDA 13.3 toolkit for nvJPEG |
+| Fedora `.rpm` | `amd64-generic`, `amd64-x86-64-v3`, `arm64-generic`, `arm64-cortex-a72` | The same names with `-nvjpeg` appended | Fedora 43 container on the matching native runner; NVIDIA CUDA 13.3 toolkit mounted read-only for nvJPEG |
+| Arch `.pkg.tar.zst` | `amd64-generic`, `amd64-x86-64-v3` | The same names with `-nvjpeg` appended | Official Arch Linux container on the x64 runner; NVIDIA CUDA 13.3 toolkit mounted read-only for nvJPEG |
+
+ARMv7, every PowerPC profile, Arch Linux ARM, ArchPOWER, and community RPM ports remain available for external builders but are not scheduled by the GitHub workflow. No QEMU, self-hosted runner, community repository, or NDI SDK is required by the automated jobs.
+
+nvJPEG selection is a compile-time choice, so installing CUDA after installing a standard VeeJay package cannot activate it. Standard suites therefore pass `--with-nvjpeg=no`; companion suites install the toolkit and pass `--with-nvjpeg=yes`. A companion build is rejected unless `config.h` positively defines both `HAVE_NVJPEG` and `HAVE_NVJPEG_CUDA_KERNEL`, and unless the packaged server ELF files positively link both `libnvjpeg` and `libcudart`. The build does not need a GPU. Running the resulting hardware codec does require a compatible NVIDIA GPU, driver, and CUDA/nvJPEG runtime. Arch `-nvjpeg` package metadata requires the distribution's `cuda` package at installation time. Fedora packages intentionally cannot express those vendor runtime dependencies through the stock Fedora repository, so install the matching NVIDIA CUDA runtime before installing an RPM whose release asset name contains `-nvjpeg`.
+
+Each matrix entry builds the suite in dependency order, validates package names and architectures, verifies the requested CUDA state, and uploads a profile-specific workflow artifact. The final job prefixes release filenames with their format and suite profile so standard, specialized, and `-nvjpeg` packages cannot overwrite each other, then publishes the packages with `BUILD-PROFILE.txt`, nvJPEG verification reports, `RELEASE-MANIFEST.txt`, and `SHA256SUMS` files on the GitHub Release.
+
 ## Building one target
 
 List the matrix:
@@ -70,7 +88,7 @@ The current Debian Ports PowerPC FFmpeg packages depend on `libx265-216`, but th
 
 Generic and specialized packages currently share package names and versions. Publish them in separate repositories or artifact directories and never mix both profiles in one dependency repository.
 
-The RPM specs request FFmpeg through `pkgconfig(libavcodec)`, `pkgconfig(libavformat)`, `pkgconfig(libavutil)`, `pkgconfig(libswscale)`, and `pkgconfig(libswresample)` capabilities. Fedora 43 provides these through its first-party `ffmpeg-free-devel` split on PPC64LE; RPM Fusion Free provides the full FFmpeg implementation used by the AMD64 and AArch64 builders. Fedora and ArchPOWER do not supply Pure Data development headers, so their suites contain the six Autotools packages unless an additional community Pd repository or separately packaged Pd SDK is provided. Debian and Arch Linux ARM provide the required Pd development files directly.
+The RPM specs request FFmpeg through `pkgconfig(libavcodec)`, `pkgconfig(libavformat)`, `pkgconfig(libavutil)`, `pkgconfig(libswscale)`, and `pkgconfig(libswresample)` capabilities. The standard GitHub workflow satisfies these capabilities with Fedora 43's first-party `ffmpeg-free-devel` package. External builders may use RPM Fusion Free when the full FFmpeg implementation is preferred. Fedora and ArchPOWER do not supply Pure Data development headers, so their suites contain the six Autotools packages unless an additional community Pd repository or separately packaged Pd SDK is provided. Debian and Arch Linux ARM provide the required Pd development files directly.
 
 For the supplied foreign Arch runner, use `ARCH_INCLUDE_PUREDATA=0` on ArchPOWER. The runner then builds Core, server, client, utils, Eidolon, and Director and skips only `sendVIMS`.
 
