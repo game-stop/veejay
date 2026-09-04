@@ -3,11 +3,12 @@ name: Distro package release
 on:
   push:
     tags:
-      - "v*"
+      - "v[0-9]*"
+      - "[0-9]*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing version tag to build and publish, for example v1.6.0
+        description: Existing version tag to build and publish, for example 1.6.0 or v1.6.0
         required: true
         type: string
 

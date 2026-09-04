@@ -129,12 +129,12 @@ case "${1:-check}" in
         check_versions
         ;;
     check-tag)
-        [[ $# -eq 2 ]] || die "usage: $0 check-tag vVERSION"
+        [[ $# -eq 2 ]] || die "usage: $0 check-tag [v]VERSION"
         version="$(check_versions)"
-        [[ "$2" == "v${version}" ]] || die "release tag '$2' does not match package version '${version}'"
+        [[ "$2" == "$version" || "$2" == "v${version}" ]] || die "release tag '$2' does not match package version '${version}'"
         printf '%s\n' "$version"
         ;;
     *)
-        die "usage: $0 {get|check|check-tag vVERSION}"
+        die "usage: $0 {get|check|check-tag [v]VERSION}"
         ;;
 esac

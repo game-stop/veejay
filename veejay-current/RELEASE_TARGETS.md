@@ -33,7 +33,7 @@ On PowerPC, generic packages retain scalar fallbacks. ArchPOWER's PPC64LE distri
 
 ## GitHub-hosted distro releases
 
-`.github/workflows/release-packages.yml` publishes unsigned distro packages from an existing `vVERSION` tag. It runs automatically when that tag is pushed and can also be started manually by supplying the existing tag. The workflow refuses to build when the tag and the versions in Autotools, Debian, RPM, Arch, or `sendVIMS` metadata differ.
+`.github/workflows/release-packages.yml` publishes unsigned distro packages from an existing `VERSION` or `vVERSION` tag. It runs automatically when either tag form is pushed and can also be started manually by supplying the existing tag. The workflow refuses to build when the tag and the versions in Autotools, Debian, RPM, Arch, or `sendVIMS` metadata differ.
 
 The automated matrix deliberately uses only standard GitHub-hosted native Linux runners. It builds 10 standard suites and a matching, explicitly enabled `-nvjpeg` companion for every suite, for 20 release suites in total:
 
