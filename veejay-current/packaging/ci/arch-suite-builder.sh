@@ -60,8 +60,8 @@ if [[ "$START_PROJECT" == core ]]; then
 fi
 mkdir -p "$BUILD_ROOT" "$PACKAGE_ROOT"
 
-# makepkg has no pacman-style --assume-installed option. Represent the
-# read-only CUDA toolkit mounted by CI without adding the provider to assets.
+# Represent the read-only CUDA toolkit mounted by CI without adding the
+# temporary dependency provider to the release assets.
 install_cuda_provider() {
     if pacman -T cuda >/dev/null 2>&1; then
         return
@@ -76,6 +76,7 @@ install_cuda_provider() {
         printf "ERROR: CUDA_SERIES produced invalid Arch version '%s'\n" "$cuda_version" >&2
         exit 2
     }
+    printf 'Installing CI-only Arch CUDA provider (cuda=%s)\n' "$cuda_version"
 
     rm -rf -- "$provider_root"
     mkdir -p "$provider_root"
@@ -108,7 +109,10 @@ install_cuda_provider() {
         exit 1
     }
     pacman -U --needed --noconfirm "$provider_package"
-    pacman -T cuda >/dev/null
+    pacman -T cuda >/dev/null || {
+        printf 'ERROR: temporary CUDA provider did not satisfy the cuda dependency\n' >&2
+        exit 1
+    }
 }
 
 build_project() {

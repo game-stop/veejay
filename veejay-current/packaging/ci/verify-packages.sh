@@ -125,6 +125,11 @@ for name in "${expected_packages[@]}"; do
     }
 done
 
+if [[ "$format" == arch && -n "${seen[veejay-cuda-build-provider]:-}" ]]; then
+    printf 'ERROR: temporary CUDA provider was copied into the Arch release assets\n' >&2
+    exit 1
+fi
+
 [[ -n "$server_package" ]] || {
     printf "ERROR: server package was not found in '%s'\n" "$package_dir" >&2
     exit 1
