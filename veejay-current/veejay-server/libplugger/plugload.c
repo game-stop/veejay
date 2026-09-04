@@ -72,7 +72,7 @@ static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
 static  int read_cfg = 0;
-static volatile g_veejay_omp_unlocked = 0;
+static volatile int g_veejay_omp_unlocked = 0;
 
 
 static struct {
