@@ -133,8 +133,12 @@ build_project() {
             "CUDA_HOME=${CUDA_HOME}"
             "CUDA_PATH=${CUDA_HOME}"
             "NVCC=${NVCC:-${CUDA_HOME}/bin/nvcc}"
+            "NVCC_PREPEND_FLAGS=-allow-unsupported-compiler"
             "LD_LIBRARY_PATH=${CUDA_LIBRARY_PATH:-${CUDA_HOME}/lib64}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         )
+        if [[ "$project" == veejay-server ]]; then
+            printf 'Arch nvJPEG: enabling nvcc compatibility override for the rolling host compiler\n'
+        fi
     fi
 
     rm -rf -- "$work_dir"
