@@ -204,7 +204,7 @@ jobs:
               set -euo pipefail
               dnf install -y \
                 alsa-lib-devel autoconf automake binutils cpio findutils fontconfig-devel \
-                freetype-devel gcc gcc-c++ gdk-pixbuf2-devel git-core glib2-devel \
+                freetype-devel gcc gcc-c++ gdk-pixbuf2-devel git-core glib2-devel gtk3-devel \
                 gzip jack-audio-connection-kit-devel libdv-devel \
                 libjpeg-turbo-devel liblo-devel libtool libunwind-devel \
                 libX11-devel libXinerama-devel libxml2-devel make \
