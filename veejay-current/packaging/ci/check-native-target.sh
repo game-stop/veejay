@@ -27,8 +27,15 @@ case "${release_target}:${arch_target}" in
         expected_host=aarch64
         compiler_flag=-mcpu=cortex-a72
         ;;
+    ppc64le-generic:generic)
+        expected_host=ppc64le
+        ;;
+    ppc64le-power8-altivec:power8)
+        expected_host=ppc64le
+        compiler_flag=-mcpu=power8
+        ;;
     *)
-        printf "ERROR: '%s' with arch target '%s' is not a standard GitHub-hosted release profile\n" \
+        printf "ERROR: '%s' with arch target '%s' is not a supported release profile\n" \
             "$release_target" "$arch_target" >&2
         exit 2
         ;;

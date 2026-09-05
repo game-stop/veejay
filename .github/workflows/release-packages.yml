@@ -66,16 +66,25 @@ jobs:
           printf 'release_tag=%s\n' "$RELEASE_TAG" >> "$GITHUB_OUTPUT"
           printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
 
-      - name: Load standard-runner build matrix
+      - name: Load release build matrix
         id: matrix
         run: |
           set -euo pipefail
           matrix=veejay-current/packaging/ci/release-matrix.json
           jq -e '
-            (.include | length == 20) and
-            ([.include[] | select(.variant == "standard")] | length == 10) and
+            (.include | length == 24) and
+            ([.include[] | select(.variant == "standard")] | length == 14) and
             ([.include[] | select(.variant == "nvjpeg")] | length == 10) and
-            ([.include[] | "\(.format):\(.suite_target)"] | unique | length == 20) and
+            ([.include[] | "\(.format):\(.suite_target)"] | unique | length == 24) and
+            ([.include[] | select(.build_mode == "qemu")] | length == 4) and
+            all(.include[] | select(.build_mode == "qemu");
+              .platform == "linux/ppc64le" and
+              .qemu_cpu == "power8" and
+              .runner == "ubuntu-24.04" and
+              .variant == "standard" and
+              (.release_target == "ppc64le-generic" or
+               .release_target == "ppc64le-power8-altivec")
+            ) and
             all(.include[];
               (.format == "deb" or .format == "rpm" or .format == "arch") and
               (.runner == "ubuntu-24.04" or .runner == "ubuntu-24.04-arm") and
@@ -110,7 +119,14 @@ jobs:
           WORKFLOW_SHA: ${{ github.workflow_sha }}
         run: git restore --source="$WORKFLOW_SHA" --worktree -- veejay-current/packaging/ci
 
+      - name: Set up QEMU for PowerPC64LE
+        if: matrix.build_mode == 'qemu'
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: ppc64le
+
       - name: Install Debian packaging tools
+        if: matrix.build_mode != 'qemu'
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
@@ -122,7 +138,8 @@ jobs:
         if: matrix.variant == 'nvjpeg'
         run: veejay-current/packaging/ci/install-cuda-toolkit.sh
 
-      - name: Build package suite
+      - name: Build package suite natively
+        if: matrix.build_mode != 'qemu'
         env:
           PACKAGE_BUILD_ENVIRONMENT: ${{ matrix.environment }}
           PACKAGE_VARIANT: ${{ matrix.variant }}
@@ -130,6 +147,37 @@ jobs:
         run: |
           veejay-current/packaging/ci/deb-suite-builder.sh \
             '${{ matrix.arch_target }}'
+
+      - name: Build package suite through QEMU
+        if: matrix.build_mode == 'qemu'
+        env:
+          ARCH_TARGET: ${{ matrix.arch_target }}
+          CONTAINER_PLATFORM: ${{ matrix.platform }}
+          PACKAGE_BUILD_ENVIRONMENT: ${{ matrix.environment }}
+          PACKAGE_VARIANT: ${{ matrix.variant }}
+          QEMU_CPU: ${{ matrix.qemu_cpu }}
+          RELEASE_TARGET: ${{ matrix.release_target }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --platform "$CONTAINER_PLATFORM" \
+            --env ARCH_TARGET \
+            --env PACKAGE_BUILD_ENVIRONMENT \
+            --env PACKAGE_VARIANT \
+            --env QEMU_CPU \
+            --env RELEASE_TARGET \
+            --volume "$GITHUB_WORKSPACE:/workspace" \
+            --workdir /workspace/veejay-current \
+            ubuntu:24.04 \
+            bash -lc '
+              set -euo pipefail
+              test "$(uname -m)" = ppc64le
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                build-essential curl devscripts equivs git gzip
+              packaging/ci/deb-suite-builder.sh "$ARCH_TARGET"
+            '
 
       - name: Upload package suite
         uses: actions/upload-artifact@v4
@@ -164,6 +212,12 @@ jobs:
             veejay-current/packaging/ci \
             veejay-current/veejay-server/veejay.spec
 
+      - name: Set up QEMU for PowerPC64LE
+        if: matrix.build_mode == 'qemu'
+        uses: docker/setup-qemu-action@v4
+        with:
+          platforms: ppc64le
+
       - name: Install NVIDIA CUDA build toolkit
         if: matrix.variant == 'nvjpeg'
         run: veejay-current/packaging/ci/install-cuda-toolkit.sh
@@ -171,12 +225,20 @@ jobs:
       - name: Build package suite in Fedora
         env:
           ARCH_TARGET: ${{ matrix.arch_target }}
+          CONTAINER_PLATFORM: ${{ matrix.platform || '' }}
           PACKAGE_BUILD_ENVIRONMENT: ${{ matrix.environment }}
           PACKAGE_VARIANT: ${{ matrix.variant }}
+          QEMU_CPU: ${{ matrix.qemu_cpu || '' }}
           RELEASE_TARGET: ${{ matrix.release_target }}
         run: |
           set -euo pipefail
           cuda_args=()
+          platform_args=()
+          qemu_args=()
+          if [[ -n "$CONTAINER_PLATFORM" ]]; then
+            platform_args+=(--platform "$CONTAINER_PLATFORM")
+            qemu_args+=(--env QEMU_CPU)
+          fi
           if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
             : "${CUDA_HOME:?CUDA_HOME was not exported by the toolkit installer}"
             : "${CUDA_LIBRARY_PATH:?CUDA_LIBRARY_PATH was not exported by the toolkit installer}"
@@ -192,16 +254,21 @@ jobs:
             )
           fi
           docker run --rm \
+            "${platform_args[@]}" \
             --env ARCH_TARGET \
             --env PACKAGE_BUILD_ENVIRONMENT \
             --env PACKAGE_VARIANT \
             --env RELEASE_TARGET \
+            "${qemu_args[@]}" \
             "${cuda_args[@]}" \
             --volume "$GITHUB_WORKSPACE:/workspace" \
             --workdir /workspace/veejay-current \
             fedora:43 \
             bash -lc '
               set -euo pipefail
+              if [[ -n "${QEMU_CPU:-}" ]]; then
+                test "$(uname -m)" = ppc64le
+              fi
               dnf install -y \
                 alsa-lib-devel autoconf automake binutils cpio findutils fontconfig-devel \
                 freetype-devel gcc gcc-c++ gdk-pixbuf2-devel git-core glib2-devel gtk3-devel \

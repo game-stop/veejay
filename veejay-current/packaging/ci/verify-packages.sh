@@ -48,7 +48,12 @@ find_packages() {
 
 case "$format" in
     deb)
-        expected_arch="${release_target%%-*}"
+        case "$release_target" in
+            amd64-*) expected_arch=amd64 ;;
+            arm64-*) expected_arch=arm64 ;;
+            ppc64le-*) expected_arch=ppc64el ;;
+            *) printf "ERROR: unsupported Debian release target '%s'\n" "$release_target" >&2; exit 2 ;;
+        esac
         expected_packages=(
             veejay-core veejay veejay-client veejay-utils
             veejay-eidolon veejay-director veejay-puredata
@@ -60,6 +65,7 @@ case "$format" in
         case "$release_target" in
             amd64-*) expected_arch=x86_64 ;;
             arm64-*) expected_arch=aarch64 ;;
+            ppc64le-*) expected_arch=ppc64le ;;
             *) printf "ERROR: unsupported RPM release target '%s'\n" "$release_target" >&2; exit 2 ;;
         esac
         expected_packages=(

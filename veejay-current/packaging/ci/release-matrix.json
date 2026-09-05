@@ -37,6 +37,30 @@
       "environment": "ubuntu-24.04-arm"
     },
     {
+      "format": "deb",
+      "release_target": "ppc64le-generic",
+      "suite_target": "ppc64le-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "ubuntu-24.04+qemu-ppc64le",
+      "build_mode": "qemu",
+      "platform": "linux/ppc64le",
+      "qemu_cpu": "power8"
+    },
+    {
+      "format": "deb",
+      "release_target": "ppc64le-power8-altivec",
+      "suite_target": "ppc64le-power8-altivec",
+      "arch_target": "power8",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "ubuntu-24.04+qemu-ppc64le",
+      "build_mode": "qemu",
+      "platform": "linux/ppc64le",
+      "qemu_cpu": "power8"
+    },
+    {
       "format": "rpm",
       "release_target": "amd64-generic",
       "suite_target": "amd64-generic",
@@ -71,6 +95,30 @@
       "variant": "standard",
       "runner": "ubuntu-24.04-arm",
       "environment": "fedora-43"
+    },
+    {
+      "format": "rpm",
+      "release_target": "ppc64le-generic",
+      "suite_target": "ppc64le-generic",
+      "arch_target": "generic",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "fedora-43+qemu-ppc64le",
+      "build_mode": "qemu",
+      "platform": "linux/ppc64le",
+      "qemu_cpu": "power8"
+    },
+    {
+      "format": "rpm",
+      "release_target": "ppc64le-power8-altivec",
+      "suite_target": "ppc64le-power8-altivec",
+      "arch_target": "power8",
+      "variant": "standard",
+      "runner": "ubuntu-24.04",
+      "environment": "fedora-43+qemu-ppc64le",
+      "build_mode": "qemu",
+      "platform": "linux/ppc64le",
+      "qemu_cpu": "power8"
     },
     {
       "format": "arch",
