@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="${VEEJAY_SOURCE_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
-REPO_ROOT="$(git -c safe.directory="${ROOT_DIR}/.." -C "$ROOT_DIR" rev-parse --show-toplevel)"
+REPO_HINT="$(cd -- "${ROOT_DIR}/.." && pwd -P)"
+REPO_ROOT="$(git -c safe.directory="$REPO_HINT" -C "$ROOT_DIR" rev-parse --show-toplevel)"
 
 [[ $# -eq 5 ]] || {
     printf 'usage: %s FORMAT RELEASE_TARGET ARCH_TARGET VARIANT PACKAGE_DIR\n' "$0" >&2
