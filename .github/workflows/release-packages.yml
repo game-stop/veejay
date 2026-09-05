@@ -79,7 +79,7 @@ jobs:
             ([.include[] | select(.build_mode == "qemu")] | length == 4) and
             all(.include[] | select(.build_mode == "qemu");
               .platform == "linux/ppc64le" and
-              .qemu_cpu == "power8" and
+              .qemu_cpu == "power9" and
               .runner == "ubuntu-24.04" and
               .variant == "standard" and
               (.release_target == "ppc64le-generic" or
@@ -161,6 +161,7 @@ jobs:
           set -euo pipefail
           docker run --rm \
             --platform "$CONTAINER_PLATFORM" \
+            --ulimit core=0 \
             --env ARCH_TARGET \
             --env PACKAGE_BUILD_ENVIRONMENT \
             --env PACKAGE_VARIANT \
@@ -237,7 +238,7 @@ jobs:
           qemu_args=()
           if [[ -n "$CONTAINER_PLATFORM" ]]; then
             platform_args+=(--platform "$CONTAINER_PLATFORM")
-            qemu_args+=(--env QEMU_CPU)
+            qemu_args+=(--ulimit core=0 --env QEMU_CPU)
           fi
           if [[ "$PACKAGE_VARIANT" == nvjpeg ]]; then
             : "${CUDA_HOME:?CUDA_HOME was not exported by the toolkit installer}"

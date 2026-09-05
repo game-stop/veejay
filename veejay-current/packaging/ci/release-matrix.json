@@ -46,7 +46,7 @@
       "environment": "ubuntu-24.04+qemu-ppc64le",
       "build_mode": "qemu",
       "platform": "linux/ppc64le",
-      "qemu_cpu": "power8"
+      "qemu_cpu": "power9"
     },
     {
       "format": "deb",
@@ -58,7 +58,7 @@
       "environment": "ubuntu-24.04+qemu-ppc64le",
       "build_mode": "qemu",
       "platform": "linux/ppc64le",
-      "qemu_cpu": "power8"
+      "qemu_cpu": "power9"
     },
     {
       "format": "rpm",
@@ -106,7 +106,7 @@
       "environment": "fedora-43+qemu-ppc64le",
       "build_mode": "qemu",
       "platform": "linux/ppc64le",
-      "qemu_cpu": "power8"
+      "qemu_cpu": "power9"
     },
     {
       "format": "rpm",
@@ -118,7 +118,7 @@
       "environment": "fedora-43+qemu-ppc64le",
       "build_mode": "qemu",
       "platform": "linux/ppc64le",
-      "qemu_cpu": "power8"
+      "qemu_cpu": "power9"
     },
     {
       "format": "arch",
