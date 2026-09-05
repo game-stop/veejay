@@ -2,7 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="${VEEJAY_SOURCE_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)}"
-REPO_ROOT="$(git -c safe.directory="${ROOT_DIR}/.." -C "$ROOT_DIR" rev-parse --show-toplevel)"
+REPO_HINT="$(cd -- "${ROOT_DIR}/.." && pwd -P)"
+REPO_ROOT="$(git -c safe.directory="$REPO_HINT" -C "$ROOT_DIR" rev-parse --show-toplevel)"
 SOURCE_COMMIT="${SOURCE_COMMIT:-HEAD}"
 VERSION="$("${ROOT_DIR}/packaging/ci/release-version.sh" check)"
 SOURCE_PREFIX="$(realpath --relative-to="$REPO_ROOT" "$ROOT_DIR")"
